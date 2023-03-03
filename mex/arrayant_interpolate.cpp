@@ -16,6 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "mex.h"
+#include "quadriga_lib.hpp"
 #include "qd_arrayant_interpolate.hpp"
 
 using namespace std;
@@ -273,13 +274,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Call private library function
     if (use_single)
-        qd_arrayant_interpolate(&arrayant_single,
+        qd_arrayant_interpolate(&arrayant_single.e_theta_re, &arrayant_single.e_theta_im,
+                                &arrayant_single.e_phi_re, &arrayant_single.e_phi_im,
+                                &arrayant_single.azimuth_grid, &arrayant_single.elevation_grid,
                                 &azimuth_single, &elevation_single,
                                 &i_element, &orientation_single, &element_pos_single,
                                 &V_re_single, &V_im_single, &H_re_single, &H_im_single, &dist_single,
                                 &azimuth_loc_single, &elevation_loc_single);
     else
-        qd_arrayant_interpolate(&arrayant_double,
+        qd_arrayant_interpolate(&arrayant_double.e_theta_re, &arrayant_double.e_theta_im,
+                                &arrayant_double.e_phi_re, &arrayant_double.e_phi_im,
+                                &arrayant_double.azimuth_grid, &arrayant_double.elevation_grid,
                                 &azimuth_double, &elevation_double,
                                 &i_element, &orientation_double, &element_pos_double,
                                 &V_re_double, &V_im_double, &H_re_double, &H_im_double, &dist_double,

@@ -29,14 +29,16 @@ dataType signum(dataType val)
 }
 
 template <typename dataType>
-void qd_arrayant_interpolate(const quadriga_lib::arrayant<dataType> *ant,
-                              const arma::Mat<dataType> *azimuth, const arma::Mat<dataType> *elevation,
-                              const arma::Col<unsigned> *i_element, const arma::Cube<dataType> *orientation,
-                              const arma::Mat<dataType> *element_pos,
-                              arma::Mat<dataType> *V_re, arma::Mat<dataType> *V_im,
-                              arma::Mat<dataType> *H_re, arma::Mat<dataType> *H_im,
-                              arma::Mat<dataType> *dist,
-                              arma::Mat<dataType> *azimuth_loc, arma::Mat<dataType> *elevation_loc)
+void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma::Cube<dataType> *e_theta_im,
+                             const arma::Cube<dataType> *e_phi_re, const arma::Cube<dataType> *e_phi_im,
+                             const arma::Col<dataType> *azimuth_grid, const arma::Col<dataType> *elevation_grid,
+                             const arma::Mat<dataType> *azimuth, const arma::Mat<dataType> *elevation,
+                             const arma::Col<unsigned> *i_element, const arma::Cube<dataType> *orientation,
+                             const arma::Mat<dataType> *element_pos,
+                             arma::Mat<dataType> *V_re, arma::Mat<dataType> *V_im,
+                             arma::Mat<dataType> *H_re, arma::Mat<dataType> *H_im,
+                             arma::Mat<dataType> *dist,
+                             arma::Mat<dataType> *azimuth_loc, arma::Mat<dataType> *elevation_loc)
 {
     // Inputs:
     // ant              ARRAYANT object containing electric field description           Size [n_elevation, n_azimuth, n_elements]
@@ -58,8 +60,8 @@ void qd_arrayant_interpolate(const quadriga_lib::arrayant<dataType> *ant,
     // Note: This function is not intended to be publicly accessible. There is no input validation.
     // Incorrectly formatted arguments may lead to undefined behavior or segmentation faults.
 
-    const unsigned n_elevation = ant->e_theta_re.n_rows;        // Number of elevation angles in the pattern
-    const unsigned n_azimuth = ant->e_theta_re.n_cols;          // Number of azimuth angles in the pattern
+    const unsigned n_elevation = e_theta_re->n_rows;            // Number of elevation angles in the pattern
+    const unsigned n_azimuth = e_theta_re->n_cols;              // Number of azimuth angles in the pattern
     const unsigned n_pattern_samples = n_azimuth * n_elevation; // Number of samples in the pattern
     const unsigned n_out = i_element->n_elem;                   // Number of elements in the output
     const unsigned n_ang = azimuth->n_cols;                     // Number of angles to be interpolated
@@ -77,11 +79,11 @@ void qd_arrayant_interpolate(const quadriga_lib::arrayant<dataType> *ant,
     R.reset();
 
     // Obtain pointers for direct memory access (faster)
-    const unsigned *p_i_element = i_element->memptr();                                             // Elements
-    const dataType *p_phi_re = ant->e_phi_re.memptr(), *p_phi_im = ant->e_phi_im.memptr();         // Vertical pattern
-    const dataType *p_theta_re = ant->e_theta_re.memptr(), *p_theta_im = ant->e_theta_im.memptr(); // Horizontal pattern
-    const dataType *p_az_global = azimuth->memptr(), *p_el_global = elevation->memptr();           // Angles
-    const dataType *p_azimuth_grid = ant->azimuth_grid.memptr(), *p_elevation_grid = ant->elevation_grid.memptr();
+    const unsigned *p_i_element = i_element->memptr();                                     // Elements
+    const dataType *p_theta_re = e_theta_re->memptr(), *p_theta_im = e_theta_im->memptr(); // Vertical pattern
+    const dataType *p_phi_re = e_phi_re->memptr(), *p_phi_im = e_phi_im->memptr();         // Horizontal pattern
+    const dataType *p_az_global = azimuth->memptr(), *p_el_global = elevation->memptr();   // Angles
+    const dataType *p_azimuth_grid = azimuth_grid->memptr(), *p_elevation_grid = elevation_grid->memptr();
     const dataType *p_element_pos = element_pos->memptr();
     dataType *p_v_re = V_re->memptr(), *p_v_im = V_im->memptr(), *p_h_re = H_re->memptr(), *p_h_im = H_im->memptr();
 
@@ -338,20 +340,24 @@ void qd_arrayant_interpolate(const quadriga_lib::arrayant<dataType> *ant,
 }
 
 // Declare templates
-template void qd_arrayant_interpolate(const quadriga_lib::arrayant<float> *ant,
-                                       const arma::Mat<float> *azimuth, const arma::Mat<float> *elevation,
-                                       const arma::Col<unsigned> *i_element, const arma::Cube<float> *orientation,
-                                       const arma::Mat<float> *element_pos,
-                                       arma::Mat<float> *V_re, arma::Mat<float> *V_im,
-                                       arma::Mat<float> *H_re, arma::Mat<float> *H_im,
-                                       arma::Mat<float> *dist,
-                                       arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc);
+template void qd_arrayant_interpolate(const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,
+                                      const arma::Cube<float> *e_phi_re, const arma::Cube<float> *e_phi_im,
+                                      const arma::Col<float> *azimuth_grid, const arma::Col<float> *elevation_grid,
+                                      const arma::Mat<float> *azimuth, const arma::Mat<float> *elevation,
+                                      const arma::Col<unsigned> *i_element, const arma::Cube<float> *orientation,
+                                      const arma::Mat<float> *element_pos,
+                                      arma::Mat<float> *V_re, arma::Mat<float> *V_im,
+                                      arma::Mat<float> *H_re, arma::Mat<float> *H_im,
+                                      arma::Mat<float> *dist,
+                                      arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc);
 
-template void qd_arrayant_interpolate(const quadriga_lib::arrayant<double> *ant,
-                                       const arma::Mat<double> *azimuth, const arma::Mat<double> *elevation,
-                                       const arma::Col<unsigned> *i_element, const arma::Cube<double> *orientation,
-                                       const arma::Mat<double> *element_pos,
-                                       arma::Mat<double> *V_re, arma::Mat<double> *V_im,
-                                       arma::Mat<double> *H_re, arma::Mat<double> *H_im,
-                                       arma::Mat<double> *dist,
-                                       arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc);
+template void qd_arrayant_interpolate(const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
+                                      const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,
+                                      const arma::Col<double> *azimuth_grid, const arma::Col<double> *elevation_grid,
+                                      const arma::Mat<double> *azimuth, const arma::Mat<double> *elevation,
+                                      const arma::Col<unsigned> *i_element, const arma::Cube<double> *orientation,
+                                      const arma::Mat<double> *element_pos,
+                                      arma::Mat<double> *V_re, arma::Mat<double> *V_im,
+                                      arma::Mat<double> *H_re, arma::Mat<double> *H_im,
+                                      arma::Mat<double> *dist,
+                                      arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc);
