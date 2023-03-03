@@ -15,8 +15,9 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_lib.hpp"
 #include <stdexcept>
+#include "quadriga_lib.hpp"
+#include "qd_arrayant_qdant.hpp"
 
 using namespace std;
 
@@ -33,6 +34,27 @@ std::string quadriga_lib::quadriga_lib_version()
     str.replace(found, 1, ".");
     str = str.substr(1, str.length());
     return str;
+}
+
+// ARRAYANT Constructor : Read from file
+template <typename dataType>
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::arrayant(std::string qdant_file_name, unsigned id)
+{
+    arma::Mat<unsigned> layout;
+
+    // Call private function to read the data from file
+    std::string error_message = qd_arrayant_qdant_read(qdant_file_name, id,
+                                                       &name, &e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
+                                                       &azimuth_grid, &elevation_grid, &element_pos,
+                                                       &coupling_re, &coupling_im, &center_frequency, &layout);
+    // Throw parsing errors
+    if (error_message.length() != 0)
+        throw invalid_argument(error_message.c_str());
+
+    // Throw validation errors
+    error_message = validate();
+    if (error_message.length() != 0)
+        throw invalid_argument(error_message.c_str());
 }
 
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets

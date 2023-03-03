@@ -21,7 +21,7 @@
 #include <armadillo>
 #include <string>
 
-#define QUADRIGA_LIB_VERSION v0_1_2
+#define QUADRIGA_LIB_VERSION v0_1_3
 
 namespace quadriga_lib
 {
@@ -34,23 +34,25 @@ namespace quadriga_lib
         class arrayant
         {
         public:
-            std::string name = "empty";                        // Name of the array antenna object
-            arma::Cube<dataType> e_theta_re;                   // Horizontal component of the electric field, real part
-            arma::Cube<dataType> e_theta_im;                   // Horizontal component of the electric field, imaginary part
-            arma::Cube<dataType> e_phi_re;                     // Vertical component of the electric field, real part
-            arma::Cube<dataType> e_phi_im;                     // Vertical component of the electric field, imaginary part
-            arma::Col<dataType> azimuth_grid;                  // Azimuth angles in pattern (theta) in [rad]
-            arma::Col<dataType> elevation_grid;                // Elevation angles in pattern (phi) in [rad]
-            arma::Mat<dataType> element_pos;                   // Element positions (optional)
-            arma::Mat<dataType> coupling_re;                   // Coupling matrix, real part (optional)
-            arma::Mat<dataType> coupling_im;                   // Coupling matrix, imaginary part (optional)
-            dataType center_frequency = dataType(299792448.0); // Center frequency in [Hz] (optional)
-            int valid = -1;                                    // Indicator of data integrity (-1 = unknown, 0 = ERROR, 1 = OK)
-            unsigned n_elevation();                            // Number of elevation angles
-            unsigned n_azimuth();                              // Number of azimuth angles
-            unsigned n_elements();                             // Number of antenna elements
-            unsigned n_ports();                                // Number of ports (after coupling of elements)
-            std::string validate();                            // Validates integrity, returns error message and sets 'valid'
+            std::string name = "empty";                         // Name of the array antenna object
+            arma::Cube<dataType> e_theta_re;                    // Horizontal component of the electric field, real part
+            arma::Cube<dataType> e_theta_im;                    // Horizontal component of the electric field, imaginary part
+            arma::Cube<dataType> e_phi_re;                      // Vertical component of the electric field, real part
+            arma::Cube<dataType> e_phi_im;                      // Vertical component of the electric field, imaginary part
+            arma::Col<dataType> azimuth_grid;                   // Azimuth angles in pattern (theta) in [rad]
+            arma::Col<dataType> elevation_grid;                 // Elevation angles in pattern (phi) in [rad]
+            arma::Mat<dataType> element_pos;                    // Element positions (optional)
+            arma::Mat<dataType> coupling_re;                    // Coupling matrix, real part (optional)
+            arma::Mat<dataType> coupling_im;                    // Coupling matrix, imaginary part (optional)
+            dataType center_frequency = dataType(299792448.0);  // Center frequency in [Hz] (optional)
+            int valid = -1;                                     // Indicator of data integrity (-1 = unknown, 0 = ERROR, 1 = OK)
+            arrayant(){};                                       // Default constructor
+            arrayant(std::string qdant_file_name, unsigned id); // Read array antenna object from QDANT file
+            unsigned n_elevation();                             // Number of elevation angles
+            unsigned n_azimuth();                               // Number of azimuth angles
+            unsigned n_elements();                              // Number of antenna elements
+            unsigned n_ports();                                 // Number of ports (after coupling of elements)
+            std::string validate();                             // Validates integrity, returns error message and sets 'valid'
         };
     }
 }

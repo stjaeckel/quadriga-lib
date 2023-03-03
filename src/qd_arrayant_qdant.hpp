@@ -18,9 +18,17 @@
 #ifndef qd_arrayant_qdant_H
 #define qd_arrayant_qdant_H
 
-#include "quadriga_lib.hpp"
+#include <armadillo>
+#include <string>
 
 template <typename dataType> // float or double
-std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_lib::arrayant<dataType> *ant, arma::Mat<unsigned> *layout);
-
+std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+                                   std::string *name,
+                                   arma::Cube<dataType> *e_theta_re, arma::Cube<dataType> *e_theta_im,
+                                   arma::Cube<dataType> *e_phi_re, arma::Cube<dataType> *e_phi_im,
+                                   arma::Col<dataType> *azimuth_grid, arma::Col<dataType> *elevation_grid,
+                                   arma::Mat<dataType> *element_pos,
+                                   arma::Mat<dataType> *coupling_re, arma::Mat<dataType> *coupling_im,
+                                   dataType *center_frequency,
+                                   arma::Mat<unsigned> *layout);
 #endif
