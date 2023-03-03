@@ -25,7 +25,15 @@
 using namespace std;
 
 template <typename dataType> // float or double
-std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_lib::arrayant<dataType> *ant, arma::Mat<unsigned> *layout)
+std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+                                   std::string *name,
+                                   arma::Cube<dataType> *e_theta_re, arma::Cube<dataType> *e_theta_im,
+                                   arma::Cube<dataType> *e_phi_re, arma::Cube<dataType> *e_phi_im,
+                                   arma::Col<dataType> *azimuth_grid, arma::Col<dataType> *elevation_grid,
+                                   arma::Mat<dataType> *element_pos,
+                                   arma::Mat<dataType> *coupling_re, arma::Mat<dataType> *coupling_im,
+                                   dataType *center_frequency,
+                                   arma::Mat<unsigned> *layout)
 {
     pugi::xml_document doc;
     pugi::xml_parse_result result = doc.load_file(fn.c_str());
@@ -44,11 +52,11 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
     pugi::xml_attribute attr = node_qdant.first_attribute();
     if (!attr.empty())
     {
-        std::string name = attr.name();
-        if (name.length() == 5 && name == "xmlns")
+        std::string namespc = attr.name();
+        if (namespc.length() == 5 && namespc == "xmlns")
             pfx = "";
-        else if (name.substr(0, 6) == "xmlns:")
-            pfx = name.substr(6) + ":";
+        else if (namespc.substr(0, 6) == "xmlns:")
+            pfx = namespc.substr(6) + ":";
         else
             return "File format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
     }
@@ -63,7 +71,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
     else
     {
         std::string s = node.text().as_string();
-        std::replace( s.begin(), s.end(), ' ', ';'); // replace all ' ' to ';'
+        std::replace(s.begin(), s.end(), ' ', ';'); // replace all ' ' to ';'
         arma::Mat<unsigned> tmp = arma::Mat<unsigned>(s);
         *layout = tmp.t();
     }
@@ -81,12 +89,12 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
     // Read name
     node_name = pfx + "name";
     node = node_arrayant.child(node_name.c_str());
-    ant->name = node.empty() ? "unknown" : node.text().as_string();
+    *name = node.empty() ? "unknown" : node.text().as_string();
 
     // Read center frequency
     node_name = pfx + "CenterFrequency";
     node = node_arrayant.child(node_name.c_str());
-    ant->center_frequency = node.empty() ? dataType(299792448.0) : dataType(node.text().as_double());
+    *center_frequency = node.empty() ? dataType(299792448.0) : dataType(node.text().as_double());
 
     // Read the number of elements
     node_name = pfx + "NoElements";
@@ -97,13 +105,13 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
     node_name = pfx + "ElementPosition";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
-        ant->element_pos = arma::Mat<dataType>(3, n_elements, arma::fill::zeros);
+        *element_pos = arma::Mat<dataType>(3, n_elements, arma::fill::zeros);
     else
     {
         arma::Col<dataType> tmp = arma::Col<dataType>(node.text().as_string());
         if (tmp.n_elem != 3 * n_elements)
             return "Number of entries in 'ElementPosition' does not match the number of antenna elements.";
-        ant->element_pos = arma::reshape(tmp, 3, n_elements);
+        *element_pos = arma::reshape(tmp, 3, n_elements);
     }
 
     // Read the elevation grid
@@ -112,51 +120,51 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
         return "Array antenna object must have an 'ElevationGrid'.";
-    ant->elevation_grid = arma::Col<dataType>(node.text().as_string()) * deg2rad;
-    unsigned n_elevation = unsigned(ant->elevation_grid.n_elem);
+    *elevation_grid = arma::Col<dataType>(node.text().as_string()) * deg2rad;
+    unsigned n_elevation = unsigned(elevation_grid->n_elem);
 
     // Read the azimuth grid
     node_name = pfx + "AzimuthGrid";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
         return "Array antenna object must have an 'AzimuthGrid'.";
-    ant->azimuth_grid = arma::Col<dataType>(node.text().as_string()) * deg2rad;
-    unsigned n_azimuth = unsigned(ant->azimuth_grid.n_elem);
+    *azimuth_grid = arma::Col<dataType>(node.text().as_string()) * deg2rad;
+    unsigned n_azimuth = unsigned(azimuth_grid->n_elem);
 
     // Read the coupling matrix
     node_name = pfx + "CouplingAbs";
     node = node_arrayant.child(node_name.c_str());
     unsigned n_ports = n_elements;
     if (node.empty())
-        ant->coupling_re = arma::Mat<dataType>(n_elements, n_elements, arma::fill::eye);
+        *coupling_re = arma::Mat<dataType>(n_elements, n_elements, arma::fill::eye);
     else
     {
         arma::Col<dataType> tmp = arma::Col<dataType>(node.text().as_string());
         if (tmp.n_elem % n_elements != 0)
             return "'CouplingAbs' must be a matrix with number of rows equal to number of elements";
         n_ports = tmp.n_elem / n_elements;
-        ant->coupling_re = arma::reshape(tmp, n_elements, n_ports);
+        *coupling_re = arma::reshape(tmp, n_elements, n_ports);
     }
 
     node_name = pfx + "CouplingPhase";
     node = node_arrayant.child(node_name.c_str());
     if (node.empty())
-        ant->coupling_im = arma::Mat<dataType>(n_elements, n_ports, arma::fill::zeros);
+        *coupling_im = arma::Mat<dataType>(n_elements, n_ports, arma::fill::zeros);
     else
     {
         arma::Col<dataType> tmp = arma::Col<dataType>(node.text().as_string()) * deg2rad;
         if (tmp.n_elem != n_elements * n_ports)
             return "Number of entries in 'CouplingPhase' must match number of entries in 'CouplingAbs'.";
         arma::Mat<dataType> tmp2 = arma::reshape(tmp, n_elements, n_ports);
-        ant->coupling_im = ant->coupling_re % sin(tmp2);
-        ant->coupling_re = ant->coupling_re % cos(tmp2);
+        *coupling_im = *coupling_re % sin(tmp2);
+        *coupling_re = *coupling_re % cos(tmp2);
     }
 
     // Read the antenna pattern
-    ant->e_theta_re = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
-    ant->e_theta_im = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
-    ant->e_phi_re = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
-    ant->e_phi_im = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
+    *e_theta_re = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
+    *e_theta_im = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
+    *e_phi_re = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
+    *e_phi_im = arma::Cube<dataType>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
     for (unsigned el = 0; el < n_elements; el++)
     {
@@ -192,11 +200,11 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
                 arma::Mat<dataType> I = arma::reshape(tmp, n_azimuth, n_elevation);
                 I = I.t() * deg2rad;
 
-                ant->e_theta_re.slice(el) = R % cos(I);
-                ant->e_theta_im.slice(el) = R % sin(I);
+                e_theta_re->slice(el) = R % cos(I);
+                e_theta_im->slice(el) = R % sin(I);
             }
             else
-                ant->e_theta_re.slice(el) = R;
+                e_theta_re->slice(el) = R;
         }
 
         // Read magnitude if Horizontal Component
@@ -230,15 +238,34 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_
                 arma::Mat<dataType> I = arma::reshape(tmp, n_azimuth, n_elevation);
                 I = I.t() * deg2rad;
 
-                ant->e_phi_re.slice(el) = R % cos(I);
-                ant->e_phi_im.slice(el) = R % sin(I);
+                e_phi_re->slice(el) = R % cos(I);
+                e_phi_im->slice(el) = R % sin(I);
             }
             else
-                ant->e_phi_re.slice(el) = R;
+                e_phi_re->slice(el) = R;
         }
     }
 
-    return ant->validate();
+    return "";
 }
-template std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_lib::arrayant<float> *ant, arma::Mat<unsigned> *layout);
-template std::string qd_arrayant_qdant_read(const std::string fn, const int id, quadriga_lib::arrayant<double> *ant, arma::Mat<unsigned> *layout);
+
+// Declare templates
+template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+                                            std::string *name,
+                                            arma::Cube<float> *e_theta_re, arma::Cube<float> *e_theta_im,
+                                            arma::Cube<float> *e_phi_re, arma::Cube<float> *e_phi_im,
+                                            arma::Col<float> *azimuth_grid, arma::Col<float> *elevation_grid,
+                                            arma::Mat<float> *element_pos,
+                                            arma::Mat<float> *coupling_re, arma::Mat<float> *coupling_im,
+                                            float *center_frequency,
+                                            arma::Mat<unsigned> *layout);
+
+template std::string qd_arrayant_qdant_read(const std::string fn, const int id,
+                                            std::string *name,
+                                            arma::Cube<double> *e_theta_re, arma::Cube<double> *e_theta_im,
+                                            arma::Cube<double> *e_phi_re, arma::Cube<double> *e_phi_im,
+                                            arma::Col<double> *azimuth_grid, arma::Col<double> *elevation_grid,
+                                            arma::Mat<double> *element_pos,
+                                            arma::Mat<double> *coupling_re, arma::Mat<double> *coupling_im,
+                                            double *center_frequency,
+                                            arma::Mat<unsigned> *layout);

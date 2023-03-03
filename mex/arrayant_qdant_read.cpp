@@ -16,8 +16,9 @@
 // ------------------------------------------------------------------------
 
 #include "mex.h"
+#include "quadriga_lib.hpp"
 #include "qd_arrayant_qdant.hpp"
-#include <cstring>
+#include <cstring> // For memcopy
 
 using namespace std;
 
@@ -101,9 +102,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     std::string error_message = "";
     if (use_single)
-        error_message = qd_arrayant_qdant_read(fn, id, &arrayant_single, &layout);
+        error_message = qd_arrayant_qdant_read(fn, id,
+                                               &arrayant_single.name,
+                                               &arrayant_single.e_theta_re, &arrayant_single.e_theta_im,
+                                               &arrayant_single.e_phi_re, &arrayant_single.e_phi_im,
+                                               &arrayant_single.azimuth_grid, &arrayant_single.elevation_grid,
+                                               &arrayant_single.element_pos,
+                                               &arrayant_single.coupling_re, &arrayant_single.coupling_im,
+                                               &arrayant_single.center_frequency, &layout);
     else
-        error_message = qd_arrayant_qdant_read(fn, id, &arrayant_double, &layout);
+        error_message = qd_arrayant_qdant_read(fn, id,
+                                               &arrayant_double.name,
+                                               &arrayant_double.e_theta_re, &arrayant_double.e_theta_im,
+                                               &arrayant_double.e_phi_re, &arrayant_double.e_phi_im,
+                                               &arrayant_double.azimuth_grid, &arrayant_double.elevation_grid,
+                                               &arrayant_double.element_pos,
+                                               &arrayant_double.coupling_re, &arrayant_double.coupling_im,
+                                               &arrayant_double.center_frequency, &layout);
 
     if (error_message.length() != 0)
         mexErrMsgIdAndTxt("quadriga_lib:qdant_read:error", error_message.c_str());
