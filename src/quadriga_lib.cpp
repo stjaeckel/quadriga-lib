@@ -37,16 +37,14 @@ std::string quadriga_lib::quadriga_lib_version()
 }
 
 // ARRAYANT Constructor : Read from file
-template <typename dataType>
-quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::arrayant(std::string qdant_file_name, unsigned id)
+template <typename dtype>
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(string qdant_file_name, unsigned id, Mat<unsigned> *layout)
 {
-    arma::Mat<unsigned> layout;
-
     // Call private function to read the data from file
     std::string error_message = qd_arrayant_qdant_read(qdant_file_name, id,
                                                        &name, &e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                                                        &azimuth_grid, &elevation_grid, &element_pos,
-                                                       &coupling_re, &coupling_im, &center_frequency, &layout);
+                                                       &coupling_re, &coupling_im, &center_frequency, layout);
     // Throw parsing errors
     if (error_message.length() != 0)
         throw invalid_argument(error_message.c_str());
@@ -57,24 +55,32 @@ quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::arrayant(std::string qda
         throw invalid_argument(error_message.c_str());
 }
 
+// ARRAYANT Constructor : Read from file
+template <typename dtype>
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(string qdant_file_name, unsigned id)
+{
+    Mat<unsigned> layout;
+    *this = quadriga_lib::arrayant<dtype>(qdant_file_name, id, &layout);
+}
+
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
-template <typename dataType>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::n_elevation()
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation()
 {
     return unsigned(e_theta_re.n_rows);
 }
-template <typename dataType>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::n_azimuth()
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_azimuth()
 {
     return unsigned(e_theta_re.n_cols);
 }
-template <typename dataType>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::n_elements()
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elements()
 {
     return unsigned(e_theta_re.n_slices);
 }
-template <typename dataType>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::n_ports()
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports()
 {
     if (coupling_re.empty() && coupling_im.empty())
         return unsigned(e_theta_re.n_slices);
@@ -85,8 +91,8 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::n_ports()
 }
 
 // ARRAYANT METHOD : Validates correctness of the member functions
-template <typename dataType>
-std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::validate()
+template <typename dtype>
+string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
 {
     valid = 0;
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
@@ -112,15 +118,15 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dataType>::validate()
         return "Number of elements in 'elevation_grid' does not match number of rows in pattern data.";
 
     int error_code = 0;
-    auto fnc_az = [&error_code](dataType &val)
+    auto fnc_az = [&error_code](dtype &val)
     {
-        if (val < dataType(-3.1415930) || val > dataType(3.1415930))
+        if (val < dtype(-3.1415930) || val > dtype(3.1415930))
             error_code = 5;
     };
     azimuth_grid.for_each(fnc_az);
-    auto fnc_el = [&error_code](dataType &val)
+    auto fnc_el = [&error_code](dtype &val)
     {
-        if (val < dataType(-1.5707965) || val > dataType(1.5707965))
+        if (val < dtype(-1.5707965) || val > dtype(1.5707965))
             error_code = 6;
     };
     elevation_grid.for_each(fnc_el);

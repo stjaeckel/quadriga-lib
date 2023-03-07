@@ -62,13 +62,27 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     }
 
     std::string node_name, attr_name, attr_value;
+    pugi::xml_node node, node_arrayant;
 
     // Read the layout filed
     node_name = pfx + "layout";
-    pugi::xml_node node = node_qdant.child(node_name.c_str());
-    if (node.empty())
-        *layout = arma::Mat<unsigned>(1, 1, arma::fill::ones);
-    else
+    node = node_qdant.child(node_name.c_str());
+    if (node.empty()) // Parse all arrayant nodes and extract id to build layout
+    {
+        arma::Mat<unsigned> tmp;
+        node_name = pfx + "arrayant";
+        for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
+        {
+            pugi::xml_attribute attr = node_arrayant.first_attribute();
+            std::string attr_value = attr.value();
+            attr_value = attr_value.empty() && tmp.empty() ? "1" : attr_value;
+            attr_value = attr_value.empty() ? "0" : attr_value;
+            tmp.reshape(1, tmp.n_elem + 1);
+            tmp(0, tmp.n_elem - 1) = std::stoi(attr_value);
+        }
+        *layout = tmp;
+    }
+    else // Read the layout from the file
     {
         std::string s = node.text().as_string();
         std::replace(s.begin(), s.end(), ' ', ';'); // replace all ' ' to ';'
@@ -80,7 +94,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     node_name = pfx + "arrayant";
     attr_name = "id";
     attr_value = std::to_string(id);
-    pugi::xml_node node_arrayant = node_qdant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
+    node_arrayant = node_qdant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
     if (node_arrayant.empty() && id == 1)
         node_arrayant = node_qdant.child(node_name.c_str());
     if (node_arrayant.empty())

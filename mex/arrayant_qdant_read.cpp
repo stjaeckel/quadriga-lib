@@ -17,7 +17,6 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "qd_arrayant_qdant.hpp"
 #include <cstring> // For memcopy
 
 using namespace std;
@@ -27,7 +26,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Inputs:
     //  0 - fn              Filename of the QDANT file
     //  1 - id              ID if the antenna to be read from the file (optional, default: 1)
-    //  2 - use_single      Indicator if results should be return in single precision (optional, default: 0, double)
+    //  2 - use_single      Indicator if results should be returned in single precision (optional, default: 0, double)
 
     // Outputs:
     //  0 - e_theta_re      Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
@@ -99,29 +98,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     arma::Mat<unsigned> layout;
-
-    std::string error_message = "";
     if (use_single)
-        error_message = qd_arrayant_qdant_read(fn, id,
-                                               &arrayant_single.name,
-                                               &arrayant_single.e_theta_re, &arrayant_single.e_theta_im,
-                                               &arrayant_single.e_phi_re, &arrayant_single.e_phi_im,
-                                               &arrayant_single.azimuth_grid, &arrayant_single.elevation_grid,
-                                               &arrayant_single.element_pos,
-                                               &arrayant_single.coupling_re, &arrayant_single.coupling_im,
-                                               &arrayant_single.center_frequency, &layout);
+        arrayant_single = quadriga_lib::arrayant<float>(fn, id, &layout);
     else
-        error_message = qd_arrayant_qdant_read(fn, id,
-                                               &arrayant_double.name,
-                                               &arrayant_double.e_theta_re, &arrayant_double.e_theta_im,
-                                               &arrayant_double.e_phi_re, &arrayant_double.e_phi_im,
-                                               &arrayant_double.azimuth_grid, &arrayant_double.elevation_grid,
-                                               &arrayant_double.element_pos,
-                                               &arrayant_double.coupling_re, &arrayant_double.coupling_im,
-                                               &arrayant_double.center_frequency, &layout);
-
-    if (error_message.length() != 0)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:error", error_message.c_str());
+        arrayant_double = quadriga_lib::arrayant<double>(fn, id, &layout);
 
     unsigned n_azimuth = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
     unsigned n_elevation = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();

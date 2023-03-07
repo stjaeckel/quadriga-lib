@@ -11,7 +11,7 @@ fprintf(f,'%s\n','</arrayant></qdant>');
 fclose(f);
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant');
 
 assertTrue( isa(e_theta_re,'double') );
 assertTrue( isa(e_theta_im,'double') );
@@ -23,6 +23,7 @@ assertTrue( isa(element_pos,'double') );
 assertTrue( isa(coupling_re,'double') );
 assertTrue( isa(coupling_im,'double') );
 assertTrue( isa(center_frequency,'double') );
+assertTrue( isa(layout,'uint32') );
 
 assertElementsAlmostEqual( 20*log10(e_theta_re), reshape(1:15,3,5)', 'absolute', 1e-14 );
 assertElementsAlmostEqual( e_theta_im, zeros(5,3), 'absolute', 1e-14 );
@@ -35,10 +36,13 @@ assertElementsAlmostEqual( coupling_re, 1, 'absolute', 1e-13 );
 assertElementsAlmostEqual( coupling_im, 0, 'absolute', 1e-13 );
 assertElementsAlmostEqual( center_frequency, 299792448, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'bla') );
+assertEqual( layout, uint32(1) );
 
 %% More complex test
 f = fopen( 'test.qdant','w' );
-fprintf(f,'%s\n','<?xml version="1.0" encoding="UTF-8"?><qdant xmlns:xx="test"><xx:arrayant id="1">');
+fprintf(f,'%s\n','<?xml version="1.0" encoding="UTF-8"?><qdant xmlns:xx="test">');
+fprintf(f,'%s\n','<xx:layout>1,1 1,1 1,1</xx:layout>');
+fprintf(f,'%s\n','<xx:arrayant id="1">');
 fprintf(f,'%s\n','<xx:AzimuthGrid>-90 -45 0 45 90</xx:AzimuthGrid>');
 fprintf(f,'%s\n','<xx:ElevationGrid>-90 0 90</xx:ElevationGrid>');
 fprintf(f,'%s\n',['<xx:EphiMag>',num2str(zeros(1,15)),'</xx:EphiMag>']);
@@ -53,7 +57,7 @@ fprintf(f,'%s\n','</xx:arrayant></qdant>');
 fclose(f);
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant',1,1);
+    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1,1);
 
 assertTrue( isa(e_theta_re,'single') );
 assertTrue( isa(e_theta_im,'single') );
@@ -77,6 +81,7 @@ assertElementsAlmostEqual( coupling_re, 1/sqrt(2), 'absolute', 1e-7 );
 assertElementsAlmostEqual( coupling_im, 1/sqrt(2), 'absolute', 1e-7 );
 assertElementsAlmostEqual( center_frequency, 3e9, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'unknown') );
+assertEqual( layout, ones(2,3,'uint32') );
 
 %% Two array antennas with uncommon formats
 f = fopen( 'test.qdant','w' );
@@ -84,7 +89,7 @@ fprintf(f,'<qdant><arrayant id="1">\n');
 fprintf(f,'<ElevationGrid> -45 45</ElevationGrid>\n');
 fprintf(f,'<AzimuthGrid>-90 0 90</AzimuthGrid>\n');
 fprintf(f,'<EthetaMag>\n\t1 1 1\n\t2 2 3\n</EthetaMag>\n');
-fprintf(f,'</arrayant><arrayant id="2">\n');
+fprintf(f,'</arrayant><arrayant id="3">\n');
 fprintf(f,'<ElevationGrid> -45 45</ElevationGrid>');
 fprintf(f,'<NoElements>2</NoElements>');
 fprintf(f,'<AzimuthGrid>-90 0 90</AzimuthGrid>\n');
@@ -97,12 +102,14 @@ fprintf(f,'</arrayant></qdant>\n');
 fclose(f);
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
+    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
+
+assertEqual( layout, uint32([1 3]) );
 
 assertElementsAlmostEqual( e_theta_re, sqrt([1.26 1.26 1.26 ; 1.58 1.58 2]), 'absolute', 1e-2 );
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant',2);
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
 
 assertElementsAlmostEqual( e_theta_re, zeros(2,3,2), 'absolute', 1e-13 );
 assertElementsAlmostEqual( e_phi_re, zeros(2,3,2), 'absolute', 1e-13 );
@@ -126,9 +133,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % AzimuthGrid tag not closed correctly
@@ -141,9 +148,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % Wrong number of entries in EthetaMag
@@ -157,9 +164,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % Wrong number of entries in CouplingAbs
@@ -174,9 +181,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % CouplingPhase with multiple ports without CouplingAbs
@@ -190,9 +197,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % Not a XML File
@@ -202,9 +209,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 % Not a QDANT file (KML instead)
@@ -222,9 +229,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
 catch expt
-    error_if_wrong_id_thrown('quadriga_lib:qdant_read:error',expt.identifier);
+    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
 end
 
 delete('test.qdant');
