@@ -1,4 +1,10 @@
 # This Makefile is for Windows / MSVC environments
+# Cheat sheet:
+#	$@    Current target's full name (path, base name, extension)
+#	$*    Current target's path and base name minus file extension.
+#	$**   All dependents of the current target
+#	$(@B) Current target's base name (no path, no extension)
+#	$(@F) Current target's base name + estension (no path)
 
 # Compilers
 CC    = cl
@@ -15,40 +21,39 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64   +quadriga_lib/version.mexw64
 
 # Library files
-build\quadriga_lib.lib:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$*.obj /Iinclude /I$(ARMA_H)
-	lib $*.obj
+build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
-build\quadriga_tools.lib:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$*.obj /Iinclude /I$(ARMA_H)
-	lib $*.obj
+build\quadriga_tools.obj:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
-build\qd_arrayant_interpolate.lib:   src\qd_arrayant_interpolate.cpp   src\qd_arrayant_interpolate.hpp
-	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$*.obj /Iinclude /I$(ARMA_H)
-	lib $*.obj
+build\qd_arrayant_interpolate.obj:   src\qd_arrayant_interpolate.cpp   src\qd_arrayant_interpolate.hpp
+	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
-build\qd_arrayant_qdant.lib:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_qdant.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$*.obj /Iinclude /I$(ARMA_H) /I$(PUGIXML_H)
-	lib $*.obj
+build\qd_arrayant_qdant.obj:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_qdant.hpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H) /I$(PUGIXML_H)
+
+build\quadriga_lib_combined.lib:   build\quadriga_lib.obj   build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj
+ 	lib /OUT:$@ $**
 
 # MEX interface files
-+quadriga_lib/arrayant_interpolate.mexw64:   mex\arrayant_interpolate.cpp   build\quadriga_lib.lib   build\quadriga_tools.lib   build\qd_arrayant_interpolate.lib
++quadriga_lib/arrayant_interpolate.mexw64:   mex\arrayant_interpolate.cpp   build\quadriga_lib_combined.lib
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/arrayant_qdant_read.mexw64:   mex\arrayant_qdant_read.cpp   build\quadriga_lib.lib   build\qd_arrayant_qdant.lib
-	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
++quadriga_lib/arrayant_qdant_read.mexw64:   mex\arrayant_qdant_read.cpp   build\quadriga_lib_combined.lib
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   build\quadriga_tools.lib
-	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
++quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   build\quadriga_tools.obj
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
 
-+quadriga_lib/cart2geo.mexw64:   mex\cart2geo.cpp   build\quadriga_tools.lib
-	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
++quadriga_lib/cart2geo.mexw64:   mex\cart2geo.cpp   build\quadriga_tools.obj
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
 
-+quadriga_lib/geo2cart.mexw64:   mex\geo2cart.cpp   build\quadriga_tools.lib
-	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
++quadriga_lib/geo2cart.mexw64:   mex\geo2cart.cpp   build\quadriga_tools.obj
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
 
-+quadriga_lib/version.mexw64:   mex\version.cpp   build\quadriga_lib.lib
-	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
++quadriga_lib/version.mexw64:   mex\version.cpp   build\quadriga_lib_combined.lib
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Clean up instructions
 clean:
