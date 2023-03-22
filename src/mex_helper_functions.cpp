@@ -30,33 +30,32 @@ template <typename dtype>
 inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name)
 {
     std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-    dtype out;
     if (mxGetNumberOfElements(input) == 0)
-        out = dtype(NAN);
+        return dtype(NAN);
     else if (mxIsDouble(input))
     {
         double *tmp = (double *)mxGetData(input);
-        out = dtype(*tmp);
+        return dtype(*tmp);
     }
     else if (mxIsSingle(input))
     {
         float *tmp = (float *)mxGetData(input);
-        out = dtype(*tmp);
+        return dtype(*tmp);
     }
     else if (mxIsClass(input, "uint32") || mxIsClass(input, "int32"))
     {
         unsigned *tmp = (unsigned *)mxGetData(input);
-        out = dtype(*tmp);
+        return dtype(*tmp);
     }
     else if (mxIsClass(input, "logical"))
     {
         bool *tmp = (bool *)mxGetData(input);
-        out = dtype(*tmp);
+        return dtype(*tmp);
     }
     else
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
 
-    return out;
+    return dtype(0);
 }
 
 // Reinterpret MATLAB Array to Armadillo Column Vector
@@ -65,8 +64,7 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    arma::Col<dtype> output = arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, false, true);
-    return std::move(output); // Avoid invoking memcopy
+    return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, false, true);
 }
 
 // Reinterpret MATLAB Array to Armadillo Matrix
@@ -75,8 +73,7 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    arma::Mat<dtype> output = arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, false, true);
-    return std::move(output); // Avoid invoking memcopy
+    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, false, true);
 }
 
 // Reinterpret MATLAB Array to Armadillo Cube
@@ -89,8 +86,7 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input)
     unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    arma::Cube<dtype> output = arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, true);
-    return std::move(output); // Avoid invoking memcopy
+    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, true);
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input
@@ -100,36 +96,33 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
 
-    std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
     if (mxIsDouble(input))
     {
         arma::Col<double> tmp = arma::Col<double>((double *)mxGetData(input), d1 * d2, false, true);
-        arma::Col<dtype> output = arma::conv_to<arma::Col<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Col<dtype>>::from(tmp);
     }
     else if (mxIsSingle(input))
     {
         arma::Col<float> tmp = arma::Col<float>((float *)mxGetData(input), d1 * d2, false, true);
-        arma::Col<dtype> output = arma::conv_to<arma::Col<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Col<dtype>>::from(tmp);
     }
     else if (mxIsClass(input, "uint32") || mxIsClass(input, "int32"))
     {
         arma::Col<int> tmp = arma::Col<int>((int *)mxGetData(input), d1 * d2, false, true);
-        arma::Col<dtype> output = arma::conv_to<arma::Col<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Col<dtype>>::from(tmp);
     }
     else if (mxIsClass(input, "uint64") || mxIsClass(input, "int64"))
     {
         arma::Col<long long> tmp = arma::Col<long long>((long long *)mxGetData(input), d1 * d2, false, true);
-        arma::Col<dtype> output = arma::conv_to<arma::Col<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Col<dtype>>::from(tmp);
     }
     else
+    {
+        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+    }
 
-    arma::Col<dtype> output;
-    return std::move(output);
+    return arma::Col<dtype>();
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input
@@ -139,36 +132,33 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
 
-    std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
     if (mxIsDouble(input))
     {
         arma::Mat<double> tmp = arma::Mat<double>((double *)mxGetData(input), d1, d2, false, true);
-        arma::Mat<dtype> output = arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsSingle(input))
     {
         arma::Mat<float> tmp = arma::Mat<float>((float *)mxGetData(input), d1, d2, false, true);
-        arma::Mat<dtype> output = arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsClass(input, "uint32") || mxIsClass(input, "int32"))
     {
         arma::Mat<int> tmp = arma::Mat<int>((int *)mxGetData(input), d1, d2, false, true);
-        arma::Mat<dtype> output = arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsClass(input, "uint64") || mxIsClass(input, "int64"))
     {
         arma::Mat<long long> tmp = arma::Mat<long long>((long long *)mxGetData(input), d1, d2, false, true);
-        arma::Mat<dtype> output = arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                             // Avoid invoking memcopy
+        return arma::conv_to<arma::Mat<dtype>>::from(tmp); // Copy and cast data
     }
     else
+    {
+        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+    }
 
-    arma::Mat<dtype> output;
-    return std::move(output);
+    return arma::Mat<dtype>();
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input
@@ -182,36 +172,33 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
 
-    std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
     if (mxIsDouble(input))
     {
         arma::Cube<double> tmp = arma::Cube<double>((double *)mxGetData(input), d1, d2, d3 * d4, false, true);
-        arma::Cube<dtype> output = arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                               // Avoid invoking memcopy
+        return arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsSingle(input))
     {
         arma::Cube<float> tmp = arma::Cube<float>((float *)mxGetData(input), d1, d2, d3 * d4, false, true);
-        arma::Cube<dtype> output = arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                               // Avoid invoking memcopy
+        return arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsClass(input, "uint32") || mxIsClass(input, "int32"))
     {
         arma::Cube<int> tmp = arma::Cube<int>((int *)mxGetData(input), d1, d2, d3 * d4, false, true);
-        arma::Cube<dtype> output = arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                               // Avoid invoking memcopy
+        return arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
     }
     else if (mxIsClass(input, "uint64") || mxIsClass(input, "int64"))
     {
         arma::Cube<long long> tmp = arma::Cube<long long>((long long *)mxGetData(input), d1, d2, d3 * d4, false, true);
-        arma::Cube<dtype> output = arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
-        return std::move(output);                                               // Avoid invoking memcopy
+        return arma::conv_to<arma::Cube<dtype>>::from(tmp); // Copy and cast data
     }
     else
+    {
+        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+    }
 
-    arma::Cube<dtype> output;
-    return std::move(output);
+    return arma::Cube<dtype>();
 }
 
 // Creates an mxArray based on the armadillo input type, copies content
