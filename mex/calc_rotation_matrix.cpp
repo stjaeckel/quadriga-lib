@@ -18,8 +18,7 @@
 #include "mex.h"
 #include "quadriga_tools.hpp"
 #include <cstring>
-
-using namespace std;
+#include "mex_helper_functions.cpp"
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -45,50 +44,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if ((unsigned)dims[0] != 3)
         mexErrMsgIdAndTxt("quadriga_tools:calc_rotation_matrix:size_mismatch", "Input must have 3 elements on the first dimension.");
 
-    // Read "invert_y_axis" variable
-    bool invert_y_axis;
-    if (nrhs < 2 || mxGetNumberOfElements(prhs[1]) == 0)
-        invert_y_axis = false;
-    else if (mxGetNumberOfElements(prhs[1]) != 1)
-        mexErrMsgIdAndTxt("quadriga_tools:calc_rotation_matrix:size_mismatch", "Input 'invert_y_axis' must be scalar.");
-    else if (mxIsDouble(prhs[1]))
-    {
-        double *tmp = (double *)mxGetData(prhs[1]);
-        invert_y_axis = (bool)tmp[0];
-    }
-    else if (mxIsClass(prhs[1], "logical"))
-    {
-        bool *tmp = (bool *)mxGetData(prhs[1]);
-        invert_y_axis = tmp[0];
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_tools:calc_rotation_matrix:wrong_type", "Input 'invert_y_axis' must be either of type 'double' or 'logical'.");
-
-    // Read "transpose" variable
-    bool transpose;
-    if (nrhs < 3 || mxGetNumberOfElements(prhs[2]) == 0)
-        transpose = false;
-    else if (mxGetNumberOfElements(prhs[2]) != 1)
-        mexErrMsgIdAndTxt("quadriga_tools:calc_rotation_matrix:size_mismatch", "Input 'transpose' must be scalar.");
-    else if (mxIsDouble(prhs[2]))
-    {
-        double *tmp = (double *)mxGetData(prhs[2]);
-        transpose = (bool)tmp[0];
-    }
-    else if (mxIsClass(prhs[2], "logical"))
-    {
-        bool *tmp = (bool *)mxGetData(prhs[2]);
-        transpose = tmp[0];
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_tools:calc_rotation_matrix:wrong_type", "Input 'transpose' must be either of type 'double' or 'logical'.");
+    // Read scalar variables
+    bool invert_y_axis = nrhs < 2 ? false : qd_mex_get_scalar<bool>(prhs[1], "invert_y_axis");
+    bool transpose = nrhs < 3 ? false : qd_mex_get_scalar<bool>(prhs[2], "transpose");
 
     mwSize dims_out[3] = {9, n_row, n_col};
     if (mxIsSingle(prhs[0]))
     {
         const arma::fcube orientation = arma::fcube((float *)mxGetData(prhs[0]), 3, n_row, n_col, false, true);
         arma::cube Rd = quadriga_tools::calc_rotation_matrix(orientation, invert_y_axis, transpose); // double precision output
-        arma::fcube R = arma::conv_to<arma::fcube>::from(Rd);                                      // conversion to single
+        arma::fcube R = arma::conv_to<arma::fcube>::from(Rd);                                        // conversion to single
         plhs[0] = mxCreateNumericArray(3, dims_out, mxSINGLE_CLASS, mxREAL);
         std::memcpy((float *)mxGetData(plhs[0]), R.memptr(), sizeof(float) * R.n_elem);
     }

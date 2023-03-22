@@ -160,13 +160,10 @@ assertEqual(size(Vr),size(Vi))
 assertEqual(size(Vr),size(Hr))
 assertEqual(size(Vr),size(Hi))
 
-% i_element must be double or uint32
-try
-    [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,single(3));
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:wrong_type',expt.identifier);
-end
+% i_element must be of supported type
+[~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,single(3));
+[~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,int64(3));
+[~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,uint64(3));
 
 % i_element cannot be zero
 try
@@ -206,7 +203,7 @@ assertEqual(size(Vr),size(Hi))
 
 % orientation must have 3 elements
 try
-    [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],1);
+    [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],single(1));
     error_exception_not_thrown('quadriga_lib:arrayant_interpolate:size_mismatch');
 catch expt
     error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:size_mismatch',expt.identifier);

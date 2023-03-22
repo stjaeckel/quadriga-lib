@@ -18,8 +18,6 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 
-using namespace std;
-
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs != 0)

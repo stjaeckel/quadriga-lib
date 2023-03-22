@@ -17,15 +17,14 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
+#include "mex_helper_functions.cpp"
 #include <cstring> // For memcopy
-
-using namespace std;
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
     //  0 - fn              Filename of the QDANT file
-    //  1 - id              ID if the antenna to be read from the file (optional, default: 1)
+    //  1 - id              ID of the antenna to be read from the file (optional, default: 1)
     //  2 - use_single      Indicator if results should be returned in single precision (optional, default: 0, double)
 
     // Outputs:
@@ -52,49 +51,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     std::string fn = mxArrayToString(prhs[0]);
 
-    // Read id variable
-    unsigned id;
-    if (nrhs < 2)
-        id = 1;
-    else if (mxGetNumberOfElements(prhs[1]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:size_mismatch", "Input 'id' must be scalar.");
-    else if (mxIsDouble(prhs[1]))
-    {
-        double *tmp = (double *)mxGetData(prhs[1]);
-        id = (unsigned)tmp[0];
-    }
-    else if (mxIsSingle(prhs[1]))
-    {
-        float *tmp = (float *)mxGetData(prhs[1]);
-        id = (unsigned)tmp[0];
-    }
-    else if (mxIsClass(prhs[1], "uint32") || mxIsClass(prhs[1], "int32"))
-    {
-        unsigned *tmp = (unsigned *)mxGetData(prhs[1]);
-        id = tmp[0];
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:wrong_type", "Input 'id' must be either of type 'double', 'single' ur 'uint32'.");
+    // Read scalar variables
+    unsigned id = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id");
+    bool use_single = nrhs < 3 ? false : qd_mex_get_scalar<bool>(prhs[2], "use_single");
 
-    // Read "use_single" variable
-    bool use_single;
-    if (nrhs < 3 || mxGetNumberOfElements(prhs[2]) == 0)
-        use_single = false;
-    else if (mxGetNumberOfElements(prhs[2]) != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:size_mismatch", "Input 'use_single' must be scalar.");
-    else if (mxIsDouble(prhs[2]))
-    {
-        double *tmp = (double *)mxGetData(prhs[2]);
-        use_single = (bool)tmp[0];
-    }
-    else if (mxIsClass(prhs[2], "logical"))
-    {
-        bool *tmp = (bool *)mxGetData(prhs[2]);
-        use_single = tmp[0];
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:wrong_type", "Input 'use_single' must be either of type 'double' or 'logical'.");
-
+    // Read from file
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     arma::Mat<unsigned> layout;
@@ -108,63 +69,34 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     unsigned n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
     unsigned n_ports = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
 
-    mwSize dims[3] = {n_elevation, n_azimuth, n_elements};
-
-    if (use_single)
-        plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL),
-        plhs[1] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL),
-        plhs[2] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL),
-        plhs[3] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL),
-        plhs[4] = mxCreateNumericMatrix(1, n_azimuth, mxSINGLE_CLASS, mxREAL),
-        plhs[5] = mxCreateNumericMatrix(1, n_elevation, mxSINGLE_CLASS, mxREAL),
-        plhs[6] = mxCreateNumericMatrix(3, n_elements, mxSINGLE_CLASS, mxREAL),
-        plhs[7] = mxCreateNumericMatrix(n_elements, n_ports, mxSINGLE_CLASS, mxREAL),
-        plhs[8] = mxCreateNumericMatrix(n_elements, n_ports, mxSINGLE_CLASS, mxREAL),
-        plhs[9] = mxCreateNumericMatrix(1, 1, mxSINGLE_CLASS, mxREAL);
-    else
-        plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL),
-        plhs[1] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL),
-        plhs[2] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL),
-        plhs[3] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL),
-        plhs[4] = mxCreateNumericMatrix(1, n_azimuth, mxDOUBLE_CLASS, mxREAL),
-        plhs[5] = mxCreateNumericMatrix(1, n_elevation, mxDOUBLE_CLASS, mxREAL),
-        plhs[6] = mxCreateNumericMatrix(3, n_elements, mxDOUBLE_CLASS, mxREAL),
-        plhs[7] = mxCreateNumericMatrix(n_elements, n_ports, mxDOUBLE_CLASS, mxREAL),
-        plhs[8] = mxCreateNumericMatrix(n_elements, n_ports, mxDOUBLE_CLASS, mxREAL),
-        plhs[9] = mxCreateNumericMatrix(1, 1, mxDOUBLE_CLASS, mxREAL);
-
     if (use_single)
     {
-        std::memcpy((float *)mxGetData(plhs[0]), arrayant_single.e_theta_re.memptr(), sizeof(float) * arrayant_single.e_theta_re.n_elem);
-        std::memcpy((float *)mxGetData(plhs[1]), arrayant_single.e_theta_im.memptr(), sizeof(float) * arrayant_single.e_theta_im.n_elem);
-        std::memcpy((float *)mxGetData(plhs[2]), arrayant_single.e_phi_re.memptr(), sizeof(float) * arrayant_single.e_phi_re.n_elem);
-        std::memcpy((float *)mxGetData(plhs[3]), arrayant_single.e_phi_im.memptr(), sizeof(float) * arrayant_single.e_phi_im.n_elem);
-        std::memcpy((float *)mxGetData(plhs[4]), arrayant_single.azimuth_grid.memptr(), sizeof(float) * arrayant_single.azimuth_grid.n_elem);
-        std::memcpy((float *)mxGetData(plhs[5]), arrayant_single.elevation_grid.memptr(), sizeof(float) * arrayant_single.elevation_grid.n_elem);
-        std::memcpy((float *)mxGetData(plhs[6]), arrayant_single.element_pos.memptr(), sizeof(float) * arrayant_single.element_pos.n_elem);
-        std::memcpy((float *)mxGetData(plhs[7]), arrayant_single.coupling_re.memptr(), sizeof(float) * arrayant_single.coupling_re.n_elem);
-        std::memcpy((float *)mxGetData(plhs[8]), arrayant_single.coupling_im.memptr(), sizeof(float) * arrayant_single.coupling_im.n_elem);
-        std::memcpy((float *)mxGetData(plhs[9]), &arrayant_single.center_frequency, sizeof(float));
+        plhs[0] = qd_mex_copy2matlab(&arrayant_single.e_theta_re);
+        plhs[1] = qd_mex_copy2matlab(&arrayant_single.e_theta_im);
+        plhs[2] = qd_mex_copy2matlab(&arrayant_single.e_phi_re);
+        plhs[3] = qd_mex_copy2matlab(&arrayant_single.e_phi_im);
+        plhs[4] = qd_mex_copy2matlab(&arrayant_single.azimuth_grid, true);
+        plhs[5] = qd_mex_copy2matlab(&arrayant_single.elevation_grid, true);
+        plhs[6] = qd_mex_copy2matlab(&arrayant_single.element_pos);
+        plhs[7] = qd_mex_copy2matlab(&arrayant_single.coupling_re);
+        plhs[8] = qd_mex_copy2matlab(&arrayant_single.coupling_im);
+        plhs[9] = qd_mex_copy2matlab(&arrayant_single.center_frequency);
     }
     else
     {
-        std::memcpy((double *)mxGetData(plhs[0]), arrayant_double.e_theta_re.memptr(), sizeof(double) * arrayant_double.e_theta_re.n_elem);
-        std::memcpy((double *)mxGetData(plhs[1]), arrayant_double.e_theta_im.memptr(), sizeof(double) * arrayant_double.e_theta_im.n_elem);
-        std::memcpy((double *)mxGetData(plhs[2]), arrayant_double.e_phi_re.memptr(), sizeof(double) * arrayant_double.e_phi_re.n_elem);
-        std::memcpy((double *)mxGetData(plhs[3]), arrayant_double.e_phi_im.memptr(), sizeof(double) * arrayant_double.e_phi_im.n_elem);
-        std::memcpy((double *)mxGetData(plhs[4]), arrayant_double.azimuth_grid.memptr(), sizeof(double) * arrayant_double.azimuth_grid.n_elem);
-        std::memcpy((double *)mxGetData(plhs[5]), arrayant_double.elevation_grid.memptr(), sizeof(double) * arrayant_double.elevation_grid.n_elem);
-        std::memcpy((double *)mxGetData(plhs[6]), arrayant_double.element_pos.memptr(), sizeof(double) * arrayant_double.element_pos.n_elem);
-        std::memcpy((double *)mxGetData(plhs[7]), arrayant_double.coupling_re.memptr(), sizeof(double) * arrayant_double.coupling_re.n_elem);
-        std::memcpy((double *)mxGetData(plhs[8]), arrayant_double.coupling_im.memptr(), sizeof(double) * arrayant_double.coupling_im.n_elem);
-        std::memcpy((double *)mxGetData(plhs[9]), &arrayant_double.center_frequency, sizeof(double));
+        plhs[0] = qd_mex_copy2matlab(&arrayant_double.e_theta_re);
+        plhs[1] = qd_mex_copy2matlab(&arrayant_double.e_theta_im);
+        plhs[2] = qd_mex_copy2matlab(&arrayant_double.e_phi_re);
+        plhs[3] = qd_mex_copy2matlab(&arrayant_double.e_phi_im);
+        plhs[4] = qd_mex_copy2matlab(&arrayant_double.azimuth_grid, true);
+        plhs[5] = qd_mex_copy2matlab(&arrayant_double.elevation_grid, true);
+        plhs[6] = qd_mex_copy2matlab(&arrayant_double.element_pos);
+        plhs[7] = qd_mex_copy2matlab(&arrayant_double.coupling_re);
+        plhs[8] = qd_mex_copy2matlab(&arrayant_double.coupling_im);
+        plhs[9] = qd_mex_copy2matlab(&arrayant_double.center_frequency);
     }
     plhs[10] = use_single ? mxCreateString(arrayant_single.name.c_str()) : mxCreateString(arrayant_double.name.c_str());
 
     if (nlhs == 12)
-    {
-        plhs[11] = mxCreateNumericMatrix(layout.n_rows, layout.n_cols, mxUINT32_CLASS, mxREAL);
-        if (layout.n_elem != 0)
-            std::memcpy((unsigned *)mxGetData(plhs[11]), layout.memptr(), sizeof(unsigned) * layout.n_elem);
-    }
+        plhs[11] = qd_mex_copy2matlab(&layout);
 }

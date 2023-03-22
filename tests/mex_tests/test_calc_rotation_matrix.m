@@ -48,18 +48,6 @@ end
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],2);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],false);
 [~] = quadriga_lib.calc_rotation_matrix([0;0;0],true);
-try
-    [~] = quadriga_lib.calc_rotation_matrix([0;0;0],[1,1]);
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:size_mismatch',expt.identifier);
-end
-try
-    [~] = quadriga_lib.calc_rotation_matrix([0;0;0],int32(1));
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:wrong_type',expt.identifier);
-end
 
 c = cos(pi/8);
 s = sin(pi/8);

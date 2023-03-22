@@ -19,8 +19,6 @@
 #include "quadriga_tools.hpp"
 #include <cstring>
 
-using namespace std;
-
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:          azimuth         Azimuth angles in [rad],                Size [n_row, n_col]

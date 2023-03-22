@@ -18,8 +18,7 @@
 #include "mex.h"
 #include "quadriga_lib.hpp"
 #include "qd_arrayant_interpolate.hpp"
-
-using namespace std;
+#include "mex_helper_functions.cpp"
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -58,60 +57,40 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "Inputs must be provided in 'single' or 'double' precision.");
 
-    // Create arrayant object and validate the input
-    quadriga_lib::arrayant<float> arrayant_single;
-    quadriga_lib::arrayant<double> arrayant_double;
-    for (int i = 0; i < 6; i++)
-    {
-        unsigned n_dim = (unsigned)mxGetNumberOfDimensions(prhs[i]); // Number of dimensions - either 2 or 3
-        const mwSize *dims = mxGetDimensions(prhs[i]);               // Read number of elements elements per dimension
-        unsigned d1 = (unsigned)dims[0];                             // Number of elements on first dimension
-        unsigned d2 = (unsigned)dims[1];                             // Number of elements on second dimension
-        unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];             // Number of elements on third dimension
-        bool not_empty = d1 * d2 * d3 > 0;
-
-        if (not_empty && ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i]))))
+    for (int i = 1; i < 8; i++)
+        if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
             mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "All floating-point inputs must have the same type: 'single' or 'double' precision");
 
-        if (use_single)
-        {
-            if (not_empty && i == 0)
-                arrayant_single.e_theta_re = arma::fcube((float *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 1)
-                arrayant_single.e_theta_im = arma::fcube((float *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 2)
-                arrayant_single.e_phi_re = arma::fcube((float *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 3)
-                arrayant_single.e_phi_im = arma::fcube((float *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 4)
-                arrayant_single.azimuth_grid = arma::fvec((float *)mxGetData(prhs[i]), d1 * d2 * d3, false, true);
-            else if (not_empty && i == 5)
-                arrayant_single.elevation_grid = arma::fvec((float *)mxGetData(prhs[i]), d1 * d2 * d3, false, true);
-        }
-        else // double
-        {
-            if (not_empty && i == 0)
-                arrayant_double.e_theta_re = arma::cube((double *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 1)
-                arrayant_double.e_theta_im = arma::cube((double *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 2)
-                arrayant_double.e_phi_re = arma::cube((double *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 3)
-                arrayant_double.e_phi_im = arma::cube((double *)mxGetData(prhs[i]), d1, d2, d3, false, true);
-            else if (not_empty && i == 4)
-                arrayant_double.azimuth_grid = arma::vec((double *)mxGetData(prhs[i]), d1 * d2 * d3, false, true);
-            else if (not_empty && i == 5)
-                arrayant_double.elevation_grid = arma::vec((double *)mxGetData(prhs[i]), d1 * d2 * d3, false, true);
-        }
-    }
+    if (mxGetNumberOfElements(prhs[6]) == 0 || mxGetNumberOfElements(prhs[7]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:import_error", "Inputs cannot be empty.");
+
+    quadriga_lib::arrayant<float> arrayant_single;
+    quadriga_lib::arrayant<double> arrayant_double;
+    arma::fmat azimuth_single, elevation_single;
+    arma::mat azimuth_double, elevation_double;
+    if (use_single)
+        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0]),
+        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1]),
+        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2]),
+        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3]),
+        arrayant_single.azimuth_grid = qd_mex_reinterpret_Col<float>(prhs[4]),
+        arrayant_single.elevation_grid = qd_mex_reinterpret_Col<float>(prhs[5]),
+        azimuth_single = qd_mex_reinterpret_Mat<float>(prhs[6]),
+        elevation_single = qd_mex_reinterpret_Mat<float>(prhs[7]);
+    else
+        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0]),
+        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1]),
+        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2]),
+        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3]),
+        arrayant_double.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[4]),
+        arrayant_double.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[5]),
+        azimuth_double = qd_mex_reinterpret_Mat<double>(prhs[6]),
+        elevation_double = qd_mex_reinterpret_Mat<double>(prhs[7]);
 
     // Validate the data integrity
     std::string error_message = use_single ? arrayant_single.validate() : arrayant_double.validate();
     if (!error_message.empty())
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:import_error", error_message.c_str());
-
-    if (mxGetNumberOfElements(prhs[6]) == 0 || mxGetNumberOfElements(prhs[7]) == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:import_error", "Inputs cannot be empty.");
 
     unsigned n_elevation = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
     unsigned n_azimuth = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
@@ -123,26 +102,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if ((unsigned)mxGetM(prhs[7]) != n_out || (unsigned)mxGetN(prhs[7]) != n_ang)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Number of elements in 'elevation' does not match number of elements in 'azimuth'.");
 
-    // Convert input arguments to armadillo objects (inputs from MATLAB are read-only)
-    arma::fmat azimuth_single, elevation_single;
-    arma::mat azimuth_double, elevation_double;
-    if (use_single)
-        azimuth_single = arma::fmat((float *)mxGetData(prhs[6]), n_out, n_ang, false, true),
-        elevation_single = arma::fmat((float *)mxGetData(prhs[7]), n_out, n_ang, false, true);
-    else
-        azimuth_double = arma::mat((double *)mxGetData(prhs[6]), n_out, n_ang, false, true),
-        elevation_double = arma::mat((double *)mxGetData(prhs[7]), n_out, n_ang, false, true);
-
     // Process optional input : i_element
     arma::Col<unsigned> i_element;
     if (nrhs < 9 || mxGetNumberOfElements(prhs[8]) == 0)
         i_element = arma::regspace<arma::Col<unsigned>>(1, n_elements);
-    else if (mxIsClass(prhs[8], "uint32"))
-        i_element = arma::Col<unsigned>((unsigned *)mxGetData(prhs[8]), mxGetNumberOfElements(prhs[8])); // Creates a copy
-    else if (mxIsDouble(prhs[8]))
-        i_element = arma::conv_to<arma::Col<unsigned>>::from(arma::vec((double *)mxGetData(prhs[8]), mxGetNumberOfElements(prhs[8]), false, true));
     else
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "Input 'i_element' must be given in double or uint32 precision.");
+        i_element = qd_mex_typecast_Col<unsigned>(prhs[8], "i_element");
 
     if (n_out != 1 && n_out != i_element.n_elem)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Number of rows in 'azimuth' and 'elevation' must be 1 or match the number of elements.");
@@ -159,31 +124,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Process optional input : orientation
     arma::fcube orientation_single;
     arma::cube orientation_double;
-    unsigned n_dim = 2, n_orientation2 = 0, n_orientation3 = 0;
-    const mwSize *dims;
-    if (nrhs >= 10)
-        n_dim = (unsigned)mxGetNumberOfDimensions(prhs[9]),
-        dims = mxGetDimensions(prhs[9]),
-        n_orientation2 = (unsigned)dims[1],
-        n_orientation3 = n_dim < 3 ? 1 : (unsigned)dims[2];
-
     if (nrhs < 10 || mxGetNumberOfElements(prhs[9]) == 0)
         if (use_single)
             orientation_single = arma::fcube(3, 1, 1, arma::fill::zeros);
         else
             orientation_double = arma::cube(3, 1, 1, arma::fill::zeros);
-    else if ((unsigned)*dims != 3)
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 3 elements on the first dimension.");
-    else if (n_orientation2 != 1 && n_orientation2 != n_out)
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.");
-    else if (n_orientation3 != 1 && n_orientation3 != n_ang)
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.");
     else if (use_single && mxIsSingle(prhs[9]))
-        orientation_single = arma::fcube((float *)mxGetData(prhs[9]), 3, n_orientation2, n_orientation3, false, true);
+        orientation_single = qd_mex_reinterpret_Cube<float>(prhs[9]);
     else if (!use_single && mxIsDouble(prhs[9]))
-        orientation_double = arma::cube((double *)mxGetData(prhs[9]), 3, n_orientation2, n_orientation3, false, true);
+        orientation_double = qd_mex_reinterpret_Cube<double>(prhs[9]);
     else
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "Input 'orientation' must be given in double or single precision.");
+
+    unsigned o1 = use_single ? orientation_single.n_rows : orientation_double.n_rows;
+    unsigned o2 = use_single ? orientation_single.n_cols : orientation_double.n_cols;
+    unsigned o3 = use_single ? orientation_single.n_slices : orientation_double.n_slices;
+
+    if (o1 != 3)
+        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 3 elements on the first dimension.");
+    else if (o2 != 1 && o2 != n_out)
+        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.");
+    else if (o3 != 1 && o3 != n_ang)
+        mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.");
 
     // Process optional input : element_pos
     arma::fmat element_pos_single;

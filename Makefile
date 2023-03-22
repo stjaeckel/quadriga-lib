@@ -44,13 +44,13 @@ build\quadriga_lib_combined.lib:   build\quadriga_lib.obj   build\quadriga_tools
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   build\quadriga_tools.obj
- 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/cart2geo.mexw64:   mex\cart2geo.cpp   build\quadriga_tools.obj
- 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/geo2cart.mexw64:   mex\geo2cart.cpp   build\quadriga_tools.obj
- 	$(MEX) -outdir +quadriga_lib $** -Iinclude -I$(ARMA_H)
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/version.mexw64:   mex\version.cpp   build\quadriga_lib_combined.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
