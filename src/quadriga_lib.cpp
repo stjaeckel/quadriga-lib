@@ -19,8 +19,6 @@
 #include "quadriga_lib.hpp"
 #include "qd_arrayant_qdant.hpp"
 
-using namespace std;
-
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
 
@@ -38,29 +36,47 @@ std::string quadriga_lib::quadriga_lib_version()
 
 // ARRAYANT Constructor : Read from file
 template <typename dtype>
-quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(string qdant_file_name, unsigned id, Mat<unsigned> *layout)
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(std::string fn, unsigned id, arma::Mat<unsigned> *layout)
 {
     // Call private function to read the data from file
-    std::string error_message = qd_arrayant_qdant_read(qdant_file_name, id,
+    std::string error_message = qd_arrayant_qdant_read(fn, id,
                                                        &name, &e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                                                        &azimuth_grid, &elevation_grid, &element_pos,
                                                        &coupling_re, &coupling_im, &center_frequency, layout);
     // Throw parsing errors
     if (error_message.length() != 0)
-        throw invalid_argument(error_message.c_str());
+        throw std::invalid_argument(error_message.c_str());
 
     // Throw validation errors
     error_message = validate();
     if (error_message.length() != 0)
-        throw invalid_argument(error_message.c_str());
+        throw std::invalid_argument(error_message.c_str());
 }
 
 // ARRAYANT Constructor : Read from file
 template <typename dtype>
-quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(string qdant_file_name, unsigned id)
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(std::string fn, unsigned id)
 {
-    Mat<unsigned> layout;
-    *this = quadriga_lib::arrayant<dtype>(qdant_file_name, id, &layout);
+    arma::Mat<unsigned> layout;
+    *this = quadriga_lib::arrayant<dtype>(fn, id, &layout);
+    layout.reset();
+}
+
+// ARRAYANT : Write to QDANT file
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout)
+{
+    // Check if arrayant object is valid
+    std::string error_message = "";
+    if (valid != 0 || valid != 1)
+        error_message = validate();
+    else if (valid == 0)
+        error_message = "Array antenna object is invalid";
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    std::cout << "Library called" << std::endl;
+    return 0;
 }
 
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
@@ -92,7 +108,7 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports()
 
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>
-string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
+std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
 {
     valid = 0;
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)

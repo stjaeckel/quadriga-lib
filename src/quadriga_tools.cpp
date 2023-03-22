@@ -18,8 +18,6 @@
 #include "quadriga_tools.hpp"
 #include <stdexcept>
 
-using namespace std;
-
 // FUNCTION: Calculate rotation matrix R from roll, pitch, and yaw angles (given by rows in the input "orientation")
 template <typename dataType>
 arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dataType> orientation, bool invert_y_axis, bool transposeR)
@@ -30,9 +28,9 @@ arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dataType> orien
     // Output:      R                   Rotation matrix, column-major order, Size [9, n_row, n_col ]
 
     if (orientation.n_elem == 0)
-        throw invalid_argument("Input cannot be empty.");
+        throw std::invalid_argument("Input cannot be empty.");
     if (orientation.n_rows != 3)
-        throw invalid_argument("Input must have 3 rows.");
+        throw std::invalid_argument("Input must have 3 rows.");
 
     unsigned n_row = orientation.n_cols, n_col = orientation.n_slices;
     arma::cube rotation = arma::cube(9, n_row, n_col, arma::fill::zeros); // Always double precision
@@ -88,10 +86,10 @@ arma::cube quadriga_tools::geo2cart(const arma::Mat<dataType> azimuth, const arm
     // Output:          cart            Cartesian coordinates,                  Size [3, n_row, n_col]
 
     if (azimuth.n_elem == 0 || elevation.n_elem == 0 || length.n_elem == 0)
-        throw invalid_argument("Inputs cannot be empty.");
+        throw std::invalid_argument("Inputs cannot be empty.");
     if (elevation.n_rows != azimuth.n_rows || length.n_rows != azimuth.n_rows ||
         elevation.n_cols != azimuth.n_cols || length.n_cols != azimuth.n_cols)
-        throw invalid_argument("Inputs must have the same size.");
+        throw std::invalid_argument("Inputs must have the same size.");
 
     unsigned n_row = azimuth.n_rows, n_col = azimuth.n_cols;
     arma::cube cart = arma::cube(3, n_row, n_col, arma::fill::zeros); // Always double precision
@@ -120,9 +118,9 @@ arma::cube quadriga_tools::cart2geo(const arma::Cube<dataType> cart)
     // Output:          geo             geographic coordinates (az,el,len)      Size [n_row, n_col, 3]
 
     if (cart.n_elem == 0)
-        throw invalid_argument("Input cannot be empty.");
+        throw std::invalid_argument("Input cannot be empty.");
     if (cart.n_rows != 3)
-        throw invalid_argument("Input must have 3 rows.");
+        throw std::invalid_argument("Input must have 3 rows.");
 
     unsigned n_row = cart.n_cols, n_col = cart.n_slices;
     arma::cube geo = arma::cube(n_row, n_col, 3, arma::fill::zeros); // Always double precision

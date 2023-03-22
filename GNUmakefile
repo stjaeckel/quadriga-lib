@@ -12,7 +12,7 @@ ARMA_H      = external/armadillo-11.4.2/include
 PUGIXML_H   = external/pugixml-1.13/src
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp #-Wl,--gc-sections -Wall -Wextra -Wpedantic
+CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
 LIBS        = -lgomp #-lblas
 
 # Sourcees
@@ -50,6 +50,7 @@ build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
 # List of Octave-MEX files and their dependencies
 +quadriga_lib/arrayant_interpolate.mex:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_read.mex:   build/quadriga_lib_combined.o
++quadriga_lib/arrayant_qdant_write.mex:   build/quadriga_lib_combined.o
 +quadriga_lib/calc_rotation_matrix.mex:   build/quadriga_tools.o
 +quadriga_lib/cart2geo.mex:   build/quadriga_tools.o
 +quadriga_lib/geo2cart.mex:   build/quadriga_tools.o
@@ -58,6 +59,7 @@ build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
 # List of MATLAB-MEX files and their dependencies
 +quadriga_lib/arrayant_interpolate.mexa64:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_read.mexa64:   build/quadriga_lib_combined.o
++quadriga_lib/arrayant_qdant_write.mexa64:   build/quadriga_lib_combined.o
 +quadriga_lib/calc_rotation_matrix.mexa64:   build/quadriga_tools.o
 +quadriga_lib/cart2geo.mexa64:   build/quadriga_tools.o
 +quadriga_lib/geo2cart.mexa64:   build/quadriga_tools.o

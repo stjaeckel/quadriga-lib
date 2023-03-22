@@ -35,7 +35,7 @@ end
 
 % c++ Interpolation
 tic
-[Vr,Vi,Hr,Hi,Di,az,el] = arrayant_lib.interpolate( e_phi_re, e_phi_im, e_theta_re, e_theta_im, ...
+[Vr,Vi,Hr,Hi,Di,az,el] = quadriga_lib.arrayant_interpolate( e_phi_re, e_phi_im, e_theta_re, e_theta_im, ...
     azimuth_grid_rad, elevation_grid_rad, azimuth, elevation, [], orientation );
 toc
 

@@ -19,8 +19,6 @@
 #include "qd_arrayant_interpolate.hpp"
 #include "quadriga_tools.hpp"
 
-using namespace std;
-
 // Implements signum (-1, 0, or 1)
 template <typename dataType>
 dataType signum(dataType val)
@@ -64,7 +62,7 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
     const unsigned n_azimuth = e_theta_re->n_cols;              // Number of azimuth angles in the pattern
     const unsigned n_pattern_samples = n_azimuth * n_elevation; // Number of samples in the pattern
     const unsigned n_out = i_element->n_elem;                   // Number of elements in the output
-    const unsigned n_ang = azimuth->n_cols;                     // Number of angles to be interpolated
+    const int n_ang = azimuth->n_cols;                          // Number of angles to be interpolated
 
     bool per_element_angles = azimuth->n_rows > 1 ? true : false;
     bool per_element_rotation = orientation->n_cols > 1 ? true : false;
@@ -112,23 +110,26 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
         const dataType *p_az_local = per_element_angles ? &p_az_global[a * n_out] : &p_az_global[a];
         const dataType *p_el_local = per_element_angles ? &p_el_global[a * n_out] : &p_el_global[a];
 
+        // Decare and initialize all local variables
+        unsigned i_up = 0, i_un = 0, i_vp = 0, i_vn = 0;   // Indices for reading the pattern
+        dataType up = one, un = zero, vp = one, vn = zero; // Relative weights for interpolation
+        dataType cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
+        dataType az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
+
         for (unsigned o = 0; o < n_out; o++)
         {
             // Check if we need to update the angles for the current output index "o"
             bool update_angles = per_element_angles || per_element_rotation || per_angle_rotation || o == 0;
 
             // Transform input angles to Cartesian coordinates
-            dataType cAZi, sAZi, cELi, sELi, Cx, Cy;
             if (per_element_angles || o == 0)
-            {
-                sAZi = sin(*p_az_local), cAZi = cos(*p_az_local++);
-                sELi = sin(*p_el_local), cELi = cos(*p_el_local++) + R1;
+                sAZi = sin(*p_az_local), cAZi = cos(*p_az_local++),
+                sELi = sin(*p_el_local), cELi = cos(*p_el_local++) + R1,
                 Cx = cELi * cAZi, Cy = cELi * sAZi;
-            }
 
             // Apply rotation (Co = R * Ci) for antenna pattern interpolation
             // Transform from Cartesian coordinates to geographic coordinates
-            dataType az, el, sin_gamma, cos_gamma, dx, dy, dz;
+
             arma::uword Rp_a = per_angle_rotation ? a : 0, Rp_o = per_element_rotation ? o : 0;
             const dataType *Rp = R_typed.slice_colptr(Rp_a, Rp_o);
             if (update_angles)
@@ -157,7 +158,7 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
             }
 
             // Calculate the projected distance
-            dataType dst;
+            dataType dst = zero;
             if (write_dist)
             {
                 dst = dx * p_element_pos[3 * o] + dy * p_element_pos[3 * o + 1] + dz * p_element_pos[3 * o + 2];
@@ -168,8 +169,6 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
             }
 
             // Calc. indices for reading the pattern and relative weights for interpolation
-            unsigned i_up, i_un, i_vp, i_vn; // Indices for reading the pattern
-            dataType up, un, vp, vn;         // Relative weights for interpolation
             if (update_angles)
             {
                 i_up = 0, i_un = 0, up = one, un = zero;
@@ -261,11 +260,11 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                 gAr = fAr * gAr, gBr = fBr * gBr, gCr = fCr * gCr, gDr = fDr * gDr;
 
                 // Declare variables
-                dataType gEr, gEi, ampE, gFr, gFi, ampF, fLr, fLi, cPhase;
-                bool linear_int;
+                dataType cPhase = gAr * gBr + gAi * gBi; // Cosine of phase
+                bool linear_int = cPhase < tS;
+                dataType gEr = zero, gEi = zero, ampE = zero, gFr = zero, gFi = zero, ampF = zero, fLr = zero, fLi = zero;
 
                 // Interpolation for point E
-                cPhase = gAr * gBr + gAi * gBi, linear_int = cPhase < tS;
                 if (linear_int) // Linear interpolation
                     fLr = un * fAr + up * fBr, fLi = un * fAi + up * fBi;
                 if (cPhase > tL) // Spherical interpolation
