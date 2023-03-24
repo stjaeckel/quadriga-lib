@@ -69,15 +69,14 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     if (node.empty()) // Parse all arrayant nodes and extract id to build layout
     {
         arma::Mat<unsigned> tmp;
-        node_name = pfx + "arrayant";
+        std::string node_name = pfx + "arrayant";
         for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
         {
-            pugi::xml_attribute attr = node_arrayant.first_attribute();
-            std::string attr_value = attr.value();
-            attr_value = attr_value.empty() && tmp.empty() ? "1" : attr_value;
-            attr_value = attr_value.empty() ? "0" : attr_value;
+            std::string val = node_arrayant.first_attribute().value();
+            val = val.empty() && tmp.empty() ? "1" : val;
+            val = val.empty() ? "0" : val;
             tmp.reshape(1, tmp.n_elem + 1);
-            tmp(0, tmp.n_elem - 1) = std::stoi(attr_value);
+            tmp(0, tmp.n_elem - 1) = std::stoi(val);
         }
         *layout = tmp;
     }
@@ -181,7 +180,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
 
     for (unsigned el = 0; el < n_elements; el++)
     {
-        // Read magnitude if Vertical Component
+        // Read magnitude of Vertical Component
         node_name = pfx + "EthetaMag";
         attr_name = "el";
         attr_value = std::to_string(el + 1);
@@ -293,28 +292,275 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                     const arma::Mat<dtype> *element_pos,
                                     const arma::Mat<dtype> *coupling_re, const arma::Mat<dtype> *coupling_im,
                                     const dtype *center_frequency,
-                                    const arma::Mat<unsigned> *layout)
+                                    const arma::Mat<unsigned> *layout,
+                                    unsigned *id_in_file)
 {
+
+    std::string pfx = ""; // Set the default prefix
+    int ID = id;          // Copy ID
+
+    // Try to load an exisiting xml file. If it exists, load it to
+    // "pugi::xml_document" otherwise create a new "pugi::xml_document"
+    pugi::xml_document doc;
+    pugi::xml_parse_result result = doc.load_file(fn.c_str());
+    pugi::xml_node node_qdant, node_arrayant;
+
+    // List of ids in the output
+    arma::Mat<unsigned> ids;
+
+    if (result.status == pugi::status_file_not_found)
+    {
+        // Add a new QDANT node
+        doc.reset();
+        node_qdant = doc.append_child("qdant");
+        node_qdant.append_attribute("xmlns").set_value("http://www.quadriga-channel-model.de");
+
+        if (ID > 1) // Write a layout node containing the ID
+            node_qdant.append_child("layout").text().set(ID);
+        else
+            ID = 1;
+
+        node_arrayant = node_qdant.append_child("arrayant");
+        node_arrayant.append_attribute("id").set_value(ID);
+        ids(0, ids.n_elem - 1) = ID;
+    }
+
+    else if (result.status != pugi::status_ok)
+        return result.description();
+
+    else // File exists
+    {
+        node_qdant = doc.first_child();
+        if (node_qdant.empty() || strcmp(node_qdant.name(), "qdant") != 0)
+            return "Exisiting file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
+
+        // Read the namespace identifier from file
+        pugi::xml_attribute attr = node_qdant.first_attribute();
+        if (!attr.empty())
+        {
+            std::string namespc = attr.name();
+            if (namespc.length() == 5 && namespc == "xmlns")
+                pfx = "";
+            else if (namespc.substr(0, 6) == "xmlns:")
+                pfx = namespc.substr(6) + ":";
+            else
+                return "Exisiting file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
+        }
+
+        // Read all exisiting IDs in the file
+        std::string node_name = pfx + "arrayant";
+        for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
+        {
+            std::string val = node_arrayant.attribute("id").value();
+            val = val.empty() && ids.empty() ? "1" : val;
+            val = val.empty() ? "0" : val;
+            ids.reshape(1, ids.n_elem + 1);
+            ids(0, ids.n_elem - 1) = std::stoi(val);
+        }
+
+        // Search for existing arrayant in file if ID is given
+        if (ID > 0)
+        {
+            // Find ID in file
+            std::string attr_name = "id", attr_value = std::to_string(ID);
+            node_arrayant = node_qdant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
+
+            if (node_arrayant.empty()) // Append new arrayant to file
+            {
+                node_arrayant = node_qdant.append_child("arrayant");
+                node_arrayant.append_attribute("id").set_value(ID);
+                ids(0, ids.n_elem - 1) = ID;
+            }
+            else // Overwrite existing arrayant
+                node_arrayant.remove_children();
+        }
+        else // ID not given
+        {
+            ID = ids.n_elem == 0 ? 1 : ids.max() + 1;
+            node_arrayant = node_qdant.append_child("arrayant");
+            node_arrayant.append_attribute("id").set_value(ID);
+            ids(0, ids.n_elem - 1) = ID;
+        }
+    }
+
+    if (node_arrayant.empty())
+        return "Something went wrong.";
+
+    // Write data
+    node_arrayant.append_child("name").text().set(name->c_str());
+    node_arrayant.append_child("CenterFrequency").text().set(*center_frequency);
+
+    arma::uword NoElements = e_theta_re->n_slices;
+    if (NoElements > 1)
+        node_arrayant.append_child("NoElements").text().set(NoElements);
+
+    std::ostringstream strm;
+    std::string str;
+
+    // Element pos
+    element_pos->t().raw_print(strm);
+    str = strm.str();
+    std::replace(str.begin(), str.end(), ' ', ',');
+    std::replace(str.begin(), str.end(), '\n', ' ');
+    str.erase(str.size() - 1);
+    node_arrayant.append_child("ElementPosition").text().set(str.c_str());
+    strm.str("");
+
+    const dtype rad2deg = dtype(57.295779513082323);
+    const dtype ten = dtype(10.0);
+
+    // Elevation grid
+    arma::Row<dtype> row_vec_tmp = elevation_grid->t() * rad2deg;
+    row_vec_tmp.raw_print(strm);
+    str = strm.str();
+    str.erase(str.size() - 1);
+    node_arrayant.append_child("ElevationGrid").text().set(str.c_str());
+    strm.str("");
+
+    // Azimuth grid
+    row_vec_tmp = azimuth_grid->t() * rad2deg;
+    row_vec_tmp.raw_print(strm);
+    str = strm.str();
+    str.erase(str.size() - 1);
+    node_arrayant.append_child("AzimuthGrid").text().set(str.c_str());
+    strm.str("");
+
+    // Coupling absolute value
+    arma::Mat<dtype> mat_tmp = arma::square(*coupling_re) + arma::square(*coupling_im);
+    mat_tmp.transform([](dtype x)
+                      { return std::sqrt(x); });
+    mat_tmp.t().raw_print(strm);
+    str = strm.str();
+    std::replace(str.begin(), str.end(), ' ', ',');
+    std::replace(str.begin(), str.end(), '\n', ' ');
+    str.erase(str.size() - 1);
+    node_arrayant.append_child("CouplingAbs").text().set(str.c_str());
+    strm.str("");
+
+    // Coupling phase
+    mat_tmp = arma::atan2(*coupling_im, *coupling_re) * rad2deg;
+    mat_tmp.t().raw_print(strm);
+    str = strm.str();
+    std::replace(str.begin(), str.end(), ' ', ',');
+    std::replace(str.begin(), str.end(), '\n', ' ');
+    str.erase(str.size() - 1);
+    node_arrayant.append_child("CouplingPhase").text().set(str.c_str());
+    strm.str("");
+
+    // Write filed components
+    auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
+    {
+        pugi::xml_node node_pat;
+        for (arma::uword i = 0; i < NoElements; i++)
+        {
+            mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
+            mat_tmp.transform([ten](dtype x)
+                              { return ten * std::log10(x); });
+
+            bool valid = arma::any(arma::vectorise(mat_tmp) > -200);
+
+            if (valid) // Write magnitude
+            {
+                std::string node_name_x = eName + "Mag";
+                mat_tmp.raw_print(strm, "\n");
+                str = strm.str();
+                str.erase(0, 1);
+                node_pat = node_arrayant.append_child(node_name_x.c_str());
+                node_pat.append_attribute("el").set_value(i);
+                node_pat.text().set(str.c_str());
+                strm.str("");
+            }
+
+            if (valid) // Calculate phase
+            {
+                mat_tmp = arma::atan2(eIm->slice(i), eRe->slice(i)) * rad2deg;
+                valid = arma::any(arma::vectorise(abs(mat_tmp)) > 0.001);
+            }
+
+            if (valid) // Write phase
+            {
+                std::string node_name_x = eName + "Phase";
+                mat_tmp.raw_print(strm, "\n");
+                str = strm.str();
+                str.erase(0, 1);
+                node_pat = node_arrayant.append_child(node_name_x.c_str());
+                node_pat.append_attribute("el").set_value(i);
+                node_pat.text().set(str.c_str());
+                strm.str("");
+            }
+        }
+        return;
+    };
+    write_e_field(e_theta_re, e_theta_im, "Etheta");
+    write_e_field(e_phi_re, e_phi_im, "Ephi");
+
+    // Process layout data
+    std::string node_name = pfx + "layout";
+    pugi::xml_node node_layout = node_qdant.child(node_name.c_str());
+    if (node_layout.empty())
+        node_layout = node_qdant.prepend_child(node_name.c_str());
+    else
+        node_layout.remove_children();
+
+    if (layout->empty()) // Layout not given
+    {
+        strm.str("");
+        ids.raw_print(strm);
+        str = strm.str();
+        str.erase(str.size() - 1);
+        node_layout.text().set(str.c_str());
+    }
+    else // Layout is given
+    {
+        // Validate layout
+        bool valid = true;
+        auto ids2 = arma::vectorise(ids);
+        auto layout_validator = [&ids2, &valid](const unsigned &val)
+        {
+            if (!arma::any(ids2 == val))
+                valid = false;
+        };
+        layout->for_each(layout_validator);
+
+        if (!valid)
+            return "Layout contains reference to non-existing array antenna!";
+
+        strm.str("");
+        layout->t().raw_print(strm);
+        str = strm.str();
+        std::replace(str.begin(), str.end(), ' ', ',');
+        std::replace(str.begin(), str.end(), '\n', ' ');
+        str.erase(str.size() - 1);
+        node_layout.text().set(str.c_str());
+    }
+
+    bool success = doc.save_file(fn.c_str(), "");
+    if (!success)
+        return "Error saving file";
+
+    *id_in_file = ID;
     return "";
 }
 
 // Declare templates
 template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
-                                    const std::string *name,
-                                    const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,
-                                    const arma::Cube<float> *e_phi_re, const arma::Cube<float> *e_phi_im,
-                                    const arma::Col<float> *azimuth_grid, const arma::Col<float> *elevation_grid,
-                                    const arma::Mat<float> *element_pos,
-                                    const arma::Mat<float> *coupling_re, const arma::Mat<float> *coupling_im,
-                                    const float *center_frequency,
-                                    const arma::Mat<unsigned> *layout);
+                                             const std::string *name,
+                                             const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,
+                                             const arma::Cube<float> *e_phi_re, const arma::Cube<float> *e_phi_im,
+                                             const arma::Col<float> *azimuth_grid, const arma::Col<float> *elevation_grid,
+                                             const arma::Mat<float> *element_pos,
+                                             const arma::Mat<float> *coupling_re, const arma::Mat<float> *coupling_im,
+                                             const float *center_frequency,
+                                             const arma::Mat<unsigned> *layout,
+                                             unsigned *id_in_file);
 
 template std::string qd_arrayant_qdant_write(const std::string fn, const int id,
-                                    const std::string *name,
-                                    const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
-                                    const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,
-                                    const arma::Col<double> *azimuth_grid, const arma::Col<double> *elevation_grid,
-                                    const arma::Mat<double> *element_pos,
-                                    const arma::Mat<double> *coupling_re, const arma::Mat<double> *coupling_im,
-                                    const double *center_frequency,
-                                    const arma::Mat<unsigned> *layout);
+                                             const std::string *name,
+                                             const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
+                                             const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,
+                                             const arma::Col<double> *azimuth_grid, const arma::Col<double> *elevation_grid,
+                                             const arma::Mat<double> *element_pos,
+                                             const arma::Mat<double> *coupling_re, const arma::Mat<double> *coupling_im,
+                                             const double *center_frequency,
+                                             const arma::Mat<unsigned> *layout,
+                                             unsigned *id_in_file);

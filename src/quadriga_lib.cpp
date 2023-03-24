@@ -75,8 +75,16 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::s
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    std::cout << "Library called" << std::endl;
-    return 0;
+    unsigned id_in_file = 0;
+    error_message = qd_arrayant_qdant_write(fn, id, &name, &e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
+                                            &azimuth_grid, &elevation_grid, &element_pos,
+                                            &coupling_re, &coupling_im, &center_frequency, &layout,
+                                            &id_in_file);
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    return id_in_file;
 }
 
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
