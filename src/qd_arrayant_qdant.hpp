@@ -41,6 +41,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                                     const arma::Mat<dtype> *element_pos,
                                     const arma::Mat<dtype> *coupling_re, const arma::Mat<dtype> *coupling_im,
                                     const dtype *center_frequency,
-                                    const arma::Mat<unsigned> *layout);
+                                    const arma::Mat<unsigned> *layout,
+                                    unsigned *id_in_file);
 
 #endif

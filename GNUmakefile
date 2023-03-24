@@ -12,7 +12,7 @@ ARMA_H      = external/armadillo-11.4.2/include
 PUGIXML_H   = external/pugixml-1.13/src
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
+CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
 LIBS        = -lgomp #-lblas
 
 # Sourcees

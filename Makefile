@@ -18,7 +18,8 @@ PUGIXML_H   = external\pugixml-1.13\src
 CCFLAGS     = /EHsc /std:c++17 /nologo /MD /MP #/Wall 
 
 all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64   +quadriga_lib/geo2cart.mexw64   \
-       +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64   +quadriga_lib/version.mexw64
+       +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
+	   +quadriga_lib/version.mexw64
 
 # Library files
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
@@ -41,6 +42,9 @@ build\quadriga_lib_combined.lib:   build\quadriga_lib.obj   build\quadriga_tools
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/arrayant_qdant_read.mexw64:   mex\arrayant_qdant_read.cpp   build\quadriga_lib_combined.lib
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib/arrayant_qdant_write.mexw64:   mex\arrayant_qdant_write.cpp   build\quadriga_lib_combined.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   build\quadriga_tools.obj
