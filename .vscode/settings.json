@@ -3,6 +3,7 @@
         "arma",
         "arrayant",
         "dtype",
+        "exisiting",
         "memptr"
     ],
     "files.associations": {

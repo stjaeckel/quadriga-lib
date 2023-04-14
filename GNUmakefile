@@ -7,9 +7,13 @@ OCT   = mkoctfile
 
 all:        mex_octave   mex_matlab
 
-# External library headers
+# External headers
 ARMA_H      = external/armadillo-11.4.2/include
 PUGIXML_H   = external/pugixml-1.13/src
+
+# External pre-compiled libraries
+CATCH2_LIB  = -I external/Catch2-3.3.2-Linux/include -L external/Catch2-3.3.2-Linux/lib -lCatch2
+ARMA_LIB    = -I external/armadillo-11.4.2-Linux/include -L external/armadillo-11.4.2-Linux/lib -larmadillo
 
 # Configurations
 CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
@@ -25,12 +29,17 @@ mex         = $(wildcard mex/*.cpp)
 mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 
+test:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o
+	$(CC) $(CCFLAGS) $^ -o test -I include $(ARMA_LIB) $(CATCH2_LIB)
+	./test
+	rm test
+
 # Individual Library files
 build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I $(ARMA_H) -I $(PUGIXML_H) -I src -I include $(LIBS)
+	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I $(PUGIXML_H) -I src -I include $(LIBS)
 
 build/%.o:   src/%.cpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I $(ARMA_H) -I src -I include $(LIBS)
+	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I src -I include $(LIBS)
 
 build/quadriga_lib_combined.o:   build/quadriga_lib.o   build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
 	ld -r -o $@ $^

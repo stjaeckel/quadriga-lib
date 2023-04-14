@@ -55,6 +55,7 @@ namespace quadriga_lib
             // Read array antenna object and layout from QDANT file
             arrayant(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
             arrayant(std::string fn, unsigned id);
+            arrayant(std::string fn);
 
             // Write array antenna object and layout to QDANT file, returns id in file
             unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);

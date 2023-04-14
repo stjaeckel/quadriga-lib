@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?><qdant xmlns:xx="test">
+<xx:layout>1,1 1,1 1,1</xx:layout>
+<xx:arrayant id="1">
+<xx:AzimuthGrid>-90 -45 0 45 90</xx:AzimuthGrid>
+<xx:ElevationGrid>-90 0 90</xx:ElevationGrid>
+<xx:EphiMag>0  0  0  0  0  0  0  0  0  0  0  0  0  0  0</xx:EphiMag>
+<xx:EphiPhase>90  90  90  90  90  90  90  90  90  90  90  90  90  90  90</xx:EphiPhase>
+<xx:EthetaMag>3  3  3  3  3  3  3  3  3  3  3  3  3  3  3</xx:EthetaMag>
+<xx:EthetaPhase>-90 -90 -90 -90 -90 -90 -90 -90 -90 -90 -90 -90 -90 -90 -90</xx:EthetaPhase>
+<xx:ElementPosition>1,2,3</xx:ElementPosition>
+<xx:CouplingAbs>1</xx:CouplingAbs>
+<xx:CouplingPhase>45</xx:CouplingPhase>
+<xx:CenterFrequency>3e9</xx:CenterFrequency>
+</xx:arrayant></qdant>

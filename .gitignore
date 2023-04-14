@@ -1,1 +1,3 @@
 build/*
+external/Catch2-3.3.2-Linux
+external/Catch2-3.3.2-win64
