@@ -79,6 +79,7 @@ clean:
 	- rm +quadriga_lib/*.manifest
 	- rm +quadriga_lib/*.exp
 	- rm +quadriga_lib/*.lib
+	- rm *.obj
 
 tidy: clean 
 	- rm +quadriga_lib/*.mex*
