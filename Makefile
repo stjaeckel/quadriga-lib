@@ -10,9 +10,13 @@
 CC    = cl
 MEX   = "C:\Program Files\MATLAB\R2022b\bin\mex"
 
-# Static library headers
+# External headers
 ARMA_H      = external\armadillo-11.4.2\include
 PUGIXML_H   = external\pugixml-1.13\src
+
+# External pre-compiled libraries
+CATCH2_LIB  = /Iexternal\Catch2-3.3.2-win64\include /link Catch2.lib /LIBPATH:external\Catch2-3.3.2-win64\lib
+ARMA_LIB    = /Iexternal\armadillo-11.4.2-win64\include /link armadillo.lib /LIBPATH:external\armadillo-11.4.2-win64\lib
 
 # Configurations
 CCFLAGS     = /EHsc /std:c++17 /nologo /MD /MP #/Wall 
@@ -21,18 +25,23 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
 	   +quadriga_lib/version.mexw64
 
+test:   tests\quadriga_lib_catch2_tests.cpp   build\quadriga_lib_combined.lib
+	$(CC) $(CCFLAGS) /Fetest.exe $** /Iinclude /I$(ARMA_H) $(CATCH2_LIB)
+	test
+	del test.exe
+
 # Library files
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude $(ARMA_LIB)
 
 build\quadriga_tools.obj:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude $(ARMA_LIB)
 
 build\qd_arrayant_interpolate.obj:   src\qd_arrayant_interpolate.cpp   src\qd_arrayant_interpolate.hpp
-	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude $(ARMA_LIB)
 
 build\qd_arrayant_qdant.obj:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_qdant.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H) /I$(PUGIXML_H)
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(PUGIXML_H) $(ARMA_LIB) 
 
 build\quadriga_lib_combined.lib:   build\quadriga_lib.obj   build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj
  	lib /OUT:$@ $**

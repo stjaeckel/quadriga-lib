@@ -1,4 +1,4 @@
-function run_mex_tests
+function quadriga_lib_mex_tests
 
 % MOxUnit Setup
 tmp = which('MOxUnitTestSuite');

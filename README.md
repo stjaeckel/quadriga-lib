@@ -9,6 +9,20 @@ An antenna model describes the radiated power, phase and polarization as a funct
 
 This library implements an interface to both, Matlab and Octave as well as to c++. It is currently in an early stage of development. Only the array antenna interpolation in polar-spheric basis is implemented. However, this is the most computing intense operation since it is performed millions of times in a typical radio simulation. Using this library, e.g. in QuaDRiGa can significantly improve the performance.
 
+## Software Structure
+### Folders
+
+| Folder | Content |
+|:---|:---|
+`++quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
+`build` | Folder for temporary build files
+`external` | External tools used in the project
+`include` | Public header files for the `quadriga-lib` library
+`mex` | Source files for the MEX interface
+`src` | C++ source files and private header files
+`tests` | Test files
+`tools` | Other tools used in the project
+
 ## Compilation
 
 Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are already included in the `+quadriga_lib` folder. To use them e.g. in QuaDRiGa-NG (https://github.com/stjaeckel/QuaDRiGa-NG), simply add the arrayant_lib folder to your MATLAB/Octave path.
@@ -34,19 +48,58 @@ Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are al
 * Open the `Makefile` (e.g. by `notepad Makefile`) set the correct MATLAB mex path 
 * Run `nmake`
 
-## Software Structure
-### Folders
+### Armadillo Library
+* Armadillo is a high quality linear algebra library used by `quadriga-lib`
+* Follow these steps to compile Armadillo locally
+* Extract the armadillo zip-file from "https://arma.sourceforge.net" into external
+* Compiling for Linux:
+```
+cd external
+mkdir build && mkdir armadillo-11.4.2-Linux
+cmake -S armadillo-11.4.2 -B build/ -D CMAKE_INSTALL_PREFIX=armadillo-11.4.2-Linux
+cd build
+make && make install
+cd .. && rm -rf build
+```
+* For Windows, you need the Build Tools for Visual Studio (see above)
+* Open "x64 Native Tools Command Prompt" and run the following commands
+```
+cd external
+mkdir build 
+mkdir armadillo-11.4.2-win64
+cmake -S armadillo-11.4.2 -B build -D CMAKE_INSTALL_PREFIX=armadillo-11.4.2-win64
+cmake --build build --config Release --target install
+```
 
-| Folder | Content |
-|:---|:---|
-`++quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
-`build` | Folder for temporary build files
-`external` | External tools used in the project
-`include` | Public header files for the `quadriga-lib` library
-`mex` | Source files for the MEX interface
-`src` | C++ source files and private header files
-`tests` | Test files
-`tools` | Other tools used in the project
+### Catch2 (v3) Unit Test Framework
+* This is only needed if you want to run the tests
+* Follow these steps to compile Catch2 locally
+* Extract the zip-file from "https://github.com/catchorg/Catch2" to external
+* Compiling for Linux:
+```
+cd external
+mkdir build && mkdir Catch2-3.3.2-Linux
+cmake -S Catch2-3.3.2 -B build
+cd build && make && make package
+tar -xzf Catch2-*-Linux.tar.gz -C ../
+cd .. && rm -rf build
+```
+* You should now be able to run `make test` from the `quadriga-lib` base Folder
+* For Windows, you need the Build Tools for Visual Studio (see above) and NSIS (https://nsis.sourceforge.io)
+* Open "x64 Native Tools Command Prompt" and run the following commands
+```
+cd external
+mkdir build
+cmake -S Catch2-3.3.2 -B build
+cmake --build build --config Release --target package
+```
+* This creates an exe-File inside of the `build`-Folder that can be installed to the "Catch2-3.3.2-win64" folder in `external`
+* Alternatively, you can extract the exe-File
+* After this, you can delete the `build` and `Catch2-3.3.2` folders
+* You should now be able to run `nmake test` from the `quadriga-lib` base Folder
+
+
+
 
 ## Distribution License
 

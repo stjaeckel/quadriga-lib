@@ -62,6 +62,15 @@ quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(std::string fn, un
     layout.reset();
 }
 
+// ARRAYANT Constructor : Read from file
+template <typename dtype>
+quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::arrayant(std::string fn)
+{
+    arma::Mat<unsigned> layout;
+    *this = quadriga_lib::arrayant<dtype>(fn, 1, &layout);
+    layout.reset();
+}
+
 // ARRAYANT : Write to QDANT file
 template <typename dtype>
 unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout)
