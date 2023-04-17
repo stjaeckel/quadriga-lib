@@ -18,7 +18,8 @@
 #include <catch2/catch_session.hpp>
 
 // Include test cases
-#include "catch2_tests/test_qdant_read.cpp"
+//#include "catch2_tests/test_qdant_read.cpp"
+#include "catch2_tests/test_qdant_write.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

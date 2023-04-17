@@ -59,6 +59,8 @@ namespace quadriga_lib
 
             // Write array antenna object and layout to QDANT file, returns id in file
             unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);
+            unsigned qdant_write(std::string fn, unsigned id);
+            unsigned qdant_write(std::string fn);
 
             // Validates integrity, returns error message and sets 'valid' property accordingly
             std::string validate();

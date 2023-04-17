@@ -22,6 +22,7 @@ LIBS        = -lgomp #-lblas
 # Sourcees
 src     	= $(wildcard src/*.cpp)
 mex         = $(wildcard mex/*.cpp)
+tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
 .PHONY: 	clean all tidy mex_matlab mex_octave
 .SECONDARY: $(src:src/%.cpp=build/%.o)
@@ -29,10 +30,11 @@ mex         = $(wildcard mex/*.cpp)
 mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 
-test:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o
-	$(CC) $(CCFLAGS) $^ -o test -I include $(ARMA_LIB) $(CATCH2_LIB)
-	./test
-	rm test
+test:   test_bin
+	./test_bin
+
+test_bin:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o $(tests)
+	$(CC) $(CCFLAGS) $< build/quadriga_lib_combined.o -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
 
 # Individual Library files
 build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
