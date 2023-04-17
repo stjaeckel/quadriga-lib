@@ -25,10 +25,12 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
 	   +quadriga_lib/version.mexw64
 
-test:   tests\quadriga_lib_catch2_tests.cpp   build\quadriga_lib_combined.lib
-	$(CC) $(CCFLAGS) /Fetest.exe $** /Iinclude /I$(ARMA_H) $(CATCH2_LIB)
-	test
-	del test.exe
+test:   tests\test.exe
+	tests\test.exe
+
+tests\test.exe:   tests\quadriga_lib_catch2_tests.cpp   build\quadriga_lib_combined.lib
+	$(CC) $(CCFLAGS) /Fetests\test.exe $** /Iinclude /I$(ARMA_H) $(CATCH2_LIB)
+	del quadriga_lib_catch2_tests.obj
 
 # Library files
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp

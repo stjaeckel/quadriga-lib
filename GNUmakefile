@@ -30,10 +30,10 @@ tests 		= $(wildcard tests/catch2_tests/*.cpp)
 mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 
-test:   test_bin
-	./test_bin
+test:   tests/test_bin
+	tests/test_bin
 
-test_bin:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o $(tests)
+tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o   $(tests)
 	$(CC) $(CCFLAGS) $< build/quadriga_lib_combined.o -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
 
 # Individual Library files
