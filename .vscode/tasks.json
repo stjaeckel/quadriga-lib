@@ -15,6 +15,16 @@
     "tasks": [
         {
             "type": "shell",
+            "label": "Build and run tests",
+            "command": "make -j32 && make test",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
             "label": "cl.exe build active file",
             "command": "cl.exe",
             "args": [
@@ -46,10 +56,7 @@
             "problemMatcher": [
                 "$msCompile"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "detail": "Vom Debugger generierte Aufgabe."
         }
     ]

@@ -322,7 +322,8 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
         node_arrayant = node_qdant.append_child("arrayant");
         node_arrayant.append_attribute("id").set_value(ID);
-        ids(0, ids.n_elem - 1) = ID;
+        ids.zeros(1, 1);
+        ids(0, 0) = ID;
     }
 
     else if (result.status != pugi::status_ok)

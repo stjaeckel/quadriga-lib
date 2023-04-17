@@ -96,6 +96,24 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::s
     return id_in_file;
 }
 
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id)
+{
+
+    arma::Mat<unsigned> layout;
+    unsigned id_in_file = qdant_write(fn, id, layout);
+    return id_in_file;
+}
+
+template <typename dtype>
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn)
+{
+
+    arma::Mat<unsigned> layout;
+    unsigned id_in_file = qdant_write(fn, 0, layout);
+    return id_in_file;
+}
+
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
 template <typename dtype>
 unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation()
