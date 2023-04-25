@@ -67,6 +67,74 @@ TEST_CASE("Arrayant reading from QDANT file - Minimal test")
     std::remove("test.qdant");
 }
 
+TEST_CASE("Arrayant reading from QDANT file - Multi-Element Array")
+{
+    std::ofstream f;
+    f.open("test2.qdant");
+    f << "<qdant><arrayant>" << std::endl;
+    f << "<name>bla</name>" << std::endl;
+    f << "<NoElements>2</NoElements >" << std::endl;
+    f << "<ElevationGrid>-90 -45 0 45 90</ElevationGrid>" << std::endl;
+    f << "<AzimuthGrid>-180 0 90</AzimuthGrid>" << std::endl;
+    f << "<EthetaMag   el=\"1\">1 2 3 4 5 6 7 8 9 10 11 12 13 14 15</EthetaMag>" << std::endl;
+    f << "<EphiMag     el=\"1\">2 3 4 5 6 7 8 9 10 11 12 13 14 15 16</EphiMag>" << std::endl;
+    f << "<EthetaMag   el=\"2\">3 4 5 6 7 8 9 10 11 12 13 14 15 16 17</EthetaMag>" << std::endl;
+    f << "<EphiMag     el=\"2\">4 5 6 7 8 9 10 11 12 13 14 15 16 17 18</EphiMag>" << std::endl;
+    f << "<EthetaPhase el=\"1\">1 1 1 1 1 1 1 1 1 1 1 1 1 1 1</EthetaPhase>" << std::endl;
+    f << "<EphiPhase   el=\"1\">2 2 2 2 2 2 2 2 2 2 2 2 2 2 2</EphiPhase>" << std::endl;
+    f << "<EthetaPhase el=\"2\">3 3 3 3 3 3 3 3 3 3 3 3 3 3 3</EthetaPhase>" << std::endl;
+    f << "<EphiPhase   el=\"2\">4 4 4 4 4 4 4 4 4 4 4 4 4 4 4</EphiPhase>" << std::endl;
+    f << "<CouplingAbs>1 2 3 4 5 6</CouplingAbs>" << std::endl;
+    f << "<CouplingPhase>5 10 15 20 25 30</CouplingPhase>" << std::endl;
+    f << "</arrayant></qdant>" << std::endl;
+    f.close();
+
+    double pi = arma::datum::pi;
+    quadriga_lib::arrayant<double> x("test2.qdant");
+
+    arma::mat A = 20 * log10(sqrt(x.e_theta_re.slice(0) % x.e_theta_re.slice(0) + x.e_theta_im.slice(0) % x.e_theta_im.slice(0)));
+    arma::mat B = arma::reshape(arma::linspace<arma::vec>(1, 15, 15), 3, 5).t();
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = 20 * log10(sqrt(x.e_phi_re.slice(0) % x.e_phi_re.slice(0) + x.e_phi_im.slice(0) % x.e_phi_im.slice(0)));
+    B = arma::reshape(arma::linspace<arma::vec>(2, 16, 15), 3, 5).t();
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = 20 * log10(sqrt(x.e_theta_re.slice(1) % x.e_theta_re.slice(1) + x.e_theta_im.slice(1) % x.e_theta_im.slice(1)));
+    B = arma::reshape(arma::linspace<arma::vec>(3, 17, 15), 3, 5).t();
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = 20 * log10(sqrt(x.e_phi_re.slice(1) % x.e_phi_re.slice(1) + x.e_phi_im.slice(1) % x.e_phi_im.slice(1)));
+    B = arma::reshape(arma::linspace<arma::vec>(4, 18, 15), 3, 5).t();
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = arma::atan2(x.e_theta_im.slice(0), x.e_theta_re.slice(0));
+    B.fill(pi / 180.0);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = arma::atan2(x.e_phi_im.slice(0), x.e_phi_re.slice(0));
+    B.fill(2.0 * pi / 180.0);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = arma::atan2(x.e_theta_im.slice(1), x.e_theta_re.slice(1));
+    B.fill(3.0 * pi / 180.0);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = arma::atan2(x.e_phi_im.slice(1), x.e_phi_re.slice(1));
+    B.fill(4.0 * pi / 180.0);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = sqrt(x.coupling_re % x.coupling_re + x.coupling_im % x.coupling_im);
+    B = arma::reshape(arma::linspace<arma::vec>(1, 6, 6), 2, 3);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-13));
+
+    A = arma::atan2(x.coupling_im, x.coupling_re) * 180.0 / pi;
+    B = arma::reshape(arma::linspace<arma::vec>(5, 30, 6), 2, 3);
+    CHECK(arma::approx_equal(A, B, "absdiff", 1e-12));
+
+    std::remove("test2.qdant");
+}
+
 TEST_CASE("Arrayant reading from QDANT file - More complex test")
 {
     std::ofstream f;

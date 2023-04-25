@@ -74,3 +74,119 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
 
     std::remove("test.qdant");
 }
+
+TEST_CASE("Arrayant writing/reading from QDANT file - Multi-Element Array")
+{
+    double pi = arma::datum::pi;
+
+    quadriga_lib::arrayant<double> ant;
+    ant.name = "bla";
+    ant.elevation_grid = arma::linspace<arma::vec>(-90.0, 90.0, 5) * pi / 180.0;
+    ant.azimuth_grid = {-pi, 0.0f, 0.5f * pi};
+
+    ant.e_theta_re = arma::cube(5, 3, 2, arma::fill::value(1.0));
+    ant.e_theta_im = arma::cube(5, 3, 2, arma::fill::value(2.0));
+    ant.e_phi_re = arma::cube(5, 3, 2, arma::fill::value(3.0));
+    ant.e_phi_im = arma::cube(5, 3, 2, arma::fill::value(4.0));
+
+    ant.e_theta_re.slice(1).fill(5.0);
+    ant.e_theta_im.slice(1).fill(6.0);
+    ant.e_phi_re.slice(1).fill(7.0);
+    ant.e_phi_im.slice(1).fill(8.0);
+
+    arma::mat A = arma::reshape(arma::linspace<arma::vec>(1.0, 6.0, 6), 2, 3);
+    arma::mat B = arma::reshape(arma::linspace<arma::vec>(2.0, 7.0, 6), 2, 3);
+    ant.coupling_re = A;
+    ant.coupling_im = B;
+
+    unsigned id = ant.qdant_write("test2.qdant");
+    CHECK(id == 1);
+
+    quadriga_lib::arrayant<double> x("test2.qdant");
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(1.0)), x.e_theta_re.slice(0), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(2.0)), x.e_theta_im.slice(0), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(3.0)), x.e_phi_re.slice(0), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(4.0)), x.e_phi_im.slice(0), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(5.0)), x.e_theta_re.slice(1), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(6.0)), x.e_theta_im.slice(1), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(7.0)), x.e_phi_re.slice(1), "absdiff", 1e-5));
+    CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(8.0)), x.e_phi_im.slice(1), "absdiff", 2e-5));
+    CHECK(arma::approx_equal(A, x.coupling_re, "absdiff", 1e-5));
+    CHECK(arma::approx_equal(B, x.coupling_im, "absdiff", 1e-5));
+
+    std::remove("test2.qdant");
+}
+
+TEST_CASE("Arrayant writing to QDANT file - Complex test")
+{
+    // Create new file
+    std::ofstream f;
+    f.open("test.qdant");
+    f << "<qdant><arrayant>" << std::endl;
+    f << "<name>bla</name>" << std::endl;
+    f << "<ElevationGrid>-90 -45 0 45 90</ElevationGrid>" << std::endl;
+    f << "<AzimuthGrid>-180 0 90</AzimuthGrid>" << std::endl;
+    f << "<EthetaMag>1 2 3 4 5 6 7 8 9 10 11 12 13 14 15</EthetaMag>" << std::endl;
+    f << "</arrayant></qdant>" << std::endl;
+    f.close();
+
+    double pi = arma::datum::pi;
+
+    quadriga_lib::arrayant<double> ant;
+    ant.azimuth_grid = {-0.75 * pi, 0.0, 0.75 * pi, pi};
+    ant.elevation_grid = {-0.45 * pi, 0.0, 0.45 * pi};
+
+    arma::mat A = arma::linspace(1.0, 12.0, 12);
+    A.reshape(3, 4);
+
+    arma::cube B;
+    B.zeros(3, 4, 1);
+    B.slice(0) = A;
+
+    ant.e_theta_re = B * 0.5;
+    ant.e_theta_im = B * 0.002;
+    ant.e_phi_re = -B;
+    ant.e_phi_im = -B * 0.001;
+
+    arma::mat C = {1.0, 2.0, 4.0};
+    ant.element_pos = C.t();
+
+    ant.coupling_re = {1.0};
+    ant.coupling_im = {0.1};
+    ant.center_frequency = 2.0e9;
+    ant.name = "name";
+
+    // Append new antenna
+    unsigned id = ant.qdant_write("test.qdant");
+
+    CHECK(id == 2);
+
+    arma::Mat<unsigned> layout, layout2;
+
+    quadriga_lib::arrayant<float> antI;
+    antI = quadriga_lib::arrayant<float>("test.qdant", 1, &layout2);
+
+    CHECK(antI.name == "bla");
+
+    antI = quadriga_lib::arrayant<float>("test.qdant", 2);
+    CHECK(antI.name == "name");
+
+    layout = {1, 2};
+    CHECK(arma::all(arma::vectorise(layout2 - layout) == 0));
+
+    id = ant.qdant_write("test.qdant", 112);
+    CHECK(id == 112);
+
+    // Layout can only contain valid entries (error expected)
+    layout = {{1, 2, 112}, {112, 112, 6}};
+    REQUIRE_THROWS_AS(ant.qdant_write("test.qdant", 5, layout), std::invalid_argument);
+
+    id = ant.qdant_write("test.qdant", 6, layout);
+    CHECK(id == 6);
+
+    antI = quadriga_lib::arrayant<float>("test.qdant", 6, &layout2);
+
+    CHECK(arma::all(arma::vectorise(layout2 - layout) == 0));
+
+    std::remove("test.qdant");
+}

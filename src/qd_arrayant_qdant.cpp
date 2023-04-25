@@ -370,6 +370,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             {
                 node_arrayant = node_qdant.append_child("arrayant");
                 node_arrayant.append_attribute("id").set_value(ID);
+                ids.reshape(1, ids.n_elem + 1);
                 ids(0, ids.n_elem - 1) = ID;
             }
             else // Overwrite existing arrayant
@@ -380,6 +381,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             ID = ids.n_elem == 0 ? 1 : ids.max() + 1;
             node_arrayant = node_qdant.append_child("arrayant");
             node_arrayant.append_attribute("id").set_value(ID);
+            ids.reshape(1, ids.n_elem + 1);
             ids(0, ids.n_elem - 1) = ID;
         }
     }
@@ -399,13 +401,16 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     std::string str;
 
     // Element pos
-    element_pos->t().raw_print(strm);
-    str = strm.str();
-    std::replace(str.begin(), str.end(), ' ', ',');
-    std::replace(str.begin(), str.end(), '\n', ' ');
-    str.erase(str.size() - 1);
-    node_arrayant.append_child("ElementPosition").text().set(str.c_str());
-    strm.str("");
+    if (!element_pos->empty())
+    {
+        element_pos->t().raw_print(strm);
+        str = strm.str();
+        std::replace(str.begin(), str.end(), ' ', ',');
+        std::replace(str.begin(), str.end(), '\n', ' ');
+        str.erase(str.size() - 1);
+        node_arrayant.append_child("ElementPosition").text().set(str.c_str());
+        strm.str("");
+    }
 
     const dtype rad2deg = dtype(57.295779513082323);
     const dtype ten = dtype(10.0);
@@ -467,7 +472,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                 str = strm.str();
                 str.erase(0, 1);
                 node_pat = node_arrayant.append_child(node_name_x.c_str());
-                node_pat.append_attribute("el").set_value(i);
+                node_pat.append_attribute("el").set_value(i + 1);
                 node_pat.text().set(str.c_str());
                 strm.str("");
             }
@@ -485,7 +490,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                 str = strm.str();
                 str.erase(0, 1);
                 node_pat = node_arrayant.append_child(node_name_x.c_str());
-                node_pat.append_attribute("el").set_value(i);
+                node_pat.append_attribute("el").set_value(i + 1);
                 node_pat.text().set(str.c_str());
                 strm.str("");
             }
