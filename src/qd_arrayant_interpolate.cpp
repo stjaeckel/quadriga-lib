@@ -42,8 +42,8 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
     // ant              ARRAYANT object containing electric field description           Size [n_elevation, n_azimuth, n_elements]
     // azimuth          Azimuth angles for interpolation in [rad],                      Size [1, n_ang] or [n_out, n_ang]
     // elevation        Elevation angles for interpolation in [rad],                    Size [1, n_ang] or [n_out, n_ang]
-    // i_element        Element indices, 1-based, optional, Default: 1:n_elements       Vector of length "n_out"
-    // orientation      Orientation of the array antenna (bank, tilt, head) in [rad],   Size [3, 1] or [3, n_out] or [3, 1, n_ang] or [3, n_out, n_ang]
+    // i_element        Element indices, 1-based                                        Vector of length "n_out"
+    // orientation      Orientation of the array antenna (bank, tilt, head) in [rad],   Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
     // element_pos      Element positions                                               Size [3, n_out]
 
     // Outputs:

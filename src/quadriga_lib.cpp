@@ -16,8 +16,10 @@
 // ------------------------------------------------------------------------
 
 #include <stdexcept>
+#include <cstring> // For std::memcopy
 #include "quadriga_lib.hpp"
 #include "qd_arrayant_qdant.hpp"
+#include "qd_arrayant_interpolate.hpp"
 
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
@@ -139,6 +141,174 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports()
         return unsigned(coupling_im.n_cols);
     else
         return unsigned(coupling_re.n_cols);
+}
+
+// ARRAYANT METHOD : Interpolation
+template <typename dtype>
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
+                                                                      const arma::Mat<dtype> elevation,
+                                                                      const arma::Col<unsigned> i_element,
+                                                                      const arma::Cube<dtype> orientation,
+                                                                      const arma::Mat<dtype> element_pos_i,
+                                                                      arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                                                                      arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                                                                      arma::Mat<dtype> *dist,
+                                                                      arma::Mat<dtype> *azimuth_loc,
+                                                                      arma::Mat<dtype> *elevation_loc)
+{
+    // Check if arrayant object is valid
+    std::string error_message = "";
+    if (valid != 0 || valid != 1)
+        error_message = validate();
+    else if (valid == 0)
+        error_message = "Array antenna object is invalid";
+
+    arma::uword n_out = azimuth.n_rows;
+    arma::uword n_ang = azimuth.n_cols;
+
+    if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
+        error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
+
+    if (i_element.n_elem == 0)
+        error_message = "Input 'i_element' cannot be empty.";
+
+    if (orientation.n_elem == 0)
+        error_message = "Input 'orientation' cannot be empty.";
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Check if values are valid
+    unsigned n_elements = unsigned(e_theta_re.n_slices);
+    for (auto val = i_element.begin(); val != i_element.end(); ++val)
+        if (*val < 1 || *val > n_elements)
+            error_message = "Input 'i_element' must have values between 1 and 'n_elements'.";
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Process orientation
+    n_out = i_element.n_elem;
+    arma::uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    if (o1 != 3)
+        error_message = "Input 'orientation' must have 3 elements on the first dimension.";
+    else if (o2 != 1 && o2 != n_out)
+        error_message = "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.";
+    else if (o3 != 1 && o3 != n_ang)
+        error_message = "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.";
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Process element_pos
+    arma::Mat<dtype> element_pos_interp(3, n_out);
+    if (!element_pos_i.empty())
+    {
+        if (element_pos_i.n_rows != 3 || element_pos_i.n_cols != n_out)
+            error_message = "Alternative element positions 'element_pos_i' must have 'n_elements' elements.";
+
+        if (error_message.length() != 0)
+            throw std::invalid_argument(error_message.c_str());
+
+        const dtype *ptrI = element_pos_i.memptr();
+        dtype *ptrO = element_pos_interp.memptr();
+        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
+    }
+    else if (!element_pos.empty())
+    {
+        dtype *ptrI = element_pos.memptr(), *ptrO = element_pos_interp.memptr();
+        for (unsigned i = 0; i < n_out; i++)
+            std::memcpy(&ptrO[3 * i], &ptrI[3 * i_element[i]], 3 * sizeof(dtype));
+    }
+
+    // Resize output variables
+    if (V_re->n_rows != n_out || V_re->n_cols != n_ang)
+        V_re->set_size(n_out, n_ang);
+    if (V_im->n_rows != n_out || V_im->n_cols != n_ang)
+        V_im->set_size(n_out, n_ang);
+    if (H_re->n_rows != n_out || H_re->n_cols != n_ang)
+        H_re->set_size(n_out, n_ang);
+    if (H_im->n_rows != n_out || H_im->n_cols != n_ang)
+        H_im->set_size(n_out, n_ang);
+    if (dist->n_rows != n_out || dist->n_cols != n_ang)
+        dist->set_size(n_out, n_ang);
+    if (azimuth_loc->n_rows != n_out || azimuth_loc->n_cols != n_ang)
+        azimuth_loc->set_size(n_out, n_ang);
+    if (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang)
+        elevation_loc->set_size(n_out, n_ang);
+
+    // Call private library function
+    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
+                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
+                            &i_element, &orientation, &element_pos_interp,
+                            V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc);
+}
+
+// ARRAYANT METHOD : Interpolation
+template <typename dtype>
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
+                                                                      const arma::Mat<dtype> elevation,
+                                                                      const arma::Cube<dtype> orientation,
+                                                                      arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                                                                      arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                                                                      arma::Mat<dtype> *dist)
+{
+    // Check if arrayant object is valid
+    std::string error_message = "";
+    if (valid != 0 || valid != 1)
+        error_message = validate();
+    else if (valid == 0)
+        error_message = "Array antenna object is invalid";
+
+    arma::uword n_out = azimuth.n_rows;
+    arma::uword n_ang = azimuth.n_cols;
+
+    if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
+        error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
+
+    if (orientation.n_elem == 0)
+        error_message = "Input 'orientation' cannot be empty.";
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    n_out = e_theta_re.n_slices;
+    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n_out, n_out);
+
+    if (element_pos.empty())
+        element_pos.zeros(3, n_out);
+
+    // Process orientation
+    arma::uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    if (o1 != 3)
+        error_message = "Input 'orientation' must have 3 elements on the first dimension.";
+    else if (o2 != 1 && o2 != n_out)
+        error_message = "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.";
+    else if (o3 != 1 && o3 != n_ang)
+        error_message = "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.";
+
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Resize output variables
+    if (V_re->n_rows != n_out || V_re->n_cols != n_ang)
+        V_re->set_size(n_out, n_ang);
+    if (V_im->n_rows != n_out || V_im->n_cols != n_ang)
+        V_im->set_size(n_out, n_ang);
+    if (H_re->n_rows != n_out || H_re->n_cols != n_ang)
+        H_re->set_size(n_out, n_ang);
+    if (H_im->n_rows != n_out || H_im->n_cols != n_ang)
+        H_im->set_size(n_out, n_ang);
+    if (dist->n_rows != n_out || dist->n_cols != n_ang)
+        dist->set_size(n_out, n_ang);
+
+    arma::Mat<dtype> azimuth_loc;
+    arma::Mat<dtype> elevation_loc;
+
+    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
+                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
+                            &i_element, &orientation, &element_pos,
+                            V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc);
 }
 
 // ARRAYANT METHOD : Validates correctness of the member functions
