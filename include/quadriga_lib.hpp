@@ -46,7 +46,7 @@ namespace quadriga_lib
             arma::Mat<dtype> element_pos;                // Element positions (optional), Size: Empty or [3, n_elements]
             arma::Mat<dtype> coupling_re;                // Coupling matrix, real part (optional), Size: [n_elements, n_ports]
             arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]
-            dtype center_frequency = dtype(299792448.0); // Center frequency in [Hz] (optional)
+            dtype center_frequency = dtype(299792458.0); // Center frequency in [Hz] (optional)
             int valid = -1;                              // Indicator of data integrity (-1 = unknown, 0 = ERROR, 1 = OK)
             arrayant(){};                                // Default constructor
 
@@ -95,7 +95,9 @@ namespace quadriga_lib
             void combine_pattern();
 
             // Generator functions
-            void generate_omni(); // Isotropic radiator, vertical polarization
+            void generate_omni();                                                  // Isotropic radiator, vertical polarization
+            void generate_dipole();                                                // Short dipole radiating with vertical polarization
+            void generate_half_wave_dipole();                                      // Half-wave dipole radiating with vertical polarization
 
             // Validates integrity, returns error message and sets 'valid' property accordingly
             std::string validate();
