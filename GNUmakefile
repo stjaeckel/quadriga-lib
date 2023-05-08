@@ -59,6 +59,7 @@ build/quadriga_tools.o:   include/quadriga_tools.hpp
 build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
 
 # List of Octave-MEX files and their dependencies
++quadriga_lib/arrayant_combine_pattern.mex:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_interpolate.mex:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_read.mex:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_write.mex:   build/quadriga_lib_combined.o
@@ -68,6 +69,7 @@ build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
 +quadriga_lib/version.mex:   build/quadriga_lib_combined.o
 
 # List of MATLAB-MEX files and their dependencies
++quadriga_lib/arrayant_combine_pattern.mexa64:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_interpolate.mexa64:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_read.mexa64:   build/quadriga_lib_combined.o
 +quadriga_lib/arrayant_qdant_write.mexa64:   build/quadriga_lib_combined.o
