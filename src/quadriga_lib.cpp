@@ -481,7 +481,47 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_omni()
     element_pos.zeros(3, 1);
     coupling_re.ones(1, 1);
     coupling_im.zeros(1, 1);
-    center_frequency = dtype(299792448.0);
+    valid = 1;
+}
+
+// Generate : Short dipole radiating with vertical polarization
+template <typename dtype>
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_dipole()
+{
+    dtype pi = dtype(arma::datum::pi);
+    name = "dipole";
+    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    e_theta_re.zeros(181, 361, 1);
+    e_theta_im.zeros(181, 361, 1);
+    e_phi_re.zeros(181, 361, 1);
+    e_phi_im.zeros(181, 361, 1);
+    e_theta_re.slice(0) = arma::repmat(elevation_grid, 1, 361);
+    e_theta_re = arma::cos(0.999999 * e_theta_re) * std::sqrt(1.499961);
+    element_pos.zeros(3, 1);
+    coupling_re.ones(1, 1);
+    coupling_im.zeros(1, 1);
+    valid = 1;
+}
+
+// Generate : Half-wave dipole radiating with vertical polarization
+template <typename dtype>
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_half_wave_dipole()
+{
+    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
+    name = "half-wave-dipole";
+    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    e_theta_re.zeros(181, 361, 1);
+    e_theta_im.zeros(181, 361, 1);
+    e_phi_re.zeros(181, 361, 1);
+    e_phi_im.zeros(181, 361, 1);
+    e_theta_re.slice(0) = arma::repmat(elevation_grid, 1, 361);
+    e_theta_re = arma::cos(pih * arma::sin(0.999999 * e_theta_re)) / arma::cos(0.999999 * e_theta_re);
+    e_theta_re = e_theta_re * dtype(1.280968208215292);
+    element_pos.zeros(3, 1);
+    coupling_re.ones(1, 1);
+    coupling_im.zeros(1, 1);
     valid = 1;
 }
 

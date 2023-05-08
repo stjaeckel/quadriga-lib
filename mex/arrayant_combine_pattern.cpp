@@ -40,14 +40,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  3 - e_phi_im_c      Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_ports]
 
     if (nlhs = !4 || nrhs < 9)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Wrong number of input/output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", "Wrong number of input/output arguments.");
 
     // Validate data types
     bool use_single = false;
     if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
         use_single = mxIsSingle(prhs[0]);
     else
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
+        mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
 
     for (int i = 1; i < 9; i++)
         if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
@@ -82,7 +82,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Validate the data integrity
     std::string error_message = use_single ? arrayant_single.validate() : arrayant_double.validate();
     if (!error_message.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", error_message.c_str());
+        mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", error_message.c_str());
 
     // Call library function
     if (use_single)

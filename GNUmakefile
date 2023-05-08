@@ -33,8 +33,8 @@ mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 test:   tests/test_bin
 	tests/test_bin
 
-tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   build/quadriga_lib_combined.o   $(tests)
-	$(CC) $(CCFLAGS) $< build/quadriga_lib_combined.o -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
+tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
+	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
 
 # Individual Library files
 build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
@@ -43,14 +43,14 @@ build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.h
 build/%.o:   src/%.cpp
 	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I src -I include $(LIBS)
 
-build/quadriga_lib_combined.o:   build/quadriga_lib.o   build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
-	ld -r -o $@ $^
+lib/quadriga_lib.a:   build/quadriga_lib.o   build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
+	ar rcs $@ $^
 
 # MEX interface files
-+quadriga_lib/%.mexa64:   mex/%.cpp
++quadriga_lib/%.mexa64:   mex/%.cpp   lib/quadriga_lib.a
 	$(MEX) -outdir +quadriga_lib $^ -I$(ARMA_H) -Isrc -Iinclude $(LIBS)
 
-+quadriga_lib/%.mex:   mex/%.cpp
++quadriga_lib/%.mex:   mex/%.cpp   lib/quadriga_lib.a
 	$(OCT) --mex -o $@ $^ -I$(ARMA_H) -Isrc -Iinclude $(LIBS) -s
 
 # List of additional dependencies
@@ -58,32 +58,13 @@ build/quadriga_lib.o:   include/quadriga_lib.hpp
 build/quadriga_tools.o:   include/quadriga_tools.hpp
 build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
 
-# List of Octave-MEX files and their dependencies
-+quadriga_lib/arrayant_combine_pattern.mex:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_interpolate.mex:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_qdant_read.mex:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_qdant_write.mex:   build/quadriga_lib_combined.o
-+quadriga_lib/calc_rotation_matrix.mex:   build/quadriga_tools.o
-+quadriga_lib/cart2geo.mex:   build/quadriga_tools.o
-+quadriga_lib/geo2cart.mex:   build/quadriga_tools.o
-+quadriga_lib/version.mex:   build/quadriga_lib_combined.o
-
-# List of MATLAB-MEX files and their dependencies
-+quadriga_lib/arrayant_combine_pattern.mexa64:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_interpolate.mexa64:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_qdant_read.mexa64:   build/quadriga_lib_combined.o
-+quadriga_lib/arrayant_qdant_write.mexa64:   build/quadriga_lib_combined.o
-+quadriga_lib/calc_rotation_matrix.mexa64:   build/quadriga_tools.o
-+quadriga_lib/cart2geo.mexa64:   build/quadriga_tools.o
-+quadriga_lib/geo2cart.mexa64:   build/quadriga_tools.o
-+quadriga_lib/version.mexa64:   build/quadriga_lib_combined.o
-
 clean:
 	- rm build/*
 	- rm +quadriga_lib/*.manifest
 	- rm +quadriga_lib/*.exp
 	- rm +quadriga_lib/*.lib
-	- rm *.obj
+		- rm *.obj
 
 tidy: clean 
 	- rm +quadriga_lib/*.mex*
+	- rm lib/*
