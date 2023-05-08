@@ -64,7 +64,7 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, false, true);
+    return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, false, false);
 }
 
 // Reinterpret MATLAB Array to Armadillo Matrix
@@ -73,7 +73,7 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, false, true);
+    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, false, false);
 }
 
 // Reinterpret MATLAB Array to Armadillo Cube
@@ -86,7 +86,7 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input)
     unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, true);
+    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, false);
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input

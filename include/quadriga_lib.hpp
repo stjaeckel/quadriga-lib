@@ -87,6 +87,16 @@ namespace quadriga_lib
                              arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im, // Interpolated horizontal (e_phi) field,       Size [n_out, n_ang]
                              arma::Mat<dtype> *dist);                        // Projected element distances,                 Size [n_out, n_ang]
 
+            // Copy antenna elements, enlarges array size if needed (0-based indices)
+            void copy_element(unsigned source, arma::Col<unsigned> destination);
+            void copy_element(unsigned source, unsigned destination);
+
+            // Calculates a virtual pattern of the given array by applying coupling and element positions
+            void combine_pattern();
+
+            // Generator functions
+            void generate_omni(); // Isotropic radiator, vertical polarization
+
             // Validates integrity, returns error message and sets 'valid' property accordingly
             std::string validate();
         };
