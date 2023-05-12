@@ -89,9 +89,7 @@ try
     id_file = quadriga_lib.arrayant_qdant_write( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
         azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name,...
         'testm.qdant',5, layout);
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 id_file = quadriga_lib.arrayant_qdant_write( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
@@ -103,14 +101,3 @@ id_file = quadriga_lib.arrayant_qdant_write( e_theta_re, e_theta_im, e_phi_re, e
 assertEqual(layout,layoutI);
 
 delete('testm.qdant');
-
-% ---------------- HELPER FUNCTIONS ------------------
-function error_exception_not_thrown(error_id)
-error('moxunit:exceptionNotRaised', 'Exception ''%s'' not thrown', error_id);
-
-function error_if_wrong_id_thrown(expected_error_id, thrown_error_id)
-if ~strcmp(thrown_error_id, expected_error_id)
-    error('moxunit:wrongExceptionRaised',...
-        'Exception raised with id ''%s'' expected id ''%s''',...
-        thrown_error_id,expected_error_id);
-end

@@ -23,12 +23,13 @@ CCFLAGS     = /EHsc /std:c++17 /nologo /MD /MP #/Wall
 
 all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64   +quadriga_lib/geo2cart.mexw64   \
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
-	   +quadriga_lib/version.mexw64   +quadriga_lib/arrayant_combine_pattern.mexw64
+	   +quadriga_lib/version.mexw64   +quadriga_lib/arrayant_combine_pattern.mexw64   +quadriga_lib/interp.mexw64   \
+	   +quadriga_lib/arrayant_generate.mexw64
 
 test:   tests\test.exe
 	tests\test.exe
 
-tests\test.exe:   tests\quadriga_lib_catch2_tests.cpp   build\quadriga_lib_combined.lib
+tests\test.exe:   tests\quadriga_lib_catch2_tests.cpp   lib\quadriga_lib.lib
 	$(CC) $(CCFLAGS) /Fetests\test.exe $** /Iinclude /I$(ARMA_H) $(CATCH2_LIB)
 	del quadriga_lib_catch2_tests.obj
 
@@ -45,32 +46,38 @@ build\qd_arrayant_interpolate.obj:   src\qd_arrayant_interpolate.cpp   src\qd_ar
 build\qd_arrayant_qdant.obj:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_qdant.hpp
 	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(PUGIXML_H) $(ARMA_LIB) 
 
-build\quadriga_lib_combined.lib:   build\quadriga_lib.obj   build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj
+lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj
  	lib /OUT:$@ $**
 
 # MEX interface files
-+quadriga_lib/arrayant_combine_pattern.mexw64:   mex\arrayant_combine_pattern.cpp   build\quadriga_lib_combined.lib
++quadriga_lib/arrayant_combine_pattern.mexw64:   mex\arrayant_combine_pattern.cpp   lib\quadriga_lib.lib
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/arrayant_interpolate.mexw64:   mex\arrayant_interpolate.cpp   build\quadriga_lib_combined.lib
++quadriga_lib/arrayant_interpolate.mexw64:   mex\arrayant_interpolate.cpp   lib\quadriga_lib.lib
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/arrayant_qdant_read.mexw64:   mex\arrayant_qdant_read.cpp   build\quadriga_lib_combined.lib
++quadriga_lib/arrayant_qdant_read.mexw64:   mex\arrayant_qdant_read.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/arrayant_qdant_write.mexw64:   mex\arrayant_qdant_write.cpp   build\quadriga_lib_combined.lib
++quadriga_lib/arrayant_qdant_write.mexw64:   mex\arrayant_qdant_write.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   build\quadriga_tools.obj
++quadriga_lib/calc_rotation_matrix.mexw64:   mex\calc_rotation_matrix.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/cart2geo.mexw64:   mex\cart2geo.cpp   build\quadriga_tools.obj
++quadriga_lib/cart2geo.mexw64:   mex\cart2geo.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/geo2cart.mexw64:   mex\geo2cart.cpp   build\quadriga_tools.obj
++quadriga_lib/geo2cart.mexw64:   mex\geo2cart.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib/version.mexw64:   mex\version.cpp   build\quadriga_lib_combined.lib
++quadriga_lib/version.mexw64:   mex\version.cpp   lib\quadriga_lib.lib
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib/interp.mexw64:   mex\interp.cpp   lib\quadriga_lib.lib
+ 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib/arrayant_generate.mexw64:   mex\arrayant_generate.cpp   lib\quadriga_lib.lib
  	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Clean up instructions

@@ -111,10 +111,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         layout = qd_mex_typecast_Mat<unsigned>(prhs[13], "layout");
 
     // Call library function
-    if (use_single)
-        id = arrayant_single.qdant_write(fn, id, layout);
-    else
-        id = arrayant_double.qdant_write(fn, id, layout);
+    try
+    {
+        if (use_single)
+            id = arrayant_single.qdant_write(fn, id, layout);
+        else
+            id = arrayant_double.qdant_write(fn, id, layout);
+    }
+    catch (const std::invalid_argument &ex)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:unknown_error", ex.what());
+    }
+    catch (...)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+    }
 
     // Create output variable
     plhs[0] = mxCreateNumericMatrix(1, 1, mxUINT32_CLASS, mxREAL);

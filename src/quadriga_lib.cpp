@@ -525,6 +525,33 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_half_wave_dip
     valid = 1;
 }
 
+// Generate : An antenna with a custom gain in elevation and azimuth
+// template <typename dtype>
+// void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
+// {
+//     dtype pi = dtype(arma::datum::pi);
+//     name = "custom";
+//     azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+//     elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+
+//     // dtype a = 1.0, dm = 0.5, x = 1e99, delta = 1e99, dr = 1.0;
+//     // for (unsigned lp = 0; lp < 5000; lp++)
+//     // {
+//     //     an = lp == 0 ? a : a + dr * dm;
+//     //     delta = lp == 0 ? 1e99 : std::abs(a - an);
+//     //     C = rear_gain_lin + (1.0 - rear_gain_lin) * std::exp(-an * az_3dB * az_3dB);
+//     // }
+
+//     e_theta_re.ones(181, 361, 1);
+//     e_theta_im.zeros(181, 361, 1);
+//     e_phi_re.zeros(181, 361, 1);
+//     e_phi_im.zeros(181, 361, 1);
+//     element_pos.zeros(3, 1);
+//     coupling_re.ones(1, 1);
+//     coupling_im.zeros(1, 1);
+//     valid = 1;
+// }
+
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>
 std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()

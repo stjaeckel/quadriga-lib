@@ -19,8 +19,8 @@
 #include <stdexcept>
 
 // FUNCTION: Calculate rotation matrix R from roll, pitch, and yaw angles (given by rows in the input "orientation")
-template <typename dataType>
-arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dataType> orientation, bool invert_y_axis, bool transposeR)
+template <typename dtype>
+arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR)
 {
     // Input:       orientation         Orientation vectors (rows = bank (roll), tilt (pitch), heading (yaw)) in [rad], Size [3, n_row, n_col]
     //              invert_y_axis       Inverts the y-axis
@@ -34,7 +34,7 @@ arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dataType> orien
 
     unsigned n_row = orientation.n_cols, n_col = orientation.n_slices;
     arma::cube rotation = arma::cube(9, n_row, n_col, arma::fill::zeros); // Always double precision
-    const dataType *p_orientation = orientation.memptr();
+    const dtype *p_orientation = orientation.memptr();
     double *p_rotation = rotation.memptr();
 
     for (unsigned iC = 0; iC < n_col; iC++)
@@ -77,8 +77,8 @@ template arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<float>
 template arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<double>, bool invert_y_axis, bool transposeR);
 
 // FUNCTION: Transform from geographic coordinates to Cartesian coordinates
-template <typename dataType>
-arma::cube quadriga_tools::geo2cart(const arma::Mat<dataType> azimuth, const arma::Mat<dataType> elevation, const arma::Mat<dataType> length)
+template <typename dtype>
+arma::cube quadriga_tools::geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length)
 {
     // Inputs:          azimuth         Azimuth angles in [rad],                Size [n_row, n_col]
     //                  elevation       Elevation angles in [rad],              Size [n_row, n_col]
@@ -111,8 +111,8 @@ template arma::cube quadriga_tools::geo2cart(const arma::Mat<float> azimuth, con
 template arma::cube quadriga_tools::geo2cart(const arma::Mat<double> azimuth, const arma::Mat<double> elevation, const arma::Mat<double> length);
 
 // FUNCTION: Transform from Cartesian coordinates to geographic coordinates
-template <typename dataType>
-arma::cube quadriga_tools::cart2geo(const arma::Cube<dataType> cart)
+template <typename dtype>
+arma::cube quadriga_tools::cart2geo(const arma::Cube<dtype> cart)
 {
     // Input:           cart            Cartesian coordinates,                  Size [3, n_row, n_col]
     // Output:          geo             geographic coordinates (az,el,len)      Size [n_row, n_col, 3]
@@ -140,3 +140,186 @@ arma::cube quadriga_tools::cart2geo(const arma::Cube<dataType> cart)
 }
 template arma::cube quadriga_tools::cart2geo(const arma::Cube<float> cart);
 template arma::cube quadriga_tools::cart2geo(const arma::Cube<double> cart);
+
+// 2D linear interpolation
+template <typename dtype>
+std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
+                                   const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
+{
+    constexpr dtype one = dtype(1.0), zero = dtype(0.0);
+    const arma::uword nx = input->n_cols, ny = input->n_rows, ne = input->n_slices, nxy = nx * ny;
+    const arma::uword mx = xo->n_elem, my = yo->n_elem;
+
+    if (input->n_elem == 0 || xi->n_elem != nx || yi->n_elem != ny || ne == 0)
+        return "Data dimensions must match the given number of sample points.";
+
+    if (mx == 0 || my == 0)
+        return "Output must have at least one sample point.";
+
+    if (output->n_rows != my || output->n_cols != mx || output->n_slices != ne)
+        output->set_size(my, mx, ne);
+
+    arma::uword *i_xp_vec = new arma::uword[mx], *i_xn_vec = new arma::uword[mx];
+    dtype *xp_vec = new dtype[mx], *xn_vec = new dtype[mx];
+
+    arma::uword *i_yp_vec = new arma::uword[my], *i_yn_vec = new arma::uword[my];
+    dtype *yp_vec = new dtype[my], *yn_vec = new dtype[my];
+
+#pragma omp parallel sections
+    {
+#pragma omp section
+        {
+            // Calculate the x-interpolation parameters
+            bool sorted = xi->is_sorted();
+            arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, nx - 1) : arma::sort_index(*xi);
+            arma::uword *p_ind = ind.memptr();
+            const dtype *pi = xi->memptr();
+
+            dtype *p_grid_srt = new dtype[nx];
+            if (!sorted)
+                for (arma::uword i = 0; i < nx; i++)
+                    p_grid_srt[i] = pi[p_ind[i]];
+            const dtype *p_grid = sorted ? pi : p_grid_srt;
+
+            dtype *p_diff = new dtype[nx];
+            *p_diff = one;
+            for (arma::uword i = 1; i < nx; i++)
+                p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
+
+            const dtype *po = xo->memptr();
+            for (arma::uword i = 0; i < mx; i++)
+            {
+                arma::uword ip = 0, in = 0;             // Indices for reading the input data
+                dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+                while (ip < nx && p_grid[ip] <= val)
+                    ip++;
+                if (ip == nx)
+                    in = --ip;
+                else if (ip != 0)
+                {
+                    in = ip--;
+                    wp = (p_grid[in] - val) * p_diff[in];
+                    wp = wp > one ? one : wp;
+                    wp = wp < zero ? zero : wp;
+                    wn = one - wp;
+                }
+                i_xp_vec[i] = p_ind[ip], i_xn_vec[i] = p_ind[in], xp_vec[i] = wp, xn_vec[i] = wn;
+            }
+            delete[] p_diff;
+            delete[] p_grid_srt;
+            ind.reset();
+        }
+#pragma omp section
+        {
+            // Calculate the y-interpolation parameters
+            bool sorted = yi->is_sorted();
+            arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, ny - 1) : arma::sort_index(*yi);
+            arma::uword *p_ind = ind.memptr();
+            const dtype *pi = yi->memptr();
+
+            dtype *p_grid_srt = new dtype[ny];
+            if (!sorted)
+                for (arma::uword i = 0; i < ny; i++)
+                    p_grid_srt[i] = pi[p_ind[i]];
+            const dtype *p_grid = sorted ? pi : p_grid_srt;
+
+            dtype *p_diff = new dtype[ny];
+            *p_diff = one;
+            for (arma::uword i = 1; i < ny; i++)
+                p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
+
+            const dtype *po = yo->memptr();
+            for (arma::uword i = 0; i < my; i++)
+            {
+                arma::uword ip = 0, in = 0;             // Indices for reading the input data
+                dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+                while (ip < ny && p_grid[ip] <= val)
+                    ip++;
+                if (ip == ny)
+                    in = --ip;
+                else if (ip != 0)
+                {
+                    in = ip--;
+                    wp = (p_grid[in] - val) * p_diff[in];
+                    wp = wp > one ? one : wp;
+                    wp = wp < zero ? zero : wp;
+                    wn = one - wp;
+                }
+                i_yp_vec[i] = p_ind[ip], i_yn_vec[i] = p_ind[in], yp_vec[i] = wp, yn_vec[i] = wn;
+            }
+            delete[] p_diff;
+            delete[] p_grid_srt;
+            ind.reset();
+        }
+    }
+
+    // Interpolate the input data and write to output memory
+    const dtype *p_input = input->memptr();
+#pragma omp parallel for    
+    for (int ie = 0; ie < ne; ie++)
+    {
+        dtype *p_output = output->slice_memptr(ie);
+        arma::uword offset = ie * nxy;
+        for (arma::uword ix = 0; ix < mx; ix++)
+        {
+            for (arma::uword iy = 0; iy < my; iy++)
+            {
+                arma::uword iA = offset + i_xp_vec[ix] * ny + i_yp_vec[iy];
+                arma::uword iB = offset + i_xn_vec[ix] * ny + i_yp_vec[iy];
+                arma::uword iC = offset + i_xp_vec[ix] * ny + i_yn_vec[iy];
+                arma::uword iD = offset + i_xn_vec[ix] * ny + i_yn_vec[iy];
+
+                dtype wA = xp_vec[ix] * yp_vec[iy];
+                dtype wB = xn_vec[ix] * yp_vec[iy];
+                dtype wC = xp_vec[ix] * yn_vec[iy];
+                dtype wD = xn_vec[ix] * yn_vec[iy];
+
+                *p_output++ = wA * p_input[iA] + wB * p_input[iB] + wC * p_input[iC] + wD * p_input[iD];
+            }
+        }
+    }
+
+    delete[] i_xp_vec;
+    delete[] i_xn_vec;
+    delete[] i_yp_vec;
+    delete[] i_yn_vec;
+    delete[] xp_vec;
+    delete[] xn_vec;
+    delete[] yp_vec;
+    delete[] yn_vec;
+
+    return "";
+}
+template std::string quadriga_tools::interp(const arma::Cube<float> *input, const arma::Col<float> *xi, const arma::Col<float> *yi,
+                                            const arma::Col<float> *xo, const arma::Col<float> *yo, arma::Cube<float> *output);
+template std::string quadriga_tools::interp(const arma::Cube<double> *input, const arma::Col<double> *xi, const arma::Col<double> *yi,
+                                            const arma::Col<double> *xo, const arma::Col<double> *yo, arma::Cube<double> *output);
+
+// 1D linear interpolation
+template <typename dtype>
+std::string quadriga_tools::interp(const arma::Mat<dtype> *input, const arma::Col<dtype> *xi,
+                                   const arma::Col<dtype> *xo, arma::Mat<dtype> *output)
+{
+    const arma::uword nx = input->n_rows, ne = input->n_cols;
+    const arma::uword mx = xo->n_elem;
+
+    if (input->n_elem == 0 || xi->n_elem != nx)
+        return "Data dimensions must match the given number of sample points.";
+
+    if (mx == 0)
+        return "Data dimensions must match the given number of sample points.";
+
+    if (output->n_rows != mx || output->n_cols != ne)
+        output->set_size(mx, ne);
+
+    // Reinterpret input matrices as cubes
+    const arma::Cube<dtype> input_cube = arma::Cube<dtype>(const_cast<dtype *>(input->memptr()), 1, nx, ne, false, true);
+    arma::Cube<dtype> output_cube = arma::Cube<dtype>(output->memptr(), 1, mx, ne, false, true);
+    arma::Col<dtype> y(1);
+
+    // Call 2D linear interpolation function
+    std::string error_message = quadriga_tools::interp(&input_cube, xi, &y, xo, &y, &output_cube);
+    return error_message;
+}
+template std::string quadriga_tools::interp(const arma::Mat<float> *input, const arma::Col<float> *xi, const arma::Col<float> *xo, arma::Mat<float> *output);
+template std::string quadriga_tools::interp(const arma::Mat<double> *input, const arma::Col<double> *xi, const arma::Col<double> *xo, arma::Mat<double> *output);

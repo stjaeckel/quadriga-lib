@@ -121,7 +121,7 @@ assertTrue( strcmp(name,'xxx') );
 %% Check error parsing
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
-    error_exception_not_thrown('quadriga_lib:qdant_read:error');
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % AzimuthGrid missing
@@ -133,9 +133,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % AzimuthGrid tag not closed correctly
@@ -148,9 +146,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % Wrong number of entries in EthetaMag
@@ -164,9 +160,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % Wrong number of entries in CouplingAbs
@@ -181,9 +175,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % CouplingPhase with multiple ports without CouplingAbs
@@ -197,9 +189,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % Not a XML File
@@ -209,9 +199,7 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 % Not a QDANT file (KML instead)
@@ -229,22 +217,9 @@ fclose(f);
 
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
-    error_exception_not_thrown('MATLAB:unexpectedCPPexception');
-catch expt
-    error_if_wrong_id_thrown('MATLAB:unexpectedCPPexception',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 end
 
 delete('test.qdant');
-
-% ---------------- HELPER FUNCTIONS ------------------
-function error_exception_not_thrown(error_id)
-error('moxunit:exceptionNotRaised', 'Exception ''%s'' not thrown', error_id);
-
-function error_if_wrong_id_thrown(expected_error_id, thrown_error_id)
-if ~strcmp(thrown_error_id, expected_error_id)
-    error('moxunit:wrongExceptionRaised',...
-        'Exception raised with id ''%s'' expected id ''%s''',...
-        thrown_error_id,expected_error_id);
-end
 
 

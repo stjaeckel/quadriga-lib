@@ -59,10 +59,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     arma::Mat<unsigned> layout;
-    if (use_single)
-        arrayant_single = quadriga_lib::arrayant<float>(fn, id, &layout);
-    else
-        arrayant_double = quadriga_lib::arrayant<double>(fn, id, &layout);
+
+    try
+    {
+        if (use_single)
+            arrayant_single = quadriga_lib::arrayant<float>(fn, id, &layout);
+        else
+            arrayant_double = quadriga_lib::arrayant<double>(fn, id, &layout);
+    }
+    catch (const std::invalid_argument &ex)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:unknown_error", ex.what());
+    }
+    catch (...)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+    }
 
     unsigned n_azimuth = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
     unsigned n_elevation = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
