@@ -18,6 +18,7 @@
 #include <catch2/catch_session.hpp>
 
 // Include test cases
+#include "catch2_tests/test_quadriga_tools.cpp"
 #include "catch2_tests/test_qdant_read.cpp"
 #include "catch2_tests/test_qdant_write.cpp"
 #include "catch2_tests/test_arrayant_interpolate.cpp"

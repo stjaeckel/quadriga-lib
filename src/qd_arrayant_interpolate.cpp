@@ -116,7 +116,7 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
         dataType cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
         dataType az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
 
-        for (unsigned o = 0; o < n_out; o++)
+        for (unsigned o = 0; o < n_out; o++)    
         {
             // Check if we need to update the angles for the current output index "o"
             bool update_angles = per_element_angles || per_element_rotation || per_angle_rotation || o == 0;

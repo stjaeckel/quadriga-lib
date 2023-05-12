@@ -23,14 +23,31 @@
 
 namespace quadriga_tools
 {
-    template <typename dataType> // float or double
-    arma::cube calc_rotation_matrix(const arma::Cube<dataType> orientation, bool invert_y_axis, bool transposeR);
+    template <typename dtype> // float or double
+    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR);
 
-    template <typename dataType> // float or double
-    arma::cube geo2cart(const arma::Mat<dataType> azimuth, const arma::Mat<dataType> elevation, const arma::Mat<dataType> length);
+    template <typename dtype> // float or double
+    arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);
 
-    template <typename dataType> // float or double
-    arma::cube cart2geo(const arma::Cube<dataType> cart);
+    template <typename dtype> // float or double
+    arma::cube cart2geo(const arma::Cube<dtype> cart);
+
+    // 2D linear interpolation (returns error message or empty string)
+    template <typename dtype>                          // Supported types: float or double
+    std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
+                       const arma::Col<dtype> *xi,     // x sample points of input; vector length nx
+                       const arma::Col<dtype> *yi,     // y sample points of input; vector length ny
+                       const arma::Col<dtype> *xo,     // x sample points of output; vector length mx
+                       const arma::Col<dtype> *yo,     // y sample points of output; vector length my
+                       arma::Cube<dtype> *output);     // Interpolated data; size [ my, mx, ne ]
+
+    // 1D linear interpolation (returns error message or empty string)
+    template <typename dtype>                         // Supported types: float or double
+    std::string interp(const arma::Mat<dtype> *input, // Input data; size [ nx, ne ], ne = multiple data sets
+                       const arma::Col<dtype> *xi,    // x sample points of input; vector length nx
+                       const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
+                       arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
+
 }
 
 #endif
