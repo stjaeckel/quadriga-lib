@@ -37,70 +37,81 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:interp:no_input", "Wrong number of input/output arguments.");
 
     bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
+    if (mxIsSingle(prhs[2]) || mxIsDouble(prhs[2]))
+        use_single = mxIsSingle(prhs[2]);
     else
         mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "Inputs must be provided in 'single' or 'double' precision.");
 
-    if ((use_single && !mxIsSingle(prhs[2])) || (!use_single && !mxIsDouble(prhs[2])))
-        mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "All inputs must have the same type: 'single' or 'double' precision");
-
-    if ((use_single && !mxIsSingle(prhs[3])) || (!use_single && !mxIsDouble(prhs[3])))
-        mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "All inputs must have the same type: 'single' or 'double' precision");
-
-    if (mxGetNumberOfElements(prhs[0]) == 0 || mxGetNumberOfElements(prhs[2]) == 0 || mxGetNumberOfElements(prhs[3]) == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "Inputs 'x', 'z', 'xc' cannot be empty.");
-
-    arma::fcube input_single, output_single;
-    arma::fvec xi_single, yi_single(1), xo_single, yo_single(1);
-
-    arma::cube input_double, output_double;
-    arma::vec xi_double, yi_double(1), xo_double, yo_double(1);
-
-    if (use_single)
-        xi_single = qd_mex_reinterpret_Col<float>(prhs[0]),
-        input_single = qd_mex_reinterpret_Cube<float>(prhs[2]),
-        xo_single = qd_mex_reinterpret_Col<float>(prhs[3]);
-    else
-        xi_double = qd_mex_reinterpret_Col<double>(prhs[0]),
-        input_double = qd_mex_reinterpret_Cube<double>(prhs[2]),
-        xo_double = qd_mex_reinterpret_Col<double>(prhs[3]);
-
-    if (mxGetNumberOfElements(prhs[1]) != 0)
-        if (use_single && mxIsSingle(prhs[1]))
-            yi_single = qd_mex_reinterpret_Col<float>(prhs[1]);
-        else if (!use_single && mxIsDouble(prhs[1]))
-            yi_double = qd_mex_reinterpret_Col<double>(prhs[1]);
-        else
-            mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "All inputs must have the same type: 'single' or 'double' precision");
-
-    if (nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
-        if (use_single && mxIsSingle(prhs[4]))
-            yo_single = qd_mex_reinterpret_Col<float>(prhs[4]);
-        else if (!use_single && mxIsDouble(prhs[4]))
-            yo_double = qd_mex_reinterpret_Col<double>(prhs[4]);
-        else
-            mexErrMsgIdAndTxt("quadriga_lib:interp:wrong_type", "All inputs must have the same type: 'single' or 'double' precision");
-
-    unsigned n_yo = use_single ? yo_single.n_elem : yo_double.n_elem;
-    unsigned n_xo = use_single ? xo_single.n_elem : xo_double.n_elem;
-    unsigned n_el = use_single ? input_single.n_slices : input_double.n_slices;
-
-    mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
-
-    if (use_single)
-        plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL),
-        output_single = arma::fcube((float *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
-    else
-        plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL),
-        output_double = arma::cube((double *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
-
-    // Call 2D linear interpolation function
     std::string error_message;
     if (use_single)
-        error_message = quadriga_tools::interp(&input_single, &xi_single, &yi_single, &xo_single, &yo_single, &output_single);
+    {
+        arma::fcube input = qd_mex_reinterpret_Cube<float>(prhs[2]);
+        arma::fvec xi, yi(1), xo, yo(1);
+
+        if (mxIsSingle(prhs[0]))
+            xi = qd_mex_reinterpret_Col<float>(prhs[0]);
+        else
+            xi = qd_mex_typecast_Col<float>(prhs[0], "xi");
+
+        if (mxGetNumberOfElements(prhs[1]) != 0)
+            if (mxIsSingle(prhs[1]))
+                yi = qd_mex_reinterpret_Col<float>(prhs[1]);
+            else
+                yi = qd_mex_typecast_Col<float>(prhs[1], "yi");
+
+        if (mxIsSingle(prhs[3]))
+            xo = qd_mex_reinterpret_Col<float>(prhs[3]);
+        else
+            xo = qd_mex_typecast_Col<float>(prhs[3], "xo");
+
+        if (nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
+            if (mxIsSingle(prhs[4]))
+                yo = qd_mex_reinterpret_Col<float>(prhs[4]);
+            else
+                yo = qd_mex_typecast_Col<float>(prhs[4], "yo");
+
+        unsigned n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
+
+        plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
+        arma::fcube output = arma::fcube((float *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
+        error_message = quadriga_tools::interp(&input, &xi, &yi, &xo, &yo, &output);
+    }
     else
-        error_message = quadriga_tools::interp(&input_double, &xi_double, &yi_double, &xo_double, &yo_double, &output_double);
+    {
+        arma::cube input = qd_mex_reinterpret_Cube<double>(prhs[2]);
+        arma::vec xi, yi(1), xo, yo(1);
+
+        if (mxIsDouble(prhs[0]))
+            xi = qd_mex_reinterpret_Col<double>(prhs[0]);
+        else
+            xi = qd_mex_typecast_Col<double>(prhs[0], "xi");
+
+        if (mxGetNumberOfElements(prhs[1]) != 0)
+            if (mxIsDouble(prhs[1]))
+                yi = qd_mex_reinterpret_Col<double>(prhs[1]);
+            else
+                yi = qd_mex_typecast_Col<double>(prhs[1], "yi");
+
+        if (mxIsDouble(prhs[3]))
+            xo = qd_mex_reinterpret_Col<double>(prhs[3]);
+        else
+            xo = qd_mex_typecast_Col<double>(prhs[3], "xo");
+
+        if (nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
+            if (mxIsDouble(prhs[4]))
+                yo = qd_mex_reinterpret_Col<double>(prhs[4]);
+            else
+                yo = qd_mex_typecast_Col<double>(prhs[4], "yo");
+
+        unsigned n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
+
+        plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
+        arma::cube output = arma::cube((double *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
+
+        error_message = quadriga_tools::interp(&input, &xi, &yi, &xo, &yo, &output);
+    }
 
     if (!error_message.empty())
         mexErrMsgIdAndTxt("quadriga_lib:interp:error", error_message.c_str());

@@ -21,7 +21,7 @@
 #include <armadillo>
 #include <string>
 
-#define QUADRIGA_LIB_VERSION v0_1_3
+#define QUADRIGA_LIB_VERSION v0_1_4
 
 namespace quadriga_lib
 {
