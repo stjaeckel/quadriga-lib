@@ -43,11 +43,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  4 - dist            Effective distances, optional                                   Size [n_out, n_ang]
     //  5 - azimuth_loc     Azimuth angles [rad] in local antenna coordinates, optional,    Size [n_out, n_ang]
     //  6 - elevation_loc   Elevation angles [rad] in local antenna coordinates, optional,  Size [n_out, n_ang]
+    //  7 - gamma           Polarization rotation angles in [rad], optional,                Size [n_out, n_ang]
 
     if (nrhs < 8 || nrhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:no_input", "Incorrect number of input arguments.");
 
-    if (nlhs < 4 || nlhs > 7)
+    if (nlhs < 4 || nlhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:no_output", "Incorrect number of output arguments.");
 
     // Validate data types
@@ -234,6 +235,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = mxCreateNumericMatrix(n_out, n_ang, mxDOUBLE_CLASS, mxREAL),
         elevation_loc_double = arma::mat((double *)mxGetData(plhs[6]), n_out, n_ang, false, true);
 
+    // Optional output "gamma"
+    arma::fmat gamma_single;
+    arma::mat gamma_double;
+    if (nlhs < 8 && use_single)
+        gamma_single = arma::fmat(0, 0);
+    else if (nlhs < 8 && !use_single)
+        gamma_double = arma::mat(0, 0);
+    else if (use_single)
+        plhs[7] = mxCreateNumericMatrix(n_out, n_ang, mxSINGLE_CLASS, mxREAL),
+        gamma_single = arma::fmat((float *)mxGetData(plhs[7]), n_out, n_ang, false, true);
+    else
+        plhs[7] = mxCreateNumericMatrix(n_out, n_ang, mxDOUBLE_CLASS, mxREAL),
+        gamma_double = arma::mat((double *)mxGetData(plhs[7]), n_out, n_ang, false, true);
+
     // Call private library function
     if (use_single)
         qd_arrayant_interpolate(&arrayant_single.e_theta_re, &arrayant_single.e_theta_im,
@@ -242,7 +257,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                 &azimuth_single, &elevation_single,
                                 &i_element, &orientation_single, &element_pos_single,
                                 &V_re_single, &V_im_single, &H_re_single, &H_im_single, &dist_single,
-                                &azimuth_loc_single, &elevation_loc_single);
+                                &azimuth_loc_single, &elevation_loc_single, &gamma_single);
     else
         qd_arrayant_interpolate(&arrayant_double.e_theta_re, &arrayant_double.e_theta_im,
                                 &arrayant_double.e_phi_re, &arrayant_double.e_phi_im,
@@ -250,5 +265,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                 &azimuth_double, &elevation_double,
                                 &i_element, &orientation_double, &element_pos_double,
                                 &V_re_double, &V_im_double, &H_re_double, &H_im_double, &dist_double,
-                                &azimuth_loc_double, &elevation_loc_double);
+                                &azimuth_loc_double, &elevation_loc_double, &gamma_double);
 }

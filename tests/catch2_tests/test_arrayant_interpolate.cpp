@@ -39,9 +39,9 @@ TEST_CASE("Arrayant interpolation - Minimal test")
     arma::Cube<double> orientation(3, 1, 1);
     arma::mat element_pos_i(3, 1);
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     arma::mat T = {-2.0, -1.0, 0.0, 1.0};
     CHECK(arma::approx_equal(V_re, T, "absdiff", 1e-13));
@@ -81,9 +81,9 @@ TEST_CASE("Arrayant interpolation - Simple interpolation in el-direction")
     arma::Cube<double> orientation(3, 1, 1);
     arma::mat element_pos_i(3, 1);
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     T = {-2.0, -1.0, 0.0, 1.0};
     CHECK(arma::approx_equal(V_re, T, "absdiff", 1e-14));
@@ -199,9 +199,9 @@ TEST_CASE("Arrayant interpolation - Spheric interpolation in az-direction with z
     orientation.slice(0) = T.t();
     arma::mat element_pos_i(3, 1);
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     CHECK(arma::approx_equal(azimuth_loc, azimuth + pi / 8.0, "absdiff", 1e-14));
 
@@ -243,9 +243,9 @@ TEST_CASE("Arrayant interpolation - Spheric interpolation in el-direction with y
     arma::Cube<double> orientation(3, 1, 1);
     orientation.slice(0) = T.t();
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     CHECK(arma::approx_equal(azimuth_loc, azimuth, "absdiff", 1e-14));
     CHECK(arma::approx_equal(elevation_loc, elevation + pi / 16.0, "absdiff", 1e-14));
@@ -286,9 +286,9 @@ TEST_CASE("Arrayant interpolation - Polarization rotation using x-rotation")
     orientation.slice(0) = T;
     arma::mat element_pos_i(3, 2);
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     double rs2 = 1.0 / std::sqrt(2.0);
     T = {rs2, rs2};
@@ -316,9 +316,9 @@ TEST_CASE("Arrayant interpolation - Test projected distance")
     arma::Cube<double> orientation(3, 1, 1);
     arma::mat element_pos_i(3, 3, arma::fill::eye);
 
-    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc;
+    arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     arma::mat T(3, 1, arma::fill::ones);
     CHECK(arma::approx_equal(V_re, T, "absdiff", 1e-14));
@@ -333,14 +333,14 @@ TEST_CASE("Arrayant interpolation - Test projected distance")
 
     azimuth.at(0) = 3.0 * pi / 4.0;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
     T = {rs2, -rs2, 0.0};
     CHECK(arma::approx_equal(dist, T.t(), "absdiff", 1e-14));
 
     azimuth.at(0) = 0.0;
     elevation.at(0) = -pi / 4.0;
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
     T = {-rs2, 0.0, rs2};
     CHECK(arma::approx_equal(dist, T.t(), "absdiff", 1e-14));
 
@@ -348,6 +348,6 @@ TEST_CASE("Arrayant interpolation - Test projected distance")
     elevation = {0.0, 0.0, -pi / 2.0};
     element_pos_i = -element_pos_i; // -eye(3)
     ant.interpolate(azimuth, elevation, i_element, orientation, element_pos_i,
-                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                    &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
     CHECK(arma::approx_equal(dist, element_pos_i, "absdiff", 1e-14));
 }

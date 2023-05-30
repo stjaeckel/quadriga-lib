@@ -155,7 +155,8 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                                                                       arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
                                                                       arma::Mat<dtype> *dist,
                                                                       arma::Mat<dtype> *azimuth_loc,
-                                                                      arma::Mat<dtype> *elevation_loc)
+                                                                      arma::Mat<dtype> *elevation_loc, 
+                                                                      arma::Mat<dtype> *gamma)
 {
     // Check if arrayant object is valid
     std::string error_message = "";
@@ -237,12 +238,14 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
         azimuth_loc->set_size(n_out, n_ang);
     if (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang)
         elevation_loc->set_size(n_out, n_ang);
+    if (gamma->n_rows != n_out || gamma->n_cols != n_ang)
+        gamma->set_size(n_out, n_ang);
 
     // Call private library function
     qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                             &azimuth_grid, &elevation_grid, &azimuth, &elevation,
                             &i_element, &orientation, &element_pos_interp,
-                            V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc);
+                            V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma);
 }
 
 // ARRAYANT METHOD : Interpolation
@@ -302,11 +305,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
 
     arma::Mat<dtype> azimuth_loc;
     arma::Mat<dtype> elevation_loc;
+    arma::Mat<dtype> gamma;
 
     qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                             &azimuth_grid, &elevation_grid, &azimuth, &elevation,
                             &i_element, &orientation, &element_pos,
-                            V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc);
+                            V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc, &gamma);
 }
 
 // Copy antenna elements, enlarge array size if needed
@@ -415,12 +419,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
     arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n_out, n_out);
     arma::Cube<dtype> orientation(3, 1, 1);
     arma::Mat<dtype> V_re(n_out, n_ang), V_im(n_out, n_ang), H_re(n_out, n_ang), H_im(n_out, n_ang), dist(n_out, n_ang);
-    arma::Mat<dtype> azimuth_loc, elevation_loc;
+    arma::Mat<dtype> azimuth_loc, elevation_loc, gamma;
 
     qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                             &azimuth_grid, &elevation_grid, &azimuth, &elevation,
                             &i_element, &orientation, &element_pos,
-                            &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc);
+                            &V_re, &V_im, &H_re, &H_im, &dist, &azimuth_loc, &elevation_loc, &gamma);
 
     // Apply phase shift caused by element positions
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));

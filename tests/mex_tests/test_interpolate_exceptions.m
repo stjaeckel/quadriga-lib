@@ -256,9 +256,9 @@ assertEqual(size(azimuth_loc),[3,6])
 [~,~,~,~,~,~,elevation_loc] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],[]);
 assertEqual(size(elevation_loc),[3,6])
 
-% 8 outputs should throw error
+% 9 outputs should throw error
 try
-    [~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],[]);
+    [~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],[]);
     error_exception_not_thrown('quadriga_lib:arrayant_interpolate:no_output');
 catch expt
     error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:no_output',expt.identifier);
