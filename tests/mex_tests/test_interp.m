@@ -34,45 +34,28 @@ assertElementsAlmostEqual( T, O, 'absolute', 1e-13 );
 try
     O = quadriga_lib.interp( [],[],I,xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch expt
+    if strcmp(expt.identifier, 'moxunit:exceptionNotRaised'); error('Expected an error!'); end
 end
 
 try
     O = quadriga_lib.interp( x,[],[],xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch expt
+    if strcmp(expt.identifier, 'moxunit:exceptionNotRaised'); error('Expected an error!'); end
 end
 
 try
     O = quadriga_lib.interp( x,[],I,[] );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch expt
+    if strcmp(expt.identifier, 'moxunit:exceptionNotRaised'); error('Expected an error!'); end
 end
 
 try
     O = quadriga_lib.interp( x,[],1,xo );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
-end
-
-try
-    O = quadriga_lib.interp( single(x),[],I,xo );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-end
-
-try
-    O = quadriga_lib.interp( single(x),[],single(I),xo );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-end
-
-try
-    O = quadriga_lib.interp( x,[],single(I),xo );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-end
-
-try
-    O = quadriga_lib.interp( x,single(1),I,xo );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-end
-
-try
-    O = quadriga_lib.interp( x,1,I,xo,single(1) );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch expt
+    if strcmp(expt.identifier, 'moxunit:exceptionNotRaised'); error('Expected an error!'); end
 end
 

@@ -32,7 +32,7 @@ namespace quadriga_tools
     template <typename dtype> // float or double
     arma::cube cart2geo(const arma::Cube<dtype> cart);
 
-    // 2D linear interpolation (returns error message or empty string)
+    // 2D linear interpolation (returns error message or empty string in case of no error)
     template <typename dtype>                          // Supported types: float or double
     std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
                        const arma::Col<dtype> *xi,     // x sample points of input; vector length nx

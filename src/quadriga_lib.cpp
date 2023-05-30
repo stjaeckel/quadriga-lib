@@ -526,31 +526,151 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_half_wave_dip
 }
 
 // Generate : An antenna with a custom gain in elevation and azimuth
-// template <typename dtype>
-// void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
-// {
-//     dtype pi = dtype(arma::datum::pi);
-//     name = "custom";
-//     azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-//     elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+template <typename dtype>
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
+{
+    dtype pi = dtype(arma::datum::pi), one = 1.0, half = 0.5, limit = 1e-7, step = -0.382,
+          deg2rad = dtype(arma::datum::pi / 360.0);
 
-//     // dtype a = 1.0, dm = 0.5, x = 1e99, delta = 1e99, dr = 1.0;
-//     // for (unsigned lp = 0; lp < 5000; lp++)
-//     // {
-//     //     an = lp == 0 ? a : a + dr * dm;
-//     //     delta = lp == 0 ? 1e99 : std::abs(a - an);
-//     //     C = rear_gain_lin + (1.0 - rear_gain_lin) * std::exp(-an * az_3dB * az_3dB);
-//     // }
+    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    arma::Col<dtype> phi_sq = azimuth_grid % azimuth_grid;
+    arma::Col<dtype> cos_theta = arma::cos(elevation_grid);
+    arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
+    az_3dB_rad.at(0) = az_3dB * deg2rad;
+    el_3db_rad.at(0) = el_3db * deg2rad;
 
-//     e_theta_re.ones(181, 361, 1);
-//     e_theta_im.zeros(181, 361, 1);
-//     e_phi_re.zeros(181, 361, 1);
-//     e_phi_im.zeros(181, 361, 1);
-//     element_pos.zeros(3, 1);
-//     coupling_re.ones(1, 1);
-//     coupling_im.zeros(1, 1);
-//     valid = 1;
-// }
+    // Calculate azimuth pattern cut
+    dtype a = one, d = half, x = 1e99, delta = 1e99;
+    arma::Col<dtype> xn(1), C(361), D(181);
+    for (unsigned lp = 0; lp < 5000; lp++)
+    {
+        dtype an = lp == 0 ? a : a + d;
+        delta = lp == 0 ? 1e99 : std::abs(a - an);
+        C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
+        quadriga_tools::interp(&C, &azimuth_grid, &az_3dB_rad, &xn);
+        dtype xm = std::abs(xn.at(0) - half);
+        a = xm < x ? an : a;
+        d = xm < x ? d : step * d;
+        x = xm < x ? xm : x;
+        if (delta < limit)
+            break;
+    }
+    C = arma::exp(-a * phi_sq);
+
+    // Calculate elevation pattern cut
+    a = one, d = half, x = 1e99, delta = 1e99;
+    for (unsigned lp = 0; lp < 5000; lp++)
+    {
+        dtype an = lp == 0 ? a : a + d;
+        delta = lp == 0 ? 1e99 : std::abs(a - an);
+        D = arma::pow(cos_theta, an);
+        quadriga_tools::interp(&D, &elevation_grid, &el_3db_rad, &xn);
+        dtype xm = std::abs(xn.at(0) - half);
+        a = xm < x ? an : a;
+        d = xm < x ? d : step * d;
+        x = xm < x ? xm : x;
+        if (delta < limit)
+            break;
+    }
+    D = arma::pow(cos_theta, a);
+
+    // Combined pattern
+    e_theta_re.zeros(181, 361, 1);
+    dtype *ptr = e_theta_re.memptr();
+    for (dtype *col = C.begin(); col != C.end(); col++)
+        for (dtype *row = D.begin(); row != D.end(); row++)
+            *ptr++ = std::sqrt(rear_gain_lin + (one - rear_gain_lin) * *row * *col);
+
+    e_theta_im.zeros(181, 361, 1);
+    e_phi_re.zeros(181, 361, 1);
+    e_phi_im.zeros(181, 361, 1);
+    element_pos.zeros(3, 1);
+    coupling_re.ones(1, 1);
+    coupling_im.zeros(1, 1);
+    name = "custom";
+    valid = 1;
+
+    // Normalize to Gain
+    dtype directivity = calc_directivity_dBi(0);
+    directivity = std::pow(10.0, 0.1 * directivity);
+    dtype p_max = e_theta_re.max();
+    p_max *= p_max;
+    e_theta_re *= std::sqrt(directivity / p_max);
+}
+
+// ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
+template <typename dtype>
+dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(unsigned element)
+{
+    // Check if arrayant object is valid
+    std::string error_message = "";
+    if (valid != 0 || valid != 1)
+        error_message = validate();
+    else if (valid == 0)
+        error_message = "Array antenna object is invalid.";
+    if (element >= unsigned(e_theta_re.n_slices))
+        error_message = "Element index out of bound.";
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Constants
+    double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
+    arma::uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
+
+    // Az and El grid as double
+    arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
+    arma::vec el = arma::conv_to<arma::vec>::from(elevation_grid);
+
+    // Calculate the azimuth weights
+    arma::vec waz(naz, arma::fill::none);
+    double *ptr = waz.memptr();
+    for (arma::uword i = 0; i < naz; i++)
+    {
+        double x = i == 0 ? az.at(naz - 1) - pi2 : az.at(i - 1);
+        double y = i == naz - 1 ? az.at(0) + pi2 : az.at(i + 1);
+        ptr[i] = y - x;
+    }
+
+    // Calculate the elevation weights
+    arma::vec wel(nel, arma::fill::none);
+    ptr = wel.memptr();
+    for (arma::uword i = 0; i < nel; i++)
+    {
+        double x = i == 0 ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
+        double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * elevation_grid.at(i + 1);
+        arma::vec tmp = arma::linspace<arma::vec>(x, y, 21);
+        double val = arma::accu(arma::cos(tmp));
+        ptr[i] = val * (y - x);
+    }
+
+    // Combine weights
+    arma::mat W(nel, naz, arma::fill::none);
+    ptr = W.memptr();
+    double norm = 0.0;
+    for (double *col = waz.begin(); col != waz.end(); col++)
+        for (double *row = wel.begin(); row != wel.end(); row++)
+            *ptr = *row * *col, norm += *ptr++;
+    ptr = W.memptr();
+    norm = 1.0 / norm;
+    for (arma::uword i = 0; i < naz * nel; i++)
+        ptr[i] *= norm;
+
+    // Calculate the directivity
+    double p_sum = 0.0, p_max = 0.0;
+    dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
+    dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
+    for (arma::uword i = 0; i < naz * nel; i++)
+    {
+        double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
+        double pow = a * a + b * b + c * c + d * d;
+        p_max = pow > p_max ? pow : p_max;
+        p_sum += pow * ptr[i];
+    }
+
+    double directivity = 10.0 * std::log10(p_max / p_sum);
+    return dtype(directivity);
+}
 
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>

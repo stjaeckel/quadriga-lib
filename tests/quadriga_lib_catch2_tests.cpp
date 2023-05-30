@@ -23,6 +23,7 @@
 #include "catch2_tests/test_qdant_write.cpp"
 #include "catch2_tests/test_arrayant_interpolate.cpp"
 #include "catch2_tests/test_arrayant_combine_pattern.cpp"
+#include "catch2_tests/test_arrayant_generate.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

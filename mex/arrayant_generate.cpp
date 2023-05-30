@@ -56,13 +56,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arrayant_double.generate_dipole();
     else if (array_type == "half-wave-dipole")
         arrayant_double.generate_half_wave_dipole();
-    // else if (array_type == "custom")
-    //     if (nrhs < 4)
-    //         mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
-    //     else
-    //         arrayant_double.generate_custom(qd_mex_get_scalar<double>(prhs[1], "az_3dB"),
-    //                                         qd_mex_get_scalar<double>(prhs[2], "el_3db"),
-    //                                         qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin"));
+    else if (array_type == "custom")
+        if (nrhs < 4)
+            mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
+        else
+            arrayant_double.generate_custom(qd_mex_get_scalar<double>(prhs[1], "az_3dB"),
+                                            qd_mex_get_scalar<double>(prhs[2], "el_3db"),
+                                            qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin"));
     else
         mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Array type not supported!");
 
