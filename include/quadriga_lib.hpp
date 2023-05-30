@@ -98,6 +98,10 @@ namespace quadriga_lib
             void generate_omni();                                                  // Isotropic radiator, vertical polarization
             void generate_dipole();                                                // Short dipole radiating with vertical polarization
             void generate_half_wave_dipole();                                      // Half-wave dipole radiating with vertical polarization
+            void generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin); // An antenna with a custom 3dB beam with (in degree)
+
+            // Calculate the directivity of an antenna element in dBi
+            dtype calc_directivity_dBi(unsigned element);
 
             // Validates integrity, returns error message and sets 'valid' property accordingly
             std::string validate();

@@ -295,7 +295,7 @@ inline mxArray *qd_mex_copy2matlab(arma::Col<unsigned> *input, bool transpose) /
     std::memcpy((unsigned *)mxGetData(output), input->memptr(), sizeof(unsigned) * input->n_elem);
     return output;
 }
-inline mxArray *qd_mex_copy2matlab(arma::Col<unsigned> *input)
+inline mxArray *qd_mex_copy2matlab(arma::Col<unsigned> *input) // 1D-UINT32 Column Vector
 {
     return qd_mex_copy2matlab(input, false);
 }
