@@ -20,16 +20,16 @@
 
 #include <armadillo>
 
-template <typename dataType> // float or double
-void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma::Cube<dataType> *e_theta_im,
-                             const arma::Cube<dataType> *e_phi_re, const arma::Cube<dataType> *e_phi_im,
-                             const arma::Col<dataType> *azimuth_grid, const arma::Col<dataType> *elevation_grid,
-                             const arma::Mat<dataType> *azimuth, const arma::Mat<dataType> *elevation,
-                             const arma::Col<unsigned> *i_element, const arma::Cube<dataType> *orientation,
-                             const arma::Mat<dataType> *element_pos,
-                             arma::Mat<dataType> *V_re, arma::Mat<dataType> *V_im,
-                             arma::Mat<dataType> *H_re, arma::Mat<dataType> *H_im,
-                             arma::Mat<dataType> *dist,
-                             arma::Mat<dataType> *azimuth_loc, arma::Mat<dataType> *elevation_loc);
+template <typename dtype> // float or double
+void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cube<dtype> *e_theta_im,
+                             const arma::Cube<dtype> *e_phi_re, const arma::Cube<dtype> *e_phi_im,
+                             const arma::Col<dtype> *azimuth_grid, const arma::Col<dtype> *elevation_grid,
+                             const arma::Mat<dtype> *azimuth, const arma::Mat<dtype> *elevation,
+                             const arma::Col<unsigned> *i_element, const arma::Cube<dtype> *orientation,
+                             const arma::Mat<dtype> *element_pos,
+                             arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                             arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                             arma::Mat<dtype> *dist,
+                             arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc, arma::Mat<dtype> *gamma);
 
 #endif

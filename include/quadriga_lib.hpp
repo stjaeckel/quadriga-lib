@@ -78,7 +78,8 @@ namespace quadriga_lib
                              arma::Mat<dtype> *H_im,               // Interpolated horizontal (e_phi) field, imaginary part, Size [n_out, n_ang]
                              arma::Mat<dtype> *dist,               // Projected element distances for phase offset,          Size [n_out, n_ang]
                              arma::Mat<dtype> *azimuth_loc,        // Azimuth angles [rad] in local antenna coordinates,     Size [n_out, n_ang]
-                             arma::Mat<dtype> *elevation_loc);     // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
+                             arma::Mat<dtype> *elevation_loc,      // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
+                             arma::Mat<dtype> *gamma);             // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
 
             void interpolate(const arma::Mat<dtype> azimuth,                 // Azimuth angles [rad],                        Size [1, n_ang] or [n_out, n_ang]
                              const arma::Mat<dtype> elevation,               // Elevation angles for interpolation in [rad], Size [1, n_ang] or [n_out, n_ang]

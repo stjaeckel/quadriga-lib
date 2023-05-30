@@ -20,26 +20,31 @@
 #include "quadriga_tools.hpp"
 
 // Implements signum (-1, 0, or 1)
-template <typename dataType>
-dataType signum(dataType val)
+template <typename dtype>
+dtype signum(dtype val)
 {
-    return (dataType(0) < val) - (val < dataType(0));
+    return (dtype(0) < val) - (val < dtype(0));
 }
 
-template <typename dataType>
-void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma::Cube<dataType> *e_theta_im,
-                             const arma::Cube<dataType> *e_phi_re, const arma::Cube<dataType> *e_phi_im,
-                             const arma::Col<dataType> *azimuth_grid, const arma::Col<dataType> *elevation_grid,
-                             const arma::Mat<dataType> *azimuth, const arma::Mat<dataType> *elevation,
-                             const arma::Col<unsigned> *i_element, const arma::Cube<dataType> *orientation,
-                             const arma::Mat<dataType> *element_pos,
-                             arma::Mat<dataType> *V_re, arma::Mat<dataType> *V_im,
-                             arma::Mat<dataType> *H_re, arma::Mat<dataType> *H_im,
-                             arma::Mat<dataType> *dist,
-                             arma::Mat<dataType> *azimuth_loc, arma::Mat<dataType> *elevation_loc)
+template <typename dtype>
+void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cube<dtype> *e_theta_im,
+                             const arma::Cube<dtype> *e_phi_re, const arma::Cube<dtype> *e_phi_im,
+                             const arma::Col<dtype> *azimuth_grid, const arma::Col<dtype> *elevation_grid,
+                             const arma::Mat<dtype> *azimuth, const arma::Mat<dtype> *elevation,
+                             const arma::Col<unsigned> *i_element, const arma::Cube<dtype> *orientation,
+                             const arma::Mat<dtype> *element_pos,
+                             arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                             arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                             arma::Mat<dtype> *dist,
+                             arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc, arma::Mat<dtype> *gamma)
 {
     // Inputs:
-    // ant              ARRAYANT object containing electric field description           Size [n_elevation, n_azimuth, n_elements]
+    // e_theta_re       Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
+    // e_theta_im       Vertical component of the electric field, imaginary part,       Size [n_elevation, n_azimuth, n_elements]
+    // e_phi_re         Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_elements]
+    // e_phi_im         Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_elements]
+    // azimuth_grid     Azimuth angles in pattern (theta) in [rad], sorted,             Vector of length "n_azimuth"
+    // elevation_grid   Elevation angles in pattern (phi) in [rad], sorted,             Vector of length "n_elevation"
     // azimuth          Azimuth angles for interpolation in [rad],                      Size [1, n_ang] or [n_out, n_ang]
     // elevation        Elevation angles for interpolation in [rad],                    Size [1, n_ang] or [n_out, n_ang]
     // i_element        Element indices, 1-based                                        Vector of length "n_out"
@@ -54,6 +59,7 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
     // dist             Effective distances, optional                                   Size [n_out, n_ang] or []
     // azimuth_loc      Azimuth angles [rad] in local antenna coordinates, optional,    Size [n_out, n_ang] or []
     // elevation_loc    Elevation angles [rad] in local antenna coordinates, optional,  Size [n_out, n_ang] or []
+    // gamma            Polarization rotation angles in [rad], optional,                Size [n_out, n_ang] or []
 
     // Note: This function is not intended to be publicly accessible. There is no input validation.
     // Incorrectly formatted arguments may lead to undefined behavior or segmentation faults.
@@ -69,31 +75,32 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
     bool per_angle_rotation = orientation->n_slices > 1 ? true : false;
 
     // Determine if we need to write the angles in local antenna coordinates
-    bool write_az = !azimuth_loc->is_empty(), write_el = !elevation_loc->is_empty(), write_dist = !dist->is_empty();
+    bool write_az = !azimuth_loc->is_empty(), write_el = !elevation_loc->is_empty(),
+         write_dist = !dist->is_empty(), write_gamma = !gamma->is_empty();
 
     // Rotation matrix [3,3,n_out] or [3,3,1], always double output
     arma::cube R = quadriga_tools::calc_rotation_matrix(*orientation, true, true);
-    const arma::Cube<dataType> R_typed = arma::conv_to<arma::Cube<dataType>>::from(R);
+    const arma::Cube<dtype> R_typed = arma::conv_to<arma::Cube<dtype>>::from(R);
     R.reset();
 
     // Obtain pointers for direct memory access (faster)
-    const unsigned *p_i_element = i_element->memptr();                                     // Elements
-    const dataType *p_theta_re = e_theta_re->memptr(), *p_theta_im = e_theta_im->memptr(); // Vertical pattern
-    const dataType *p_phi_re = e_phi_re->memptr(), *p_phi_im = e_phi_im->memptr();         // Horizontal pattern
-    const dataType *p_az_global = azimuth->memptr(), *p_el_global = elevation->memptr();   // Angles
-    const dataType *p_azimuth_grid = azimuth_grid->memptr(), *p_elevation_grid = elevation_grid->memptr();
-    const dataType *p_element_pos = element_pos->memptr();
-    dataType *p_v_re = V_re->memptr(), *p_v_im = V_im->memptr(), *p_h_re = H_re->memptr(), *p_h_im = H_im->memptr();
+    const unsigned *p_i_element = i_element->memptr();                                  // Elements
+    const dtype *p_theta_re = e_theta_re->memptr(), *p_theta_im = e_theta_im->memptr(); // Vertical pattern
+    const dtype *p_phi_re = e_phi_re->memptr(), *p_phi_im = e_phi_im->memptr();         // Horizontal pattern
+    const dtype *p_az_global = azimuth->memptr(), *p_el_global = elevation->memptr();   // Angles
+    const dtype *p_azimuth_grid = azimuth_grid->memptr(), *p_elevation_grid = elevation_grid->memptr();
+    const dtype *p_element_pos = element_pos->memptr();
+    dtype *p_v_re = V_re->memptr(), *p_v_im = V_im->memptr(), *p_h_re = H_re->memptr(), *p_h_im = H_im->memptr();
 
     // Declare constants at compile time to avoid unnecessary type conversions
-    const dataType pi_double = arma::Datum<dataType>::tau;
-    const dataType R0 = arma::Datum<dataType>::eps * arma::Datum<dataType>::eps * arma::Datum<dataType>::eps;
-    const dataType R1 = arma::Datum<dataType>::eps;
-    constexpr dataType one = dataType(1.0), neg_one = dataType(-1.0), zero = dataType(0.0),
-                       tL = dataType(-0.999), tS = dataType(-0.99), dT = one / (tS - tL);
+    const dtype pi_double = arma::Datum<dtype>::tau;
+    const dtype R0 = arma::Datum<dtype>::eps * arma::Datum<dtype>::eps * arma::Datum<dtype>::eps;
+    const dtype R1 = arma::Datum<dtype>::eps;
+    constexpr dtype one = dtype(1.0), neg_one = dtype(-1.0), zero = dtype(0.0),
+                    tL = dtype(-0.999), tS = dtype(-0.99), dT = one / (tS - tL);
 
     // Calculate 1/dist in the pattern sampling
-    dataType *az_diff = new dataType[n_azimuth], *el_diff = new dataType[n_elevation];
+    dtype *az_diff = new dtype[n_azimuth], *el_diff = new dtype[n_elevation];
     *az_diff = pi_double - p_azimuth_grid[n_azimuth - 1] + *p_azimuth_grid;
     *az_diff = one / *az_diff;
     *el_diff = one;
@@ -107,16 +114,16 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
     for (int a = 0; a < n_ang; a++)
     {
         // Get the local pointer for the angles
-        const dataType *p_az_local = per_element_angles ? &p_az_global[a * n_out] : &p_az_global[a];
-        const dataType *p_el_local = per_element_angles ? &p_el_global[a * n_out] : &p_el_global[a];
+        const dtype *p_az_local = per_element_angles ? &p_az_global[a * n_out] : &p_az_global[a];
+        const dtype *p_el_local = per_element_angles ? &p_el_global[a * n_out] : &p_el_global[a];
 
         // Decare and initialize all local variables
-        unsigned i_up = 0, i_un = 0, i_vp = 0, i_vn = 0;   // Indices for reading the pattern
-        dataType up = one, un = zero, vp = one, vn = zero; // Relative weights for interpolation
-        dataType cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
-        dataType az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
+        unsigned i_up = 0, i_un = 0, i_vp = 0, i_vn = 0; // Indices for reading the pattern
+        dtype up = one, un = zero, vp = one, vn = zero;  // Relative weights for interpolation
+        dtype cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
+        dtype az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
 
-        for (unsigned o = 0; o < n_out; o++)    
+        for (unsigned o = 0; o < n_out; o++)
         {
             // Check if we need to update the angles for the current output index "o"
             bool update_angles = per_element_angles || per_element_rotation || per_angle_rotation || o == 0;
@@ -131,10 +138,10 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
             // Transform from Cartesian coordinates to geographic coordinates
 
             arma::uword Rp_a = per_angle_rotation ? a : 0, Rp_o = per_element_rotation ? o : 0;
-            const dataType *Rp = R_typed.slice_colptr(Rp_a, Rp_o);
+            const dtype *Rp = R_typed.slice_colptr(Rp_a, Rp_o);
             if (update_angles)
             {
-                dataType cAZo, sAZo;
+                dtype cAZo, sAZo;
                 dx = Rp[0] * Cx + Rp[3] * Cy + Rp[6] * sELi,
                 dy = Rp[1] * Cx + Rp[4] * Cy + Rp[7] * sELi,
                 dz = Rp[2] * Cx + Rp[5] * Cy + Rp[8] * sELi;
@@ -143,14 +150,14 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                 az = atan2(dy, dx), el = asin(dz), sAZo = sin(az), cAZo = cos(az);
 
                 // Calculate basis vectors
-                dataType eTHi_x = sELi * cAZi, eTHi_y = sELi * sAZi, eTHi_z = -cELi;
-                dataType ePHi_x = -sAZi, ePHi_y = cAZi;
-                dataType eTHo_x = dz * cAZo, eTHo_y = dz * sAZo, eTHo_z = -cos(el);
+                dtype eTHi_x = sELi * cAZi, eTHi_y = sELi * sAZi, eTHi_z = -cELi;
+                dtype ePHi_x = -sAZi, ePHi_y = cAZi;
+                dtype eTHo_x = dz * cAZo, eTHo_y = dz * sAZo, eTHo_z = -cos(el);
 
                 // Apply rotation to eTHo
-                dataType eTHor_x = Rp[0] * eTHo_x + Rp[1] * eTHo_y + Rp[2] * eTHo_z;
-                dataType eTHor_y = Rp[3] * eTHo_x + Rp[4] * eTHo_y + Rp[5] * eTHo_z;
-                dataType eTHor_z = Rp[6] * eTHo_x + Rp[7] * eTHo_y + Rp[8] * eTHo_z;
+                dtype eTHor_x = Rp[0] * eTHo_x + Rp[1] * eTHo_y + Rp[2] * eTHo_z;
+                dtype eTHor_y = Rp[3] * eTHo_x + Rp[4] * eTHo_y + Rp[5] * eTHo_z;
+                dtype eTHor_z = Rp[6] * eTHo_x + Rp[7] * eTHo_y + Rp[8] * eTHo_z;
 
                 // Calculate polarization rotation angle
                 cos_gamma = eTHi_x * eTHor_x + eTHi_y * eTHor_y + eTHi_z * eTHor_z;
@@ -158,12 +165,12 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
             }
 
             // Calculate the projected distance
-            dataType dst = zero;
+            dtype dst = zero;
             if (write_dist)
             {
                 dst = dx * p_element_pos[3 * o] + dy * p_element_pos[3 * o + 1] + dz * p_element_pos[3 * o + 2];
-                dataType dx2 = dx * dx, dy2 = dy * dy, dz2 = dz * dz;
-                dataType sgn = signum(dst * dx2 + dst * dy2 + dst * dz2);
+                dtype dx2 = dx * dx, dy2 = dy * dy, dz2 = dz * dz;
+                dtype sgn = signum(dst * dx2 + dst * dy2 + dst * dz2);
                 dst *= dst;
                 dst = -sgn * sqrt(dst * dx2 + dst * dy2 + dst * dz2);
             }
@@ -232,11 +239,11 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
             unsigned iB = i_un * n_elevation + i_vp + offset;
             unsigned iC = i_up * n_elevation + i_vn + offset;
             unsigned iD = i_un * n_elevation + i_vn + offset;
-            dataType Vr, Vi, Hr, Hi;
+            dtype Vr, Vi, Hr, Hi;
 
             for (unsigned VH = 0; VH < 2; VH++)
             {
-                dataType fAr, fBr, fCr, fDr, fAi, fBi, fCi, fDi;
+                dtype fAr, fBr, fCr, fDr, fAi, fBi, fCi, fDi;
                 if (VH == 0) // Read the pattern values
                     fAr = p_theta_re[iA] + R0, fAi = p_theta_im[iA],
                     fBr = p_theta_re[iB] + R0, fBi = p_theta_im[iB],
@@ -249,28 +256,28 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                     fDr = p_phi_re[iD] + R0, fDi = p_phi_im[iD];
 
                 // Calculate amplitude
-                dataType ampA = sqrt(fAr * fAr + fAi * fAi);
-                dataType ampB = sqrt(fBr * fBr + fBi * fBi);
-                dataType ampC = sqrt(fCr * fCr + fCi * fCi);
-                dataType ampD = sqrt(fDr * fDr + fDi * fDi);
+                dtype ampA = sqrt(fAr * fAr + fAi * fAi);
+                dtype ampB = sqrt(fBr * fBr + fBi * fBi);
+                dtype ampC = sqrt(fCr * fCr + fCi * fCi);
+                dtype ampD = sqrt(fDr * fDr + fDi * fDi);
 
                 // Normalize real and imaginary parts to obtain phase
-                dataType gAr = one / ampA, gBr = one / ampB, gCr = one / ampC, gDr = one / ampD;
-                dataType gAi = fAi * gAr, gBi = fBi * gBr, gCi = fCi * gCr, gDi = fDi * gDr;
+                dtype gAr = one / ampA, gBr = one / ampB, gCr = one / ampC, gDr = one / ampD;
+                dtype gAi = fAi * gAr, gBi = fBi * gBr, gCi = fCi * gCr, gDi = fDi * gDr;
                 gAr = fAr * gAr, gBr = fBr * gBr, gCr = fCr * gCr, gDr = fDr * gDr;
 
                 // Declare variables
-                dataType cPhase = gAr * gBr + gAi * gBi; // Cosine of phase
+                dtype cPhase = gAr * gBr + gAi * gBi; // Cosine of phase
                 bool linear_int = cPhase < tS;
-                dataType gEr = zero, gEi = zero, ampE = zero, gFr = zero, gFi = zero, ampF = zero, fLr = zero, fLi = zero;
+                dtype gEr = zero, gEi = zero, ampE = zero, gFr = zero, gFi = zero, ampF = zero, fLr = zero, fLi = zero;
 
                 // Interpolation for point E
                 if (linear_int) // Linear interpolation
                     fLr = un * fAr + up * fBr, fLi = un * fAi + up * fBi;
                 if (cPhase > tL) // Spherical interpolation
                 {
-                    dataType Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
-                             wp = sin(up * Phase) * sPhase, wn = sin(un * Phase) * sPhase;
+                    dtype Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
+                          wp = sin(up * Phase) * sPhase, wn = sin(un * Phase) * sPhase;
                     gEr = wn * gAr + wp * gBr, gEi = wn * gAi + wp * gBi, ampE = un * ampA + up * ampB;
                     if (linear_int) // Mixed mode
                         wp = (tS - cPhase) * dT, wn = one - wp,
@@ -285,8 +292,8 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                     fLr = un * fCr + up * fDr, fLi = un * fCi + up * fDi;
                 if (cPhase > tL)
                 {
-                    dataType Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
-                             wp = sin(up * Phase) * sPhase, wn = sin(un * Phase) * sPhase;
+                    dtype Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
+                          wp = sin(up * Phase) * sPhase, wn = sin(un * Phase) * sPhase;
                     gFr = wn * gCr + wp * gDr, gFi = wn * gCi + wp * gDi, ampF = un * ampC + up * ampD;
                     if (linear_int)
                         wp = (tS - cPhase) * dT, wn = one - wp,
@@ -301,9 +308,9 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                     fLr = vn * gEr * ampE + vp * gFr * ampF, fLi = vn * gEi * ampE + vp * gFi * ampF;
                 if (cPhase > tL)
                 {
-                    dataType Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
-                             wp = sin(vp * Phase) * sPhase, wn = sin(vn * Phase) * sPhase;
-                    dataType gLr = wn * gEr + wp * gFr, gLi = wn * gEi + wp * gFi, ampL = vn * ampE + vp * ampF;
+                    dtype Phase = (cPhase >= one) ? R0 : acos(cPhase) + R0, sPhase = one / sin(Phase),
+                          wp = sin(vp * Phase) * sPhase, wn = sin(vn * Phase) * sPhase;
+                    dtype gLr = wn * gEr + wp * gFr, gLi = wn * gEi + wp * gFi, ampL = vn * ampE + vp * ampF;
                     if (linear_int)
                         wp = (tS - cPhase) * dT, wn = one - wp,
                         fLr = wn * gLr * ampL + wp * fLr, fLi = wn * gLi * ampL + wp * fLi;
@@ -331,6 +338,8 @@ void qd_arrayant_interpolate(const arma::Cube<dataType> *e_theta_re, const arma:
                 azimuth_loc->at(ioa) = az;
             if (write_el)
                 elevation_loc->at(ioa) = el;
+            if (write_gamma)
+                gamma->at(ioa) = std::atan2(sin_gamma, cos_gamma);
         }
     }
 
@@ -348,7 +357,7 @@ template void qd_arrayant_interpolate(const arma::Cube<float> *e_theta_re, const
                                       arma::Mat<float> *V_re, arma::Mat<float> *V_im,
                                       arma::Mat<float> *H_re, arma::Mat<float> *H_im,
                                       arma::Mat<float> *dist,
-                                      arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc);
+                                      arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc, arma::Mat<float> *gamma);
 
 template void qd_arrayant_interpolate(const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
                                       const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,
@@ -359,4 +368,4 @@ template void qd_arrayant_interpolate(const arma::Cube<double> *e_theta_re, cons
                                       arma::Mat<double> *V_re, arma::Mat<double> *V_im,
                                       arma::Mat<double> *H_re, arma::Mat<double> *H_im,
                                       arma::Mat<double> *dist,
-                                      arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc);
+                                      arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc, arma::Mat<double> *gamma);
