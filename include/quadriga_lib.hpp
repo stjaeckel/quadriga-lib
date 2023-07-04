@@ -95,11 +95,18 @@ namespace quadriga_lib
             // Calculates a virtual pattern of the given array by applying coupling and element positions
             void combine_pattern();
 
+            // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
+            // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
+            void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0, unsigned usage = 0, unsigned element = -1);
+
+            // Remove zeros from the pattern
+            void remove_zeros();
+
             // Generator functions
-            void generate_omni();                                                  // Isotropic radiator, vertical polarization
-            void generate_dipole();                                                // Short dipole radiating with vertical polarization
-            void generate_half_wave_dipole();                                      // Half-wave dipole radiating with vertical polarization
-            void generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin); // An antenna with a custom 3dB beam with (in degree)
+            void generate_omni();                                                                      // Isotropic radiator, vertical polarization
+            void generate_dipole();                                                                    // Short dipole radiating with vertical polarization
+            void generate_half_wave_dipole();                                                          // Half-wave dipole radiating with vertical polarization
+            void generate_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0); // An antenna with a custom 3dB beam with (in degree)
 
             // Calculate the directivity of an antenna element in dBi
             dtype calc_directivity_dBi(unsigned element);

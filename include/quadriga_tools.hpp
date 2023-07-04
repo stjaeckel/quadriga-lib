@@ -24,7 +24,8 @@
 namespace quadriga_tools
 {
     template <typename dtype> // float or double
-    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR);
+    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation,
+                                    bool invert_y_axis = false, bool transposeR = false);
 
     template <typename dtype> // float or double
     arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);

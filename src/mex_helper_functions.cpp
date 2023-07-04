@@ -60,25 +60,25 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name)
 
 // Reinterpret MATLAB Array to Armadillo Column Vector
 template <typename dtype>
-inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input)
+inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create_copy = false)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, false, false);
+    return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, create_copy, !create_copy);
 }
 
 // Reinterpret MATLAB Array to Armadillo Matrix
 template <typename dtype>
-inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input)
+inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create_copy = false)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
-    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, false, false);
+    return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, create_copy, !create_copy);
 }
 
 // Reinterpret MATLAB Array to Armadillo Cube
 template <typename dtype>
-inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input)
+inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool create_copy = false)
 {
     unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
@@ -86,7 +86,7 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input)
     unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, false, false);
+    return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input

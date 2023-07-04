@@ -31,20 +31,46 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
     ant.coupling_im.reset();
     ant.combine_pattern();
 
-    arma::fcube T(181,361,1,arma::fill::value(2.0f));
+    arma::fcube T(181, 361, 1, arma::fill::value(2.0f));
     CHECK(arma::approx_equal(ant.e_theta_re, T, "absdiff", 1e-6));
-    
+
     T.zeros();
     CHECK(arma::approx_equal(ant.e_theta_im, T, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ant.e_phi_re, T, "absdiff", 1e-6));
     CHECK(arma::approx_equal(ant.e_phi_im, T, "absdiff", 1e-6));
 
-    arma::fmat Q(3,1);
+    arma::fmat Q(3, 1);
     CHECK(arma::approx_equal(ant.element_pos, Q, "absdiff", 1e-6));
 
-    Q.ones(1,1);
+    Q.ones(1, 1);
     CHECK(arma::approx_equal(ant.coupling_re, Q, "absdiff", 1e-6));
 
-    Q.zeros(1,1);
+    Q.zeros(1, 1);
     CHECK(arma::approx_equal(ant.coupling_im, Q, "absdiff", 1e-6));
+}
+
+TEST_CASE("Arrayant rotation - Minimal test")
+{
+    quadriga_lib::arrayant<float> ant;
+    ant.generate_custom(5.0, 5.0);
+
+    arma::uword i = ant.e_theta_re.index_max();
+    arma::uvec s = arma::ind2sub(arma::size(ant.e_theta_re), i);
+    CHECK(s(0) == 90);
+    CHECK(s(1) == 180);
+
+    ant.rotate_pattern(0.0, 0.0, 90.0);
+
+    i = ant.e_theta_re.index_max();
+    s = arma::ind2sub(arma::size(ant.e_theta_re), i);
+    CHECK(s(0) == 90);
+    CHECK(s(1) == 270);
+
+    ant.generate_custom(5.0, 5.0);
+    ant.rotate_pattern(0.0, -45.0);
+
+    i = ant.e_theta_re.index_max();
+    s = arma::ind2sub(arma::size(ant.e_theta_re), i);
+    CHECK(s(0) == 135);
+    CHECK(s(1) == 180);
 }

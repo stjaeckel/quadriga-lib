@@ -57,26 +57,26 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     if (use_single)
-        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0]),
-        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1]),
-        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2]),
-        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3]),
+        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0], true),
+        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1], true),
+        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2], true),
+        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3], true),
         arrayant_single.azimuth_grid = qd_mex_reinterpret_Col<float>(prhs[4]),
         arrayant_single.elevation_grid = qd_mex_reinterpret_Col<float>(prhs[5]),
-        arrayant_single.element_pos = qd_mex_reinterpret_Mat<float>(prhs[6]),
-        arrayant_single.coupling_re = qd_mex_reinterpret_Mat<float>(prhs[7]),
-        arrayant_single.coupling_im = qd_mex_reinterpret_Mat<float>(prhs[8]),
+        arrayant_single.element_pos = qd_mex_reinterpret_Mat<float>(prhs[6], true),
+        arrayant_single.coupling_re = qd_mex_reinterpret_Mat<float>(prhs[7], true),
+        arrayant_single.coupling_im = qd_mex_reinterpret_Mat<float>(prhs[8], true),
         arrayant_single.center_frequency = qd_mex_get_scalar<float>(prhs[9], "center_frequency");
     else
-        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0]),
-        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1]),
-        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2]),
-        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3]),
+        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0], true),
+        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1], true),
+        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2], true),
+        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3], true),
         arrayant_double.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[4]),
         arrayant_double.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[5]),
-        arrayant_double.element_pos = qd_mex_reinterpret_Mat<double>(prhs[6]),
-        arrayant_double.coupling_re = qd_mex_reinterpret_Mat<double>(prhs[7]),
-        arrayant_double.coupling_im = qd_mex_reinterpret_Mat<double>(prhs[8]),
+        arrayant_double.element_pos = qd_mex_reinterpret_Mat<double>(prhs[6], true),
+        arrayant_double.coupling_re = qd_mex_reinterpret_Mat<double>(prhs[7], true),
+        arrayant_double.coupling_im = qd_mex_reinterpret_Mat<double>(prhs[8], true),
         arrayant_double.center_frequency = qd_mex_get_scalar<double>(prhs[9], "center_frequency");
 
     // Validate the data integrity
