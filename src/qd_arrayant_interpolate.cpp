@@ -189,19 +189,21 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                         un = un > one ? one : un, up = one - un;
                     }
                     else
+                    {
                         while (i_up < n_azimuth && p_azimuth_grid[i_up] <= az)
                             i_up++;
 
-                    if (i_up == n_azimuth) // az is between last grid point and pi
-                    {
-                        up = (az - p_azimuth_grid[--i_up] + R0) * *az_diff;
-                        up = up > one ? one : up, un = one - up;
-                    }
-                    else
-                    {
-                        i_un = i_up--;
-                        un = (p_azimuth_grid[i_un] - az) * az_diff[i_un];
-                        un = un > one ? one : un, up = one - un;
+                        if (i_up == n_azimuth) // az is between last grid point and pi
+                        {
+                            up = (az - p_azimuth_grid[--i_up] + R0) * *az_diff;
+                            up = up > one ? one : up, un = one - up;
+                        }
+                        else
+                        {
+                            i_un = i_up--;
+                            un = (p_azimuth_grid[i_un] - az) * az_diff[i_un];
+                            un = un > one ? one : un, up = one - un;
+                        }
                     }
                 }
 

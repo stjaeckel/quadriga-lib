@@ -256,7 +256,7 @@ std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::C
     // Interpolate the input data and write to output memory
     const dtype *p_input = input->memptr();
 #pragma omp parallel for    
-    for (int ie = 0; ie < ne; ie++)
+    for (int ie = 0; ie < int(ne); ie++)
     {
         dtype *p_output = output->slice_memptr(ie);
         arma::uword offset = ie * nxy;
