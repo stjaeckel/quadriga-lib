@@ -21,7 +21,7 @@
 #include <armadillo>
 #include <string>
 
-#define QUADRIGA_LIB_VERSION v0_1_4
+#define QUADRIGA_LIB_VERSION v0_1_5
 
 namespace quadriga_lib
 {
@@ -102,12 +102,6 @@ namespace quadriga_lib
             // Remove zeros from the pattern
             void remove_zeros();
 
-            // Generator functions
-            void generate_omni();                                                                      // Isotropic radiator, vertical polarization
-            void generate_dipole();                                                                    // Short dipole radiating with vertical polarization
-            void generate_half_wave_dipole();                                                          // Half-wave dipole radiating with vertical polarization
-            void generate_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0); // An antenna with a custom 3dB beam with (in degree)
-
             // Calculate the directivity of an antenna element in dBi
             dtype calc_directivity_dBi(unsigned element);
 
@@ -115,6 +109,26 @@ namespace quadriga_lib
             std::string validate();
         };
     }
+
+    // The following functions generate new array antenna objects
+    // Usage example: auto ant = quadriga_lib::generate_omni<float>();
+
+    // Generate : Isotropic radiator, vertical polarization, 1 deg resolution
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_omni();
+
+    // Generate : Short dipole radiating with vertical polarization, 1 deg resolution
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_dipole();
+
+    // Generate : Half-wave dipole radiating with vertical polarization, 1 deg resolution
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_half_wave_dipole();
+
+    // Generate : An antenna with a custom 3dB beam with (in degree)
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0);
+
 }
 
 #endif

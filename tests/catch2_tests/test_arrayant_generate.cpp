@@ -22,11 +22,30 @@
 #include <iostream>
 #include <string>
 
-TEST_CASE("Directivity calculation - Minimal test")
+TEST_CASE("Generate Arrayant - Minimal test omni")
 {
-    quadriga_lib::arrayant<float> ant;
-    ant.generate_dipole();
+    auto ant = quadriga_lib::generate_arrayant_omni<float>();
+    CHECK(ant.name == "omni");
+}
+
+TEST_CASE("Generate Arrayant - Minimal test dipole")
+{
+    auto ant = quadriga_lib::generate_arrayant_dipole<float>();
     float directivity = ant.calc_directivity_dBi(0);
     CHECK(std::abs(directivity - 1.760964f) < 0.0001);
     REQUIRE_THROWS_AS(ant.calc_directivity_dBi(1), std::invalid_argument);
+}
+
+TEST_CASE("Generate Arrayant - Minimal test Half-wave dipole")
+{
+    auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
+    float directivity = ant.calc_directivity_dBi(0);
+    CHECK(std::abs(directivity - 2.15f) < 0.001);
+}
+
+TEST_CASE("Generate Arrayant - Custom")
+{
+    auto ant = quadriga_lib::generate_arrayant_custom<float>(10.0, 10.0);
+    float directivity = ant.calc_directivity_dBi(0);
+    CHECK(std::abs(directivity - 25.627f) < 0.001);
 }
