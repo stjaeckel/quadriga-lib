@@ -51,18 +51,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<double> arrayant_double;
 
     if (array_type == "omni")
-        arrayant_double.generate_omni();
+        arrayant_double = quadriga_lib::generate_arrayant_omni<double>();
     else if (array_type == "dipole" || array_type == "short-dipole")
-        arrayant_double.generate_dipole();
+        arrayant_double = quadriga_lib::generate_arrayant_dipole<double>();
     else if (array_type == "half-wave-dipole")
-        arrayant_double.generate_half_wave_dipole();
+        arrayant_double = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
     else if (array_type == "custom")
         if (nrhs < 4)
             mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
         else
-            arrayant_double.generate_custom(qd_mex_get_scalar<double>(prhs[1], "az_3dB"),
-                                            qd_mex_get_scalar<double>(prhs[2], "el_3db"),
-                                            qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin"));
+            arrayant_double = quadriga_lib::generate_arrayant_custom<double>(qd_mex_get_scalar<double>(prhs[1], "az_3dB"),
+                                                                             qd_mex_get_scalar<double>(prhs[2], "el_3db"),
+                                                                             qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin"));
     else
         mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Array type not supported!");
 

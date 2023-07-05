@@ -568,8 +568,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
         }
         else // step < 0.1 degree --> Use subsampled sphere
         {
-            quadriga_lib::arrayant<dtype> ant;
-            ant.generate_omni();
+            auto ant = quadriga_lib::generate_arrayant_omni<dtype>();
             ant.e_theta_re.zeros();
             arma::Col<unsigned> has_az(361), has_el(181);
 
@@ -904,140 +903,6 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
     delete[] elevation_grid_new;
 }
 
-// Generate : Isotropic radiator, vertical polarization
-template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_omni()
-{
-    dtype pi = dtype(arma::datum::pi);
-    name = "omni";
-    e_theta_re.ones(181, 361, 1);
-    e_theta_im.zeros(181, 361, 1);
-    e_phi_re.zeros(181, 361, 1);
-    e_phi_im.zeros(181, 361, 1);
-    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
-    element_pos.zeros(3, 1);
-    coupling_re.ones(1, 1);
-    coupling_im.zeros(1, 1);
-    valid = 1;
-}
-
-// Generate : Short dipole radiating with vertical polarization
-template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_dipole()
-{
-    dtype pi = dtype(arma::datum::pi);
-    name = "dipole";
-    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
-    e_theta_re.zeros(181, 361, 1);
-    e_theta_im.zeros(181, 361, 1);
-    e_phi_re.zeros(181, 361, 1);
-    e_phi_im.zeros(181, 361, 1);
-    e_theta_re.slice(0) = arma::repmat(elevation_grid, 1, 361);
-    e_theta_re = arma::cos(0.999999 * e_theta_re) * std::sqrt(1.499961);
-    element_pos.zeros(3, 1);
-    coupling_re.ones(1, 1);
-    coupling_im.zeros(1, 1);
-    valid = 1;
-}
-
-// Generate : Half-wave dipole radiating with vertical polarization
-template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_half_wave_dipole()
-{
-    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
-    name = "half-wave-dipole";
-    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
-    e_theta_re.zeros(181, 361, 1);
-    e_theta_im.zeros(181, 361, 1);
-    e_phi_re.zeros(181, 361, 1);
-    e_phi_im.zeros(181, 361, 1);
-    e_theta_re.slice(0) = arma::repmat(elevation_grid, 1, 361);
-    e_theta_re = arma::cos(pih * arma::sin(0.999999 * e_theta_re)) / arma::cos(0.999999 * e_theta_re);
-    e_theta_re = e_theta_re * dtype(1.280968208215292);
-    element_pos.zeros(3, 1);
-    coupling_re.ones(1, 1);
-    coupling_im.zeros(1, 1);
-    valid = 1;
-}
-
-// Generate : An antenna with a custom gain in elevation and azimuth
-template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::generate_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
-{
-    dtype pi = dtype(arma::datum::pi), one = 1.0, half = 0.5, limit = 1e-7, step = -0.382, limit_inf = 1e38,
-          deg2rad = dtype(arma::datum::pi / 360.0);
-
-    azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
-    arma::Col<dtype> phi_sq = azimuth_grid % azimuth_grid;
-    arma::Col<dtype> cos_theta = arma::cos(elevation_grid);
-    cos_theta.at(0) = dtype(0.0), cos_theta.at(180) = dtype(0.0);
-    arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
-    az_3dB_rad.at(0) = az_3dB * deg2rad;
-    el_3db_rad.at(0) = el_3db * deg2rad;
-
-    // Calculate azimuth pattern cut
-    dtype a = one, d = half, x = limit_inf, delta = limit_inf;
-    arma::Col<dtype> xn(1), C(361), D(181);
-    for (unsigned lp = 0; lp < 5000; lp++)
-    {
-        dtype an = lp == 0 ? a : a + d;
-        delta = lp == 0 ? limit_inf : std::abs(a - an);
-        C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
-        quadriga_tools::interp(&C, &azimuth_grid, &az_3dB_rad, &xn);
-        dtype xm = std::abs(xn.at(0) - half);
-        a = xm < x ? an : a;
-        d = xm < x ? d : step * d;
-        x = xm < x ? xm : x;
-        if (delta < limit)
-            break;
-    }
-    C = arma::exp(-a * phi_sq);
-
-    // Calculate elevation pattern cut
-    a = one, d = half, x = limit_inf, delta = limit_inf;
-    for (unsigned lp = 0; lp < 5000; lp++)
-    {
-        dtype an = lp == 0 ? a : a + d;
-        delta = lp == 0 ? limit_inf : std::abs(a - an);
-        D = arma::pow(cos_theta, an);
-        quadriga_tools::interp(&D, &elevation_grid, &el_3db_rad, &xn);
-        dtype xm = std::abs(xn.at(0) - half);
-        a = xm < x ? an : a;
-        d = xm < x ? d : step * d;
-        x = xm < x ? xm : x;
-        if (delta < limit)
-            break;
-    }
-    D = arma::pow(cos_theta, a);
-
-    // Combined pattern
-    e_theta_re.zeros(181, 361, 1);
-    dtype *ptr = e_theta_re.memptr();
-    for (dtype *col = C.begin(); col != C.end(); col++)
-        for (dtype *row = D.begin(); row != D.end(); row++)
-            *ptr++ = std::sqrt(rear_gain_lin + (one - rear_gain_lin) * *row * *col);
-
-    e_theta_im.zeros(181, 361, 1);
-    e_phi_re.zeros(181, 361, 1);
-    e_phi_im.zeros(181, 361, 1);
-    element_pos.zeros(3, 1);
-    coupling_re.ones(1, 1);
-    coupling_im.zeros(1, 1);
-    name = "custom";
-    valid = 1;
-
-    // Normalize to Gain
-    dtype directivity = calc_directivity_dBi(0);
-    directivity = std::pow(10.0, 0.1 * directivity);
-    dtype p_max = e_theta_re.max();
-    p_max *= p_max;
-    e_theta_re *= std::sqrt(directivity / p_max);
-}
-
 // ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
 template <typename dtype>
 dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(unsigned element)
@@ -1194,3 +1059,161 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
 
 template class quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<float>;
 template class quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<double>;
+
+// Generate : Isotropic radiator, vertical polarization, 1 deg resolution
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
+{
+    quadriga_lib::arrayant<dtype> ant;
+
+    dtype pi = dtype(arma::datum::pi);
+    ant.name = "omni";
+    ant.e_theta_re.ones(181, 361, 1);
+    ant.e_theta_im.zeros(181, 361, 1);
+    ant.e_phi_re.zeros(181, 361, 1);
+    ant.e_phi_im.zeros(181, 361, 1);
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.element_pos.zeros(3, 1);
+    ant.coupling_re.ones(1, 1);
+    ant.coupling_im.zeros(1, 1);
+    ant.valid = 1;
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni();
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni();
+
+// Generate : Short dipole radiating with vertical polarization, 1 deg resolution
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
+{
+    quadriga_lib::arrayant<dtype> ant;
+
+    dtype pi = dtype(arma::datum::pi);
+    ant.name = "dipole";
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.e_theta_re.zeros(181, 361, 1);
+    ant.e_theta_im.zeros(181, 361, 1);
+    ant.e_phi_re.zeros(181, 361, 1);
+    ant.e_phi_im.zeros(181, 361, 1);
+    ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
+    ant.e_theta_re = arma::cos(0.999999 * ant.e_theta_re) * std::sqrt(1.499961);
+    ant.element_pos.zeros(3, 1);
+    ant.coupling_re.ones(1, 1);
+    ant.coupling_im.zeros(1, 1);
+    ant.valid = 1;
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole();
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole();
+
+// Generate : Half-wave dipole radiating with vertical polarization
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
+{
+    quadriga_lib::arrayant<dtype> ant;
+
+    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
+    ant.name = "half-wave-dipole";
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.e_theta_re.zeros(181, 361, 1);
+    ant.e_theta_im.zeros(181, 361, 1);
+    ant.e_phi_re.zeros(181, 361, 1);
+    ant.e_phi_im.zeros(181, 361, 1);
+    ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
+    ant.e_theta_re = arma::cos(pih * arma::sin(0.999999 * ant.e_theta_re)) / arma::cos(0.999999 * ant.e_theta_re);
+    ant.e_theta_re = ant.e_theta_re * dtype(1.280968208215292);
+    ant.element_pos.zeros(3, 1);
+    ant.coupling_re.ones(1, 1);
+    ant.coupling_im.zeros(1, 1);
+    ant.valid = 1;
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole();
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wave_dipole();
+
+// Generate : An antenna with a custom gain in elevation and azimuth
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
+{
+    dtype pi = dtype(arma::datum::pi), one = 1.0, half = 0.5, limit = 1e-7, step = -0.382, limit_inf = 1e38,
+          deg2rad = dtype(arma::datum::pi / 360.0);
+
+    quadriga_lib::arrayant<dtype> ant;
+
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    arma::Col<dtype> phi_sq = ant.azimuth_grid % ant.azimuth_grid;
+    arma::Col<dtype> cos_theta = arma::cos(ant.elevation_grid);
+    cos_theta.at(0) = dtype(0.0), cos_theta.at(180) = dtype(0.0);
+    arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
+    az_3dB_rad.at(0) = az_3dB * deg2rad;
+    el_3db_rad.at(0) = el_3db * deg2rad;
+
+    // Calculate azimuth pattern cut
+    dtype a = one, d = half, x = limit_inf, delta = limit_inf;
+    arma::Col<dtype> xn(1), C(361), D(181);
+    for (unsigned lp = 0; lp < 5000; lp++)
+    {
+        dtype an = lp == 0 ? a : a + d;
+        delta = lp == 0 ? limit_inf : std::abs(a - an);
+        C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
+        quadriga_tools::interp(&C, &ant.azimuth_grid, &az_3dB_rad, &xn);
+        dtype xm = std::abs(xn.at(0) - half);
+        a = xm < x ? an : a;
+        d = xm < x ? d : step * d;
+        x = xm < x ? xm : x;
+        if (delta < limit)
+            break;
+    }
+    C = arma::exp(-a * phi_sq);
+
+    // Calculate elevation pattern cut
+    a = one, d = half, x = limit_inf, delta = limit_inf;
+    for (unsigned lp = 0; lp < 5000; lp++)
+    {
+        dtype an = lp == 0 ? a : a + d;
+        delta = lp == 0 ? limit_inf : std::abs(a - an);
+        D = arma::pow(cos_theta, an);
+        quadriga_tools::interp(&D, &ant.elevation_grid, &el_3db_rad, &xn);
+        dtype xm = std::abs(xn.at(0) - half);
+        a = xm < x ? an : a;
+        d = xm < x ? d : step * d;
+        x = xm < x ? xm : x;
+        if (delta < limit)
+            break;
+    }
+    D = arma::pow(cos_theta, a);
+
+    // Combined pattern
+    ant.e_theta_re.zeros(181, 361, 1);
+    dtype *ptr = ant.e_theta_re.memptr();
+    for (dtype *col = C.begin(); col != C.end(); col++)
+        for (dtype *row = D.begin(); row != D.end(); row++)
+            *ptr++ = std::sqrt(rear_gain_lin + (one - rear_gain_lin) * *row * *col);
+
+    ant.e_theta_im.zeros(181, 361, 1);
+    ant.e_phi_re.zeros(181, 361, 1);
+    ant.e_phi_im.zeros(181, 361, 1);
+    ant.element_pos.zeros(3, 1);
+    ant.coupling_re.ones(1, 1);
+    ant.coupling_im.zeros(1, 1);
+    ant.name = "custom";
+    ant.valid = 1;
+
+    // Normalize to Gain
+    dtype directivity = ant.calc_directivity_dBi(0);
+    directivity = std::pow(10.0, 0.1 * directivity);
+    dtype p_max = ant.e_theta_re.max();
+    p_max *= p_max;
+    ant.e_theta_re *= std::sqrt(directivity / p_max);
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin);

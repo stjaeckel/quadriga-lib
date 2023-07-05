@@ -24,8 +24,7 @@
 
 TEST_CASE("Arrayant combine pattern - Minimal test")
 {
-    quadriga_lib::arrayant<float> ant;
-    ant.generate_omni();
+    auto ant = quadriga_lib::generate_arrayant_omni<float>();
     ant.copy_element(0, 2);
     ant.coupling_re.ones(3, 1);
     ant.coupling_im.reset();
@@ -51,8 +50,7 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
 
 TEST_CASE("Arrayant rotation - Minimal test")
 {
-    quadriga_lib::arrayant<float> ant;
-    ant.generate_custom(5.0, 5.0);
+    auto ant = quadriga_lib::generate_arrayant_custom<float>(5.0, 5.0);
 
     arma::uword i = ant.e_theta_re.index_max();
     arma::uvec s = arma::ind2sub(arma::size(ant.e_theta_re), i);
@@ -66,7 +64,7 @@ TEST_CASE("Arrayant rotation - Minimal test")
     CHECK(s(0) == 90);
     CHECK(s(1) == 270);
 
-    ant.generate_custom(5.0, 5.0);
+    ant = quadriga_lib::generate_arrayant_custom<float>(5.0, 5.0);
     ant.rotate_pattern(0.0, -45.0);
 
     i = ant.e_theta_re.index_max();
