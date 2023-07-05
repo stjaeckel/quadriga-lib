@@ -389,7 +389,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
 
 // Calculates a virtual pattern of the given array by applying coupling and element positions
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype> *output)
 {
     // Check if arrayant object is valid
     std::string error_message = "";
@@ -410,23 +410,15 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
     arma::uword n_ang = n_el * n_az;
     arma::uword n_prt = coupling_re.n_cols;
 
-    // Convert angles to Cartesian coordinates
-    arma::Mat<dtype> phi = arma::Mat<dtype>(azimuth_grid.as_row());
-    arma::Mat<dtype> theta = arma::Mat<dtype>(elevation_grid);
-    arma::Mat<dtype> length(n_el, n_az, arma::fill::value(1000.0 * lambda));
-    phi = arma::repmat(phi, n_el, 1);
-    theta = arma::repmat(theta, 1, n_az);
+    // Create list of angles for pattern interpolation
+    arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
+    arma::Mat<dtype> elevation(1, n_ang, arma::fill::none);
+    dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
+          *p_phi = azimuth_grid.memptr(), *p_theta = elevation_grid.memptr();
 
-    arma::cube B = quadriga_tools::geo2cart(phi, theta, length);
-    B.reshape(3, n_ang, 1);
-    arma::rowvec Bx = B.slice(0).row(0), By = B.slice(0).row(1), Bz = B.slice(0).row(2);
-
-    // Calculate the angles for the pattern interpolation
-    arma::rowvec tmp = arma::atan2(By, Bx);
-    arma::Mat<dtype> azimuth = arma::conv_to<arma::Mat<dtype>>::from(tmp);
-    tmp = arma::atan(Bz / arma::sqrt(Bx % Bx + By % By));
-    tmp.replace(arma::datum::nan, 0.0);
-    arma::Mat<dtype> elevation = arma::conv_to<arma::Mat<dtype>>::from(tmp);
+    for (arma::uword ia = 0; ia < n_az; ia++)
+        for (arma::uword ie = 0; ie < n_el; ie++)
+            *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
     // Interpolate the pattern data
     arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n_out, n_out);
@@ -457,27 +449,57 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
         }
     }
 
-    // Update arrayant properties
-    e_theta_re.set_size(n_el, n_az, n_prt);
-    e_theta_im.set_size(n_el, n_az, n_prt);
-    e_phi_re.set_size(n_el, n_az, n_prt);
-    e_phi_im.set_size(n_el, n_az, n_prt);
-    element_pos.zeros(3, n_prt);
-    coupling_re.eye(n_prt, n_prt);
-    coupling_im.zeros(n_prt, n_prt);
+    // Write output data
+    if (output->azimuth_grid.n_elem != n_az)
+        output->azimuth_grid.set_size(n_az);
+    std::memcpy(output->azimuth_grid.memptr(), azimuth_grid.memptr(), n_az * sizeof(dtype));
 
-    arma::Mat<dtype> cpy = real(Vo);
-    dtype *ptrI = cpy.memptr(), *ptrO = e_theta_re.memptr();
-    std::memcpy(ptrO, ptrI, n_el * n_az * n_prt * sizeof(dtype));
+    if (output->elevation_grid.n_elem != n_el)
+        output->elevation_grid.set_size(n_el);
+    std::memcpy(output->elevation_grid.memptr(), elevation_grid.memptr(), n_el * sizeof(dtype));
 
-    cpy = imag(Vo), ptrI = cpy.memptr(), ptrO = e_theta_im.memptr();
-    std::memcpy(ptrO, ptrI, n_el * n_az * n_prt * sizeof(dtype));
+    arma::Mat<dtype> cpy = arma::real(Vo);
+    if (output->e_theta_re.n_rows != n_el || output->e_theta_re.n_cols != n_az || output->e_theta_re.n_slices != n_prt)
+        output->e_theta_re.set_size(n_el, n_az, n_prt);
+    std::memcpy(output->e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    cpy = real(Ho), ptrI = cpy.memptr(), ptrO = e_phi_re.memptr();
-    std::memcpy(ptrO, ptrI, n_el * n_az * n_prt * sizeof(dtype));
+    cpy = arma::imag(Vo);
+    if (output->e_theta_im.n_rows != n_el || output->e_theta_im.n_cols != n_az || output->e_theta_im.n_slices != n_prt)
+        output->e_theta_im.set_size(n_el, n_az, n_prt);
+    std::memcpy(output->e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    cpy = imag(Ho), ptrI = cpy.memptr(), ptrO = e_phi_im.memptr();
-    std::memcpy(ptrO, ptrI, n_el * n_az * n_prt * sizeof(dtype));
+    cpy = arma::real(Ho);
+    if (output->e_phi_re.n_rows != n_el || output->e_phi_re.n_cols != n_az || output->e_phi_re.n_slices != n_prt)
+        output->e_phi_re.set_size(n_el, n_az, n_prt);
+    std::memcpy(output->e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+
+    cpy = arma::imag(Ho);
+    if (output->e_phi_im.n_rows != n_el || output->e_phi_im.n_cols != n_az || output->e_phi_im.n_slices != n_prt)
+        output->e_phi_im.set_size(n_el, n_az, n_prt);
+    std::memcpy(output->e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+
+    if (output->element_pos.n_rows != 3 || output->element_pos.n_cols != n_prt)
+        output->element_pos.set_size(3, n_prt);
+    output->element_pos.zeros();
+
+    if (output->coupling_re.n_rows != n_prt || output->coupling_re.n_cols != n_prt)
+        output->coupling_re.set_size(n_prt, n_prt);
+    output->coupling_re.eye();
+
+    if (output->coupling_im.n_rows != n_prt || output->coupling_im.n_cols != n_prt)
+        output->coupling_im.set_size(n_prt, n_prt);
+    output->coupling_im.zeros();
+
+    output->center_frequency = center_frequency;
+    output->valid = 1;
+}
+
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
+{
+    quadriga_lib::arrayant<dtype> output;
+    combine_pattern(&output);
+    return output;
 }
 
 // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
