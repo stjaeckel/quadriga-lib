@@ -48,6 +48,7 @@ namespace quadriga_lib
             arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]
             dtype center_frequency = dtype(299792458.0); // Center frequency in [Hz] (optional)
             int valid = -1;                              // Indicator of data integrity (-1 = unknown, 0 = ERROR, 1 = OK)
+            bool read_only = false;                      // Prevent member functions from writing to the properties
             arrayant(){};                                // Default constructor
 
             // Functions to determine the size of the array antenna properties
@@ -93,7 +94,8 @@ namespace quadriga_lib
             void copy_element(unsigned source, unsigned destination);
 
             // Calculates a virtual pattern of the given array by applying coupling and element positions
-            void combine_pattern();
+            void combine_pattern(arrayant<dtype> *output);
+            arrayant<dtype> combine_pattern();
 
             // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
             // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting

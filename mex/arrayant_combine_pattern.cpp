@@ -53,30 +53,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
             mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "All floating-point inputs must have the same type: 'single' or 'double' precision");
 
-    // Create arrayant object and validate the input
+    // Create arrayant object from the input data
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     if (use_single)
-        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0], true),
-        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1], true),
-        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2], true),
-        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3], true),
+        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0]),
+        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1]),
+        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2]),
+        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3]),
         arrayant_single.azimuth_grid = qd_mex_reinterpret_Col<float>(prhs[4]),
         arrayant_single.elevation_grid = qd_mex_reinterpret_Col<float>(prhs[5]),
-        arrayant_single.element_pos = qd_mex_reinterpret_Mat<float>(prhs[6], true),
-        arrayant_single.coupling_re = qd_mex_reinterpret_Mat<float>(prhs[7], true),
-        arrayant_single.coupling_im = qd_mex_reinterpret_Mat<float>(prhs[8], true),
+        arrayant_single.element_pos = qd_mex_reinterpret_Mat<float>(prhs[6]),
+        arrayant_single.coupling_re = qd_mex_reinterpret_Mat<float>(prhs[7]),
+        arrayant_single.coupling_im = qd_mex_reinterpret_Mat<float>(prhs[8]),
         arrayant_single.center_frequency = qd_mex_get_scalar<float>(prhs[9], "center_frequency");
     else
-        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0], true),
-        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1], true),
-        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2], true),
-        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3], true),
+        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0]),
+        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1]),
+        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2]),
+        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3]),
         arrayant_double.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[4]),
         arrayant_double.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[5]),
-        arrayant_double.element_pos = qd_mex_reinterpret_Mat<double>(prhs[6], true),
-        arrayant_double.coupling_re = qd_mex_reinterpret_Mat<double>(prhs[7], true),
-        arrayant_double.coupling_im = qd_mex_reinterpret_Mat<double>(prhs[8], true),
+        arrayant_double.element_pos = qd_mex_reinterpret_Mat<double>(prhs[6]),
+        arrayant_double.coupling_re = qd_mex_reinterpret_Mat<double>(prhs[7]),
+        arrayant_double.coupling_im = qd_mex_reinterpret_Mat<double>(prhs[8]),
         arrayant_double.center_frequency = qd_mex_get_scalar<double>(prhs[9], "center_frequency");
 
     // Validate the data integrity
@@ -84,21 +84,38 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!error_message.empty())
         mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", error_message.c_str());
 
-    // Call library function
-    if (use_single)
-        arrayant_single.combine_pattern();
-    else
-        arrayant_double.combine_pattern();
+    // Allocate memory for output data
+    unsigned n_az = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
+    unsigned n_el = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
+    unsigned n_prt = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
 
-    // Write output
+    quadriga_lib::arrayant<float> arrayant_single_out;
+    quadriga_lib::arrayant<double> arrayant_double_out;
     if (use_single)
-        plhs[0] = qd_mex_copy2matlab(&arrayant_single.e_theta_re),
-        plhs[1] = qd_mex_copy2matlab(&arrayant_single.e_theta_im),
-        plhs[2] = qd_mex_copy2matlab(&arrayant_single.e_phi_re),
-        plhs[3] = qd_mex_copy2matlab(&arrayant_single.e_phi_im);
+        plhs[0] = qd_mex_init_output(&arrayant_single_out.e_theta_re, n_el, n_az, n_prt),
+        plhs[1] = qd_mex_init_output(&arrayant_single_out.e_theta_im, n_el, n_az, n_prt),
+        plhs[2] = qd_mex_init_output(&arrayant_single_out.e_phi_re, n_el, n_az, n_prt),
+        plhs[3] = qd_mex_init_output(&arrayant_single_out.e_phi_im, n_el, n_az, n_prt);
     else
-        plhs[0] = qd_mex_copy2matlab(&arrayant_double.e_theta_re),
-        plhs[1] = qd_mex_copy2matlab(&arrayant_double.e_theta_im),
-        plhs[2] = qd_mex_copy2matlab(&arrayant_double.e_phi_re),
-        plhs[3] = qd_mex_copy2matlab(&arrayant_double.e_phi_im);
+        plhs[0] = qd_mex_init_output(&arrayant_double_out.e_theta_re, n_el, n_az, n_prt),
+        plhs[1] = qd_mex_init_output(&arrayant_double_out.e_theta_im, n_el, n_az, n_prt),
+        plhs[2] = qd_mex_init_output(&arrayant_double_out.e_phi_re, n_el, n_az, n_prt),
+        plhs[3] = qd_mex_init_output(&arrayant_double_out.e_phi_im, n_el, n_az, n_prt);
+
+    // Call library function
+    try
+    {
+        if (use_single)
+            arrayant_single.combine_pattern(&arrayant_single_out);
+        else
+            arrayant_double.combine_pattern(&arrayant_double_out);
+    }
+    catch (const std::invalid_argument &ex)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", ex.what());
+    }
+    catch (...)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+    }
 }
