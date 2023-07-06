@@ -29,24 +29,24 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
     ant.coupling_re.ones(3, 1);
     ant.coupling_im.reset();
 
-    auto out = ant.combine_pattern();
+    ant.combine_pattern();
 
     arma::fcube T(181, 361, 1, arma::fill::value(2.0f));
-    CHECK(arma::approx_equal(out.e_theta_re, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.e_theta_re, T, "absdiff", 1e-6));
 
     T.zeros();
-    CHECK(arma::approx_equal(out.e_theta_im, T, "absdiff", 1e-6));
-    CHECK(arma::approx_equal(out.e_phi_re, T, "absdiff", 1e-6));
-    CHECK(arma::approx_equal(out.e_phi_im, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.e_theta_im, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.e_phi_re, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.e_phi_im, T, "absdiff", 1e-6));
 
     arma::fmat Q(3, 1);
-    CHECK(arma::approx_equal(out.element_pos, Q, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.element_pos, Q, "absdiff", 1e-6));
 
     Q.ones(1, 1);
-    CHECK(arma::approx_equal(out.coupling_re, Q, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.coupling_re, Q, "absdiff", 1e-6));
 
     Q.zeros(1, 1);
-    CHECK(arma::approx_equal(out.coupling_im, Q, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.coupling_im, Q, "absdiff", 1e-6));
 }
 
 TEST_CASE("Arrayant rotation - Minimal test")

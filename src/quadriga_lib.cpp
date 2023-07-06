@@ -449,57 +449,78 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
         }
     }
 
-    // Write output data
-    if (output->azimuth_grid.n_elem != n_az)
-        output->azimuth_grid.set_size(n_az);
-    std::memcpy(output->azimuth_grid.memptr(), azimuth_grid.memptr(), n_az * sizeof(dtype));
+    if (output != NULL) // Write output data
+    {
+        if (output->azimuth_grid.n_elem != n_az)
+            output->azimuth_grid.set_size(n_az);
+        std::memcpy(output->azimuth_grid.memptr(), azimuth_grid.memptr(), n_az * sizeof(dtype));
 
-    if (output->elevation_grid.n_elem != n_el)
-        output->elevation_grid.set_size(n_el);
-    std::memcpy(output->elevation_grid.memptr(), elevation_grid.memptr(), n_el * sizeof(dtype));
+        if (output->elevation_grid.n_elem != n_el)
+            output->elevation_grid.set_size(n_el);
+        std::memcpy(output->elevation_grid.memptr(), elevation_grid.memptr(), n_el * sizeof(dtype));
 
-    arma::Mat<dtype> cpy = arma::real(Vo);
-    if (output->e_theta_re.n_rows != n_el || output->e_theta_re.n_cols != n_az || output->e_theta_re.n_slices != n_prt)
-        output->e_theta_re.set_size(n_el, n_az, n_prt);
-    std::memcpy(output->e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        arma::Mat<dtype> cpy = arma::real(Vo);
+        if (output->e_theta_re.n_rows != n_el || output->e_theta_re.n_cols != n_az || output->e_theta_re.n_slices != n_prt)
+            output->e_theta_re.set_size(n_el, n_az, n_prt);
+        std::memcpy(output->e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    cpy = arma::imag(Vo);
-    if (output->e_theta_im.n_rows != n_el || output->e_theta_im.n_cols != n_az || output->e_theta_im.n_slices != n_prt)
-        output->e_theta_im.set_size(n_el, n_az, n_prt);
-    std::memcpy(output->e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        cpy = arma::imag(Vo);
+        if (output->e_theta_im.n_rows != n_el || output->e_theta_im.n_cols != n_az || output->e_theta_im.n_slices != n_prt)
+            output->e_theta_im.set_size(n_el, n_az, n_prt);
+        std::memcpy(output->e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    cpy = arma::real(Ho);
-    if (output->e_phi_re.n_rows != n_el || output->e_phi_re.n_cols != n_az || output->e_phi_re.n_slices != n_prt)
-        output->e_phi_re.set_size(n_el, n_az, n_prt);
-    std::memcpy(output->e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        cpy = arma::real(Ho);
+        if (output->e_phi_re.n_rows != n_el || output->e_phi_re.n_cols != n_az || output->e_phi_re.n_slices != n_prt)
+            output->e_phi_re.set_size(n_el, n_az, n_prt);
+        std::memcpy(output->e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    cpy = arma::imag(Ho);
-    if (output->e_phi_im.n_rows != n_el || output->e_phi_im.n_cols != n_az || output->e_phi_im.n_slices != n_prt)
-        output->e_phi_im.set_size(n_el, n_az, n_prt);
-    std::memcpy(output->e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        cpy = arma::imag(Ho);
+        if (output->e_phi_im.n_rows != n_el || output->e_phi_im.n_cols != n_az || output->e_phi_im.n_slices != n_prt)
+            output->e_phi_im.set_size(n_el, n_az, n_prt);
+        std::memcpy(output->e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-    if (output->element_pos.n_rows != 3 || output->element_pos.n_cols != n_prt)
-        output->element_pos.set_size(3, n_prt);
-    output->element_pos.zeros();
+        if (output->element_pos.n_rows != 3 || output->element_pos.n_cols != n_prt)
+            output->element_pos.set_size(3, n_prt);
+        output->element_pos.zeros();
 
-    if (output->coupling_re.n_rows != n_prt || output->coupling_re.n_cols != n_prt)
-        output->coupling_re.set_size(n_prt, n_prt);
-    output->coupling_re.eye();
+        if (output->coupling_re.n_rows != n_prt || output->coupling_re.n_cols != n_prt)
+            output->coupling_re.set_size(n_prt, n_prt);
+        output->coupling_re.eye();
 
-    if (output->coupling_im.n_rows != n_prt || output->coupling_im.n_cols != n_prt)
-        output->coupling_im.set_size(n_prt, n_prt);
-    output->coupling_im.zeros();
+        if (output->coupling_im.n_rows != n_prt || output->coupling_im.n_cols != n_prt)
+            output->coupling_im.set_size(n_prt, n_prt);
+        output->coupling_im.zeros();
 
-    output->center_frequency = center_frequency;
-    output->valid = 1;
-}
+        output->center_frequency = center_frequency;
+        output->valid = 1;
+    }
+    else if (read_only)
+    {
+        error_message = "Cannot update read-only array antenna object inplace.";
+        throw std::invalid_argument(error_message.c_str());
+    }
+    else // Update the properties of current array antenna object
+    {
+        arma::Mat<dtype> cpy = real(Vo);
+        e_theta_re.set_size(n_el, n_az, n_prt);
+        std::memcpy(e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
 
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern()
-{
-    quadriga_lib::arrayant<dtype> output;
-    combine_pattern(&output);
-    return output;
+        cpy = imag(Vo);
+        e_theta_im.set_size(n_el, n_az, n_prt);
+        std::memcpy(e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+
+        cpy = real(Ho);
+        e_phi_re.set_size(n_el, n_az, n_prt);
+        std::memcpy(e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+
+        cpy = imag(Ho);
+        e_phi_im.set_size(n_el, n_az, n_prt);
+        std::memcpy(e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+
+        element_pos.zeros(3, n_prt);
+        coupling_re.eye(n_prt, n_prt);
+        coupling_im.zeros(n_prt, n_prt);
+    }
 }
 
 // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
@@ -794,7 +815,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
 
 // Remove zeros from the pattern
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *output)
 {
     // Check if arrayant object is valid
     std::string error_message = "";
@@ -804,6 +825,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
         error_message = "Array antenna object is invalid.";
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
+
+    if (output == NULL && read_only)
+    {
+        error_message = "Cannot update read-only array antenna object inplace.";
+        throw std::invalid_argument(error_message.c_str());
+    }
 
     arma::uword n_el = e_theta_re.n_rows;
     arma::uword n_az = e_theta_re.n_cols;
@@ -826,6 +853,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
     arma::Col<dtype> el_sum = arma::sum(pow, 1);
     pow.reset();
 
+    // Determine which parts of the pattern should be kept
     arma::uvec keep_az(n_az), keep_el(n_el);
     arma::uword *keep_az_ptr = keep_az.memptr();
     arma::uword *keep_el_ptr = keep_el.memptr();
@@ -864,12 +892,42 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
     }
     el_sum.reset();
 
+    // Copy the relevant pattern data
     arma::uword n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
 
 #pragma omp parallel for
     for (int p = 0; p < 4; p++)
     {
-        dtype *data = new dtype[n_el_new * n_az_new * n_slices], *ptrO = data, *ptrI = NULL;
+        dtype *data = NULL, *ptrO = NULL, *ptrI = NULL;
+
+        if (output == NULL)
+            data = new dtype[n_el_new * n_az_new * n_slices];
+        else if (p == 0)
+        {
+            if (output->e_theta_re.n_rows != n_el_new || output->e_theta_re.n_cols != n_az_new || output->e_theta_re.n_slices != n_slices)
+                output->e_theta_re.set_size(n_el_new, n_az_new, n_slices);
+            data = output->e_theta_re.memptr();
+        }
+        else if (p == 1)
+        {
+            if (output->e_theta_im.n_rows != n_el_new || output->e_theta_im.n_cols != n_az_new || output->e_theta_im.n_slices != n_slices)
+                output->e_theta_im.set_size(n_el_new, n_az_new, n_slices);
+            data = output->e_theta_im.memptr();
+        }
+        else if (p == 2)
+        {
+            if (output->e_phi_re.n_rows != n_el_new || output->e_phi_re.n_cols != n_az_new || output->e_phi_re.n_slices != n_slices)
+                output->e_phi_re.set_size(n_el_new, n_az_new, n_slices);
+            data = output->e_phi_re.memptr();
+        }
+        else if (p == 3)
+        {
+            if (output->e_phi_im.n_rows != n_el_new || output->e_phi_im.n_cols != n_az_new || output->e_phi_im.n_slices != n_slices)
+                output->e_phi_im.set_size(n_el_new, n_az_new, n_slices);
+            data = output->e_phi_im.memptr();
+        }
+
+        ptrO = data;
         for (arma::uword is = 0; is < n_slices; is++)
         {
             if (p == 0)
@@ -890,39 +948,82 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros()
             }
         }
 
-        if (p == 0)
-            e_theta_re.set_size(n_el_new, n_az_new, n_slices),
-                std::memcpy(e_theta_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-        else if (p == 1)
-            e_theta_im.set_size(n_el_new, n_az_new, n_slices),
-                std::memcpy(e_theta_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-        else if (p == 2)
-            e_phi_re.set_size(n_el_new, n_az_new, n_slices),
-                std::memcpy(e_phi_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
-        else if (p == 3)
-            e_phi_im.set_size(n_el_new, n_az_new, n_slices),
-                std::memcpy(e_phi_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
+        if (output == NULL)
+        {
+            if (p == 0)
+                e_theta_re.set_size(n_el_new, n_az_new, n_slices),
+                    std::memcpy(e_theta_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
+            else if (p == 1)
+                e_theta_im.set_size(n_el_new, n_az_new, n_slices),
+                    std::memcpy(e_theta_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
+            else if (p == 2)
+                e_phi_re.set_size(n_el_new, n_az_new, n_slices),
+                    std::memcpy(e_phi_re.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
+            else if (p == 3)
+                e_phi_im.set_size(n_el_new, n_az_new, n_slices),
+                    std::memcpy(e_phi_im.memptr(), data, n_el_new * n_az_new * n_slices * sizeof(dtype));
 
-        delete[] data;
+            delete[] data;
+        }
     }
 
+    // Copy the new azimuth grid
     dtype *azimuth_grid_new = new dtype[n_az_new];
     pp = azimuth_grid_new;
     for (arma::uword ia = 0; ia < n_az; ia++)
         if (keep_az_ptr[ia] == 1)
             *pp++ = azimuth_grid[ia];
-    azimuth_grid.set_size(n_az_new);
-    std::memcpy(azimuth_grid.memptr(), azimuth_grid_new, n_az_new * sizeof(dtype));
+    if (output == NULL)
+        azimuth_grid.set_size(n_az_new), pp = azimuth_grid.memptr();
+    else if (output->azimuth_grid.n_elem != n_az_new)
+        output->azimuth_grid.set_size(n_az_new), pp = output->azimuth_grid.memptr();
+    else
+        pp = output->azimuth_grid.memptr();
+    std::memcpy(pp, azimuth_grid_new, n_az_new * sizeof(dtype));
     delete[] azimuth_grid_new;
 
+    // Copy the new elevation grid
     dtype *elevation_grid_new = new dtype[n_el_new];
     pp = elevation_grid_new;
     for (arma::uword ie = 0; ie < n_el; ie++)
         if (keep_el_ptr[ie] == 1)
             *pp++ = elevation_grid[ie];
-    elevation_grid.set_size(n_el_new);
-    std::memcpy(elevation_grid.memptr(), elevation_grid_new, n_el_new * sizeof(dtype));
+    if (output == NULL)
+        elevation_grid.set_size(n_el_new), pp = elevation_grid.memptr();
+    else if (output->elevation_grid.n_elem != n_el_new)
+        output->elevation_grid.set_size(n_el_new), pp = output->elevation_grid.memptr();
+    else
+        pp = output->elevation_grid.memptr();
+    std::memcpy(pp, elevation_grid_new, n_el_new * sizeof(dtype));
     delete[] elevation_grid_new;
+
+    // Copy the unchanged data
+    if (output != NULL)
+    {
+        if (!element_pos.empty())
+        {
+            if (output->element_pos.n_rows != 3 || output->element_pos.n_cols != n_slices)
+                output->element_pos.set_size(3, n_slices);
+            std::memcpy(output->element_pos.memptr(), element_pos.memptr(), 3 * n_slices * sizeof(dtype));
+        }
+
+        if (!coupling_re.empty())
+        {
+            if (output->coupling_re.n_rows != n_slices || output->coupling_re.n_cols != coupling_re.n_cols)
+                output->coupling_re.set_size(n_slices, coupling_re.n_cols);
+            std::memcpy(output->coupling_re.memptr(), coupling_re.memptr(), n_slices * coupling_re.n_cols * sizeof(dtype));
+        }
+
+        if (!coupling_im.empty())
+        {
+            if (output->coupling_im.n_rows != n_slices || output->coupling_im.n_cols != coupling_im.n_cols)
+                output->coupling_im.set_size(n_slices, coupling_im.n_cols);
+            std::memcpy(output->coupling_im.memptr(), coupling_im.memptr(), n_slices * coupling_im.n_cols * sizeof(dtype));
+        }
+
+        output->center_frequency = center_frequency;
+        output->validate();
+    }
 }
 
 // ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
