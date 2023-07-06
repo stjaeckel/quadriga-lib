@@ -94,15 +94,15 @@ namespace quadriga_lib
             void copy_element(unsigned source, unsigned destination);
 
             // Calculates a virtual pattern of the given array by applying coupling and element positions
-            void combine_pattern(arrayant<dtype> *output);
-            arrayant<dtype> combine_pattern();
+            // Calling this function without an argument updates the arrayant properties inplace
+            void combine_pattern(arrayant<dtype> *output = NULL);
 
             // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
             // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
             void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0, unsigned usage = 0, unsigned element = -1);
 
             // Remove zeros from the pattern
-            void remove_zeros();
+            void remove_zeros(arrayant<dtype> *output = NULL);
 
             // Calculate the directivity of an antenna element in dBi
             dtype calc_directivity_dBi(unsigned element);
