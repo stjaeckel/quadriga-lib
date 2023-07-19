@@ -66,7 +66,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arrayant_single.element_pos = qd_mex_reinterpret_Mat<float>(prhs[6]),
         arrayant_single.coupling_re = qd_mex_reinterpret_Mat<float>(prhs[7]),
         arrayant_single.coupling_im = qd_mex_reinterpret_Mat<float>(prhs[8]),
-        arrayant_single.center_frequency = qd_mex_get_scalar<float>(prhs[9], "center_frequency");
+        arrayant_single.center_frequency = qd_mex_get_scalar<float>(prhs[9], "center_frequency"),
+        arrayant_single.read_only = true;
     else
         arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0]),
         arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1]),
@@ -77,7 +78,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arrayant_double.element_pos = qd_mex_reinterpret_Mat<double>(prhs[6]),
         arrayant_double.coupling_re = qd_mex_reinterpret_Mat<double>(prhs[7]),
         arrayant_double.coupling_im = qd_mex_reinterpret_Mat<double>(prhs[8]),
-        arrayant_double.center_frequency = qd_mex_get_scalar<double>(prhs[9], "center_frequency");
+        arrayant_double.center_frequency = qd_mex_get_scalar<double>(prhs[9], "center_frequency"),
+        arrayant_double.read_only = true;
 
     // Validate the data integrity
     std::string error_message = use_single ? arrayant_single.validate() : arrayant_double.validate();

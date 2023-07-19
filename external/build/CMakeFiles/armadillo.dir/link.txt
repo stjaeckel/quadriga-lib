@@ -1,0 +1,2 @@
+/usr/bin/ar qc libarmadillo.a CMakeFiles/armadillo.dir/src/wrapper1.cpp.o CMakeFiles/armadillo.dir/src/wrapper2.cpp.o
+/usr/bin/ranlib libarmadillo.a

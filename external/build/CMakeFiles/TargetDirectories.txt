@@ -1,0 +1,16 @@
+/sjc/quadriga-lib/external/build/CMakeFiles/armadillo.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/test.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/edit_cache.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/rebuild_cache.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/list_install_components.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/install.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/install/local.dir
+/sjc/quadriga-lib/external/build/CMakeFiles/install/strip.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/smoke_test.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/test.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/edit_cache.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/rebuild_cache.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/list_install_components.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/install.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/install/local.dir
+/sjc/quadriga-lib/external/build/tests1/CMakeFiles/install/strip.dir

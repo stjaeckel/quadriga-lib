@@ -15,6 +15,7 @@ PUGIXML_H   = external/pugixml-1.13/src
 CATCH2_LIB  = -I external/Catch2-3.3.2-Linux/include -L external/Catch2-3.3.2-Linux/lib -lCatch2
 ARMA_LIB    = -I external/armadillo-11.4.2-Linux/include -L external/armadillo-11.4.2-Linux/lib -larmadillo
 
+
 # Configurations
 CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
 LIBS        = -lgomp #-lblas
@@ -34,6 +35,7 @@ test:   tests/test_bin
 	tests/test_bin
 
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
+#	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a external/armadillo-11.4.2-Linux/lib/libarmadillo.so -o $@ -I include -I external/armadillo-11.4.2-Linux/include $(CATCH2_LIB)
 	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
 
 # Individual Library files

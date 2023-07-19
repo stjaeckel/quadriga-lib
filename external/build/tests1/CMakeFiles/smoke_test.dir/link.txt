@@ -1,0 +1,1 @@
+/usr/bin/c++  -O2 -rdynamic CMakeFiles/smoke_test.dir/smoke_test.cpp.o -o smoke_test  -Wl,-rpath,/home/stephan/anaconda3/lib ../libarmadillo.a -lopenblas -llapack /home/stephan/anaconda3/lib/libhdf5.so -Wl,-Bstatic -lpthread -Wl,-Bdynamic /home/stephan/anaconda3/lib/libz.so -Wl,-Bstatic -ldl -Wl,-Bdynamic -lm -larpack -lsuperlu 

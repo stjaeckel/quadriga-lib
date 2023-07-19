@@ -56,7 +56,7 @@ Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are al
 ```
 cd external
 mkdir build && mkdir armadillo-11.4.2-Linux
-cmake -S armadillo-11.4.2 -B build/ -D CMAKE_INSTALL_PREFIX=armadillo-11.4.2-Linux
+cmake -S armadillo-11.4.2 -B build/ -D CMAKE_INSTALL_PREFIX=armadillo-11.4.2-Linux -D BUILD_SHARED_LIBS=OFF
 cd build
 make && make install
 cd .. && rm -rf build
