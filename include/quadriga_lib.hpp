@@ -67,6 +67,15 @@ namespace quadriga_lib
             unsigned qdant_write(std::string fn, unsigned id);
             unsigned qdant_write(std::string fn);
 
+            // Change the size of an arrayant, without explicitly preserving data
+            // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
+            // - Only performs a size update if exisiting size is different from new size
+            // - Returns error when read-only
+            void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
+
+            // Reset the size to zero (the arrayant object will contain no data) 
+            void reset();
+
             // Interpolation of the antenna pattern
             void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
                              const arma::Mat<dtype> elevation,     // Elevation angles for interpolation in [rad],           Size [1, n_ang] or [n_out, n_ang]
@@ -99,9 +108,12 @@ namespace quadriga_lib
 
             // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
             // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
-            void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0, unsigned usage = 0, unsigned element = -1);
+            // Calling this function without the argument "output" updates the arrayant properties inplace
+            void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0,
+                                unsigned usage = 0, unsigned element = -1, arrayant<dtype> *output = NULL);
 
             // Remove zeros from the pattern
+            // Calling this function without an argument updates the arrayant properties inplace
             void remove_zeros(arrayant<dtype> *output = NULL);
 
             // Calculate the directivity of an antenna element in dBi
