@@ -647,7 +647,13 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     ptr = elevation_grid.memptr();
     for (arma::uword i = 0; i <= n_el; i++)
     {
-        step = i == 0 ? *ptr + pi_half : ptr[i] - ptr[i - 1];
+        if (i == 0)
+            step = *ptr + pi_half;
+        else if (i == n_el)
+            step = pi_half - ptr[i - 1];
+        else
+            step = ptr[i] - ptr[i - 1];
+
         el_step_min = step < el_step_min && step > limit ? step : el_step_min;
         el_step_max = step > el_step_max ? step : el_step_max;
     }
@@ -845,12 +851,20 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
         }
         gamma.reset();
 
-        // Copy element position
+        // Copy unchanged data
         if (output != NULL)
         {
             dtype *ptrI = use_all_elements ? element_pos_update.memptr() : element_pos_update.colptr(element);
             dtype *ptrO = output->element_pos.memptr();
             std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
+
+            ptrI = azimuth_grid_update.memptr();
+            ptrO = output->azimuth_grid.memptr();
+            std::memcpy(ptrO, ptrI, n_az * sizeof(dtype));
+
+            ptrI = elevation_grid_update.memptr();
+            ptrO = output->elevation_grid.memptr();
+            std::memcpy(ptrO, ptrI, n_el * sizeof(dtype));
         }
     }
     else // Usage 0, 1 or 3
