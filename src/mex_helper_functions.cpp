@@ -27,11 +27,11 @@
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
 // Returns NaN for empty input (0 in case of integer types)
 template <typename dtype>
-inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name)
+inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name, dtype def = dtype(NAN))
 {
     std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
     if (mxGetNumberOfElements(input) == 0)
-        return dtype(NAN);
+        return def;
     else if (mxIsDouble(input))
     {
         double *tmp = (double *)mxGetData(input);
