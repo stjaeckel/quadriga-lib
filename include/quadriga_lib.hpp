@@ -21,7 +21,7 @@
 #include <armadillo>
 #include <string>
 
-#define QUADRIGA_LIB_VERSION v0_1_5
+#define QUADRIGA_LIB_VERSION v0_1_6
 
 namespace quadriga_lib
 {
@@ -73,8 +73,11 @@ namespace quadriga_lib
             // - Returns error when read-only
             void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
 
-            // Reset the size to zero (the arrayant object will contain no data) 
+            // Reset the size to zero (the arrayant object will contain no data)
             void reset();
+
+            // Creates a copy of the array antenna object
+            arrayant<dtype> copy() const;
 
             // Interpolation of the antenna pattern
             void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
@@ -142,6 +145,27 @@ namespace quadriga_lib
     // Generate : An antenna with a custom 3dB beam with (in degree)
     template <typename dtype>
     arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0);
+
+    // Generate : Antenna model for the 3GPP-NR channel model
+    // Polarization indicator:
+    //   1. K=1, vertical polarization only
+    //   2. K=1, H/V polarized elements
+    //   3. K=1, +/-45 degree polarized elements
+    //   4. K=M, vertical polarization only
+    //   5. K=M, H/V polarized elements
+    //   6. K=M, +/-45 degree polarized elements
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_3GPP(unsigned M = 1,                         // Number of vertical elements
+                                           unsigned N = 1,                         // Number of horizontal elements
+                                           dtype center_freq = 299792458.0,        // The center frequency in [Hz]
+                                           unsigned pol = 1,                       // Polarization indicator
+                                           dtype tilt = 0.0,                       // The electric downtilt angle in [deg] for pol = 4,5,6
+                                           dtype spacing = 0.5,                    // Element spacing in [λ]
+                                           unsigned Mg = 1,                        // Number of nested panels in a column (Mg)
+                                           unsigned Ng = 1,                        // Number of nested panels in a row (Ng)
+                                           dtype dgv = 0.5,                        // Panel spacing in vertical direction (dg,V) in [λ]
+                                           dtype dgh = 0.5,                        // Panel spacing in horizontal direction (dg,H) in [λ]
+                                           const arrayant<dtype> *pattern = NULL); // Optional custom per-element pattern
 
 }
 

@@ -408,6 +408,29 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                             V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc, &gamma);
 }
 
+// Creates a copy of the array antenna object
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy() const
+{
+    quadriga_lib::arrayant<dtype> ant;
+
+    ant.name = name;
+    ant.e_theta_re = e_theta_re;
+    ant.e_theta_im = e_theta_im;
+    ant.e_phi_re = e_phi_re;
+    ant.e_phi_im = e_phi_im;
+    ant.azimuth_grid = azimuth_grid;
+    ant.elevation_grid = elevation_grid;
+    ant.element_pos = element_pos;
+    ant.coupling_re = coupling_re;
+    ant.coupling_im = coupling_im;
+    ant.center_frequency = center_frequency;
+    ant.valid = valid;
+    ant.read_only = false;
+
+    return ant;
+}
+
 // Copy antenna elements, enlarge array size if needed
 template <typename dtype>
 void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned source,
@@ -1458,3 +1481,185 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 }
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin);
+
+// Generate : Antenna model for the 3GPP-NR channel model
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, dtype center_freq,
+                                                                   unsigned pol, dtype tilt, dtype spacing,
+                                                                   unsigned Mg, unsigned Ng, dtype dgv, dtype dgh,
+                                                                   const arrayant<dtype> *pattern)
+{
+    dtype pi = dtype(arma::datum::pi), rad2deg = dtype(180.0 / arma::datum::pi), deg2rad = dtype(arma::datum::pi / 180.0);
+    dtype wavelength = dtype(299792458.0 / double(center_freq));
+
+    quadriga_lib::arrayant<dtype> ant = pattern == NULL ? quadriga_lib::generate_arrayant_omni<dtype>() : pattern->copy();
+
+    if (pattern != NULL)
+    {
+        std::string error_message = ant.validate();
+        if (error_message.length() != 0)
+            throw std::invalid_argument(error_message.c_str());
+    }
+
+    ant.center_frequency = center_freq;
+    arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
+
+    if (pattern == NULL)
+    {
+        // Single antenna element vertical radiation pattern cut in dB
+        arma::Col<dtype> Y = ant.elevation_grid;
+        for (dtype *py = Y.begin(); py < Y.end(); py++)
+        {
+            dtype y = *py * rad2deg / 65.0;
+            y = 12.0 * y * y;
+            *py = y > 30.0 ? 30.0 : y;
+        }
+
+        // Full pattern (normalized to 8 dBi gain using factor 2.51..)
+        dtype *ptr = ant.e_theta_re.memptr(), *py = Y.memptr(), *px = ant.azimuth_grid.memptr();
+        for (arma::uword ia = 0; ia < n_az; ia++)
+        {
+            dtype x = *px++ * rad2deg / 65.0;
+            x = 12.0 * x * x;
+            x = x > 30.0 ? 30.0 : x;
+
+            for (arma::uword ie = 0; ie < n_el; ie++)
+            {
+                dtype z = py[ie] + x;
+                z = z > 30.0 ? -30.0 : -z;
+                *ptr++ = 2.511886431509580 * std::sqrt(std::pow(10.0, 0.1 * z)); // 8dBi gain
+            }
+        }
+        Y.reset();
+
+        // Adjust polarization
+        if (pol == 2 || pol == 5)
+        {
+            ant.copy_element(0, 1);
+            ant.rotate_pattern(90.0, 0.0, 0.0, 2, 1);
+        }
+        else if (pol == 3 || pol == 6)
+        {
+            ant.copy_element(0, 1);
+            ant.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
+            ant.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+        }
+    }
+
+    // Duplicate the existing elements in z-direction (vertical stacking)
+    unsigned n_elements = ant.n_elements();
+    if (M > 1)
+        for (unsigned source = n_elements; source > 0; source--)
+        {
+            unsigned i_start = n_elements + source - 1;
+            unsigned i_end = M * n_elements - 1;
+            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1, destination);
+        }
+
+    // Calculate the element z-position
+    arma::Col<dtype> z_position(M);
+    if (M > 1)
+    {
+        z_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(M - 1) * spacing * wavelength, M);
+        z_position = z_position - arma::mean(z_position);
+
+        for (unsigned m = 0; m < M; m++)
+            for (unsigned n = 0; n < n_elements; n++)
+                ant.element_pos.at(2, m * n_elements + n) = z_position.at(m);
+    }
+
+    // Apply element coupling for polarization indicators 4, 5, and 6
+    if (pol > 3 && M > 1)
+    {
+        dtype tmp = 2.0 * pi * std::sin(tilt * deg2rad) / wavelength;
+        arma::Col<dtype> cpl_re = z_position * tmp;
+        tmp = dtype(1.0 / std::sqrt(double(M)));
+        arma::Col<dtype> cpl_im = arma::sin(cpl_re) * tmp;
+        cpl_re = arma::cos(cpl_re) * tmp;
+
+        ant.coupling_re.zeros(n_elements * M, n_elements);
+        ant.coupling_im.zeros(n_elements * M, n_elements);
+
+        for (unsigned m = 0; m < M; m++)
+            for (unsigned n = 0; n < n_elements; n++)
+            {
+                ant.coupling_re.at(m * n_elements + n, n) = cpl_re.at(m);
+                ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
+            }
+
+        ant.combine_pattern();
+        M = 1;
+    }
+
+    // Duplicate the existing elements in y-direction (horizontal stacking)
+    n_elements = ant.n_elements();
+    if (N > 1)
+    {
+        for (unsigned source = n_elements; source > 0; source--)
+        {
+            unsigned i_start = n_elements + source - 1;
+            unsigned i_end = N * n_elements - 1;
+            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1, destination);
+        }
+
+        arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(N - 1) * spacing * wavelength, N);
+        y_position = y_position - arma::mean(y_position);
+
+        for (unsigned m = 0; m < N; m++)
+            for (unsigned n = 0; n < n_elements; n++)
+                ant.element_pos.at(1, m * n_elements + n) = y_position.at(m);
+    }
+
+    // Duplicate panels in z-direction (vertical panel stacking)
+    n_elements = ant.n_elements();
+    if (Mg > 1)
+    {
+        for (unsigned source = n_elements; source > 0; source--)
+        {
+            unsigned i_start = n_elements + source - 1;
+            unsigned i_end = Mg * n_elements - 1;
+            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1, destination);
+        }
+
+        arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(Mg - 1) * dgv * wavelength, Mg);
+        zg_position = zg_position - arma::mean(zg_position);
+
+        for (unsigned mg = 0; mg < Mg; mg++)
+            for (unsigned n = 0; n < n_elements; n++)
+                ant.element_pos.at(2, mg * n_elements + n) += zg_position.at(mg);
+    }
+
+    // Duplicate panels in y-direction (horizontal panel stacking)
+    n_elements = ant.n_elements();
+    if (Ng > 1)
+    {
+        for (unsigned source = n_elements; source > 0; source--)
+        {
+            unsigned i_start = n_elements + source - 1;
+            unsigned i_end = Ng * n_elements - 1;
+            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1, destination);
+        }
+
+        arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(Ng - 1) * dgv * wavelength, Ng);
+        yg_position = yg_position - arma::mean(yg_position);
+
+        for (unsigned mg = 0; mg < Ng; mg++)
+            for (unsigned n = 0; n < n_elements; n++)
+                ant.element_pos.at(1, mg * n_elements + n) += yg_position.at(mg);
+    }
+
+    ant.name = "3gpp";
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, float center_freq,
+                                                                            unsigned pol, float tilt, float spacing,
+                                                                            unsigned Mg, unsigned Ng, float dgv, float dgh,
+                                                                            const quadriga_lib::arrayant<float> *pattern);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, double center_freq,
+                                                                             unsigned pol, double tilt, double spacing,
+                                                                             unsigned Mg, unsigned Ng, double dgv, double dgh,
+                                                                             const quadriga_lib::arrayant<double> *pattern);

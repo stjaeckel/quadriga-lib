@@ -40,8 +40,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 10 - name            Name of the array antenna object, string
 
     // Number of in and outputs
-    if (nlhs < 11 || nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
+    if (nrhs < 1)
+        mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input arguments.");
 
     // Read filename
     if (!mxIsClass(prhs[0], "char"))
@@ -60,22 +60,76 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs < 4)
             mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
         else
-            arrayant_double = quadriga_lib::generate_arrayant_custom<double>(qd_mex_get_scalar<double>(prhs[1], "az_3dB"),
-                                                                             qd_mex_get_scalar<double>(prhs[2], "el_3db"),
-                                                                             qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin"));
+            arrayant_double = quadriga_lib::generate_arrayant_custom<double>(qd_mex_get_scalar<double>(prhs[1], "az_3dB", 90.0),
+                                                                             qd_mex_get_scalar<double>(prhs[2], "el_3db", 90.0),
+                                                                             qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin", 0.0));
+    else if (array_type == "3GPP" || array_type == "3gpp")
+    {
+        unsigned M = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "M", 1); 
+        unsigned N = nrhs < 3 ? 1 : qd_mex_get_scalar<unsigned>(prhs[2], "N", 1);
+        double center_freq = nrhs < 4 ? 299792458.0 : qd_mex_get_scalar<double>(prhs[3], "center_freq", 299792458.0);
+        unsigned pol = nrhs < 5 ? 1 : qd_mex_get_scalar<unsigned>(prhs[4], "pol", 1);
+        double tilt = nrhs < 6 ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "tilt", 0.0);
+        double spacing = nrhs < 7 ? 0.5 : qd_mex_get_scalar<double>(prhs[6], "spacing", 0.5);
+        unsigned Mg = nrhs < 8 ? 1 : qd_mex_get_scalar<unsigned>(prhs[7], "Mg", 1);
+        unsigned Ng = nrhs < 9 ? 1 : qd_mex_get_scalar<unsigned>(prhs[8], "Ng", 1);
+        double dgv = nrhs < 10 ? 0.5 : qd_mex_get_scalar<double>(prhs[9], "dgv", 0.5);
+        double dgh = nrhs < 11 ? 0.5 : qd_mex_get_scalar<double>(prhs[10], "dgh", 0.5);
+        if (nrhs < 12)
+            arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+        else if (nrhs < 17)
+            mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
+        else if (mxIsDouble(prhs[11]) && mxIsDouble(prhs[12]) && mxIsDouble(prhs[13]) &&
+                 mxIsDouble(prhs[14]) && mxIsDouble(prhs[15]) && mxIsDouble(prhs[16]))
+        {
+            quadriga_lib::arrayant<double> pattern;
+            pattern.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[11]);
+            pattern.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[12]);
+            pattern.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[13]);
+            pattern.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[14]);
+            pattern.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[15]);
+            pattern.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[16]);
+
+            try
+            {
+                arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &pattern);
+            }
+            catch (const std::invalid_argument &ex)
+            {
+                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", ex.what());
+            }
+            catch (...)
+            {
+                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+            }
+        }
+        else
+            mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Custom antenna pattern must be provided in double precision.");
+    }
     else
         mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Array type not supported!");
 
     // Write to MATLAB
-    plhs[0] = qd_mex_copy2matlab(&arrayant_double.e_theta_re);
-    plhs[1] = qd_mex_copy2matlab(&arrayant_double.e_theta_im);
-    plhs[2] = qd_mex_copy2matlab(&arrayant_double.e_phi_re);
-    plhs[3] = qd_mex_copy2matlab(&arrayant_double.e_phi_im);
-    plhs[4] = qd_mex_copy2matlab(&arrayant_double.azimuth_grid, true);
-    plhs[5] = qd_mex_copy2matlab(&arrayant_double.elevation_grid, true);
-    plhs[6] = qd_mex_copy2matlab(&arrayant_double.element_pos);
-    plhs[7] = qd_mex_copy2matlab(&arrayant_double.coupling_re);
-    plhs[8] = qd_mex_copy2matlab(&arrayant_double.coupling_im);
-    plhs[9] = qd_mex_copy2matlab(&arrayant_double.center_frequency);
-    plhs[10] = mxCreateString(arrayant_double.name.c_str());
+    if (nlhs > 0)
+        plhs[0] = qd_mex_copy2matlab(&arrayant_double.e_theta_re);
+    if (nlhs > 1)
+        plhs[1] = qd_mex_copy2matlab(&arrayant_double.e_theta_im);
+    if (nlhs > 2)
+        plhs[2] = qd_mex_copy2matlab(&arrayant_double.e_phi_re);
+    if (nlhs > 3)
+        plhs[3] = qd_mex_copy2matlab(&arrayant_double.e_phi_im);
+    if (nlhs > 4)
+        plhs[4] = qd_mex_copy2matlab(&arrayant_double.azimuth_grid, true);
+    if (nlhs > 5)
+        plhs[5] = qd_mex_copy2matlab(&arrayant_double.elevation_grid, true);
+    if (nlhs > 6)
+        plhs[6] = qd_mex_copy2matlab(&arrayant_double.element_pos);
+    if (nlhs > 7)
+        plhs[7] = qd_mex_copy2matlab(&arrayant_double.coupling_re);
+    if (nlhs > 8)
+        plhs[8] = qd_mex_copy2matlab(&arrayant_double.coupling_im);
+    if (nlhs > 9)
+        plhs[9] = qd_mex_copy2matlab(&arrayant_double.center_frequency);
+    if (nlhs > 10)
+        plhs[10] = mxCreateString(arrayant_double.name.c_str());
 }

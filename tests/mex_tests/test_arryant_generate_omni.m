@@ -1,4 +1,4 @@
-function test_arryant_genearte
+function test_arryant_generate_omni
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni');
