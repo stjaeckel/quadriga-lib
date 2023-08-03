@@ -63,9 +63,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     try
     {
         if (use_single)
-            arrayant_single = quadriga_lib::arrayant<float>(fn, id, &layout);
+            arrayant_single = quadriga_lib::qdant_read<float>(fn, id, &layout);
         else
-            arrayant_double = quadriga_lib::arrayant<double>(fn, id, &layout);
+            arrayant_double = quadriga_lib::qdant_read<double>(fn, id, &layout);
     }
     catch (const std::invalid_argument &ex)
     {

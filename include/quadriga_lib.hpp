@@ -57,11 +57,6 @@ namespace quadriga_lib
             unsigned n_elements();  // Number of antenna elements
             unsigned n_ports();     // Number of ports (after coupling of elements)
 
-            // Read array antenna object and layout from QDANT file
-            arrayant(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
-            arrayant(std::string fn, unsigned id);
-            arrayant(std::string fn);
-
             // Write array antenna object and layout to QDANT file, returns id in file
             unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);
             unsigned qdant_write(std::string fn, unsigned id);
@@ -127,10 +122,12 @@ namespace quadriga_lib
         };
     }
 
-    // The following functions generate new array antenna objects
-    // Usage example: auto ant = quadriga_lib::generate_omni<float>();
+    // Read array antenna object and layout from QDANT file
+    template <typename dtype>
+    arrayant<dtype> qdant_read(std::string fn, unsigned id = 1, arma::Mat<unsigned> *layout = NULL);
 
     // Generate : Isotropic radiator, vertical polarization, 1 deg resolution
+    // Usage example: auto ant = quadriga_lib::generate_omni<float>();
     template <typename dtype>
     arrayant<dtype> generate_arrayant_omni();
 
@@ -154,6 +151,8 @@ namespace quadriga_lib
     //   4. K=M, vertical polarization only
     //   5. K=M, H/V polarized elements
     //   6. K=M, +/-45 degree polarized elements
+    // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
+    // Values for coupling, element positions and center frequency of the custom pattern are ignored.
     template <typename dtype>
     arrayant<dtype> generate_arrayant_3GPP(unsigned M = 1,                         // Number of vertical elements
                                            unsigned N = 1,                         // Number of horizontal elements
