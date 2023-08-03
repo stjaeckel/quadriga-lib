@@ -431,27 +431,39 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     node_arrayant.append_child("AzimuthGrid").text().set(str.c_str());
     strm.str("");
 
-    // Coupling absolute value
-    arma::Mat<dtype> mat_tmp = arma::square(*coupling_re) + arma::square(*coupling_im);
-    mat_tmp.transform([](dtype x)
-                      { return std::sqrt(x); });
-    mat_tmp.t().raw_print(strm);
-    str = strm.str();
-    std::replace(str.begin(), str.end(), ' ', ',');
-    std::replace(str.begin(), str.end(), '\n', ' ');
-    str.erase(str.size() - 1);
-    node_arrayant.append_child("CouplingAbs").text().set(str.c_str());
-    strm.str("");
+    // Coupling matrix
+    if (!coupling_re->empty())
+    {
+        // Coupling absolute value
+        arma::Mat<dtype> mat_tmp;
+        if (coupling_im->empty())
+            mat_tmp = arma::square(*coupling_re);
+        else
+            mat_tmp = arma::square(*coupling_re) + arma::square(*coupling_im);
 
-    // Coupling phase
-    mat_tmp = arma::atan2(*coupling_im, *coupling_re) * rad2deg;
-    mat_tmp.t().raw_print(strm);
-    str = strm.str();
-    std::replace(str.begin(), str.end(), ' ', ',');
-    std::replace(str.begin(), str.end(), '\n', ' ');
-    str.erase(str.size() - 1);
-    node_arrayant.append_child("CouplingPhase").text().set(str.c_str());
-    strm.str("");
+        mat_tmp.transform([](dtype x)
+                          { return std::sqrt(x); });
+        mat_tmp.t().raw_print(strm);
+        str = strm.str();
+        std::replace(str.begin(), str.end(), ' ', ',');
+        std::replace(str.begin(), str.end(), '\n', ' ');
+        str.erase(str.size() - 1);
+        node_arrayant.append_child("CouplingAbs").text().set(str.c_str());
+        strm.str("");
+
+        // Coupling phase
+        if (!coupling_im->empty())
+        {
+            mat_tmp = arma::atan2(*coupling_im, *coupling_re) * rad2deg;
+            mat_tmp.t().raw_print(strm);
+            str = strm.str();
+            std::replace(str.begin(), str.end(), ' ', ',');
+            std::replace(str.begin(), str.end(), '\n', ' ');
+            str.erase(str.size() - 1);
+            node_arrayant.append_child("CouplingPhase").text().set(str.c_str());
+            strm.str("");
+        }
+    }
 
     // Write filed components
     auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
@@ -459,7 +471,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         pugi::xml_node node_pat;
         for (arma::uword i = 0; i < NoElements; i++)
         {
-            mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
+            arma::Mat<dtype> mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
             mat_tmp.transform([ten](dtype x)
                               { return ten * std::log10(x); });
 
