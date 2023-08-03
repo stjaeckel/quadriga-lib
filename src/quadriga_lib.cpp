@@ -52,12 +52,12 @@ std::string quadriga_lib::quadriga_lib_version()
 
 // ARRAYANT : Write to QDANT file
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout)
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout) const
 {
     // Check if arrayant object is valid
     std::string error_message = "";
     if (valid != 0 || valid != 1)
-        error_message = validate();
+        error_message = is_valid();
     else if (valid == 0)
         error_message = "Array antenna object is invalid";
     if (error_message.length() != 0)
@@ -75,42 +75,24 @@ unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::s
     return id_in_file;
 }
 
-template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id)
-{
-
-    arma::Mat<unsigned> layout;
-    unsigned id_in_file = qdant_write(fn, id, layout);
-    return id_in_file;
-}
-
-template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn)
-{
-
-    arma::Mat<unsigned> layout;
-    unsigned id_in_file = qdant_write(fn, 0, layout);
-    return id_in_file;
-}
-
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation()
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation() const
 {
     return unsigned(e_theta_re.n_rows);
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_azimuth()
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_azimuth() const
 {
     return unsigned(e_theta_re.n_cols);
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elements()
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elements() const
 {
     return unsigned(e_theta_re.n_slices);
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports()
+unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports() const
 {
     if (coupling_re.empty() && coupling_im.empty())
         return unsigned(e_theta_re.n_slices);
@@ -214,12 +196,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                                                                       arma::Mat<dtype> *dist,
                                                                       arma::Mat<dtype> *azimuth_loc,
                                                                       arma::Mat<dtype> *elevation_loc,
-                                                                      arma::Mat<dtype> *gamma)
+                                                                      arma::Mat<dtype> *gamma) const
 {
     // Check if arrayant object is valid
     std::string error_message = "";
     if (valid != 0 || valid != 1)
-        error_message = validate();
+        error_message = is_valid();
     else if (valid == 0)
         error_message = "Array antenna object is invalid";
 
@@ -274,9 +256,10 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
         dtype *ptrO = element_pos_interp.memptr();
         std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
     }
-    else
+    else if (!element_pos.empty())
     {
-        dtype *ptrI = element_pos.memptr(), *ptrO = element_pos_interp.memptr();
+        const dtype *ptrI = element_pos.memptr();
+        dtype *ptrO = element_pos_interp.memptr();
         for (unsigned i = 0; i < n_out; i++)
             std::memcpy(&ptrO[3 * i], &ptrI[3 * i_element[i]], 3 * sizeof(dtype));
     }
@@ -313,12 +296,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                                                                       const arma::Cube<dtype> orientation,
                                                                       arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
                                                                       arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
-                                                                      arma::Mat<dtype> *dist)
+                                                                      arma::Mat<dtype> *dist) const
 {
     // Check if arrayant object is valid
     std::string error_message = "";
     if (valid != 0 || valid != 1)
-        error_message = validate();
+        error_message = is_valid();
     else if (valid == 0)
         error_message = "Array antenna object is invalid";
 
@@ -349,6 +332,15 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
+    // Copy the element positions
+    arma::Mat<dtype> element_pos_interp(3, n_out);
+    if (!element_pos.empty())
+    {
+        const dtype *ptrI = element_pos.memptr();
+        dtype *ptrO = element_pos_interp.memptr();
+        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
+    }
+
     // Resize output variables
     if (V_re->n_rows != n_out || V_re->n_cols != n_ang)
         V_re->set_size(n_out, n_ang);
@@ -367,7 +359,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
 
     qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
                             &azimuth_grid, &elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, &element_pos,
+                            &i_element, &orientation, &element_pos_interp,
                             V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc, &gamma);
 }
 
@@ -1132,15 +1124,15 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
 
 // ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
 template <typename dtype>
-dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(unsigned element)
+dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(unsigned element) const
 {
     // Check if arrayant object is valid
     std::string error_message = "";
     if (valid != 0 || valid != 1)
-        error_message = validate();
+        error_message = is_valid();
     else if (valid == 0)
         error_message = "Array antenna object is invalid.";
-    if (element >= unsigned(e_theta_re.n_slices))
+    if (element >= n_elements())
         error_message = "Element index out of bound.";
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
@@ -1189,8 +1181,8 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
 
     // Calculate the directivity
     double p_sum = 0.0, p_max = 0.0;
-    dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
-    dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
+    const dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
+    const dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
     for (arma::uword i = 0; i < naz * nel; i++)
     {
         double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
@@ -1205,9 +1197,8 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
 
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>
-std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
+std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid() const
 {
-    valid = 0;
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
         return "Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid";
 
@@ -1230,25 +1221,15 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
     if (elevation_grid.n_elem != n_elevation)
         return "Number of elements in 'elevation_grid' does not match number of rows in pattern data.";
 
-    int error_code = 0;
-    auto fnc_az = [&error_code](dtype &val)
-    {
-        if (val < dtype(-3.1415930) || val > dtype(3.1415930))
-            error_code = 5;
-    };
-    azimuth_grid.for_each(fnc_az);
-    auto fnc_el = [&error_code](dtype &val)
-    {
-        if (val < dtype(-1.5707965) || val > dtype(1.5707965))
-            error_code = 6;
-    };
-    elevation_grid.for_each(fnc_el);
-
-    valid = error_code;
-    if (error_code == 5)
+    bool error_code = false;
+    for (const dtype *val = azimuth_grid.begin(); val < azimuth_grid.end(); val++)
+        error_code = *val < dtype(-3.1415930) || *val > dtype(3.1415930) ? true : error_code;
+    if (error_code)
         return "Values of 'azimuth_grid' must be between -pi and pi (equivalent to -180 to 180 degree).";
 
-    if (error_code == 6)
+    for (const dtype *val = elevation_grid.begin(); val < elevation_grid.end(); val++)
+        error_code = *val < dtype(-1.5707965) || *val > dtype(1.5707965) ? true : error_code;
+    if (error_code)
         return "Values of 'elevation_grid' must be between -pi/2 and pi/2 (equivalent to -90 to 90 degree).";
 
     if (!azimuth_grid.is_sorted())
@@ -1269,6 +1250,20 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
     if (!coupling_im.empty() && (coupling_im.n_rows != n_elements && coupling_im.n_cols != coupling_re.n_rows))
         return "'Coupling' must be a matrix with rows equal to number of elements and columns equal to number of ports";
 
+    return "";
+}
+
+// ARRAYANT METHOD : Validates correctness of the member functions and initializes element positions and coupling matrix
+template <typename dtype>
+std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
+{
+    valid = 0;
+
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        return error_message;
+
+    arma::uword n_elements = e_theta_re.n_slices;
     arma::uword n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
 
     if (element_pos.empty())

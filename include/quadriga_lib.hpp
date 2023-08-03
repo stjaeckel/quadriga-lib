@@ -52,13 +52,13 @@ namespace quadriga_lib
             arrayant(){};                                // Default constructor
 
             // Functions to determine the size of the array antenna properties
-            unsigned n_elevation(); // Number of elevation angles
-            unsigned n_azimuth();   // Number of azimuth angles
-            unsigned n_elements();  // Number of antenna elements
-            unsigned n_ports();     // Number of ports (after coupling of elements)
+            unsigned n_elevation() const; // Number of elevation angles
+            unsigned n_azimuth() const;   // Number of azimuth angles
+            unsigned n_elements() const;  // Number of antenna elements
+            unsigned n_ports() const;     // Number of ports (after coupling of elements)
 
             // Calculate the directivity of an antenna element in dBi
-            dtype calc_directivity_dBi(unsigned element);
+            dtype calc_directivity_dBi(unsigned element) const;
 
             // Calculates a virtual pattern of the given array by applying coupling and element positions
             // Calling this function without an argument updates the arrayant properties inplace
@@ -84,19 +84,17 @@ namespace quadriga_lib
                              arma::Mat<dtype> *dist,               // Projected element distances for phase offset,          Size [n_out, n_ang]
                              arma::Mat<dtype> *azimuth_loc,        // Azimuth angles [rad] in local antenna coordinates,     Size [n_out, n_ang]
                              arma::Mat<dtype> *elevation_loc,      // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
-                             arma::Mat<dtype> *gamma);             // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
+                             arma::Mat<dtype> *gamma) const;       // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
 
             void interpolate(const arma::Mat<dtype> azimuth,                 // Azimuth angles [rad],                        Size [1, n_ang] or [n_out, n_ang]
                              const arma::Mat<dtype> elevation,               // Elevation angles for interpolation in [rad], Size [1, n_ang] or [n_out, n_ang]
                              const arma::Cube<dtype> orientation,            // Orientation (bank, tilt, head) in [rad],     Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
                              arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im, // Interpolated vertical (e_theta) field,       Size [n_out, n_ang]
                              arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im, // Interpolated horizontal (e_phi) field,       Size [n_out, n_ang]
-                             arma::Mat<dtype> *dist);                        // Projected element distances,                 Size [n_out, n_ang]
+                             arma::Mat<dtype> *dist) const;                  // Projected element distances,                 Size [n_out, n_ang]
 
             // Write array antenna object and layout to QDANT file, returns id in file
-            unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);
-            unsigned qdant_write(std::string fn, unsigned id);
-            unsigned qdant_write(std::string fn);
+            unsigned qdant_write(std::string fn, unsigned id = 0, arma::Mat<unsigned> layout = arma::Mat<unsigned>()) const;
 
             // Remove zeros from the pattern data. Changes that size of the pattern data.
             // Calling this function without an argument updates the arrayant properties inplace
@@ -118,8 +116,9 @@ namespace quadriga_lib
             // - Returns error when read-only
             void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
 
-            // Validates integrity, returns error message and sets 'valid' property accordingly
-            std::string validate();
+            // Validate integrity
+            std::string is_valid() const; // Returns an empty string if arrayant object is valid or an error message otherwise
+            std::string validate();       // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
         };
     }
 
