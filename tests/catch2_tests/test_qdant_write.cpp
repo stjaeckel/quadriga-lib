@@ -58,7 +58,7 @@ TEST_CASE("Arrayant writing to QDANT file - Minimal test")
     CHECK(id == 1);
 
     // Load file again and compare
-    quadriga_lib::arrayant<float> antI("test.qdant");
+    auto antI = quadriga_lib::qdant_read<float>("test.qdant");
 
     CHECK(arma::approx_equal(antI.azimuth_grid, ant.azimuth_grid, "absdiff", 1e-6));
     CHECK(arma::approx_equal(antI.elevation_grid, ant.elevation_grid, "absdiff", 1e-6));
@@ -102,7 +102,7 @@ TEST_CASE("Arrayant writing/reading from QDANT file - Multi-Element Array")
     unsigned id = ant.qdant_write("test2.qdant");
     CHECK(id == 1);
 
-    quadriga_lib::arrayant<double> x("test2.qdant");
+    auto x = quadriga_lib::qdant_read<double>("test2.qdant");
     CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(1.0)), x.e_theta_re.slice(0), "absdiff", 1e-5));
     CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(2.0)), x.e_theta_im.slice(0), "absdiff", 1e-5));
     CHECK(arma::approx_equal(arma::mat(5, 3, arma::fill::value(3.0)), x.e_phi_re.slice(0), "absdiff", 1e-5));
@@ -163,12 +163,11 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
 
     arma::Mat<unsigned> layout, layout2;
 
-    quadriga_lib::arrayant<float> antI;
-    antI = quadriga_lib::arrayant<float>("test.qdant", 1, &layout2);
+    auto antI = quadriga_lib::qdant_read<float>("test.qdant", 1, &layout2);
 
     CHECK(antI.name == "bla");
 
-    antI = quadriga_lib::arrayant<float>("test.qdant", 2);
+    antI = quadriga_lib::qdant_read<float>("test.qdant", 2);
     CHECK(antI.name == "name");
 
     layout = {1, 2};
@@ -184,7 +183,7 @@ TEST_CASE("Arrayant writing to QDANT file - Complex test")
     id = ant.qdant_write("test.qdant", 6, layout);
     CHECK(id == 6);
 
-    antI = quadriga_lib::arrayant<float>("test.qdant", 6, &layout2);
+    antI = quadriga_lib::qdant_read<float>("test.qdant", 6, &layout2);
 
     CHECK(arma::all(arma::vectorise(layout2 - layout) == 0));
 

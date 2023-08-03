@@ -37,7 +37,7 @@ TEST_CASE("Arrayant reading from QDANT file - Minimal test")
     f.close();
 
     float pi = arma::datum::pi;
-    quadriga_lib::arrayant<float> x("test.qdant");
+    auto x = quadriga_lib::qdant_read<float>("test.qdant");
 
     arma::fmat A = 20 * log10(x.e_theta_re.slice(0));
     arma::fmat B = arma::reshape(arma::linspace<arma::fvec>(1, 15, 15), 3, 5).t();
@@ -90,7 +90,7 @@ TEST_CASE("Arrayant reading from QDANT file - Multi-Element Array")
     f.close();
 
     double pi = arma::datum::pi;
-    quadriga_lib::arrayant<double> x("test2.qdant");
+    auto x = quadriga_lib::qdant_read<double>("test2.qdant");
 
     arma::mat A = 20 * log10(sqrt(x.e_theta_re.slice(0) % x.e_theta_re.slice(0) + x.e_theta_im.slice(0) % x.e_theta_im.slice(0)));
     arma::mat B = arma::reshape(arma::linspace<arma::vec>(1, 15, 15), 3, 5).t();
@@ -158,7 +158,7 @@ TEST_CASE("Arrayant reading from QDANT file - More complex test")
     double pi = arma::datum::pi;
 
     arma::Mat<unsigned> layout;
-    quadriga_lib::arrayant<double> x("test.qdant", 1, &layout);
+    auto x = quadriga_lib::qdant_read<double>("test.qdant", 1, &layout);
 
     arma::mat B = {-pi / 2.0, -pi / 4.0, 0.0, pi / 4.0, pi / 2.0};
     CHECK(arma::approx_equal(x.azimuth_grid, B.t(), "absdiff", 1e-13));
