@@ -57,22 +57,19 @@ namespace quadriga_lib
             unsigned n_elements();  // Number of antenna elements
             unsigned n_ports();     // Number of ports (after coupling of elements)
 
-            // Write array antenna object and layout to QDANT file, returns id in file
-            unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);
-            unsigned qdant_write(std::string fn, unsigned id);
-            unsigned qdant_write(std::string fn);
+            // Calculate the directivity of an antenna element in dBi
+            dtype calc_directivity_dBi(unsigned element);
 
-            // Change the size of an arrayant, without explicitly preserving data
-            // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
-            // - Only performs a size update if exisiting size is different from new size
-            // - Returns error when read-only
-            void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
-
-            // Reset the size to zero (the arrayant object will contain no data)
-            void reset();
+            // Calculates a virtual pattern of the given array by applying coupling and element positions
+            // Calling this function without an argument updates the arrayant properties inplace
+            void combine_pattern(arrayant<dtype> *output = NULL);
 
             // Creates a copy of the array antenna object
             arrayant<dtype> copy() const;
+
+            // Copy antenna elements, enlarges array size if needed (0-based indices)
+            void copy_element(unsigned source, arma::Col<unsigned> destination);
+            void copy_element(unsigned source, unsigned destination);
 
             // Interpolation of the antenna pattern
             void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
@@ -96,13 +93,17 @@ namespace quadriga_lib
                              arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im, // Interpolated horizontal (e_phi) field,       Size [n_out, n_ang]
                              arma::Mat<dtype> *dist);                        // Projected element distances,                 Size [n_out, n_ang]
 
-            // Copy antenna elements, enlarges array size if needed (0-based indices)
-            void copy_element(unsigned source, arma::Col<unsigned> destination);
-            void copy_element(unsigned source, unsigned destination);
+            // Write array antenna object and layout to QDANT file, returns id in file
+            unsigned qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout);
+            unsigned qdant_write(std::string fn, unsigned id);
+            unsigned qdant_write(std::string fn);
 
-            // Calculates a virtual pattern of the given array by applying coupling and element positions
+            // Remove zeros from the pattern data. Changes that size of the pattern data.
             // Calling this function without an argument updates the arrayant properties inplace
-            void combine_pattern(arrayant<dtype> *output = NULL);
+            void remove_zeros(arrayant<dtype> *output = NULL);
+
+            // Reset the size to zero (the arrayant object will contain no data)
+            void reset();
 
             // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
             // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
@@ -110,12 +111,12 @@ namespace quadriga_lib
             void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0,
                                 unsigned usage = 0, unsigned element = -1, arrayant<dtype> *output = NULL);
 
-            // Remove zeros from the pattern
-            // Calling this function without an argument updates the arrayant properties inplace
-            void remove_zeros(arrayant<dtype> *output = NULL);
-
-            // Calculate the directivity of an antenna element in dBi
-            dtype calc_directivity_dBi(unsigned element);
+            // Change the size of an arrayant, without explicitly preserving data
+            // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
+            // - Data in other properties may contain garbage
+            // - Only performs a size update if exisiting size is different from new size
+            // - Returns error when read-only
+            void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
 
             // Validates integrity, returns error message and sets 'valid' property accordingly
             std::string validate();
