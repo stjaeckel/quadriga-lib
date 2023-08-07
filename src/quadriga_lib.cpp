@@ -55,11 +55,7 @@ template <typename dtype>
 unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout) const
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = is_valid();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid";
+    std::string error_message = is_valid();
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -139,8 +135,6 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::set_size(unsigned n_el
 
     if (coupling_im.n_rows != n_elements || coupling_im.n_cols != n_ports)
         coupling_im.zeros(n_elements, n_ports);
-
-    valid = -1;
 }
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
@@ -181,7 +175,6 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::reset()
         coupling_im.reset();
 
     center_frequency = dtype(299792458.0);
-    valid = -1;
 }
 
 // ARRAYANT METHOD : Interpolation
@@ -199,11 +192,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                                                                       arma::Mat<dtype> *gamma) const
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = is_valid();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid";
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
 
     arma::uword n_out = azimuth.n_rows;
     arma::uword n_ang = azimuth.n_cols;
@@ -299,11 +290,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
                                                                       arma::Mat<dtype> *dist) const
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = is_valid();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid";
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
 
     arma::uword n_out = azimuth.n_rows;
     arma::uword n_ang = azimuth.n_cols;
@@ -380,7 +369,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype
     ant.coupling_re = coupling_re;
     ant.coupling_im = coupling_im;
     ant.center_frequency = center_frequency;
-    ant.valid = valid;
     ant.read_only = false;
 
     return ant;
@@ -392,11 +380,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
                                                                        arma::Col<unsigned> destination)
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = validate();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid";
+    std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -437,6 +421,17 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
             std::memcpy(e_phi_im.slice_memptr(*dest), e_phi_im.slice_memptr(source), n_ang * sizeof(dtype));
             std::memcpy(element_pos.colptr(*dest), element_pos.colptr(source), 3 * sizeof(dtype));
         }
+
+    // Set the data pointers for the quick check.
+    check_ptr[0] = e_theta_re.memptr();
+    check_ptr[1] = e_theta_im.memptr();
+    check_ptr[2] = e_phi_re.memptr();
+    check_ptr[3] = e_phi_im.memptr();
+    check_ptr[4] = azimuth_grid.memptr();
+    check_ptr[5] = elevation_grid.memptr();
+    check_ptr[6] = element_pos.memptr();
+    check_ptr[7] = coupling_re.memptr();
+    check_ptr[8] = coupling_im.memptr();
 }
 
 template <typename dtype>
@@ -452,11 +447,7 @@ template <typename dtype>
 void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype> *output)
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = validate();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid";
+    std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -532,7 +523,17 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
         output->coupling_re.eye();
         output->coupling_im.zeros();
         output->center_frequency = center_frequency;
-        output->valid = 1;
+
+        // Set the data pointers for the quick check.
+        output->check_ptr[0] = output->e_theta_re.memptr();
+        output->check_ptr[1] = output->e_theta_im.memptr();
+        output->check_ptr[2] = output->e_phi_re.memptr();
+        output->check_ptr[3] = output->e_phi_im.memptr();
+        output->check_ptr[4] = output->azimuth_grid.memptr();
+        output->check_ptr[5] = output->elevation_grid.memptr();
+        output->check_ptr[6] = output->element_pos.memptr();
+        output->check_ptr[7] = output->coupling_re.memptr();
+        output->check_ptr[8] = output->coupling_im.memptr();
     }
     else if (read_only)
     {
@@ -560,6 +561,17 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
         element_pos.zeros(3, n_prt);
         coupling_re.eye(n_prt, n_prt);
         coupling_im.zeros(n_prt, n_prt);
+
+        // Set the data pointers for the quick check.
+        check_ptr[0] = e_theta_re.memptr();
+        check_ptr[1] = e_theta_im.memptr();
+        check_ptr[2] = e_phi_re.memptr();
+        check_ptr[3] = e_phi_im.memptr();
+        check_ptr[4] = azimuth_grid.memptr();
+        check_ptr[5] = elevation_grid.memptr();
+        check_ptr[6] = element_pos.memptr();
+        check_ptr[7] = coupling_re.memptr();
+        check_ptr[8] = coupling_im.memptr();
     }
 }
 
@@ -570,12 +582,11 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
                                                                          quadriga_lib::arrayant<dtype> *output)
 {
     // Check if arrayant object is valid
+    std::string error_message = validate(); // Deep check
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
     bool use_all_elements = false;
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = validate();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid.";
     if (usage > 3)
         error_message = "Input parameter 'usage' must be 0, 1, 2 or 3.";
     if (element == unsigned(-1) || e_theta_re.n_slices == 1)
@@ -914,11 +925,7 @@ template <typename dtype>
 void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *output)
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = validate();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid.";
+    std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
@@ -1127,12 +1134,8 @@ template <typename dtype>
 dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(unsigned element) const
 {
     // Check if arrayant object is valid
-    std::string error_message = "";
-    if (valid != 0 || valid != 1)
-        error_message = is_valid();
-    else if (valid == 0)
-        error_message = "Array antenna object is invalid.";
-    if (element >= n_elements())
+    std::string error_message = is_valid();
+    if (error_message.length() == 0 && element >= n_elements())
         error_message = "Element index out of bound.";
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
@@ -1197,8 +1200,27 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
 
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>
-std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid() const
+std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid(bool quick_check) const
 {
+
+    // Assuming that the data has been validated before, we can quickly check if the
+    // data pointers were updated. If not, we can assume that the data is still valid.
+    if (quick_check)
+        quick_check = check_ptr[0] != NULL && check_ptr[1] != NULL && check_ptr[2] != NULL &&
+                      check_ptr[3] != NULL && check_ptr[4] != NULL && check_ptr[5] != NULL &&
+                      check_ptr[0] == e_theta_re.memptr() &&
+                      check_ptr[1] == e_theta_im.memptr() &&
+                      check_ptr[2] == e_phi_re.memptr() &&
+                      check_ptr[3] == e_phi_im.memptr() &&
+                      check_ptr[4] == azimuth_grid.memptr() &&
+                      check_ptr[5] == elevation_grid.memptr() &&
+                      check_ptr[6] == element_pos.memptr() &&
+                      check_ptr[7] == coupling_re.memptr() &&
+                      check_ptr[8] == coupling_im.memptr();
+    if (quick_check)
+        return "";
+
+    // Perform a deep check
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
         return "Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid";
 
@@ -1257,9 +1279,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid() cons
 template <typename dtype>
 std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
 {
-    valid = 0;
-
-    std::string error_message = is_valid();
+    std::string error_message = is_valid(false); // Deep check
     if (error_message.length() != 0)
         return error_message;
 
@@ -1275,7 +1295,17 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
     if (coupling_im.empty())
         coupling_im.zeros(n_elements, n_prt);
 
-    valid = 1;
+    // Set the data pointers for the quick check.
+    check_ptr[0] = e_theta_re.memptr();
+    check_ptr[1] = e_theta_im.memptr();
+    check_ptr[2] = e_phi_re.memptr();
+    check_ptr[3] = e_phi_im.memptr();
+    check_ptr[4] = azimuth_grid.memptr();
+    check_ptr[5] = elevation_grid.memptr();
+    check_ptr[6] = element_pos.memptr();
+    check_ptr[7] = coupling_re.memptr();
+    check_ptr[8] = coupling_im.memptr();
+
     return "";
 }
 
@@ -1337,7 +1367,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
-    ant.valid = 1;
+
+    // Set the data pointers for the quick check.
+    ant.check_ptr[0] = ant.e_theta_re.memptr();
+    ant.check_ptr[1] = ant.e_theta_im.memptr();
+    ant.check_ptr[2] = ant.e_phi_re.memptr();
+    ant.check_ptr[3] = ant.e_phi_im.memptr();
+    ant.check_ptr[4] = ant.azimuth_grid.memptr();
+    ant.check_ptr[5] = ant.elevation_grid.memptr();
+    ant.check_ptr[6] = ant.element_pos.memptr();
+    ant.check_ptr[7] = ant.coupling_re.memptr();
+    ant.check_ptr[8] = ant.coupling_im.memptr();
 
     return ant;
 }
@@ -1363,7 +1403,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
     ant.element_pos.zeros(3, 2);
     ant.coupling_re.eye(2, 2);
     ant.coupling_im.zeros(2, 2);
-    ant.valid = 1;
+
+    // Set the data pointers for the quick check.
+    ant.check_ptr[0] = ant.e_theta_re.memptr();
+    ant.check_ptr[1] = ant.e_theta_im.memptr();
+    ant.check_ptr[2] = ant.e_phi_re.memptr();
+    ant.check_ptr[3] = ant.e_phi_im.memptr();
+    ant.check_ptr[4] = ant.azimuth_grid.memptr();
+    ant.check_ptr[5] = ant.elevation_grid.memptr();
+    ant.check_ptr[6] = ant.element_pos.memptr();
+    ant.check_ptr[7] = ant.coupling_re.memptr();
+    ant.check_ptr[8] = ant.coupling_im.memptr();
 
     return ant;
 }
@@ -1389,7 +1439,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
-    ant.valid = 1;
+
+    // Set the data pointers for the quick check.
+    ant.check_ptr[0] = ant.e_theta_re.memptr();
+    ant.check_ptr[1] = ant.e_theta_im.memptr();
+    ant.check_ptr[2] = ant.e_phi_re.memptr();
+    ant.check_ptr[3] = ant.e_phi_im.memptr();
+    ant.check_ptr[4] = ant.azimuth_grid.memptr();
+    ant.check_ptr[5] = ant.elevation_grid.memptr();
+    ant.check_ptr[6] = ant.element_pos.memptr();
+    ant.check_ptr[7] = ant.coupling_re.memptr();
+    ant.check_ptr[8] = ant.coupling_im.memptr();
 
     return ant;
 }
@@ -1416,7 +1476,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
-    ant.valid = 1;
+
+    // Set the data pointers for the quick check.
+    ant.check_ptr[0] = ant.e_theta_re.memptr();
+    ant.check_ptr[1] = ant.e_theta_im.memptr();
+    ant.check_ptr[2] = ant.e_phi_re.memptr();
+    ant.check_ptr[3] = ant.e_phi_im.memptr();
+    ant.check_ptr[4] = ant.azimuth_grid.memptr();
+    ant.check_ptr[5] = ant.elevation_grid.memptr();
+    ant.check_ptr[6] = ant.element_pos.memptr();
+    ant.check_ptr[7] = ant.coupling_re.memptr();
+    ant.check_ptr[8] = ant.coupling_im.memptr();
 
     return ant;
 }
@@ -1490,7 +1560,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
     ant.name = "custom";
-    ant.valid = 1;
+
+    // Set the data pointers for the quick check.
+    ant.check_ptr[0] = ant.e_theta_re.memptr();
+    ant.check_ptr[1] = ant.e_theta_im.memptr();
+    ant.check_ptr[2] = ant.e_phi_re.memptr();
+    ant.check_ptr[3] = ant.e_phi_im.memptr();
+    ant.check_ptr[4] = ant.azimuth_grid.memptr();
+    ant.check_ptr[5] = ant.elevation_grid.memptr();
+    ant.check_ptr[6] = ant.element_pos.memptr();
+    ant.check_ptr[7] = ant.coupling_re.memptr();
+    ant.check_ptr[8] = ant.coupling_im.memptr();
 
     // Normalize to Gain
     dtype directivity = ant.calc_directivity_dBi(0);
@@ -1518,7 +1598,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, u
 
     if (pattern != NULL)
     {
-        std::string error_message = ant.validate();
+        std::string error_message = ant.validate(); // Deep check
         if (error_message.length() != 0)
             throw std::invalid_argument(error_message.c_str());
     }
@@ -1677,10 +1757,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, u
     ant.name = "3gpp";
     return ant;
 }
+
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, float center_freq,
                                                                             unsigned pol, float tilt, float spacing,
                                                                             unsigned Mg, unsigned Ng, float dgv, float dgh,
                                                                             const quadriga_lib::arrayant<float> *pattern);
+
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
                                                                              unsigned Mg, unsigned Ng, double dgv, double dgh,
