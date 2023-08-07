@@ -1344,6 +1344,32 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni();
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni();
 
+// Generate : Cross-polarized isotropic radiator, 1 deg resolution
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
+{
+    quadriga_lib::arrayant<dtype> ant;
+
+    dtype pi = dtype(arma::datum::pi);
+    ant.name = "xpol";
+    ant.e_theta_re.ones(181, 361, 2);
+    ant.e_theta_im.zeros(181, 361, 2);
+    ant.e_phi_re.ones(181, 361, 2);
+    ant.e_phi_im.zeros(181, 361, 2);
+    ant.e_phi_re.slice(0).zeros();
+    ant.e_theta_re.slice(1).zeros();
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.element_pos.zeros(3, 2);
+    ant.coupling_re.eye(2, 2);
+    ant.coupling_im.zeros(2, 2);
+    ant.valid = 1;
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol();
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol();
+
 // Generate : Short dipole radiating with vertical polarization, 1 deg resolution
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()

@@ -131,6 +131,10 @@ namespace quadriga_lib
     template <typename dtype>
     arrayant<dtype> generate_arrayant_omni();
 
+    // Generate : Cross-polarized isotropic radiator, 1 deg resolution
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_xpol();
+
     // Generate : Short dipole radiating with vertical polarization, 1 deg resolution
     template <typename dtype>
     arrayant<dtype> generate_arrayant_dipole();
