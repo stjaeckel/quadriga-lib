@@ -47,8 +47,8 @@ namespace quadriga_lib
             arma::Mat<dtype> coupling_re;                // Coupling matrix, real part (optional), Size: [n_elements, n_ports]
             arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]
             dtype center_frequency = dtype(299792458.0); // Center frequency in [Hz] (optional)
-            int valid = -1;                              // Indicator of data integrity (-1 = unknown, 0 = ERROR, 1 = OK)
             bool read_only = false;                      // Prevent member functions from writing to the properties
+            dtype *check_ptr[9];                         // Data pointers for quick validation
             arrayant(){};                                // Default constructor
 
             // Functions to determine the size of the array antenna properties
@@ -96,7 +96,7 @@ namespace quadriga_lib
             // Write array antenna object and layout to QDANT file, returns id in file
             unsigned qdant_write(std::string fn, unsigned id = 0, arma::Mat<unsigned> layout = arma::Mat<unsigned>()) const;
 
-            // Remove zeros from the pattern data. Changes that size of the pattern data.
+            // Remove zeros from the pattern data. Changes that size of the pattern.
             // Calling this function without an argument updates the arrayant properties inplace
             void remove_zeros(arrayant<dtype> *output = NULL);
 
@@ -117,8 +117,8 @@ namespace quadriga_lib
             void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
 
             // Validate integrity
-            std::string is_valid() const; // Returns an empty string if arrayant object is valid or an error message otherwise
-            std::string validate();       // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
+            std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
+            std::string validate();                              // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
         };
     }
 
