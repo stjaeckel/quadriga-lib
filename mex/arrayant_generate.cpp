@@ -56,6 +56,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         arrayant_double = quadriga_lib::generate_arrayant_dipole<double>();
     else if (array_type == "half-wave-dipole")
         arrayant_double = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
+    else if (array_type == "xpol")
+        arrayant_double = quadriga_lib::generate_arrayant_xpol<double>();
     else if (array_type == "custom")
         if (nrhs < 4)
             mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
