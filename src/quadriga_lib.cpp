@@ -1194,7 +1194,7 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
         p_sum += pow * ptr[i];
     }
 
-    double directivity = 10.0 * std::log10(p_max / p_sum);
+    double directivity = p_max < 1.0e-14 ? 0.0 : 10.0 * std::log10(p_max / p_sum);
     return dtype(directivity);
 }
 
