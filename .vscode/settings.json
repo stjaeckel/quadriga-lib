@@ -4,7 +4,9 @@
         "arrayant",
         "dtype",
         "exisiting",
-        "memptr"
+        "memptr",
+        "MIMO",
+        "xpol"
     ],
     "files.associations": {
         "armadillo": "cpp",

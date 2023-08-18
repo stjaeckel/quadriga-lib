@@ -64,6 +64,8 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    if (d1 * d2 == 0)
+        return arma::Col<dtype>();
     return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, create_copy, !create_copy);
 }
 
@@ -73,6 +75,8 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    if (d1 * d2 == 0)
+        return arma::Mat<dtype>();
     return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, create_copy, !create_copy);
 }
 
@@ -86,15 +90,26 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
     unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
+    if (d1 * d2 * d3 * d4 == 0)
+        return arma::Cube<dtype>();
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
 }
 
 // Reads input and converts it to desired c++ type, creates a copy of the input
 template <typename dtype>
-inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name)
+inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name, unsigned n_elem = 0)
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+
+    if (d1 * d2 == 0)
+        return arma::Col<dtype>();
+
+    if (n_elem != 0 && d1 * d2 != n_elem)
+    {
+        std::string error_message = "Input '" + var_name + "' has incorrect number of elements.";
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
+    }
 
     if (mxIsDouble(input))
     {
@@ -131,6 +146,9 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
 {
     unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
     unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+
+    if (d1 * d2 == 0)
+        return arma::Mat<dtype>();
 
     if (mxIsDouble(input))
     {
@@ -171,6 +189,9 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
     unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
     unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
     unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
+
+    if (d1 * d2 * d3 * d4 == 0)
+        return arma::Cube<dtype>();
 
     if (mxIsDouble(input))
     {
