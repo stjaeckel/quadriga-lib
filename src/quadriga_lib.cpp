@@ -50,6 +50,221 @@ std::string quadriga_lib::quadriga_lib_version()
     return str;
 }
 
+// Helper-function "quick_rotate"
+template <typename dtype>
+inline void quick_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, unsigned N)
+{
+    dtype cc = std::cos(bank), sc = std::sin(bank);
+    dtype cb = std::cos(tilt), sb = std::sin(tilt);
+    dtype ca = std::cos(heading), sa = std::sin(heading);
+
+    dtype R[9]; // Rotation Matrix
+    R[0] = ca * cb;
+    R[1] = sa * cb;
+    R[2] = -sb;
+    R[3] = ca * sb * sc - sa * cc;
+    R[4] = sa * sb * sc + ca * cc;
+    R[5] = cb * sc;
+    R[6] = ca * sb * cc + sa * sc;
+    R[7] = sa * sb * cc - ca * sc;
+    R[8] = cb * cc;
+
+    for (unsigned i = 0; i < N; i++)
+    {
+        unsigned ix = 3 * i, iy = ix + 1, iz = ix + 2;
+        dtype a = R[0] * data3xN[ix] + R[3] * data3xN[iy] + R[6] * data3xN[iz];
+        dtype b = R[1] * data3xN[ix] + R[4] * data3xN[iy] + R[7] * data3xN[iz];
+        dtype c = R[2] * data3xN[ix] + R[5] * data3xN[iy] + R[8] * data3xN[iz];
+        data3xN[ix] = a, data3xN[iy] = b, data3xN[iz] = c;
+    }
+}
+
+// Helper function "quick_geo2cart"
+template <typename dtype>
+inline void quick_geo2cart(int n,                  // Number of values
+                           const dtype *az,        // Input azimuth angles
+                           dtype *x, dtype *y,     // 2D Output coordinates (x, y)
+                           const dtype *el = NULL, // Input elevation angles (optional)
+                           dtype *z = NULL,        // Output z-coordinate (optional)
+                           const dtype *r = NULL)  // Input vector length (optional)
+{
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+    for (int in = 0; in < n; in++)
+    {
+        dtype ca = az[in], sa = std::sin(ca);
+        ca = std::cos(ca);
+
+        dtype ce = (el == NULL) ? one : std::cos(el[in]);
+        dtype se = (el == NULL) ? zero : std::sin(el[in]);
+
+        dtype le = (r == NULL) ? one : r[in];
+
+        x[in] = le * ce * ca;
+        y[in] = le * ce * sa;
+
+        if (z != NULL)
+            z[in] = le * se;
+    }
+}
+
+// Helper function "quick_cart2geo"
+template <typename dtype>
+inline void quick_cart2geo(int n,                          // Number of values
+                           dtype *az,                      // Output azimuth angles
+                           const dtype *x, const dtype *y, // 2D Input coordinates (x, y)
+                           dtype *el = NULL,               // Output elevation angles (optional)
+                           const dtype *z = NULL,          // Input z-coordinate (optional)
+                           dtype *r = NULL)                // Output vector length (optional)
+{
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+    for (int in = 0; in < n; in++)
+    {
+        dtype xx = x[in], yy = y[in], zz = (z == NULL) ? zero : z[in];
+        dtype le = std::sqrt(xx * xx + yy * yy + zz * zz);
+
+        if (r != NULL)
+            r[in] = le;
+
+        le = one / le;
+        xx *= le, yy *= le, zz *= le;
+        xx = xx > one ? one : xx, yy = yy > one ? one : yy, zz = zz > one ? one : zz;
+
+        if (az != NULL)
+            az[in] = std::atan2(yy, xx);
+
+        if (el != NULL)
+            el[in] = std::asin(zz);
+    }
+}
+
+// Helper function "quick_multiply_3_mat"
+// Calculates the matrix product X = A^T * B * C
+// A, C can be NULL
+template <typename dtype>
+inline void quick_multiply_3_mat(const dtype *A, // n rows, m columns
+                                 const dtype *B, // n rows, o columns
+                                 const dtype *C, // o rows, p columns
+                                 dtype *X,       // m rows, p columns
+                                 int n, int m, int o, int p)
+{
+    // Avoid expensive typecasts
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+
+    // Calculate the output row by row
+    for (int im = 0; im < m; im++)
+    {
+        for (int ip = 0; ip < p; ip++) // Initialize output to zero
+            X[ip * m + im] = zero;
+
+        // Process temporary matrix T = A^H * B column-wise
+        for (int io = 0; io < o; io++)
+        {
+            // Calculate one value of the temporary matrix T
+            dtype t = zero;
+            for (int in = 0; in < n; in++)
+            {
+                dtype a = (A == NULL) ? (im == in ? one : zero) : A[im * n + in];
+                t += a * B[io * n + in];
+            }
+
+            // Update all values of an entire row of the output matrix X = T * C
+            for (int ip = 0; ip < p; ip++)
+            {
+                dtype c = (C == NULL) ? (io == ip ? one : zero) : C[ip * o + io];
+                X[ip * m + im] += t * c;
+            }
+        }
+    }
+}
+
+// Helper function "quick_multiply_3_complex_mat"
+// Calculates the matrix product X = A^H * B * C
+// Ar, Ai, Cr, Ci can be NULL
+template <typename dtype>
+inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n rows, m columns
+                                         const dtype *Br, const dtype *Bi, // n rows, o columns
+                                         const dtype *Cr, const dtype *Ci, // o rows, p columns
+                                         dtype *Xr, dtype *Xi,             // m rows, p columns
+                                         int n, int m, int o, int p)
+{
+    // Avoid expensive typecasts
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+
+    // Calculate the output row by row
+    for (int im = 0; im < m; im++)
+    {
+        // Initialize output to zero
+        for (int ip = 0; ip < p; ip++)
+            Xr[ip * m + im] = zero, Xi[ip * m + im] = zero;
+
+        // Process temporary matrix T = A^H * B column-wise
+        for (int io = 0; io < o; io++)
+        {
+            // Calculate one value of the temporary matrix T
+            dtype tR = zero, tI = zero;
+            for (int in = 0; in < n; in++)
+            {
+                dtype a_real = (Ar == NULL) ? (im == in ? one : zero) : Ar[im * n + in];
+                dtype a_imag = (Ai == NULL) ? zero : Ai[im * n + in];
+                tR += a_real * Br[io * n + in] + a_imag * Bi[io * n + in];
+                tI += a_real * Bi[io * n + in] - a_imag * Br[io * n + in];
+            }
+
+            // Update all values of an entire row of the output matrix X = T * C
+            for (int ip = 0; ip < p; ip++)
+            {
+                dtype c_real = (Cr == NULL) ? (io == ip ? one : zero) : Cr[ip * o + io];
+                dtype c_imag = (Ci == NULL) ? zero : Ci[ip * o + io];
+                Xr[ip * m + im] += tR * c_real - tI * c_imag;
+                Xi[ip * m + im] += tR * c_imag + tI * c_real;
+            }
+        }
+    }
+}
+
+// Helper function "quick_power_mat"
+// - Calculates X = abs( A ).^2 + abs ( B ).^2
+// - Optional normalization of the columns by their sum-power
+// - Returns identity matrix normalization is true and inputs A/B are NULL
+template <typename dtype>
+inline void quick_power_mat(int n, int m,                                   // Matrix dimensions (n=rows, m=columns)
+                            dtype *X,                                       // Output X with n rows, m columns
+                            bool normalize_columns = false,                 // Optional normalization
+                            const dtype *Ar = NULL, const dtype *Ai = NULL, // Input A with n rows, m columns
+                            const dtype *Br = NULL, const dtype *Bi = NULL) // Input B with n rows, m columns
+{
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0), limit = dtype(1.0e-10);
+    dtype avg = one / dtype(n);
+
+    for (int im = 0; im < n * m; im += n)
+    {
+        dtype sum = zero;
+        for (int in = im; in < im + n; in++)
+        {
+            X[in] = zero;
+            X[in] += (Ar == NULL) ? zero : Ar[in] * Ar[in];
+            X[in] += (Ai == NULL) ? zero : Ai[in] * Ai[in];
+            X[in] += (Br == NULL) ? zero : Br[in] * Br[in];
+            X[in] += (Bi == NULL) ? zero : Bi[in] * Bi[in];
+            sum += X[in];
+        }
+        if (normalize_columns)
+        {
+            if (Ar == NULL && Ai == NULL && Br == NULL && Bi == NULL) // Return identity matrix
+                X[im + im / n] = one;
+            else if (sum > limit) // Scale values by sum
+            {
+                sum = one / sum;
+                for (int in = im; in < im + n; in++)
+                    X[in] *= sum;
+            }
+            else
+                for (int in = im; in < im + n; in++)
+                    X[in] = avg;
+        }
+    }
+}
+
 // ARRAYANT : Write to QDANT file
 template <typename dtype>
 unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout) const
@@ -1767,3 +1982,482 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(uns
                                                                              unsigned pol, double tilt, double spacing,
                                                                              unsigned Mg, unsigned Ng, double dgv, double dgh,
                                                                              const quadriga_lib::arrayant<double> *pattern);
+// Calculate channel coefficients for spherical waves
+template <typename dtype>
+void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *tx_array, const quadriga_lib::arrayant<dtype> *rx_array,
+                                          dtype Tx, dtype Ty, dtype Tz, dtype Tb, dtype Tt, dtype Th,
+                                          dtype Rx, dtype Ry, dtype Rz, dtype Rb, dtype Rt, dtype Rh,
+                                          const arma::Mat<dtype> *fbs_pos, const arma::Mat<dtype> *lbs_pos,
+                                          const arma::Col<dtype> *path_gain, const arma::Col<dtype> *path_length, const arma::Mat<dtype> *M,
+                                          arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
+                                          dtype center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                          arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa)
+{
+    // Constants
+    constexpr dtype los_limit = dtype(1.0e-4);
+    constexpr dtype zero = dtype(0.0);
+    constexpr dtype one = dtype(1.0);
+    constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
+    dtype wavelength = center_frequency > zero ? dtype(299792458.0) / center_frequency : one;
+    dtype wave_number = dtype(2.095845021951682e-08) * center_frequency; // 2 * pi / C
+
+    // Catch NULL-Pointers
+    std::string error_message;
+    if (tx_array == NULL || rx_array == NULL ||
+        fbs_pos == NULL || lbs_pos == NULL || path_gain == NULL || path_length == NULL || M == NULL ||
+        coeff_re == NULL || coeff_im == NULL || delay == NULL)
+    {
+        error_message = "Mandatory inputs and outputs canot be NULL";
+        throw std::invalid_argument(error_message.c_str());
+    }
+
+    // Check if the antennas are valid
+    error_message = tx_array->is_valid();
+    if (error_message.length() != 0)
+    {
+        error_message = "Transmit antenna: " + error_message;
+        throw std::invalid_argument(error_message.c_str());
+    }
+    error_message = rx_array->is_valid();
+    if (error_message.length() != 0)
+    {
+        error_message = "Receive antenna: " + error_message;
+        throw std::invalid_argument(error_message.c_str());
+    }
+
+    // Check if the number of paths is consistent in all inputs
+    if (fbs_pos->n_elem == 0 || lbs_pos->n_elem == 0 || path_gain->n_elem == 0 || path_length->n_elem == 0 || M->n_elem == 0)
+    {
+        error_message = "Missing data for any of: fbs_pos, lbs_pos, path_gain, path_length, M";
+        throw std::invalid_argument(error_message.c_str());
+    }
+    if (fbs_pos->n_rows != 3 || lbs_pos->n_rows != 3 || M->n_rows != 8)
+    {
+        error_message = "Inputs 'fbs_pos' and 'lbs_pos' must have 3 rows; 'M' must have 8 rows.";
+        throw std::invalid_argument(error_message.c_str());
+    }
+
+    // 64-bit integers used by Armadillo
+    arma::uword n_path = fbs_pos->n_cols;                        // Number of paths
+    arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
+    arma::uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
+    arma::uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    arma::uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
+    arma::uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
+    arma::uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
+
+    // 32-bit integers used in loops
+    unsigned n32_out = unsigned(n_out);
+    unsigned n32_tx = unsigned(n_tx);
+    unsigned n32_rx = unsigned(n_rx);
+    unsigned n32_links = unsigned(n_links);
+    unsigned n32_tx_ports = unsigned(n_tx_ports);
+    unsigned n32_rx_ports = unsigned(n_rx_ports);
+    unsigned n32_ports = n32_tx_ports * n32_rx_ports;
+
+    if (lbs_pos->n_cols != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
+    {
+        error_message = "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).";
+        throw std::invalid_argument(error_message.c_str());
+    }
+
+    // Set the output size
+    if (coeff_re->n_rows != n_rx_ports || coeff_re->n_cols != n_tx_ports || coeff_re->n_slices != n_out)
+        coeff_re->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (coeff_im->n_rows != n_rx_ports || coeff_im->n_cols != n_tx_ports || coeff_im->n_slices != n_out)
+        coeff_im->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (delay->n_rows != n_rx_ports || delay->n_cols != n_tx_ports || delay->n_slices != n_out)
+        delay->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (aod != NULL && (aod->n_rows != n_rx_ports || aod->n_cols != n_tx_ports || aod->n_slices != n_out))
+        aod->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (eod != NULL && (eod->n_rows != n_rx_ports || eod->n_cols != n_tx_ports || eod->n_slices != n_out))
+        eod->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (aoa != NULL && (aoa->n_rows != n_rx_ports || aoa->n_cols != n_tx_ports || aoa->n_slices != n_out))
+        aoa->set_size(n_rx_ports, n_tx_ports, n_out);
+    if (eoa != NULL && (eoa->n_rows != n_rx_ports || eoa->n_cols != n_tx_ports || eoa->n_slices != n_out))
+        eoa->set_size(n_rx_ports, n_tx_ports, n_out);
+
+    // Map output memory to internal representation
+    arma::Cube<dtype> CR, CI, DL;        // Internal map for delays and angles
+    arma::Mat<dtype> AOD, EOD, AOA, EOA; // Antenna interpolation requires matrix of size [n_out, n_ang]
+    bool different_output_size = n_tx != n_tx_ports || n_rx != n_rx_ports;
+
+    if (different_output_size) // Temporary internal data storage
+    {
+        CR.set_size(n_rx, n_tx, n_out);
+        CI.set_size(n_rx, n_tx, n_out);
+        DL.set_size(n_rx, n_tx, n_out);
+        AOD.set_size(n_links, n_out);
+        EOD.set_size(n_links, n_out);
+        AOA.set_size(n_links, n_out);
+        EOA.set_size(n_links, n_out);
+    }
+    else // Direct mapping of external memory
+    {
+        CR = arma::Cube<dtype>(coeff_re->memptr(), n_rx, n_tx, n_out, false, true);
+        CI = arma::Cube<dtype>(coeff_im->memptr(), n_rx, n_tx, n_out, false, true);
+        DL = arma::Cube<dtype>(delay->memptr(), n_rx, n_tx, n_out, false, true);
+
+        if (aod == NULL)
+            AOD.set_size(n_links, n_out);
+        else
+            AOD = arma::Mat<dtype>(aod->memptr(), n_links, n_out, false, true);
+
+        if (eod == NULL)
+            EOD.set_size(n_links, n_out);
+        else
+            EOD = arma::Mat<dtype>(eod->memptr(), n_links, n_out, false, true);
+
+        if (aoa == NULL)
+            AOA.set_size(n_links, n_out);
+        else
+            AOA = arma::Mat<dtype>(aoa->memptr(), n_links, n_out, false, true);
+
+        if (eoa == NULL)
+            EOA.set_size(n_links, n_out);
+        else
+            EOA = arma::Mat<dtype>(eoa->memptr(), n_links, n_out, false, true);
+    }
+
+    // Get pointers
+    const dtype *p_fbs = fbs_pos->memptr();
+    const dtype *p_lbs = lbs_pos->memptr();
+    const dtype *p_gain = path_gain->memptr();
+    const dtype *p_length = path_length->memptr();
+
+    dtype *p_coeff_re = CR.memptr();
+    dtype *p_coeff_im = CI.memptr();
+    dtype *p_delays = DL.memptr();
+    dtype *p_aod = AOD.memptr();
+    dtype *p_eod = EOD.memptr();
+    dtype *p_aoa = AOA.memptr();
+    dtype *p_eoa = EOA.memptr();
+    dtype *ptr;
+
+    // Convert inputs to orientation vector
+    arma::Cube<dtype> tx_orientation(3, 1, 1);
+    arma::Cube<dtype> rx_orientation(3, 1, 1);
+    bool tx_orientation_not_zero = Tb != zero || Tt != zero || Th != zero;
+    bool rx_orientation_not_zero = Rb != zero || Rt != zero || Rh != zero;
+
+    if (tx_orientation_not_zero)
+        ptr = tx_orientation.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
+
+    if (rx_orientation_not_zero)
+        ptr = rx_orientation.memptr(), ptr[0] = Rb, ptr[1] = Rt, ptr[2] = Rh;
+
+    // Calculate the antenna element positions in GCS
+    arma::Mat<dtype> tx_element_pos(3, n_tx), rx_element_pos(3, n_rx);
+    dtype *p_tx = tx_element_pos.memptr(), *p_rx = rx_element_pos.memptr();
+
+    if (tx_array->element_pos.n_elem != 0)
+        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
+    if (tx_orientation_not_zero) // Apply TX antenna orientation
+        quick_rotate_inplace(Tb, -Tt, Th, p_tx, n_tx);
+    for (unsigned t = 0; t < 3 * n32_tx; t += 3) // Add TX position
+        p_tx[t] += Tx, p_tx[t + 1] += Ty, p_tx[t + 2] += Tz;
+
+    if (rx_array->element_pos.n_elem != 0)
+        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
+    if (rx_orientation_not_zero) // Apply RX antenna orientation
+        quick_rotate_inplace(Rb, -Rt, Rh, p_rx, n_rx);
+    for (unsigned r = 0; r < 3 * n32_rx; r += 3) // Add RX position
+        p_rx[r] += Rx, p_rx[r + 1] += Ry, p_rx[r + 2] += Rz;
+
+    // Calculate the Freespace distance
+    dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
+    dtype dist_rx_tx = std::sqrt(x * x + y * y + z * z);
+
+    // There may be multiple LOS paths. We need to find the real one (having the strongest power)
+    unsigned true_los_path = 0;
+    dtype true_los_power = zero;
+
+    for (unsigned j = 0; j < n32_out; j++) // Loop over paths
+    {
+        unsigned i = add_fake_los_path ? j - 1 : j;
+        unsigned ix = 3 * i, iy = ix + 1, iz = ix + 2;
+
+        // Calculate the shortest possible path length (TX > FBS > LBS > RX)
+        dtype d_shortest = dist_rx_tx, d_length = dist_rx_tx;
+        if (!add_fake_los_path || j != 0)
+        {
+            dtype x = p_fbs[ix] - Tx, y = p_fbs[iy] - Ty, z = p_fbs[iz] - Tz;
+            d_shortest = std::sqrt(x * x + y * y + z * z);
+            x = p_lbs[ix] - p_fbs[ix], y = p_lbs[iy] - p_fbs[iy], z = p_lbs[iz] - p_fbs[iz];
+            d_shortest += std::sqrt(x * x + y * y + z * z);
+            x = Rx - p_lbs[ix], y = Ry - p_lbs[iy], z = Rz - p_lbs[iz];
+            d_shortest += std::sqrt(x * x + y * y + z * z);
+            d_length = p_length[i] < d_shortest ? d_shortest : p_length[i];
+        }
+
+        // Calculate path delays, departure angles and arrival angles
+        unsigned o = j * n32_links, o0 = o; // Slice offset
+        if (std::abs(d_length - dist_rx_tx) < los_limit) // LOS path
+        {
+            if (add_fake_los_path && j != 0 && p_gain[i] > true_los_power)
+                true_los_path = j, true_los_power = p_gain[i];
+
+            for (unsigned t = 0; t < n32_tx; t++)
+                for (unsigned r = 0; r < n32_rx; r++)
+                {
+                    x = p_rx[3 * r] - p_tx[3 * t];
+                    y = p_rx[3 * r + 1] - p_tx[3 * t + 1];
+                    z = p_rx[3 * r + 2] - p_tx[3 * t + 2];
+                    dtype d = std::sqrt(x * x + y * y + z * z);
+
+                    p_aod[o] = std::atan2(y, x);
+                    p_eod[o] = d < los_limit ? zero : std::asin(z / d);
+                    p_aoa[o] = std::atan2(-y, -x);
+                    p_eoa[o] = -p_eod[o];
+                    p_delays[o++] = d;
+                }
+        }
+        else // NLOS path
+        {
+            dtype d_fbs_lbs = d_length - d_shortest;
+            dtype *dr = new dtype[n32_rx];
+            for (unsigned r = 0; r < n32_rx; r++)
+                x = p_lbs[ix] - p_rx[3 * r],
+                y = p_lbs[iy] - p_rx[3 * r + 1],
+                z = p_lbs[iz] - p_rx[3 * r + 2],
+                dr[r] = std::sqrt(x * x + y * y + z * z),
+                p_aoa[o0 + r] = std::atan2(y, x),
+                p_eoa[o0 + r] = dr[r] < los_limit ? zero : std::asin(z / dr[r]);
+
+            for (unsigned t = 0; t < n32_tx; t++)
+            {
+                x = p_fbs[ix] - p_tx[3 * t],
+                y = p_fbs[iy] - p_tx[3 * t + 1],
+                z = p_fbs[iz] - p_tx[3 * t + 2];
+
+                dtype dt = std::sqrt(x * x + y * y + z * z),
+                      at = std::atan2(y, x),
+                      et = dt < los_limit ? zero : std::asin(z / dt);
+
+                for (unsigned r = 0; r < n32_rx; r++)
+                    p_aod[o] = at, p_eod[o] = et,
+                    p_aoa[o] = p_aoa[o0 + r], p_eoa[o] = p_eoa[o0 + r],
+                    p_delays[o++] = dt + d_fbs_lbs + dr[r];
+            }
+            delete[] dr;
+        }
+    }
+
+    // Interpolate the antenna patterns for all paths
+    // - ToDo: Performance can be improved by omitting redundant computations for NLOS paths
+
+    arma::Mat<dtype> Vt_re(n_links, n_out, arma::fill::none), Vt_im(n_links, n_out, arma::fill::none),
+        Ht_re(n_links, n_out, arma::fill::none), Ht_im(n_links, n_out, arma::fill::none),
+        Vr_re(n_links, n_out, arma::fill::none), Vr_im(n_links, n_out, arma::fill::none),
+        Hr_re(n_links, n_out, arma::fill::none), Hr_im(n_links, n_out, arma::fill::none);
+    arma::Mat<dtype> EMPTY;
+
+    arma::Col<unsigned> i_element(n_links, arma::fill::none);
+    unsigned *p_element = i_element.memptr();
+    arma::Mat<dtype> element_pos_interp(3, n_links, arma::fill::none);
+    ptr = element_pos_interp.memptr();
+    if (tx_array->element_pos.n_elem != 0)
+        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
+    else
+        tx_element_pos.zeros();
+    for (unsigned t = 0; t < n32_tx; t++)
+        for (unsigned r = 0; r < n32_rx; r++)
+            *p_element++ = t + 1, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
+
+    qd_arrayant_interpolate(&tx_array->e_theta_re, &tx_array->e_theta_im, &tx_array->e_phi_re, &tx_array->e_phi_im,
+                            &tx_array->azimuth_grid, &tx_array->elevation_grid, &AOD, &EOD,
+                            &i_element, &tx_orientation, &element_pos_interp,
+                            &Vt_re, &Vt_im, &Ht_re, &Ht_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+
+    p_element = i_element.memptr();
+    ptr = element_pos_interp.memptr();
+    if (rx_array->element_pos.n_elem != 0)
+        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
+    else
+        rx_element_pos.zeros();
+    for (unsigned t = 0; t < n32_tx; t++)
+        for (unsigned r = 0; r < n32_rx; r++)
+            *p_element++ = r + 1, *ptr++ = p_rx[3 * r], *ptr++ = p_rx[3 * r + 1], *ptr++ = p_rx[3 * r + 2];
+
+    qd_arrayant_interpolate(&rx_array->e_theta_re, &rx_array->e_theta_im, &rx_array->e_phi_re, &rx_array->e_phi_im,
+                            &rx_array->azimuth_grid, &rx_array->elevation_grid, &AOA, &EOA,
+                            &i_element, &rx_orientation, &element_pos_interp,
+                            &Vr_re, &Vr_im, &Hr_re, &Hr_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+    element_pos_interp.reset();
+
+    // Calculate the MIMO channel coefficients for each path
+    for (unsigned j = 0; j < n32_out; j++) // Loop over paths
+    {
+        unsigned i = add_fake_los_path ? j - 1 : j;
+
+        const dtype *pM = add_fake_los_path && j == 0 ? M->colptr(0) : M->colptr(i);
+        dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
+              *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
+              *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
+              *pHtr = Ht_re.colptr(j), *pHti = Ht_im.colptr(j);
+
+        dtype path_amplitude = add_fake_los_path && j == 0 ? zero : std::sqrt(p_gain[i]);
+
+        unsigned o = j * n32_links; // Slice offset
+        for (unsigned t = 0; t < n32_tx; t++)
+        {
+            unsigned T = t * n32_rx; // Column offset
+            for (unsigned r = 0; r < n32_rx; r++)
+            {
+                unsigned R = T + r;
+
+                dtype re = pVrr[R] * pM[0] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[1] * pVtr[R] - pVri[R] * pM[0] * pVti[R];
+                re += pVrr[R] * pM[4] * pHtr[R] - pVrr[R] * pM[5] * pHti[R] - pVri[R] * pM[5] * pHtr[R] - pVri[R] * pM[4] * pHti[R];
+                re += pHrr[R] * pM[2] * pVtr[R] - pHrr[R] * pM[3] * pVti[R] - pHri[R] * pM[3] * pVtr[R] - pHri[R] * pM[2] * pVti[R];
+                re += pHrr[R] * pM[6] * pHtr[R] - pHrr[R] * pM[7] * pHti[R] - pHri[R] * pM[7] * pHtr[R] - pHri[R] * pM[6] * pHti[R];
+
+                dtype im = pVrr[R] * pM[1] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] + pVri[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVti[R];
+                re += pVrr[R] * pM[5] * pHtr[R] + pVrr[R] * pM[4] * pHti[R] + pVri[R] * pM[4] * pHtr[R] - pVri[R] * pM[5] * pHti[R];
+                re += pHrr[R] * pM[3] * pVtr[R] + pHrr[R] * pM[2] * pVti[R] + pHri[R] * pM[2] * pVtr[R] - pHri[R] * pM[3] * pVti[R];
+                re += pHrr[R] * pM[7] * pHtr[R] + pHrr[R] * pM[6] * pHti[R] + pHri[R] * pM[6] * pHtr[R] - pHri[R] * pM[7] * pHti[R];
+
+                dtype dl = p_delays[o + R]; // path length from previous calculation
+                dtype phase = wave_number * std::fmod(dl, wavelength);
+                dtype cp = std::cos(phase), sp = std::sin(phase);
+
+                p_coeff_re[o + R] = (re * cp + im * sp) * path_amplitude;
+                p_coeff_im[o + R] = (-re * sp + im * cp) * path_amplitude;
+
+                dl = use_absolute_delays ? dl : dl - dist_rx_tx;
+                p_delays[o + R] = dl * rC;
+            }
+        }
+    }
+
+    // Set the true LOS path as the first path
+    if (add_fake_los_path && true_los_path != 0)
+    {
+        std::memcpy(p_coeff_re, CR.slice_memptr(true_los_path), n32_links * sizeof(dtype));
+        std::memcpy(p_coeff_im, CI.slice_memptr(true_los_path), n32_links * sizeof(dtype));
+        CR.slice(true_los_path).zeros();
+        CI.slice(true_los_path).zeros();
+    }
+
+    // Apply antenna element coupling
+    if (rx_array->coupling_re.n_elem != 0 || rx_array->coupling_im.n_elem != 0 ||
+        tx_array->coupling_re.n_elem != 0 || tx_array->coupling_im.n_elem != 0)
+    {
+        // Calculate abs( cpl )^2 and normalize the row-sum to 1
+        dtype *p_rx_cpl = new dtype[n32_rx * n32_rx_ports];
+        dtype *p_tx_cpl = new dtype[n32_tx * n32_tx_ports];
+        quick_power_mat(n32_rx, n32_rx_ports, p_rx_cpl, true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
+        quick_power_mat(n32_tx, n32_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
+
+        // Allocate memory for temporary data
+        unsigned N = n32_ports > n32_links ? n32_ports : n32_links;
+        dtype *tempX = new dtype[N];
+        dtype *tempY = new dtype[N];
+        dtype *tempZ = new dtype[N];
+        dtype *tempT = new dtype[N];
+
+        for (unsigned j = 0; j < n32_out; j++) // Loop over paths
+        {
+            unsigned o = j * n32_links; // Slice offset
+
+            // Process coefficients and delays
+            if (different_output_size) // Data is stored in internal memory, we can write directly to the output
+            {
+                // Apply coupling to coefficients
+                quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                                             &p_coeff_re[o], &p_coeff_im[o],
+                                             tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                             coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
+                                             n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+
+                // Apply coupling to delays
+                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+            }
+            else // Data has been written to external memory
+            {
+                // Apply coupling to coefficients
+                quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                                             &p_coeff_re[o], &p_coeff_im[o],
+                                             tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                             tempX, tempY,
+                                             n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+
+                std::memcpy(&p_coeff_re[o], tempX, n32_ports * sizeof(dtype));
+                std::memcpy(&p_coeff_im[o], tempY, n32_ports * sizeof(dtype));
+
+                // Apply coupling to delays
+                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempT, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+                std::memcpy(&p_delays[o], tempT, n32_ports * sizeof(dtype));
+            }
+
+            // Process departure angles
+            if (aod != NULL || eod != NULL)
+            {
+                // Convert AOD and EOD to Cartesian coordinates
+                quick_geo2cart(n32_links, &p_aod[o], tempX, tempY, &p_eod[o], tempZ);
+
+                // Apply coupling to the x, y, z, component independently
+                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+
+                // Convert back to geographic coordinates and save to external memory
+                if (!different_output_size) // External memory is mapped to "p_aod" and "p_eod"
+                    quick_cart2geo(n32_ports, &p_aod[o], tempT, tempX, &p_eod[o], tempY);
+                else if (aod == NULL)
+                    quick_cart2geo<dtype>(n32_ports, NULL, tempT, tempX, eod->slice_memptr(j), tempY);
+                else if (eod == NULL)
+                    quick_cart2geo<dtype>(n32_ports, aod->slice_memptr(j), tempT, tempX, NULL, tempY);
+                else
+                    quick_cart2geo<dtype>(n32_ports, aod->slice_memptr(j), tempT, tempX, eod->slice_memptr(j), tempY);
+            }
+
+            // Process arrival angles
+            if (aoa != NULL || eoa != NULL)
+            {
+                // Convert AOD and EOD to Cartesian coordinates
+                quick_geo2cart(n32_links, &p_aoa[o], tempX, tempY, &p_eoa[o], tempZ);
+
+                // Apply coupling to the x, y, z, component independently
+                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n32_rx, n32_rx_ports, n32_tx, n32_tx_ports);
+
+                // Convert back to geographic coordinates and save to external memory
+                if (!different_output_size) // External memory is mapped to "p_aoa" and "p_eoa"
+                    quick_cart2geo(n32_ports, &p_aoa[o], tempT, tempX, &p_eoa[o], tempY);
+                else if (aoa == NULL)
+                    quick_cart2geo<dtype>(n32_ports, NULL, tempT, tempX, eoa->slice_memptr(j), tempY);
+                else if (eoa == NULL)
+                    quick_cart2geo<dtype>(n32_ports, aoa->slice_memptr(j), tempT, tempX, NULL, tempY);
+                else
+                    quick_cart2geo<dtype>(n32_ports, aoa->slice_memptr(j), tempT, tempX, eoa->slice_memptr(j), tempY);
+            }
+        }
+
+        // Free temporary memory
+        delete[] tempX;
+        delete[] tempY;
+        delete[] tempZ;
+        delete[] tempT;
+        delete[] p_rx_cpl;
+        delete[] p_tx_cpl;
+    }
+}
+
+template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<float> *tx_array, const quadriga_lib::arrayant<float> *rx_array,
+                                                   float Tx, float Ty, float Tz, float Tb, float Tt, float Th,
+                                                   float Rx, float Ry, float Rz, float Rb, float Rt, float Rh,
+                                                   const arma::Mat<float> *fbs_pos, const arma::Mat<float> *lbs_pos,
+                                                   const arma::Col<float> *path_gain, const arma::Col<float> *path_length, const arma::Mat<float> *M,
+                                                   arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
+                                                   float center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                   arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa);
+
+template void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<double> *tx_array, const quadriga_lib::arrayant<double> *rx_array,
+                                                   double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
+                                                   double Rx, double Ry, double Rz, double Rb, double Rt, double Rh,
+                                                   const arma::Mat<double> *fbs_pos, const arma::Mat<double> *lbs_pos,
+                                                   const arma::Col<double> *path_gain, const arma::Col<double> *path_length, const arma::Mat<double> *M,
+                                                   arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
+                                                   double center_frequency, bool use_absolute_delays, bool add_fake_los_path,
+                                                   arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa);
