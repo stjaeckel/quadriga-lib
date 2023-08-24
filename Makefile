@@ -25,7 +25,7 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
 	   +quadriga_lib/version.mexw64   +quadriga_lib/arrayant_combine_pattern.mexw64   +quadriga_lib/interp.mexw64   \
 	   +quadriga_lib/arrayant_generate.mexw64   +quadriga_lib/arrayant_calc_directivity.mexw64   +quadriga_lib/arrayant_rotate_pattern.mexw64 \
-	   +quadriga_lib/get_channels_spherical.mexw64
+	   +quadriga_lib/get_channels_spherical.mexw64   +quadriga_lib/get_channels_planar.mexw64
 
 test:   tests\test.exe
 	tests\test.exe
@@ -88,6 +88,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\quadriga_tools.obj   buil
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/get_channels_spherical.mexw64:   mex\get_channels_spherical.cpp   lib\quadriga_lib.lib
+	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib/get_channels_planar.mexw64:   mex\get_channels_planar.cpp   lib\quadriga_lib.lib
 	$(MEX) -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Clean up instructions

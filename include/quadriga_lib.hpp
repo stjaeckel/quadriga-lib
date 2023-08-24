@@ -21,7 +21,7 @@
 #include <armadillo>
 #include <string>
 
-#define QUADRIGA_LIB_VERSION v0_1_6
+#define QUADRIGA_LIB_VERSION v0_1_7
 
 namespace quadriga_lib
 {
@@ -203,11 +203,36 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *aoa = NULL,       // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eoa = NULL);      // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
 
-    // Todo: Planar waves
-    // const arma::Col<dtype> *aod,     // Departure azimuth angles in [rad], vector of length 'n_path'
-    // const arma::Col<dtype> *eod,     // Departure elevation angles in [rad], vector of length 'n_path'
-    // const arma::Col<dtype> *aoa,     // Arrival azimuth angles in [rad], vector of length 'n_path'
-    // const arma::Col<dtype> *eoa,     // Arrival elevation angles in [rad], vector of length 'n_path'
+    // Calculate channel coefficients for planar waves
+    // - Interpolates the transmit antenna pattern (including orientation and polarization)
+    // - Interpolates the receive antenna pattern (including orientation and polarization)
+    // - Calculates the channel response and delays in time domain for each MIMO sub-link (including antenna element coupling)
+    // - LOS-Path identification: path-length must equal the TX-RX 3D-distance within 0.1 mm
+    // - Angles are ignored for LOS path identification
+    // - Polarization transfer matrix must be given by 8 interleaved complex values, (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+    // - Polarization transfer matrix must be normalized (i.e., not include the path gain)
+    // - Option to calculate the Doppler weights from orientation (+1 Moves towards path, -1 moves away from path)
+    template <typename dtype>
+    void get_channels_planar(const arrayant<dtype> *tx_array,      // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                             const arrayant<dtype> *rx_array,      // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                             dtype Tx, dtype Ty, dtype Tz,         // Transmitter position in Cartesian coordinates
+                             dtype Tb, dtype Tt, dtype Th,         // Transmitter orientation (bank, tilt, head) in [rad]
+                             dtype Rx, dtype Ry, dtype Rz,         // Receiver position in Cartesian coordinates
+                             dtype Rb, dtype Rt, dtype Rh,         // Receiver orientation (bank, tilt, head) in [rad]
+                             const arma::Col<dtype> *aod,          // Departure azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *eod,          // Departure elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *aoa,          // Arrival azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *eoa,          // Arrival elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *path_gain,    // Path gain (linear scale), vector of length [n_path]
+                             const arma::Col<dtype> *path_length,  // Absolute path length from TX to RX phase center, vector of length [n_path]
+                             const arma::Mat<dtype> *M,            // Polarization transfer matrix, matrix of size [8, n_path]
+                             arma::Cube<dtype> *coeff_re,          // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> *coeff_im,          // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> *delay,             // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
+                             dtype center_frequency = dtype(0.0),  // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
+                             bool use_absolute_delays = false,     // Option: If true, the LOS delay is included for all paths
+                             bool add_fake_los_path = false,       // Option: Add a zero-power LOS path in case where no LOS path was present
+                             arma::Col<dtype> *rx_Doppler = NULL); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
 
 }
 
