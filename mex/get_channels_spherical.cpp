@@ -43,19 +43,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 16 - coupling_re     Coupling matrix, real part, Default: Identity matrix            Size [n_rx_elements, n_rx_ports] or []
     // 17 - coupling_im     Coupling matrix, imaginary part, Default: Zero matrix           Size [n_rx_elements, n_rx_ports] or []
 
-    // Inputs - Positions and orientations:
-    // 18 - tx_pos          Transmitter position in Cartesian coordinates                   Size [3,1]
-    // 19 - tx_orientation  Transmitter orientation (bank, tilt, head) in [rad]             Size [3,1]
-    // 20 - rx_pos          Receiver position in Cartesian coordinates                      Size [3,1]
-    // 21 - rx_orientation  Receiver orientation (bank, tilt, head) in [rad]                Size [3,1]
-
     // Inputs - Path data
-    // 22 - fbs_pos         First-bounce scatterer positions                                Size [3, n_path]
-    // 23 - lbs_pos         Last-bounce scatterer positions                                 Size [3, n_path]
-    // 24 - path_gain       Path gain (linear scale)                                        Size [1, n_path]
-    // 25 - path_length     Absolute path length from TX to RX phase center                 Size [1, n_path]
-    // 26 - M               Polarization transfer matrix                                    Size [8, n_path]
+    // 18 - fbs_pos         First-bounce scatterer positions                                Size [3, n_path]
+    // 19 - lbs_pos         Last-bounce scatterer positions                                 Size [3, n_path]
+    // 20 - path_gain       Path gain (linear scale)                                        Size [1, n_path]
+    // 21 - path_length     Absolute path length from TX to RX phase center                 Size [1, n_path]
+    // 22 - M               Polarization transfer matrix                                    Size [8, n_path]
     //                      interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+
+    // Inputs - Positions and orientations:
+    // 23 - tx_pos          Transmitter position in Cartesian coordinates                   Size [3,1]
+    // 24 - tx_orientation  Transmitter orientation (bank, tilt, head) in [rad]             Size [3,1]
+    // 25 - rx_pos          Receiver position in Cartesian coordinates                      Size [3,1]
+    // 26 - rx_orientation  Receiver orientation (bank, tilt, head) in [rad]                Size [3,1]
 
     // Inputs - Scalars and switches
     // 27 - center_freq          Center frequency in [Hz]
@@ -71,7 +71,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  5 - aoa             [OPTIONAL] Azimuth of Arrival angles in [rad]                   Size [n_rx_ports, n_tx_ports, n_path]
     //  6 - eoa             [OPTIONAL] Elevation of Arrival angles in [rad]                 Size [n_rx_ports, n_tx_ports, n_path]
 
-    if (nrhs < 30)
+    if (nrhs < 27)
         mexErrMsgIdAndTxt("quadriga_lib:get_channels_spherical:no_input", "Incorrect number of input arguments.");
 
     if (nlhs < 3 || nlhs > 7)
@@ -83,7 +83,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:get_channels_spherical:wrong_type", "Inputs must be provided in 'single' or 'double' precision.");
 
-    for (int i = 1; i < 28; i++)
+    for (int i = 1; i < 23; i++)
         if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
             mexErrMsgIdAndTxt("quadriga_lib:get_channels_spherical:wrong_type", "All inputs must have the same type: 'single' or 'double' precision");
 
@@ -149,33 +149,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:get_channels_spherical:invalid_argument", error_message.c_str());
     }
 
-    // Positions and orientations
-    arma::vec tmp = qd_mex_typecast_Col<double>(prhs[18], "tx_pos", 3);
-    double Tx = tmp.at(0), Ty = tmp.at(1), Tz = tmp.at(2);
-    tmp = qd_mex_typecast_Col<double>(prhs[19], "tx_orientation", 3);
-    double Tb = tmp.at(0), Tt = tmp.at(1), Th = tmp.at(2);
-    tmp = qd_mex_typecast_Col<double>(prhs[20], "rx_pos", 3);
-    double Rx = tmp.at(0), Ry = tmp.at(1), Rz = tmp.at(2);
-    tmp = qd_mex_typecast_Col<double>(prhs[21], "rx_orientation", 3);
-    double Rb = tmp.at(0), Rt = tmp.at(1), Rh = tmp.at(2);
-
     // Path data
     arma::fmat fbs_pos_single, lbs_pos_single, M_single;
     arma::mat fbs_pos_double, lbs_pos_double, M_double;
     arma::fvec path_gain_single, path_length_single;
     arma::vec path_gain_double, path_length_double;
     if (use_single)
-        fbs_pos_single = qd_mex_reinterpret_Mat<float>(prhs[22]),
-        lbs_pos_single = qd_mex_reinterpret_Mat<float>(prhs[23]),
-        path_gain_single = qd_mex_reinterpret_Col<float>(prhs[24]),
-        path_length_single = qd_mex_reinterpret_Col<float>(prhs[25]),
-        M_single = qd_mex_reinterpret_Mat<float>(prhs[26]);
+        fbs_pos_single = qd_mex_reinterpret_Mat<float>(prhs[18]),
+        lbs_pos_single = qd_mex_reinterpret_Mat<float>(prhs[19]),
+        path_gain_single = qd_mex_reinterpret_Col<float>(prhs[20]),
+        path_length_single = qd_mex_reinterpret_Col<float>(prhs[21]),
+        M_single = qd_mex_reinterpret_Mat<float>(prhs[22]);
     else
-        fbs_pos_double = qd_mex_reinterpret_Mat<double>(prhs[22]),
-        lbs_pos_double = qd_mex_reinterpret_Mat<double>(prhs[23]),
-        path_gain_double = qd_mex_reinterpret_Col<double>(prhs[24]),
-        path_length_double = qd_mex_reinterpret_Col<double>(prhs[25]),
-        M_double = qd_mex_reinterpret_Mat<double>(prhs[26]);
+        fbs_pos_double = qd_mex_reinterpret_Mat<double>(prhs[18]),
+        lbs_pos_double = qd_mex_reinterpret_Mat<double>(prhs[19]),
+        path_gain_double = qd_mex_reinterpret_Col<double>(prhs[20]),
+        path_length_double = qd_mex_reinterpret_Col<double>(prhs[21]),
+        M_double = qd_mex_reinterpret_Mat<double>(prhs[22]);
 
     unsigned n_path = use_single ? fbs_pos_single.n_cols : fbs_pos_double.n_cols;
     if (n_path == 0 ||
@@ -186,10 +176,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:get_channels_spherical:invalid_argument", error_message.c_str());
     }
 
+    // Positions and orientations
+    arma::vec tmp = qd_mex_typecast_Col<double>(prhs[23], "tx_pos", 3);
+    double Tx = tmp.at(0), Ty = tmp.at(1), Tz = tmp.at(2);
+    tmp = qd_mex_typecast_Col<double>(prhs[24], "tx_orientation", 3);
+    double Tb = tmp.at(0), Tt = tmp.at(1), Th = tmp.at(2);
+    tmp = qd_mex_typecast_Col<double>(prhs[25], "rx_pos", 3);
+    double Rx = tmp.at(0), Ry = tmp.at(1), Rz = tmp.at(2);
+    tmp = qd_mex_typecast_Col<double>(prhs[26], "rx_orientation", 3);
+    double Rb = tmp.at(0), Rt = tmp.at(1), Rh = tmp.at(2);
+
     // Scalars and switches
-    double center_freq = qd_mex_get_scalar<double>(prhs[27], "center_freq", 299792458.0);
-    bool use_absolute_delays = qd_mex_get_scalar<bool>(prhs[28], "use_absolute_delays", false);
-    bool add_fake_los_path = qd_mex_get_scalar<bool>(prhs[29], "add_fake_los_path", true);
+    double center_freq = (nrhs < 28) ? 0.0 : qd_mex_get_scalar<double>(prhs[27], "center_freq", 0.0);
+    bool use_absolute_delays = (nrhs < 29) ? false : qd_mex_get_scalar<bool>(prhs[28], "use_absolute_delays", false);
+    bool add_fake_los_path = (nrhs < 30) ? false : qd_mex_get_scalar<bool>(prhs[29], "add_fake_los_path", false);
 
     // Allocate output memory
     unsigned n_tx_ports = use_single ? tx_array_single.n_ports() : tx_array_double.n_ports();
@@ -237,6 +237,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nlhs > 6)
             plhs[6] = qd_mex_init_output(p_eoa_double, n_rx_ports, n_tx_ports, n_path);
     }
+
+
+
 
     // Call library function
     try

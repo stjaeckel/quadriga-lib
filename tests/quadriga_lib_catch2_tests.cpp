@@ -24,8 +24,8 @@
 #include "catch2_tests/test_arrayant_interpolate.cpp"
 #include "catch2_tests/test_arrayant_combine_pattern.cpp"
 #include "catch2_tests/test_arrayant_generate.cpp"
-#include "catch2_tests/test_get_channels.cpp"
-
+#include "catch2_tests/test_get_channels_spherical.cpp"
+#include "catch2_tests/test_get_channels_planar.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
