@@ -7,18 +7,15 @@ OCT   = mkoctfile
 
 all:        mex_octave   mex_matlab
 
-# External headers
-ARMA_H      = external/armadillo-11.4.2/include
+# External libraries
+ARMA_H      = external/armadillo-12.6.3/include
 PUGIXML_H   = external/pugixml-1.13/src
-
-# External pre-compiled libraries
-CATCH2_LIB  = -I external/Catch2-3.3.2-Linux/include -L external/Catch2-3.3.2-Linux/lib -lCatch2
-ARMA_LIB    = -I external/armadillo-11.4.2-Linux/include -L external/armadillo-11.4.2-Linux/lib -larmadillo
-
+CATCH2      = external/Catch2-3.3.2-Linux
+HDF5_H      = /usr/include/hdf5/serial  # external/hdf5-1.14.2-Linux/include
+HDF5_LIB    = /usr/lib/x86_64-linux-gnu/hdf5/serial  # external/hdf5-1.14.2-Linux/lib
 
 # Configurations
 CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
-LIBS        = -lgomp #-lblas
 
 # Sourcees
 src     	= $(wildcard src/*.cpp)
@@ -35,30 +32,50 @@ test:   tests/test_bin
 	tests/test_bin
 
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
-	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include $(ARMA_LIB) $(CATCH2_LIB)
+	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -L $(HDF5_LIB) -lCatch2 -lhdf5
 
 # Individual Library files
+build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_lib.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I $(PUGIXML_H) -I src -I include $(LIBS)
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H)
 
-build/%.o:   src/%.cpp
-	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I src -I include $(LIBS)
+build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_interpolate.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
-lib/quadriga_lib.a:   build/quadriga_lib.o   build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
+build/qd_channel.o:   src/qd_channel.cpp   include/quadriga_lib.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(HDF5_H)
+
+build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
+
+build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
+#build/%.o:   src/%.cpp
+#	$(CC) $(CCFLAGS) -c $< -o $@ $(ARMA_LIB) -I src -I include
+
+# Archive file for static linking
+lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
+                      build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
 	ar rcs $@ $^
 
-# MEX interface files
+# MEX MATLAB interface
++quadriga_lib/test_hdf5.mexa64:   mex/test_hdf5.cpp   lib/quadriga_lib.a
+	$(MEX) -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5
+
 +quadriga_lib/%.mexa64:   mex/%.cpp   lib/quadriga_lib.a
-	$(MEX) -outdir +quadriga_lib $^ -I$(ARMA_H) -Isrc -Iinclude $(LIBS)
+	$(MEX) -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp
+
+# MEX Ocate interface
++quadriga_lib/test_hdf5.mex:   mex/test_hdf5.cpp   lib/quadriga_lib.a
+	$(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5 -s
 
 +quadriga_lib/%.mex:   mex/%.cpp   lib/quadriga_lib.a
-	$(OCT) --mex -o $@ $^ -I$(ARMA_H) -Isrc -Iinclude $(LIBS) -s
+	$(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s
 
-# List of additional dependencies
-build/quadriga_lib.o:   include/quadriga_lib.hpp
-build/quadriga_tools.o:   include/quadriga_tools.hpp
-build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.hpp
-
+# Maintainance section
 clean:
 	- rm build/*
 	- rm +quadriga_lib/*.manifest

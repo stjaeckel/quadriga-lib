@@ -120,6 +120,15 @@ namespace quadriga_lib
             std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
             std::string validate();                              // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
         };
+
+        template <typename dtype> // float or double
+        class channel
+        {
+        public:
+            std::string name = "empty";                   // Name of the array channel object
+            std::string version = quadriga_lib_version(); // Version identifier
+            channel(){};                                  // Default constructor
+        };
     }
 
     // Read array antenna object and layout from QDANT file
@@ -233,6 +242,11 @@ namespace quadriga_lib
                              bool use_absolute_delays = false,     // Option: If true, the LOS delay is included for all paths
                              bool add_fake_los_path = false,       // Option: Add a zero-power LOS path in case where no LOS path was present
                              arma::Col<dtype> *rx_Doppler = NULL); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
+
+    // Prints the versions of all uses libraries to stdout
+    void print_lib_versions();
+
+    void qd_channel_hello();
 
 }
 
