@@ -1,9 +1,0 @@
-libdir=Z:/sjc/quadriga-lib/external/armadillo-11.4.2-win64/lib
-includedir=Z:/sjc/quadriga-lib/external/armadillo-11.4.2-win64/include
-
-Name: armadillo
-Description: Fast C++ matrix library with syntax similar to MATLAB and Octave
-URL: http://arma.sourceforge.net
-Version: 11.4.2
-Cflags: -I${includedir}
-Libs: -L${libdir} -larmadillo

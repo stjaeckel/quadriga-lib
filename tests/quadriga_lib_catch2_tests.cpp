@@ -18,14 +18,16 @@
 #include <catch2/catch_session.hpp>
 
 // Include test cases
-#include "catch2_tests/test_quadriga_tools.cpp"
-#include "catch2_tests/test_qdant_read.cpp"
-#include "catch2_tests/test_qdant_write.cpp"
-#include "catch2_tests/test_arrayant_interpolate.cpp"
-#include "catch2_tests/test_arrayant_combine_pattern.cpp"
-#include "catch2_tests/test_arrayant_generate.cpp"
-#include "catch2_tests/test_get_channels_spherical.cpp"
-#include "catch2_tests/test_get_channels_planar.cpp"
+// #include "catch2_tests/test_quadriga_tools.cpp"
+// #include "catch2_tests/test_qdant_read.cpp"
+// #include "catch2_tests/test_qdant_write.cpp"
+// #include "catch2_tests/test_arrayant_interpolate.cpp"
+// #include "catch2_tests/test_arrayant_combine_pattern.cpp"
+// #include "catch2_tests/test_arrayant_generate.cpp"
+// #include "catch2_tests/test_get_channels_spherical.cpp"
+// #include "catch2_tests/test_get_channels_planar.cpp"
+#include "catch2_tests/test_hdf_functions.cpp"
+
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

@@ -165,97 +165,91 @@ std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::C
     arma::uword *i_yp_vec = new arma::uword[my], *i_yn_vec = new arma::uword[my];
     dtype *yp_vec = new dtype[my], *yn_vec = new dtype[my];
 
-#pragma omp parallel sections
     {
-#pragma omp section
+        // Calculate the x-interpolation parameters
+        bool sorted = xi->is_sorted();
+        arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, nx - 1) : arma::sort_index(*xi);
+        arma::uword *p_ind = ind.memptr();
+        const dtype *pi = xi->memptr();
+
+        dtype *p_grid_srt = new dtype[nx];
+        if (!sorted)
+            for (arma::uword i = 0; i < nx; i++)
+                p_grid_srt[i] = pi[p_ind[i]];
+        const dtype *p_grid = sorted ? pi : p_grid_srt;
+
+        dtype *p_diff = new dtype[nx];
+        *p_diff = one;
+        for (arma::uword i = 1; i < nx; i++)
+            p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
+
+        const dtype *po = xo->memptr();
+        for (arma::uword i = 0; i < mx; i++)
         {
-            // Calculate the x-interpolation parameters
-            bool sorted = xi->is_sorted();
-            arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, nx - 1) : arma::sort_index(*xi);
-            arma::uword *p_ind = ind.memptr();
-            const dtype *pi = xi->memptr();
-
-            dtype *p_grid_srt = new dtype[nx];
-            if (!sorted)
-                for (arma::uword i = 0; i < nx; i++)
-                    p_grid_srt[i] = pi[p_ind[i]];
-            const dtype *p_grid = sorted ? pi : p_grid_srt;
-
-            dtype *p_diff = new dtype[nx];
-            *p_diff = one;
-            for (arma::uword i = 1; i < nx; i++)
-                p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
-
-            const dtype *po = xo->memptr();
-            for (arma::uword i = 0; i < mx; i++)
+            arma::uword ip = 0, in = 0;             // Indices for reading the input data
+            dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+            while (ip < nx && p_grid[ip] <= val)
+                ip++;
+            if (ip == nx)
+                in = --ip;
+            else if (ip != 0)
             {
-                arma::uword ip = 0, in = 0;             // Indices for reading the input data
-                dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
-                while (ip < nx && p_grid[ip] <= val)
-                    ip++;
-                if (ip == nx)
-                    in = --ip;
-                else if (ip != 0)
-                {
-                    in = ip--;
-                    wp = (p_grid[in] - val) * p_diff[in];
-                    wp = wp > one ? one : wp;
-                    wp = wp < zero ? zero : wp;
-                    wn = one - wp;
-                }
-                i_xp_vec[i] = p_ind[ip], i_xn_vec[i] = p_ind[in], xp_vec[i] = wp, xn_vec[i] = wn;
+                in = ip--;
+                wp = (p_grid[in] - val) * p_diff[in];
+                wp = wp > one ? one : wp;
+                wp = wp < zero ? zero : wp;
+                wn = one - wp;
             }
-            delete[] p_diff;
-            delete[] p_grid_srt;
-            ind.reset();
+            i_xp_vec[i] = p_ind[ip], i_xn_vec[i] = p_ind[in], xp_vec[i] = wp, xn_vec[i] = wn;
         }
-#pragma omp section
+        delete[] p_diff;
+        delete[] p_grid_srt;
+        ind.reset();
+    }
+    {
+        // Calculate the y-interpolation parameters
+        bool sorted = yi->is_sorted();
+        arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, ny - 1) : arma::sort_index(*yi);
+        arma::uword *p_ind = ind.memptr();
+        const dtype *pi = yi->memptr();
+
+        dtype *p_grid_srt = new dtype[ny];
+        if (!sorted)
+            for (arma::uword i = 0; i < ny; i++)
+                p_grid_srt[i] = pi[p_ind[i]];
+        const dtype *p_grid = sorted ? pi : p_grid_srt;
+
+        dtype *p_diff = new dtype[ny];
+        *p_diff = one;
+        for (arma::uword i = 1; i < ny; i++)
+            p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
+
+        const dtype *po = yo->memptr();
+        for (arma::uword i = 0; i < my; i++)
         {
-            // Calculate the y-interpolation parameters
-            bool sorted = yi->is_sorted();
-            arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, ny - 1) : arma::sort_index(*yi);
-            arma::uword *p_ind = ind.memptr();
-            const dtype *pi = yi->memptr();
-
-            dtype *p_grid_srt = new dtype[ny];
-            if (!sorted)
-                for (arma::uword i = 0; i < ny; i++)
-                    p_grid_srt[i] = pi[p_ind[i]];
-            const dtype *p_grid = sorted ? pi : p_grid_srt;
-
-            dtype *p_diff = new dtype[ny];
-            *p_diff = one;
-            for (arma::uword i = 1; i < ny; i++)
-                p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
-
-            const dtype *po = yo->memptr();
-            for (arma::uword i = 0; i < my; i++)
+            arma::uword ip = 0, in = 0;             // Indices for reading the input data
+            dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+            while (ip < ny && p_grid[ip] <= val)
+                ip++;
+            if (ip == ny)
+                in = --ip;
+            else if (ip != 0)
             {
-                arma::uword ip = 0, in = 0;             // Indices for reading the input data
-                dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
-                while (ip < ny && p_grid[ip] <= val)
-                    ip++;
-                if (ip == ny)
-                    in = --ip;
-                else if (ip != 0)
-                {
-                    in = ip--;
-                    wp = (p_grid[in] - val) * p_diff[in];
-                    wp = wp > one ? one : wp;
-                    wp = wp < zero ? zero : wp;
-                    wn = one - wp;
-                }
-                i_yp_vec[i] = p_ind[ip], i_yn_vec[i] = p_ind[in], yp_vec[i] = wp, yn_vec[i] = wn;
+                in = ip--;
+                wp = (p_grid[in] - val) * p_diff[in];
+                wp = wp > one ? one : wp;
+                wp = wp < zero ? zero : wp;
+                wn = one - wp;
             }
-            delete[] p_diff;
-            delete[] p_grid_srt;
-            ind.reset();
+            i_yp_vec[i] = p_ind[ip], i_yn_vec[i] = p_ind[in], yp_vec[i] = wp, yn_vec[i] = wn;
         }
+        delete[] p_diff;
+        delete[] p_grid_srt;
+        ind.reset();
     }
 
     // Interpolate the input data and write to output memory
     const dtype *p_input = input->memptr();
-#pragma omp parallel for    
     for (int ie = 0; ie < int(ne); ie++)
     {
         dtype *p_output = output->slice_memptr(ie);

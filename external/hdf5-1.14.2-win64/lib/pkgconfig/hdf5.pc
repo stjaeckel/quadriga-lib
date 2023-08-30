@@ -1,0 +1,14 @@
+prefix=Z:/sjc/quadriga-lib/external/hdf5-1.14.2-win64
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: hdf5
+Description: HDF5 (Hierarchical Data Format 5) Software Library
+Version: 1.14.2
+
+Cflags: -I${includedir}
+Libs: -L${libdir} 
+Requires: 
+Libs.private:  -lhdf5  -lshlwapi
+Requires.private: 

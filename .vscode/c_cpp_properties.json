@@ -6,13 +6,14 @@
                 "${workspaceFolder}/**",
                 "include/",
                 "src/",
-                "external/armadillo-11.4.2/include",
+                "external/armadillo-12.6.3/include",
+                "external/hdf5-1.14.2-win64/include",
                 "external/Catch2-3.3.2-Linux/include",
                 "/usr/local/MATLAB/R2021a/extern/include/"
             ],
             "defines": [],
             "cStandard": "gnu17",
-            "cppStandard": "gnu++14",
+            "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-x64",
             "configurationProvider": "ms-vscode.makefile-tools"
         },
@@ -20,7 +21,7 @@
             "name": "Windows",
             "includePath": [
                 "${workspaceFolder}/**",
-                "lib/armadillo-11.4.2/include/"
+                "lib/armadillo-12.6.3-win64/include/"
             ],
             "defines": [
                 "_DEBUG",
@@ -30,7 +31,7 @@
             "windowsSdkVersion": "10.0.22000.0",
             "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.34.31933/bin/Hostx64/x64/cl.exe",
             "cStandard": "c17",
-            "cppStandard": "c++14",
+            "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64"
         }
     ],
