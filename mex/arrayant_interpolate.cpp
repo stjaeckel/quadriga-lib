@@ -114,12 +114,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Number of rows in 'azimuth' and 'elevation' must be 1 or match the number of elements.");
 
     // Check if values are valid (using lambda function)
-    auto fnc_iel = [n_elements](unsigned &val)
-    {
-        if (val < 1 || val > n_elements)
+    for (unsigned *val = i_element.begin(); val < i_element.end(); val++)
+        if (*val < 1 || *val > n_elements)
             mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:out_of_bound", "Input 'i_element' must have values between 1 and 'n_elements'.");
-    };
-    i_element.for_each(fnc_iel);
     n_out = i_element.n_elem;
 
     // Process optional input : orientation
