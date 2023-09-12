@@ -2,10 +2,20 @@
     "cSpell.words": [
         "arma",
         "arrayant",
+        "Dcreate",
+        "Dopen",
+        "drowvec",
         "dtype",
+        "Dwrite",
         "exisiting",
+        "Gclose",
+        "Gcreate",
+        "Gopen",
         "memptr",
         "MIMO",
+        "Sclose",
+        "Tclose",
+        "Tcopy",
         "xpol"
     ],
     "files.associations": {
