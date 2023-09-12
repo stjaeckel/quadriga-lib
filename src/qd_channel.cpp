@@ -21,6 +21,10 @@
 
 #include <hdf5.h>
 
+// Instantiate templates
+template class quadriga_lib::QUADRIGA_LIB_VERSION::channel<float>;
+template class quadriga_lib::QUADRIGA_LIB_VERSION::channel<double>;
+
 void quadriga_lib::qd_channel_hello()
 {
     std::cout << H5_VERS_INFO << std::endl;

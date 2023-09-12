@@ -69,6 +69,9 @@ TEST_CASE("HDF - Minimal test")
     // std::cout << w.type().name() << std::endl;
 
 
+    auto c = quadriga_lib::channel<float>();
+    std::cout << c.name << ", " << c.version << std::endl;
+
     quadriga_lib::qd_channel_hello();
 
     quadriga_lib::print_lib_versions(); 
