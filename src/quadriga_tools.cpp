@@ -141,6 +141,86 @@ arma::cube quadriga_tools::cart2geo(const arma::Cube<dtype> cart)
 template arma::cube quadriga_tools::cart2geo(const arma::Cube<float> cart);
 template arma::cube quadriga_tools::cart2geo(const arma::Cube<double> cart);
 
+// Convert path interaction coordinates into FBS/LBS positions, path length and angles
+template <typename dtype>
+void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
+                                arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
+{
+    if (coord == NULL || coord->n_elem == 0 || coord->n_rows != 3)
+        throw std::invalid_argument("Input 'coord' must have 3 rows.");
+
+    arma::uword n_interact = coord->n_cols;
+    arma::uword n_path = coord->n_slices;
+
+    constexpr dtype zero = dtype(0.0);
+    constexpr dtype half = dtype(0.5);
+    constexpr dtype los_limit = dtype(1.0e-4);
+
+    // Set the output size
+    if (path_length != NULL && path_length->n_elem != n_path)
+        path_length->set_size(n_path);
+    if (fbs_pos != NULL && (fbs_pos->n_rows != 3 || fbs_pos->n_cols != n_path))
+        fbs_pos->set_size(3, n_path);
+    if (lbs_pos != NULL && (lbs_pos->n_rows != 3 || lbs_pos->n_cols != n_path))
+        lbs_pos->set_size(3, n_path);
+    if (path_angles != NULL && (path_angles->n_rows != n_path || path_angles->n_cols != 4))
+        path_angles->set_size(n_path, 4);
+
+    // Get pointers
+    const dtype *p_coord = coord->memptr();
+    dtype *p_length = path_length == NULL ? NULL : path_length->memptr();
+    dtype *p_fbs = fbs_pos == NULL ? NULL : fbs_pos->memptr();
+    dtype *p_lbs = lbs_pos == NULL ? NULL : lbs_pos->memptr();
+    dtype *p_angles = path_angles == NULL ? NULL : path_angles->memptr();
+
+    // Calculate half way point between TX and RX
+    dtype TRx = Rx - Tx, TRy = Ry - Ty, TRz = Rz - Tz;
+    TRx = Tx + half * TRx, TRy = Ty + half * TRy, TRz = Tz + half * TRz;
+
+    for (arma::uword ip = 0; ip < n_path; ip++)
+    {
+        dtype fx = TRx, fy = TRy, fz = TRz;     // Initial FBS-Pos
+        dtype lx = TRx, ly = TRy, lz = TRz;     // Initial LBS-Pos
+        dtype x = Tx, y = Ty, z = Tz, d = zero; // Initial length
+
+        // Get FBS and LBS positions
+        for (arma::uword ii = 0; ii < n_interact; ii++)
+        {
+            arma::uword ix = 3 * ip * n_interact + 3 * ii, iy = ix + 1, iz = ix + 2;
+            if (std::isnan(p_coord[ix]) || std::isnan(p_coord[iy]) || std::isnan(p_coord[iz]))
+                break;
+            lx = p_coord[ix], ly = p_coord[iy], lz = p_coord[iz];
+            x -= lx, y -= ly, z -= lx, d += std::sqrt(x * x + y * y + z * z);
+            x = lx, y = ly, z = lz;
+            fx = ii == 0 ? lx : fx, fy = ii == 0 ? ly : fy, fz = ii == 0 ? lz : fz;
+        }
+        x -= Rx, y -= Ry, z -= Rz, d += std::sqrt(x * x + y * y + z * z);
+
+        if (p_length != NULL)
+            p_length[ip] = d;
+        if (p_fbs != NULL)
+            p_fbs[3 * ip] = fx, p_fbs[3 * ip + 1] = fy, p_fbs[3 * ip + 2] = fz;
+        if (p_lbs != NULL)
+            p_lbs[3 * ip] = lx, p_lbs[3 * ip + 1] = ly, p_lbs[3 * ip + 2] = lz;
+
+        if (p_angles != NULL)
+        {
+            x = fx - Tx, y = fy - Ty, z = fz - Tz;
+            d = std::sqrt(x * x + y * y + z * z);
+            p_angles[ip] = std::atan2(y, x);                                 // AOD
+            p_angles[n_path + ip] = d < los_limit ? zero : std::asin(z / d); // EOD
+            x = lx - Rx, y = ly - Ry, z = lz - Rz;
+            d = std::sqrt(x * x + y * y + z * z);
+            p_angles[2 * n_path + ip] = std::atan2(y, x);                        // AOA
+            p_angles[3 * n_path + ip] = d < los_limit ? zero : std::asin(z / d); // EOA
+        }
+    }
+}
+template void quadriga_tools::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Cube<float> *coord,
+                                         arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles);
+template void quadriga_tools::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Cube<double> *coord,
+                                         arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles);
+
 // 2D linear interpolation
 template <typename dtype>
 std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,

@@ -35,10 +35,9 @@
 // ts = te;
 // std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
 
+// Returns the arrayant_lib version number as a string
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
-
-// Returns the arrayant_lib version number as a string
 std::string quadriga_lib::quadriga_lib_version()
 {
     std::string str = STRINGIFY(QUADRIGA_LIB_VERSION);
@@ -51,8 +50,6 @@ std::string quadriga_lib::quadriga_lib_version()
 }
 
 #include "helper_functions.cpp"
-
-
 
 // Calculate channel coefficients for spherical waves
 template <typename dtype>
@@ -858,7 +855,8 @@ void quadriga_lib::print_lib_versions()
     arma::arma_version ver;
     std::cout << "quadriga_lib      " << quadriga_lib::quadriga_lib_version() << std::endl;
     std::cout << "Armadillo         " << ver.as_string() << std::endl;
-    std::cout << "C++ version       ";
+    std::cout << "HDF5              " << quadriga_lib::get_HDF5_version() << std::endl;
+    std::cout << "C++ standard      ";
 
     if (__cplusplus == 202101L) std::cout << "C++23";
     else if (__cplusplus == 202002L) std::cout << "C++20";

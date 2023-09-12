@@ -23,12 +23,14 @@
 #include <vector>
 #include <any>
 
-#define QUADRIGA_LIB_VERSION v0_1_7
+#define QUADRIGA_LIB_VERSION v0_1_8
 
 namespace quadriga_lib
 {
-    // Returns the quadriga_lib version number as a string in format (x.y.z)
+    // Returns the version number as a string in format (x.y.z)
     std::string quadriga_lib_version();
+    std::string get_HDF5_version();
+    void print_lib_versions();
 
     inline namespace QUADRIGA_LIB_VERSION // Maintain ABI compatibility
     {
@@ -130,26 +132,38 @@ namespace quadriga_lib
         {
         public:
             std::string name = "empty";                      // Name of the channel object
-            std::string version = quadriga_lib_version();    // Version identifier
             dtype center_frequency = dtype(299792458.0);     // Center frequency in [Hz]
+            arma::Mat<dtype> tx_pos;                         // Transmitter positions, matrix of size [3, n_snap] or [3, 1]
+            arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap]
+            arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
+            arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
             std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
             std::vector<arma::Cube<dtype>> coeff_im;         // Channel coefficients, imaginary part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
             std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            arma::Mat<dtype> tx_pos;                         // Transmitter position, matrix of size [3, n_snap] or [3, 1]
-            arma::Mat<dtype> rx_pos;                         // Receiver position, matrix of size [3, n_snap]
-            arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1]
-            arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1]
             std::vector<arma::Col<dtype>> path_gain;         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
             std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
             std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
-            std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [4, n_path], {AOD, EOD, AOA, EOA}
+            std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
             std::vector<arma::Cube<dtype>> path_coord;       // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
-            std::vector<arma::Col<unsigned>> path_n_coord;   // Number of interaction coordinates per path, 0=LOS, vector (n_snap) of vectors of length [n_path]
             std::vector<std::string> par_names;              // Names of unstructured data fields
             std::vector<std::any> par_data;                  // Unstructured data of types {string, float, double, int, long int, arma::Col<dtype>, arma::Mat<dtype>, arma::Cube<dtype>}
-            unsigned initial_position = 0;                   // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
+            int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
+            channel(){};                                     // Default constructor
 
-            channel(){}; // Default constructor
+            arma::uword n_snap() const; // Number of snapshots
+            arma::uword n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
+            arma::uword n_tx() const;   // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
+            arma::uvec n_path() const;  // Number of paths per snapshot (arma::uword)
+
+            // Validate integrity
+            std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
+
+            // Save data to HDF file
+            // - All data is stored in single precision
+            // - Data is added to the end of the file
+            // - The index is updated to include to the newly written data
+            // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
+            void hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0) const;
         };
     }
 
@@ -265,11 +279,17 @@ namespace quadriga_lib
                              bool add_fake_los_path = false,       // Option: Add a zero-power LOS path in case where no LOS path was present
                              arma::Col<dtype> *rx_Doppler = NULL); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
 
-    // Prints the versions of all uses libraries to stdout
-    void print_lib_versions();
+    // Create a new channel HDF file and set the index to to given storage layout
+    void hdf5_create(std::string fn, unsigned nx = 65535, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
 
-    void qd_channel_hello();
-
+    // Write unstructured data to hdf5 file
+    // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
+    // - Armadillo Vectors, Matrices and Cubes with types: unsigned, int, uword, sword, float, double
+    // - Vector types: Armadillo Row and Col types are mapped to 1D storage type - reading will be arma::Col
+    // - Parameter name may only contain letters and numbers and the underscore "_"
+    // - Unsupported data types will cause an error
+    void hdf5_write_unstructured(std::string fn, std::string par_name, const std::any *par_data,
+                                 unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0);
 }
 
 #endif

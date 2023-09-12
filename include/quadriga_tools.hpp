@@ -33,6 +33,19 @@ namespace quadriga_tools
     template <typename dtype> // float or double
     arma::cube cart2geo(const arma::Cube<dtype> cart);
 
+    // Convert path interaction coordinates into FBS/LBS positions, path length and angles
+    // - Interaction coordinates for the LOS path must be all nan
+    // - FBS / LBS position of the LOS path is place half way between TX and RX
+    // - Size of the output arguments is adjusted if it does not match the required size
+    template <typename dtype>                              // Supported types: float or double
+    void coord2path(dtype Tx, dtype Ty, dtype Tz,          // Transmitter position in Cartesian coordinates
+                    dtype Rx, dtype Ry, dtype Rz,          // Receiver position in Cartesian coordinates
+                    const arma::Cube<dtype> *coord,        // Interaction coordinates, NAN-padded, size [3, n_coord, n_path]
+                    arma::Col<dtype> *path_length = NULL,  // Absolute path length from TX to RX phase center, vector of length [n_path]
+                    arma::Mat<dtype> *fbs_pos = NULL,      // First-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *lbs_pos = NULL,      // Last-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *path_angles = NULL); // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
+
     // 2D linear interpolation (returns error message or empty string in case of no error)
     template <typename dtype>                          // Supported types: float or double
     std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
