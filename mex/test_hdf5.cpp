@@ -23,7 +23,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     quadriga_lib::qd_channel_hello();
 
-    //quadriga_lib::channel c;
+    auto c = quadriga_lib::channel<double>();
+
+    std::cout << c.name << std::endl;
 
 
 

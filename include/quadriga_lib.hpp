@@ -20,6 +20,8 @@
 
 #include <armadillo>
 #include <string>
+#include <vector>
+#include <any>
 
 #define QUADRIGA_LIB_VERSION v0_1_7
 
@@ -121,13 +123,33 @@ namespace quadriga_lib
             std::string validate();                              // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
         };
 
+        // Class for storing and managing channel data (+ metadata)
+        // Note: "n_path" is different for each snapshot
         template <typename dtype> // float or double
         class channel
         {
         public:
-            std::string name = "empty";                   // Name of the array channel object
-            std::string version = quadriga_lib_version(); // Version identifier
-            channel(){};                                  // Default constructor
+            std::string name = "empty";                      // Name of the channel object
+            std::string version = quadriga_lib_version();    // Version identifier
+            dtype center_frequency = dtype(299792458.0);     // Center frequency in [Hz]
+            std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+            std::vector<arma::Cube<dtype>> coeff_im;         // Channel coefficients, imaginary part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+            std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+            arma::Mat<dtype> tx_pos;                         // Transmitter position, matrix of size [3, n_snap] or [3, 1]
+            arma::Mat<dtype> rx_pos;                         // Receiver position, matrix of size [3, n_snap]
+            arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1]
+            arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1]
+            std::vector<arma::Col<dtype>> path_gain;         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
+            std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
+            std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
+            std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [4, n_path], {AOD, EOD, AOA, EOA}
+            std::vector<arma::Cube<dtype>> path_coord;       // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
+            std::vector<arma::Col<unsigned>> path_n_coord;   // Number of interaction coordinates per path, 0=LOS, vector (n_snap) of vectors of length [n_path]
+            std::vector<std::string> par_names;              // Names of unstructured data fields
+            std::vector<std::any> par_data;                  // Unstructured data of types {string, float, double, int, long int, arma::Col<dtype>, arma::Mat<dtype>, arma::Cube<dtype>}
+            unsigned initial_position = 0;                   // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
+
+            channel(){}; // Default constructor
         };
     }
 

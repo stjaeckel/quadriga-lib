@@ -5,7 +5,7 @@ CC    = g++
 MEX   = /usr/local/MATLAB/R2021a/bin/mex
 OCT   = mkoctfile
 
-all:        mex_octave   mex_matlab
+all:        mex_octave  mex_matlab 
 
 # External libraries
 ARMA_H      = external/armadillo-12.6.3/include
@@ -15,7 +15,7 @@ HDF5_H      = /usr/include/hdf5/serial  # external/hdf5-1.14.2-Linux/include
 HDF5_LIB    = /usr/lib/x86_64-linux-gnu/hdf5/serial  # external/hdf5-1.14.2-Linux/lib
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
+CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp# -Wall #-Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic
 
 # Sourcees
 src     	= $(wildcard src/*.cpp)
@@ -63,17 +63,17 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 
 # MEX MATLAB interface
 +quadriga_lib/test_hdf5.mexa64:   mex/test_hdf5.cpp   lib/quadriga_lib.a
-	$(MEX) -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5
+	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5 -lgomp
 
 +quadriga_lib/%.mexa64:   mex/%.cpp   lib/quadriga_lib.a
-	$(MEX) -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp
+	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp
 
 # MEX Ocate interface
 +quadriga_lib/test_hdf5.mex:   mex/test_hdf5.cpp   lib/quadriga_lib.a
-	$(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5 -s
+	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -L$(HDF5_LIB) -lhdf5 -s
 
 +quadriga_lib/%.mex:   mex/%.cpp   lib/quadriga_lib.a
-	$(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s
+	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s
 
 # Maintainance section
 clean:
