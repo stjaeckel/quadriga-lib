@@ -87,7 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double x_deg = nrhs < 8 ? 0.0 : qd_mex_get_scalar<double>(prhs[7], "x_deg");
     double y_deg = nrhs < 9 ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "y_deg");
     double z_deg = nrhs < 10 ? 0.0 : qd_mex_get_scalar<double>(prhs[9], "z_deg");
-    unsigned usage = nrhs < 11 ? 0 : qd_mex_get_scalar<double>(prhs[10], "usage");
+    unsigned usage = nrhs < 11 ? 0 : qd_mex_get_scalar<unsigned>(prhs[10], "usage");
 
     quadriga_lib::arrayant<float> output_single;
     quadriga_lib::arrayant<double> output_double;

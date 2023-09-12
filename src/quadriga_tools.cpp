@@ -32,13 +32,13 @@ arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dtype> orientat
     if (orientation.n_rows != 3)
         throw std::invalid_argument("Input must have 3 rows.");
 
-    unsigned n_row = orientation.n_cols, n_col = orientation.n_slices;
+    uword n_row = orientation.n_cols, n_col = orientation.n_slices;
     arma::cube rotation = arma::cube(9, n_row, n_col, arma::fill::zeros); // Always double precision
     const dtype *p_orientation = orientation.memptr();
     double *p_rotation = rotation.memptr();
 
-    for (unsigned iC = 0; iC < n_col; iC++)
-        for (unsigned iR = 0; iR < n_row; iR++)
+    for (uword iC = 0; iC < n_col; iC++)
+        for (uword iR = 0; iR < n_row; iR++)
         {
             double cc = (double)*p_orientation++, sc = sin(cc);
             double cb = (double)*p_orientation++, sb = sin(cb);
@@ -91,16 +91,16 @@ arma::cube quadriga_tools::geo2cart(const arma::Mat<dtype> azimuth, const arma::
         elevation.n_cols != azimuth.n_cols || length.n_cols != azimuth.n_cols)
         throw std::invalid_argument("Inputs must have the same size.");
 
-    unsigned n_row = azimuth.n_rows, n_col = azimuth.n_cols;
+    uword n_row = azimuth.n_rows, n_col = azimuth.n_cols;
     arma::cube cart = arma::cube(3, n_row, n_col, arma::fill::zeros); // Always double precision
 
-    for (unsigned i = 0; i < azimuth.n_elem; i++)
+    for (uword i = 0; i < azimuth.n_elem; i++)
     {
         double ca = (double)azimuth(i), sa = sin(ca), r = (double)length(i);
         double ce = (double)elevation(i), se = sin(ce);
         ca = cos(ca), ce = cos(ce);
 
-        unsigned rw = i % n_row, co = i / n_row;
+        uword rw = i % n_row, co = i / n_row;
         cart(0, rw, co) = r * ce * ca;
         cart(1, rw, co) = r * ce * sa;
         cart(2, rw, co) = r * se;
@@ -122,11 +122,11 @@ arma::cube quadriga_tools::cart2geo(const arma::Cube<dtype> cart)
     if (cart.n_rows != 3)
         throw std::invalid_argument("Input must have 3 rows.");
 
-    unsigned n_row = cart.n_cols, n_col = cart.n_slices;
+    uword n_row = cart.n_cols, n_col = cart.n_slices;
     arma::cube geo = arma::cube(n_row, n_col, 3, arma::fill::zeros); // Always double precision
 
-    for (unsigned r = 0; r < n_row; r++)
-        for (unsigned c = 0; c < n_col; c++)
+    for (uword r = 0; r < n_row; r++)
+        for (uword c = 0; c < n_col; c++)
         {
             double x = (double)cart(0, r, c), y = (double)cart(1, r, c), z = (double)cart(2, r, c);
             double len = sqrt(x * x + y * y + z * z), rlen = 1.0 / len;

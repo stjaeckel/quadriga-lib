@@ -111,7 +111,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     // Read the number of elements
     node_name = pfx + "NoElements";
     node = node_arrayant.child(node_name.c_str());
-    unsigned n_elements = node.empty() ? 1 : node.text().as_uint();
+    uword n_elements = node.empty() ? 1ULL : node.text().as_ullong();
 
     // Read element position
     node_name = pfx + "ElementPosition";
@@ -121,9 +121,9 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     else
     {
         arma::Col<dtype> tmp = arma::Col<dtype>(node.text().as_string());
-        if (tmp.n_elem != 3 * n_elements)
+        if (tmp.n_elem != 3ULL * n_elements)
             return "Number of entries in 'ElementPosition' does not match the number of antenna elements.";
-        *element_pos = arma::reshape(tmp, 3, n_elements);
+        *element_pos = arma::reshape(tmp, 3ULL, n_elements);
     }
 
     // Read the elevation grid
@@ -133,7 +133,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     if (node.empty())
         return "Array antenna object must have an 'ElevationGrid'.";
     *elevation_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
-    unsigned n_elevation = unsigned(elevation_grid->n_elem);
+    uword n_elevation = elevation_grid->n_elem;
 
     // Read the azimuth grid
     node_name = pfx + "AzimuthGrid";
@@ -141,12 +141,12 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     if (node.empty())
         return "Array antenna object must have an 'AzimuthGrid'.";
     *azimuth_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
-    unsigned n_azimuth = unsigned(azimuth_grid->n_elem);
+    uword n_azimuth = azimuth_grid->n_elem;
 
     // Read the coupling matrix
     node_name = pfx + "CouplingAbs";
     node = node_arrayant.child(node_name.c_str());
-    unsigned n_ports = n_elements;
+    uword n_ports = n_elements;
     if (node.empty())
         *coupling_re = arma::Mat<dtype>(n_elements, n_elements, arma::fill::eye);
     else
@@ -178,7 +178,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     *e_phi_re = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
     *e_phi_im = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
-    for (unsigned el = 0; el < n_elements; el++)
+    for (uword el = 0ULL; el < n_elements; el++)
     {
         // Read magnitude of Vertical Component
         node_name = pfx + "EthetaMag";
@@ -222,7 +222,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
         // Read magnitude if Horizontal Component
         node_name = pfx + "EphiMag";
         node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
-        if (node.empty() && n_elements == 1)
+        if (node.empty() && n_elements == 1ULL)
             node = node_arrayant.child(node_name.c_str());
 
         if (!node.empty())
@@ -393,7 +393,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     node_arrayant.append_child("name").text().set(name->c_str());
     node_arrayant.append_child("CenterFrequency").text().set(*center_frequency);
 
-    arma::uword NoElements = e_theta_re->n_slices;
+    uword NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
         node_arrayant.append_child("NoElements").text().set(NoElements);
 
@@ -469,7 +469,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
     {
         pugi::xml_node node_pat;
-        for (arma::uword i = 0; i < NoElements; i++)
+        for (uword i = 0; i < NoElements; i++)
         {
             arma::Mat<dtype> mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
             mat_tmp.transform([ten](dtype x)
@@ -492,7 +492,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             if (valid) // Calculate phase
             {
                 mat_tmp = arma::atan2(eIm->slice(i), eRe->slice(i)) * rad2deg;
-                valid = arma::any(arma::vectorise(abs(mat_tmp)) > 0.001);
+                valid = arma::any(arma::vectorise(arma::abs(mat_tmp)) > dtype(0.001));
             }
 
             if (valid) // Write phase

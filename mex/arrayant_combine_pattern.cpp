@@ -39,7 +39,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  2 - e_phi_re_c      Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_ports]
     //  3 - e_phi_im_c      Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_ports]
 
-    if (nlhs = !4 || nrhs < 9)
+    if (nlhs != 4 || nrhs < 9)
         mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", "Wrong number of input/output arguments.");
 
     // Validate data types
@@ -87,9 +87,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", error_message.c_str());
 
     // Allocate memory for output data
-    unsigned n_az = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
-    unsigned n_el = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
-    unsigned n_prt = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
+    uword n_az = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
+    uword n_el = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
+    uword n_prt = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
 
     quadriga_lib::arrayant<float> arrayant_single_out;
     quadriga_lib::arrayant<double> arrayant_double_out;

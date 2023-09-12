@@ -93,12 +93,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!error_message.empty())
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:import_error", error_message.c_str());
 
-    unsigned n_elevation = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
-    unsigned n_azimuth = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
-    unsigned n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
-
-    unsigned n_out = (unsigned)mxGetM(prhs[6]); // Number of rows in "azimuth"
-    unsigned n_ang = (unsigned)mxGetN(prhs[6]); // Number of angles for interpolation
+    uword n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
+    uword n_out = (unsigned)mxGetM(prhs[6]); // Number of rows in "azimuth"
+    uword n_ang = (unsigned)mxGetN(prhs[6]); // Number of angles for interpolation
 
     if ((unsigned)mxGetM(prhs[7]) != n_out || (unsigned)mxGetN(prhs[7]) != n_ang)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Number of elements in 'elevation' does not match number of elements in 'azimuth'.");
@@ -106,7 +103,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Process optional input : i_element
     arma::Col<unsigned> i_element;
     if (nrhs < 9 || mxGetNumberOfElements(prhs[8]) == 0)
-        i_element = arma::regspace<arma::Col<unsigned>>(1, n_elements);
+        i_element = arma::regspace<arma::Col<unsigned>>(1, unsigned(n_elements));
     else
         i_element = qd_mex_typecast_Col<unsigned>(prhs[8], "i_element");
 
@@ -134,15 +131,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "Input 'orientation' must be given in double or single precision.");
 
-    unsigned o1 = use_single ? orientation_single.n_rows : orientation_double.n_rows;
-    unsigned o2 = use_single ? orientation_single.n_cols : orientation_double.n_cols;
-    unsigned o3 = use_single ? orientation_single.n_slices : orientation_double.n_slices;
+    uword o1 = use_single ? orientation_single.n_rows : orientation_double.n_rows;
+    uword o2 = use_single ? orientation_single.n_cols : orientation_double.n_cols;
+    uword o3 = use_single ? orientation_single.n_slices : orientation_double.n_slices;
 
-    if (o1 != 3)
+    if (o1 != 3ULL)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 3 elements on the first dimension.");
-    else if (o2 != 1 && o2 != n_out)
+    else if (o2 != 1ULL && o2 != n_out)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.");
-    else if (o3 != 1 && o3 != n_ang)
+    else if (o3 != 1ULL && o3 != n_ang)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.");
 
     // Process optional input : element_pos

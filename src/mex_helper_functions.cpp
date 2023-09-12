@@ -62,8 +62,8 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name, dtype
 template <typename dtype>
 inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create_copy = false)
 {
-    unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
-    unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    uword d1 = (uword)mxGetM(input); // Number of elements on first dimension
+    uword d2 = (uword)mxGetN(input); // Number of elements on other dimensions
     if (d1 * d2 == 0)
         return arma::Col<dtype>();
     return arma::Col<dtype>((dtype *)mxGetData(input), d1 * d2, create_copy, !create_copy);
@@ -73,8 +73,8 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create_copy = false)
 {
-    unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
-    unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    uword d1 = (uword)mxGetM(input); // Number of elements on first dimension
+    uword d2 = (uword)mxGetN(input); // Number of elements on other dimensions
     if (d1 * d2 == 0)
         return arma::Mat<dtype>();
     return arma::Mat<dtype>((dtype *)mxGetData(input), d1, d2, create_copy, !create_copy);
@@ -84,12 +84,12 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool create_copy = false)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
+    uword n_dim = (uword)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
+    uword d1 = (uword)dims[0];                           // Number of elements on first dimension
+    uword d2 = (uword)dims[1];                           // Number of elements on second dimension
+    uword d3 = n_dim < 3 ? 1 : (uword)dims[2];           // Number of elements on third dimension
+    uword d4 = n_dim < 4 ? 1 : (uword)dims[3];           // Number of elements on fourth dimension
     if (d1 * d2 * d3 * d4 == 0)
         return arma::Cube<dtype>();
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
@@ -97,10 +97,10 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
 
 // Reads input and converts it to desired c++ type, creates a copy of the input
 template <typename dtype>
-inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name, unsigned n_elem = 0)
+inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name, uword n_elem = 0)
 {
-    unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
-    unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    uword d1 = (uword)mxGetM(input); // Number of elements on first dimension
+    uword d2 = (uword)mxGetN(input); // Number of elements on other dimensions
 
     if (d1 * d2 == 0)
         return arma::Col<dtype>();
@@ -144,8 +144,8 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string var_name)
 {
-    unsigned d1 = (unsigned)mxGetM(input); // Number of elements on first dimension
-    unsigned d2 = (unsigned)mxGetN(input); // Number of elements on other dimensions
+    uword d1 = (uword)mxGetM(input); // Number of elements on first dimension
+    uword d2 = (uword)mxGetN(input); // Number of elements on other dimensions
 
     if (d1 * d2 == 0)
         return arma::Mat<dtype>();
@@ -183,12 +183,12 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string var_name)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
+    uword n_dim = (uword)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
+    uword d1 = (uword)dims[0];                           // Number of elements on first dimension
+    uword d2 = (uword)dims[1];                           // Number of elements on second dimension
+    uword d3 = n_dim < 3 ? 1 : (uword)dims[2];           // Number of elements on third dimension
+    uword d4 = n_dim < 4 ? 1 : (uword)dims[3];           // Number of elements on fourth dimension
 
     if (d1 * d2 * d3 * d4 == 0)
         return arma::Cube<dtype>();
@@ -321,79 +321,79 @@ inline mxArray *qd_mex_copy2matlab(arma::Cube<unsigned> *input) // 3D-UINT32
 }
 
 // Creates an mxArray based on the armadillo type, Initializes mxArray and reinterprets armadillo object
-inline mxArray *qd_mex_init_output(arma::Row<float> *input, unsigned n_elem) // 1D-Single Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<float> *input, uword n_elem) // 1D-Single Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL);
     *input = arma::Row<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<float> *input, unsigned n_elem, bool transpose = false) // 1D-Single Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<float> *input, uword n_elem, bool transpose = false) // 1D-Single Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxSINGLE_CLASS, mxREAL);
     *input = arma::Col<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<float> *input, unsigned n_rows, unsigned n_cols) // 2D-Single
+inline mxArray *qd_mex_init_output(arma::Mat<float> *input, uword n_rows, uword n_cols) // 2D-Single
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxSINGLE_CLASS, mxREAL);
     *input = arma::Mat<float>((float *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Cube<float> *input, unsigned n_rows, unsigned n_cols, unsigned n_slices) // 3D-Single
+inline mxArray *qd_mex_init_output(arma::Cube<float> *input, uword n_rows, uword n_cols, uword n_slices) // 3D-Single
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
     *input = arma::Cube<float>((float *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Row<double> *input, unsigned n_elem) // 1D-Double Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<double> *input, uword n_elem) // 1D-Double Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Row<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<double> *input, unsigned n_elem, bool transpose = false) // 1D-Double Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<double> *input, uword n_elem, bool transpose = false) // 1D-Double Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Col<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<double> *input, unsigned n_rows, unsigned n_cols) // 2D-Double
+inline mxArray *qd_mex_init_output(arma::Mat<double> *input, uword n_rows, uword n_cols) // 2D-Double
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Mat<double>((double *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Cube<double> *input, unsigned n_rows, unsigned n_cols, unsigned n_slices) // 3D-Double
+inline mxArray *qd_mex_init_output(arma::Cube<double> *input, uword n_rows, uword n_cols, uword n_slices) // 3D-Double
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Cube<double>((double *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Row<unsigned> *input, unsigned n_elem) // 1D-UINT32 Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<unsigned> *input, uword n_elem) // 1D-UINT32 Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL);
     *input = arma::Row<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<unsigned> *input, unsigned n_elem, bool transpose = false) // 1D-UINT32 Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<unsigned> *input, uword n_elem, bool transpose = false) // 1D-UINT32 Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxUINT32_CLASS, mxREAL);
     *input = arma::Col<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<unsigned> *input, unsigned n_rows, unsigned n_cols) // 2D-UINT32
+inline mxArray *qd_mex_init_output(arma::Mat<unsigned> *input, uword n_rows, uword n_cols) // 2D-UINT32
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxUINT32_CLASS, mxREAL);
     *input = arma::Mat<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
 
-inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, unsigned n_rows, unsigned n_cols, unsigned n_slices) // 3D-UINT32
+inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, uword n_rows, uword n_cols, uword n_slices) // 3D-UINT32
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxUINT32_CLASS, mxREAL);

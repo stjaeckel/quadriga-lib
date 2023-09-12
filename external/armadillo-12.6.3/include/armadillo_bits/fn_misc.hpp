@@ -65,7 +65,7 @@ linspace
       
       for(uword i=0; i<num_m1; ++i)
         {
-        x_mem[i] = eT(start + i*delta);
+        x_mem[i] = eT(start + T(i)*delta);
         }
       
       x_mem[num_m1] = eT(end);
@@ -76,7 +76,7 @@ linspace
       
       for(uword i=0; i<num_m1; ++i)
         {
-        x_mem[i] = eT(double(start) + i*delta);
+        x_mem[i] = eT(double(start) + double(i)*delta);
         }
       
       x_mem[num_m1] = eT(end);

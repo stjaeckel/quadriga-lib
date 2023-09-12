@@ -25,6 +25,9 @@
 
 #define QUADRIGA_LIB_VERSION v0_1_8
 
+typedef unsigned long long int uword;
+typedef long long int sword;
+
 namespace quadriga_lib
 {
     // Returns the version number as a string in format (x.y.z)
@@ -56,10 +59,10 @@ namespace quadriga_lib
             arrayant(){};                                // Default constructor
 
             // Functions to determine the size of the array antenna properties
-            unsigned n_elevation() const; // Number of elevation angles
-            unsigned n_azimuth() const;   // Number of azimuth angles
-            unsigned n_elements() const;  // Number of antenna elements
-            unsigned n_ports() const;     // Number of ports (after coupling of elements)
+            uword n_elevation() const; // Number of elevation angles
+            uword n_azimuth() const;   // Number of azimuth angles
+            uword n_elements() const;  // Number of antenna elements
+            uword n_ports() const;     // Number of ports (after coupling of elements)
 
             // Calculate the directivity of an antenna element in dBi
             dtype calc_directivity_dBi(unsigned element) const;
@@ -72,8 +75,8 @@ namespace quadriga_lib
             arrayant<dtype> copy() const;
 
             // Copy antenna elements, enlarges array size if needed (0-based indices)
-            void copy_element(unsigned source, arma::Col<unsigned> destination);
-            void copy_element(unsigned source, unsigned destination);
+            void copy_element(uword source, arma::uvec destination);
+            void copy_element(uword source, uword destination);
 
             // Interpolation of the antenna pattern
             void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
@@ -118,7 +121,7 @@ namespace quadriga_lib
             // - Data in other properties may contain garbage
             // - Only performs a size update if exisiting size is different from new size
             // - Returns error when read-only
-            void set_size(unsigned n_elevation, unsigned n_azimuth, unsigned n_elements, unsigned n_ports);
+            void set_size(uword n_elevation, uword n_azimuth, uword n_elements, uword n_ports);
 
             // Validate integrity
             std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
@@ -150,10 +153,10 @@ namespace quadriga_lib
             int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
             channel(){};                                     // Default constructor
 
-            arma::uword n_snap() const; // Number of snapshots
-            arma::uword n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
-            arma::uword n_tx() const;   // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
-            arma::uvec n_path() const;  // Number of paths per snapshot (arma::uword)
+            uword n_snap() const;      // Number of snapshots
+            uword n_rx() const;        // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
+            uword n_tx() const;        // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
+            arma::uvec n_path() const; // Number of paths per snapshot (uword)
 
             // Validate integrity
             std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
@@ -203,14 +206,14 @@ namespace quadriga_lib
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_3GPP(unsigned M = 1,                         // Number of vertical elements
-                                           unsigned N = 1,                         // Number of horizontal elements
+    arrayant<dtype> generate_arrayant_3GPP(uword M = 1,                            // Number of vertical elements
+                                           uword N = 1,                            // Number of horizontal elements
                                            dtype center_freq = 299792458.0,        // The center frequency in [Hz]
                                            unsigned pol = 1,                       // Polarization indicator
                                            dtype tilt = 0.0,                       // The electric downtilt angle in [deg] for pol = 4,5,6
                                            dtype spacing = 0.5,                    // Element spacing in [λ]
-                                           unsigned Mg = 1,                        // Number of nested panels in a column (Mg)
-                                           unsigned Ng = 1,                        // Number of nested panels in a row (Ng)
+                                           uword Mg = 1,                           // Number of nested panels in a column (Mg)
+                                           uword Ng = 1,                           // Number of nested panels in a row (Ng)
                                            dtype dgv = 0.5,                        // Panel spacing in vertical direction (dg,V) in [λ]
                                            dtype dgh = 0.5,                        // Panel spacing in horizontal direction (dg,H) in [λ]
                                            const arrayant<dtype> *pattern = NULL); // Optional custom per-element pattern
