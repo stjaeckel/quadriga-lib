@@ -169,8 +169,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         path_length_double = qd_mex_reinterpret_Col<double>(prhs[23]),
         M_double = qd_mex_reinterpret_Mat<double>(prhs[24]);
 
-    unsigned n_path = use_single ? aod_single.n_elem : aod_double.n_elem;
-    if (n_path == 0 ||
+    uword n_path = use_single ? aod_single.n_elem : aod_double.n_elem;
+    if (n_path == 0ULL ||
         (use_single && (eod_single.n_elem != n_path || aoa_single.n_elem != n_path || eoa_single.n_elem != n_path ||
                         path_gain_single.n_elem != n_path || path_length_single.n_elem != n_path || M_single.n_cols != n_path)) ||
         (!use_single && (eod_double.n_elem != n_path || aoa_double.n_elem != n_path || eoa_double.n_elem != n_path ||
@@ -196,9 +196,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool add_fake_los_path = (nrhs < 32) ? false : qd_mex_get_scalar<bool>(prhs[31], "add_fake_los_path", false);
 
     // Allocate output memory
-    unsigned n_tx_ports = use_single ? tx_array_single.n_ports() : tx_array_double.n_ports();
-    unsigned n_rx_ports = use_single ? rx_array_single.n_ports() : rx_array_double.n_ports();
-    n_path += add_fake_los_path ? 1 : 0;
+    uword n_tx_ports = use_single ? tx_array_single.n_ports() : tx_array_double.n_ports();
+    uword n_rx_ports = use_single ? rx_array_single.n_ports() : rx_array_double.n_ports();
+    n_path += add_fake_los_path ? 1ULL : 0ULL;
 
     arma::fcube coeff_re_single, coeff_im_single, delay_single;
     arma::cube coeff_re_double, coeff_im_double, delay_double;
@@ -230,11 +230,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         if (use_single)
             quadriga_lib::get_channels_planar<float>(&tx_array_single, &rx_array_single,
-                                                     Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
+                                                     (float)Tx, (float)Ty, (float)Tz, (float)Tb, (float)Tt, (float)Th,
+                                                     (float)Rx, (float)Ry, (float)Rz, (float)Rb, (float)Rt, (float)Rh,
                                                      &aod_single, &eod_single, &aoa_single, &eoa_single,
                                                      &path_gain_single, &path_length_single, &M_single,
                                                      &coeff_re_single, &coeff_im_single, &delay_single,
-                                                     center_freq, use_absolute_delays, add_fake_los_path,
+                                                     (float)center_freq, use_absolute_delays, add_fake_los_path,
                                                      p_rx_Doppler_single);
         else
             quadriga_lib::get_channels_planar<double>(&tx_array_double, &rx_array_double,

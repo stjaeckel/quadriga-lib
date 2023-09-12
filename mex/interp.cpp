@@ -54,10 +54,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             xi = qd_mex_typecast_Col<float>(prhs[0], "xi");
 
         if (mxGetNumberOfElements(prhs[1]) != 0)
+        {
             if (mxIsSingle(prhs[1]))
                 yi = qd_mex_reinterpret_Col<float>(prhs[1]);
             else
                 yi = qd_mex_typecast_Col<float>(prhs[1], "yi");
+        }
 
         if (mxIsSingle(prhs[3]))
             xo = qd_mex_reinterpret_Col<float>(prhs[3]);
@@ -65,12 +67,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             xo = qd_mex_typecast_Col<float>(prhs[3], "xo");
 
         if (nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
+        {
             if (mxIsSingle(prhs[4]))
                 yo = qd_mex_reinterpret_Col<float>(prhs[4]);
             else
                 yo = qd_mex_typecast_Col<float>(prhs[4], "yo");
+        }
 
-        unsigned n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        uword n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
         mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
 
         plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
@@ -88,10 +92,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             xi = qd_mex_typecast_Col<double>(prhs[0], "xi");
 
         if (mxGetNumberOfElements(prhs[1]) != 0)
+        {
             if (mxIsDouble(prhs[1]))
                 yi = qd_mex_reinterpret_Col<double>(prhs[1]);
             else
                 yi = qd_mex_typecast_Col<double>(prhs[1], "yi");
+        }
 
         if (mxIsDouble(prhs[3]))
             xo = qd_mex_reinterpret_Col<double>(prhs[3]);
@@ -99,12 +105,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             xo = qd_mex_typecast_Col<double>(prhs[3], "xo");
 
         if (nrhs > 4 && mxGetNumberOfElements(prhs[4]) != 0)
+        {
             if (mxIsDouble(prhs[4]))
                 yo = qd_mex_reinterpret_Col<double>(prhs[4]);
             else
                 yo = qd_mex_typecast_Col<double>(prhs[4], "yo");
+        }
 
-        unsigned n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        uword n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
         mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
 
         plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);

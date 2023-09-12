@@ -52,9 +52,9 @@ inline bool qHDF_file_exists(const std::string &name)
 
 // Helper function: convert double to float
 template <typename dtype>
-inline void qHDF_cast_to_float(const dtype *in, float *out, unsigned n_elem)
+inline void qHDF_cast_to_float(const dtype *in, float *out, uword n_elem)
 {
-    for (unsigned n = 0; n < n_elem; n++)
+    for (uword n = 0; n < n_elem; n++)
         out[n] = float(in[n]);
 }
 
@@ -503,12 +503,12 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
 
 // CHANNEL METHODS : Return object dimensions
 template <typename dtype>
-arma::uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_snap() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_snap() const
 {
     return rx_pos.n_cols;
 }
 template <typename dtype>
-arma::uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_rows;
@@ -516,7 +516,7 @@ arma::uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
         return 0;
 }
 template <typename dtype>
-arma::uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_cols;
@@ -526,29 +526,29 @@ arma::uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
 template <typename dtype>
 arma::uvec quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_path() const
 {
-    arma::uword n_snap = rx_pos.n_cols;
+    uword n_snap = rx_pos.n_cols;
     if (n_snap == 0)
         return arma::uvec();
 
     arma::uvec n_path(n_snap);
-    arma::uword *p_path = n_path.memptr();
+    uword *p_path = n_path.memptr();
     if (coeff_re.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = coeff_re[i].n_slices;
     else if (path_gain.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = path_gain[i].n_elem;
     else if (path_length.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = path_length[i].n_elem;
     else if (path_polarization.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = path_polarization[i].n_cols;
     else if (path_angles.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = path_angles[i].n_rows;
     else if (path_coord.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             p_path[i] = path_coord[i].n_slices;
 
     return n_path;
@@ -564,10 +564,10 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
     if (rx_pos.n_cols == 0)
         return "There must be at least one entry in 'rx_pos'.";
 
-    arma::uword n_snap = rx_pos.n_cols;
-    arma::uword n_tx = 0, n_rx = 0;
+    uword n_snap = rx_pos.n_cols;
+    uword n_tx = 0, n_rx = 0;
     arma::uvec n_pth_v = this->n_path();
-    arma::uword *n_pth = n_pth_v.memptr();
+    uword *n_pth = n_pth_v.memptr();
 
     if (tx_pos.n_rows != 3)
         return "'tx_pos' must have 3 rows.";
@@ -600,7 +600,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
 
         n_rx = coeff_re[0].n_rows, n_tx = coeff_re[0].n_cols;
 
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
         {
             if (coeff_re[i].n_rows != n_rx || coeff_re[i].n_cols != n_tx || coeff_re[i].n_slices != n_pth[i])
                 return "Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.";
@@ -619,7 +619,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_gain' must be empty or match the number of snapshots.";
 
     if (path_gain.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             if (path_gain[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_gain[" + std::to_string(i) + "]'.";
 
@@ -627,7 +627,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_length' must be empty or match the number of snapshots.";
 
     if (path_length.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             if (path_length[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_length[" + std::to_string(i) + "]'.";
 
@@ -635,7 +635,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_polarization' must be empty or match the number of snapshots.";
 
     if (path_polarization.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             if (path_polarization[i].n_rows != 8 || path_polarization[i].n_cols != n_pth[i])
                 return "Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.";
 
@@ -643,7 +643,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_angles' must be empty or match the number of snapshots.";
 
     if (path_angles.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4)
                 return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
 
@@ -651,7 +651,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_coord' must be empty or match the number of snapshots.";
 
     if (path_coord.size() == n_snap)
-        for (arma::uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; i++)
             if (path_coord[i].n_elem != 0 && (path_coord[i].n_rows != 3 || path_coord[i].n_slices != n_pth[i]))
                 return "Size mismatch in 'path_coord[" + std::to_string(i) + "]'.";
 
@@ -664,9 +664,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
 {
     // Commonly reused variables
     hid_t file_id, dspace_id, dset_id, group_id, type_id, snap_id;
-    herr_t status;
     hsize_t dims[4];
-    unsigned ndims;
 
     // Validate the channel data
     std::string error_message = is_valid();
@@ -800,8 +798,8 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
     }
 
     // Snapshot data
-    arma::uword n_snap = this->n_snap();
-    for (arma::uword i = 0; i < n_snap; i++)
+    uword n_snap = this->n_snap();
+    for (uword i = 0; i < n_snap; i++)
     {
         if (n_snap == 1)
             snap_id = group_id;
@@ -986,7 +984,6 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
 // Create a new HDF file and set the index to to given storage layout
 void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
-    herr_t status;
     hid_t file_id, dspace_id, dset_id;
     hsize_t dims[4];
 
@@ -1004,9 +1001,9 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     dims[0] = 4;
     dspace_id = H5Screate_simple(1, dims, NULL);
     dset_id = H5Dcreate2(file_id, "ChannelDims", H5T_NATIVE_UINT32, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
-    status = H5Sclose(dspace_id);
-    status = H5Dclose(dset_id);
+    H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
+    H5Sclose(dspace_id);
+    H5Dclose(dset_id);
 
     // Create the index
     unsigned n_order = nx * ny * nz * nw;
@@ -1014,13 +1011,13 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     dims[0] = n_order;
     dspace_id = H5Screate_simple(1, dims, NULL);
     dset_id = H5Dcreate2(file_id, "Order", H5T_NATIVE_UINT32, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    status = H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
-    status = H5Sclose(dspace_id);
-    status = H5Dclose(dset_id);
+    H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
+    H5Sclose(dspace_id);
+    H5Dclose(dset_id);
     delete[] p_order;
 
     // Close the file
-    status = H5Fclose(file_id);
+    H5Fclose(file_id);
 }
 
 // Writes unstructured data to a hdf5 file

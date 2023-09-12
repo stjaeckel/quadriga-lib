@@ -15,7 +15,7 @@ HDF5_H      = /usr/include/hdf5/serial  # external/hdf5-1.14.2-Linux/include
 HDF5_LIB    = /usr/lib/x86_64-linux-gnu/hdf5/serial  # external/hdf5-1.14.2-Linux/lib
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp #-Wall -Wextra -Wconversion # -Wall -Werror #-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
+CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Wextra -Wpedantic -Wconversion -Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
 
 # Sourcees
 src     	= $(wildcard src/*.cpp)
@@ -32,7 +32,7 @@ test:   tests/test_bin
 	tests/test_bin
 
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
-	$(CC) $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -L $(HDF5_LIB) -lCatch2 -lhdf5
+	$(CC) -std=c++17 -fopenmp  $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -L $(HDF5_LIB) -lCatch2 -lhdf5
 
 # Individual Library files
 build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_lib.hpp

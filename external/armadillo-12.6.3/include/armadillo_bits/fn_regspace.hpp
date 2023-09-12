@@ -87,11 +87,11 @@ internal_regspace_var_delta
   
   if(ascend)
     {
-    for(uword i=0; i < N; ++i) { x_mem[i] = eT( start + T(i*inc) ); }
+    for(uword i=0; i < N; ++i) { x_mem[i] = eT( start + T(i)*inc ); }
     }
   else
     {
-    for(uword i=0; i < N; ++i) { x_mem[i] = eT( start - T(i*inc) ); }
+    for(uword i=0; i < N; ++i) { x_mem[i] = eT( start - T(i)*inc ); }
     }
   }
 

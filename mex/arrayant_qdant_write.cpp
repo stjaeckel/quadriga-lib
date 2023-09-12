@@ -40,7 +40,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output:
     //  0 - id_in_file      ID of the antenna in the file
 
-    if (nlhs = !1 || nrhs < 12 || nrhs > 14)
+    if (nlhs != 1 || nrhs < 12 || nrhs > 14)
         mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Wrong number of input/output arguments.");
 
     // Validate data types

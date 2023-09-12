@@ -76,11 +76,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:qdant_read:unknown_error", "Unknown failure occurred. Possible memory corruption!");
     }
 
-    unsigned n_azimuth = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
-    unsigned n_elevation = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
-    unsigned n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
-    unsigned n_ports = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
-
     if (use_single)
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant_single.e_theta_re);

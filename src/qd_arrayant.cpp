@@ -26,29 +26,29 @@
 
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elevation() const
 {
-    return unsigned(e_theta_re.n_rows);
+    return e_theta_re.n_rows;
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_azimuth() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_azimuth() const
 {
-    return unsigned(e_theta_re.n_cols);
+    return e_theta_re.n_cols;
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elements() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_elements() const
 {
-    return unsigned(e_theta_re.n_slices);
+    return e_theta_re.n_slices;
 }
 template <typename dtype>
-unsigned quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports() const
+uword quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::n_ports() const
 {
     if (coupling_re.empty() && coupling_im.empty())
-        return unsigned(e_theta_re.n_slices);
+        return e_theta_re.n_slices;
     else if (coupling_re.empty())
-        return unsigned(coupling_im.n_cols);
+        return coupling_im.n_cols;
     else
-        return unsigned(coupling_re.n_cols);
+        return coupling_re.n_cols;
 }
 
 // ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
@@ -64,7 +64,7 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
 
     // Constants
     double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
-    arma::uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
+    uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
 
     // Az and El grid as double
     arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
@@ -73,19 +73,19 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
     // Calculate the azimuth weights
     arma::vec waz(naz, arma::fill::none);
     double *ptr = waz.memptr();
-    for (arma::uword i = 0; i < naz; i++)
+    for (uword i = 0ULL; i < naz; i++)
     {
-        double x = i == 0 ? az.at(naz - 1) - pi2 : az.at(i - 1);
-        double y = i == naz - 1 ? az.at(0) + pi2 : az.at(i + 1);
+        double x = i == 0ULL ? az.at(naz - 1) - pi2 : az.at(i - 1);
+        double y = i == naz - 1 ? az.at(0ULL) + pi2 : az.at(i + 1);
         ptr[i] = y - x;
     }
 
     // Calculate the elevation weights
     arma::vec wel(nel, arma::fill::none);
     ptr = wel.memptr();
-    for (arma::uword i = 0; i < nel; i++)
+    for (uword i = 0ULL; i < nel; i++)
     {
-        double x = i == 0 ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
+        double x = i == 0ULL ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
         double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * elevation_grid.at(i + 1);
         arma::vec tmp = arma::linspace<arma::vec>(x, y, 21);
         double val = arma::accu(arma::cos(tmp));
@@ -101,14 +101,14 @@ dtype quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::calc_directivity_dBi(
             *ptr = *row * *col, norm += *ptr++;
     ptr = W.memptr();
     norm = 1.0 / norm;
-    for (arma::uword i = 0; i < naz * nel; i++)
+    for (uword i = 0ULL; i < naz * nel; i++)
         ptr[i] *= norm;
 
     // Calculate the directivity
     double p_sum = 0.0, p_max = 0.0;
     const dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
     const dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
-    for (arma::uword i = 0; i < naz * nel; i++)
+    for (uword i = 0ULL; i < naz * nel; i++)
     {
         double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
         double pow = a * a + b * b + c * c + d * d;
@@ -131,13 +131,14 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
 
     dtype pi = dtype(arma::datum::pi);
     dtype lambda = dtype(299792448.0) / center_frequency;
-    dtype wave_no = 2.0 * pi / lambda;
+    dtype wave_no = dtype(2.0) * pi / lambda;
 
-    arma::uword n_el = e_theta_re.n_rows;
-    arma::uword n_az = e_theta_re.n_cols;
-    arma::uword n_out = e_theta_re.n_slices;
-    arma::uword n_ang = n_el * n_az;
-    arma::uword n_prt = coupling_re.n_cols;
+    uword n_el = e_theta_re.n_rows;
+    uword n_az = e_theta_re.n_cols;
+    uword n_out = e_theta_re.n_slices;
+    uword n_ang = n_el * n_az;
+    uword n_prt = coupling_re.n_cols;
+    unsigned n32_out = unsigned(n_out);
 
     // Create list of angles for pattern interpolation
     arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
@@ -145,12 +146,12 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
     dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
           *p_phi = azimuth_grid.memptr(), *p_theta = elevation_grid.memptr();
 
-    for (arma::uword ia = 0; ia < n_az; ia++)
-        for (arma::uword ie = 0; ie < n_el; ie++)
+    for (uword ia = 0ULL; ia < n_az; ia++)
+        for (uword ie = 0ULL; ie < n_el; ie++)
             *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
     // Interpolate the pattern data
-    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n_out, n_out);
+    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
     arma::Cube<dtype> orientation(3, 1, 1);
     arma::Mat<dtype> V_re(n_out, n_ang), V_im(n_out, n_ang), H_re(n_out, n_ang), H_im(n_out, n_ang), dist(n_out, n_ang);
     arma::Mat<dtype> EMPTY;
@@ -168,10 +169,10 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
     // Apply coupling
     arma::Mat<std::complex<dtype>> coupling(coupling_re, coupling_im);
     arma::Mat<std::complex<dtype>> Vo(n_ang, n_prt), Ho(n_ang, n_prt);
-    for (arma::uword i = 0; i < n_out; i++)
+    for (uword i = 0ULL; i < n_out; i++)
     {
         arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col(), hi = Hi.row(i).as_col();
-        for (arma::uword o = 0; o < n_prt; o++)
+        for (uword o = 0ULL; o < n_prt; o++)
         {
             std::complex<dtype> cpl = coupling.at(i, o);
             Vo.col(o) += vi * cpl, Ho.col(o) += hi * cpl;
@@ -277,20 +278,19 @@ quadriga_lib::arrayant<dtype> quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype
 
 // Copy antenna elements, enlarge array size if needed
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned source,
-                                                                       arma::Col<unsigned> destination)
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(uword source, arma::uvec destination)
 {
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    arma::uword n_el = e_theta_re.n_rows;
-    arma::uword n_az = e_theta_re.n_cols;
-    arma::uword n_ang = n_el * n_az;
-    arma::uword n_elements = e_theta_re.n_slices;
-    arma::uword n_element_max = arma::uword(destination.max()) + 1;
-    arma::uword n_ports = coupling_re.n_cols;
+    uword n_el = e_theta_re.n_rows;
+    uword n_az = e_theta_re.n_cols;
+    uword n_ang = n_el * n_az;
+    uword n_elements = e_theta_re.n_slices;
+    uword n_element_max = uword(destination.max()) + 1;
+    uword n_ports = coupling_re.n_cols;
 
     if (source >= n_elements)
         error_message = "Source index out of bound";
@@ -300,7 +300,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
     // Enlarge existing arrayant object
     if (n_element_max > n_elements)
     {
-        arma::uword added_elements = n_element_max - n_elements;
+        uword added_elements = n_element_max - n_elements;
         e_theta_re.resize(n_el, n_az, n_element_max);
         e_theta_im.resize(n_el, n_az, n_element_max);
         e_phi_re.resize(n_el, n_az, n_element_max);
@@ -308,7 +308,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
         element_pos.resize(3, n_element_max);
         coupling_re.resize(n_element_max, n_ports + added_elements);
         coupling_im.resize(n_element_max, n_ports + added_elements);
-        for (arma::uword i = 0; i < added_elements; i++)
+        for (uword i = 0ULL; i < added_elements; i++)
             coupling_re.at(n_elements + i, n_ports + i) = dtype(1.0);
     }
 
@@ -336,9 +336,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned 
 }
 
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(unsigned source, unsigned destination)
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::copy_element(uword source, uword destination)
 {
-    arma::Col<unsigned> dest(1);
+    arma::uvec dest(1);
     dest.at(0) = destination;
     copy_element(source, dest);
 }
@@ -362,8 +362,8 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    arma::uword n_out = azimuth.n_rows;
-    arma::uword n_ang = azimuth.n_cols;
+    uword n_out = azimuth.n_rows;
+    uword n_ang = azimuth.n_cols;
 
     if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
         error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
@@ -388,7 +388,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
 
     // Process orientation
     n_out = i_element.n_elem;
-    arma::uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
     if (o1 != 3)
         error_message = "Input 'orientation' must have 3 elements on the first dimension.";
     else if (o2 != 1 && o2 != n_out)
@@ -403,22 +403,22 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
     arma::Mat<dtype> element_pos_interp(3, n_out);
     if (!element_pos_i.empty())
     {
-        if (element_pos_i.n_rows != 3 || element_pos_i.n_cols != n_out)
+        if (element_pos_i.n_rows != 3ULL || element_pos_i.n_cols != n_out)
             error_message = "Alternative element positions 'element_pos_i' must have 'n_elements' elements.";
 
-        if (error_message.length() != 0)
+        if (error_message.length() != 0ULL)
             throw std::invalid_argument(error_message.c_str());
 
         const dtype *ptrI = element_pos_i.memptr();
         dtype *ptrO = element_pos_interp.memptr();
-        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
+        std::memcpy(ptrO, ptrI, 3ULL * n_out * sizeof(dtype));
     }
     else if (!element_pos.empty())
     {
         const dtype *ptrI = element_pos.memptr();
         dtype *ptrO = element_pos_interp.memptr();
-        for (unsigned i = 0; i < n_out; i++)
-            std::memcpy(&ptrO[3 * i], &ptrI[3 * i_element[i]], 3 * sizeof(dtype));
+        for (uword i = 0ULL; i < n_out; i++)
+            std::memcpy(&ptrO[3ULL * i], &ptrI[3ULL * i_element[i]], 3ULL * sizeof(dtype));
     }
 
     // Resize output variables
@@ -460,8 +460,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    arma::uword n_out = azimuth.n_rows;
-    arma::uword n_ang = azimuth.n_cols;
+    uword n_out = azimuth.n_rows;
+    uword n_ang = azimuth.n_cols;
+    unsigned n32_out = unsigned(n_out);
 
     if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
         error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
@@ -473,10 +474,10 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::interpolate(const arma
         throw std::invalid_argument(error_message.c_str());
 
     n_out = e_theta_re.n_slices;
-    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n_out, n_out);
+    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
 
     // Process orientation
-    arma::uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
     if (o1 != 3)
         error_message = "Input 'orientation' must have 3 elements on the first dimension.";
     else if (o2 != 1 && o2 != n_out)
@@ -554,20 +555,20 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
         throw std::invalid_argument(error_message.c_str());
     }
 
-    arma::uword n_el = e_theta_re.n_rows;
-    arma::uword n_az = e_theta_re.n_cols;
-    arma::uword n_slices = e_theta_re.n_slices;
+    uword n_el = e_theta_re.n_rows;
+    uword n_az = e_theta_re.n_cols;
+    uword n_slices = e_theta_re.n_slices;
 
     // Calculate the power pattern
     arma::Mat<dtype> pow(n_el, n_az);
     dtype *pp = pow.memptr();
     dtype limit = dtype(1.0e-12), pi_half = dtype(arma::datum::pi / 2.0);
 
-    for (arma::uword is = 0; is < n_slices; is++)
+    for (uword is = 0ULL; is < n_slices; is++)
     {
         dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
               *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
-        for (arma::uword j = 0; j < n_el * n_az; j++)
+        for (uword j = 0ULL; j < n_el * n_az; j++)
             pp[j] += pa[j] * pa[j] + pb[j] * pb[j] + pc[j] * pc[j] + pd[j] * pd[j];
     }
 
@@ -577,18 +578,18 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
 
     // Determine which parts of the pattern should be kept
     arma::uvec keep_az(n_az), keep_el(n_el);
-    arma::uword *keep_az_ptr = keep_az.memptr();
-    arma::uword *keep_el_ptr = keep_el.memptr();
+    uword *keep_az_ptr = keep_az.memptr();
+    uword *keep_el_ptr = keep_el.memptr();
 
     pp = az_sum.memptr();
     dtype *grid_ptr = azimuth_grid.memptr();
-    for (arma::uword ia = 0; ia < n_az; ia++)
+    for (uword ia = 0ULL; ia < n_az; ia++)
     {
         dtype p = ia == 0 ? *grid_ptr + grid_ptr[n_az - 1] : grid_ptr[ia] - grid_ptr[ia - 1];
         dtype n = ia == n_az - 1 ? *grid_ptr + grid_ptr[ia] : grid_ptr[ia + 1] - grid_ptr[ia];
 
-        arma::uword ip = ia == 0 ? n_az - 1 : ia - 1;
-        arma::uword in = ia == n_az - 1 ? 0 : ia + 1;
+        uword ip = ia == 0 ? n_az - 1 : ia - 1;
+        uword in = ia == n_az - 1 ? 0 : ia + 1;
 
         if (pp[ia] > limit)
             keep_az_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_az_ptr[ip] : 1,
@@ -599,13 +600,13 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
 
     pp = el_sum.memptr(), grid_ptr = elevation_grid.memptr();
 
-    for (arma::uword ie = 0; ie < n_el; ie++)
+    for (uword ie = 0ULL; ie < n_el; ie++)
     {
         dtype p = ie == 0 ? *grid_ptr + pi_half : grid_ptr[ie] - grid_ptr[ie - 1];
         dtype n = ie == n_el - 1 ? pi_half - grid_ptr[ie] : grid_ptr[ie + 1] - grid_ptr[ie];
 
-        arma::uword ip = ie == 0 ? 0 : ie - 1;
-        arma::uword in = ie == n_el - 1 ? n_el - 1 : ie + 1;
+        uword ip = ie == 0 ? 0 : ie - 1;
+        uword in = ie == n_el - 1 ? n_el - 1 : ie + 1;
 
         if (pp[ie] > limit)
             keep_el_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_el_ptr[ip] : 1,
@@ -615,7 +616,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     el_sum.reset();
 
     // Copy the relevant pattern data
-    arma::uword n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
+    uword n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
 
     for (int p = 0; p < 4; p++)
     {
@@ -649,7 +650,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
         }
 
         ptrO = data;
-        for (arma::uword is = 0; is < n_slices; is++)
+        for (uword is = 0ULL; is < n_slices; is++)
         {
             if (p == 0)
                 ptrI = e_theta_re.slice_memptr(is);
@@ -660,10 +661,10 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
             else if (p == 3)
                 ptrI = e_phi_im.slice_memptr(is);
 
-            for (arma::uword ia = 0; ia < n_az; ia++)
+            for (uword ia = 0ULL; ia < n_az; ia++)
             {
                 bool keep_az = keep_az_ptr[ia] == 1;
-                for (arma::uword ie = 0; ie < n_el; ie++)
+                for (uword ie = 0ULL; ie < n_el; ie++)
                     if (keep_az && keep_el_ptr[ie] == 1)
                         *ptrO++ = ptrI[ia * n_el + ie];
             }
@@ -691,7 +692,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     // Copy the new azimuth grid
     dtype *azimuth_grid_new = new dtype[n_az_new];
     pp = azimuth_grid_new;
-    for (arma::uword ia = 0; ia < n_az; ia++)
+    for (uword ia = 0ULL; ia < n_az; ia++)
         if (keep_az_ptr[ia] == 1)
             *pp++ = azimuth_grid[ia];
     if (output == NULL)
@@ -706,7 +707,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     // Copy the new elevation grid
     dtype *elevation_grid_new = new dtype[n_el_new];
     pp = elevation_grid_new;
-    for (arma::uword ie = 0; ie < n_el; ie++)
+    for (uword ie = 0ULL; ie < n_el; ie++)
         if (keep_el_ptr[ie] == 1)
             *pp++ = elevation_grid[ie];
     if (output == NULL)
@@ -817,7 +818,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     // Set element indices
     arma::Col<unsigned> i_element(1);
     if (use_all_elements)
-        i_element = arma::regspace<arma::Col<unsigned>>(1, e_theta_re.n_slices);
+        i_element = arma::regspace<arma::Col<unsigned>>(1, unsigned(e_theta_re.n_slices));
     else
         i_element.at(0) = element + 1;
 
@@ -828,25 +829,26 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     else
         element_pos_update = element_pos;
 
-    arma::uword n_el = e_theta_re.n_rows;
-    arma::uword n_az = e_theta_re.n_cols;
-    arma::uword n_out = i_element.n_elem;
-    arma::uword n_ang = n_el * n_az;
+    uword n_el = e_theta_re.n_rows;
+    uword n_az = e_theta_re.n_cols;
+    uword n_out = i_element.n_elem;
+    uword n_ang = n_el * n_az;
 
     dtype tau = dtype(arma::datum::tau), pi_half = dtype(arma::datum::pi / 2.0), pi = dtype(arma::datum::pi),
           deg2rad = dtype(arma::datum::pi / 180.0), limit = dtype(1.0e-6);
 
     // Calculate the coverage range for the angle sampling grid
-    dtype az_step_min = 1e38, az_step_max = 0.0, el_step_min = 1e38, zero = 0.0, el_step_max = zero, step = zero;
+    dtype zero = dtype(0.0), az_step_min = dtype(1e38), az_step_max = zero, el_step_min = az_step_min,
+          el_step_max = zero, step = zero;
     dtype *ptr = azimuth_grid.memptr();
-    for (arma::uword i = 0; i < n_az; i++)
+    for (uword i = 0ULL; i < n_az; i++)
     {
         step = i == 0 ? *ptr - ptr[n_az - 1] + tau : ptr[i] - ptr[i - 1];
         az_step_min = step < az_step_min && step > limit ? step : az_step_min;
         az_step_max = step > az_step_max ? step : az_step_max;
     }
     ptr = elevation_grid.memptr();
-    for (arma::uword i = 0; i <= n_el; i++)
+    for (uword i = 0ULL; i <= n_el; i++)
     {
         if (i == 0)
             step = *ptr + pi_half;
@@ -882,7 +884,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
 
         if (step > dtype(0.0017)) // >= 0.1 degree --> Use entire sphere
         {
-            arma::uword N = arma::uword(std::round(pi / step));
+            uword N = uword(std::round(pi / step));
             N = N < 4 ? 4 : N;
 
             azimuth_grid_update = arma::linspace<arma::Col<dtype>>(-pi, pi, 2 * N + 1);
@@ -930,7 +932,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
 
             // Set interpolation target
             p = ant.e_theta_re.memptr();
-            for (arma::uword i = 0; i < ant.e_theta_re.n_elem; i++)
+            for (uword i = 0ULL; i < ant.e_theta_re.n_elem; i++)
                 p[i] = ra[i / 181] == 1 && re[i % 181] == 1 ? 1.0 : 0.0;
 
             // Find target area for interpolation
@@ -938,30 +940,31 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
             ant.remove_zeros();
 
             // Subdivide target grid
-            arma::uword sdiv = std::fmod(deg2rad, step) < 0.1 * step ? std::floor(deg2rad / step) : std::ceil(deg2rad / step);
+            dtype sdiv = std::fmod(deg2rad, step) < 0.1 * step ? std::floor(deg2rad / step) : std::ceil(deg2rad / step);
             dtype stp = deg2rad / sdiv;
+            uword ndiv = uword(sdiv);
 
             bool wrap = ant.azimuth_grid.at(ant.azimuth_grid.n_elem - 1) + stp > pi;
-            arma::uword N = wrap ? sdiv * (ant.azimuth_grid.n_elem - 1) + 1 : sdiv * ant.azimuth_grid.n_elem;
+            uword N = wrap ? ndiv * (ant.azimuth_grid.n_elem - 1) + 1 : ndiv * ant.azimuth_grid.n_elem;
             azimuth_grid_update.set_size(N);
             p = azimuth_grid_update.memptr(), q = ant.azimuth_grid.memptr();
-            for (unsigned i = 0; i < ant.azimuth_grid.n_elem; i++)
+            for (uword i = 0ULL; i < ant.azimuth_grid.n_elem; i++)
                 if (wrap && i == ant.azimuth_grid.n_elem - 1)
                     *p = q[i];
                 else
-                    for (unsigned j = 0; j < sdiv; j++)
-                        *p++ = q[i] + j * stp;
+                    for (uword j = 0ULL; j < ndiv; j++)
+                        *p++ = q[i] + dtype(j) * stp;
 
             wrap = ant.elevation_grid.at(ant.elevation_grid.n_elem - 1) + stp > pi_half;
-            N = wrap ? sdiv * (ant.elevation_grid.n_elem - 1) + 1 : sdiv * ant.elevation_grid.n_elem;
+            N = wrap ? ndiv * (ant.elevation_grid.n_elem - 1) + 1 : ndiv * ant.elevation_grid.n_elem;
             elevation_grid_update.set_size(N);
             p = elevation_grid_update.memptr(), q = ant.elevation_grid.memptr();
-            for (unsigned i = 0; i < ant.elevation_grid.n_elem; i++)
+            for (uword i = 0ULL; i < ant.elevation_grid.n_elem; i++)
                 if (wrap && i == ant.elevation_grid.n_elem - 1)
                     *p = q[i];
                 else
-                    for (unsigned j = 0; j < sdiv; j++)
-                        *p++ = q[i] + j * stp;
+                    for (uword j = 0ULL; j < ndiv; j++)
+                        *p++ = q[i] + dtype(j) * stp;
         }
 
         n_az = azimuth_grid_update.n_elem;
@@ -986,8 +989,8 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
           *p_phi = azimuth_grid_update.memptr(), *p_theta = elevation_grid_update.memptr();
 
-    for (arma::uword ia = 0; ia < n_az; ia++)
-        for (arma::uword ie = 0; ie < n_el; ie++)
+    for (uword ia = 0ULL; ia < n_az; ia++)
+        for (uword ie = 0ULL; ie < n_el; ie++)
             *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
     // Set antenna orientation
@@ -1024,7 +1027,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     if (usage == 2) // Only adjust the polarization
     {
         gamma = gamma.t();
-        for (arma::uword i = 0; i < n_out; i++)
+        for (uword i = 0ULL; i < n_out; i++)
         {
             dtype *p_gamma = gamma.colptr(i);
             dtype *p_theta_re = use_all_elements ? e_theta_re.slice_memptr(i) : e_theta_re.slice_memptr(element);
@@ -1039,7 +1042,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
                 q_phi_re = use_all_elements ? output->e_phi_re.slice_memptr(i) : output->e_phi_re.memptr(),
                 q_phi_im = use_all_elements ? output->e_phi_im.slice_memptr(i) : output->e_phi_im.memptr();
 
-            for (arma::uword j = 0; j < n_ang; j++)
+            for (uword j = 0ULL; j < n_ang; j++)
             {
                 dtype sin_gamma = std::sin(p_gamma[j]), cos_gamma = std::cos(p_gamma[j]);
                 dtype tmp = sin_gamma * p_theta_re[j];
@@ -1115,7 +1118,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
         ptrO = use_all_elements ? element_pos.memptr() : element_pos.colptr(element);
         ptrO = output == NULL ? ptrO : output->element_pos.memptr();
         double *R_ptr = R.memptr();
-        for (arma::uword i = 0; i < i_element.n_elem; i++)
+        for (uword i = 0ULL; i < i_element.n_elem; i++)
         {
             unsigned j = 3 * (i_element.at(i) - 1);
             unsigned k = use_all_elements ? j : 0;
@@ -1134,8 +1137,8 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::set_size(unsigned n_elevation, unsigned n_azimuth,
-                                                                   unsigned n_elements, unsigned n_ports)
+void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::set_size(uword n_elevation, uword n_azimuth,
+                                                                   uword n_elements, uword n_ports)
 {
     if (read_only)
     {
@@ -1197,9 +1200,9 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid(bool q
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
         return "Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid";
 
-    arma::uword n_elevation = e_theta_re.n_rows;
-    arma::uword n_azimuth = e_theta_re.n_cols;
-    arma::uword n_elements = e_theta_re.n_slices;
+    uword n_elevation = e_theta_re.n_rows;
+    uword n_azimuth = e_theta_re.n_cols;
+    uword n_elements = e_theta_re.n_slices;
 
     if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements)
         return "Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.";
@@ -1256,8 +1259,8 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
     if (error_message.length() != 0)
         return error_message;
 
-    arma::uword n_elements = e_theta_re.n_slices;
-    arma::uword n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
+    uword n_elements = e_theta_re.n_slices;
+    uword n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
 
     if (element_pos.empty())
         element_pos.zeros(3, n_elements);
@@ -1329,14 +1332,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    dtype pi = dtype(arma::datum::pi);
+    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     ant.name = "omni";
     ant.e_theta_re.ones(181, 361, 1);
     ant.e_theta_im.zeros(181, 361, 1);
     ant.e_phi_re.zeros(181, 361, 1);
     ant.e_phi_im.zeros(181, 361, 1);
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -1363,7 +1366,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    dtype pi = dtype(arma::datum::pi);
+    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     ant.name = "xpol";
     ant.e_theta_re.ones(181, 361, 2);
     ant.e_theta_im.zeros(181, 361, 2);
@@ -1372,7 +1375,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
     ant.e_phi_re.slice(0).zeros();
     ant.e_theta_re.slice(1).zeros();
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
     ant.element_pos.zeros(3, 2);
     ant.coupling_re.eye(2, 2);
     ant.coupling_im.zeros(2, 2);
@@ -1399,16 +1402,16 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
 {
     quadriga_lib::arrayant<dtype> ant;
 
-    dtype pi = dtype(arma::datum::pi);
+    dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     ant.name = "dipole";
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
     ant.e_theta_re.zeros(181, 361, 1);
     ant.e_theta_im.zeros(181, 361, 1);
     ant.e_phi_re.zeros(181, 361, 1);
     ant.e_phi_im.zeros(181, 361, 1);
     ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
-    ant.e_theta_re = arma::cos(0.999999 * ant.e_theta_re) * std::sqrt(1.499961);
+    ant.e_theta_re = arma::cos(dtype(0.999999) * ant.e_theta_re) * dtype(std::sqrt(1.499961));
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -1436,15 +1439,17 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
     quadriga_lib::arrayant<dtype> ant;
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
+    constexpr dtype scale = dtype(0.999999);
+
     ant.name = "half-wave-dipole";
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
     ant.e_theta_re.zeros(181, 361, 1);
     ant.e_theta_im.zeros(181, 361, 1);
     ant.e_phi_re.zeros(181, 361, 1);
     ant.e_phi_im.zeros(181, 361, 1);
     ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
-    ant.e_theta_re = arma::cos(pih * arma::sin(0.999999 * ant.e_theta_re)) / arma::cos(0.999999 * ant.e_theta_re);
+    ant.e_theta_re = arma::cos(pih * arma::sin(scale * ant.e_theta_re)) / arma::cos(scale * ant.e_theta_re);
     ant.e_theta_re = ant.e_theta_re * dtype(1.280968208215292);
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
@@ -1470,16 +1475,17 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wav
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
 {
-    dtype pi = dtype(arma::datum::pi), one = 1.0, half = 0.5, limit = 1e-7, step = -0.382, limit_inf = 1e38,
-          deg2rad = dtype(arma::datum::pi / 360.0);
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0), half = dtype(0.5),
+                    limit = dtype(1e-7), step = dtype(-0.382), limit_inf = dtype(1e38);
+    const dtype pi = dtype(arma::datum::pi), deg2rad = dtype(arma::datum::pi / 360.0);
 
     quadriga_lib::arrayant<dtype> ant;
 
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi / 2.0, pi / 2.0, 181);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi * half, pi * half, 181);
     arma::Col<dtype> phi_sq = ant.azimuth_grid % ant.azimuth_grid;
     arma::Col<dtype> cos_theta = arma::cos(ant.elevation_grid);
-    cos_theta.at(0) = dtype(0.0), cos_theta.at(180) = dtype(0.0);
+    cos_theta.at(0) = zero, cos_theta.at(180) = zero;
     arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
     az_3dB_rad.at(0) = az_3dB * deg2rad;
     el_3db_rad.at(0) = el_3db * deg2rad;
@@ -1547,7 +1553,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     // Normalize to Gain
     dtype directivity = ant.calc_directivity_dBi(0);
-    directivity = std::pow(10.0, 0.1 * directivity);
+    directivity = dtype(std::pow(10.0, 0.1 * double(directivity)));
     dtype p_max = ant.e_theta_re.max();
     p_max *= p_max;
     ant.e_theta_re *= std::sqrt(directivity / p_max);
@@ -1559,13 +1565,14 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(d
 
 // Generate : Antenna model for the 3GPP-NR channel model
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, dtype center_freq,
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, dtype center_freq,
                                                                    unsigned pol, dtype tilt, dtype spacing,
-                                                                   unsigned Mg, unsigned Ng, dtype dgv, dtype dgh,
+                                                                   uword Mg, uword Ng, dtype dgv, dtype dgh,
                                                                    const arrayant<dtype> *pattern)
 {
-    dtype pi = dtype(arma::datum::pi), rad2deg = dtype(180.0 / arma::datum::pi), deg2rad = dtype(arma::datum::pi / 180.0);
-    dtype wavelength = dtype(299792458.0 / double(center_freq));
+    double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
+    double wavelength = 299792458.0 / double(center_freq);
+    constexpr dtype zero = dtype(0.0);
 
     quadriga_lib::arrayant<dtype> ant = pattern == NULL ? quadriga_lib::generate_arrayant_omni<dtype>() : pattern->copy();
 
@@ -1577,7 +1584,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, u
     }
 
     ant.center_frequency = center_freq;
-    arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
+    uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
     if (pattern == NULL) // Generate 3GPP default radiation pattern
     {
@@ -1585,24 +1592,24 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, u
         arma::Col<dtype> Y = ant.elevation_grid;
         for (dtype *py = Y.begin(); py < Y.end(); py++)
         {
-            dtype y = *py * rad2deg / 65.0;
+            double y = double(*py) * rad2deg / 65.0;
             y = 12.0 * y * y;
-            *py = y > 30.0 ? 30.0 : y;
+            *py = y > 30.0 ? dtype(30.0) : dtype(y);
         }
 
         // Full pattern (normalized to 8 dBi gain using factor 2.51..)
         dtype *ptr = ant.e_theta_re.memptr(), *py = Y.memptr(), *px = ant.azimuth_grid.memptr();
-        for (arma::uword ia = 0; ia < n_az; ia++)
+        for (uword ia = 0ULL; ia < n_az; ia++)
         {
-            dtype x = *px++ * rad2deg / 65.0;
+            double x = double(*px++) * rad2deg / 65.0;
             x = 12.0 * x * x;
             x = x > 30.0 ? 30.0 : x;
 
-            for (arma::uword ie = 0; ie < n_el; ie++)
+            for (uword ie = 0ULL; ie < n_el; ie++)
             {
-                dtype z = py[ie] + x;
+                double z = double(py[ie]) + x;
                 z = z > 30.0 ? -30.0 : -z;
-                *ptr++ = 2.511886431509580 * std::sqrt(std::pow(10.0, 0.1 * z)); // 8dBi gain
+                *ptr++ = dtype(2.511886431509580 * std::sqrt(std::pow(10.0, 0.1 * z))); // 8dBi gain
             }
         }
         Y.reset();
@@ -1611,132 +1618,132 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned M, u
         if (pol == 2 || pol == 5)
         {
             ant.copy_element(0, 1);
-            ant.rotate_pattern(90.0, 0.0, 0.0, 2, 1);
+            ant.rotate_pattern(90.0, zero, zero, 2, 1);
         }
         else if (pol == 3 || pol == 6)
         {
             ant.copy_element(0, 1);
-            ant.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
-            ant.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+            ant.rotate_pattern(dtype(45.0), zero, zero, 2, 0);
+            ant.rotate_pattern(dtype(-45.0), zero, zero, 2, 1);
         }
     }
 
     // Duplicate the existing elements in z-direction (vertical stacking)
-    unsigned n_elements = ant.n_elements();
-    if (M > 1)
-        for (unsigned source = n_elements; source > 0; source--)
+    uword n_elements = ant.n_elements();
+    if (M > 1ULL)
+        for (uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned i_start = n_elements + source - 1;
-            unsigned i_end = M * n_elements - 1;
-            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1, destination);
+            uword i_start = n_elements + source - 1ULL;
+            uword i_end = M * n_elements - 1ULL;
+            arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1ULL, destination);
         }
 
     // Calculate the element z-position
     arma::Col<dtype> z_position(M);
-    if (M > 1)
+    if (M > 1ULL)
     {
-        z_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(M - 1) * spacing * wavelength, M);
+        z_position = arma::linspace<arma::Col<dtype>>(zero, dtype(M - 1ULL) * spacing * dtype(wavelength), M);
         z_position = z_position - arma::mean(z_position);
 
-        for (unsigned m = 0; m < M; m++)
-            for (unsigned n = 0; n < n_elements; n++)
-                ant.element_pos.at(2, m * n_elements + n) = z_position.at(m);
+        for (uword m = 0ULL; m < M; m++)
+            for (uword n = 0ULL; n < n_elements; n++)
+                ant.element_pos.at(2ULL, m * n_elements + n) = z_position.at(m);
     }
 
     // Apply element coupling for polarization indicators 4, 5, and 6
-    if (pol > 3 && M > 1)
+    if (pol > 3 && M > 1ULL)
     {
-        dtype tmp = 2.0 * pi * std::sin(tilt * deg2rad) / wavelength;
-        arma::Col<dtype> cpl_re = z_position * tmp;
-        tmp = dtype(1.0 / std::sqrt(double(M)));
-        arma::Col<dtype> cpl_im = arma::sin(cpl_re) * tmp;
-        cpl_re = arma::cos(cpl_re) * tmp;
+        double tmp = 2.0 * pi * std::sin(double(tilt) * deg2rad) / wavelength;
+        arma::Col<dtype> cpl_re = z_position * dtype(tmp);
+        tmp = 1.0 / std::sqrt(double(M));
+        arma::Col<dtype> cpl_im = arma::sin(cpl_re) * dtype(tmp);
+        cpl_re = arma::cos(cpl_re) * dtype(tmp);
 
         ant.coupling_re.zeros(n_elements * M, n_elements);
         ant.coupling_im.zeros(n_elements * M, n_elements);
 
-        for (unsigned m = 0; m < M; m++)
-            for (unsigned n = 0; n < n_elements; n++)
+        for (uword m = 0ULL; m < M; m++)
+            for (uword n = 0ULL; n < n_elements; n++)
             {
                 ant.coupling_re.at(m * n_elements + n, n) = cpl_re.at(m);
                 ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
             }
 
         ant.combine_pattern();
-        M = 1;
+        M = 1ULL;
     }
 
     // Duplicate the existing elements in y-direction (horizontal stacking)
     n_elements = ant.n_elements();
-    if (N > 1)
+    if (N > 1ULL)
     {
-        for (unsigned source = n_elements; source > 0; source--)
+        for (uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned i_start = n_elements + source - 1;
-            unsigned i_end = N * n_elements - 1;
-            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1, destination);
+            uword i_start = n_elements + source - 1ULL;
+            uword i_end = N * n_elements - 1ULL;
+            arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1ULL, destination);
         }
 
-        arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(N - 1) * spacing * wavelength, N);
+        arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(zero, dtype(N - 1ULL) * spacing * dtype(wavelength), N);
         y_position = y_position - arma::mean(y_position);
 
-        for (unsigned m = 0; m < N; m++)
-            for (unsigned n = 0; n < n_elements; n++)
-                ant.element_pos.at(1, m * n_elements + n) = y_position.at(m);
+        for (uword m = 0ULL; m < N; m++)
+            for (uword n = 0ULL; n < n_elements; n++)
+                ant.element_pos.at(1ULL, m * n_elements + n) = y_position.at(m);
     }
 
     // Duplicate panels in z-direction (vertical panel stacking)
     n_elements = ant.n_elements();
-    if (Mg > 1)
+    if (Mg > 1ULL)
     {
-        for (unsigned source = n_elements; source > 0; source--)
+        for (uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned i_start = n_elements + source - 1;
-            unsigned i_end = Mg * n_elements - 1;
-            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1, destination);
+            uword i_start = n_elements + source - 1ULL;
+            uword i_end = Mg * n_elements - 1ULL;
+            arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1ULL, destination);
         }
 
-        arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(Mg - 1) * dgv * wavelength, Mg);
+        arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Mg - 1ULL) * dgv * dtype(wavelength), Mg);
         zg_position = zg_position - arma::mean(zg_position);
 
-        for (unsigned mg = 0; mg < Mg; mg++)
-            for (unsigned n = 0; n < n_elements; n++)
-                ant.element_pos.at(2, mg * n_elements + n) += zg_position.at(mg);
+        for (uword mg = 0ULL; mg < Mg; mg++)
+            for (uword n = 0ULL; n < n_elements; n++)
+                ant.element_pos.at(2ULL, mg * n_elements + n) += zg_position.at(mg);
     }
 
     // Duplicate panels in y-direction (horizontal panel stacking)
     n_elements = ant.n_elements();
     if (Ng > 1)
     {
-        for (unsigned source = n_elements; source > 0; source--)
+        for (uword source = n_elements; source > 0; source--)
         {
-            unsigned i_start = n_elements + source - 1;
-            unsigned i_end = Ng * n_elements - 1;
-            arma::Col<unsigned> destination = arma::regspace<arma::Col<unsigned>>(i_start, n_elements, i_end);
-            ant.copy_element(source - 1, destination);
+            uword i_start = n_elements + source - 1ULL;
+            uword i_end = Ng * n_elements - 1ULL;
+            arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
+            ant.copy_element(source - 1ULL, destination);
         }
 
-        arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(0.0, dtype(Ng - 1) * dgv * wavelength, Ng);
+        arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Ng - 1ULL) * dgh * dtype(wavelength), Ng);
         yg_position = yg_position - arma::mean(yg_position);
 
-        for (unsigned mg = 0; mg < Ng; mg++)
-            for (unsigned n = 0; n < n_elements; n++)
-                ant.element_pos.at(1, mg * n_elements + n) += yg_position.at(mg);
+        for (uword mg = 0ULL; mg < Ng; mg++)
+            for (uword n = 0ULL; n < n_elements; n++)
+                ant.element_pos.at(1ULL, mg * n_elements + n) += yg_position.at(mg);
     }
 
     ant.name = "3gpp";
     return ant;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, float center_freq,
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, float center_freq,
                                                                             unsigned pol, float tilt, float spacing,
-                                                                            unsigned Mg, unsigned Ng, float dgv, float dgh,
+                                                                            uword Mg, uword Ng, float dgv, float dgh,
                                                                             const quadriga_lib::arrayant<float> *pattern);
 
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(unsigned M, unsigned N, double center_freq,
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
-                                                                             unsigned Mg, unsigned Ng, double dgv, double dgh,
+                                                                             uword Mg, uword Ng, double dgv, double dgh,
                                                                              const quadriga_lib::arrayant<double> *pattern);

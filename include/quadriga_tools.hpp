@@ -21,6 +21,9 @@
 #include <armadillo>
 #include <string>
 
+typedef unsigned long long int uword;
+typedef long long int sword;
+
 namespace quadriga_tools
 {
     template <typename dtype> // float or double
