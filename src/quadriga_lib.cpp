@@ -235,7 +235,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     dtype shortest_path = los_limit;
 
     // Calculate angles and delays
-    for (uword j = 0ULL; j < n_out; j++) // Loop over paths
+    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
     {
         uword i = add_fake_los_path ? j - 1ULL : j;
         uword ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
@@ -261,8 +261,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
             if (!add_fake_los_path || j != 0ULL)
                 true_los_path = j, shortest_path = std::abs(d_length - dist_rx_tx);
 
-            for (uword t = 0ULL; t < n_tx; t++)
-                for (uword r = 0ULL; r < n_rx; r++)
+            for (uword t = 0ULL; t < n_tx; ++t)
+                for (uword r = 0ULL; r < n_rx; ++r)
                 {
                     x = p_rx[3ULL * r] - p_tx[3ULL * t];
                     y = p_rx[3ULL * r + 1ULL] - p_tx[3ULL * t + 1ULL];
@@ -279,7 +279,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         else // NLOS path
         {
             dtype *dr = new dtype[n_rx];
-            for (uword r = 0ULL; r < n_rx; r++)
+            for (uword r = 0ULL; r < n_rx; ++r)
                 x = p_lbs[ix] - p_rx[3ULL * r],
                 y = p_lbs[iy] - p_rx[3ULL * r + 1ULL],
                 z = p_lbs[iz] - p_rx[3ULL * r + 2ULL],
@@ -287,7 +287,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                 p_aoa[o0 + r] = std::atan2(y, x),
                 p_eoa[o0 + r] = dr[r] < los_limit ? zero : std::asin(z / dr[r]);
 
-            for (uword t = 0ULL; t < n_tx; t++)
+            for (uword t = 0ULL; t < n_tx; ++t)
             {
                 x = p_fbs[ix] - p_tx[3ULL * t],
                 y = p_fbs[iy] - p_tx[3ULL * t + 1ULL],
@@ -297,7 +297,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                       at = std::atan2(y, x),
                       et = dt < los_limit ? zero : std::asin(z / dt);
 
-                for (uword r = 0ULL; r < n_rx; r++)
+                for (uword r = 0ULL; r < n_rx; ++r)
                     p_aod[o] = at, p_eod[o] = et,
                     p_aoa[o] = p_aoa[o0 + r], p_eoa[o] = p_eoa[o0 + r],
                     p_delays[o++] = dt + d_fbs_lbs + dr[r];
@@ -323,8 +323,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     else
         tx_element_pos.zeros();
-    for (unsigned t = 0; t < unsigned(n_tx); t++)
-        for (unsigned r = 0; r < unsigned(n_rx); r++)
+    for (unsigned t = 0; t < unsigned(n_tx); ++t)
+        for (unsigned r = 0; r < unsigned(n_rx); ++r)
             *p_element++ = t + 1, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
 
     qd_arrayant_interpolate(&tx_array->e_theta_re, &tx_array->e_theta_im, &tx_array->e_phi_re, &tx_array->e_phi_im,
@@ -338,8 +338,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     else
         rx_element_pos.zeros();
-    for (unsigned t = 0; t < unsigned(n_tx); t++)
-        for (unsigned r = 0; r < unsigned(n_rx); r++)
+    for (unsigned t = 0; t < unsigned(n_tx); ++t)
+        for (unsigned r = 0; r < unsigned(n_rx); ++r)
             *p_element++ = r + 1, *ptr++ = p_rx[3 * r], *ptr++ = p_rx[3 * r + 1], *ptr++ = p_rx[3 * r + 2];
 
     qd_arrayant_interpolate(&rx_array->e_theta_re, &rx_array->e_theta_im, &rx_array->e_phi_re, &rx_array->e_phi_im,
@@ -349,7 +349,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     element_pos_interp.reset();
 
     // Calculate the MIMO channel coefficients for each path
-    for (uword j = 0ULL; j < n_out; j++) // Loop over paths
+    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
     {
         uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
@@ -362,8 +362,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         dtype path_amplitude = add_fake_los_path && j == 0 ? zero : std::sqrt(p_gain[i]);
 
         uword O = j * n_links; // Slice offset
-        for (uword t = 0ULL; t < n_tx; t++)
-            for (uword r = 0ULL; r < n_rx; r++)
+        for (uword t = 0ULL; t < n_tx; ++t)
+            for (uword r = 0ULL; r < n_rx; ++r)
             {
                 uword R = t * n_rx + r;
 
@@ -416,7 +416,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         dtype *tempZ = new dtype[N];
         dtype *tempT = new dtype[N];
 
-        for (uword j = 0ULL; j < n_out; j++) // Loop over paths
+        for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
         {
             uword o = j * n_links; // Slice offset
 
@@ -657,7 +657,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
     arma::Col<unsigned> i_element(n_tx, arma::fill::none);
     unsigned *p_element = i_element.memptr();
-    for (unsigned t = 0; t < unsigned(n_tx); t++)
+    for (unsigned t = 0; t < unsigned(n_tx); ++t)
         *p_element++ = t + 1;
 
     arma::Mat<dtype> element_pos_interp(3ULL, n_tx);
@@ -671,7 +671,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
     i_element.set_size(n_rx);
     p_element = i_element.memptr();
-    for (unsigned r = 0; r < unsigned(n_rx); r++)
+    for (unsigned r = 0; r < unsigned(n_rx); ++r)
         *p_element++ = r + 1;
 
     element_pos_interp.zeros(3ULL, n_rx);
@@ -690,14 +690,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     {
         dtype *pAz = AOA_loc.memptr(), *pEl = EOA_loc.memptr();
         dtype *pD = add_fake_los_path ? rx_Doppler->memptr() + 1 : rx_Doppler->memptr();
-        for (uword i = 0; i < n_path; i++)
+        for (uword i = 0ULL; i < n_path; ++i)
             pD[i] = std::cos(pAz[i * n_rx]) * std::cos(pEl[i * n_rx]);
     }
 
     // Calculate the MIMO channel coefficients for each path
     uword true_los_path = 0ULL;
     dtype true_los_power = zero;
-    for (uword j = 0ULL; j < n_out; j++) // Loop over paths
+    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
     {
         uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
@@ -717,8 +717,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             true_los_path = j, true_los_power = p_gain[i];
 
         uword O = j * n_links; // Slice offset
-        for (uword t = 0ULL; t < n_tx; t++)
-            for (uword r = 0ULL; r < n_rx; r++)
+        for (uword t = 0ULL; t < n_tx; ++t)
+            for (uword r = 0ULL; r < n_rx; ++r)
             {
                 uword R = t * n_rx + r;
 
@@ -767,7 +767,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         // Process coefficients and delays
         if (different_output_size) // Data is stored in internal memory, we can write directly to the output
         {
-            for (uword j = 0ULL; j < n_out; j++) // Loop over paths
+            for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
             {
                 uword o = j * n_links; // Slice offset
 

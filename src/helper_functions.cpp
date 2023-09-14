@@ -17,6 +17,9 @@
 
 // A collection of small helper functions to reduce copy and pasting code
 
+typedef unsigned long long int uword;
+typedef long long int sword;
+
 // Helper-function "quick_rotate"
 template <typename dtype>
 inline void quick_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, uword N)
@@ -36,7 +39,7 @@ inline void quick_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *d
     R[7] = sa * sb * cc - ca * sc;
     R[8] = cb * cc;
 
-    for (uword i = 0ULL; i < N; i++)
+    for (uword i = 0ULL; i < N; ++i)
     {
         uword ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
         dtype a = R[0] * data3xN[ix] + R[3] * data3xN[iy] + R[6] * data3xN[iz];
@@ -56,7 +59,7 @@ inline void quick_geo2cart(uword n,                // Number of values
                            const dtype *r = NULL)  // Input vector length (optional)
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
-    for (uword in = 0ULL; in < n; in++)
+    for (uword in = 0ULL; in < n; ++in)
     {
         dtype ca = az[in], sa = std::sin(ca);
         ca = std::cos(ca);
@@ -84,7 +87,7 @@ inline void quick_cart2geo(uword n,                        // Number of values
                            dtype *r = NULL)                // Output vector length (optional)
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
-    for (uword in = 0ULL; in < n; in++)
+    for (uword in = 0ULL; in < n; ++in)
     {
         dtype xx = x[in], yy = y[in], zz = (z == NULL) ? zero : z[in];
         dtype le = std::sqrt(xx * xx + yy * yy + zz * zz);
@@ -118,24 +121,24 @@ inline void quick_multiply_3_mat(const dtype *A, // n rows, m columns
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
 
     // Calculate the output row by row
-    for (uword im = 0ULL; im < m; im++)
+    for (uword im = 0ULL; im < m; ++im)
     {
         for (uword ip = 0ULL; ip < p; ip++) // Initialize output to zero
             X[ip * m + im] = zero;
 
         // Process temporary matrix T = A^H * B column-wise
-        for (uword io = 0; io < o; io++)
+        for (uword io = 0; io < o; ++io)
         {
             // Calculate one value of the temporary matrix T
             dtype t = zero;
-            for (uword in = 0ULL; in < n; in++)
+            for (uword in = 0ULL; in < n; ++in)
             {
                 dtype a = (A == NULL) ? (im == in ? one : zero) : A[im * n + in];
                 t += a * B[io * n + in];
             }
 
             // Update all values of an entire row of the output matrix X = T * C
-            for (uword ip = 0ULL; ip < p; ip++)
+            for (uword ip = 0ULL; ip < p; ++ip)
             {
                 dtype c = (C == NULL) ? (io == ip ? one : zero) : C[ip * o + io];
                 X[ip * m + im] += t * c;
@@ -158,18 +161,18 @@ inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n 
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
 
     // Calculate the output row by row
-    for (uword im = 0ULL; im < m; im++)
+    for (uword im = 0ULL; im < m; ++im)
     {
         // Initialize output to zero
-        for (uword ip = 0ULL; ip < p; ip++)
+        for (uword ip = 0ULL; ip < p; ++ip)
             Xr[ip * m + im] = zero, Xi[ip * m + im] = zero;
 
         // Process temporary matrix T = A^H * B column-wise
-        for (uword io = 0ULL; io < o; io++)
+        for (uword io = 0ULL; io < o; ++io)
         {
             // Calculate one value of the temporary matrix T
             dtype tR = zero, tI = zero;
-            for (uword in = 0ULL; in < n; in++)
+            for (uword in = 0ULL; in < n; ++in)
             {
                 dtype a_real = (Ar == NULL) ? (im == in ? one : zero) : Ar[im * n + in];
                 dtype a_imag = (Ai == NULL) ? zero : Ai[im * n + in];
@@ -178,7 +181,7 @@ inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n 
             }
 
             // Update all values of an entire row of the output matrix X = T * C
-            for (uword ip = 0ULL; ip < p; ip++)
+            for (uword ip = 0ULL; ip < p; ++ip)
             {
                 dtype c_real = (Cr == NULL) ? (io == ip ? one : zero) : Cr[ip * o + io];
                 dtype c_imag = (Ci == NULL) ? zero : Ci[ip * o + io];
@@ -206,7 +209,7 @@ inline void quick_power_mat(uword n, uword m,                               // M
     for (uword im = 0ULL; im < n * m; im += n)
     {
         dtype sum = zero;
-        for (uword in = im; in < im + n; in++)
+        for (uword in = im; in < im + n; ++in)
         {
             X[in] = zero;
             X[in] += (Ar == NULL) ? zero : Ar[in] * Ar[in];
@@ -222,11 +225,11 @@ inline void quick_power_mat(uword n, uword m,                               // M
             else if (sum > limit) // Scale values by sum
             {
                 sum = one / sum;
-                for (uword in = im; in < im + n; in++)
+                for (uword in = im; in < im + n; ++in)
                     X[in] *= sum;
             }
             else
-                for (uword in = im; in < im + n; in++)
+                for (uword in = im; in < im + n; ++in)
                     X[in] = avg;
         }
     }

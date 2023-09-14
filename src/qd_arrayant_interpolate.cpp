@@ -105,15 +105,15 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     *az_diff = pi_double - p_azimuth_grid[n_azimuth - 1ULL] + *p_azimuth_grid;
     *az_diff = one / *az_diff;
     *el_diff = one;
-    for (uword a = 1ULL; a < n_azimuth; a++)
+    for (uword a = 1ULL; a < n_azimuth; ++a)
         az_diff[a] = one / (p_azimuth_grid[a] - p_azimuth_grid[a - 1ULL]);
-    for (uword a = 1ULL; a < n_elevation; a++)
+    for (uword a = 1ULL; a < n_elevation; ++a)
         el_diff[a] = one / (p_elevation_grid[a] - p_elevation_grid[a - 1ULL]);
 
         // Interpolate the pattern data using spheric interpolation
         // datatype "int" is required by MSVC to allow parallel for
 #pragma omp parallel for
-    for (int a_i32 = 0; a_i32 < int(n_ang); a_i32++)
+    for (int a_i32 = 0; a_i32 < int(n_ang); ++a_i32)
     {
         // Convert a_i32 to 64 bit
         const uword a = uword(a_i32);
@@ -128,7 +128,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
         dtype cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
         dtype az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
 
-        for (uword o = 0ULL; o < n_out; o++)
+        for (uword o = 0ULL; o < n_out; ++o)
         {
             // Check if we need to update the angles for the current output index "o"
             bool update_angles = per_element_angles || per_element_rotation || per_angle_rotation || o == 0ULL;
@@ -195,7 +195,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                     else
                     {
                         while (i_up < n_azimuth && p_azimuth_grid[i_up] <= az)
-                            i_up++;
+                            ++i_up;
 
                         if (i_up == n_azimuth) // az is between last grid point and pi
                         {
@@ -212,7 +212,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                 }
 
                 while (i_vp < n_elevation && p_elevation_grid[i_vp] <= el)
-                    i_vp++;
+                    ++i_vp;
 
                 if (i_vp == n_elevation)
                     i_vn = --i_vp;
@@ -247,7 +247,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
             uword iD = i_un * n_elevation + i_vn + offset;
             dtype Vr, Vi, Hr, Hi;
 
-            for (uword VH = 0ULL; VH < 2ULL; VH++)
+            for (uword VH = 0ULL; VH < 2ULL; ++VH)
             {
                 dtype fAr, fBr, fCr, fDr, fAi, fBi, fCi, fDi;
                 if (VH == 0) // Read the pattern values

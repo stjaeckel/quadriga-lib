@@ -178,12 +178,12 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     *e_phi_re = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
     *e_phi_im = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
-    for (uword el = 0ULL; el < n_elements; el++)
+    for (uword el = 0ULL; el < n_elements; ++el)
     {
         // Read magnitude of Vertical Component
         node_name = pfx + "EthetaMag";
         attr_name = "el";
-        attr_value = std::to_string(el + 1);
+        attr_value = std::to_string(el + 1ULL);
         node = node_arrayant.find_child_by_attribute(node_name.c_str(), attr_name.c_str(), attr_value.c_str());
         if (node.empty() && n_elements == 1)
             node = node_arrayant.child(node_name.c_str());
@@ -469,13 +469,13 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
     {
         pugi::xml_node node_pat;
-        for (uword i = 0; i < NoElements; i++)
+        for (uword i = 0ULL; i < NoElements; ++i)
         {
             arma::Mat<dtype> mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
             mat_tmp.transform([ten](dtype x)
                               { return ten * std::log10(x); });
 
-            bool valid = arma::any(arma::vectorise(mat_tmp) > -200);
+            bool valid = arma::any(arma::vectorise(mat_tmp) > dtype(-200.0));
 
             if (valid) // Write magnitude
             {
