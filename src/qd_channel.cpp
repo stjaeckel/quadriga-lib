@@ -54,7 +54,7 @@ inline bool qHDF_file_exists(const std::string &name)
 template <typename dtype>
 inline void qHDF_cast_to_float(const dtype *in, float *out, uword n_elem)
 {
-    for (uword n = 0; n < n_elem; n++)
+    for (uword n = 0; n < n_elem; ++n)
         out[n] = float(in[n]);
 }
 
@@ -135,9 +135,9 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
     if (create_new)
     {
         // Find maximum value in storage index
-        for (unsigned i = 0; i < n_order; i++)
+        for (unsigned i = 0; i < n_order; ++i)
             channel_index = p_order[i] > channel_index ? p_order[i] : channel_index;
-        channel_index++;
+        ++channel_index;
 
         // Update storage index
         p_order[storage_location] = channel_index;
@@ -426,7 +426,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_UINT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -438,7 +438,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_INT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -450,7 +450,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_UINT64, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_UINT64, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -462,7 +462,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_INT64, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_INT64, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -474,7 +474,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -486,7 +486,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
         dims[0] = data->n_slices;
         dims[1] = data->n_cols;
         dims[2] = data->n_rows;
-        hid_t dspace_id = H5Screate_simple(2, dims, NULL);
+        hid_t dspace_id = H5Screate_simple(3, dims, NULL);
         hid_t dset_id = H5Dcreate2(group_id, par_name->c_str(), H5T_NATIVE_DOUBLE, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT, data->memptr());
         H5Sclose(dspace_id);
@@ -533,22 +533,22 @@ arma::uvec quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_path() const
     arma::uvec n_path(n_snap);
     uword *p_path = n_path.memptr();
     if (coeff_re.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = coeff_re[i].n_slices;
     else if (path_gain.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = path_gain[i].n_elem;
     else if (path_length.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = path_length[i].n_elem;
     else if (path_polarization.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = path_polarization[i].n_cols;
     else if (path_angles.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = path_angles[i].n_rows;
     else if (path_coord.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             p_path[i] = path_coord[i].n_slices;
 
     return n_path;
@@ -600,7 +600,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
 
         n_rx = coeff_re[0].n_rows, n_tx = coeff_re[0].n_cols;
 
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
         {
             if (coeff_re[i].n_rows != n_rx || coeff_re[i].n_cols != n_tx || coeff_re[i].n_slices != n_pth[i])
                 return "Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.";
@@ -619,7 +619,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_gain' must be empty or match the number of snapshots.";
 
     if (path_gain.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             if (path_gain[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_gain[" + std::to_string(i) + "]'.";
 
@@ -627,7 +627,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_length' must be empty or match the number of snapshots.";
 
     if (path_length.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             if (path_length[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_length[" + std::to_string(i) + "]'.";
 
@@ -635,7 +635,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_polarization' must be empty or match the number of snapshots.";
 
     if (path_polarization.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             if (path_polarization[i].n_rows != 8 || path_polarization[i].n_cols != n_pth[i])
                 return "Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.";
 
@@ -643,7 +643,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_angles' must be empty or match the number of snapshots.";
 
     if (path_angles.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4)
                 return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
 
@@ -651,9 +651,12 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
         return "'path_coord' must be empty or match the number of snapshots.";
 
     if (path_coord.size() == n_snap)
-        for (uword i = 0; i < n_snap; i++)
+        for (uword i = 0; i < n_snap; ++i)
             if (path_coord[i].n_elem != 0 && (path_coord[i].n_rows != 3 || path_coord[i].n_slices != n_pth[i]))
                 return "Size mismatch in 'path_coord[" + std::to_string(i) + "]'.";
+
+    if (par_names.size() != par_data.size())
+        return "Number of elements in 'par_data' must match number of elements in 'par_name'.";
 
     return "";
 }
@@ -799,7 +802,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
 
     // Snapshot data
     uword n_snap = this->n_snap();
-    for (uword i = 0; i < n_snap; i++)
+    for (uword i = 0; i < n_snap; ++i)
     {
         if (n_snap == 1)
             snap_id = group_id;
@@ -970,7 +973,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
     }
 
     // Write unstructured data
-    for (std::size_t i = 0; i < par_names.size(); i++)
+    for (std::size_t i = 0; i < par_names.size(); ++i)
     {
         std::string par_name = "par_" + par_names[i];
         qHDF_write_par(group_id, &par_name, &par_data[i]);
@@ -1043,7 +1046,8 @@ void quadriga_lib::hdf5_write_unstructured(std::string fn, std::string par_name,
     hid_t group_id = H5Gopen2(file_id, group_name.c_str(), H5P_DEFAULT);
 
     // Write unstructured data to file
-    qHDF_write_par(group_id, &par_name, par_data);
+    std::string name = "par_" + par_name;
+    qHDF_write_par(group_id, &name, par_data);
 
     // Close the group and file
     H5Gclose(group_id);
@@ -1087,7 +1091,7 @@ void quadriga_lib::hdf5_write_unstructured(std::string fn, std::string par_name,
 //     hsize_t res_dims[1];
 //     status = H5Sget_simple_extent_dims(dspace_id, res_dims, NULL);
 //     int res_sz = 1;
-//     for (int i = 0; i < 1; i++)
+//     for (int i = 0; i < 1; ++i)
 //     {
 //         res_sz *= res_dims[i];
 //     }

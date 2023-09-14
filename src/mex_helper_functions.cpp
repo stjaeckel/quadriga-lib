@@ -24,6 +24,9 @@
 #include <utility> // for std::move
 #include <cstring> // For std::memcopy
 
+typedef unsigned long long int uword;
+typedef long long int sword;
+
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
 // Returns NaN for empty input (0 in case of integer types)
 template <typename dtype>
