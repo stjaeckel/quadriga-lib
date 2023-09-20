@@ -23,7 +23,7 @@
 #include <vector>
 #include <any>
 
-#define QUADRIGA_LIB_VERSION v0_1_8
+#define QUADRIGA_LIB_VERSION v0_1_9
 
 typedef unsigned long long int uword;
 typedef long long int sword;
@@ -157,6 +157,7 @@ namespace quadriga_lib
             uword n_rx() const;        // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
             uword n_tx() const;        // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
             arma::uvec n_path() const; // Number of paths per snapshot (uword)
+            bool empty() const;        // Returns true if the channel object contains no data
 
             // Validate integrity
             std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
@@ -282,17 +283,60 @@ namespace quadriga_lib
                              bool add_fake_los_path = false,       // Option: Add a zero-power LOS path in case where no LOS path was present
                              arma::Col<dtype> *rx_Doppler = NULL); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
 
-    // Create a new channel HDF file and set the index to to given storage layout
+    // Returns type ID of a std::any field and allows low-level data access
+    // - Optional parameter dims = Pointer to 3-element array to store the size of each dimension
+    // - For strings, dims[0] contains the length of the string
+    // - Optional parameter dataptr = Raw pointer to the internal data array
+    // - WARNING: Use  dataptr with caution. It allows full RW-access to the internal data, ignores const and is not typesafe!
+    // - Type-codes:
+    //      -2  no value,                 -1  unsupported type,          9  std::string,
+    //      10  float,                    11  double,                   12  unsigned long long int,
+    //      13  long long int,            14  unsigned int,             15  int,
+    //      20  arma::Mat<float>,         21  arma::Mat<double>,        22  arma::Mat<arma::uword>,
+    //      23  arma::Mat<arma::sword>,   24  arma::Mat<unsigned>,      25  arma::Mat<int>,
+    //      30  arma::Cube<float>,        31  arma::Cube<double>,       32  arma::Cube<arma::uword>,
+    //      33  arma::Cube<arma::sword>,  34  arma::Cube<unsigned>,     35  arma::Cube<int>,
+    //      40  arma::Col<float>,         41  arma::Col<double>,        42  arma::Col<arma::uword>,
+    //      43  arma::Col<arma::sword>,   44  arma::Col<unsigned>,      45  arma::Col<int>,
+    //      50  arma::Row<float>,         51  arma::Row<double>,        52  arma::Row<arma::uword>,
+    //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
+    int any_type_id(const std::any *data, uword *dims = NULL, void **dataptr = NULL);
+
+    // Create a new channel HDF file and set the index to given storage layout
     void hdf5_create(std::string fn, unsigned nx = 65535, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
 
-    // Write unstructured data to hdf5 file
+    // Read channel object from HDF5 file
+    // - Returns empty channel object if channel ID dies not exist
+    // - Conversion to float or double is not done for unstructured data
+    template <typename dtype> // Read as float or double
+    channel<dtype> hdf5_read_channel(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0);
+
+    // Read single unstructured data field from HDF5 file
+    // - Returns the type ID for the contained data (see "any_type_id" for list)
+    // - Use "any_type_id" to obtain type and low-level access to data
+    std::any hdf5_read_unstructured(std::string fn, std::string par_name,
+                                    unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
+                                    std::string prefix = "par_");
+
+    // Read names of the unstructured data fields from the HDF file
+    // - Returns number of the unstructured fields at the given location
+    uword hdf_read_unstructured_names(std::string fn,                                                     // File name
+                                      std::vector<std::string> *par_names,                                // Output
+                                      unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
+                                      std::string prefix = "par_");                                       // Default prefix
+
+    // Write single unstructured data field to HDF5 file
     // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
     // - Armadillo Vectors, Matrices and Cubes with types: unsigned, int, uword, sword, float, double
-    // - Vector types: Armadillo Row and Col types are mapped to 1D storage type - reading will be arma::Col
+    // - Vector types: Armadillo Row and Col types are mapped to 1D storage type
+    // - arma::Row will be converted to arma::Col
     // - Parameter name may only contain letters and numbers and the underscore "_"
+    // - An additional prefix "par_" will be added to the name before writing to the HDF file
     // - Unsupported data types will cause an error
     void hdf5_write_unstructured(std::string fn, std::string par_name, const std::any *par_data,
-                                 unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0);
+                                 unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
+                                 std::string prefix = "par_");
+
 }
 
 #endif

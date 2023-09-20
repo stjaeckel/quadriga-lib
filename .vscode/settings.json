@@ -13,9 +13,12 @@
         "Gopen",
         "memptr",
         "MIMO",
+        "ndiv",
         "Sclose",
         "Tclose",
         "Tcopy",
+        "Tequal",
+        "Tget",
         "xpol"
     ],
     "files.associations": {

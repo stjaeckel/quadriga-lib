@@ -1285,6 +1285,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::validate()
     return "";
 }
 
+// Instantiate templates
 template class quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<float>;
 template class quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<double>;
 

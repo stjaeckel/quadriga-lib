@@ -9,13 +9,17 @@
                 "external/armadillo-12.6.3/include",
                 "external/hdf5-1.14.2-win64/include",
                 "external/Catch2-3.3.2-Linux/include",
-                "/usr/local/MATLAB/R2021a/extern/include/"
+                "/usr/local/MATLAB/R2021a/extern/include/",
+                "${default}"
             ],
-            "defines": [],
+            "defines": [
+                "${default}"
+            ],
             "cStandard": "gnu17",
             "cppStandard": "gnu++17",
             "intelliSenseMode": "linux-gcc-x64",
-            "configurationProvider": "ms-vscode.makefile-tools"
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "compilerPath": "/usr/bin/g++"
         },
         {
             "name": "Windows",

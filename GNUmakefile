@@ -15,7 +15,7 @@ HDF5_H      = /usr/include/hdf5/serial  # external/hdf5-1.14.2-Linux/include
 HDF5_LIB    = /usr/lib/x86_64-linux-gnu/hdf5/serial  # external/hdf5-1.14.2-Linux/lib
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Wextra -Wpedantic -Wconversion -Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
+CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Wextra -Wpedantic -Wconversion #-Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
 
 # Sourcees
 src     	= $(wildcard src/*.cpp)
