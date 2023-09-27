@@ -146,7 +146,7 @@ template <typename dtype>
 void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
                                 arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
 {
-    if (coord == NULL || coord->n_elem == 0 || coord->n_rows != 3)
+    if (coord == nullptr || coord->n_elem == 0 || coord->n_rows != 3)
         throw std::invalid_argument("Input 'coord' must have 3 rows.");
 
     arma::uword n_interact = coord->n_cols;
@@ -157,21 +157,21 @@ void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry
     constexpr dtype los_limit = dtype(1.0e-4);
 
     // Set the output size
-    if (path_length != NULL && path_length->n_elem != n_path)
+    if (path_length != nullptr && path_length->n_elem != n_path)
         path_length->set_size(n_path);
-    if (fbs_pos != NULL && (fbs_pos->n_rows != 3 || fbs_pos->n_cols != n_path))
+    if (fbs_pos != nullptr && (fbs_pos->n_rows != 3 || fbs_pos->n_cols != n_path))
         fbs_pos->set_size(3, n_path);
-    if (lbs_pos != NULL && (lbs_pos->n_rows != 3 || lbs_pos->n_cols != n_path))
+    if (lbs_pos != nullptr && (lbs_pos->n_rows != 3 || lbs_pos->n_cols != n_path))
         lbs_pos->set_size(3, n_path);
-    if (path_angles != NULL && (path_angles->n_rows != n_path || path_angles->n_cols != 4))
+    if (path_angles != nullptr && (path_angles->n_rows != n_path || path_angles->n_cols != 4))
         path_angles->set_size(n_path, 4);
 
     // Get pointers
     const dtype *p_coord = coord->memptr();
-    dtype *p_length = path_length == NULL ? NULL : path_length->memptr();
-    dtype *p_fbs = fbs_pos == NULL ? NULL : fbs_pos->memptr();
-    dtype *p_lbs = lbs_pos == NULL ? NULL : lbs_pos->memptr();
-    dtype *p_angles = path_angles == NULL ? NULL : path_angles->memptr();
+    dtype *p_length = path_length == nullptr ? NULL : path_length->memptr();
+    dtype *p_fbs = fbs_pos == nullptr ? NULL : fbs_pos->memptr();
+    dtype *p_lbs = lbs_pos == nullptr ? NULL : lbs_pos->memptr();
+    dtype *p_angles = path_angles == nullptr ? NULL : path_angles->memptr();
 
     // Calculate half way point between TX and RX
     dtype TRx = Rx - Tx, TRy = Ry - Ty, TRz = Rz - Tz;
@@ -196,14 +196,14 @@ void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry
         }
         x -= Rx, y -= Ry, z -= Rz, d += std::sqrt(x * x + y * y + z * z);
 
-        if (p_length != NULL)
+        if (p_length != nullptr)
             p_length[ip] = d;
-        if (p_fbs != NULL)
+        if (p_fbs != nullptr)
             p_fbs[3 * ip] = fx, p_fbs[3 * ip + 1] = fy, p_fbs[3 * ip + 2] = fz;
-        if (p_lbs != NULL)
+        if (p_lbs != nullptr)
             p_lbs[3 * ip] = lx, p_lbs[3 * ip + 1] = ly, p_lbs[3 * ip + 2] = lz;
 
-        if (p_angles != NULL)
+        if (p_angles != nullptr)
         {
             x = fx - Tx, y = fy - Ty, z = fz - Tz;
             d = std::sqrt(x * x + y * y + z * z);

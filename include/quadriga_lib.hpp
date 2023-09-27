@@ -69,7 +69,7 @@ namespace quadriga_lib
 
             // Calculates a virtual pattern of the given array by applying coupling and element positions
             // Calling this function without an argument updates the arrayant properties inplace
-            void combine_pattern(arrayant<dtype> *output = NULL);
+            void combine_pattern(arrayant<dtype> *output = nullptr);
 
             // Creates a copy of the array antenna object
             arrayant<dtype> copy() const;
@@ -105,7 +105,7 @@ namespace quadriga_lib
 
             // Remove zeros from the pattern data. Changes that size of the pattern.
             // Calling this function without an argument updates the arrayant properties inplace
-            void remove_zeros(arrayant<dtype> *output = NULL);
+            void remove_zeros(arrayant<dtype> *output = nullptr);
 
             // Reset the size to zero (the arrayant object will contain no data)
             void reset();
@@ -114,7 +114,7 @@ namespace quadriga_lib
             // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
             // Calling this function without the argument "output" updates the arrayant properties inplace
             void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0,
-                                unsigned usage = 0, unsigned element = -1, arrayant<dtype> *output = NULL);
+                                unsigned usage = 0, unsigned element = -1, arrayant<dtype> *output = nullptr);
 
             // Change the size of an arrayant, without explicitly preserving data
             // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
@@ -173,7 +173,7 @@ namespace quadriga_lib
 
     // Read array antenna object and layout from QDANT file
     template <typename dtype>
-    arrayant<dtype> qdant_read(std::string fn, unsigned id = 1, arma::Mat<unsigned> *layout = NULL);
+    arrayant<dtype> qdant_read(std::string fn, unsigned id = 1, arma::Mat<unsigned> *layout = nullptr);
 
     // Generate : Isotropic radiator, vertical polarization, 1 deg resolution
     // Usage example: auto ant = quadriga_lib::generate_omni<float>();
@@ -207,17 +207,17 @@ namespace quadriga_lib
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_3GPP(uword M = 1,                            // Number of vertical elements
-                                           uword N = 1,                            // Number of horizontal elements
-                                           dtype center_freq = 299792458.0,        // The center frequency in [Hz]
-                                           unsigned pol = 1,                       // Polarization indicator
-                                           dtype tilt = 0.0,                       // The electric downtilt angle in [deg] for pol = 4,5,6
-                                           dtype spacing = 0.5,                    // Element spacing in [λ]
-                                           uword Mg = 1,                           // Number of nested panels in a column (Mg)
-                                           uword Ng = 1,                           // Number of nested panels in a row (Ng)
-                                           dtype dgv = 0.5,                        // Panel spacing in vertical direction (dg,V) in [λ]
-                                           dtype dgh = 0.5,                        // Panel spacing in horizontal direction (dg,H) in [λ]
-                                           const arrayant<dtype> *pattern = NULL); // Optional custom per-element pattern
+    arrayant<dtype> generate_arrayant_3GPP(uword M = 1,                               // Number of vertical elements
+                                           uword N = 1,                               // Number of horizontal elements
+                                           dtype center_freq = 299792458.0,           // The center frequency in [Hz]
+                                           unsigned pol = 1,                          // Polarization indicator
+                                           dtype tilt = 0.0,                          // The electric downtilt angle in [deg] for pol = 4,5,6
+                                           dtype spacing = 0.5,                       // Element spacing in [λ]
+                                           uword Mg = 1,                              // Number of nested panels in a column (Mg)
+                                           uword Ng = 1,                              // Number of nested panels in a row (Ng)
+                                           dtype dgv = 0.5,                           // Panel spacing in vertical direction (dg,V) in [λ]
+                                           dtype dgh = 0.5,                           // Panel spacing in horizontal direction (dg,H) in [λ]
+                                           const arrayant<dtype> *pattern = nullptr); // Optional custom per-element pattern
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -247,10 +247,10 @@ namespace quadriga_lib
                                 dtype center_frequency = dtype(0.0), // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
                                 bool use_absolute_delays = false,    // Option: If true, the LOS delay is included for all paths
                                 bool add_fake_los_path = false,      // Option: Add a zero-power LOS path in case where no LOS path was present
-                                arma::Cube<dtype> *aod = NULL,       // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
-                                arma::Cube<dtype> *eod = NULL,       // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
-                                arma::Cube<dtype> *aoa = NULL,       // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
-                                arma::Cube<dtype> *eoa = NULL);      // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *eoa = nullptr);   // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
 
     // Calculate channel coefficients for planar waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -262,26 +262,26 @@ namespace quadriga_lib
     // - Polarization transfer matrix must be normalized (i.e., not include the path gain)
     // - Option to calculate the Doppler weights from orientation (+1 Moves towards path, -1 moves away from path)
     template <typename dtype>
-    void get_channels_planar(const arrayant<dtype> *tx_array,      // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
-                             const arrayant<dtype> *rx_array,      // Receive array antenna with 'n_rx' elements (= ports after element coupling)
-                             dtype Tx, dtype Ty, dtype Tz,         // Transmitter position in Cartesian coordinates
-                             dtype Tb, dtype Tt, dtype Th,         // Transmitter orientation (bank, tilt, head) in [rad]
-                             dtype Rx, dtype Ry, dtype Rz,         // Receiver position in Cartesian coordinates
-                             dtype Rb, dtype Rt, dtype Rh,         // Receiver orientation (bank, tilt, head) in [rad]
-                             const arma::Col<dtype> *aod,          // Departure azimuth angles in [rad], vector of length 'n_path'
-                             const arma::Col<dtype> *eod,          // Departure elevation angles in [rad], vector of length 'n_path'
-                             const arma::Col<dtype> *aoa,          // Arrival azimuth angles in [rad], vector of length 'n_path'
-                             const arma::Col<dtype> *eoa,          // Arrival elevation angles in [rad], vector of length 'n_path'
-                             const arma::Col<dtype> *path_gain,    // Path gain (linear scale), vector of length [n_path]
-                             const arma::Col<dtype> *path_length,  // Absolute path length from TX to RX phase center, vector of length [n_path]
-                             const arma::Mat<dtype> *M,            // Polarization transfer matrix, matrix of size [8, n_path]
-                             arma::Cube<dtype> *coeff_re,          // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
-                             arma::Cube<dtype> *coeff_im,          // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
-                             arma::Cube<dtype> *delay,             // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
-                             dtype center_frequency = dtype(0.0),  // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
-                             bool use_absolute_delays = false,     // Option: If true, the LOS delay is included for all paths
-                             bool add_fake_los_path = false,       // Option: Add a zero-power LOS path in case where no LOS path was present
-                             arma::Col<dtype> *rx_Doppler = NULL); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
+    void get_channels_planar(const arrayant<dtype> *tx_array,         // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                             const arrayant<dtype> *rx_array,         // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                             dtype Tx, dtype Ty, dtype Tz,            // Transmitter position in Cartesian coordinates
+                             dtype Tb, dtype Tt, dtype Th,            // Transmitter orientation (bank, tilt, head) in [rad]
+                             dtype Rx, dtype Ry, dtype Rz,            // Receiver position in Cartesian coordinates
+                             dtype Rb, dtype Rt, dtype Rh,            // Receiver orientation (bank, tilt, head) in [rad]
+                             const arma::Col<dtype> *aod,             // Departure azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *eod,             // Departure elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *aoa,             // Arrival azimuth angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *eoa,             // Arrival elevation angles in [rad], vector of length 'n_path'
+                             const arma::Col<dtype> *path_gain,       // Path gain (linear scale), vector of length [n_path]
+                             const arma::Col<dtype> *path_length,     // Absolute path length from TX to RX phase center, vector of length [n_path]
+                             const arma::Mat<dtype> *M,               // Polarization transfer matrix, matrix of size [8, n_path]
+                             arma::Cube<dtype> *coeff_re,             // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> *coeff_im,             // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path(+1)]
+                             arma::Cube<dtype> *delay,                // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path(+1)]
+                             dtype center_frequency = dtype(0.0),     // Center frequency in [Hz]; a value of 0.0 disables phase calculation in coefficients
+                             bool use_absolute_delays = false,        // Option: If true, the LOS delay is included for all paths
+                             bool add_fake_los_path = false,          // Option: Add a zero-power LOS path in case where no LOS path was present
+                             arma::Col<dtype> *rx_Doppler = nullptr); // Optional output: Doppler weights for moving RX, vector of length 'n_path(+1)'
 
     // Returns type ID of a std::any field and allows low-level data access
     // - Optional parameter dims = Pointer to 3-element array to store the size of each dimension
@@ -300,10 +300,16 @@ namespace quadriga_lib
     //      43  arma::Col<arma::sword>,   44  arma::Col<unsigned>,      45  arma::Col<int>,
     //      50  arma::Row<float>,         51  arma::Row<double>,        52  arma::Row<arma::uword>,
     //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
-    int any_type_id(const std::any *data, uword *dims = NULL, void **dataptr = NULL);
+    int any_type_id(const std::any *data, uword *dims = nullptr, void **dataptr = nullptr);
 
     // Create a new channel HDF file and set the index to given storage layout
     void hdf5_create(std::string fn, unsigned nx = 65535, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
+
+    // Read storage layout from HDF file
+    // - Output will be a 4-element vector
+    // - Optional output: has_value = vector containing the ChannelID in the file
+    // - channelIDs with value 0 indicate that there is no data stored at this index
+    arma::Col<unsigned> hdf_read_ChannelDims(std::string fn, arma::Col<unsigned> *channelID = nullptr);
 
     // Read channel object from HDF5 file
     // - Returns empty channel object if channel ID dies not exist

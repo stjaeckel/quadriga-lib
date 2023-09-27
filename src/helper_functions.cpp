@@ -51,12 +51,12 @@ inline void quick_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *d
 
 // Helper function "quick_geo2cart"
 template <typename dtype>
-inline void quick_geo2cart(uword n,                // Number of values
-                           const dtype *az,        // Input azimuth angles
-                           dtype *x, dtype *y,     // 2D Output coordinates (x, y)
-                           const dtype *el = NULL, // Input elevation angles (optional)
-                           dtype *z = NULL,        // Output z-coordinate (optional)
-                           const dtype *r = NULL)  // Input vector length (optional)
+inline void quick_geo2cart(uword n,                   // Number of values
+                           const dtype *az,           // Input azimuth angles
+                           dtype *x, dtype *y,        // 2D Output coordinates (x, y)
+                           const dtype *el = nullptr, // Input elevation angles (optional)
+                           dtype *z = nullptr,        // Output z-coordinate (optional)
+                           const dtype *r = nullptr)  // Input vector length (optional)
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
     for (uword in = 0ULL; in < n; ++in)
@@ -64,15 +64,15 @@ inline void quick_geo2cart(uword n,                // Number of values
         dtype ca = az[in], sa = std::sin(ca);
         ca = std::cos(ca);
 
-        dtype ce = (el == NULL) ? one : std::cos(el[in]);
-        dtype se = (el == NULL) ? zero : std::sin(el[in]);
+        dtype ce = (el == nullptr) ? one : std::cos(el[in]);
+        dtype se = (el == nullptr) ? zero : std::sin(el[in]);
 
-        dtype le = (r == NULL) ? one : r[in];
+        dtype le = (r == nullptr) ? one : r[in];
 
         x[in] = le * ce * ca;
         y[in] = le * ce * sa;
 
-        if (z != NULL)
+        if (z != nullptr)
             z[in] = le * se;
     }
 }
@@ -82,27 +82,27 @@ template <typename dtype>
 inline void quick_cart2geo(uword n,                        // Number of values
                            dtype *az,                      // Output azimuth angles
                            const dtype *x, const dtype *y, // 2D Input coordinates (x, y)
-                           dtype *el = NULL,               // Output elevation angles (optional)
-                           const dtype *z = NULL,          // Input z-coordinate (optional)
-                           dtype *r = NULL)                // Output vector length (optional)
+                           dtype *el = nullptr,            // Output elevation angles (optional)
+                           const dtype *z = nullptr,       // Input z-coordinate (optional)
+                           dtype *r = nullptr)             // Output vector length (optional)
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0);
     for (uword in = 0ULL; in < n; ++in)
     {
-        dtype xx = x[in], yy = y[in], zz = (z == NULL) ? zero : z[in];
+        dtype xx = x[in], yy = y[in], zz = (z == nullptr) ? zero : z[in];
         dtype le = std::sqrt(xx * xx + yy * yy + zz * zz);
 
-        if (r != NULL)
+        if (r != nullptr)
             r[in] = le;
 
         le = one / le;
         xx *= le, yy *= le, zz *= le;
         xx = xx > one ? one : xx, yy = yy > one ? one : yy, zz = zz > one ? one : zz;
 
-        if (az != NULL)
+        if (az != nullptr)
             az[in] = std::atan2(yy, xx);
 
-        if (el != NULL)
+        if (el != nullptr)
             el[in] = std::asin(zz);
     }
 }
@@ -133,14 +133,14 @@ inline void quick_multiply_3_mat(const dtype *A, // n rows, m columns
             dtype t = zero;
             for (uword in = 0ULL; in < n; ++in)
             {
-                dtype a = (A == NULL) ? (im == in ? one : zero) : A[im * n + in];
+                dtype a = (A == nullptr) ? (im == in ? one : zero) : A[im * n + in];
                 t += a * B[io * n + in];
             }
 
             // Update all values of an entire row of the output matrix X = T * C
             for (uword ip = 0ULL; ip < p; ++ip)
             {
-                dtype c = (C == NULL) ? (io == ip ? one : zero) : C[ip * o + io];
+                dtype c = (C == nullptr) ? (io == ip ? one : zero) : C[ip * o + io];
                 X[ip * m + im] += t * c;
             }
         }
@@ -174,8 +174,8 @@ inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n 
             dtype tR = zero, tI = zero;
             for (uword in = 0ULL; in < n; ++in)
             {
-                dtype a_real = (Ar == NULL) ? (im == in ? one : zero) : Ar[im * n + in];
-                dtype a_imag = (Ai == NULL) ? zero : Ai[im * n + in];
+                dtype a_real = (Ar == nullptr) ? (im == in ? one : zero) : Ar[im * n + in];
+                dtype a_imag = (Ai == nullptr) ? zero : Ai[im * n + in];
                 tR += a_real * Br[io * n + in] - a_imag * Bi[io * n + in];
                 tI += a_real * Bi[io * n + in] + a_imag * Br[io * n + in];
             }
@@ -183,8 +183,8 @@ inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n 
             // Update all values of an entire row of the output matrix X = T * C
             for (uword ip = 0ULL; ip < p; ++ip)
             {
-                dtype c_real = (Cr == NULL) ? (io == ip ? one : zero) : Cr[ip * o + io];
-                dtype c_imag = (Ci == NULL) ? zero : Ci[ip * o + io];
+                dtype c_real = (Cr == nullptr) ? (io == ip ? one : zero) : Cr[ip * o + io];
+                dtype c_imag = (Ci == nullptr) ? zero : Ci[ip * o + io];
                 Xr[ip * m + im] += tR * c_real - tI * c_imag;
                 Xi[ip * m + im] += tR * c_imag + tI * c_real;
             }
@@ -197,11 +197,11 @@ inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n 
 // - Optional normalization of the columns by their sum-power
 // - Returns identity matrix normalization is true and inputs A/B are NULL
 template <typename dtype>
-inline void quick_power_mat(uword n, uword m,                               // Matrix dimensions (n=rows, m=columns)
-                            dtype *X,                                       // Output X with n rows, m columns
-                            bool normalize_columns = false,                 // Optional normalization
-                            const dtype *Ar = NULL, const dtype *Ai = NULL, // Input A with n rows, m columns
-                            const dtype *Br = NULL, const dtype *Bi = NULL) // Input B with n rows, m columns
+inline void quick_power_mat(uword n, uword m,                                     // Matrix dimensions (n=rows, m=columns)
+                            dtype *X,                                             // Output X with n rows, m columns
+                            bool normalize_columns = false,                       // Optional normalization
+                            const dtype *Ar = nullptr, const dtype *Ai = nullptr, // Input A with n rows, m columns
+                            const dtype *Br = nullptr, const dtype *Bi = nullptr) // Input B with n rows, m columns
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0), limit = dtype(1.0e-10);
     dtype avg = one / dtype(n);
@@ -212,15 +212,15 @@ inline void quick_power_mat(uword n, uword m,                               // M
         for (uword in = im; in < im + n; ++in)
         {
             X[in] = zero;
-            X[in] += (Ar == NULL) ? zero : Ar[in] * Ar[in];
-            X[in] += (Ai == NULL) ? zero : Ai[in] * Ai[in];
-            X[in] += (Br == NULL) ? zero : Br[in] * Br[in];
-            X[in] += (Bi == NULL) ? zero : Bi[in] * Bi[in];
+            X[in] += (Ar == nullptr) ? zero : Ar[in] * Ar[in];
+            X[in] += (Ai == nullptr) ? zero : Ai[in] * Ai[in];
+            X[in] += (Br == nullptr) ? zero : Br[in] * Br[in];
+            X[in] += (Bi == nullptr) ? zero : Bi[in] * Bi[in];
             sum += X[in];
         }
         if (normalize_columns)
         {
-            if (Ar == NULL && Ai == NULL && Br == NULL && Bi == NULL) // Return identity matrix
+            if (Ar == nullptr && Ai == nullptr && Br == nullptr && Bi == nullptr) // Return identity matrix
                 X[im + im / n] = one;
             else if (sum > limit) // Scale values by sum
             {

@@ -88,10 +88,10 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
     hid_t dspace_id = H5Dget_space(dset_id);
     int ndims = H5Sget_simple_extent_ndims(dspace_id);
     if (ndims != 1)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Sget_simple_extent_dims(dspace_id, dims, NULL);
     if (dims[0] != 4)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
     H5Sclose(dspace_id);
     H5Dclose(dset_id);
@@ -109,10 +109,10 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
     dspace_id = H5Dget_space(dset_id);
     ndims = H5Sget_simple_extent_ndims(dspace_id);
     if (ndims != 1)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Sget_simple_extent_dims(dspace_id, dims, NULL);
     if (dims[0] != n_order)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
 
     unsigned storage_location = iw * ChannelDims[0] * ChannelDims[1] * ChannelDims[2] +
@@ -169,7 +169,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
     if (par_name->length() == 0 || !qHDF_isalnum(*par_name))
         throw std::invalid_argument("Parameter name must only contain letters, numbers and the underscore '_'.");
 
-    if (par_data == NULL)
+    if (par_data == nullptr)
         throw std::invalid_argument("NULL pointer was passed as data object.");
 
     htri_t exists = H5Lexists(group_id, par_name->c_str(), H5P_DEFAULT);
@@ -280,7 +280,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
 }
 
 // Helper function to write unstructured data
-inline sword qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = NULL)
+inline sword qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = nullptr)
 {
     // Get information about the group
     H5G_info_t group_info;
@@ -288,7 +288,7 @@ inline sword qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_n
         return -1LL; // Error
 
     size_t prefix_length = 0;
-    if (prefix != NULL)
+    if (prefix != nullptr)
         prefix_length = prefix->length();
 
     // Traverse the objects in the group by index
@@ -1164,20 +1164,20 @@ template class quadriga_lib::QUADRIGA_LIB_VERSION::channel<double>;
 // Returns type ID of a std::any field:
 int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **dataptr)
 {
-    if (par_data == NULL || !par_data->has_value())
+    if (par_data == nullptr || !par_data->has_value())
         return -2;
 
-    if (dims != NULL) // Set dims to scalar type
+    if (dims != nullptr) // Set dims to scalar type
         dims[0] = 1ULL, dims[1] = 1ULL, dims[2] = 1ULL;
 
     if (par_data->type().name() == typeid(std::string).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<std::string>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 *dims = (uword)data->length();
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->c_str();
         }
         return 9;
@@ -1186,42 +1186,42 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
     // Scalar types
     if (par_data->type().name() == typeid(float).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<float>(par_data);
         return 10;
     }
 
     if (par_data->type().name() == typeid(double).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<double>(par_data);
         return 11;
     }
 
     if (par_data->type().name() == typeid(unsigned long long int).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<unsigned long long int>(par_data);
         return 12;
     }
 
     if (par_data->type().name() == typeid(long long int).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<long long int>(par_data);
         return 13;
     }
 
     if (par_data->type().name() == typeid(unsigned int).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<unsigned int>(par_data);
         return 14;
     }
 
     if (par_data->type().name() == typeid(int).name())
     {
-        if (dataptr != NULL)
+        if (dataptr != nullptr)
             *dataptr = (void *)std::any_cast<int>(par_data);
         return 15;
     }
@@ -1229,12 +1229,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
     // Matrix types
     if (par_data->type().name() == typeid(arma::Mat<float>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<float>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 20;
@@ -1242,12 +1242,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Mat<double>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<double>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 21;
@@ -1255,12 +1255,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Mat<unsigned long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<unsigned long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 22;
@@ -1268,12 +1268,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Mat<long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 23;
@@ -1281,12 +1281,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Mat<unsigned int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<unsigned int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 24;
@@ -1294,12 +1294,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Mat<int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Mat<int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 25;
@@ -1308,12 +1308,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
     // Cube types
     if (par_data->type().name() == typeid(arma::Cube<float>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<float>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 30;
@@ -1321,12 +1321,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Cube<double>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<double>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 31;
@@ -1334,12 +1334,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Cube<unsigned long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<unsigned long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 32;
@@ -1347,12 +1347,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Cube<long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 33;
@@ -1360,12 +1360,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Cube<unsigned int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<unsigned int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 34;
@@ -1373,12 +1373,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Cube<int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Cube<int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_rows, dims[1] = data->n_cols, dims[2] = data->n_slices;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 35;
@@ -1387,12 +1387,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
     // Column vectors
     if (par_data->type().name() == typeid(arma::Col<float>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<float>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 40;
@@ -1400,12 +1400,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Col<double>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<double>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 41;
@@ -1413,12 +1413,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Col<unsigned long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<unsigned long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 42;
@@ -1426,12 +1426,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Col<long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 43;
@@ -1439,12 +1439,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Col<unsigned int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<unsigned int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 44;
@@ -1452,12 +1452,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Col<int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Col<int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 45;
@@ -1466,12 +1466,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
     // Row vectors
     if (par_data->type().name() == typeid(arma::Row<float>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<float>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 50;
@@ -1479,12 +1479,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Row<double>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<double>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 51;
@@ -1492,12 +1492,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Row<unsigned long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<unsigned long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 52;
@@ -1505,12 +1505,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Row<long long int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<long long int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 53;
@@ -1518,12 +1518,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Row<unsigned int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<unsigned int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 54;
@@ -1531,12 +1531,12 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
 
     if (par_data->type().name() == typeid(arma::Row<int>).name())
     {
-        if (dims != NULL || dataptr != NULL)
+        if (dims != nullptr || dataptr != nullptr)
         {
             auto *data = std::any_cast<arma::Row<int>>(par_data);
-            if (dims != NULL)
+            if (dims != nullptr)
                 dims[0] = data->n_elem;
-            if (dataptr != NULL)
+            if (dataptr != nullptr)
                 *dataptr = (void *)data->memptr();
         }
         return 55;
@@ -1581,6 +1581,60 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
 
     // Close the file
     H5Fclose(file_id);
+}
+
+// Read storage layout from HDF file
+arma::Col<unsigned> quadriga_lib::hdf_read_ChannelDims(std::string fn, arma::Col<unsigned> *channelID)
+{
+    if (!qHDF_file_exists(fn))
+        throw std::invalid_argument("File does not exist.");
+
+    // Open file for reading
+    // Note: Read-only access causes error in consecutive write operation. Hence, we use read/write here!
+    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file_id == H5I_INVALID_HID)
+        throw std::invalid_argument("Error opening file.");
+
+    arma::Col<unsigned> ChannelDims(4, arma::fill::none);
+
+    // Read channel dims from file
+    hsize_t dims[4];
+    hid_t dset_id = H5Dopen(file_id, "ChannelDims", H5P_DEFAULT);
+    if (dset_id == H5I_INVALID_HID)
+        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    hid_t dspace_id = H5Dget_space(dset_id);
+    int ndims = H5Sget_simple_extent_ndims(dspace_id);
+    if (ndims != 1)
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+    if (dims[0] != 4)
+        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims.memptr());
+    H5Sclose(dspace_id);
+    H5Dclose(dset_id);
+
+    // Load the storage index from file
+    if (channelID != nullptr)
+    {
+        unsigned *p_ChannelDims = ChannelDims.memptr();
+        unsigned n_order = p_ChannelDims[0] * p_ChannelDims[1] * p_ChannelDims[2] * p_ChannelDims[3];
+        channelID->set_size((uword)n_order);
+
+        dset_id = H5Dopen(file_id, "Order", H5P_DEFAULT);
+        if (dset_id == H5I_INVALID_HID)
+            H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        dspace_id = H5Dget_space(dset_id);
+        ndims = H5Sget_simple_extent_ndims(dspace_id);
+        if (ndims != 1)
+            H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+        if (dims[0] != n_order)
+            H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, channelID->memptr());
+    }
+    H5Fclose(file_id);
+
+    return ChannelDims;
 }
 
 // Read channel object from HDF5 file
