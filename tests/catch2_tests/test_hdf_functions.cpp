@@ -116,6 +116,13 @@ TEST_CASE("HDF - Minimal Test")
     quadriga_lib::hdf5_create("test.hdf5", 10);
     c.hdf5_write("test.hdf5", 1);
 
+    auto ChanelDims = quadriga_lib::hdf_read_ChannelDims("test.hdf5");
+    CHECK(ChanelDims.n_elem == 4);
+    CHECK(ChanelDims.at(0) == 10);
+    CHECK(ChanelDims.at(1) == 1);
+    CHECK(ChanelDims.at(2) == 1);
+    CHECK(ChanelDims.at(3) == 1);
+
     // Test all supported par types
     { // String - 0
         auto t = std::string("Bla Bla Bla");
@@ -361,6 +368,14 @@ TEST_CASE("HDF - Minimal Test")
     // Write all unstructured data fields individually to slot [0]
     for (uword i = 0; i < c.par_names.size(); i++)
         quadriga_lib::hdf5_write_unstructured("test.hdf5", c.par_names[i], &c.par_data[i]);
+
+    // Read channelIDs
+    arma::Col<unsigned> channelID;
+    ChanelDims = quadriga_lib::hdf_read_ChannelDims("test.hdf5", &channelID);
+    CHECK(channelID.at(0) == 3);
+    CHECK(channelID.at(1) == 1);
+    CHECK(channelID.at(7) == 2);
+    CHECK(channelID.at(5) == 0);
 
     // Read names of the unstructured data fields
     std::vector<std::string> names2;

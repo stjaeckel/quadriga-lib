@@ -72,9 +72,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
     // Catch NULL-Pointers
     std::string error_message;
-    if (tx_array == NULL || rx_array == NULL ||
-        fbs_pos == NULL || lbs_pos == NULL || path_gain == NULL || path_length == NULL || M == NULL ||
-        coeff_re == NULL || coeff_im == NULL || delay == NULL)
+    if (tx_array == nullptr || rx_array == nullptr ||
+        fbs_pos == nullptr || lbs_pos == nullptr || path_gain == nullptr || path_length == nullptr || M == nullptr ||
+        coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
     {
         error_message = "Mandatory inputs and outputs cannot be NULL";
         throw std::invalid_argument(error_message.c_str());
@@ -129,13 +129,13 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         coeff_im->set_size(n_rx_ports, n_tx_ports, n_out);
     if (delay->n_rows != n_rx_ports || delay->n_cols != n_tx_ports || delay->n_slices != n_out)
         delay->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (aod != NULL && (aod->n_rows != n_rx_ports || aod->n_cols != n_tx_ports || aod->n_slices != n_out))
+    if (aod != nullptr && (aod->n_rows != n_rx_ports || aod->n_cols != n_tx_ports || aod->n_slices != n_out))
         aod->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (eod != NULL && (eod->n_rows != n_rx_ports || eod->n_cols != n_tx_ports || eod->n_slices != n_out))
+    if (eod != nullptr && (eod->n_rows != n_rx_ports || eod->n_cols != n_tx_ports || eod->n_slices != n_out))
         eod->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (aoa != NULL && (aoa->n_rows != n_rx_ports || aoa->n_cols != n_tx_ports || aoa->n_slices != n_out))
+    if (aoa != nullptr && (aoa->n_rows != n_rx_ports || aoa->n_cols != n_tx_ports || aoa->n_slices != n_out))
         aoa->set_size(n_rx_ports, n_tx_ports, n_out);
-    if (eoa != NULL && (eoa->n_rows != n_rx_ports || eoa->n_cols != n_tx_ports || eoa->n_slices != n_out))
+    if (eoa != nullptr && (eoa->n_rows != n_rx_ports || eoa->n_cols != n_tx_ports || eoa->n_slices != n_out))
         eoa->set_size(n_rx_ports, n_tx_ports, n_out);
 
     // Map output memory to internal representation
@@ -159,22 +159,22 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         CI = arma::Cube<dtype>(coeff_im->memptr(), n_rx, n_tx, n_out, false, true);
         DL = arma::Cube<dtype>(delay->memptr(), n_rx, n_tx, n_out, false, true);
 
-        if (aod == NULL)
+        if (aod == nullptr)
             AOD.set_size(n_links, n_out);
         else
             AOD = arma::Mat<dtype>(aod->memptr(), n_links, n_out, false, true);
 
-        if (eod == NULL)
+        if (eod == nullptr)
             EOD.set_size(n_links, n_out);
         else
             EOD = arma::Mat<dtype>(eod->memptr(), n_links, n_out, false, true);
 
-        if (aoa == NULL)
+        if (aoa == nullptr)
             AOA.set_size(n_links, n_out);
         else
             AOA = arma::Mat<dtype>(aoa->memptr(), n_links, n_out, false, true);
 
-        if (eoa == NULL)
+        if (eoa == nullptr)
             EOA.set_size(n_links, n_out);
         else
             EOA = arma::Mat<dtype>(eoa->memptr(), n_links, n_out, false, true);
@@ -451,7 +451,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
             }
 
             // Process departure angles
-            if (aod != NULL || eod != NULL)
+            if (aod != nullptr || eod != nullptr)
             {
                 // Convert AOD and EOD to Cartesian coordinates
                 quick_geo2cart(n_links, &p_aod[o], tempX, tempY, &p_eod[o], tempZ);
@@ -464,16 +464,16 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                 // Convert back to geographic coordinates and save to external memory
                 if (!different_output_size) // External memory is mapped to "p_aod" and "p_eod"
                     quick_cart2geo(n_ports, &p_aod[o], tempT, tempX, &p_eod[o], tempY);
-                else if (aod == NULL)
+                else if (aod == nullptr)
                     quick_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eod->slice_memptr(j), tempY);
-                else if (eod == NULL)
+                else if (eod == nullptr)
                     quick_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, NULL, tempY);
                 else
                     quick_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, eod->slice_memptr(j), tempY);
             }
 
             // Process arrival angles
-            if (aoa != NULL || eoa != NULL)
+            if (aoa != nullptr || eoa != nullptr)
             {
                 // Convert AOD and EOD to Cartesian coordinates
                 quick_geo2cart(n_links, &p_aoa[o], tempX, tempY, &p_eoa[o], tempZ);
@@ -486,9 +486,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                 // Convert back to geographic coordinates and save to external memory
                 if (!different_output_size) // External memory is mapped to "p_aoa" and "p_eoa"
                     quick_cart2geo(n_ports, &p_aoa[o], tempT, tempX, &p_eoa[o], tempY);
-                else if (aoa == NULL)
+                else if (aoa == nullptr)
                     quick_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eoa->slice_memptr(j), tempY);
-                else if (eoa == NULL)
+                else if (eoa == nullptr)
                     quick_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, NULL, tempY);
                 else
                     quick_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, eoa->slice_memptr(j), tempY);
@@ -544,9 +544,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
     // Catch NULL-Pointers
     std::string error_message;
-    if (tx_array == NULL || rx_array == NULL ||
-        aod == NULL || eod == NULL || aoa == NULL || eoa == NULL || path_gain == NULL || path_length == NULL || M == NULL ||
-        coeff_re == NULL || coeff_im == NULL || delay == NULL)
+    if (tx_array == nullptr || rx_array == nullptr ||
+        aod == nullptr || eod == nullptr || aoa == nullptr || eoa == nullptr || path_gain == nullptr || path_length == nullptr || M == nullptr ||
+        coeff_re == nullptr || coeff_im == nullptr || delay == nullptr)
     {
         error_message = "Mandatory inputs and outputs cannot be NULL";
         throw std::invalid_argument(error_message.c_str());
@@ -647,7 +647,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     arma::Mat<dtype> AOA_loc, EOA_loc, EMPTY;
 
     // To calculate the Doppler weights, we need the arrival in local antenna-coordinates
-    if (rx_Doppler != NULL)
+    if (rx_Doppler != nullptr)
     {
         AOA_loc.set_size(n_rx, n_path);
         EOA_loc.set_size(n_rx, n_path);
@@ -686,7 +686,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     element_pos_interp.reset();
 
     // Calculate the Doppler weights
-    if (rx_Doppler != NULL)
+    if (rx_Doppler != nullptr)
     {
         dtype *pAz = AOA_loc.memptr(), *pEl = EOA_loc.memptr();
         dtype *pD = add_fake_los_path ? rx_Doppler->memptr() + 1 : rx_Doppler->memptr();

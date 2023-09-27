@@ -179,7 +179,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::combine_pattern(quadri
         }
     }
 
-    if (output != NULL) // Write output data
+    if (output != nullptr) // Write output data
     {
         output->set_size(n_el, n_az, n_prt, n_prt);
 
@@ -549,7 +549,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    if (output == NULL && read_only)
+    if (output == nullptr && read_only)
     {
         error_message = "Cannot update read-only array antenna object inplace.";
         throw std::invalid_argument(error_message.c_str());
@@ -620,9 +620,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
 
     for (int p = 0; p < 4; ++p)
     {
-        dtype *data = NULL, *ptrO = NULL, *ptrI = NULL;
+        dtype *data = nullptr, *ptrO = nullptr, *ptrI = nullptr;
 
-        if (output == NULL)
+        if (output == nullptr)
             data = new dtype[n_el_new * n_az_new * n_slices];
         else if (p == 0)
         {
@@ -670,7 +670,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
             }
         }
 
-        if (output == NULL)
+        if (output == nullptr)
         {
             if (p == 0)
                 e_theta_re.set_size(n_el_new, n_az_new, n_slices),
@@ -695,7 +695,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     for (uword ia = 0ULL; ia < n_az; ++ia)
         if (keep_az_ptr[ia] == 1)
             *pp++ = azimuth_grid[ia];
-    if (output == NULL)
+    if (output == nullptr)
         azimuth_grid.set_size(n_az_new), pp = azimuth_grid.memptr();
     else if (output->azimuth_grid.n_elem != n_az_new)
         output->azimuth_grid.set_size(n_az_new), pp = output->azimuth_grid.memptr();
@@ -710,7 +710,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     for (uword ie = 0ULL; ie < n_el; ++ie)
         if (keep_el_ptr[ie] == 1)
             *pp++ = elevation_grid[ie];
-    if (output == NULL)
+    if (output == nullptr)
         elevation_grid.set_size(n_el_new), pp = elevation_grid.memptr();
     else if (output->elevation_grid.n_elem != n_el_new)
         output->elevation_grid.set_size(n_el_new), pp = output->elevation_grid.memptr();
@@ -720,7 +720,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::remove_zeros(quadriga_
     delete[] elevation_grid_new;
 
     // Copy the unchanged data
-    if (output != NULL)
+    if (output != nullptr)
     {
         if (!element_pos.empty())
         {
@@ -809,7 +809,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    if (output == NULL && read_only)
+    if (output == nullptr && read_only)
     {
         error_message = "Cannot update read-only array antenna object inplace.";
         throw std::invalid_argument(error_message.c_str());
@@ -876,7 +876,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     arma::Col<dtype> azimuth_grid_update, elevation_grid_update;
     if (update_grid)
     {
-        if (output == NULL && !use_all_elements)
+        if (output == nullptr && !use_all_elements)
         {
             error_message = "Update of sampling grid cannot be done for single elements of an array antenna!";
             throw std::invalid_argument(error_message.c_str());
@@ -1021,7 +1021,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
     azimuth_loc.reset(), elevation_loc.reset();
 
     // Adjust size of output, if needed
-    if (output != NULL)
+    if (output != nullptr)
         output->set_size(n_el, n_az, n_out, n_out);
 
     if (usage == 2) // Only adjust the polarization
@@ -1036,7 +1036,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
             dtype *p_phi_im = use_all_elements ? e_phi_im.slice_memptr(i) : e_phi_im.slice_memptr(element);
 
             dtype *q_theta_re = p_theta_re, *q_theta_im = p_theta_im, *q_phi_re = p_phi_re, *q_phi_im = p_phi_im;
-            if (output != NULL)
+            if (output != nullptr)
                 q_theta_re = use_all_elements ? output->e_theta_re.slice_memptr(i) : output->e_theta_re.memptr(),
                 q_theta_im = use_all_elements ? output->e_theta_im.slice_memptr(i) : output->e_theta_im.memptr(),
                 q_phi_re = use_all_elements ? output->e_phi_re.slice_memptr(i) : output->e_phi_re.memptr(),
@@ -1056,7 +1056,7 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
         gamma.reset();
 
         // Copy unchanged data
-        if (output != NULL)
+        if (output != nullptr)
         {
             dtype *ptrI = use_all_elements ? element_pos_update.memptr() : element_pos_update.colptr(element);
             dtype *ptrO = output->element_pos.memptr();
@@ -1077,46 +1077,46 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
         if (n_out > 1) // Transpose the interpolated data
             V_re = V_re.t(), V_im = V_im.t(), H_re = H_re.t(), H_im = H_im.t();
 
-        if (output == NULL && update_grid) // Set new array size
+        if (output == nullptr && update_grid) // Set new array size
             set_size(n_el, n_az, n_out, n_out);
 
         dtype *ptrI, *ptrO;
 
         ptrI = V_re.memptr();
         ptrO = use_all_elements ? e_theta_re.memptr() : e_theta_re.slice_memptr(element);
-        ptrO = output == NULL ? ptrO : output->e_theta_re.memptr();
+        ptrO = output == nullptr ? ptrO : output->e_theta_re.memptr();
         std::memcpy(ptrO, ptrI, n_el * n_az * n_out * sizeof(dtype));
         V_re.reset();
 
         ptrI = V_im.memptr();
         ptrO = use_all_elements ? e_theta_im.memptr() : e_theta_im.slice_memptr(element);
-        ptrO = output == NULL ? ptrO : output->e_theta_im.memptr();
+        ptrO = output == nullptr ? ptrO : output->e_theta_im.memptr();
         std::memcpy(ptrO, ptrI, n_el * n_az * n_out * sizeof(dtype));
         V_im.reset();
 
         ptrI = H_re.memptr();
         ptrO = use_all_elements ? e_phi_re.memptr() : e_phi_re.slice_memptr(element);
-        ptrO = output == NULL ? ptrO : output->e_phi_re.memptr();
+        ptrO = output == nullptr ? ptrO : output->e_phi_re.memptr();
         std::memcpy(ptrO, ptrI, n_el * n_az * n_out * sizeof(dtype));
         H_re.reset();
 
         ptrI = H_im.memptr();
         ptrO = use_all_elements ? e_phi_im.memptr() : e_phi_im.slice_memptr(element);
-        ptrO = output == NULL ? ptrO : output->e_phi_im.memptr();
+        ptrO = output == nullptr ? ptrO : output->e_phi_im.memptr();
         std::memcpy(ptrO, ptrI, n_el * n_az * n_out * sizeof(dtype));
         H_im.reset();
 
         ptrI = azimuth_grid_update.memptr();
-        ptrO = output == NULL ? azimuth_grid.memptr() : output->azimuth_grid.memptr();
+        ptrO = output == nullptr ? azimuth_grid.memptr() : output->azimuth_grid.memptr();
         std::memcpy(ptrO, ptrI, n_az * sizeof(dtype));
 
         ptrI = elevation_grid_update.memptr();
-        ptrO = output == NULL ? elevation_grid.memptr() : output->elevation_grid.memptr();
+        ptrO = output == nullptr ? elevation_grid.memptr() : output->elevation_grid.memptr();
         std::memcpy(ptrO, ptrI, n_el * sizeof(dtype));
 
         ptrI = element_pos_update.memptr();
         ptrO = use_all_elements ? element_pos.memptr() : element_pos.colptr(element);
-        ptrO = output == NULL ? ptrO : output->element_pos.memptr();
+        ptrO = output == nullptr ? ptrO : output->element_pos.memptr();
         double *R_ptr = R.memptr();
         for (uword i = 0ULL; i < i_element.n_elem; ++i)
         {
@@ -1128,9 +1128,9 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::rotate_pattern(dtype x
             ptrO[k] = a, ptrO[k + 1] = b, ptrO[k + 2] = c;
         }
 
-        if (output == NULL && update_grid)
+        if (output == nullptr && update_grid)
             remove_zeros();
-        else if (output != NULL && update_grid)
+        else if (output != nullptr && update_grid)
             output->remove_zeros();
     }
 }
@@ -1182,8 +1182,8 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::arrayant<dtype>::is_valid(bool q
     // Assuming that the data has been validated before, we can quickly check if the
     // data pointers were updated. If not, we can assume that the data is still valid.
     if (quick_check)
-        quick_check = check_ptr[0] != NULL && check_ptr[1] != NULL && check_ptr[2] != NULL &&
-                      check_ptr[3] != NULL && check_ptr[4] != NULL && check_ptr[5] != NULL &&
+        quick_check = check_ptr[0] != nullptr && check_ptr[1] != nullptr && check_ptr[2] != nullptr &&
+                      check_ptr[3] != nullptr && check_ptr[4] != nullptr && check_ptr[5] != nullptr &&
                       check_ptr[0] == e_theta_re.memptr() &&
                       check_ptr[1] == e_theta_im.memptr() &&
                       check_ptr[2] == e_phi_re.memptr() &&
@@ -1296,7 +1296,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned 
     quadriga_lib::arrayant<dtype> ant;
     std::string error_message;
 
-    if (layout == NULL)
+    if (layout == nullptr)
     {
         arma::Mat<unsigned> tmp_layout;
         error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
@@ -1575,9 +1575,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     double wavelength = 299792458.0 / double(center_freq);
     constexpr dtype zero = dtype(0.0);
 
-    quadriga_lib::arrayant<dtype> ant = pattern == NULL ? quadriga_lib::generate_arrayant_omni<dtype>() : pattern->copy();
+    quadriga_lib::arrayant<dtype> ant = pattern == nullptr ? quadriga_lib::generate_arrayant_omni<dtype>() : pattern->copy();
 
-    if (pattern != NULL)
+    if (pattern != nullptr)
     {
         std::string error_message = ant.validate(); // Deep check
         if (error_message.length() != 0)
@@ -1587,7 +1587,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     ant.center_frequency = center_freq;
     uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
-    if (pattern == NULL) // Generate 3GPP default radiation pattern
+    if (pattern == nullptr) // Generate 3GPP default radiation pattern
     {
         // Single antenna element vertical radiation pattern cut in dB
         arma::Col<dtype> Y = ant.elevation_grid;
