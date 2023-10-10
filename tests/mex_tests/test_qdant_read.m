@@ -120,8 +120,12 @@ assertTrue( strcmp(name,'xxx') );
 
 %% Check error parsing
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
+    [~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % AzimuthGrid missing
@@ -134,6 +138,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % AzimuthGrid tag not closed correctly
@@ -147,6 +155,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Wrong number of entries in EthetaMag
@@ -161,6 +173,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Wrong number of entries in CouplingAbs
@@ -176,6 +192,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % CouplingPhase with multiple ports without CouplingAbs
@@ -190,6 +210,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Not a XML File
@@ -200,6 +224,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Not a QDANT file (KML instead)
@@ -218,6 +246,10 @@ fclose(f);
 try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 delete('test.qdant');

@@ -116,7 +116,7 @@ TEST_CASE("HDF - Minimal Test")
     quadriga_lib::hdf5_create("test.hdf5", 10);
     c.hdf5_write("test.hdf5", 1);
 
-    auto ChanelDims = quadriga_lib::hdf_read_ChannelDims("test.hdf5");
+    auto ChanelDims = quadriga_lib::hdf5_read_layout("test.hdf5");
     CHECK(ChanelDims.n_elem == 4);
     CHECK(ChanelDims.at(0) == 10);
     CHECK(ChanelDims.at(1) == 1);
@@ -354,7 +354,7 @@ TEST_CASE("HDF - Minimal Test")
 
     // Read names of the unstructured data fields
     std::vector<std::string> names;
-    quadriga_lib::hdf_read_unstructured_names("test.hdf5", &names, 7);
+    quadriga_lib::hdf5_read_dset_names("test.hdf5", &names, 7);
 
     // Check if all fields are included in the HDF file and that the correct names are returned
     for (auto &hdf_name : names)
@@ -367,11 +367,11 @@ TEST_CASE("HDF - Minimal Test")
 
     // Write all unstructured data fields individually to slot [0]
     for (uword i = 0; i < c.par_names.size(); i++)
-        quadriga_lib::hdf5_write_unstructured("test.hdf5", c.par_names[i], &c.par_data[i]);
+        quadriga_lib::hdf5_write_dset("test.hdf5", c.par_names[i], &c.par_data[i]);
 
     // Read channelIDs
     arma::Col<unsigned> channelID;
-    ChanelDims = quadriga_lib::hdf_read_ChannelDims("test.hdf5", &channelID);
+    ChanelDims = quadriga_lib::hdf5_read_layout("test.hdf5", &channelID);
     CHECK(channelID.at(0) == 3);
     CHECK(channelID.at(1) == 1);
     CHECK(channelID.at(7) == 2);
@@ -379,7 +379,7 @@ TEST_CASE("HDF - Minimal Test")
 
     // Read names of the unstructured data fields
     std::vector<std::string> names2;
-    quadriga_lib::hdf_read_unstructured_names("test.hdf5", &names2, 0);
+    quadriga_lib::hdf5_read_dset_names("test.hdf5", &names2, 0);
 
     // Check if all fields are included in the HDF file and that the correct names are returned
     for (auto &hdf_name : names2)
@@ -392,169 +392,169 @@ TEST_CASE("HDF - Minimal Test")
 
     // Read string
     std::any value;
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "string");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "string");
     CHECK(quadriga_lib::any_type_id(&value) == 9);
     CHECK(std::any_cast<std::string>(value) == "Bla Bla Bla");
 
     // Read float
     void *dataptr;
     uword dims[3];
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_float", 7);
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_float", 7);
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 10);
     CHECK(*(float *)dataptr == 3.14f);
 
     // Read double
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_double");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_double");
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 11);
     CHECK(std::any_cast<double>(value) == 6.28);
 
     // Read ULL
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_ullong");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_ullong");
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 12);
     CHECK(*(unsigned long long int *)dataptr == 12341100000ULL);
 
     // Read LL
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_llong");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_llong");
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 13);
     CHECK(*(long long int *)dataptr == -98760000000LL);
 
     // Read unsigned
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_unsigned", 7);
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_unsigned", 7);
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 14);
     CHECK(*(unsigned *)dataptr == 13);
 
     // Read int
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "scalar_int");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_int");
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 15);
     CHECK(*(int *)dataptr == -13);
 
     // Mat, float
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_float");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_float");
     CHECK(quadriga_lib::any_type_id(&value) == 20);
     CHECK(arma::approx_equal(std::any_cast<arma::fmat>(value), std::any_cast<arma::fmat>(c.par_data[7]), "absdiff", 1e-14));
 
     // Mat, double
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_double");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_double");
     CHECK(quadriga_lib::any_type_id(&value) == 21);
     CHECK(arma::approx_equal(std::any_cast<arma::mat>(value), std::any_cast<arma::mat>(c.par_data[8]), "absdiff", 1e-14));
 
     // Mat, uword
     arma::umat cmp;
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_uword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_uword");
     CHECK(quadriga_lib::any_type_id(&value) == 22);
     cmp = std::any_cast<arma::umat>(value) == std::any_cast<arma::umat>(c.par_data[9]);
     CHECK(arma::all(arma::vectorise(cmp)));
 
     // Mat, sword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_sword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_sword");
     CHECK(quadriga_lib::any_type_id(&value) == 23);
     cmp = std::any_cast<arma::imat>(value) == std::any_cast<arma::imat>(c.par_data[10]);
     CHECK(arma::all(arma::vectorise(cmp)));
 
     // Mat, unsigned
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_unsigned");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_unsigned");
     CHECK(quadriga_lib::any_type_id(&value) == 24);
     cmp = std::any_cast<arma::u32_mat>(value) == std::any_cast<arma::Mat<unsigned>>(c.par_data[11]);
     CHECK(arma::all(arma::vectorise(cmp)));
 
     // Mat, int
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "mat_int");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "mat_int");
     CHECK(quadriga_lib::any_type_id(&value) == 25);
     cmp = std::any_cast<arma::s32_mat>(value) == std::any_cast<arma::Mat<int>>(c.par_data[12]);
     CHECK(arma::all(arma::vectorise(cmp)));
 
     // Cube, float
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_float");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_float");
     CHECK(quadriga_lib::any_type_id(&value) == 30);
     CHECK(arma::approx_equal(std::any_cast<arma::fcube>(value), std::any_cast<arma::fcube>(c.par_data[13]), "absdiff", 1e-14));
 
     // Cube, double
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_double", 7);
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_double", 7);
     CHECK(quadriga_lib::any_type_id(&value) == 31);
     CHECK(arma::approx_equal(std::any_cast<arma::cube>(value), std::any_cast<arma::cube>(c.par_data[14]), "absdiff", 1e-14));
 
     //  Cube, uword
     arma::ucube cmp_cube;
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_uword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_uword");
     CHECK(quadriga_lib::any_type_id(&value) == 32);
     cmp_cube = std::any_cast<arma::ucube>(value) == std::any_cast<arma::ucube>(c.par_data[15]);
     CHECK(arma::all(arma::vectorise(cmp_cube)));
 
     // Cube, sword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_sword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_sword");
     CHECK(quadriga_lib::any_type_id(&value) == 33);
     cmp_cube = std::any_cast<arma::icube>(value) == std::any_cast<arma::icube>(c.par_data[16]);
     CHECK(arma::all(arma::vectorise(cmp_cube)));
 
     // Cube, unsigned
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_unsigned");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_unsigned");
     CHECK(quadriga_lib::any_type_id(&value) == 34);
     cmp_cube = std::any_cast<arma::u32_cube>(value) == std::any_cast<arma::Cube<unsigned>>(c.par_data[17]);
     CHECK(arma::all(arma::vectorise(cmp_cube)));
 
     // Cube, int
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "cube_int");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "cube_int");
     CHECK(quadriga_lib::any_type_id(&value) == 35);
     cmp_cube = std::any_cast<arma::s32_cube>(value) == std::any_cast<arma::Cube<int>>(c.par_data[18]);
     CHECK(arma::all(arma::vectorise(cmp_cube)));
 
     // Col, float
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_float");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_float");
     CHECK(quadriga_lib::any_type_id(&value) == 40);
     CHECK(arma::approx_equal(std::any_cast<arma::fvec>(value), std::any_cast<arma::Col<float>>(c.par_data[19]), "absdiff", 1e-14));
 
     // Col, double
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_double");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_double");
     CHECK(quadriga_lib::any_type_id(&value) == 41);
     CHECK(arma::approx_equal(std::any_cast<arma::vec>(value), std::any_cast<arma::vec>(c.par_data[20]), "absdiff", 1e-14));
 
     // Col, uword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_uword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_uword");
     CHECK(quadriga_lib::any_type_id(&value) == 42);
     CHECK(arma::all(std::any_cast<arma::uvec>(value) == std::any_cast<arma::uvec>(c.par_data[21])));
 
     // Col, sword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_sword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_sword");
     CHECK(quadriga_lib::any_type_id(&value) == 43);
     CHECK(arma::all(std::any_cast<arma::icolvec>(value) == std::any_cast<arma::ivec>(c.par_data[22])));
 
     // Col, unsigned
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_unsigned");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_unsigned");
     CHECK(quadriga_lib::any_type_id(&value) == 44);
     CHECK(arma::all(std::any_cast<arma::u32_vec>(value) == std::any_cast<arma::Col<unsigned>>(c.par_data[23])));
 
     // Col, int
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "col_int");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "col_int");
     CHECK(quadriga_lib::any_type_id(&value) == 45);
     CHECK(arma::all(std::any_cast<arma::s32_vec>(value) == std::any_cast<arma::Col<int>>(c.par_data[24])));
 
     // Row, float
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_float");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_float");
     CHECK(quadriga_lib::any_type_id(&value) == 40);
     CHECK(arma::approx_equal(std::any_cast<arma::fvec>(value), std::any_cast<arma::Row<float>>(c.par_data[25]).as_col(), "absdiff", 1e-14));
 
     // Row, double
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_double", 7);
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_double", 7);
     CHECK(quadriga_lib::any_type_id(&value) == 41);
     CHECK(arma::approx_equal(std::any_cast<arma::vec>(value), std::any_cast<arma::rowvec>(c.par_data[26]).as_col(), "absdiff", 1e-14));
 
     // Row, uword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_uword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_uword");
     CHECK(quadriga_lib::any_type_id(&value) == 42);
     CHECK(arma::all(std::any_cast<arma::uvec>(value) == std::any_cast<arma::u64_rowvec>(c.par_data[27]).as_col()));
 
     // Row, sword
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_sword");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_sword");
     CHECK(quadriga_lib::any_type_id(&value) == 43);
     CHECK(arma::all(std::any_cast<arma::icolvec>(value) == std::any_cast<arma::irowvec>(c.par_data[28]).as_col()));
 
     // Row, unsigned
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_unsigned");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_unsigned");
     CHECK(quadriga_lib::any_type_id(&value) == 44);
     CHECK(arma::all(std::any_cast<arma::u32_vec>(value) == std::any_cast<arma::Row<unsigned>>(c.par_data[29]).as_col()));
 
     // Row, int
-    value = quadriga_lib::hdf5_read_unstructured("test.hdf5", "row_int");
+    value = quadriga_lib::hdf5_read_dset("test.hdf5", "row_int");
     CHECK(quadriga_lib::any_type_id(&value) == 45);
     CHECK(arma::all(std::any_cast<arma::s32_vec>(value) == std::any_cast<arma::Row<int>>(c.par_data[30]).as_col()));
 
@@ -564,7 +564,7 @@ TEST_CASE("HDF - Minimal Test")
     CHECK(d.is_valid().empty()); // Data is valid?
 
     CHECK(d.name == c.name);
-    CHECK(d.center_frequency == c.center_frequency);
+    CHECK(d.center_frequency(0) == c.center_frequency(0));
     CHECK(arma::approx_equal(d.tx_pos, c.tx_pos, "absdiff", 1e-14));
     CHECK(arma::approx_equal(d.rx_pos, c.rx_pos, "absdiff", 1e-14));
     CHECK(arma::approx_equal(d.tx_orientation, c.tx_orientation, "absdiff", 1e-14));
@@ -601,4 +601,6 @@ TEST_CASE("HDF - Minimal Test")
         else // Conversion from row to col
             CHECK(b == a - 10);
     }
+
+    std::remove("test.hdf5");
 }

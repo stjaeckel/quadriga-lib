@@ -90,6 +90,10 @@ try
         azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name,...
         'testm.qdant',5, layout);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 id_file = quadriga_lib.arrayant_qdant_write( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...

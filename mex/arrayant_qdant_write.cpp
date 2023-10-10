@@ -98,7 +98,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!mxIsClass(prhs[11], "char"))
         mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Input 'fn' must be a string");
 
-    std::string fn = mxArrayToString(prhs[11]);
+    auto mx_fn = mxArrayToString(prhs[11]);
+    std::string fn = std::string(mx_fn);
+    mxFree(mx_fn);
 
     // Read id variable - indicate that ID is not given by passing a value 0
     unsigned id = nrhs < 13 ? 0 : qd_mex_get_scalar<unsigned>(prhs[12], "id");

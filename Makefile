@@ -24,7 +24,9 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
        +quadriga_lib/arrayant_interpolate.mexw64   +quadriga_lib/arrayant_qdant_read.mexw64      +quadriga_lib/arrayant_qdant_write.mexw64   \
 	   +quadriga_lib/version.mexw64   +quadriga_lib/arrayant_combine_pattern.mexw64   +quadriga_lib/interp.mexw64   \
 	   +quadriga_lib/arrayant_generate.mexw64   +quadriga_lib/arrayant_calc_directivity.mexw64   +quadriga_lib/arrayant_rotate_pattern.mexw64 \
-	   +quadriga_lib/get_channels_spherical.mexw64   +quadriga_lib/get_channels_planar.mexw64
+	   +quadriga_lib/get_channels_spherical.mexw64   +quadriga_lib/get_channels_planar.mexw64 \
+	   +quadriga_lib/hdf5_create_file.mexw64   +quadriga_lib/hdf5_read_channel.mexw64   +quadriga_lib/hdf5_read_dset.mexw64   +quadriga_lib/hdf5_read_dset_names.mexw64   \
+	   +quadriga_lib/hdf5_read_layout.mexw64   +quadriga_lib/hdf5_reshape_layout.mexw64   +quadriga_lib/hdf5_write_channel.mexw64   +quadriga_lib/hdf5_write_dset.mexw64   
 
 test:   tests\test.exe
 	tests\test.exe
@@ -98,6 +100,30 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
 
 +quadriga_lib/get_channels_planar.mexw64:   mex\get_channels_planar.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_create_file.mexw64:   mex\hdf5_create_file.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_read_channel.mexw64:   mex\hdf5_read_channel.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_read_dset.mexw64:   mex\hdf5_read_dset.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_read_dset_names.mexw64:   mex\hdf5_read_dset_names.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_read_layout.mexw64:   mex\hdf5_read_layout.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_reshape_layout.mexw64:   mex\hdf5_reshape_layout.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_write_channel.mexw64:   mex\hdf5_write_channel.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
+
++quadriga_lib/hdf5_write_dset.mexw64:   mex\hdf5_write_dset.cpp   lib\quadriga_lib.lib
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H) -L$(HDF5)\lib libhdf5.lib Shlwapi.lib
 
 # Maintainance section

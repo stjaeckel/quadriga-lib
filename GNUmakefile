@@ -11,11 +11,12 @@ all:        mex_octave  mex_matlab
 ARMA_H      = external/armadillo-12.6.3/include
 PUGIXML_H   = external/pugixml-1.13/src
 CATCH2      = external/Catch2-3.3.2-Linux
-HDF5_H      = /usr/include/hdf5/serial  # external/hdf5-1.14.2-Linux/include
-HDF5_LIB    = /usr/lib/x86_64-linux-gnu/hdf5/serial  # external/hdf5-1.14.2-Linux/lib
+HDF5_H      = external/hdf5-1.14.2-Linux/include
+HDF5_LIB    = external/hdf5-1.14.2-Linux/lib
+
 
 # Configurations
-CCFLAGS     = -std=c++17 -fPIC -O3 -fopenmp -Wall -Wextra -Wpedantic -Wconversion #-Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
+CCFLAGS     = -std=c++17 -O3 -fPIC -fopenmp -Wall -Wextra -Wpedantic -Wconversion #   -Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
 
 # Sourcees
 src     	= $(wildcard src/*.cpp)
@@ -28,9 +29,10 @@ tests 		= $(wildcard tests/catch2_tests/*.cpp)
 mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 
-test:   tests/test_bin
+test:   mex_octave   tests/test_bin
+	octave --eval "cd tests; quadriga_lib_mex_tests;"
 	tests/test_bin
-
+	
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
 	$(CC) -std=c++17 -fopenmp  $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -L $(HDF5_LIB) -lCatch2 -lhdf5
 
