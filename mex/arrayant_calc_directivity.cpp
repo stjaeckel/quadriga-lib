@@ -33,8 +33,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output:
     //  0 - directivity     Directivity of the antenna pattern in dBi
 
-    if (nlhs != 1 || nrhs < 6)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Wrong number of input/output arguments.");
+    if (nrhs != 6)
+        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Wrong number of input arguments.");
+
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Wrong number of output arguments.");
 
     // Validate data types
     bool use_single = false;
@@ -95,7 +98,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Create output variable
-    plhs[0] = mxCreateNumericMatrix(1, 1, mxDOUBLE_CLASS, mxREAL);
-    double *output = (double *)mxGetData(plhs[0]);
-    *output = directivity;
+    if (nlhs > 0)
+    {
+        plhs[0] = mxCreateNumericMatrix(1, 1, mxDOUBLE_CLASS, mxREAL);
+        double *output = (double *)mxGetData(plhs[0]);
+        *output = directivity;
+    }
 }

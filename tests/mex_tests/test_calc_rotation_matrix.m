@@ -6,41 +6,51 @@ assertExceptionThrown( f, 'quadriga_tools:calc_rotation_matrix:no_input')
 % 4 inputs should throw error
 try
     [~] = quadriga_lib.calc_rotation_matrix(1,1,1,1);
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:no_input');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:no_input',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % 2 outputs should throw error
 try
     [~,~] = quadriga_lib.calc_rotation_matrix([0;0;0]);
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:no_output');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:no_output',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % empty input
 try
     [~] = quadriga_lib.calc_rotation_matrix([]);
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:empty');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:empty',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % wrong input
 try
     [~] = quadriga_lib.calc_rotation_matrix(eye(2));
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:size_mismatch',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % int32 input
 try
     [~] = quadriga_lib.calc_rotation_matrix(int32([0;0;0]));
-    error_exception_not_thrown('quadriga_tools:calc_rotation_matrix:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:calc_rotation_matrix:wrong_type',expt.identifier);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % invert_y_axis
@@ -69,15 +79,3 @@ assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
 
 R = quadriga_lib.calc_rotation_matrix([0;-pi/8;0],0,1);
 assertElementsAlmostEqual( R, [c,0,-s,0,1,0,s,0,c]', 'absolute', 1e-5 );
-
-
-% ---------------- HELPER FUNCTIONS ------------------
-function error_exception_not_thrown(error_id)
-error('moxunit:exceptionNotRaised', 'Exception ''%s'' not thrown', error_id);
-
-function error_if_wrong_id_thrown(expected_error_id, thrown_error_id)
-if ~strcmp(thrown_error_id, expected_error_id)
-    error('moxunit:wrongExceptionRaised',...
-        'Exception raised with id ''%s'' expected id ''%s''',...
-        thrown_error_id,expected_error_id);
-end

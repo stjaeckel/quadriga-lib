@@ -39,7 +39,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  2 - e_phi_re_c      Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_ports]
     //  3 - e_phi_im_c      Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_ports]
 
-    if (nlhs != 4 || nrhs < 9)
+    if (nlhs != 4 || nrhs != 10)
         mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", "Wrong number of input/output arguments.");
 
     // Validate data types

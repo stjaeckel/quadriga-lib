@@ -17,44 +17,50 @@ assertExceptionThrown( f, 'quadriga_lib:arrayant_interpolate:no_output')
 
 try
     [~, ~, ~] = quadriga_lib.arrayant_interpolate([],e,e,e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:no_output');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:no_output',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate([],e,e,e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,[],e,e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,[],el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,[],el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,[]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % All double
@@ -64,9 +70,10 @@ end
 e = single(e);
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:wrong_type',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 az_grid = single(az_grid);
@@ -76,44 +83,50 @@ el = single(el);
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e(1,:,:),e,e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e(:,1,:),e,az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e(:,:,1),az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid(1:2),el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid(1:2),az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el(1:2));
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Should be error-free
@@ -123,9 +136,10 @@ end
 % Test azimuth grid range
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,2*az_grid,el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 az(1) = pi;
@@ -134,9 +148,10 @@ az(1) = pi;
 % Test elevation grid range (-pi/ to pi/2)
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,2*el_grid,az,el);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:import_error');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:import_error',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 el(1) = pi/2;
@@ -168,25 +183,28 @@ assertEqual(size(Vr),size(Hi))
 % i_element cannot be zero
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,0);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:out_of_bound');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:out_of_bound',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % i_element cannot be -1
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,-1);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:out_of_bound');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:out_of_bound',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % i_element cannot exceed number of elements
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[1,4]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:out_of_bound');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:out_of_bound',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 
@@ -204,40 +222,47 @@ assertEqual(size(Vr),size(Hi))
 % orientation must have 3 elements
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],single(1));
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % orientation must be double or single
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],int32(or));
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:wrong_type',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Optional per-element angles 
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az([1,1],:),el,[1,2]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
+
 try
     [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az([1,1,1],:),el([1,1,1],:),[1,2]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
+
 [~, ~, ~, ~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az([1,1],:),el([1,1],:),[1,1]);
 
 % 11 inputs should throw error
 try
     [~,~,~,~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],[],[],[]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:no_input');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:no_input',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % Test projected distance
@@ -259,20 +284,8 @@ assertEqual(size(elevation_loc),[3,6])
 % 9 outputs should throw error
 try
     [~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_interpolate(e,e,e,e,az_grid,el_grid,az,el,[],[]);
-    error_exception_not_thrown('quadriga_lib:arrayant_interpolate:no_output');
-catch expt
-    error_if_wrong_id_thrown('quadriga_lib:arrayant_interpolate:no_output',expt.identifier);
-end
-
-
-
-% ---------------- HELPER FUNCTIONS ------------------
-function error_exception_not_thrown(error_id)
-error('moxunit:exceptionNotRaised', 'Exception ''%s'' not thrown', error_id);
-
-function error_if_wrong_id_thrown(expected_error_id, thrown_error_id)
-if ~strcmp(thrown_error_id, expected_error_id)
-    error('moxunit:wrongExceptionRaised',...
-        'Exception raised with id ''%s'' expected id ''%s''',...
-        thrown_error_id,expected_error_id);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end

@@ -42,14 +42,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 11 - layout          Layout of multiple array antennas (optional), uint32            Matrix
 
     // Number of in and outputs
-    if (nlhs < 11 || nrhs < 1)
+    if (nlhs < 11 || nrhs < 1 || nlhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:qdant_read:no_input", "Wrong number of input/output arguments.");
 
     // Read filename
     if (!mxIsClass(prhs[0], "char"))
         mexErrMsgIdAndTxt("quadriga_lib:qdant_read:wrong_type", "Input 'fn' must be a string");
 
-    std::string fn = mxArrayToString(prhs[0]);
+    auto mx_fn = mxArrayToString(prhs[0]);
+    std::string fn = std::string(mx_fn);
+    mxFree(mx_fn);
 
     // Read scalar variables
     unsigned id = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id");

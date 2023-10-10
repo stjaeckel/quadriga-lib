@@ -47,6 +47,71 @@ inline bool qHDF_file_exists(const std::string &name)
         return false;
 }
 
+// Close file
+inline void qHDF_close_file(hid_t file_id)
+{
+    if (file_id == H5I_INVALID_HID)
+        throw std::invalid_argument("Error closing file. Invalid File ID.");
+
+    hid_t *obj_ids;
+
+    // Check if the file is opened only once
+    ssize_t count = H5Fget_obj_count(file_id, H5F_OBJ_FILE);
+    if (count > 1)
+        throw std::invalid_argument("Error closing file. File is opened multiple times.");
+
+    // Close all attributes
+    count = H5Fget_obj_count(file_id, H5F_OBJ_ATTR);
+    if (count > 0)
+    {
+        obj_ids = new hid_t[count];
+        H5Fget_obj_ids(file_id, H5F_OBJ_ATTR, count, obj_ids);
+        for (ssize_t i = 0; i < count; ++i)
+            H5Aclose(obj_ids[i]);
+        delete[] obj_ids;
+    }
+
+    // Close all datatypes
+    count = H5Fget_obj_count(file_id, H5F_OBJ_DATATYPE);
+    if (count > 0)
+    {
+        obj_ids = new hid_t[count];
+        H5Fget_obj_ids(file_id, H5F_OBJ_DATATYPE, count, obj_ids);
+        for (ssize_t i = 0; i < count; ++i)
+            H5Tclose(obj_ids[i]);
+        delete[] obj_ids;
+    }
+
+    // Close all datasets
+    count = H5Fget_obj_count(file_id, H5F_OBJ_DATASET);
+    if (count > 0)
+    {
+        obj_ids = new hid_t[count];
+        H5Fget_obj_ids(file_id, H5F_OBJ_DATASET, count, obj_ids);
+        for (ssize_t i = 0; i < count; ++i)
+            H5Dclose(obj_ids[i]);
+        delete[] obj_ids;
+    }
+
+    // Close all groups
+    count = H5Fget_obj_count(file_id, H5F_OBJ_GROUP);
+    if (count > 0)
+    {
+        obj_ids = new hid_t[count];
+        H5Fget_obj_ids(file_id, H5F_OBJ_GROUP, count, obj_ids);
+        for (ssize_t i = 0; i < count; ++i)
+            H5Gclose(obj_ids[i]);
+        delete[] obj_ids;
+    }
+
+    // Check if we got all of them
+    count = H5Fget_obj_count(file_id, H5F_OBJ_ALL);
+    if (count > 1)
+        throw std::invalid_argument("Error closing file. Objects are still open.");
+    else if (count == 1)   // Only the file_id is left
+        H5Fclose(file_id); // Bye
+}
+
 // Helper function: convert double to float
 template <typename dtype>
 inline void qHDF_cast_to_float(const dtype *in, float *out, uword n_elem)
@@ -84,19 +149,19 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
     hsize_t dims[4];
     hid_t dset_id = H5Dopen(file_id, "ChannelDims", H5P_DEFAULT);
     if (dset_id == H5I_INVALID_HID)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     hid_t dspace_id = H5Dget_space(dset_id);
     int ndims = H5Sget_simple_extent_ndims(dspace_id);
     if (ndims != 1)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Sget_simple_extent_dims(dspace_id, dims, NULL);
     if (dims[0] != 4)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
     H5Sclose(dspace_id);
     H5Dclose(dset_id);
 
-    // Check, if the requested storage location exists
+    // Always returns 0 if index out of bound
     if (ix >= ChannelDims[0] || iy >= ChannelDims[1] || iz >= ChannelDims[2] || iw >= ChannelDims[3])
         return 0;
 
@@ -105,19 +170,20 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
     unsigned *p_order = new unsigned[n_order];
     dset_id = H5Dopen(file_id, "Order", H5P_DEFAULT);
     if (dset_id == H5I_INVALID_HID)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     dspace_id = H5Dget_space(dset_id);
     ndims = H5Sget_simple_extent_ndims(dspace_id);
     if (ndims != 1)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Sget_simple_extent_dims(dspace_id, dims, NULL);
     if (dims[0] != n_order)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
 
     unsigned storage_location = iw * ChannelDims[0] * ChannelDims[1] * ChannelDims[2] +
                                 iz * ChannelDims[0] * ChannelDims[1] +
                                 iy * ChannelDims[0] + ix;
+
     unsigned channel_index = p_order[storage_location];
     bool create_new = false;
 
@@ -147,8 +213,6 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
         // Update storage index
         p_order[storage_location] = channel_index;
         H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
-        H5Dclose(dset_id);
-        H5Sclose(dspace_id);
 
         // Create group for storing channel data
         std::string group_name = "/channel_" + std::to_string(channel_index);
@@ -158,25 +222,29 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
         H5Gclose(group_id);
         H5Pclose(gcpl);
     }
+
+    H5Dclose(dset_id);
+    H5Sclose(dspace_id);
+
     delete[] p_order;
     return channel_index;
 }
 
 // Helper function to write unstructured data
-inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const std::any *par_data)
+inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par_name, const std::any *par_data)
 {
 
     if (par_name->length() == 0 || !qHDF_isalnum(*par_name))
-        throw std::invalid_argument("Parameter name must only contain letters, numbers and the underscore '_'.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Parameter name must only contain letters, numbers and the underscore '_'.");
 
     if (par_data == nullptr)
-        throw std::invalid_argument("NULL pointer was passed as data object.");
+        qHDF_close_file(file_id), throw std::invalid_argument("NULL pointer was passed as data object.");
 
     htri_t exists = H5Lexists(group_id, par_name->c_str(), H5P_DEFAULT);
     if (exists > 0)
     {
         std::string error_msg = "Dataset '" + *par_name + "' already exists.";
-        throw std::invalid_argument(error_msg);
+        qHDF_close_file(file_id), throw std::invalid_argument(error_msg);
     }
 
     // Get low-level access to the data
@@ -275,7 +343,7 @@ inline void qHDF_write_par(hid_t group_id, const std::string *par_name, const st
     else
     {
         std::string error_msg = "Unsupported data type for '" + *par_name + "'";
-        throw std::invalid_argument(error_msg);
+        qHDF_close_file(file_id), throw std::invalid_argument(error_msg);
     }
 }
 
@@ -338,13 +406,17 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
     // Obtain the data type id
     hid_t datatype_id = H5Dget_type(dset_id);
     if (datatype_id == H5I_INVALID_HID)
+    {
+        H5Dclose(dset_id);
         return std::any();
+    }
 
     // Evaluate dataspace
     hid_t dspace_id = H5Dget_space(dset_id);
     if (dspace_id == H5I_INVALID_HID)
     {
         H5Tclose(datatype_id);
+        H5Dclose(dset_id);
         return std::any();
     }
 
@@ -369,6 +441,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             value.resize(size);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.data());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -377,6 +450,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             float value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             if (float2double)
                 return (double)value;
             else
@@ -388,6 +462,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             double value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -396,6 +471,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             unsigned long long int value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -404,6 +480,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             long long int value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -412,6 +489,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             unsigned int value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -420,6 +498,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             int value;
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value);
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
     }
@@ -435,6 +514,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
                 delete[] data;
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
             else
@@ -442,6 +522,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 arma::Col<float> value((uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
         }
@@ -451,6 +532,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Col<double> value((uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -459,6 +541,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Col<unsigned long long int> value((uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -467,6 +550,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Col<long long int> value((uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -475,6 +559,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Col<unsigned int> value((uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -483,6 +568,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Col<int> value((uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
     }
@@ -498,6 +584,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
                 delete[] data;
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
             else
@@ -505,6 +592,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 arma::Mat<float> value((uword)dims[1], (uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
         }
@@ -514,6 +602,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Mat<double> value((uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -522,6 +611,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Mat<unsigned long long int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -530,6 +620,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Mat<long long int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -538,6 +629,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Mat<unsigned int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -546,6 +638,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Mat<int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
     }
@@ -561,6 +654,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
                 delete[] data;
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
             else
@@ -568,6 +662,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
                 arma::Cube<float> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
+                H5Dclose(dset_id);
                 return value;
             }
         }
@@ -577,6 +672,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Cube<double> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -585,6 +681,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Cube<unsigned long long int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -593,6 +690,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Cube<long long int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -601,6 +699,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Cube<unsigned int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
 
@@ -609,6 +708,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             arma::Cube<int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
+            H5Dclose(dset_id);
             return value;
         }
     }
@@ -622,7 +722,43 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 template <typename dtype>
 uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_snap() const
 {
-    return rx_pos.n_cols;
+    if (center_frequency.n_elem > 1ULL)
+        return center_frequency.n_elem;
+
+    if (tx_orientation.n_cols > 1ULL)
+        return tx_orientation.n_cols;
+
+    if (rx_orientation.n_cols > 1ULL)
+        return rx_orientation.n_cols;
+
+    if (coeff_re.size() >= 1)
+        return (uword)coeff_re.size();
+
+    if (delay.size() >= 1)
+        return (uword)delay.size();
+
+    if (path_gain.size() >= 1)
+        return (uword)path_gain.size();
+
+    if (path_length.size() >= 1)
+        return (uword)path_length.size();
+
+    if (path_polarization.size() >= 1)
+        return (uword)path_polarization.size();
+
+    if (path_angles.size() >= 1)
+        return (uword)path_angles.size();
+
+    if (path_coord.size() >= 1)
+        return (uword)path_coord.size();
+
+    if (rx_pos.n_cols >= 1ULL)
+        return rx_pos.n_cols;
+
+    if (tx_pos.n_cols >= 1ULL)
+        return tx_pos.n_cols;
+
+    return 0ULL;
 }
 template <typename dtype>
 uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
@@ -643,7 +779,7 @@ uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
 template <typename dtype>
 arma::uvec quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_path() const
 {
-    uword n_snap = rx_pos.n_cols;
+    uword n_snap = this->n_snap();
     if (n_snap == 0)
         return arma::uvec();
 
@@ -678,7 +814,7 @@ bool quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::empty() const
     if (name != "empty")
         return false;
 
-    if (center_frequency != dtype(299792458.0))
+    if (center_frequency.n_elem != 0ULL)
         return false;
 
     if (tx_pos.n_elem != 0ULL)
@@ -714,9 +850,6 @@ bool quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::empty() const
     if (path_coord.size() != 0)
         return false;
 
-    if (par_names.size() != 0)
-        return false;
-
     if (initial_position != 0)
         return false;
 
@@ -727,39 +860,45 @@ bool quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::empty() const
 template <typename dtype>
 std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
 {
-    if (rx_pos.n_rows != 3)
-        return "'rx_pos' must have 3 rows.";
-
-    if (rx_pos.n_cols == 0)
-        return "There must be at least one entry in 'rx_pos'.";
-
-    uword n_snap = rx_pos.n_cols;
+    uword n_snap = this->n_snap();
     uword n_tx = 0, n_rx = 0;
     arma::uvec n_pth_v = this->n_path();
+
+    if (n_pth_v.n_elem != n_snap)
+        return "Number of elements returned by 'n_path()' does not match number of snapshots.";
     uword *n_pth = n_pth_v.memptr();
 
-    if (tx_pos.n_rows != 3)
-        return "'tx_pos' must have 3 rows.";
+    if (n_snap != 0ULL && rx_pos.n_rows != 3ULL)
+        return "'rx_pos' is missing or ill-formatted (must have 3 rows).";
 
-    if (tx_pos.n_cols != 1 && tx_pos.n_cols != n_snap)
+    if (rx_pos.n_cols != 1ULL && rx_pos.n_cols != n_snap)
+        return "Number of columns in 'rx_pos' must be 1 or match the number of snapshots.";
+
+    if (n_snap != 0UL && tx_pos.n_rows != 3ULL)
+        return "'tx_pos' is missing or ill-formatted (must have 3 rows).";
+
+    if (tx_pos.n_cols != 1ULL && tx_pos.n_cols != n_snap)
         return "Number of columns in 'tx_pos' must be 1 or match the number of snapshots.";
 
-    if (tx_orientation.n_elem != 0 && tx_orientation.n_rows != 3)
+    if (center_frequency.n_elem != 0ULL && center_frequency.n_elem != 1ULL && center_frequency.n_elem != n_snap)
+        return "Number of entries in 'center_frequency' must be 0, 1 or match the number of snapshots.";
+
+    if (tx_orientation.n_elem != 0ULL && tx_orientation.n_rows != 3ULL)
         return "'tx_orientation' must be empty or have 3 rows.";
 
-    if (tx_orientation.n_elem != 0 && tx_orientation.n_cols != 1 && tx_orientation.n_cols != n_snap)
+    if (tx_orientation.n_elem != 0ULL && tx_orientation.n_cols != 1ULL && tx_orientation.n_cols != n_snap)
         return "Number of columns in 'tx_orientation' must be 1 or match the number of snapshots.";
 
-    if (rx_orientation.n_elem != 0 && rx_orientation.n_rows != 3)
+    if (rx_orientation.n_elem != 0ULL && rx_orientation.n_rows != 3ULL)
         return "'rx_orientation' must be empty or have 3 rows.";
 
-    if (rx_orientation.n_elem != 0 && rx_orientation.n_cols != 1 && rx_orientation.n_cols != n_snap)
+    if (rx_orientation.n_elem != 0ULL && rx_orientation.n_cols != 1ULL && rx_orientation.n_cols != n_snap)
         return "Number of columns in 'rx_orientation' must be 1 or match the number of snapshots.";
 
     if (coeff_re.size() != 0 && coeff_re.size() != n_snap)
         return "'coeff_re' must be empty or match the number of snapshots.";
 
-    if (coeff_re.size() == n_snap)
+    if (n_snap != 0ULL && coeff_re.size() == n_snap)
     {
         if (coeff_im.size() != n_snap)
             return "Imaginary part of channel coefficients 'coeff_im' is missing or incomplete.";
@@ -783,11 +922,17 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
                 return "Size mismatch in 'delay[" + std::to_string(i) + "]'.";
         }
     }
+    else if (!coeff_im.empty())
+        return "Real part of channel coefficients 'coeff_re' is missing or incomplete.";
+    else if (!delay.empty())
+        for (uword i = 0ULL; i < n_snap; ++i)
+            if (delay[i].n_rows != 1 || delay[i].n_cols != 1 || delay[i].n_slices != n_pth[i])
+                return "Size mismatch in 'delay[" + std::to_string(i) + "]'.";
 
     if (path_gain.size() != 0 && path_gain.size() != n_snap)
         return "'path_gain' must be empty or match the number of snapshots.";
 
-    if (path_gain.size() == n_snap)
+    if (n_snap != 0ULL && path_gain.size() == n_snap)
         for (uword i = 0ULL; i < n_snap; ++i)
             if (path_gain[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_gain[" + std::to_string(i) + "]'.";
@@ -795,7 +940,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
     if (path_length.size() != 0 && path_length.size() != n_snap)
         return "'path_length' must be empty or match the number of snapshots.";
 
-    if (path_length.size() == n_snap)
+    if (n_snap != 0ULL && path_length.size() == n_snap)
         for (uword i = 0; i < n_snap; ++i)
             if (path_length[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_length[" + std::to_string(i) + "]'.";
@@ -803,7 +948,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
     if (path_polarization.size() != 0 && path_polarization.size() != n_snap)
         return "'path_polarization' must be empty or match the number of snapshots.";
 
-    if (path_polarization.size() == n_snap)
+    if (n_snap != 0ULL && path_polarization.size() == n_snap)
         for (uword i = 0ULL; i < n_snap; ++i)
             if (path_polarization[i].n_rows != 8ULL || path_polarization[i].n_cols != n_pth[i])
                 return "Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.";
@@ -811,7 +956,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
     if (path_angles.size() != 0 && path_angles.size() != n_snap)
         return "'path_angles' must be empty or match the number of snapshots.";
 
-    if (path_angles.size() == n_snap)
+    if (n_snap != 0ULL && path_angles.size() == n_snap)
         for (uword i = 0ULL; i < n_snap; ++i)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4)
                 return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
@@ -819,7 +964,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
     if (path_coord.size() != 0 && path_coord.size() != n_snap)
         return "'path_coord' must be empty or match the number of snapshots.";
 
-    if (path_coord.size() == n_snap)
+    if (n_snap != 0ULL && path_coord.size() == n_snap)
         for (uword i = 0ULL; i < n_snap; ++i)
             if (path_coord[i].n_elem != 0ULL && (path_coord[i].n_rows != 3ULL || path_coord[i].n_slices != n_pth[i]))
                 return "Size mismatch in 'path_coord[" + std::to_string(i) + "]'.";
@@ -836,19 +981,27 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
 
 // Save data to HDF
 template <typename dtype>
-void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw) const
+int quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw) const
 {
     // Commonly reused variables
     hid_t file_id, dspace_id, dset_id, group_id, type_id, snap_id;
     hsize_t dims[4];
+    int return_code = 0;
 
     // Validate the channel data
     std::string error_message = is_valid();
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
+    // Determine if the channel object has no structured data fields
+    bool channel_is_empty = empty();
+
+    // Are the unstructured fields?
+    if (channel_is_empty && par_names.size() == 0)
+        return 0; // Nothing to be done!
+
     // Determine if we need to convert the data to float
-    bool data_is_float = typeid(rx_pos).name() == typeid(arma::Mat<float>).name();
+    bool data_is_float = !channel_is_empty && typeid(rx_pos).name() == typeid(arma::Mat<float>).name();
     float *data;
 
     // Create file
@@ -856,42 +1009,71 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
         quadriga_lib::hdf5_create(fn);
 
     // Open file for writing
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
     file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
     // Get channel ID
+    return_code = (qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 0) != 0) ? 1 : 0;
     unsigned channel_index = qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 1);
     if (channel_index == 0)
-        H5Fclose(file_id), throw std::invalid_argument("Index out of bound.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Index out of bound.");
 
     // Open group for writing
     std::string group_name = "/channel_" + std::to_string(channel_index);
     group_id = H5Gopen2(file_id, group_name.c_str(), H5P_DEFAULT);
 
+    // Store the number of snapshots
+    if (!channel_is_empty)
+    {
+        unsigned n_snap = (unsigned)this->n_snap();
+        hid_t dspace_scalar = H5Screate(H5S_SCALAR);
+        dset_id = H5Dcreate2(group_id, "NumSnap", H5T_NATIVE_UINT, dspace_scalar, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &n_snap);
+        H5Dclose(dset_id);
+        H5Sclose(dspace_scalar);
+    }
+
     // Store channel name
-    type_id = H5Tcopy(H5T_C_S1);
-    H5Tset_size(type_id, name.length());
-    dims[0] = 1;
-    dspace_id = H5Screate_simple(1, dims, NULL);
-    dset_id = H5Dcreate2(group_id, "Name", type_id, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    H5Dwrite(dset_id, type_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, name.c_str());
-    H5Dclose(dset_id);
-    H5Sclose(dspace_id);
-    H5Tclose(type_id);
+    if (!channel_is_empty)
+    {
+        type_id = H5Tcopy(H5T_C_S1);
+        H5Tset_size(type_id, name.length());
+        dims[0] = 1;
+        dspace_id = H5Screate_simple(1, dims, NULL);
+        dset_id = H5Dcreate2(group_id, "Name", type_id, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        H5Dwrite(dset_id, type_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, name.c_str());
+        H5Dclose(dset_id);
+        H5Sclose(dspace_id);
+        H5Tclose(type_id);
+    }
 
     // Center frequency in [Hz]
-    float tmp = float(center_frequency);
-    dims[0] = 1;
-    dspace_id = H5Screate_simple(1, dims, NULL);
-    dset_id = H5Dcreate2(group_id, "CenterFrequency", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &tmp);
-    H5Dclose(dset_id);
-    H5Sclose(dspace_id);
+    if (!center_frequency.empty())
+    {
+        dims[0] = (hsize_t)center_frequency.n_elem;
+        dspace_id = H5Screate_simple(1, dims, NULL);
+        dset_id = H5Dcreate2(group_id, "CenterFrequency", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        if (data_is_float)
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, center_frequency.memptr());
+        else
+        {
+            data = new float[center_frequency.n_elem];
+            qHDF_cast_to_float(center_frequency.memptr(), data, center_frequency.n_elem);
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+            delete[] data;
+        }
+        H5Dclose(dset_id);
+        H5Sclose(dspace_id);
+    }
 
     // Index of reference position
     if (initial_position != 0)
     {
+        dims[0] = 1;
         dspace_id = H5Screate_simple(1, dims, NULL);
         dset_id = H5Dcreate2(group_id, "Initial_position", H5T_NATIVE_INT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
         H5Dwrite(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &initial_position);
@@ -900,38 +1082,44 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
     }
 
     // Transmitter positions, matrix of size [3, n_snap] or [3, 1]
-    dims[0] = tx_pos.n_cols;
-    dims[1] = 3;
-    dspace_id = H5Screate_simple(2, dims, NULL);
-    dset_id = H5Dcreate2(group_id, "tx_position", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    if (data_is_float)
-        H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, tx_pos.memptr());
-    else
+    if (tx_pos.n_elem != 0ULL)
     {
-        data = new float[tx_pos.n_elem];
-        qHDF_cast_to_float(tx_pos.memptr(), data, tx_pos.n_elem);
-        H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-        delete[] data;
+        dims[0] = tx_pos.n_cols;
+        dims[1] = 3;
+        dspace_id = H5Screate_simple(2, dims, NULL);
+        dset_id = H5Dcreate2(group_id, "tx_position", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        if (data_is_float)
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, tx_pos.memptr());
+        else
+        {
+            data = new float[tx_pos.n_elem];
+            qHDF_cast_to_float(tx_pos.memptr(), data, tx_pos.n_elem);
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+            delete[] data;
+        }
+        H5Dclose(dset_id);
+        H5Sclose(dspace_id);
     }
-    H5Dclose(dset_id);
-    H5Sclose(dspace_id);
 
     // Receiver positions, matrix of size [3, n_snap]
-    dims[0] = rx_pos.n_cols;
-    dims[1] = 3;
-    dspace_id = H5Screate_simple(2, dims, NULL);
-    dset_id = H5Dcreate2(group_id, "rx_position", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    if (data_is_float)
-        H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rx_pos.memptr());
-    else
+    if (rx_pos.n_elem != 0ULL)
     {
-        data = new float[rx_pos.n_elem];
-        qHDF_cast_to_float(rx_pos.memptr(), data, rx_pos.n_elem);
-        H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-        delete[] data;
+        dims[0] = rx_pos.n_cols;
+        dims[1] = 3;
+        dspace_id = H5Screate_simple(2, dims, NULL);
+        dset_id = H5Dcreate2(group_id, "rx_position", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        if (data_is_float)
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, rx_pos.memptr());
+        else
+        {
+            data = new float[rx_pos.n_elem];
+            qHDF_cast_to_float(rx_pos.memptr(), data, rx_pos.n_elem);
+            H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+            delete[] data;
+        }
+        H5Dclose(dset_id);
+        H5Sclose(dspace_id);
     }
-    H5Dclose(dset_id);
-    H5Sclose(dspace_id);
 
     // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
     if (tx_orientation.n_elem != 0ULL)
@@ -1149,12 +1337,13 @@ void quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string 
     for (std::size_t i = 0; i < par_names.size(); ++i)
     {
         std::string par_name = "par_" + par_names[i];
-        qHDF_write_par(group_id, &par_name, &par_data[i]);
+        qHDF_write_par(file_id, group_id, &par_name, &par_data[i]);
     }
 
     // Close the group and file
-    H5Gclose(group_id);
-    H5Fclose(file_id);
+    qHDF_close_file(file_id);
+
+    return return_code;
 }
 
 // Instantiate templates
@@ -1553,6 +1742,9 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     if (nx == 0 || ny == 0 || nz == 0 || nw == 0)
         throw std::invalid_argument("Storage layout dimension sizes cannot be 0.");
 
+    // Initialize HDF5 library
+    H5open();
+
     // Create and open file
     file_id = H5Fcreate(fn.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID) // May be invalid if file is currently opened
@@ -1565,8 +1757,8 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     dspace_id = H5Screate_simple(1, dims, NULL);
     dset_id = H5Dcreate2(file_id, "ChannelDims", H5T_NATIVE_UINT32, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
-    H5Sclose(dspace_id);
     H5Dclose(dset_id);
+    H5Sclose(dspace_id);
 
     // Create the index
     unsigned n_order = nx * ny * nz * nw;
@@ -1575,23 +1767,40 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     dspace_id = H5Screate_simple(1, dims, NULL);
     dset_id = H5Dcreate2(file_id, "Order", H5T_NATIVE_UINT32, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, p_order);
-    H5Sclose(dspace_id);
     H5Dclose(dset_id);
+    H5Sclose(dspace_id);
     delete[] p_order;
 
+    // Write a version ID
+    unsigned version = 2;
+    hid_t dspace_scalar = H5Screate(H5S_SCALAR);
+    dset_id = H5Dcreate2(file_id, "Version", H5T_NATIVE_UINT, dspace_scalar, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, &version);
+    H5Dclose(dset_id);
+    H5Sclose(dspace_scalar);
+
     // Close the file
-    H5Fclose(file_id);
+    qHDF_close_file(file_id);
+
+    // Close HDF5 library
+    H5close();
+    return;
 }
 
 // Read storage layout from HDF file
-arma::Col<unsigned> quadriga_lib::hdf_read_ChannelDims(std::string fn, arma::Col<unsigned> *channelID)
+arma::Col<unsigned> quadriga_lib::hdf5_read_layout(std::string fn, arma::Col<unsigned> *channelID)
 {
     if (!qHDF_file_exists(fn))
-        throw std::invalid_argument("File does not exist.");
+        return arma::Col<unsigned>(4);
+
+    // Initialize HDF5 library
+    H5open();
 
     // Open file for reading
-    // Note: Read-only access causes error in consecutive write operation. Hence, we use read/write here!
-    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
+    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
@@ -1601,17 +1810,17 @@ arma::Col<unsigned> quadriga_lib::hdf_read_ChannelDims(std::string fn, arma::Col
     hsize_t dims[4];
     hid_t dset_id = H5Dopen(file_id, "ChannelDims", H5P_DEFAULT);
     if (dset_id == H5I_INVALID_HID)
-        H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     hid_t dspace_id = H5Dget_space(dset_id);
     int ndims = H5Sget_simple_extent_ndims(dspace_id);
     if (ndims != 1)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Sget_simple_extent_dims(dspace_id, dims, NULL);
     if (dims[0] != 4)
-        H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
     H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims.memptr());
-    H5Sclose(dspace_id);
     H5Dclose(dset_id);
+    H5Sclose(dspace_id);
 
     // Load the storage index from file
     if (channelID != nullptr)
@@ -1622,17 +1831,24 @@ arma::Col<unsigned> quadriga_lib::hdf_read_ChannelDims(std::string fn, arma::Col
 
         dset_id = H5Dopen(file_id, "Order", H5P_DEFAULT);
         if (dset_id == H5I_INVALID_HID)
-            H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+            qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
         dspace_id = H5Dget_space(dset_id);
         ndims = H5Sget_simple_extent_ndims(dspace_id);
         if (ndims != 1)
-            H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+            qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
         H5Sget_simple_extent_dims(dspace_id, dims, NULL);
         if (dims[0] != n_order)
-            H5Sclose(dspace_id), H5Dclose(dset_id), H5Fclose(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+            qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
         H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, channelID->memptr());
+        H5Dclose(dset_id);
+        H5Sclose(dspace_id);
     }
-    H5Fclose(file_id);
+
+    // Close the file
+    qHDF_close_file(file_id);
+
+    // Close HDF5 library
+    H5close();
 
     return ChannelDims;
 }
@@ -1644,9 +1860,15 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     if (!qHDF_file_exists(fn))
         throw std::invalid_argument("File does not exist.");
 
+    // Create empty channel
+    quadriga_lib::channel<dtype> c;
+    hid_t file_id = -1;
+
     // Open file for reading
-    // Note: Read-only access causes error in consecutive write operation. Hence, we use read/write here!
-    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
+    file_id = H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
@@ -1654,8 +1876,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     unsigned channel_index = qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 0);
     if (channel_index == 0)
     {
-        std::cout << "Channel not found!" << std::endl;
-        H5Fclose(file_id);
+        qHDF_close_file(file_id);
         return quadriga_lib::channel<dtype>();
     }
 
@@ -1667,17 +1888,43 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     bool float2double = typeid(dtype).name() == typeid(double).name();
 
     std::any val;
-    quadriga_lib::channel<dtype> c;
+
+    // Read unstructured data
+    std::string prefix = "par_";
+    std::vector<std::string> available_par;
+    qHDF_read_par_names(group_id, &available_par, &prefix);
+
+    for (std::string &name : available_par)
+    {
+        val = qHDF_read_data(group_id, prefix + name);
+        if (quadriga_lib::any_type_id(&val) > 0)
+            c.par_names.push_back(name), c.par_data.push_back(val);
+    }
 
     // Read channel name
     val = qHDF_read_data(group_id, "Name");
     if (val.has_value())
         c.name = std::any_cast<std::string>(val);
 
-    // Center frequency in [Hz]
-    val = qHDF_read_data(group_id, "CenterFrequency");
+    // Read the number of snapshots
+    uword n_snapshots = 0ULL;
+    val = qHDF_read_data(group_id, "NumSnap");
     if (val.has_value())
-        c.center_frequency = (dtype)std::any_cast<float>(val);
+        n_snapshots = (uword)std::any_cast<unsigned int>(val);
+
+    // If there are no snapshots, we don't nee to continue
+    if (n_snapshots == 0ULL)
+    {
+        qHDF_close_file(file_id);
+        return c;
+    }
+
+    // Center frequency in [Hz]
+    val = qHDF_read_data(group_id, "CenterFrequency", float2double);
+    if (val.has_value() && quadriga_lib::any_type_id(&val) < 20) // scalar vale
+        c.center_frequency = (dtype)std::any_cast<dtype>(val);
+    else if (val.has_value())
+        c.center_frequency = std::any_cast<arma::Col<dtype>>(val);
 
     // Index of reference position
     val = qHDF_read_data(group_id, "Initial_position");
@@ -1704,8 +1951,6 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     if (val.has_value())
         c.rx_orientation = std::any_cast<arma::Mat<dtype>>(val);
 
-    // Get the number of snapshots
-    uword n_snapshots = c.rx_pos.n_cols;
     for (uword i = 0ULL; i < n_snapshots; ++i)
     {
         // Open group containing snapshot data
@@ -1759,43 +2004,82 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
             H5Gclose(snap_id);
     }
 
-    // Read unstructured data
-    std::string prefix = "par_";
-    std::vector<std::string> available_par;
-    qHDF_read_par_names(group_id, &available_par, &prefix);
-
-    for (std::string &name : available_par)
-    {
-        val = qHDF_read_data(group_id, prefix + name);
-        if (quadriga_lib::any_type_id(&val) > 0)
-            c.par_names.push_back(name), c.par_data.push_back(val);
-    }
-
-    H5Gclose(group_id);
-    H5Fclose(file_id);
+    qHDF_close_file(file_id);
     return c;
 }
 template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
+// Reshape storage layout
+void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
+{
+    if (!qHDF_file_exists(fn))
+        throw std::invalid_argument("File does not exist.");
+
+    // Open file for writing
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
+    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file_id == H5I_INVALID_HID)
+        throw std::invalid_argument("Error opening file.");
+
+    // Read channel dims from file
+    unsigned ChannelDims[4];
+    hsize_t dims[4];
+    hid_t dset_id = H5Dopen(file_id, "ChannelDims", H5P_DEFAULT);
+    if (dset_id == H5I_INVALID_HID)
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    hid_t dspace_id = H5Dget_space(dset_id);
+    int ndims = H5Sget_simple_extent_ndims(dspace_id);
+    if (ndims != 1)
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    H5Sget_simple_extent_dims(dspace_id, dims, NULL);
+    if (dims[0] != 4)
+        qHDF_close_file(file_id), throw std::invalid_argument("Storage index in HDF file is corrupted.");
+    H5Dread(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
+
+    unsigned n_data_old = ChannelDims[0] * ChannelDims[1] * ChannelDims[2] * ChannelDims[3];
+    unsigned n_data_new = nx * ny * nz * nw;
+
+    if (n_data_new != n_data_old)
+        qHDF_close_file(file_id), throw std::invalid_argument("Mismatch in number of elements in storage index.");
+
+    ChannelDims[0] = nx;
+    ChannelDims[1] = ny;
+    ChannelDims[2] = nz;
+    ChannelDims[3] = nw;
+    H5Dwrite(dset_id, H5T_NATIVE_UINT32, H5S_ALL, H5S_ALL, H5P_DEFAULT, ChannelDims);
+
+    H5Sclose(dspace_id);
+    H5Dclose(dset_id);
+
+    qHDF_close_file(file_id);
+}
+
 // Read unstructured data from HDF5 file
-std::any quadriga_lib::hdf5_read_unstructured(std::string fn, std::string par_name,
-                                              unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                              std::string prefix)
+std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
+                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                      std::string prefix)
 {
     if (!qHDF_file_exists(fn))
         throw std::invalid_argument("File does not exist.");
 
     // Open file for reading
-    // Note: Read-only access causes error in consecutive write operation. Hence, we use read/write here!
-    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
+    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
     // Get channel ID
     unsigned channel_index = qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 0);
     if (channel_index == 0)
-        H5Fclose(file_id), throw std::invalid_argument("Channel ID does not exist.");
+    {
+        qHDF_close_file(file_id);
+        return std::any();
+    }
 
     // Open group
     std::string group_name = "/channel_" + std::to_string(channel_index);
@@ -1805,22 +2089,24 @@ std::any quadriga_lib::hdf5_read_unstructured(std::string fn, std::string par_na
     std::string name = prefix + par_name;
     std::any data = qHDF_read_data(group_id, name);
 
-    H5Gclose(group_id);
-    H5Fclose(file_id);
+    // Close group and file
+    qHDF_close_file(file_id);
     return data;
 }
 
 // Read names of the unstructured data fields from the HDF file
-uword quadriga_lib::hdf_read_unstructured_names(std::string fn, std::vector<std::string> *par_names,
-                                                unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                std::string prefix)
+uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
+                                         unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                         std::string prefix)
 {
     if (!qHDF_file_exists(fn))
         throw std::invalid_argument("File does not exist.");
 
     // Open file for reading
-    // Note: Read-only access causes error in consecutive write operation. Hence, we use read/write here!
-    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
+    hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
@@ -1828,7 +2114,7 @@ uword quadriga_lib::hdf_read_unstructured_names(std::string fn, std::vector<std:
     unsigned channel_index = qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 0);
     if (channel_index == 0)
     {
-        H5Fclose(file_id);
+        qHDF_close_file(file_id);
         return 0ULL;
     }
 
@@ -1838,8 +2124,7 @@ uword quadriga_lib::hdf_read_unstructured_names(std::string fn, std::vector<std:
 
     // Read names
     sword no_par_names = qHDF_read_par_names(group_id, par_names, &prefix);
-    H5Gclose(group_id);
-    H5Fclose(file_id);
+    qHDF_close_file(file_id);
 
     if (no_par_names < 0LL)
         throw std::invalid_argument("Failed to get group info.");
@@ -1848,15 +2133,18 @@ uword quadriga_lib::hdf_read_unstructured_names(std::string fn, std::vector<std:
 }
 
 // Writes unstructured data to a hdf5 file
-void quadriga_lib::hdf5_write_unstructured(std::string fn, std::string par_name, const std::any *par_data,
-                                           unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                           std::string prefix)
+void quadriga_lib::hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,
+                                   unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                   std::string prefix)
 {
     // Create file
     if (!qHDF_file_exists(fn))
         quadriga_lib::hdf5_create(fn);
 
     // Open file for writing
+    htri_t status = H5Fis_hdf5(fn.c_str());
+    if (status <= 0)
+        throw std::invalid_argument("Not an HDF5 file.");
     hid_t file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
@@ -1864,7 +2152,7 @@ void quadriga_lib::hdf5_write_unstructured(std::string fn, std::string par_name,
     // Get channel ID
     unsigned channel_index = qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 2);
     if (channel_index == 0)
-        H5Fclose(file_id), throw std::invalid_argument("Index out of bound.");
+        qHDF_close_file(file_id), throw std::invalid_argument("Index out of bound.");
 
     // Open group for writing
     std::string group_name = "/channel_" + std::to_string(channel_index);
@@ -1872,63 +2160,8 @@ void quadriga_lib::hdf5_write_unstructured(std::string fn, std::string par_name,
 
     // Write unstructured data to file
     std::string name = prefix + par_name;
-    qHDF_write_par(group_id, &name, par_data);
+    qHDF_write_par(file_id, group_id, &name, par_data);
 
     // Close the group and file
-    H5Gclose(group_id);
-    H5Fclose(file_id);
+    qHDF_close_file(file_id);
 }
-
-// void quadriga_lib::qd_channel_hello()
-// {
-//     std::cout << H5_VERS_INFO << std::endl;
-
-//     hid_t file_id, dset_id, dspace_id, group_id; /* identifiers */
-//     herr_t status;
-
-//     // Setup dataset dimensions and input data
-//     int ndims = 1;
-//     hsize_t dims[1];
-//     dims[0] = 50;
-//     std::vector<double> data(50, 1);
-
-//     // Open a file
-//     file_id = H5Fcreate("new_file.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-//     // Create a group
-//     group_id = H5Gcreate2(file_id, "/group", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-
-//     // Create a dataset
-//     dspace_id = H5Screate_simple(1, dims, NULL);
-//     dset_id = H5Dcreate2(group_id, "dset1", H5T_STD_I32BE, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-
-//     // Write the data
-//     status = H5Dwrite(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data.data());
-
-//     // Close dataset after writing
-//     status = H5Dclose(dset_id);
-
-//     // Retrieve result size and preallocate vector
-//     std::vector<double> result;
-//     dset_id = H5Dopen(file_id, "/group/dset1", H5P_DEFAULT);
-//     dspace_id = H5Dget_space(dset_id);
-//     ndims = H5Sget_simple_extent_ndims(dspace_id);
-//     hsize_t res_dims[1];
-//     status = H5Sget_simple_extent_dims(dspace_id, res_dims, NULL);
-//     int res_sz = 1;
-//     for (int i = 0; i < 1; ++i)
-//     {
-//         res_sz *= res_dims[i];
-//     }
-//     result.resize(res_sz);
-
-//     // Read the data
-//     status = H5Dread(dset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT, result.data());
-
-//     // Close the dataset and group
-//     status = H5Dclose(dset_id);
-//     status = H5Gclose(group_id);
-
-//     // Close the file
-//     status = H5Fclose(file_id);
-// }

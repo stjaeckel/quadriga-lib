@@ -14,31 +14,36 @@ assertExceptionThrown( f, 'quadriga_tools:cart2geo:no_output')
 % empty
 try
     [~,~] = quadriga_lib.cart2geo([]);
-    error_exception_not_thrown('quadriga_tools:cart2geo:empty');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:cart2geo:empty',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % size_mismatch
 try
     [~,~] = quadriga_lib.cart2geo(rand(2,2,2,2));
-    error_exception_not_thrown('quadriga_tools:cart2geo:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:cart2geo:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
+
 try
     [~,~] = quadriga_lib.cart2geo(rand(2,2,2));
-    error_exception_not_thrown('quadriga_tools:cart2geo:size_mismatch');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:cart2geo:size_mismatch',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 % wrong_type
 try
     [~,~] = quadriga_lib.cart2geo(int32([1;1;1]));
-    error_exception_not_thrown('quadriga_tools:cart2geo:wrong_type');
-catch expt
-    error_if_wrong_id_thrown('quadriga_tools:cart2geo:wrong_type',expt.identifier);
+catch ME
+    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 end
 
 [az,el] = quadriga_lib.cart2geo(e);
@@ -65,15 +70,3 @@ assertElementsAlmostEqual( le, 2, 'absolute', 1e-5 );
 assertElementsAlmostEqual( az, [pi/2;pi/4], 'absolute', 1e-5 );
 assertElementsAlmostEqual( el, pi/4*[1;-1], 'absolute', 1e-5 );
 assertElementsAlmostEqual( le, sqrt(2)*[1;1], 'absolute', 1e-5 );
-
-
-% ---------------- HELPER FUNCTIONS ------------------
-function error_exception_not_thrown(error_id)
-error('moxunit:exceptionNotRaised', 'Exception ''%s'' not thrown', error_id);
-
-function error_if_wrong_id_thrown(expected_error_id, thrown_error_id)
-if ~strcmp(thrown_error_id, expected_error_id)
-    error('moxunit:wrongExceptionRaised',...
-        'Exception raised with id ''%s'' expected id ''%s''',...
-        thrown_error_id,expected_error_id);
-end

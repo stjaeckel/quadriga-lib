@@ -135,14 +135,14 @@ namespace quadriga_lib
         {
         public:
             std::string name = "empty";                      // Name of the channel object
-            dtype center_frequency = dtype(299792458.0);     // Center frequency in [Hz]
+            arma::Col<dtype> center_frequency;               // Center frequency in [Hz], vector of length [1] or [n_snap] or []
             arma::Mat<dtype> tx_pos;                         // Transmitter positions, matrix of size [3, n_snap] or [3, 1]
             arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap]
             arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
             arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
             std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
             std::vector<arma::Cube<dtype>> coeff_im;         // Channel coefficients, imaginary part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+            std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path] or [1, 1, n_path]
             std::vector<arma::Col<dtype>> path_gain;         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
             std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
             std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
@@ -157,7 +157,7 @@ namespace quadriga_lib
             uword n_rx() const;        // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
             uword n_tx() const;        // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
             arma::uvec n_path() const; // Number of paths per snapshot (uword)
-            bool empty() const;        // Returns true if the channel object contains no data
+            bool empty() const;        // Returns true if the channel object contains no structured data
 
             // Validate integrity
             std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
@@ -167,7 +167,8 @@ namespace quadriga_lib
             // - Data is added to the end of the file
             // - The index is updated to include to the newly written data
             // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
-            void hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0) const;
+            // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
+            int hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0) const;
         };
     }
 
@@ -303,13 +304,17 @@ namespace quadriga_lib
     int any_type_id(const std::any *data, uword *dims = nullptr, void **dataptr = nullptr);
 
     // Create a new channel HDF file and set the index to given storage layout
-    void hdf5_create(std::string fn, unsigned nx = 65535, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
+    void hdf5_create(std::string fn, unsigned nx = 65536, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
 
     // Read storage layout from HDF file
     // - Output will be a 4-element vector
+    // - If file does not exist, output will be [0,0,0,0], no error-message
     // - Optional output: has_value = vector containing the ChannelID in the file
     // - channelIDs with value 0 indicate that there is no data stored at this index
-    arma::Col<unsigned> hdf_read_ChannelDims(std::string fn, arma::Col<unsigned> *channelID = nullptr);
+    arma::Col<unsigned> hdf5_read_layout(std::string fn, arma::Col<unsigned> *channelID = nullptr);
+
+    // Reshape storage layout
+    void hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
 
     // Read channel object from HDF5 file
     // - Returns empty channel object if channel ID dies not exist
@@ -317,19 +322,18 @@ namespace quadriga_lib
     template <typename dtype> // Read as float or double
     channel<dtype> hdf5_read_channel(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0);
 
-    // Read single unstructured data field from HDF5 file
-    // - Returns the type ID for the contained data (see "any_type_id" for list)
-    // - Use "any_type_id" to obtain type and low-level access to data
-    std::any hdf5_read_unstructured(std::string fn, std::string par_name,
+    // Read single unstructured dataset from HDF5 file
+    // - Returns empty std::any if there is no dataset at this location or under this name
+    std::any hdf5_read_dset(std::string fn, std::string par_name,
                                     unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
                                     std::string prefix = "par_");
 
-    // Read names of the unstructured data fields from the HDF file
-    // - Returns number of the unstructured fields at the given location
-    uword hdf_read_unstructured_names(std::string fn,                                                     // File name
-                                      std::vector<std::string> *par_names,                                // Output
-                                      unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
-                                      std::string prefix = "par_");                                       // Default prefix
+    // Read names of the unstructured datasets from the HDF file
+    // - Returns number of the unstructured datasets at the given location
+    uword hdf5_read_dset_names(std::string fn,                                                     // File name
+                                       std::vector<std::string> *par_names,                                // Output
+                                       unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
+                                       std::string prefix = "par_");                                       // Default prefix
 
     // Write single unstructured data field to HDF5 file
     // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
@@ -339,7 +343,7 @@ namespace quadriga_lib
     // - Parameter name may only contain letters and numbers and the underscore "_"
     // - An additional prefix "par_" will be added to the name before writing to the HDF file
     // - Unsupported data types will cause an error
-    void hdf5_write_unstructured(std::string fn, std::string par_name, const std::any *par_data,
+    void hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,
                                  unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
                                  std::string prefix = "par_");
 
