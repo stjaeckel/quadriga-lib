@@ -19,8 +19,10 @@
 #include <cstring> // For std::memcopy
 #include <cctype>  // For string type operations such as isalnum
 #include <map>
-#include "quadriga_lib.hpp"
+
 #include <hdf5.h>
+#include "quadriga_channel.hpp"
+
 
 // Return HDF5 version info
 #define AUX(x) #x
@@ -720,7 +722,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
 // CHANNEL METHODS : Return object dimensions
 template <typename dtype>
-uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_snap() const
+uword quadriga_lib::channel<dtype>::n_snap() const
 {
     if (center_frequency.n_elem > 1ULL)
         return center_frequency.n_elem;
@@ -761,7 +763,7 @@ uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_snap() const
     return 0ULL;
 }
 template <typename dtype>
-uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
+uword quadriga_lib::channel<dtype>::n_rx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_rows;
@@ -769,7 +771,7 @@ uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_rx() const
         return 0;
 }
 template <typename dtype>
-uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
+uword quadriga_lib::channel<dtype>::n_tx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_cols;
@@ -777,7 +779,7 @@ uword quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_tx() const
         return 0;
 }
 template <typename dtype>
-arma::uvec quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_path() const
+arma::uvec quadriga_lib::channel<dtype>::n_path() const
 {
     uword n_snap = this->n_snap();
     if (n_snap == 0)
@@ -809,7 +811,7 @@ arma::uvec quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::n_path() const
 
 // Returns true if the channel object contains no data
 template <typename dtype>
-bool quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::empty() const
+bool quadriga_lib::channel<dtype>::empty() const
 {
     if (name != "empty")
         return false;
@@ -858,7 +860,7 @@ bool quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::empty() const
 
 // CHANNEL METHOD : Validate correctness of the members
 template <typename dtype>
-std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
+std::string quadriga_lib::channel<dtype>::is_valid() const
 {
     uword n_snap = this->n_snap();
     uword n_tx = 0, n_rx = 0;
@@ -981,7 +983,7 @@ std::string quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::is_valid() const
 
 // Save data to HDF
 template <typename dtype>
-int quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw) const
+int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw) const
 {
     // Commonly reused variables
     hid_t file_id, dspace_id, dset_id, group_id, type_id, snap_id;
@@ -1347,8 +1349,8 @@ int quadriga_lib::QUADRIGA_LIB_VERSION::channel<dtype>::hdf5_write(std::string f
 }
 
 // Instantiate templates
-template class quadriga_lib::QUADRIGA_LIB_VERSION::channel<float>;
-template class quadriga_lib::QUADRIGA_LIB_VERSION::channel<double>;
+template class quadriga_lib::channel<float>;
+template class quadriga_lib::channel<double>;
 
 // Returns type ID of a std::any field:
 int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **dataptr)

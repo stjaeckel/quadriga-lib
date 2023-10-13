@@ -24,7 +24,7 @@
 typedef unsigned long long int uword;
 typedef long long int sword;
 
-namespace quadriga_tools
+namespace quadriga_lib
 {
     template <typename dtype> // float or double
     arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation,

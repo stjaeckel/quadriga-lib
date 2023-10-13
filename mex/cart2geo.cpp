@@ -27,13 +27,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //                  length          Length of the vector, optional,         Size [n_row, n_col]
 
     if (nrhs != 1)
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:no_input", "Incorrect number of input arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:no_input", "Incorrect number of input arguments.");
 
     if (nlhs < 2 || nlhs > 3)
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:no_output", "Incorrect number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:no_output", "Incorrect number of output arguments.");
 
     if (mxGetNumberOfElements(prhs[0]) == 0)
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:empty", "Input cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:empty", "Input cannot be empty.");
 
     unsigned n_dim = (unsigned)mxGetNumberOfDimensions(prhs[0]); // Number of dimensions in pattern
     const mwSize *dims = mxGetDimensions(prhs[0]);               // Read number of elements elements per dimension
@@ -41,15 +41,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (n_dim == 3)
         n_col = (unsigned)dims[2];
     else if (n_dim > 3)
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:size_mismatch", "Input must have 2 or 3 dimensions.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:size_mismatch", "Input must have 2 or 3 dimensions.");
 
     if (dims[0] != 3)
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:size_mismatch", "Input must have 3 rows.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:size_mismatch", "Input must have 3 rows.");
 
     if (mxIsSingle(prhs[0]))
     {
         const arma::fcube cart = arma::fcube((float *)mxGetData(prhs[0]), 3, n_row, n_col, false, true);
-        arma::cube geo_double = quadriga_tools::cart2geo(cart);           // double precision output
+        arma::cube geo_double = quadriga_lib::cart2geo(cart);           // double precision output
         arma::fcube geo = arma::conv_to<arma::fcube>::from(geo_double); // conversion to single
         const float *ptr = geo.memptr();
 
@@ -65,7 +65,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else if (mxIsDouble(prhs[0]))
     {
         const arma::cube cart = arma::cube((double *)mxGetData(prhs[0]), 3, n_row, n_col, false, true);
-        arma::cube geo = quadriga_tools::cart2geo(cart);
+        arma::cube geo = quadriga_lib::cart2geo(cart);
         const double *ptr = geo.memptr();
 
         plhs[0] = mxCreateNumericMatrix(n_row, n_col, mxDOUBLE_CLASS, mxREAL); // Azimuth
@@ -78,5 +78,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             std::memcpy((double *)mxGetData(plhs[2]), &ptr[2 * n_row * n_col], sizeof(double) * n_row * n_col);
     }
     else
-        mexErrMsgIdAndTxt("quadriga_tools:cart2geo:wrong_type", "Input must be provided in 'single' or 'double' precision.");
+        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:wrong_type", "Input must be provided in 'single' or 'double' precision.");
 }

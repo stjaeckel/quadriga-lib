@@ -11,7 +11,7 @@ end
 
 % List of all available tests
 tests = dir('mex_tests/test*.m');
-addpath( 'mex_tests' );
+addpath( [pwd,'/mex_tests']);
 N = numel( tests );
 
 disp(['Running ',num2str(N),' tests'])

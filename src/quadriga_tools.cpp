@@ -20,7 +20,7 @@
 
 // FUNCTION: Calculate rotation matrix R from roll, pitch, and yaw angles (given by rows in the input "orientation")
 template <typename dtype>
-arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR)
+arma::cube quadriga_lib::calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR)
 {
     // Input:       orientation         Orientation vectors (rows = bank (roll), tilt (pitch), heading (yaw)) in [rad], Size [3, n_row, n_col]
     //              invert_y_axis       Inverts the y-axis
@@ -73,12 +73,12 @@ arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<dtype> orientat
 
     return rotation;
 }
-template arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<float>, bool invert_y_axis, bool transposeR);
-template arma::cube quadriga_tools::calc_rotation_matrix(const arma::Cube<double>, bool invert_y_axis, bool transposeR);
+template arma::cube quadriga_lib::calc_rotation_matrix(const arma::Cube<float>, bool invert_y_axis, bool transposeR);
+template arma::cube quadriga_lib::calc_rotation_matrix(const arma::Cube<double>, bool invert_y_axis, bool transposeR);
 
 // FUNCTION: Transform from geographic coordinates to Cartesian coordinates
 template <typename dtype>
-arma::cube quadriga_tools::geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length)
+arma::cube quadriga_lib::geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length)
 {
     // Inputs:          azimuth         Azimuth angles in [rad],                Size [n_row, n_col]
     //                  elevation       Elevation angles in [rad],              Size [n_row, n_col]
@@ -107,12 +107,12 @@ arma::cube quadriga_tools::geo2cart(const arma::Mat<dtype> azimuth, const arma::
     }
     return cart;
 }
-template arma::cube quadriga_tools::geo2cart(const arma::Mat<float> azimuth, const arma::Mat<float> elevation, const arma::Mat<float> length);
-template arma::cube quadriga_tools::geo2cart(const arma::Mat<double> azimuth, const arma::Mat<double> elevation, const arma::Mat<double> length);
+template arma::cube quadriga_lib::geo2cart(const arma::Mat<float> azimuth, const arma::Mat<float> elevation, const arma::Mat<float> length);
+template arma::cube quadriga_lib::geo2cart(const arma::Mat<double> azimuth, const arma::Mat<double> elevation, const arma::Mat<double> length);
 
 // FUNCTION: Transform from Cartesian coordinates to geographic coordinates
 template <typename dtype>
-arma::cube quadriga_tools::cart2geo(const arma::Cube<dtype> cart)
+arma::cube quadriga_lib::cart2geo(const arma::Cube<dtype> cart)
 {
     // Input:           cart            Cartesian coordinates,                  Size [3, n_row, n_col]
     // Output:          geo             geographic coordinates (az,el,len)      Size [n_row, n_col, 3]
@@ -138,12 +138,12 @@ arma::cube quadriga_tools::cart2geo(const arma::Cube<dtype> cart)
         }
     return geo;
 }
-template arma::cube quadriga_tools::cart2geo(const arma::Cube<float> cart);
-template arma::cube quadriga_tools::cart2geo(const arma::Cube<double> cart);
+template arma::cube quadriga_lib::cart2geo(const arma::Cube<float> cart);
+template arma::cube quadriga_lib::cart2geo(const arma::Cube<double> cart);
 
 // Convert path interaction coordinates into FBS/LBS positions, path length and angles
 template <typename dtype>
-void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
+void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
                                 arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
 {
     if (coord == nullptr || coord->n_elem == 0 || coord->n_rows != 3)
@@ -216,14 +216,14 @@ void quadriga_tools::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry
         }
     }
 }
-template void quadriga_tools::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Cube<float> *coord,
+template void quadriga_lib::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Cube<float> *coord,
                                          arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles);
-template void quadriga_tools::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Cube<double> *coord,
+template void quadriga_lib::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Cube<double> *coord,
                                          arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles);
 
 // 2D linear interpolation
 template <typename dtype>
-std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
+std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
                                    const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
 {
     constexpr dtype one = dtype(1.0), zero = dtype(0.0);
@@ -364,14 +364,14 @@ std::string quadriga_tools::interp(const arma::Cube<dtype> *input, const arma::C
 
     return "";
 }
-template std::string quadriga_tools::interp(const arma::Cube<float> *input, const arma::Col<float> *xi, const arma::Col<float> *yi,
+template std::string quadriga_lib::interp(const arma::Cube<float> *input, const arma::Col<float> *xi, const arma::Col<float> *yi,
                                             const arma::Col<float> *xo, const arma::Col<float> *yo, arma::Cube<float> *output);
-template std::string quadriga_tools::interp(const arma::Cube<double> *input, const arma::Col<double> *xi, const arma::Col<double> *yi,
+template std::string quadriga_lib::interp(const arma::Cube<double> *input, const arma::Col<double> *xi, const arma::Col<double> *yi,
                                             const arma::Col<double> *xo, const arma::Col<double> *yo, arma::Cube<double> *output);
 
 // 1D linear interpolation
 template <typename dtype>
-std::string quadriga_tools::interp(const arma::Mat<dtype> *input, const arma::Col<dtype> *xi,
+std::string quadriga_lib::interp(const arma::Mat<dtype> *input, const arma::Col<dtype> *xi,
                                    const arma::Col<dtype> *xo, arma::Mat<dtype> *output)
 {
     const arma::uword nx = input->n_rows, ne = input->n_cols;
@@ -392,8 +392,8 @@ std::string quadriga_tools::interp(const arma::Mat<dtype> *input, const arma::Co
     arma::Col<dtype> y(1);
 
     // Call 2D linear interpolation function
-    std::string error_message = quadriga_tools::interp(&input_cube, xi, &y, xo, &y, &output_cube);
+    std::string error_message = quadriga_lib::interp(&input_cube, xi, &y, xo, &y, &output_cube);
     return error_message;
 }
-template std::string quadriga_tools::interp(const arma::Mat<float> *input, const arma::Col<float> *xi, const arma::Col<float> *xo, arma::Mat<float> *output);
-template std::string quadriga_tools::interp(const arma::Mat<double> *input, const arma::Col<double> *xi, const arma::Col<double> *xo, arma::Mat<double> *output);
+template std::string quadriga_lib::interp(const arma::Mat<float> *input, const arma::Col<float> *xi, const arma::Col<float> *xo, arma::Mat<float> *output);
+template std::string quadriga_lib::interp(const arma::Mat<double> *input, const arma::Col<double> *xi, const arma::Col<double> *xo, arma::Mat<double> *output);

@@ -16,9 +16,8 @@
 // ------------------------------------------------------------------------
 
 #include "mex.h"
-#include "quadriga_lib.hpp"
+#include "quadriga_arrayant.hpp"
 #include "mex_helper_functions.cpp"
-#include <cstring> // For memcopy
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {

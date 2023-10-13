@@ -83,7 +83,7 @@ TEST_CASE("HDF - Minimal Test")
     c.delay.push_back(arma::cube());
 
     unsigned s = 0; // Snapshot index
-    quadriga_tools::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
+    quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
                                &c.path_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,
@@ -103,7 +103,7 @@ TEST_CASE("HDF - Minimal Test")
     c.delay.push_back(arma::cube());
 
     s = 1;
-    quadriga_tools::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
+    quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
                                &c.path_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,

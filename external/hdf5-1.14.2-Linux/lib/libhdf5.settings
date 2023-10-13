@@ -4,7 +4,7 @@
 General Information:
 -------------------
                    HDF5 Version: 1.14.2
-                  Configured on: 2023-10-10
+                  Configured on: 2023-10-13
                   Configured by: Unix Makefiles
                     Host system: Linux-5.15.0-86-generic
               Uname information: Linux
@@ -71,7 +71,7 @@ Features:
                 Large Parallel I/O: 
                 High-level library: ON
 Dimension scales w/ new references: 
-                  Build HDF5 Tests: ON
+                  Build HDF5 Tests: OFF
                   Build HDF5 Tools: ON
                    Build GIF Tools: OFF
                       Threadsafety: OFF

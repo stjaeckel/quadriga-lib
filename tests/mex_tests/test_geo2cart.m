@@ -3,13 +3,13 @@ function test_geo2cart
 e = 2*pi*(rand(2,6)-0.5);
 
 f = @() quadriga_lib.geo2cart;
-assertExceptionThrown( f, 'quadriga_tools:geo2cart:no_input')
+assertExceptionThrown( f, 'quadriga_lib:geo2cart:no_input')
 
 f = @() quadriga_lib.geo2cart(e);
-assertExceptionThrown( f, 'quadriga_tools:geo2cart:no_input')
+assertExceptionThrown( f, 'quadriga_lib:geo2cart:no_input')
 
 f = @() quadriga_lib.geo2cart(e,e);
-assertExceptionThrown( f, 'quadriga_tools:geo2cart:no_output')
+assertExceptionThrown( f, 'quadriga_lib:geo2cart:no_output')
 
 % empty
 try

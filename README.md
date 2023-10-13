@@ -95,7 +95,7 @@ cmake --build build --config Release --target install
 ```
 cd external
 mkdir build && mkdir hdf5-1.14.2-Linux
-cmake -S hdf5-1.14.2 -B build/ -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-Linux -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
+cmake -S hdf5-1.14.2 -B build/ -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-Linux -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF -D BUILD_TESTING=OFF
 cd build && make -j32 && make install
 cd .. && rm -rf build
 ```
