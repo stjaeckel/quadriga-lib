@@ -33,13 +33,13 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
     arma::cube O, T;
 
     // Interpolation at the same sample points should create identical output
-    quadriga_tools::interp(&I, &x, &y, &x, &y, &O);
+    quadriga_lib::interp(&I, &x, &y, &x, &y, &O);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-13));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75, 1.875};
     yo = {0.0, 100.0};
-    quadriga_tools::interp(&I, &x, &y, &xo, &yo, &O);
+    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
     T.set_size(2, 2, 2);
     T.slice(0) = {{0.5, -1.5}, {0.5, -1.5}};
     T.slice(1) = {{2.0, 2.0}, {4.0, 4.0}};
@@ -49,14 +49,14 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
     I.set_size(1, 4, 1);
     I.slice(0) = {{0.0, 1.0, 2.0, 3.0}};
     x = {0.0, 1.0, 1.0, 2.0}, y = {0.0}, xo = {0.9, 1.0, 1.1}, yo = {-1.0, 1.0};
-    quadriga_tools::interp(&I, &x, &y, &xo, &yo, &O);
+    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
     T.set_size(2, 3, 1);
     T.slice(0) = {{0.9, 2.0, 2.1}, {0.9, 2.0, 2.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
 
     // Reverse order
     x = {3.0, 2.0, 1.0, 0.0}, y = {0.0}, xo = {2.5, 2.1, 2.0, 1.9}, yo = {0.0};
-    quadriga_tools::interp(&I, &x, &y, &xo, &yo, &O);
+    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
     T.set_size(1, 4, 1);
     T.slice(0) = {{0.5, 0.9, 1.0, 1.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
@@ -70,12 +70,12 @@ TEST_CASE("Quadriga tools - 1D Interpolation")
     I = I.t();
 
     // Interpolation at the same sample points should create identical output
-    quadriga_tools::interp(&I, &x, &x, &O);
+    quadriga_lib::interp(&I, &x, &x, &O);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-6));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75f, 1.875f};
-    quadriga_tools::interp(&I, &x, &xo, &O);
+    quadriga_lib::interp(&I, &x, &xo, &O);
     T = {{0.5f, 2.5f}, {-1.5f, 3.75f}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-6));
 }

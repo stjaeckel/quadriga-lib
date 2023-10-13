@@ -27,22 +27,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Output:          cart            Cartesian coordinates,                  Size [3, n_row, n_col]
 
     if (nrhs < 2 || nrhs > 3)
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:no_input", "Incorrect number of input arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:no_input", "Incorrect number of input arguments.");
 
     if (nlhs != 1)
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:no_output", "Incorrect number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:no_output", "Incorrect number of output arguments.");
 
     if (mxGetNumberOfElements(prhs[0]) == 0 || mxGetNumberOfElements(prhs[1]) == 0)
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:empty", "Inputs 'azimuth' and 'elevation' cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:empty", "Inputs 'azimuth' and 'elevation' cannot be empty.");
 
     unsigned n_row = (unsigned)mxGetM(prhs[0]);
     unsigned n_col = (unsigned)mxGetN(prhs[0]);
 
     if ((unsigned)mxGetM(prhs[1]) != n_row || (unsigned)mxGetN(prhs[1]) != n_col)
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:size_mismatch", "Number of elements in 'elevation' does not match number of elements in 'azimuth'.");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:size_mismatch", "Number of elements in 'elevation' does not match number of elements in 'azimuth'.");
 
     if (nrhs > 2 && ((unsigned)mxGetM(prhs[2]) != n_row || (unsigned)mxGetN(prhs[2]) != n_col))
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:size_mismatch", "Number of elements in 'length' does not match number of elements in 'azimuth'.");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:size_mismatch", "Number of elements in 'length' does not match number of elements in 'azimuth'.");
 
     const mwSize n_dim = 3;
     mwSize dims[3] = {3, n_row, n_col};
@@ -57,9 +57,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else if (mxIsSingle(prhs[2]))
             length = arma::fmat((float *)mxGetData(prhs[2]), n_row, n_col, false, true);
         else
-            mexErrMsgIdAndTxt("quadriga_tools:geo2cart:wrong_type", "Inputs 'azimuth', 'elevation' and 'length' must have same type.");
+            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:wrong_type", "Inputs 'azimuth', 'elevation' and 'length' must have same type.");
 
-        arma::cube cart_double = quadriga_tools::geo2cart(azimuth, elevation, length); // double precision output
+        arma::cube cart_double = quadriga_lib::geo2cart(azimuth, elevation, length); // double precision output
         arma::fcube cart = arma::conv_to<arma::fcube>::from(cart_double);            // conversion to single
         plhs[0] = mxCreateNumericArray(n_dim, dims, mxSINGLE_CLASS, mxREAL);
         std::memcpy((float *)mxGetData(plhs[0]), cart.memptr(), sizeof(float) * cart.n_elem);
@@ -74,12 +74,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else if (mxIsDouble(prhs[2]))
             length = arma::mat((double *)mxGetData(prhs[2]), n_row, n_col, false, true);
         else
-            mexErrMsgIdAndTxt("quadriga_tools:geo2cart:wrong_type", "Inputs 'azimuth', 'elevation' and 'length' must have same type.");
+            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:wrong_type", "Inputs 'azimuth', 'elevation' and 'length' must have same type.");
 
-        arma::cube cart = quadriga_tools::geo2cart(azimuth, elevation, length);
+        arma::cube cart = quadriga_lib::geo2cart(azimuth, elevation, length);
         plhs[0] = mxCreateNumericArray(n_dim, dims, mxDOUBLE_CLASS, mxREAL);
         std::memcpy((double *)mxGetData(plhs[0]), cart.memptr(), sizeof(double) * cart.n_elem);
     }
     else
-        mexErrMsgIdAndTxt("quadriga_tools:geo2cart:wrong_type", "Inputs 'azimuth' or 'elevation' must have same type (single or double).");
+        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:wrong_type", "Inputs 'azimuth' or 'elevation' must have same type (single or double).");
 }

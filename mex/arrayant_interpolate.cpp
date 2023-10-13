@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "mex.h"
-#include "quadriga_lib.hpp"
+#include "quadriga_arrayant.hpp"
 #include "qd_arrayant_interpolate.hpp"
 #include "mex_helper_functions.cpp"
 

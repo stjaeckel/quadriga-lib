@@ -3,13 +3,13 @@ function test_cart2geo
 e = rand(3,6,2);
 
 f = @() quadriga_lib.cart2geo;
-assertExceptionThrown( f, 'quadriga_tools:cart2geo:no_input')
+assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_input')
 
 f = @() quadriga_lib.cart2geo(e,[]);
-assertExceptionThrown( f, 'quadriga_tools:cart2geo:no_input')
+assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_input')
 
 f = @() quadriga_lib.cart2geo(e);
-assertExceptionThrown( f, 'quadriga_tools:cart2geo:no_output')
+assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_output')
 
 % empty
 try

@@ -18,7 +18,6 @@
 #include "mex.h"
 #include "quadriga_tools.hpp"
 #include "mex_helper_functions.cpp"
-#include <cstring> // For memcopy
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -79,7 +78,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
         arma::fcube output = arma::fcube((float *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
-        error_message = quadriga_tools::interp(&input, &xi, &yi, &xo, &yo, &output);
+        error_message = quadriga_lib::interp(&input, &xi, &yi, &xo, &yo, &output);
     }
     else
     {
@@ -118,7 +117,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
         arma::cube output = arma::cube((double *)mxGetData(plhs[0]), n_yo, n_xo, n_el, false, true);
 
-        error_message = quadriga_tools::interp(&input, &xi, &yi, &xo, &yo, &output);
+        error_message = quadriga_lib::interp(&input, &xi, &yi, &xo, &yo, &output);
     }
 
     if (!error_message.empty())

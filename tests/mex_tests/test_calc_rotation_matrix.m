@@ -1,7 +1,7 @@
 function test_calc_rotation_matrix
 
 f = @() quadriga_lib.calc_rotation_matrix;
-assertExceptionThrown( f, 'quadriga_tools:calc_rotation_matrix:no_input')
+assertExceptionThrown( f, 'quadriga_lib:calc_rotation_matrix:no_input')
 
 % 4 inputs should throw error
 try

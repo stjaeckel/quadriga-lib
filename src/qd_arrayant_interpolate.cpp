@@ -80,7 +80,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
          write_dist = !dist->is_empty(), write_gamma = !gamma->is_empty();
 
     // Rotation matrix [3,3,n_out] or [3,3,1], always double output
-    arma::cube R = quadriga_tools::calc_rotation_matrix(*orientation, true, true);
+    arma::cube R = quadriga_lib::calc_rotation_matrix(*orientation, true, true);
     const arma::Cube<dtype> R_typed = arma::conv_to<arma::Cube<dtype>>::from(R);
     R.reset();
 
