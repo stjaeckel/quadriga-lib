@@ -80,7 +80,7 @@ cmake --build build --config Release --target install
 
 ### HDF5 Library
 * Hierarchical Data Format version 5 (HDF5), is an open source file format that supports large, complex, heterogeneous data. It is used to store channel coefficients and metadata.
-* If you intend to use Octave, you will need the same HDF5 library version that Octave was compiled with. Otherwise, Octave will crash. It is therefore recommended to use the HDF5 Library from your system installation. In ubuntu, you need the package "`libhdf5-dev`"
+* If you intend to use Octave, you will need at least Octave 8. Older versions cause a crash with HDF5
 * For Windows, you need to compile the library using Build Tools for Visual Studio (see above)
 * Extract the hdf5 tar.gz-file from "https://arma.sourceforge.net" into external
 * Open "x64 Native Tools Command Prompt" and run the following commands
@@ -91,11 +91,11 @@ mkdir hdf5-1.14.2-win64
 cmake -S hdf5-1.14.2 -B build -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
 cmake --build build --config Release --target install
 ```
-* Compiling for Linux (optional):
+* Compiling for Linux:
 ```
 cd external
 mkdir build && mkdir hdf5-1.14.2-Linux
-cmake -S hdf5-1.14.2 -B build/ -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-Linux -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF -D BUILD_TESTING=OFF
+cmake -S hdf5-1.14.2 -B build/ -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-Linux -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF -D BUILD_TESTING=OFF -D CMAKE_C_FLAGS=-O3
 cd build && make -j32 && make install
 cd .. && rm -rf build
 ```
