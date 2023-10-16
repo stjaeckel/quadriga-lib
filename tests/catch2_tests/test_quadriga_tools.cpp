@@ -79,3 +79,48 @@ TEST_CASE("Quadriga tools - 1D Interpolation")
     T = {{0.5f, 2.5f}, {-1.5f, 3.75f}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-6));
 }
+
+TEST_CASE("Quadriga tools - Icosphere")
+{
+    arma::Mat<double> center;
+    arma::Col<double> length;
+    arma::Mat<double> vert;
+    arma::Mat<double> direction;
+
+    // Number of subdivisions cannot be zero
+    REQUIRE_THROWS_AS(quadriga_lib::icosphere<double>(0, 1.0, &center), std::invalid_argument);
+
+    auto n = quadriga_lib::icosphere<double>(1, 1.0, &center);
+    CHECK(n == 20ULL);
+
+    n = quadriga_lib::icosphere<double>(1, 1.0, &center, &length);
+    arma::vec sumRow = sqrt(sum(arma::abs(pow(center, 2)), 1));
+    CHECK(arma::approx_equal(length, sumRow, "absdiff", 1e-14));
+
+    n = quadriga_lib::icosphere<double>(2, 1.0, &center, &length);
+    CHECK(n == 80ULL);
+    sumRow = sqrt(sum(arma::abs(pow(center, 2)), 1));
+    CHECK(arma::approx_equal(length, sumRow, "absdiff", 1e-14));
+
+    n = quadriga_lib::icosphere<double>(2, 1.0, &center, &length, &vert);
+    arma::vec squaredSum = sum(arma::square(arma::abs(center + vert.cols(0, 2))), 1);
+    auto test = arma::vec(80, arma::fill::ones);
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+
+    squaredSum = sum(arma::square(arma::abs(center + vert.cols(3, 5))), 1);
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+
+    squaredSum = sum(arma::square(arma::abs(center + vert.cols(6, 8))), 1);
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+
+    n = quadriga_lib::icosphere<double>(2, 2.0, &center, &length, &vert, &direction);
+    CHECK(direction.n_rows == 80ULL);
+    CHECK(direction.n_cols == 6ULL);
+
+    test = 4.0 * test;
+    squaredSum = sum(arma::square(arma::abs(center + vert.cols(6, 8))), 1);
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+
+    bool allElementsWithinRange = arma::all(arma::vectorise(arma::abs(direction)) <= arma::datum::pi);
+    CHECK(allElementsWithinRange);
+}

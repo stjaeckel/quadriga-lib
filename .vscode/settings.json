@@ -13,6 +13,8 @@
         "Gclose",
         "Gcreate",
         "Gopen",
+        "icosphere",
+        "isohedron",
         "memptr",
         "MIMO",
         "ndiv",
@@ -21,6 +23,8 @@
         "Tcopy",
         "Tequal",
         "Tget",
+        "tridir",
+        "trivec",
         "xpol"
     ],
     "files.associations": {

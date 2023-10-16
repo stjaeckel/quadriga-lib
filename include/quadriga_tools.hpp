@@ -31,23 +31,33 @@ namespace quadriga_lib
                                     bool invert_y_axis = false, bool transposeR = false);
 
     template <typename dtype> // float or double
-    arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);
-
-    template <typename dtype> // float or double
     arma::cube cart2geo(const arma::Cube<dtype> cart);
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - Interaction coordinates for the LOS path must be all nan
     // - FBS / LBS position of the LOS path is place half way between TX and RX
     // - Size of the output arguments is adjusted if it does not match the required size
-    template <typename dtype>                              // Supported types: float or double
-    void coord2path(dtype Tx, dtype Ty, dtype Tz,          // Transmitter position in Cartesian coordinates
-                    dtype Rx, dtype Ry, dtype Rz,          // Receiver position in Cartesian coordinates
-                    const arma::Cube<dtype> *coord,        // Interaction coordinates, NAN-padded, size [3, n_coord, n_path]
-                    arma::Col<dtype> *path_length = NULL,  // Absolute path length from TX to RX phase center, vector of length [n_path]
-                    arma::Mat<dtype> *fbs_pos = NULL,      // First-bounce scatterer positions, matrix of size [3, n_path]
-                    arma::Mat<dtype> *lbs_pos = NULL,      // Last-bounce scatterer positions, matrix of size [3, n_path]
-                    arma::Mat<dtype> *path_angles = NULL); // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
+    template <typename dtype>                                 // Supported types: float or double
+    void coord2path(dtype Tx, dtype Ty, dtype Tz,             // Transmitter position in Cartesian coordinates
+                    dtype Rx, dtype Ry, dtype Rz,             // Receiver position in Cartesian coordinates
+                    const arma::Cube<dtype> *coord,           // Interaction coordinates, NAN-padded, size [3, n_coord, n_path]
+                    arma::Col<dtype> *path_length = nullptr,  // Absolute path length from TX to RX phase center, vector of length [n_path]
+                    arma::Mat<dtype> *fbs_pos = nullptr,      // First-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *lbs_pos = nullptr,      // Last-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *path_angles = nullptr); // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
+
+    template <typename dtype> // float or double
+    arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);
+
+    // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
+    // - Returns the number of faces
+    template <typename dtype>                               // Allowed types: float or double
+    uword icosphere(uword n_div,                            // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
+                    dtype radius,                           // Radius of the icosphere in meters
+                    arma::Mat<dtype> *center,               // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
+                    arma::Col<dtype> *length = nullptr,     // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
+                    arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                    arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
 
     // 2D linear interpolation (returns error message or empty string in case of no error)
     template <typename dtype>                          // Supported types: float or double
@@ -64,6 +74,14 @@ namespace quadriga_lib
                        const arma::Col<dtype> *xi,    // x sample points of input; vector length nx
                        const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
                        arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
+
+    // Subdivide triangles into smaller triangles
+    // - Returns the number of triangles after subdivision
+    // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
+    template <typename dtype>                                       // Supported types: float or double
+    uword subdivide_triangles(uword n_div,                          // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
+                              const arma::Mat<dtype> *triangles_in, // Input, matrix of size [n_triangles_in, 9]
+                              arma::Mat<dtype> *triangles_out);     // Output, matrix of size [n_triangles_out, 9]
 
 }
 
