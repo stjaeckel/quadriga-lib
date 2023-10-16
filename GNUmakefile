@@ -6,7 +6,6 @@ MEX   = /usr/local/MATLAB/R2021a/bin/mex
 OCT   = mkoctfile
 
 all:        mex_octave  mex_matlab 
-#all:        mex_matlab 
 
 # External libraries
 ARMA_H      = external/armadillo-12.6.3/include
@@ -30,7 +29,7 @@ tests 		= $(wildcard tests/catch2_tests/*.cpp)
 mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 
-test:   mex_octave   tests/test_bin
+test:   tests/test_bin   mex_octave
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 	tests/test_bin
 	
@@ -73,6 +72,7 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 
 # Maintainance section
 clean:
+	- rm quadrigalib*.tar.gz
 	- rm build/*
 	- rm +quadriga_lib/*.manifest
 	- rm +quadriga_lib/*.exp
@@ -82,3 +82,6 @@ clean:
 tidy: clean 
 	- rm +quadriga_lib/*.mex*
 	- rm lib/*
+
+archive:  mex_octave   mex_matlab
+	tar czf quadrigalib-0.1.9.tar.gz +quadriga_lib include lib

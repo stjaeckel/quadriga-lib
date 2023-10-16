@@ -144,7 +144,7 @@ template arma::cube quadriga_lib::cart2geo(const arma::Cube<double> cart);
 // Convert path interaction coordinates into FBS/LBS positions, path length and angles
 template <typename dtype>
 void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
-                                arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
+                              arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
 {
     if (coord == nullptr || coord->n_elem == 0 || coord->n_rows != 3)
         throw std::invalid_argument("Input 'coord' must have 3 rows.");
@@ -168,10 +168,10 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
 
     // Get pointers
     const dtype *p_coord = coord->memptr();
-    dtype *p_length = path_length == nullptr ? NULL : path_length->memptr();
-    dtype *p_fbs = fbs_pos == nullptr ? NULL : fbs_pos->memptr();
-    dtype *p_lbs = lbs_pos == nullptr ? NULL : lbs_pos->memptr();
-    dtype *p_angles = path_angles == nullptr ? NULL : path_angles->memptr();
+    dtype *p_length = path_length == nullptr ? nullptr : path_length->memptr();
+    dtype *p_fbs = fbs_pos == nullptr ? nullptr : fbs_pos->memptr();
+    dtype *p_lbs = lbs_pos == nullptr ? nullptr : lbs_pos->memptr();
+    dtype *p_angles = path_angles == nullptr ? nullptr : path_angles->memptr();
 
     // Calculate half way point between TX and RX
     dtype TRx = Rx - Tx, TRy = Ry - Ty, TRz = Rz - Tz;
@@ -217,14 +217,186 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     }
 }
 template void quadriga_lib::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Cube<float> *coord,
-                                         arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles);
+                                       arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles);
 template void quadriga_lib::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Cube<double> *coord,
-                                         arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles);
+                                       arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles);
+
+// Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
+template <typename dtype>
+uword quadriga_lib::icosphere(uword n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length, arma::Mat<dtype> *vert, arma::Mat<dtype> *direction)
+{
+    if (n_div == 0ULL)
+        throw std::invalid_argument("Input 'n_div' cannot be 0.");
+
+    if (radius < dtype(0.0))
+        throw std::invalid_argument("Input 'radius' cannot be negative.");
+
+    uword n_faces = n_div * n_div * 20ULL;
+
+    // Set sizes
+    if (center == nullptr)
+        throw std::invalid_argument("Output 'center' cannot be NULL.");
+
+    if (center->n_rows != n_faces || center->n_cols != 3ULL)
+        center->set_size(n_faces, 3ULL);
+
+    if (length != nullptr && length->n_elem != n_faces)
+        length->set_size(n_faces);
+
+    if (vert != nullptr && (vert->n_rows != n_faces || vert->n_cols != 9ULL))
+        vert->set_size(n_faces, 9ULL);
+
+    bool calc_directions = direction != nullptr;
+    if (calc_directions && (direction->n_rows != n_faces || direction->n_cols != 6ULL))
+        direction->set_size(n_faces, 6ULL);
+
+    // Vertex coordinates of a regular isohedron
+    dtype r = radius, p = dtype(1.6180340) * r, z = dtype(0.0);
+    dtype val[180] = {z, z, z, z, z, z, z, z, -p, -p, p, p, -r, -r, r, z, z, z, z, z,
+                      r, r, r, r, r, -r, -r, -r, z, z, z, z, -p, -p, -p, r, r, r, r, r,
+                      p, p, p, p, p, p, p, p, r, r, r, r, z, z, z, -p, -p, -p, -p, -p,
+                      z, -p, p, -r, r, r, -r, -p, -r, -p, r, p, -p, z, z, -r, -p, z, p, r,
+                      -r, z, z, p, p, -p, -p, z, p, z, -p, z, z, -r, -r, p, z, -r, z, p,
+                      p, r, r, z, z, z, z, r, z, -r, z, -r, -r, -p, -p, z, -r, -p, -r, z,
+                      p, z, r, -p, -r, p, r, -r, -p, -r, p, r, z, r, p, r, -r, -p, z, p,
+                      z, -r, p, z, p, z, -p, -p, z, -p, z, p, -r, -p, z, p, p, z, -r, z,
+                      r, p, z, r, z, r, z, z, -r, z, -r, z, -p, z, -r, z, z, -r, -p, -r};
+
+    // Rotate x and y-coordinates slightly to avoid artifacts in regular grids
+    constexpr dtype si = dtype(0.0078329); // ~ 0.45 degree
+    constexpr dtype co = dtype(0.999969322368236);
+    for (unsigned n = 0; n < 20; ++n)
+    {
+        dtype tmp = val[n];
+        val[n] = co * tmp - si * val[n + 20];
+        val[n + 20] = si * tmp + co * val[n + 20];
+        tmp = val[n + 60];
+        val[n + 60] = co * tmp - si * val[n + 80];
+        val[n + 80] = si * tmp + co * val[n + 80];
+        tmp = val[n + 120];
+        val[n + 120] = co * tmp - si * val[n + 140];
+        val[n + 140] = si * tmp + co * val[n + 140];
+    }
+
+    // Convert to armadillo matrix
+    arma::Mat<dtype> isohedron = arma::Mat<dtype>(val, 20ULL, 9ULL, false, true);
+
+    // Subdivide faces of the isohedron
+    arma::Mat<dtype> icosphere;
+    quadriga_lib::subdivide_triangles(n_div, &isohedron, &icosphere);
+
+    // Get pointers for direct memory access
+    dtype *p_icosphere = icosphere.memptr();
+    dtype *p_dest = center->memptr();
+    dtype *p_length = (length == nullptr) ? nullptr : length->memptr();
+    dtype *p_trivec = (vert == nullptr) ? nullptr : vert->memptr();
+    dtype *p_tridir = calc_directions ? direction->memptr() : nullptr;
+
+    // Process all faces
+    constexpr dtype one = dtype(1.0), none = -one;
+    dtype ri = one / r;
+    for (uword n = 0ULL; n < n_faces; ++n)
+    {
+        // Project triangles onto the unit sphere
+        // First vertex
+        dtype tmp = r / std::sqrt(p_icosphere[n] * p_icosphere[n] +
+                                  p_icosphere[n + n_faces] * p_icosphere[n + n_faces] +
+                                  p_icosphere[n + 2ULL * n_faces] * p_icosphere[n + 2ULL * n_faces]);
+
+        p_icosphere[n] *= tmp;
+        p_icosphere[n + n_faces] *= tmp;
+        p_icosphere[n + 2ULL * n_faces] *= tmp;
+
+        if (calc_directions)
+        {
+            dtype tmp = p_icosphere[n + 2ULL * n_faces] * ri;
+            tmp = (tmp > one) ? one : (tmp < none ? none : tmp);
+            p_tridir[n] = std::atan2(p_icosphere[n + n_faces], p_icosphere[n]);
+            p_tridir[n + n_faces] = std::asin(tmp);
+        }
+
+        // Second vertex
+        tmp = r / std::sqrt(p_icosphere[n + 3ULL * n_faces] * p_icosphere[n + 3ULL * n_faces] +
+                            p_icosphere[n + 4ULL * n_faces] * p_icosphere[n + 4ULL * n_faces] +
+                            p_icosphere[n + 5ULL * n_faces] * p_icosphere[n + 5ULL * n_faces]);
+
+        p_icosphere[n + 3ULL * n_faces] *= tmp;
+        p_icosphere[n + 4ULL * n_faces] *= tmp;
+        p_icosphere[n + 5ULL * n_faces] *= tmp;
+
+        if (calc_directions)
+        {
+            dtype tmp = p_icosphere[n + 5ULL * n_faces] * ri;
+            tmp = (tmp > one) ? one : (tmp < none ? none : tmp);
+            p_tridir[n + 2ULL * n_faces] = std::atan2(p_icosphere[n + 4ULL * n_faces], p_icosphere[n + 3ULL * n_faces]);
+            p_tridir[n + 3ULL * n_faces] = std::asin(tmp);
+        }
+
+        // Third vertex
+        tmp = r / std::sqrt(p_icosphere[n + 6ULL * n_faces] * p_icosphere[n + 6ULL * n_faces] +
+                            p_icosphere[n + 7ULL * n_faces] * p_icosphere[n + 7ULL * n_faces] +
+                            p_icosphere[n + 8ULL * n_faces] * p_icosphere[n + 8ULL * n_faces]);
+
+        p_icosphere[n + 6ULL * n_faces] *= tmp;
+        p_icosphere[n + 7ULL * n_faces] *= tmp;
+        p_icosphere[n + 8ULL * n_faces] *= tmp;
+
+        if (calc_directions)
+        {
+            dtype tmp = p_icosphere[n + 8ULL * n_faces] * ri;
+            tmp = (tmp > one) ? one : (tmp < none ? none : tmp);
+            p_tridir[n + 4ULL * n_faces] = std::atan2(p_icosphere[n + 7ULL * n_faces], p_icosphere[n + 6ULL * n_faces]);
+            p_tridir[n + 5ULL * n_faces] = std::asin(tmp);
+        }
+
+        // Calculate normal vector of the plane that is formed by the 3 vertices
+        dtype Ux = p_icosphere[n + 3ULL * n_faces] - p_icosphere[n],
+              Uy = p_icosphere[n + 4ULL * n_faces] - p_icosphere[n + n_faces],
+              Uz = p_icosphere[n + 5ULL * n_faces] - p_icosphere[n + 2ULL * n_faces];
+
+        dtype Vx = p_icosphere[n + 6ULL * n_faces] - p_icosphere[n],
+              Vy = p_icosphere[n + 7ULL * n_faces] - p_icosphere[n + n_faces],
+              Vz = p_icosphere[n + 8ULL * n_faces] - p_icosphere[n + 2ULL * n_faces];
+
+        dtype Nx = Uy * Vz - Uz * Vy, Ny = Uz * Vx - Ux * Vz, Nz = Ux * Vy - Uy * Vx;        // Cross Product
+        tmp = one / std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz), Nx *= tmp, Ny *= tmp, Nz *= tmp; // Normalize
+
+        // Distance from origin to plane
+        tmp = (p_icosphere[n] * Nx + p_icosphere[n + n_faces] * Ny + p_icosphere[n + 2ULL * n_faces] * Nz);
+
+        // Calculate intersect coordinate
+        p_dest[n] = tmp * Nx;
+        p_dest[n + n_faces] = tmp * Ny;
+        p_dest[n + 2ULL * n_faces] = tmp * Nz;
+
+        if (p_length != nullptr)
+            p_length[n] = std::abs(tmp);
+
+        // Calculate vectors pointing from the face center to the triangle vertices
+        if (p_trivec != nullptr)
+        {
+            p_trivec[n] = p_icosphere[n] - p_dest[n];
+            p_trivec[n + n_faces] = p_icosphere[n + n_faces] - p_dest[n + n_faces];
+            p_trivec[n + 2ULL * n_faces] = p_icosphere[n + 2ULL * n_faces] - p_dest[n + 2ULL * n_faces];
+            p_trivec[n + 3ULL * n_faces] = p_icosphere[n + 3ULL * n_faces] - p_dest[n];
+            p_trivec[n + 4ULL * n_faces] = p_icosphere[n + 4ULL * n_faces] - p_dest[n + n_faces];
+            p_trivec[n + 5ULL * n_faces] = p_icosphere[n + 5ULL * n_faces] - p_dest[n + 2ULL * n_faces];
+            p_trivec[n + 6ULL * n_faces] = p_icosphere[n + 6ULL * n_faces] - p_dest[n];
+            p_trivec[n + 7ULL * n_faces] = p_icosphere[n + 7ULL * n_faces] - p_dest[n + n_faces];
+            p_trivec[n + 8ULL * n_faces] = p_icosphere[n + 8ULL * n_faces] - p_dest[n + 2ULL * n_faces];
+        }
+    }
+
+    return n_faces;
+}
+
+template uword quadriga_lib::icosphere(uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length, arma::Mat<float> *vert, arma::Mat<float> *direction);
+template uword quadriga_lib::icosphere(uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length, arma::Mat<double> *vert, arma::Mat<double> *direction);
 
 // 2D linear interpolation
 template <typename dtype>
 std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
-                                   const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
+                                 const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
 {
     constexpr dtype one = dtype(1.0), zero = dtype(0.0);
     const arma::uword nx = input->n_cols, ny = input->n_rows, ne = input->n_slices, nxy = nx * ny;
@@ -365,14 +537,14 @@ std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col
     return "";
 }
 template std::string quadriga_lib::interp(const arma::Cube<float> *input, const arma::Col<float> *xi, const arma::Col<float> *yi,
-                                            const arma::Col<float> *xo, const arma::Col<float> *yo, arma::Cube<float> *output);
+                                          const arma::Col<float> *xo, const arma::Col<float> *yo, arma::Cube<float> *output);
 template std::string quadriga_lib::interp(const arma::Cube<double> *input, const arma::Col<double> *xi, const arma::Col<double> *yi,
-                                            const arma::Col<double> *xo, const arma::Col<double> *yo, arma::Cube<double> *output);
+                                          const arma::Col<double> *xo, const arma::Col<double> *yo, arma::Cube<double> *output);
 
 // 1D linear interpolation
 template <typename dtype>
 std::string quadriga_lib::interp(const arma::Mat<dtype> *input, const arma::Col<dtype> *xi,
-                                   const arma::Col<dtype> *xo, arma::Mat<dtype> *output)
+                                 const arma::Col<dtype> *xo, arma::Mat<dtype> *output)
 {
     const arma::uword nx = input->n_rows, ne = input->n_cols;
     const arma::uword mx = xo->n_elem;
@@ -395,5 +567,100 @@ std::string quadriga_lib::interp(const arma::Mat<dtype> *input, const arma::Col<
     std::string error_message = quadriga_lib::interp(&input_cube, xi, &y, xo, &y, &output_cube);
     return error_message;
 }
+
 template std::string quadriga_lib::interp(const arma::Mat<float> *input, const arma::Col<float> *xi, const arma::Col<float> *xo, arma::Mat<float> *output);
 template std::string quadriga_lib::interp(const arma::Mat<double> *input, const arma::Col<double> *xi, const arma::Col<double> *xo, arma::Mat<double> *output);
+
+// Subdivide triangles into smaller triangles
+template <typename dtype>
+uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out)
+{
+    if (n_div == 0ULL)
+        throw std::invalid_argument("Input 'n_div' cannot be 0.");
+
+    if (triangles_in == nullptr || triangles_in->n_elem == 0ULL)
+        throw std::invalid_argument("Input 'triangles_in' cannot be NULL.");
+
+    if (triangles_in->n_cols != 9ULL)
+        throw std::invalid_argument("Input 'triangles_in' must have 9 columns.");
+
+    if (triangles_out == nullptr)
+        throw std::invalid_argument("Output 'triangles_out' cannot be NULL.");
+
+    uword n_triangles_in = triangles_in->n_rows;
+    uword n_triangles_out = n_triangles_in * n_div * n_div;
+
+    if (triangles_out->n_cols != 9ULL || triangles_out->n_rows != n_triangles_out)
+        triangles_out->set_size(n_triangles_out, 9ULL);
+
+    // Process each triangle
+    uword cnt = 0ULL;                                     // Counter
+    dtype stp = dtype(1.0) / dtype(n_div);                // Step size
+    const dtype *p_triangles_in = triangles_in->memptr(); // Pointer to input memory
+    dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
+
+    for (uword n = 0ULL; n < n_triangles_in; ++n)
+    {
+        // Read current triangle vertices
+        dtype v1x = p_triangles_in[n];
+        dtype v1y = p_triangles_in[n + n_triangles_in];
+        dtype v1z = p_triangles_in[n + 2ULL * n_triangles_in];
+        dtype e12x = p_triangles_in[n + 3ULL * n_triangles_in] - v1x;
+        dtype e12y = p_triangles_in[n + 4ULL * n_triangles_in] - v1y;
+        dtype e12z = p_triangles_in[n + 5ULL * n_triangles_in] - v1z;
+        dtype e13x = p_triangles_in[n + 6ULL * n_triangles_in] - v1x;
+        dtype e13y = p_triangles_in[n + 7ULL * n_triangles_in] - v1y;
+        dtype e13z = p_triangles_in[n + 8ULL * n_triangles_in] - v1z;
+
+        for (uword u = 0ULL; u < n_div; ++u)
+        {
+            dtype ful = dtype(u) * stp;
+            dtype fuu = ful + stp;
+
+            for (uword v = 0ULL; v < n_div - u; ++v)
+            {
+                dtype fvl = dtype(v) * stp;
+                dtype fvu = fvl + stp;
+
+                // Lower triangle first vertex
+                p_triangles_out[cnt] = v1x + fvl * e12x + ful * e13x;                          // w1x
+                p_triangles_out[cnt + n_triangles_out] = v1y + fvl * e12y + ful * e13y;        // w1y
+                p_triangles_out[cnt + 2ULL * n_triangles_out] = v1z + fvl * e12z + ful * e13z; // w1z
+
+                // Lower triangle second vertex
+                p_triangles_out[cnt + 3ULL * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w2x
+                p_triangles_out[cnt + 4ULL * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w2y
+                p_triangles_out[cnt + 5ULL * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w2z
+
+                // Lower triangle third vertex
+                p_triangles_out[cnt + 6ULL * n_triangles_out] = v1x + fvl * e12x + fuu * e13x; // w2x
+                p_triangles_out[cnt + 7ULL * n_triangles_out] = v1y + fvl * e12y + fuu * e13y; // w2y
+                p_triangles_out[cnt + 8ULL * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w2z
+                cnt++;
+
+                if (v < n_div - u - 1ULL)
+                {
+                    // Upper triangle first vertex
+                    p_triangles_out[cnt] = v1x + fvl * e12x + fuu * e13x;                          // w1x
+                    p_triangles_out[cnt + n_triangles_out] = v1y + fvl * e12y + fuu * e13y;        // w1y
+                    p_triangles_out[cnt + 2ULL * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w1z
+
+                    // Upper triangle second vertex
+                    p_triangles_out[cnt + 6ULL * n_triangles_out] = v1x + fvu * e12x + fuu * e13x; // w2x
+                    p_triangles_out[cnt + 7ULL * n_triangles_out] = v1y + fvu * e12y + fuu * e13y; // w2y
+                    p_triangles_out[cnt + 8ULL * n_triangles_out] = v1z + fvu * e12z + fuu * e13z; // w2z
+
+                    // Upper triangle third vertex
+                    p_triangles_out[cnt + 3ULL * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w2x
+                    p_triangles_out[cnt + 4ULL * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w2y
+                    p_triangles_out[cnt + 5ULL * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w2z
+                    ++cnt;
+                }
+            }
+        }
+    }
+    return n_triangles_out;
+}
+
+template uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out);
+template uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out);
