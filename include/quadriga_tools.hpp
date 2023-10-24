@@ -75,6 +75,30 @@ namespace quadriga_lib
                        const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
                        arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
 
+    // Read Wavefront .obj file
+    // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
+    // - 3D model must be triangularized
+    // - Material properties are encoded in the material name using the "usemtl [material name]" tag
+    // - Default material properties are taken from ITU-R P.2040-1, Table 3
+    // - Default materials: Concrete, Brick, Plasterboard, Wood, Glass, Chipboard, Metal,
+    //                      Ground_dry, Ground_medium, Ground_wet, Vegetation, Water, Ice, IRR_glass
+    // - Supported frequency range: 1 - 100 GHz (1 - 10 GHz for Ground materials)
+    // - Custom materials can be defined by: "usemtl Name::A:B:C:D:att"
+    //          - Real part of relative permittivity "eta = A * fGHz ^ B"
+    //          - Conductivity "sigma = C * fGHz ^ D"
+    //          - att = Material penetration loss in dB (fixed loss per material interaction)
+    // - Unknown materials are treated as Vacuum
+    // - Returns number of mesh elements "n_mesh"
+    // - Attempts to change the size of the output if it does not have correct size already
+    template <typename dtype>                                       // Supported types: float or double
+    unsigned obj_file_read(std::string fn,                          // File name
+                           arma::Mat<dtype> *mesh = nullptr,        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                           arma::Mat<dtype> *mtl_prop = nullptr,    // Material properties, Size: [ n_mesh, 5 ]
+                           arma::Mat<dtype> *vert_list = nullptr,   // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
+                           arma::Mat<unsigned> *face_ind = nullptr, // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
+                           arma::Col<unsigned> *obj_ind = nullptr,  // Object index, 1-based, Size: [ n_mesh ]
+                           arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
+
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
     // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
