@@ -998,7 +998,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     // Determine if the channel object has no structured data fields
     bool channel_is_empty = empty();
 
-    // Are the unstructured fields?
+    // Are there unstructured fields?
     if (channel_is_empty && par_names.size() == 0)
         return 0; // Nothing to be done!
 

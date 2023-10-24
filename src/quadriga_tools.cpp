@@ -16,6 +16,8 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_tools.hpp"
+#include <vector>
+#include <fstream>
 #include <stdexcept>
 
 // FUNCTION: Calculate rotation matrix R from roll, pitch, and yaw angles (given by rows in the input "orientation")
@@ -570,6 +572,263 @@ std::string quadriga_lib::interp(const arma::Mat<dtype> *input, const arma::Col<
 
 template std::string quadriga_lib::interp(const arma::Mat<float> *input, const arma::Col<float> *xi, const arma::Col<float> *xo, arma::Mat<float> *output);
 template std::string quadriga_lib::interp(const arma::Mat<double> *input, const arma::Col<double> *xi, const arma::Col<double> *xo, arma::Mat<double> *output);
+
+// Read Wavefront .obj file
+template <typename dtype>
+unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
+                                      arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind)
+{
+    // Open file for reading
+    std::ifstream fileR = std::ifstream(fn, std::ios::in);
+    if (!fileR.is_open())
+        throw std::invalid_argument("Error opening file.");
+
+    // Obtain the number of faces and vertices from the file
+    unsigned n_vert = 0, n_faces = 0;
+    std::string line;
+    while (std::getline(fileR, line))
+        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
+            ++n_vert;
+        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
+            ++n_faces;
+
+    // Stop here if no other outputs are needed
+    if (n_vert == 0 || n_faces == 0)
+    {
+        fileR.close();
+        return 0;
+    }
+
+    if (mesh == nullptr && mtl_prop == nullptr && vert_list == nullptr && face_ind == nullptr && obj_ind == nullptr && mtl_ind == nullptr)
+    {
+        fileR.close();
+        return n_faces;
+    }
+
+    // Define a struct to store the material properties
+    struct MaterialProp
+    {
+        std::string name;  // Material name
+        double a, b, c, d; // Electromagnetic properties
+        double att;        // Additional fixed  attenuation in dB
+        unsigned index;    // Material index
+    };
+
+    // Add default material data, See: Rec. ITU-R P.2040-1, Table 3
+    std::vector<MaterialProp> mtl_lib;
+    mtl_lib.push_back({"Concrete", 5.31, 0.0, 0.0326, 0.8095, 0.0, 0});
+    mtl_lib.push_back({"Brick", 3.75, 0.0, 0.038, 0.0, 0.0, 0});
+    mtl_lib.push_back({"Plasterboard", 2.94, 0.0, 0.0116, 0.7076, 0.0, 0});
+    mtl_lib.push_back({"Wood", 1.99, 0.0, 0.0047, 1.0718, 0.0, 0});
+    mtl_lib.push_back({"Glass", 6.27, 0.0, 0.0043, 1.1925, 0.0, 0});
+    mtl_lib.push_back({"Chipboard", 2.58, 0.0, 0.0217, 0.78, 0.0, 0});
+    mtl_lib.push_back({"Metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0});
+    mtl_lib.push_back({"Ground_dry", 3.0, 0.0, 0.00015, 2.52, 0.0, 0});
+    mtl_lib.push_back({"Ground_medium", 15.0, -0.1, 0.035, 1.63, 0.0, 0});
+    mtl_lib.push_back({"Ground_wet", 30.0, -0.4, 0.15, 1.30, 0.0, 0});
+    mtl_lib.push_back({"Vegetation", 1.0, 0.0, 1e-4, 1.1, 0.0, 0});       // Rec. ITU-R P.833-9, Figure 2
+    mtl_lib.push_back({"Water", 80.0, 0.0, 0.2, 2.0, 0.0, 0});            // Rec. ITU-R P.527-3, Figure 1
+    mtl_lib.push_back({"Ice", 3.0, 0.0, 3e-4, 0.7, 0.0, 0});              // Rec. ITU-R P.527-3, Figure 1
+    mtl_lib.push_back({"IRR_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
+
+    // Reset the file pointer to the beginning of the file
+    fileR.clear(); // Clear any flags
+    fileR.seekg(0, std::ios::beg);
+
+    // Local data
+    unsigned i_vert = 0, i_face = 0, j_face = 0, i_object = 0, i_mtl = 0; // Counters for vertices, faces, objects, materials
+    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;            // Default material properties
+    unsigned iM = 0;                                                      // Material index
+    bool simple_face_format = true;                                       // Selector for face format
+
+    // Obtain memory for the vertex list
+    dtype *p_vert;
+    if (vert_list == nullptr)
+        p_vert = new dtype[n_vert * 3];
+    else if (vert_list->n_rows != (arma::uword)n_vert || vert_list->n_cols != 3ULL)
+    {
+        vert_list->set_size((arma::uword)n_vert, 3ULL);
+        p_vert = vert_list->memptr();
+    }
+    else
+        p_vert = vert_list->memptr();
+
+    // Obtain memory for face indices
+    unsigned *p_face_ind;
+    if (face_ind == nullptr)
+        p_face_ind = new unsigned[n_faces * 3];
+    else if (face_ind->n_rows != (arma::uword)n_faces || face_ind->n_cols != 3ULL)
+    {
+        face_ind->set_size((arma::uword)n_faces, 3ULL);
+        p_face_ind = face_ind->memptr();
+    }
+    else
+        p_face_ind = face_ind->memptr();
+
+    // Set size of "mtl_prop"
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != (arma::uword)n_faces || mtl_prop->n_cols != 5ULL))
+        mtl_prop->set_size((arma::uword)n_faces, 5ULL);
+    dtype *p_mtl_prop = mtl_prop == nullptr ? nullptr : mtl_prop->memptr();
+
+    // Set size of "mtl_ind"
+    if (mtl_ind != nullptr && mtl_ind->n_elem != (arma::uword)n_faces)
+        mtl_ind->set_size((arma::uword)n_faces);
+    unsigned *p_mtl_ind = mtl_ind == nullptr ? nullptr : mtl_ind->memptr();
+
+    // Set size of "obj_ind"
+    if (obj_ind != nullptr && obj_ind->n_elem != (arma::uword)n_faces)
+        obj_ind->set_size((arma::uword)n_faces);
+    unsigned *p_obj_ind = obj_ind == nullptr ? nullptr : obj_ind->memptr();
+
+    // Process file
+    while (std::getline(fileR, line))
+    {
+        // Read vertex
+        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
+        {
+            if (i_vert >= n_vert)
+                throw std::invalid_argument("Error reading vertex data.");
+
+            double x, y, z;
+            std::sscanf(line.c_str(), "v %lf %lf %lf", &x, &y, &z);
+            p_vert[i_vert] = (dtype)x;
+            p_vert[i_vert + n_vert] = (dtype)y;
+            p_vert[i_vert++ + 2ULL * n_vert] = (dtype)z;
+        }
+
+        // Read face
+        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
+        {
+            if (i_face >= n_faces)
+                throw std::invalid_argument("Error reading face data.");
+
+            // Read face indices from file (1-based)
+            int a = 0, b = 0, c = 0, d = 0;
+            if (simple_face_format)
+            {
+                sscanf(line.c_str(), "f %d %d %d %d", &a, &b, &c, &d);
+                simple_face_format = b != 0;
+            }
+            if (!simple_face_format)
+                sscanf(line.c_str(), "f %d%*[/0-9] %d%*[/0-9] %d%*[/0-9] %d", &a, &b, &c, &d);
+
+            if (a == 0 || b == 0 || c == 0)
+                throw std::invalid_argument("Error reading face data.");
+
+            if (d != 0)
+                throw std::invalid_argument("Mesh is not in triangularized form.");
+
+            // Store current material properties
+            if (p_mtl_prop != nullptr)
+                p_mtl_prop[i_face] = (dtype)aM,
+                p_mtl_prop[i_face + n_faces] = (dtype)bM,
+                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM,
+                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM,
+                p_mtl_prop[i_face + 4 * n_faces] = (dtype)attM;
+
+            if (p_mtl_ind != nullptr)
+                p_mtl_ind[i_face] = iM;
+
+            // Store face indices (0-based)
+            p_face_ind[i_face] = (unsigned)a - 1;
+            p_face_ind[i_face + n_faces] = (unsigned)b - 1;
+            p_face_ind[i_face++ + 2 * n_faces] = (unsigned)c - 1;
+        }
+
+        // Read objects ids (= connected faces)
+        // - Object name is written to the OBJ file before vertices, materials and faces
+        else if (line.length() > 2 && line.at(0) == 111) // Line starts with "o "
+        {
+            if (p_obj_ind != nullptr)
+                for (unsigned i = j_face; i < i_face; ++i)
+                    p_obj_ind[i] = i_object;
+
+            // Reset current material
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0;
+            j_face = i_face;
+            ++i_object;
+        }
+
+        // Read and set material properties
+        // - Material names are written before face indices
+        else if (line.length() > 7 && line.substr(0, 6).compare("usemtl") == 0) // Line contains material definition
+        {
+            std::string mtl_name = line.substr(7, 255);                 // Name in OBJ File
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0; // Reset current material
+            int found = -1;
+
+            // Try to find the material name in the material library
+            for (int n = 0; n < (int)mtl_lib.size(); ++n)
+                if (mtl_lib[n].name.compare(mtl_name) == 0)
+                    aM = mtl_lib[n].a, bM = mtl_lib[n].b, cM = mtl_lib[n].c, dM = mtl_lib[n].d, attM = mtl_lib[n].att, iM = mtl_lib[n].index, found = n;
+
+            if (found == -1) // Add new material
+            {
+                sscanf(mtl_name.c_str(), "%*[a-zA-Z0-9. ]::%lf:%lf:%lf:%lf:%lf", &aM, &bM, &cM, &dM, &attM);
+                if (aM == 0.0)
+                    mtl_lib.push_back({mtl_name, 1.0, 0.0, 0.0, 0.0, 0.0, 0}); // Air
+                else
+                    mtl_lib.push_back({mtl_name, aM, bM, cM, dM, attM, 0});
+                found = (int)mtl_lib.size() - 1;
+            }
+
+            if (iM == 0) // Increase material counter
+                iM = ++i_mtl, mtl_lib[found].index = i_mtl;
+        }
+    }
+
+    // Set the object ID of the last object
+    i_object = i_object == 0 ? 1 : i_object; // Single unnamed object
+    if (p_obj_ind != nullptr)
+        for (unsigned i = j_face; i < i_face; ++i)
+            p_obj_ind[i] = i_object;
+
+    // Calculate the triangle mesh from vertices and faces
+    if (mesh != nullptr)
+    {
+        if (mesh->n_rows != (arma::uword)n_faces || mesh->n_cols != 9ULL)
+            mesh->set_size((arma::uword)n_faces, 9ULL);
+        dtype *p_mesh = mesh->memptr();
+
+        for (unsigned n = 0; n < n_faces; ++n)
+        {
+            unsigned a = p_face_ind[n],
+                     b = p_face_ind[n + n_faces],
+                     c = p_face_ind[n + 2 * n_faces];
+
+            if (a > n_vert || b > n_vert || c > n_vert)
+                throw std::invalid_argument("Error assembling triangle mesh.");
+
+            p_mesh[n] = p_vert[a];
+            p_mesh[n + n_faces] = p_vert[a + n_vert];
+            p_mesh[n + 2 * n_faces] = p_vert[a + 2 * n_vert];
+            p_mesh[n + 3 * n_faces] = p_vert[b];
+            p_mesh[n + 4 * n_faces] = p_vert[b + n_vert];
+            p_mesh[n + 5 * n_faces] = p_vert[b + 2 * n_vert];
+            p_mesh[n + 6 * n_faces] = p_vert[c];
+            p_mesh[n + 7 * n_faces] = p_vert[c + n_vert];
+            p_mesh[n + 8 * n_faces] = p_vert[c + 2 * n_vert];
+        }
+    }
+
+    // Clean up and return
+    mtl_lib.clear();
+
+    if (vert_list == nullptr)
+        delete[] p_vert;
+
+    if (face_ind == nullptr)
+        delete[] p_face_ind;
+
+    fileR.close();
+
+    return n_faces;
+}
+
+template unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
+                                               arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
+template unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
+                                               arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
 
 // Subdivide triangles into smaller triangles
 template <typename dtype>
