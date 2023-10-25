@@ -27,10 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_1_9
-
-typedef unsigned long long int uword;
-typedef long long int sword;
+#define QUADRIGA_LIB_VERSION v0_1_10
 
 namespace quadriga_lib
 {

@@ -40,9 +40,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 10 - path_length     Absolute path length from TX to RX phase center in m, size [n_path, n_snap], zero-padded
     // 11 - path_polarization   Polarization transfer function, size [8, n_path, n_snap], interleaved complex, zero-padded
     // 12 - path_angles     Departure and arrival angles in rad {AOD, EOD, AOA, EOA}, size [n_path, 4, n_snap], zero-padded
-    // 13 - path_coord      Interaction coordinates, size [3, n_coord, n_path, n_snap], NAN-padded
-    // 14 - rx_orientation  Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
-    // 15 - tx_orientation  Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
+    // 13 - path_fbs_pos    First-bounce scatterer positions, size [3, n_path, n_snap], zero-padded
+    // 14 - path_lbs_pos    Last-bounce scatterer positions, size [3, n_path, n_snap], zero-padded
+    // 15 - no_interact     Number interaction points of a path with the environment, 0 = LOS, [n_path, n_snap], zero-padded
+    // 16 - interact_coord  Interaction coordinates, size [3, max(sum(no_interact)), n_snap], zero-padded
+    // 17 - rx_orientation  Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
+    // 18 - tx_orientation  Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
 
     // Notes:
     // - Empty outputs are returned if data does not exist in the file
@@ -55,7 +58,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_channel:no_input", "Filename is missing.");
 
-    if (nlhs > 16)
+    if (nlhs > 19)
         mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_channel:no_input", "Too many output arguments.");
 
     // Read filename
@@ -106,20 +109,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read snapshot range
     arma::uvec snap; // Empty = read all
     if (nrhs > 2)
-        snap = qd_mex_typecast_Col<uword>(prhs[2], "snap");
+        snap = qd_mex_typecast_Col<unsigned long long>(prhs[2], "snap");
 
     // Update snapshot index
-    uword n_snap_channel = channel.n_snap();
+    unsigned long long n_snap_channel = channel.n_snap();
     if (snap.empty() && n_snap_channel != 0ULL)
     {
         snap.set_size(n_snap_channel);
-        uword *p = snap.memptr();
-        for (uword s = 0ULL; s < n_snap_channel; ++s)
+        unsigned long long *p = snap.memptr();
+        for (auto s = 0ULL; s < n_snap_channel; ++s)
             p[s] = s;
     }
     else if (n_snap_channel != 0ULL) // Check bounds
     {
-        for (uword &p : snap)
+        for (auto &p : snap)
             if (p < 1 || p > n_snap_channel)
                 mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_channel:out_of_bound", "Snapshot index out of bound.");
             else // Convert 1-based to 0-based
@@ -128,16 +131,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else // n_snap_channel == 0ULL
         snap.reset();
 
-    uword n_snap = snap.n_elem;
-    uword *i_snap = snap.memptr(); // Snapshot index
+    unsigned long long n_snap = snap.n_elem;
+    unsigned long long *i_snap = snap.memptr(); // Snapshot index
 
     // Get number of paths
-    uword n_path = 0ULL;
+    unsigned long long n_path = 0ULL;
     if (n_snap != 0ULL && n_snap_channel != 0ULL)
     {
         arma::uvec n_path_vec = channel.n_path();
-        uword *p = n_path_vec.memptr();
-        for (uword i = 0ULL; i < n_snap; ++i)
+        unsigned long long *p = n_path_vec.memptr();
+        for (auto i = 0ULL; i < n_snap; ++i)
             n_path = p[i_snap[i]] > n_path ? p[i_snap[i]] : n_path;
     }
 
@@ -158,7 +161,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
         for (size_t n = 0; n < field_names.size(); ++n)
         {
-            uword dims[3];
+            unsigned long long dims[3];
             void *dataptr;
             int type_id = quadriga_lib::any_type_id(&channel.par_data.at(n), dims, &dataptr);
 
@@ -195,12 +198,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
             else if (type_id == 22)
             {
-                auto data = std::any_cast<arma::Mat<arma::uword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Mat<unsigned long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 23)
             {
-                auto data = std::any_cast<arma::Mat<arma::sword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Mat<long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 24)
@@ -227,12 +230,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
             else if (type_id == 32)
             {
-                auto data = std::any_cast<arma::Cube<arma::uword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Cube<unsigned long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 33)
             {
-                auto data = std::any_cast<arma::Cube<arma::sword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Cube<long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 34)
@@ -259,12 +262,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             }
             else if (type_id == 42)
             {
-                auto data = std::any_cast<arma::Col<arma::uword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Col<unsigned long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 43)
             {
-                auto data = std::any_cast<arma::Col<arma::sword>>(channel.par_data.at(n));
+                auto data = std::any_cast<arma::Col<long long>>(channel.par_data.at(n));
                 mxSetField(plhs[0], 0, field_names.at(n), qd_mex_copy2matlab(&data));
             }
             else if (type_id == 44)
@@ -323,15 +326,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[12] = qd_mex_vector2matlab(&channel.path_angles, n_snap, i_snap);
 
     if (nlhs > 13)
-        plhs[13] = qd_mex_vector2matlab(&channel.path_coord, n_snap, i_snap, NAN);
+        plhs[13] = qd_mex_vector2matlab(&channel.path_fbs_pos, n_snap, i_snap);
 
-    if (nlhs > 14 && channel.rx_orientation.n_cols <= 1ULL)
-        plhs[14] = qd_mex_copy2matlab(&channel.rx_orientation);
-    else if (nlhs > 14)
-        plhs[14] = qd_mex_copy2matlab(&channel.rx_orientation, n_snap, i_snap);
+    if (nlhs > 14)
+        plhs[14] = qd_mex_vector2matlab(&channel.path_lbs_pos, n_snap, i_snap);
 
-    if (nlhs > 15 && channel.tx_orientation.n_cols <= 1ULL)
-        plhs[15] = qd_mex_copy2matlab(&channel.tx_orientation);
-    else if (nlhs > 15)
-        plhs[15] = qd_mex_copy2matlab(&channel.tx_orientation, n_snap, i_snap);
+    if (nlhs > 15)
+        plhs[15] = qd_mex_vector2matlab(&channel.no_interact, n_snap, i_snap);
+
+    if (nlhs > 16)
+        plhs[16] = qd_mex_vector2matlab(&channel.interact_coord, n_snap, i_snap);
+
+    if (nlhs > 17 && channel.rx_orientation.n_cols <= 1ULL)
+        plhs[17] = qd_mex_copy2matlab(&channel.rx_orientation);
+    else if (nlhs > 17)
+        plhs[17] = qd_mex_copy2matlab(&channel.rx_orientation, n_snap, i_snap);
+
+    if (nlhs > 18 && channel.tx_orientation.n_cols <= 1ULL)
+        plhs[18] = qd_mex_copy2matlab(&channel.tx_orientation);
+    else if (nlhs > 18)
+        plhs[18] = qd_mex_copy2matlab(&channel.tx_orientation, n_snap, i_snap);
 }

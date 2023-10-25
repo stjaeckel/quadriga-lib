@@ -21,9 +21,6 @@
 #include <armadillo>
 #include <string>
 
-typedef unsigned long long int uword;
-typedef long long int sword;
-
 template <typename dtype> // float or double
 std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                                    std::string *name,

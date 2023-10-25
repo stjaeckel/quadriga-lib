@@ -23,9 +23,6 @@
 #include <vector>
 #include <any>
 
-typedef unsigned long long int uword;
-typedef long long int sword;
-
 namespace quadriga_lib
 {
     // Class for storing and managing channel data (+ metadata)
@@ -47,17 +44,20 @@ namespace quadriga_lib
         std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
         std::vector<arma::Mat<dtype>> path_angles;       // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
-        std::vector<arma::Cube<dtype>> path_coord;       // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
+        std::vector<arma::Mat<dtype>> path_fbs_pos;      // First-bounce scatterer positions, matrices of size [3, n_path]
+        std::vector<arma::Mat<dtype>> path_lbs_pos;      // Last-bounce scatterer positions, matrices of size [3, n_path]
+        std::vector<arma::Col<unsigned>> no_interact;    // Number interaction points of a path with the environment, 0 = LOS, vector (n_snap) of vectors of length [n_path]
+        std::vector<arma::Mat<dtype>> interact_coord;    // Interaction coordinates of paths with the environment, matrices of size [3, sum(no_interact)]
         std::vector<std::string> par_names;              // Names of unstructured data fields
         std::vector<std::any> par_data;                  // Unstructured data of types {string, float, double, int, long int, arma::Col<dtype>, arma::Mat<dtype>, arma::Cube<dtype>}
         int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
         channel(){};                                     // Default constructor
 
-        uword n_snap() const;      // Number of snapshots
-        uword n_rx() const;        // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
-        uword n_tx() const;        // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
-        arma::uvec n_path() const; // Number of paths per snapshot (uword)
-        bool empty() const;        // Returns true if the channel object contains no structured data
+        unsigned long long n_snap() const; // Number of snapshots
+        unsigned long long n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
+        unsigned long long n_tx() const;   // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
+        arma::uvec n_path() const;         // Number of paths per snapshot (unsigned long long)
+        bool empty() const;                // Returns true if the channel object contains no structured data
 
         // Validate integrity
         std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
@@ -68,7 +68,8 @@ namespace quadriga_lib
         // - The index is updated to include to the newly written data
         // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
         // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
-        int hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0) const;
+        // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
+        int hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, bool assume_valid = false) const;
     };
 
     // Function to obtain the HDF5 library version
@@ -91,7 +92,7 @@ namespace quadriga_lib
     //      43  arma::Col<arma::sword>,   44  arma::Col<unsigned>,      45  arma::Col<int>,
     //      50  arma::Row<float>,         51  arma::Row<double>,        52  arma::Row<arma::uword>,
     //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
-    int any_type_id(const std::any *data, uword *dims = nullptr, void **dataptr = nullptr);
+    int any_type_id(const std::any *data, unsigned long long *dims = nullptr, void **dataptr = nullptr);
 
     // Create a new channel HDF file and set the index to given storage layout
     void hdf5_create(std::string fn, unsigned nx = 65536, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
@@ -120,14 +121,14 @@ namespace quadriga_lib
 
     // Read names of the unstructured datasets from the HDF file
     // - Returns number of the unstructured datasets at the given location
-    uword hdf5_read_dset_names(std::string fn,                                                     // File name
-                               std::vector<std::string> *par_names,                                // Output
-                               unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
-                               std::string prefix = "par_");                                       // Default prefix
+    unsigned long long hdf5_read_dset_names(std::string fn,                                                     // File name
+                                            std::vector<std::string> *par_names,                                // Output
+                                            unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
+                                            std::string prefix = "par_");                                       // Default prefix
 
     // Write single unstructured data field to HDF5 file
     // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
-    // - Armadillo Vectors, Matrices and Cubes with types: unsigned, int, uword, sword, float, double
+    // - Armadillo Vectors, Matrices and Cubes with types: unsigned, int, unsigned long long, sword, float, double
     // - Vector types: Armadillo Row and Col types are mapped to 1D storage type
     // - arma::Row will be converted to arma::Col
     // - Parameter name may only contain letters and numbers and the underscore "_"

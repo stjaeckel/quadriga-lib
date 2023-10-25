@@ -37,9 +37,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 12 - path_length     Absolute path length from TX to RX phase center in m, size [n_path, n_snap], zero-padded
     // 13 - path_polarization   Polarization transfer function, size [8, n_path, n_snap], interleaved complex, zero-padded
     // 14 - path_angles     Departure and arrival angles in rad {AOD, EOD, AOA, EOA}, size [n_path, 4, n_snap], zero-padded
-    // 15 - path_coord      Interaction coordinates, size [3, n_coord, n_path, n_snap], NAN-padded
-    // 16 - rx_orientation  Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
-    // 17 - tx_orientation  Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
+    // 15 - path_fbs_pos    First-bounce scatterer positions, size [3, n_path, n_snap], zero-padded
+    // 16 - path_lbs_pos    Last-bounce scatterer positions, size [3, n_path, n_snap], zero-padded
+    // 17 - no_interact     Number interaction points of a path with the environment, 0 = LOS, [n_path, n_snap], zero-padded
+    // 18 - interact_coord  Interaction coordinates, size [3, max(sum(no_interact)), n_snap], zero-padded
+    // 19 - rx_orientation  Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
+    // 20 - tx_orientation  Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
 
     // Output:
     //  0 - storage_dims    Dimensions of the storage space in the file, 4-element vector
@@ -215,19 +218,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         c.path_angles = qd_mex_matlab2vector_Mat<float>(prhs[14], 2);
 
     if (nrhs > 15)
-        c.path_coord = qd_mex_matlab2vector_Cube<float>(prhs[15], 3);
+        c.path_fbs_pos = qd_mex_matlab2vector_Mat<float>(prhs[15], 2);
 
     if (nrhs > 16)
-        c.rx_orientation = qd_mex_typecast_Mat<float>(prhs[16]);
+        c.path_lbs_pos = qd_mex_matlab2vector_Mat<float>(prhs[16], 2);
 
     if (nrhs > 17)
-        c.tx_orientation = qd_mex_typecast_Mat<float>(prhs[17]);
+        c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[17], 1);
 
-    uword n_snap = c.n_snap();
+    if (nrhs > 18)
+        c.interact_coord = qd_mex_matlab2vector_Mat<float>(prhs[18], 2);
+
+    if (nrhs > 19)
+        c.rx_orientation = qd_mex_typecast_Mat<float>(prhs[19]);
+
+    if (nrhs > 20)
+        c.tx_orientation = qd_mex_typecast_Mat<float>(prhs[20]);
+
+    unsigned long long n_snap = c.n_snap();
     if (nrhs > 7) // Delay
     {
-        uword n_dim = (uword)mxGetNumberOfDimensions(prhs[7]);
-        uword n_cols = (uword)mxGetN(prhs[7]);
+        unsigned long long n_dim = (unsigned long long)mxGetNumberOfDimensions(prhs[7]);
+        unsigned long long n_cols = (unsigned long long)mxGetN(prhs[7]);
         if (n_dim == 2ULL && n_cols == n_snap)
         {
             auto tmp = qd_mex_matlab2vector_Cube<float>(prhs[7], 1);
@@ -237,6 +249,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         else
             c.delay = qd_mex_matlab2vector_Cube<float>(prhs[7], 3);
     }
+
+    // Prune the size of 'interact_coord'
+    if (c.no_interact.size() == (size_t)n_snap && c.no_interact.size() == c.interact_coord.size())
+        for (auto s = 0ULL; s < n_snap; ++s)
+        {
+            unsigned cnt = 0;
+            for (auto &d : c.no_interact[s])
+                cnt += d;
+
+            if (c.interact_coord[s].n_cols > (unsigned long long)cnt)
+                c.interact_coord[s].resize(c.interact_coord[s].n_rows, (unsigned long long)cnt);
+        }
 
     // Write channel object to HDF5 file
     int return_code = 0;

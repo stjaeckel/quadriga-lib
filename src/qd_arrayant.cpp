@@ -27,22 +27,22 @@
 
 // ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
 template <typename dtype>
-uword quadriga_lib::arrayant<dtype>::n_elevation() const
+unsigned long long quadriga_lib::arrayant<dtype>::n_elevation() const
 {
     return e_theta_re.n_rows;
 }
 template <typename dtype>
-uword quadriga_lib::arrayant<dtype>::n_azimuth() const
+unsigned long long quadriga_lib::arrayant<dtype>::n_azimuth() const
 {
     return e_theta_re.n_cols;
 }
 template <typename dtype>
-uword quadriga_lib::arrayant<dtype>::n_elements() const
+unsigned long long quadriga_lib::arrayant<dtype>::n_elements() const
 {
     return e_theta_re.n_slices;
 }
 template <typename dtype>
-uword quadriga_lib::arrayant<dtype>::n_ports() const
+unsigned long long quadriga_lib::arrayant<dtype>::n_ports() const
 {
     if (coupling_re.empty() && coupling_im.empty())
         return e_theta_re.n_slices;
@@ -65,7 +65,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
 
     // Constants
     double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
-    uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
+    unsigned long long naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
 
     // Az and El grid as double
     arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
@@ -74,7 +74,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
     // Calculate the azimuth weights
     arma::vec waz(naz, arma::fill::none);
     double *ptr = waz.memptr();
-    for (uword i = 0ULL; i < naz; ++i)
+    for (auto i = 0ULL; i < naz; ++i)
     {
         double x = i == 0ULL ? az.at(naz - 1) - pi2 : az.at(i - 1);
         double y = i == naz - 1 ? az.at(0ULL) + pi2 : az.at(i + 1);
@@ -84,7 +84,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
     // Calculate the elevation weights
     arma::vec wel(nel, arma::fill::none);
     ptr = wel.memptr();
-    for (uword i = 0ULL; i < nel; ++i)
+    for (auto i = 0ULL; i < nel; ++i)
     {
         double x = i == 0ULL ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
         double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * elevation_grid.at(i + 1);
@@ -102,14 +102,14 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
             *ptr = *row * *col, norm += *ptr++;
     ptr = W.memptr();
     norm = 1.0 / norm;
-    for (uword i = 0ULL; i < naz * nel; ++i)
+    for (auto i = 0ULL; i < naz * nel; ++i)
         ptr[i] *= norm;
 
     // Calculate the directivity
     double p_sum = 0.0, p_max = 0.0;
     const dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
     const dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
-    for (uword i = 0ULL; i < naz * nel; ++i)
+    for (auto i = 0ULL; i < naz * nel; ++i)
     {
         double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
         double pow = a * a + b * b + c * c + d * d;
@@ -134,11 +134,11 @@ void quadriga_lib::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype
     dtype lambda = dtype(299792448.0) / center_frequency;
     dtype wave_no = dtype(2.0) * pi / lambda;
 
-    uword n_el = e_theta_re.n_rows;
-    uword n_az = e_theta_re.n_cols;
-    uword n_out = e_theta_re.n_slices;
-    uword n_ang = n_el * n_az;
-    uword n_prt = coupling_re.n_cols;
+    unsigned long long n_el = e_theta_re.n_rows;
+    unsigned long long n_az = e_theta_re.n_cols;
+    unsigned long long n_out = e_theta_re.n_slices;
+    unsigned long long n_ang = n_el * n_az;
+    unsigned long long n_prt = coupling_re.n_cols;
     unsigned n32_out = unsigned(n_out);
 
     // Create list of angles for pattern interpolation
@@ -147,8 +147,8 @@ void quadriga_lib::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype
     dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
           *p_phi = azimuth_grid.memptr(), *p_theta = elevation_grid.memptr();
 
-    for (uword ia = 0ULL; ia < n_az; ++ia)
-        for (uword ie = 0ULL; ie < n_el; ++ie)
+    for (auto ia = 0ULL; ia < n_az; ++ia)
+        for (auto ie = 0ULL; ie < n_el; ++ie)
             *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
     // Interpolate the pattern data
@@ -170,10 +170,10 @@ void quadriga_lib::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype
     // Apply coupling
     arma::Mat<std::complex<dtype>> coupling(coupling_re, coupling_im);
     arma::Mat<std::complex<dtype>> Vo(n_ang, n_prt), Ho(n_ang, n_prt);
-    for (uword i = 0ULL; i < n_out; ++i)
+    for (auto i = 0ULL; i < n_out; ++i)
     {
         arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col(), hi = Hi.row(i).as_col();
-        for (uword o = 0ULL; o < n_prt; ++o)
+        for (auto o = 0ULL; o < n_prt; ++o)
         {
             std::complex<dtype> cpl = coupling.at(i, o);
             Vo.col(o) += vi * cpl, Ho.col(o) += hi * cpl;
@@ -279,19 +279,19 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
 
 // Copy antenna elements, enlarge array size if needed
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(uword source, arma::uvec destination)
+void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, arma::uvec destination)
 {
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    uword n_el = e_theta_re.n_rows;
-    uword n_az = e_theta_re.n_cols;
-    uword n_ang = n_el * n_az;
-    uword n_elements = e_theta_re.n_slices;
-    uword n_element_max = uword(destination.max()) + 1;
-    uword n_ports = coupling_re.n_cols;
+    unsigned long long n_el = e_theta_re.n_rows;
+    unsigned long long n_az = e_theta_re.n_cols;
+    unsigned long long n_ang = n_el * n_az;
+    unsigned long long n_elements = e_theta_re.n_slices;
+    unsigned long long n_element_max = (unsigned long long)destination.max() + 1ULL;
+    unsigned long long n_ports = coupling_re.n_cols;
 
     if (source >= n_elements)
         error_message = "Source index out of bound";
@@ -301,7 +301,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(uword source, arma::uvec destin
     // Enlarge existing arrayant object
     if (n_element_max > n_elements)
     {
-        uword added_elements = n_element_max - n_elements;
+        unsigned long long added_elements = n_element_max - n_elements;
         e_theta_re.resize(n_el, n_az, n_element_max);
         e_theta_im.resize(n_el, n_az, n_element_max);
         e_phi_re.resize(n_el, n_az, n_element_max);
@@ -309,7 +309,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(uword source, arma::uvec destin
         element_pos.resize(3, n_element_max);
         coupling_re.resize(n_element_max, n_ports + added_elements);
         coupling_im.resize(n_element_max, n_ports + added_elements);
-        for (uword i = 0ULL; i < added_elements; ++i)
+        for (auto i = 0ULL; i < added_elements; ++i)
             coupling_re.at(n_elements + i, n_ports + i) = dtype(1.0);
     }
 
@@ -337,7 +337,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(uword source, arma::uvec destin
 }
 
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(uword source, uword destination)
+void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, unsigned long long destination)
 {
     arma::uvec dest(1);
     dest.at(0) = destination;
@@ -363,8 +363,8 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    uword n_out = azimuth.n_rows;
-    uword n_ang = azimuth.n_cols;
+    unsigned long long n_out = azimuth.n_rows;
+    unsigned long long n_ang = azimuth.n_cols;
 
     if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
         error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
@@ -389,12 +389,12 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
 
     // Process orientation
     n_out = i_element.n_elem;
-    uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
-    if (o1 != 3)
+    unsigned long long o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    if (o1 != 3ULL)
         error_message = "Input 'orientation' must have 3 elements on the first dimension.";
-    else if (o2 != 1 && o2 != n_out)
+    else if (o2 != 1ULL && o2 != n_out)
         error_message = "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.";
-    else if (o3 != 1 && o3 != n_ang)
+    else if (o3 != 1ULL && o3 != n_ang)
         error_message = "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.";
 
     if (error_message.length() != 0)
@@ -418,7 +418,7 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
     {
         const dtype *ptrI = element_pos.memptr();
         dtype *ptrO = element_pos_interp.memptr();
-        for (uword i = 0ULL; i < n_out; ++i)
+        for (auto i = 0ULL; i < n_out; ++i)
             std::memcpy(&ptrO[3ULL * i], &ptrI[3ULL * i_element[i]], 3ULL * sizeof(dtype));
     }
 
@@ -461,8 +461,8 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    uword n_out = azimuth.n_rows;
-    uword n_ang = azimuth.n_cols;
+    unsigned long long n_out = azimuth.n_rows;
+    unsigned long long n_ang = azimuth.n_cols;
     unsigned n32_out = unsigned(n_out);
 
     if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
@@ -478,7 +478,7 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
     arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
 
     // Process orientation
-    uword o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
+    unsigned long long o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
     if (o1 != 3)
         error_message = "Input 'orientation' must have 3 elements on the first dimension.";
     else if (o2 != 1 && o2 != n_out)
@@ -556,20 +556,20 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
         throw std::invalid_argument(error_message.c_str());
     }
 
-    uword n_el = e_theta_re.n_rows;
-    uword n_az = e_theta_re.n_cols;
-    uword n_slices = e_theta_re.n_slices;
+    unsigned long long n_el = e_theta_re.n_rows;
+    unsigned long long n_az = e_theta_re.n_cols;
+    unsigned long long n_slices = e_theta_re.n_slices;
 
     // Calculate the power pattern
     arma::Mat<dtype> pow(n_el, n_az);
     dtype *pp = pow.memptr();
     dtype limit = dtype(1.0e-12), pi_half = dtype(arma::datum::pi / 2.0);
 
-    for (uword is = 0ULL; is < n_slices; ++is)
+    for (auto is = 0ULL; is < n_slices; ++is)
     {
         dtype *pa = e_theta_re.slice_memptr(is), *pb = e_theta_im.slice_memptr(is),
               *pc = e_phi_re.slice_memptr(is), *pd = e_phi_im.slice_memptr(is);
-        for (uword j = 0ULL; j < n_el * n_az; ++j)
+        for (auto j = 0ULL; j < n_el * n_az; ++j)
             pp[j] += pa[j] * pa[j] + pb[j] * pb[j] + pc[j] * pc[j] + pd[j] * pd[j];
     }
 
@@ -579,18 +579,18 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
 
     // Determine which parts of the pattern should be kept
     arma::uvec keep_az(n_az), keep_el(n_el);
-    uword *keep_az_ptr = keep_az.memptr();
-    uword *keep_el_ptr = keep_el.memptr();
+    unsigned long long *keep_az_ptr = keep_az.memptr();
+    unsigned long long *keep_el_ptr = keep_el.memptr();
 
     pp = az_sum.memptr();
     dtype *grid_ptr = azimuth_grid.memptr();
-    for (uword ia = 0ULL; ia < n_az; ++ia)
+    for (auto ia = 0ULL; ia < n_az; ++ia)
     {
         dtype p = ia == 0 ? *grid_ptr + grid_ptr[n_az - 1] : grid_ptr[ia] - grid_ptr[ia - 1];
         dtype n = ia == n_az - 1 ? *grid_ptr + grid_ptr[ia] : grid_ptr[ia + 1] - grid_ptr[ia];
 
-        uword ip = ia == 0 ? n_az - 1 : ia - 1;
-        uword in = ia == n_az - 1 ? 0 : ia + 1;
+        unsigned long long ip = ia == 0ULL ? n_az - 1ULL : ia - 1ULL;
+        unsigned long long in = ia == n_az - 1ULL ? 0ULL : ia + 1ULL;
 
         if (pp[ia] > limit)
             keep_az_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_az_ptr[ip] : 1,
@@ -601,13 +601,13 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
 
     pp = el_sum.memptr(), grid_ptr = elevation_grid.memptr();
 
-    for (uword ie = 0ULL; ie < n_el; ++ie)
+    for (auto ie = 0ULL; ie < n_el; ++ie)
     {
         dtype p = ie == 0 ? *grid_ptr + pi_half : grid_ptr[ie] - grid_ptr[ie - 1];
         dtype n = ie == n_el - 1 ? pi_half - grid_ptr[ie] : grid_ptr[ie + 1] - grid_ptr[ie];
 
-        uword ip = ie == 0 ? 0 : ie - 1;
-        uword in = ie == n_el - 1 ? n_el - 1 : ie + 1;
+        unsigned long long ip = ie == 0ULL ? 0ULL : ie - 1ULL;
+        unsigned long long in = ie == n_el - 1ULL ? n_el - 1ULL : ie + 1ULL;
 
         if (pp[ie] > limit)
             keep_el_ptr[ip] = n > 0.001 * p && p > 1.5 * n ? keep_el_ptr[ip] : 1ULL,
@@ -617,7 +617,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     el_sum.reset();
 
     // Copy the relevant pattern data
-    uword n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
+    unsigned long long n_az_new = arma::sum(keep_az), n_el_new = arma::sum(keep_el);
 
     for (int p = 0; p < 4; ++p)
     {
@@ -651,7 +651,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
         }
 
         ptrO = data;
-        for (uword is = 0ULL; is < n_slices; ++is)
+        for (auto is = 0ULL; is < n_slices; ++is)
         {
             if (p == 0)
                 ptrI = e_theta_re.slice_memptr(is);
@@ -662,10 +662,10 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
             else if (p == 3)
                 ptrI = e_phi_im.slice_memptr(is);
 
-            for (uword ia = 0ULL; ia < n_az; ++ia)
+            for (auto ia = 0ULL; ia < n_az; ++ia)
             {
                 bool keep_az = keep_az_ptr[ia] == 1;
-                for (uword ie = 0ULL; ie < n_el; ++ie)
+                for (auto ie = 0ULL; ie < n_el; ++ie)
                     if (keep_az && keep_el_ptr[ie] == 1ULL)
                         *ptrO++ = ptrI[ia * n_el + ie];
             }
@@ -693,7 +693,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     // Copy the new azimuth grid
     dtype *azimuth_grid_new = new dtype[n_az_new];
     pp = azimuth_grid_new;
-    for (uword ia = 0ULL; ia < n_az; ++ia)
+    for (auto ia = 0ULL; ia < n_az; ++ia)
         if (keep_az_ptr[ia] == 1)
             *pp++ = azimuth_grid[ia];
     if (output == nullptr)
@@ -708,7 +708,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(quadriga_lib::arrayant<dtype> *
     // Copy the new elevation grid
     dtype *elevation_grid_new = new dtype[n_el_new];
     pp = elevation_grid_new;
-    for (uword ie = 0ULL; ie < n_el; ++ie)
+    for (auto ie = 0ULL; ie < n_el; ++ie)
         if (keep_el_ptr[ie] == 1)
             *pp++ = elevation_grid[ie];
     if (output == nullptr)
@@ -830,10 +830,10 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     else
         element_pos_update = element_pos;
 
-    uword n_el = e_theta_re.n_rows;
-    uword n_az = e_theta_re.n_cols;
-    uword n_out = i_element.n_elem;
-    uword n_ang = n_el * n_az;
+    unsigned long long n_el = e_theta_re.n_rows;
+    unsigned long long n_az = e_theta_re.n_cols;
+    unsigned long long n_out = i_element.n_elem;
+    unsigned long long n_ang = n_el * n_az;
 
     dtype tau = dtype(arma::datum::tau), pi_half = dtype(arma::datum::pi / 2.0), pi = dtype(arma::datum::pi),
           deg2rad = dtype(arma::datum::pi / 180.0), limit = dtype(1.0e-6);
@@ -842,14 +842,14 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     dtype zero = dtype(0.0), az_step_min = dtype(1e38), az_step_max = zero, el_step_min = az_step_min,
           el_step_max = zero, step = zero;
     dtype *ptr = azimuth_grid.memptr();
-    for (uword i = 0ULL; i < n_az; ++i)
+    for (auto i = 0ULL; i < n_az; ++i)
     {
         step = i == 0 ? *ptr - ptr[n_az - 1] + tau : ptr[i] - ptr[i - 1];
         az_step_min = step < az_step_min && step > limit ? step : az_step_min;
         az_step_max = step > az_step_max ? step : az_step_max;
     }
     ptr = elevation_grid.memptr();
-    for (uword i = 0ULL; i <= n_el; ++i)
+    for (auto i = 0ULL; i <= n_el; ++i)
     {
         if (i == 0)
             step = *ptr + pi_half;
@@ -885,15 +885,15 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
         if (step > dtype(0.0017)) // >= 0.1 degree --> Use entire sphere
         {
-            uword N = uword(std::round(pi / step));
-            N = N < 4 ? 4 : N;
+            unsigned long long N = (unsigned long long)std::round(pi / step);
+            N = N < 4ULL ? 4ULL : N;
 
-            azimuth_grid_update = arma::linspace<arma::Col<dtype>>(-pi, pi, 2 * N + 1);
+            azimuth_grid_update = arma::linspace<arma::Col<dtype>>(-pi, pi, 2ULL * N + 1ULL);
 
             if (std::abs(x_deg) < limit && std::abs(y_deg) < limit)
                 elevation_grid_update = elevation_grid;
             else
-                elevation_grid_update = arma::linspace<arma::Col<dtype>>(-pi_half + step, pi_half - step, N - 1);
+                elevation_grid_update = arma::linspace<arma::Col<dtype>>(-pi_half + step, pi_half - step, N - 1ULL);
         }
         else // step < 0.1 degree --> Use subsampled sphere
         {
@@ -933,7 +933,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
             // Set interpolation target
             p = ant.e_theta_re.memptr();
-            for (uword i = 0ULL; i < ant.e_theta_re.n_elem; ++i)
+            for (auto i = 0ULL; i < ant.e_theta_re.n_elem; ++i)
                 p[i] = ra[i / 181] == 1 && re[i % 181] == 1 ? 1.0 : 0.0;
 
             // Find target area for interpolation
@@ -943,28 +943,28 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
             // Subdivide target grid
             dtype sdiv = std::fmod(deg2rad, step) < 0.1 * step ? std::floor(deg2rad / step) : std::ceil(deg2rad / step);
             dtype stp = deg2rad / sdiv;
-            uword ndiv = uword(sdiv);
+            unsigned long long ndiv = (unsigned long long)sdiv;
 
             bool wrap = ant.azimuth_grid.at(ant.azimuth_grid.n_elem - 1) + stp > pi;
-            uword N = wrap ? ndiv * (ant.azimuth_grid.n_elem - 1) + 1 : ndiv * ant.azimuth_grid.n_elem;
+            unsigned long long N = wrap ? ndiv * (ant.azimuth_grid.n_elem - 1) + 1 : ndiv * ant.azimuth_grid.n_elem;
             azimuth_grid_update.set_size(N);
             p = azimuth_grid_update.memptr(), q = ant.azimuth_grid.memptr();
-            for (uword i = 0ULL; i < ant.azimuth_grid.n_elem; ++i)
+            for (auto i = 0ULL; i < ant.azimuth_grid.n_elem; ++i)
                 if (wrap && i == ant.azimuth_grid.n_elem - 1ULL)
                     *p = q[i];
                 else
-                    for (uword j = 0ULL; j < ndiv; ++j)
+                    for (auto j = 0ULL; j < ndiv; ++j)
                         *p++ = q[i] + dtype(j) * stp;
 
             wrap = ant.elevation_grid.at(ant.elevation_grid.n_elem - 1) + stp > pi_half;
             N = wrap ? ndiv * (ant.elevation_grid.n_elem - 1) + 1 : ndiv * ant.elevation_grid.n_elem;
             elevation_grid_update.set_size(N);
             p = elevation_grid_update.memptr(), q = ant.elevation_grid.memptr();
-            for (uword i = 0ULL; i < ant.elevation_grid.n_elem; ++i)
+            for (auto i = 0ULL; i < ant.elevation_grid.n_elem; ++i)
                 if (wrap && i == ant.elevation_grid.n_elem - 1)
                     *p = q[i];
                 else
-                    for (uword j = 0ULL; j < ndiv; ++j)
+                    for (auto j = 0ULL; j < ndiv; ++j)
                         *p++ = q[i] + dtype(j) * stp;
         }
 
@@ -990,8 +990,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
           *p_phi = azimuth_grid_update.memptr(), *p_theta = elevation_grid_update.memptr();
 
-    for (uword ia = 0ULL; ia < n_az; ++ia)
-        for (uword ie = 0ULL; ie < n_el; ++ie)
+    for (auto ia = 0ULL; ia < n_az; ++ia)
+        for (auto ie = 0ULL; ie < n_el; ++ie)
             *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
     // Set antenna orientation
@@ -1028,7 +1028,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     if (usage == 2) // Only adjust the polarization
     {
         gamma = gamma.t();
-        for (uword i = 0ULL; i < n_out; ++i)
+        for (auto i = 0ULL; i < n_out; ++i)
         {
             dtype *p_gamma = gamma.colptr(i);
             dtype *p_theta_re = use_all_elements ? e_theta_re.slice_memptr(i) : e_theta_re.slice_memptr(element);
@@ -1043,7 +1043,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
                 q_phi_re = use_all_elements ? output->e_phi_re.slice_memptr(i) : output->e_phi_re.memptr(),
                 q_phi_im = use_all_elements ? output->e_phi_im.slice_memptr(i) : output->e_phi_im.memptr();
 
-            for (uword j = 0ULL; j < n_ang; ++j)
+            for (auto j = 0ULL; j < n_ang; ++j)
             {
                 dtype sin_gamma = std::sin(p_gamma[j]), cos_gamma = std::cos(p_gamma[j]);
                 dtype tmp = sin_gamma * p_theta_re[j];
@@ -1119,7 +1119,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         ptrO = use_all_elements ? element_pos.memptr() : element_pos.colptr(element);
         ptrO = output == nullptr ? ptrO : output->element_pos.memptr();
         double *R_ptr = R.memptr();
-        for (uword i = 0ULL; i < i_element.n_elem; ++i)
+        for (auto i = 0ULL; i < i_element.n_elem; ++i)
         {
             unsigned j = 3 * (i_element.at(i) - 1);
             unsigned k = use_all_elements ? j : 0;
@@ -1138,8 +1138,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::set_size(uword n_elevation, uword n_azimuth,
-                                             uword n_elements, uword n_ports)
+void quadriga_lib::arrayant<dtype>::set_size(unsigned long long n_elevation, unsigned long long n_azimuth,
+                                             unsigned long long n_elements, unsigned long long n_ports)
 {
     if (read_only)
     {
@@ -1201,9 +1201,9 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
         return "Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid";
 
-    uword n_elevation = e_theta_re.n_rows;
-    uword n_azimuth = e_theta_re.n_cols;
-    uword n_elements = e_theta_re.n_slices;
+    unsigned long long n_elevation = e_theta_re.n_rows;
+    unsigned long long n_azimuth = e_theta_re.n_cols;
+    unsigned long long n_elements = e_theta_re.n_slices;
 
     if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements)
         return "Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.";
@@ -1260,8 +1260,8 @@ std::string quadriga_lib::arrayant<dtype>::validate()
     if (error_message.length() != 0)
         return error_message;
 
-    uword n_elements = e_theta_re.n_slices;
-    uword n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
+    unsigned long long n_elements = e_theta_re.n_slices;
+    unsigned long long n_prt = coupling_re.empty() ? n_elements : coupling_re.n_cols;
 
     if (element_pos.empty())
         element_pos.zeros(3, n_elements);
@@ -1567,9 +1567,9 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(d
 
 // Generate : Antenna model for the 3GPP-NR channel model
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, dtype center_freq,
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, dtype center_freq,
                                                                    unsigned pol, dtype tilt, dtype spacing,
-                                                                   uword Mg, uword Ng, dtype dgv, dtype dgh,
+                                                                   unsigned long long Mg, unsigned long long Ng, dtype dgv, dtype dgh,
                                                                    const arrayant<dtype> *pattern)
 {
     double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
@@ -1586,7 +1586,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     }
 
     ant.center_frequency = center_freq;
-    uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
+    unsigned long long n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
     if (pattern == nullptr) // Generate 3GPP default radiation pattern
     {
@@ -1601,13 +1601,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
 
         // Full pattern (normalized to 8 dBi gain using factor 2.51..)
         dtype *ptr = ant.e_theta_re.memptr(), *py = Y.memptr(), *px = ant.azimuth_grid.memptr();
-        for (uword ia = 0ULL; ia < n_az; ++ia)
+        for (auto ia = 0ULL; ia < n_az; ++ia)
         {
             double x = double(*px++) * rad2deg / 65.0;
             x = 12.0 * x * x;
             x = x > 30.0 ? 30.0 : x;
 
-            for (uword ie = 0ULL; ie < n_el; ++ie)
+            for (auto ie = 0ULL; ie < n_el; ++ie)
             {
                 double z = double(py[ie]) + x;
                 z = z > 30.0 ? -30.0 : -z;
@@ -1631,12 +1631,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     }
 
     // Duplicate the existing elements in z-direction (vertical stacking)
-    uword n_elements = ant.n_elements();
+    unsigned long long n_elements = ant.n_elements();
     if (M > 1ULL)
-        for (uword source = n_elements; source > 0ULL; source--)
+        for (unsigned long long source = n_elements; source > 0ULL; source--)
         {
-            uword i_start = n_elements + source - 1ULL;
-            uword i_end = M * n_elements - 1ULL;
+            unsigned long long i_start = n_elements + source - 1ULL;
+            unsigned long long i_end = M * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -1648,8 +1648,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
         z_position = arma::linspace<arma::Col<dtype>>(zero, dtype(M - 1ULL) * spacing * dtype(wavelength), M);
         z_position = z_position - arma::mean(z_position);
 
-        for (uword m = 0ULL; m < M; ++m)
-            for (uword n = 0ULL; n < n_elements; ++n)
+        for (auto m = 0ULL; m < M; ++m)
+            for (auto n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(2ULL, m * n_elements + n) = z_position.at(m);
     }
 
@@ -1665,8 +1665,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
         ant.coupling_re.zeros(n_elements * M, n_elements);
         ant.coupling_im.zeros(n_elements * M, n_elements);
 
-        for (uword m = 0ULL; m < M; ++m)
-            for (uword n = 0ULL; n < n_elements; ++n)
+        for (auto m = 0ULL; m < M; ++m)
+            for (auto n = 0ULL; n < n_elements; ++n)
             {
                 ant.coupling_re.at(m * n_elements + n, n) = cpl_re.at(m);
                 ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
@@ -1680,10 +1680,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     n_elements = ant.n_elements();
     if (N > 1ULL)
     {
-        for (uword source = n_elements; source > 0ULL; source--)
+        for (unsigned long long source = n_elements; source > 0ULL; source--)
         {
-            uword i_start = n_elements + source - 1ULL;
-            uword i_end = N * n_elements - 1ULL;
+            unsigned long long i_start = n_elements + source - 1ULL;
+            unsigned long long i_end = N * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -1691,8 +1691,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
         arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(zero, dtype(N - 1ULL) * spacing * dtype(wavelength), N);
         y_position = y_position - arma::mean(y_position);
 
-        for (uword m = 0ULL; m < N; ++m)
-            for (uword n = 0ULL; n < n_elements; ++n)
+        for (auto m = 0ULL; m < N; ++m)
+            for (auto n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(1ULL, m * n_elements + n) = y_position.at(m);
     }
 
@@ -1700,10 +1700,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     n_elements = ant.n_elements();
     if (Mg > 1ULL)
     {
-        for (uword source = n_elements; source > 0ULL; source--)
+        for (unsigned long long source = n_elements; source > 0ULL; source--)
         {
-            uword i_start = n_elements + source - 1ULL;
-            uword i_end = Mg * n_elements - 1ULL;
+            unsigned long long i_start = n_elements + source - 1ULL;
+            unsigned long long i_end = Mg * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -1711,8 +1711,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
         arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Mg - 1ULL) * dgv * dtype(wavelength), Mg);
         zg_position = zg_position - arma::mean(zg_position);
 
-        for (uword mg = 0ULL; mg < Mg; ++mg)
-            for (uword n = 0ULL; n < n_elements; ++n)
+        for (auto mg = 0ULL; mg < Mg; ++mg)
+            for (auto n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(2ULL, mg * n_elements + n) += zg_position.at(mg);
     }
 
@@ -1720,10 +1720,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     n_elements = ant.n_elements();
     if (Ng > 1)
     {
-        for (uword source = n_elements; source > 0; source--)
+        for (unsigned long long source = n_elements; source > 0; source--)
         {
-            uword i_start = n_elements + source - 1ULL;
-            uword i_end = Ng * n_elements - 1ULL;
+            unsigned long long i_start = n_elements + source - 1ULL;
+            unsigned long long i_end = Ng * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -1731,8 +1731,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
         arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Ng - 1ULL) * dgh * dtype(wavelength), Ng);
         yg_position = yg_position - arma::mean(yg_position);
 
-        for (uword mg = 0ULL; mg < Ng; ++mg)
-            for (uword n = 0ULL; n < n_elements; ++n)
+        for (auto mg = 0ULL; mg < Ng; ++mg)
+            for (auto n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(1ULL, mg * n_elements + n) += yg_position.at(mg);
     }
 
@@ -1740,14 +1740,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(uword M, uwor
     return ant;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, float center_freq,
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, float center_freq,
                                                                             unsigned pol, float tilt, float spacing,
-                                                                            uword Mg, uword Ng, float dgv, float dgh,
+                                                                            unsigned long long Mg, unsigned long long Ng, float dgv, float dgh,
                                                                             const quadriga_lib::arrayant<float> *pattern);
 
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(uword M, uword N, double center_freq,
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
-                                                                             uword Mg, uword Ng, double dgv, double dgh,
+                                                                             unsigned long long Mg, unsigned long long Ng, double dgv, double dgh,
                                                                              const quadriga_lib::arrayant<double> *pattern);
 
 // Calculate channel coefficients for spherical waves
@@ -1806,14 +1806,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // 64-bit integers used by Armadillo
-    uword n_path = fbs_pos->n_cols;                        // Number of paths
-    uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
-    uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
-    uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
-    uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
+    unsigned long long n_path = fbs_pos->n_cols;                        // Number of paths
+    unsigned long long n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
+    unsigned long long n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
+    unsigned long long n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    unsigned long long n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
+    unsigned long long n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
+    unsigned long long n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
+    unsigned long long n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
     if (lbs_pos->n_cols != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
     {
@@ -1914,14 +1914,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         std::memcpy(p_tx, tx_array->element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
     if (tx_orientation_not_zero) // Apply TX antenna orientation
         quick_rotate_inplace(Tb, -Tt, Th, p_tx, n_tx);
-    for (uword t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
+    for (auto t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
         p_tx[t] += Tx, p_tx[t + 1ULL] += Ty, p_tx[t + 2ULL] += Tz;
 
     if (rx_array->element_pos.n_elem != 0ULL)
         std::memcpy(p_rx, rx_array->element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
     if (rx_orientation_not_zero) // Apply RX antenna orientation
         quick_rotate_inplace(Rb, -Rt, Rh, p_rx, n_rx);
-    for (uword r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
+    for (auto r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
         p_rx[r] += Rx, p_rx[r + 1ULL] += Ry, p_rx[r + 2ULL] += Rz;
 
     // Calculate the Freespace distance
@@ -1930,14 +1930,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
     // There may be multiple LOS paths. We need to find the real one
     // Detection is done by sing the shortest length difference to the TX-RX line
-    uword true_los_path = 0ULL;
+    auto true_los_path = 0ULL;
     dtype shortest_path = los_limit;
 
     // Calculate angles and delays
-    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
+    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
     {
-        uword i = add_fake_los_path ? j - 1ULL : j;
-        uword ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
+        unsigned long long i = add_fake_los_path ? j - 1ULL : j;
+        unsigned long long ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
 
         // Calculate the shortest possible path length (TX > FBS > LBS > RX)
         dtype d_shortest = dist_rx_tx, d_length = dist_rx_tx, d_fbs_lbs = zero;
@@ -1954,14 +1954,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         }
 
         // Calculate path delays, departure angles and arrival angles
-        uword o = j * n_links, o0 = o;                       // Slice offset
+        unsigned long long o = j * n_links, o0 = o;          // Slice offset
         if (std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
         {
             if (!add_fake_los_path || j != 0ULL)
                 true_los_path = j, shortest_path = std::abs(d_length - dist_rx_tx);
 
-            for (uword t = 0ULL; t < n_tx; ++t)
-                for (uword r = 0ULL; r < n_rx; ++r)
+            for (auto t = 0ULL; t < n_tx; ++t)
+                for (auto r = 0ULL; r < n_rx; ++r)
                 {
                     x = p_rx[3ULL * r] - p_tx[3ULL * t];
                     y = p_rx[3ULL * r + 1ULL] - p_tx[3ULL * t + 1ULL];
@@ -1978,7 +1978,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         else // NLOS path
         {
             dtype *dr = new dtype[n_rx];
-            for (uword r = 0ULL; r < n_rx; ++r)
+            for (auto r = 0ULL; r < n_rx; ++r)
                 x = p_lbs[ix] - p_rx[3ULL * r],
                 y = p_lbs[iy] - p_rx[3ULL * r + 1ULL],
                 z = p_lbs[iz] - p_rx[3ULL * r + 2ULL],
@@ -1986,7 +1986,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                 p_aoa[o0 + r] = std::atan2(y, x),
                 p_eoa[o0 + r] = dr[r] < los_limit ? zero : std::asin(z / dr[r]);
 
-            for (uword t = 0ULL; t < n_tx; ++t)
+            for (auto t = 0ULL; t < n_tx; ++t)
             {
                 x = p_fbs[ix] - p_tx[3ULL * t],
                 y = p_fbs[iy] - p_tx[3ULL * t + 1ULL],
@@ -1996,7 +1996,7 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                       at = std::atan2(y, x),
                       et = dt < los_limit ? zero : std::asin(z / dt);
 
-                for (uword r = 0ULL; r < n_rx; ++r)
+                for (auto r = 0ULL; r < n_rx; ++r)
                     p_aod[o] = at, p_eod[o] = et,
                     p_aoa[o] = p_aoa[o0 + r], p_eoa[o] = p_eoa[o0 + r],
                     p_delays[o++] = dt + d_fbs_lbs + dr[r];
@@ -2048,9 +2048,9 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     element_pos_interp.reset();
 
     // Calculate the MIMO channel coefficients for each path
-    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
+    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
     {
-        uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
+        unsigned long long i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
         const dtype *pM = M->colptr(i);
         dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
@@ -2060,11 +2060,11 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
         dtype path_amplitude = add_fake_los_path && j == 0 ? zero : std::sqrt(p_gain[i]);
 
-        uword O = j * n_links; // Slice offset
-        for (uword t = 0ULL; t < n_tx; ++t)
-            for (uword r = 0ULL; r < n_rx; ++r)
+        unsigned long long O = j * n_links; // Slice offset
+        for (auto t = 0ULL; t < n_tx; ++t)
+            for (auto r = 0ULL; r < n_rx; ++r)
             {
-                uword R = t * n_rx + r;
+                unsigned long long R = t * n_rx + r;
 
                 dtype re = zero, im = zero;
                 re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
@@ -2109,15 +2109,15 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         quick_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
 
         // Allocate memory for temporary data
-        uword N = n_ports > n_links ? n_ports : n_links;
+        unsigned long long N = n_ports > n_links ? n_ports : n_links;
         dtype *tempX = new dtype[N];
         dtype *tempY = new dtype[N];
         dtype *tempZ = new dtype[N];
         dtype *tempT = new dtype[N];
 
-        for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
+        for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
         {
-            uword o = j * n_links; // Slice offset
+            unsigned long long o = j * n_links; // Slice offset
 
             // Process coefficients and delays
             if (different_output_size) // Data is stored in internal memory, we can write directly to the output
@@ -2265,14 +2265,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         throw std::invalid_argument(error_message.c_str());
     }
 
-    uword n_path = aod->n_elem;                            // Number of paths
-    uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
-    uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
-    uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
-    uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
+    unsigned long long n_path = aod->n_elem;                            // Number of paths
+    unsigned long long n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
+    unsigned long long n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
+    unsigned long long n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    unsigned long long n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
+    unsigned long long n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
+    unsigned long long n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
+    unsigned long long n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
     if (n_path == 0ULL || eod->n_elem != n_path || aoa->n_elem != n_path || eoa->n_elem != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
@@ -2389,16 +2389,16 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     {
         dtype *pAz = AOA_loc.memptr(), *pEl = EOA_loc.memptr();
         dtype *pD = add_fake_los_path ? rx_Doppler->memptr() + 1 : rx_Doppler->memptr();
-        for (uword i = 0ULL; i < n_path; ++i)
+        for (auto i = 0ULL; i < n_path; ++i)
             pD[i] = std::cos(pAz[i * n_rx]) * std::cos(pEl[i * n_rx]);
     }
 
     // Calculate the MIMO channel coefficients for each path
-    uword true_los_path = 0ULL;
+    auto true_los_path = 0ULL;
     dtype true_los_power = zero;
-    for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
+    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
     {
-        uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
+        unsigned long long i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
         const dtype *pM = M->colptr(i);
         dtype *pVrr = Vr_re.colptr(i), *pVri = Vr_im.colptr(i),
@@ -2415,11 +2415,11 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         if (std::abs(path_length - dist_rx_tx) < los_limit && add_fake_los_path && j != 0ULL && p_gain[i] > true_los_power)
             true_los_path = j, true_los_power = p_gain[i];
 
-        uword O = j * n_links; // Slice offset
-        for (uword t = 0ULL; t < n_tx; ++t)
-            for (uword r = 0ULL; r < n_rx; ++r)
+        unsigned long long O = j * n_links; // Slice offset
+        for (auto t = 0ULL; t < n_tx; ++t)
+            for (auto r = 0ULL; r < n_rx; ++r)
             {
-                uword R = t * n_rx + r;
+                unsigned long long R = t * n_rx + r;
 
                 dtype re = zero, im = zero;
                 re += pVrr[r] * pM[0] * pVtr[t] - pVri[r] * pM[1] * pVtr[t] - pVrr[r] * pM[1] * pVti[t] - pVri[r] * pM[0] * pVti[t];
@@ -2466,9 +2466,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         // Process coefficients and delays
         if (different_output_size) // Data is stored in internal memory, we can write directly to the output
         {
-            for (uword j = 0ULL; j < n_out; ++j) // Loop over paths
+            for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
             {
-                uword o = j * n_links; // Slice offset
+                unsigned long long o = j * n_links; // Slice offset
 
                 // Apply coupling to coefficients
                 quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
@@ -2487,7 +2487,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             dtype *tempX = new dtype[n_ports];
             dtype *tempY = new dtype[n_ports];
 
-            for (uword o = 0ULL; o < n_links * n_out; o += n_links) // Loop over paths
+            for (auto o = 0ULL; o < n_links * n_out; o += n_links) // Loop over paths
             {
                 // Apply coupling to coefficients
                 quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),

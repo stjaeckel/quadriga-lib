@@ -169,7 +169,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         path_length_double = qd_mex_reinterpret_Col<double>(prhs[23]),
         M_double = qd_mex_reinterpret_Mat<double>(prhs[24]);
 
-    uword n_path = use_single ? aod_single.n_elem : aod_double.n_elem;
+    unsigned long long n_path = use_single ? aod_single.n_elem : aod_double.n_elem;
     if (n_path == 0ULL ||
         (use_single && (eod_single.n_elem != n_path || aoa_single.n_elem != n_path || eoa_single.n_elem != n_path ||
                         path_gain_single.n_elem != n_path || path_length_single.n_elem != n_path || M_single.n_cols != n_path)) ||
@@ -196,8 +196,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool add_fake_los_path = (nrhs < 32) ? false : qd_mex_get_scalar<bool>(prhs[31], "add_fake_los_path", false);
 
     // Allocate output memory
-    uword n_tx_ports = use_single ? tx_array_single.n_ports() : tx_array_double.n_ports();
-    uword n_rx_ports = use_single ? rx_array_single.n_ports() : rx_array_double.n_ports();
+    unsigned long long n_tx_ports = use_single ? tx_array_single.n_ports() : tx_array_double.n_ports();
+    unsigned long long n_rx_ports = use_single ? rx_array_single.n_ports() : rx_array_double.n_ports();
     n_path += add_fake_los_path ? 1ULL : 0ULL;
 
     arma::fcube coeff_re_single, coeff_im_single, delay_single;

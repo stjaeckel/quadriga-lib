@@ -38,7 +38,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:icosphere:io_error", "Too many output arguments.");
 
     // Read inputs
-    uword n_div = nrhs < 1 ? 1 : qd_mex_get_scalar<uword>(prhs[0], "n_div", 1);
+    unsigned long long n_div = nrhs < 1 ? 1ULL : qd_mex_get_scalar<unsigned long long>(prhs[0], "n_div", 1ULL);
     double radius = nrhs < 2 ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "radius", 1.0);
 
     // Calculate number of rows in the output

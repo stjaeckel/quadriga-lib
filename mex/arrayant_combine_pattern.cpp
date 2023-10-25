@@ -87,9 +87,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:combine_pattern:IO_error", error_message.c_str());
 
     // Allocate memory for output data
-    uword n_az = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
-    uword n_el = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
-    uword n_prt = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
+    unsigned long long n_az = use_single ? arrayant_single.n_azimuth() : arrayant_double.n_azimuth();
+    unsigned long long n_el = use_single ? arrayant_single.n_elevation() : arrayant_double.n_elevation();
+    unsigned long long n_prt = use_single ? arrayant_single.n_ports() : arrayant_double.n_ports();
 
     quadriga_lib::arrayant<float> arrayant_single_out;
     quadriga_lib::arrayant<double> arrayant_double_out;

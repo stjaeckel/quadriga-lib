@@ -65,11 +65,11 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     // Note: This function is not intended to be publicly accessible. There is no input validation.
     // Incorrectly formatted arguments may lead to undefined behavior or segmentation faults.
 
-    const uword n_elevation = e_theta_re->n_rows;            // Number of elevation angles in the pattern
-    const uword n_azimuth = e_theta_re->n_cols;              // Number of azimuth angles in the pattern
-    const uword n_pattern_samples = n_azimuth * n_elevation; // Number of samples in the pattern
-    const uword n_out = i_element->n_elem;                   // Number of elements in the output
-    const uword n_ang = azimuth->n_cols;                     // Number of angles to be interpolated
+    const unsigned long long n_elevation = e_theta_re->n_rows;            // Number of elevation angles in the pattern
+    const unsigned long long n_azimuth = e_theta_re->n_cols;              // Number of azimuth angles in the pattern
+    const unsigned long long n_pattern_samples = n_azimuth * n_elevation; // Number of samples in the pattern
+    const unsigned long long n_out = i_element->n_elem;                   // Number of elements in the output
+    const unsigned long long n_ang = azimuth->n_cols;                     // Number of angles to be interpolated
 
     bool per_element_angles = azimuth->n_rows > 1 ? true : false;
     bool per_element_rotation = orientation->n_cols > 1 ? true : false;
@@ -105,30 +105,30 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     *az_diff = pi_double - p_azimuth_grid[n_azimuth - 1ULL] + *p_azimuth_grid;
     *az_diff = one / *az_diff;
     *el_diff = one;
-    for (uword a = 1ULL; a < n_azimuth; ++a)
+    for (auto a = 1ULL; a < n_azimuth; ++a)
         az_diff[a] = one / (p_azimuth_grid[a] - p_azimuth_grid[a - 1ULL]);
-    for (uword a = 1ULL; a < n_elevation; ++a)
+    for (auto a = 1ULL; a < n_elevation; ++a)
         el_diff[a] = one / (p_elevation_grid[a] - p_elevation_grid[a - 1ULL]);
 
         // Interpolate the pattern data using spheric interpolation
         // datatype "int" is required by MSVC to allow parallel for
 #pragma omp parallel for
-    for (int a_i32 = 0; a_i32 < int(n_ang); ++a_i32)
+    for (int a_i32 = 0; a_i32 < (int)n_ang; ++a_i32)
     {
         // Convert a_i32 to 64 bit
-        const uword a = uword(a_i32);
+        const auto a = (unsigned long long)a_i32;
 
         // Get the local pointer for the angles
         const dtype *p_az_local = per_element_angles ? &p_az_global[a * n_out] : &p_az_global[a];
         const dtype *p_el_local = per_element_angles ? &p_el_global[a * n_out] : &p_el_global[a];
 
         // Decare and initialize all local variables
-        uword i_up = 0ULL, i_un = 0ULL, i_vp = 0ULL, i_vn = 0ULL; // Indices for reading the pattern
-        dtype up = one, un = zero, vp = one, vn = zero;           // Relative weights for interpolation
+        auto i_up = 0ULL, i_un = 0ULL, i_vp = 0ULL, i_vn = 0ULL; // Indices for reading the pattern
+        dtype up = one, un = zero, vp = one, vn = zero;          // Relative weights for interpolation
         dtype cAZi = one, sAZi = zero, cELi = one, sELi = zero, Cx = one, Cy = zero;
         dtype az = zero, el = zero, sin_gamma = zero, cos_gamma = one, dx = one, dy = zero, dz = zero;
 
-        for (uword o = 0ULL; o < n_out; ++o)
+        for (auto o = 0ULL; o < n_out; ++o)
         {
             // Check if we need to update the angles for the current output index "o"
             bool update_angles = per_element_angles || per_element_rotation || per_angle_rotation || o == 0ULL;
@@ -141,7 +141,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
 
             // Apply rotation (Co = R * Ci) for antenna pattern interpolation
             // Transform from Cartesian coordinates to geographic coordinates
-            uword Rp_a = per_angle_rotation ? a : 0ULL, Rp_o = per_element_rotation ? o : 0ULL;
+            unsigned long long Rp_a = per_angle_rotation ? a : 0ULL, Rp_o = per_element_rotation ? o : 0ULL;
             const dtype *Rp = R_typed.slice_colptr(Rp_a, Rp_o);
             if (update_angles)
             {
@@ -240,14 +240,14 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
             //      A------E--------------------B
 
             // Calculate the indices to read points A,B,C,D from the input pattern data
-            uword offset = n_pattern_samples * (p_i_element[o] - 1ULL);
-            uword iA = i_up * n_elevation + i_vp + offset;
-            uword iB = i_un * n_elevation + i_vp + offset;
-            uword iC = i_up * n_elevation + i_vn + offset;
-            uword iD = i_un * n_elevation + i_vn + offset;
+            unsigned long long offset = n_pattern_samples * (p_i_element[o] - 1ULL);
+            unsigned long long iA = i_up * n_elevation + i_vp + offset;
+            unsigned long long iB = i_un * n_elevation + i_vp + offset;
+            unsigned long long iC = i_up * n_elevation + i_vn + offset;
+            unsigned long long iD = i_un * n_elevation + i_vn + offset;
             dtype Vr, Vi, Hr, Hi;
 
-            for (uword VH = 0ULL; VH < 2ULL; ++VH)
+            for (auto VH = 0ULL; VH < 2ULL; ++VH)
             {
                 dtype fAr, fBr, fCr, fDr, fAi, fBi, fCi, fDi;
                 if (VH == 0) // Read the pattern values
@@ -331,7 +331,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
             }
 
             // Compute and write output
-            uword ioa = a * n_out + o;
+            unsigned long long ioa = a * n_out + o;
             p_v_re[ioa] = cos_gamma * Vr - sin_gamma * Hr;
             p_v_im[ioa] = cos_gamma * Vi - sin_gamma * Hi;
             p_h_re[ioa] = sin_gamma * Vr + cos_gamma * Hr;

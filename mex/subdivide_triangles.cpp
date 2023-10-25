@@ -45,11 +45,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:subdivide_triangles:io_error", "Input must be provided in single or double precision.");
 
     // Read number of divisions
-    uword n_div = nrhs < 2 ? 1 : qd_mex_get_scalar<uword>(prhs[1], "n_div", 1);
+    unsigned long long n_div = nrhs < 2 ? 1ULL : qd_mex_get_scalar<unsigned long long>(prhs[1], "n_div", 1ULL);
 
     // Determine number of rows
-    uword n_triangles_in = (mxIsSingle(prhs[0])) ? triangles_in_single.n_rows : triangles_in_double.n_rows;
-    uword n_triangles_out = n_triangles_in * n_div * n_div;
+    unsigned long long n_triangles_in = (mxIsSingle(prhs[0])) ? triangles_in_single.n_rows : triangles_in_double.n_rows;
+    unsigned long long n_triangles_out = n_triangles_in * n_div * n_div;
 
     // Reserver output memory
     if (nlhs > 0)

@@ -68,7 +68,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                  nw = storage_space.at(3);
 
         unsigned n_data = nx * ny * nz * nw;
-        if (channelID.n_elem != (uword)n_data)
+        if (channelID.n_elem != (unsigned long long)n_data)
             mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:unknown_error", "Corrupted storage index.");
 
         mwSize dims[4] = {(mwSize)nx, (mwSize)ny, (mwSize)nz, (mwSize)nw};

@@ -38,8 +38,9 @@ try
     quadriga_lib.hdf5_create_file(fn);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'File already exists.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -65,8 +66,9 @@ try
     quadriga_lib.hdf5_reshape_layout(fn,145);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Mismatch in number of elements in storage index.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -79,8 +81,9 @@ try
     quadriga_lib.hdf5_reshape_layout(fn,144);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'File does not exist.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -130,8 +133,9 @@ try
     [storage_space, ~] = quadriga_lib.hdf5_write_channel(fn,[2,1,1,1],par);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Incorrect number of output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -166,11 +170,11 @@ for n = 1:length(fieldsPar)
     field = fieldsPar{n};
     assertEqual( class(par.(field)), class(parR.(field)));  % Same data type
     assertTrue(  isequal(par.(field), parR.(field)) );      % Same data
-
+    
     % Load single fields
     data = quadriga_lib.hdf5_read_dset(fn, 1, field);
     assertTrue(  isequal(par.(field), data) );      % Same data
-
+    
     % Add a copy of the data to new storage location
     quadriga_lib.hdf5_write_dset(fn, [1,2], field, data);
 end
@@ -188,8 +192,9 @@ try
     quadriga_lib.hdf5_write_dset(fn, [1,2], 'string', 'Oh no, I bought Ethereum.');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Dataset ''par_string'' already exists.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -227,8 +232,9 @@ try
     quadriga_lib.hdf5_write_channel(fn,[2,1,1,1],[],rx_pos);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''tx_pos'' is missing or ill-formatted (must have 3 rows).';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -236,14 +242,6 @@ end
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Tx and rx location"); end
 quadriga_lib.hdf5_write_channel(fn,[2,1,1,1],[],rx_pos,tx_pos);
-
-% % Rewriting the data to the same position should issue a warning (does not work for octave)
-% lastwarn(''); % Clear last warning
-% quadriga_lib.hdf5_write_channel(fn,[2,1,1,1],[],rx_pos,tx_pos);
-% [warnMsg, ~] = lastwarn;
-% if isempty(warnMsg)
-%     error('moxunit:exceptionNotRaised', 'Expected a warning!');
-% end
 
 coeff_re = rand(3,2,5,3);
 coeff_im = rand(3,2,5,3);
@@ -255,8 +253,9 @@ try
     quadriga_lib.hdf5_write_channel(fn,[3,1,1,1],[],rx_pos,tx_pos,coeff_re);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Imaginary part of channel coefficients ''coeff_im'' is missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -267,8 +266,9 @@ try
     quadriga_lib.hdf5_write_channel(fn,[3,1,1,1],[],rx_pos,tx_pos,[],coeff_im);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Real part of channel coefficients ''coeff_re'' is missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -279,8 +279,9 @@ try
     quadriga_lib.hdf5_write_channel(fn,[3,1,1,1],[],rx_pos,tx_pos,coeff_re,coeff_im);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Delays are missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -319,8 +320,9 @@ try
     quadriga_lib.hdf5_read_channel(fn, 3, 0);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Snapshot index out of bound.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -328,8 +330,9 @@ try
     quadriga_lib.hdf5_read_channel(fn, 3, 4);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Snapshot index out of bound.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -350,18 +353,22 @@ path_gain = rand(5,3);
 path_length = rand(5,3);
 path_polarization = rand(8,5,3);
 path_angles = rand(5,4,3);
-path_coord = rand(3,12,5,3);
+fbs_pos = rand(3,5,3);
+lbs_pos = rand(3,5,3);
+no_interact = [1 2 3 4 5 ; 5 4 3 2 1 ; 1 1 1 1 1]';
+interact_coord = rand(3,15,3);
+interact_coord(:,6:end,3) = 0;
 rx_orientation = rand(3,3);
 tx_orientation = rand(3,3);
 
 quadriga_lib.hdf5_write_channel(fn, [5,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-    center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+    center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
 
 % Test if we can restore the data
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Reading optional parameters"); end
 [parR, rx_posR, tx_posR, coeff_reR, coeff_imR, delay_4dR, center_frequencyR, nameR, initR, path_gainR, path_lengthR, ...
-    path_polarizationR, path_anglesR, path_coordR, rx_orientationR, tx_orientationR ] =...
+    path_polarizationR, path_anglesR, fbs_posR, lbs_posR, no_interactR, interact_coordR, rx_orientationR, tx_orientationR ] =...
     quadriga_lib.hdf5_read_channel(fn, 5);
 
 assertTrue( isempty(parR) );
@@ -377,7 +384,10 @@ assertEqual( path_gainR, single(path_gain) );
 assertEqual( path_lengthR, single(path_length) );
 assertEqual( path_polarizationR, single(path_polarization) );
 assertEqual( path_anglesR, single(path_angles) );
-assertEqual( path_coordR, single(path_coord) );
+assertEqual( fbs_posR, single(fbs_pos) );
+assertEqual( lbs_posR, single(lbs_pos) );
+assertEqual( no_interactR, uint32(no_interact) );
+assertEqual( interact_coordR, single(interact_coord) );
 assertEqual( rx_orientationR, single(rx_orientation) );
 assertEqual( tx_orientationR, single(tx_orientation) );
 
@@ -385,7 +395,7 @@ assertEqual( tx_orientationR, single(tx_orientation) );
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Load single snapshot"); end
 [~, rx_posR, tx_posR, coeff_reR, coeff_imR, delay_4dR, center_frequencyR, nameR, initR, path_gainR, path_lengthR, ...
-    path_polarizationR, path_anglesR, path_coordR, rx_orientationR, tx_orientationR ] =...
+    path_polarizationR, path_anglesR, fbs_posR, lbs_posR, no_interactR, interact_coordR, rx_orientationR, tx_orientationR ] =...
     quadriga_lib.hdf5_read_channel(fn, 5, 3);
 
 assertEqual( rx_posR, single(rx_pos) );
@@ -400,7 +410,10 @@ assertEqual( path_gainR, single(path_gain(:,3)) );
 assertEqual( path_lengthR, single(path_length(:,3)) );
 assertEqual( path_polarizationR, single(path_polarization(:,:,3)) );
 assertEqual( path_anglesR, single(path_angles(:,:,3)) );
-assertEqual( path_coordR, single(path_coord(:,:,:,3)) );
+assertEqual( fbs_posR, single(fbs_pos(:,:,3)) );
+assertEqual( lbs_posR, single(lbs_pos(:,:,3)) );
+assertEqual( no_interactR, uint32(no_interact(:,3)) );
+assertEqual( interact_coordR, single(interact_coord(:,:,3)) );
 assertEqual( rx_orientationR, single(rx_orientation(:,3)) );
 assertEqual( tx_orientationR, single(tx_orientation(:,3)) );
 
@@ -409,41 +422,45 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted coeff-re"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re([1,2],:,:,:), coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.'; % Assumes that coeff_re is correct
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re(:,[1,1,1],:,:), coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.'; % Assumes that coeff_re is correct
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re(:,:,[1,2,3,4],:), coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.'; % Assumes that coeff_re is correct
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re(:,:,:,[1,2]), coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''coeff_re'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -452,41 +469,45 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted coeff-im"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im([1,2],:,:,:), delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im(:,[1,1,1],:,:), delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im(:,:,[1,2,3,4],:), delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''coeff_im[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im(:,:,:,[1,2]), delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Imaginary part of channel coefficients ''coeff_im'' is missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -495,41 +516,45 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted 4D delays"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d([1,2],:,:,:), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''delay[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d(:,[1,1,1],:,:), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''delay[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d(:,:,[1,2,3,4],:), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''delay[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d(:,:,:,[1,2]), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Delays are missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -538,21 +563,23 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted 2D delays"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_2d([1,2],:), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''delay[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_2d(:,[1,2]), ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Delays are missing or incomplete.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -561,21 +588,23 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted path gain"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain(:,[1,2]), path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain(:,[1,2]), path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''path_gain'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain([1,2,3,4],:), path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain([1,2,3,4],:), path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_gain[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -584,21 +613,23 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted path lenght"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length(:,[1,2]), path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length(:,[1,2]), path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''path_length'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length([1,2,3,4],:), path_polarization, path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length([1,2,3,4],:), path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_length[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -607,31 +638,34 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted polarizaiion"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization([1,2,3],:,:), path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization([1,2,3],:,:), path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_polarization[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization(:,[1,2,3,4],:), path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization(:,[1,2,3,4],:), path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_polarization[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization(:,:,[1,2]), path_angles, path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization(:,:,[1,2]), path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''path_polarization'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -640,64 +674,187 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted angles"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles([1,2,3],:,:), path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles([1,2,3],:,:), fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_angles[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles(:,[1,2,3],:), path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles(:,[1,2,3],:), fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''path_angles[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles(:,:,[1,2]), path_coord, rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles(:,:,[1,2]), fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''path_angles'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Test ill-formatted FBS
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Ill-formatted FBS"); end
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos([1,2],:,:), lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Size mismatch in ''path_fbs_pos[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos(:,[1,2,3],:), lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Size mismatch in ''path_fbs_pos[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos(:,:,[1,2]), lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''path_fbs_pos'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Test ill-formatted LBS
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Ill-formatted LBS"); end
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos([1,2],:,:), no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Size mismatch in ''path_lbs_pos[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos(:,[1,2,3],:), no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Size mismatch in ''path_lbs_pos[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos(:,:,[1,2]), no_interact, interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''path_lbs_pos'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 % Test ill-formatted path_coord
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted coords"); end
+
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord([1,2],:,:,:), rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, [], interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''interact_coord'' is provided but ''no_interact'' is missing.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord(:,:,[1,2,3],:), rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, [], rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''no_interact'' is provided but ''interact_coord'' is missing or has wrong number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord(:,:,:,[1,2]), rx_orientation, tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact([1,2],:), interact_coord, rx_orientation, tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Size mismatch in ''no_interact[0]''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact(:,[1,2]), interact_coord, rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''no_interact'' must be empty or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord([1,2],:,:), rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''interact_coord[0]'' must have 3 rows.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord(:,[1,2],:), rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Number of columns in ''interact_coord[0]'' must match the sum of ''no_interact''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord(:,:,[1,2]), rx_orientation, tx_orientation );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''no_interact'' is provided but ''interact_coord'' is missing or has wrong number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -706,21 +863,23 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted rx orientation"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation([1,2],:), tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation([1,2],:), tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''rx_orientation'' must be empty or have 3 rows.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation(:,[1,2]), tx_orientation );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation(:,[1,2]), tx_orientation );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Number of columns in ''rx_orientation'' must be 1 or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -729,21 +888,23 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Ill-formatted tx orientation"); end
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation([1,2],:) );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation([1,2],:) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''tx_orientation'' must be empty or have 3 rows.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
     quadriga_lib.hdf5_write_channel(fn, [6,1,1,1], [], rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, path_coord, rx_orientation, tx_orientation(:,[1,2]) );
+        center_frequency, name, [], path_gain, path_length, path_polarization, path_angles, fbs_pos, lbs_pos, no_interact, interact_coord, rx_orientation, tx_orientation(:,[1,2]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Number of columns in ''tx_orientation'' must be 1 or match the number of snapshots.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -755,13 +916,13 @@ tx_pos = rand(3,3);
 center_frequency = rand(3,1);
 
 quadriga_lib.hdf5_write_channel(fn, [6,1,1,2], par, rx_pos, tx_pos, coeff_re, coeff_im, delay_4d, ...
-    center_frequency, name, 2, [], [], [], [], [], rx_orientation(:,1), tx_orientation(:,2) );
+    center_frequency, name, 2, [], [], [], [], [], [], [], [], rx_orientation(:,1), tx_orientation(:,2) );
 
 % Test if we can restore the data
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Alternative format loading"); end
 [parR, rx_posR, tx_posR, coeff_reR, coeff_imR, delay_4dR, center_frequencyR, nameR, initR, path_gainR, path_lengthR, ...
-    path_polarizationR, path_anglesR, path_coordR, rx_orientationR, tx_orientationR ] =...
+    path_polarizationR, path_anglesR, fbs_posR, lbs_posR, no_interactR, interact_coordR, rx_orientationR, tx_orientationR ] =...
     quadriga_lib.hdf5_read_channel(fn, [6,1,1,2]);
 
 assertTrue( ~isempty(parR) );
@@ -777,7 +938,10 @@ assertTrue( isempty(path_gainR) );
 assertTrue( isempty(path_lengthR) );
 assertTrue( isempty(path_polarizationR) );
 assertTrue( isempty(path_anglesR) );
-assertTrue( isempty(path_coordR) );
+assertTrue( isempty(fbs_posR) );
+assertTrue( isempty(lbs_posR) );
+assertTrue( isempty(no_interactR) );
+assertTrue( isempty(interact_coordR) );
 assertEqual( rx_orientationR, single(rx_orientation(:,1)) );
 assertEqual( tx_orientationR, single(tx_orientation(:,2)) );
 
@@ -807,8 +971,9 @@ try
     quadriga_lib.hdf5_read_layout(files(end).name);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Not an HDF5 file.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 

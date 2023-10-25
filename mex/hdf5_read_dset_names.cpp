@@ -60,7 +60,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read names of the unstructured data fields from file
     quadriga_lib::channel<float> channel;
     std::vector<std::string> par_names;
-    uword n_par = 0ULL;
+    unsigned long long n_par = 0ULL;
     try
     {
         n_par = quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw);
