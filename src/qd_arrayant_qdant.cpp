@@ -111,7 +111,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     // Read the number of elements
     node_name = pfx + "NoElements";
     node = node_arrayant.child(node_name.c_str());
-    uword n_elements = node.empty() ? 1ULL : node.text().as_ullong();
+    unsigned long long n_elements = node.empty() ? 1ULL : node.text().as_ullong();
 
     // Read element position
     node_name = pfx + "ElementPosition";
@@ -133,7 +133,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     if (node.empty())
         return "Array antenna object must have an 'ElevationGrid'.";
     *elevation_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
-    uword n_elevation = elevation_grid->n_elem;
+    unsigned long long n_elevation = elevation_grid->n_elem;
 
     // Read the azimuth grid
     node_name = pfx + "AzimuthGrid";
@@ -141,12 +141,12 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     if (node.empty())
         return "Array antenna object must have an 'AzimuthGrid'.";
     *azimuth_grid = arma::Col<dtype>(node.text().as_string()) * deg2rad;
-    uword n_azimuth = azimuth_grid->n_elem;
+    unsigned long long n_azimuth = azimuth_grid->n_elem;
 
     // Read the coupling matrix
     node_name = pfx + "CouplingAbs";
     node = node_arrayant.child(node_name.c_str());
-    uword n_ports = n_elements;
+    unsigned long long n_ports = n_elements;
     if (node.empty())
         *coupling_re = arma::Mat<dtype>(n_elements, n_elements, arma::fill::eye);
     else
@@ -178,7 +178,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     *e_phi_re = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
     *e_phi_im = arma::Cube<dtype>(n_elevation, n_azimuth, n_elements, arma::fill::zeros);
 
-    for (uword el = 0ULL; el < n_elements; ++el)
+    for (auto el = 0ULL; el < n_elements; ++el)
     {
         // Read magnitude of Vertical Component
         node_name = pfx + "EthetaMag";
@@ -393,7 +393,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     node_arrayant.append_child("name").text().set(name->c_str());
     node_arrayant.append_child("CenterFrequency").text().set(*center_frequency);
 
-    uword NoElements = e_theta_re->n_slices;
+    unsigned long long NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
         node_arrayant.append_child("NoElements").text().set(NoElements);
 
@@ -469,7 +469,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
     {
         pugi::xml_node node_pat;
-        for (uword i = 0ULL; i < NoElements; ++i)
+        for (auto i = 0ULL; i < NoElements; ++i)
         {
             arma::Mat<dtype> mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
             mat_tmp.transform([ten](dtype x)

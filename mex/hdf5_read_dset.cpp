@@ -86,7 +86,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[0] = mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
     else if (nlhs > 0)
     {
-        uword dims[3];
+        unsigned long long dims[3];
         void *dataptr;
         int type_id = quadriga_lib::any_type_id(&dset, dims, &dataptr);
 
@@ -123,12 +123,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
         else if (type_id == 22)
         {
-            auto data = std::any_cast<arma::Mat<arma::uword>>(dset);
+            auto data = std::any_cast<arma::Mat<unsigned long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 23)
         {
-            auto data = std::any_cast<arma::Mat<arma::sword>>(dset);
+            auto data = std::any_cast<arma::Mat<long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 24)
@@ -155,12 +155,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
         else if (type_id == 32)
         {
-            auto data = std::any_cast<arma::Cube<arma::uword>>(dset);
+            auto data = std::any_cast<arma::Cube<unsigned long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 33)
         {
-            auto data = std::any_cast<arma::Cube<arma::sword>>(dset);
+            auto data = std::any_cast<arma::Cube<long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 34)
@@ -187,12 +187,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         }
         else if (type_id == 42)
         {
-            auto data = std::any_cast<arma::Col<arma::uword>>(dset);
+            auto data = std::any_cast<arma::Col<unsigned long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 43)
         {
-            auto data = std::any_cast<arma::Col<arma::sword>>(dset);
+            auto data = std::any_cast<arma::Col<long long>>(dset);
             plhs[0] = qd_mex_copy2matlab(&data);
         }
         else if (type_id == 44)

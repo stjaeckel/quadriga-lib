@@ -23,7 +23,6 @@
 #include <hdf5.h>
 #include "quadriga_channel.hpp"
 
-
 // Return HDF5 version info
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
@@ -116,17 +115,17 @@ inline void qHDF_close_file(hid_t file_id)
 
 // Helper function: convert double to float
 template <typename dtype>
-inline void qHDF_cast_to_float(const dtype *in, float *out, uword n_elem)
+inline void qHDF_cast_to_float(const dtype *in, float *out, unsigned long long n_elem)
 {
-    for (uword n = 0ULL; n < n_elem; ++n)
+    for (auto n = 0ULL; n < n_elem; ++n)
         out[n] = float(in[n]);
 }
 
 // Helper function: convert float to double
 template <typename dtype>
-inline void qHDF_cast_to_double(const dtype *in, double *out, uword n_elem)
+inline void qHDF_cast_to_double(const dtype *in, double *out, unsigned long long n_elem)
 {
-    for (uword n = 0ULL; n < n_elem; ++n)
+    for (auto n = 0ULL; n < n_elem; ++n)
         out[n] = double(in[n]);
 }
 
@@ -250,7 +249,7 @@ inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par
     }
 
     // Get low-level access to the data
-    uword dims_arma[3];
+    unsigned long long dims_arma[3];
     hsize_t dims[3] = {1, 1, 1};
     void *dataptr;
     int datatype_id = quadriga_lib::any_type_id(par_data, dims_arma, &dataptr);
@@ -350,7 +349,7 @@ inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par
 }
 
 // Helper function to write unstructured data
-inline sword qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = nullptr)
+inline long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = nullptr)
 {
     // Get information about the group
     H5G_info_t group_info;
@@ -362,7 +361,7 @@ inline sword qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_n
         prefix_length = prefix->length();
 
     // Traverse the objects in the group by index
-    sword no_par_names = 0LL;
+    long long no_par_names = 0LL;
     for (hsize_t i = 0; i < group_info.nlinks; ++i)
     {
         // Get the name of the object by its creation order
@@ -510,7 +509,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
         {
             if (float2double)
             {
-                arma::Col<double> value((uword)dims[0], arma::fill::none);
+                arma::Col<double> value((arma::uword)dims[0], arma::fill::none);
                 float *data = new float[value.n_elem];
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
@@ -521,7 +520,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             }
             else
             {
-                arma::Col<float> value((uword)dims[0], arma::fill::none);
+                arma::Col<float> value((arma::uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
                 H5Dclose(dset_id);
@@ -531,7 +530,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_DOUBLE))
         {
-            arma::Col<double> value((uword)dims[0], arma::fill::none);
+            arma::Col<double> value((arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -540,7 +539,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_ULLONG))
         {
-            arma::Col<unsigned long long int> value((uword)dims[0], arma::fill::none);
+            arma::Col<unsigned long long int> value((arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -549,7 +548,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_LLONG))
         {
-            arma::Col<long long int> value((uword)dims[0], arma::fill::none);
+            arma::Col<long long int> value((arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -558,7 +557,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_UINT))
         {
-            arma::Col<unsigned int> value((uword)dims[0], arma::fill::none);
+            arma::Col<unsigned int> value((arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -567,7 +566,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_INT))
         {
-            arma::Col<int> value((uword)dims[0], arma::fill::none);
+            arma::Col<int> value((arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -580,7 +579,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
         {
             if (float2double)
             {
-                arma::Mat<double> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+                arma::Mat<double> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
                 float *data = new float[value.n_elem];
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
@@ -591,7 +590,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             }
             else
             {
-                arma::Mat<float> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+                arma::Mat<float> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
                 H5Dclose(dset_id);
@@ -601,7 +600,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_DOUBLE))
         {
-            arma::Mat<double> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Mat<double> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -610,7 +609,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_ULLONG))
         {
-            arma::Mat<unsigned long long int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Mat<unsigned long long int> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -619,7 +618,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_LLONG))
         {
-            arma::Mat<long long int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Mat<long long int> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -628,7 +627,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_UINT))
         {
-            arma::Mat<unsigned int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Mat<unsigned int> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -637,7 +636,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_INT))
         {
-            arma::Mat<int> value((uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Mat<int> value((arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -650,7 +649,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
         {
             if (float2double)
             {
-                arma::Cube<double> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+                arma::Cube<double> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
                 float *data = new float[value.n_elem];
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
                 qHDF_cast_to_double(data, value.memptr(), value.n_elem);
@@ -661,7 +660,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
             }
             else
             {
-                arma::Cube<float> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+                arma::Cube<float> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
                 H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
                 H5Tclose(datatype_id);
                 H5Dclose(dset_id);
@@ -671,7 +670,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_DOUBLE))
         {
-            arma::Cube<double> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Cube<double> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -680,7 +679,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_ULLONG))
         {
-            arma::Cube<unsigned long long int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Cube<unsigned long long int> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -689,7 +688,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_LLONG))
         {
-            arma::Cube<long long int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Cube<long long int> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -698,7 +697,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_UINT))
         {
-            arma::Cube<unsigned int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Cube<unsigned int> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -707,7 +706,7 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
         if (H5Tequal(datatype_id, H5T_NATIVE_INT))
         {
-            arma::Cube<int> value((uword)dims[2], (uword)dims[1], (uword)dims[0], arma::fill::none);
+            arma::Cube<int> value((arma::uword)dims[2], (arma::uword)dims[1], (arma::uword)dims[0], arma::fill::none);
             H5Dread(dset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, value.memptr());
             H5Tclose(datatype_id);
             H5Dclose(dset_id);
@@ -722,89 +721,100 @@ inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool fl
 
 // CHANNEL METHODS : Return object dimensions
 template <typename dtype>
-uword quadriga_lib::channel<dtype>::n_snap() const
+unsigned long long quadriga_lib::channel<dtype>::n_snap() const
 {
-    if (center_frequency.n_elem > 1ULL)
-        return center_frequency.n_elem;
+    auto s = 0ULL;
 
-    if (tx_orientation.n_cols > 1ULL)
-        return tx_orientation.n_cols;
+    if (center_frequency.n_elem > s) // 1 or s
+        s = center_frequency.n_elem;
 
-    if (rx_orientation.n_cols > 1ULL)
-        return rx_orientation.n_cols;
+    if (tx_orientation.n_cols > s) // 1 or s
+        s = tx_orientation.n_cols;
 
-    if (coeff_re.size() >= 1)
-        return (uword)coeff_re.size();
+    if (rx_orientation.n_cols > s) // 1 or s
+        s = rx_orientation.n_cols;
 
-    if (delay.size() >= 1)
-        return (uword)delay.size();
+    if (rx_pos.n_cols > s) // 1 or s
+        s = rx_pos.n_cols;
 
-    if (path_gain.size() >= 1)
-        return (uword)path_gain.size();
+    if (tx_pos.n_cols > s) // 1 or s
+        s = tx_pos.n_cols;
 
-    if (path_length.size() >= 1)
-        return (uword)path_length.size();
+    if (coeff_re.size() > (size_t)s)
+        s = (unsigned long long)coeff_re.size();
 
-    if (path_polarization.size() >= 1)
-        return (uword)path_polarization.size();
+    if (delay.size() > (size_t)s)
+        s = (unsigned long long)delay.size();
 
-    if (path_angles.size() >= 1)
-        return (uword)path_angles.size();
+    if (path_gain.size() > (size_t)s)
+        s = (unsigned long long)path_gain.size();
 
-    if (path_coord.size() >= 1)
-        return (uword)path_coord.size();
+    if (path_length.size() > (size_t)s)
+        s = (unsigned long long)path_length.size();
 
-    if (rx_pos.n_cols >= 1ULL)
-        return rx_pos.n_cols;
+    if (path_polarization.size() > (size_t)s)
+        s = (unsigned long long)path_polarization.size();
 
-    if (tx_pos.n_cols >= 1ULL)
-        return tx_pos.n_cols;
+    if (path_angles.size() > (size_t)s)
+        s = (unsigned long long)path_angles.size();
 
-    return 0ULL;
+    if (path_fbs_pos.size() > (size_t)s)
+        s = (unsigned long long)path_fbs_pos.size();
+
+    if (path_lbs_pos.size() > (size_t)s)
+        s = (unsigned long long)path_lbs_pos.size();
+
+    if (no_interact.size() > (size_t)s)
+        s = (unsigned long long)no_interact.size();
+
+    return s;
 }
+
 template <typename dtype>
-uword quadriga_lib::channel<dtype>::n_rx() const
+unsigned long long quadriga_lib::channel<dtype>::n_rx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_rows;
     else
-        return 0;
+        return 0ULL;
 }
+
 template <typename dtype>
-uword quadriga_lib::channel<dtype>::n_tx() const
+unsigned long long quadriga_lib::channel<dtype>::n_tx() const
 {
     if (coeff_re.size() != 0)
         return coeff_re[0].n_cols;
     else
-        return 0;
+        return 0ULL;
 }
+
 template <typename dtype>
 arma::uvec quadriga_lib::channel<dtype>::n_path() const
 {
-    uword n_snap = this->n_snap();
+    unsigned long long n_snap = this->n_snap();
     if (n_snap == 0)
         return arma::uvec();
 
     arma::uvec n_path(n_snap);
-    uword *p_path = n_path.memptr();
+    unsigned long long *p_path = n_path.memptr();
     if (coeff_re.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             p_path[i] = coeff_re[i].n_slices;
     else if (path_gain.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             p_path[i] = path_gain[i].n_elem;
     else if (path_length.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             p_path[i] = path_length[i].n_elem;
     else if (path_polarization.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             p_path[i] = path_polarization[i].n_cols;
     else if (path_angles.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             p_path[i] = path_angles[i].n_rows;
-    else if (path_coord.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
-            p_path[i] = path_coord[i].n_slices;
+    else if (no_interact.size() == n_snap)
+        for (auto i = 0ULL; i < n_snap; ++i)
+            p_path[i] = no_interact[i].n_elem;
 
     return n_path;
 }
@@ -849,7 +859,16 @@ bool quadriga_lib::channel<dtype>::empty() const
     if (path_angles.size() != 0)
         return false;
 
-    if (path_coord.size() != 0)
+    if (path_fbs_pos.size() != 0)
+        return false;
+
+    if (path_lbs_pos.size() != 0)
+        return false;
+
+    if (no_interact.size() != 0)
+        return false;
+
+    if (interact_coord.size() != 0)
         return false;
 
     if (initial_position != 0)
@@ -862,13 +881,13 @@ bool quadriga_lib::channel<dtype>::empty() const
 template <typename dtype>
 std::string quadriga_lib::channel<dtype>::is_valid() const
 {
-    uword n_snap = this->n_snap();
-    uword n_tx = 0, n_rx = 0;
+    unsigned long long n_snap = this->n_snap();
+    unsigned long long n_tx = 0ULL, n_rx = 0ULL;
     arma::uvec n_pth_v = this->n_path();
 
     if (n_pth_v.n_elem != n_snap)
         return "Number of elements returned by 'n_path()' does not match number of snapshots.";
-    uword *n_pth = n_pth_v.memptr();
+    unsigned long long *n_pth = n_pth_v.memptr();
 
     if (n_snap != 0ULL && rx_pos.n_rows != 3ULL)
         return "'rx_pos' is missing or ill-formatted (must have 3 rows).";
@@ -910,13 +929,13 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 
         n_rx = coeff_re[0].n_rows, n_tx = coeff_re[0].n_cols;
 
-        for (uword i = 0ULL; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
         {
             if (coeff_re[i].n_rows != n_rx || coeff_re[i].n_cols != n_tx || coeff_re[i].n_slices != n_pth[i])
                 return "Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.";
 
             if (coeff_im[i].n_rows != n_rx || coeff_im[i].n_cols != n_tx || coeff_im[i].n_slices != n_pth[i])
-                return "Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.";
+                return "Size mismatch in 'coeff_im[" + std::to_string(i) + "]'.";
 
             if ((delay[i].n_rows != 1 && delay[i].n_rows != n_rx) ||
                 (delay[i].n_cols != 1 && delay[i].n_cols != n_tx) ||
@@ -927,7 +946,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     else if (!coeff_im.empty())
         return "Real part of channel coefficients 'coeff_re' is missing or incomplete.";
     else if (!delay.empty())
-        for (uword i = 0ULL; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             if (delay[i].n_rows != 1 || delay[i].n_cols != 1 || delay[i].n_slices != n_pth[i])
                 return "Size mismatch in 'delay[" + std::to_string(i) + "]'.";
 
@@ -935,7 +954,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         return "'path_gain' must be empty or match the number of snapshots.";
 
     if (n_snap != 0ULL && path_gain.size() == n_snap)
-        for (uword i = 0ULL; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             if (path_gain[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_gain[" + std::to_string(i) + "]'.";
 
@@ -943,7 +962,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         return "'path_length' must be empty or match the number of snapshots.";
 
     if (n_snap != 0ULL && path_length.size() == n_snap)
-        for (uword i = 0; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             if (path_length[i].n_elem != n_pth[i])
                 return "Size mismatch in 'path_length[" + std::to_string(i) + "]'.";
 
@@ -951,7 +970,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         return "'path_polarization' must be empty or match the number of snapshots.";
 
     if (n_snap != 0ULL && path_polarization.size() == n_snap)
-        for (uword i = 0ULL; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             if (path_polarization[i].n_rows != 8ULL || path_polarization[i].n_cols != n_pth[i])
                 return "Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.";
 
@@ -959,22 +978,53 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
         return "'path_angles' must be empty or match the number of snapshots.";
 
     if (n_snap != 0ULL && path_angles.size() == n_snap)
-        for (uword i = 0ULL; i < n_snap; ++i)
+        for (auto i = 0ULL; i < n_snap; ++i)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4)
                 return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
 
-    if (path_coord.size() != 0 && path_coord.size() != n_snap)
-        return "'path_coord' must be empty or match the number of snapshots.";
+    if (path_fbs_pos.size() != 0 && path_fbs_pos.size() != n_snap)
+        return "'path_fbs_pos' must be empty or match the number of snapshots.";
 
-    if (n_snap != 0ULL && path_coord.size() == n_snap)
-        for (uword i = 0ULL; i < n_snap; ++i)
-            if (path_coord[i].n_elem != 0ULL && (path_coord[i].n_rows != 3ULL || path_coord[i].n_slices != n_pth[i]))
-                return "Size mismatch in 'path_coord[" + std::to_string(i) + "]'.";
+    if (n_snap != 0ULL && path_fbs_pos.size() == n_snap)
+        for (auto i = 0ULL; i < n_snap; ++i)
+            if (path_fbs_pos[i].n_rows != 3ULL || path_fbs_pos[i].n_cols != n_pth[i])
+                return "Size mismatch in 'path_fbs_pos[" + std::to_string(i) + "]'.";
+
+    if (path_lbs_pos.size() != 0 && path_lbs_pos.size() != n_snap)
+        return "'path_lbs_pos' must be empty or match the number of snapshots.";
+
+    if (n_snap != 0ULL && path_lbs_pos.size() == n_snap)
+        for (auto i = 0ULL; i < n_snap; ++i)
+            if (path_lbs_pos[i].n_rows != 3ULL || path_lbs_pos[i].n_cols != n_pth[i])
+                return "Size mismatch in 'path_lbs_pos[" + std::to_string(i) + "]'.";
+
+    if (no_interact.size() != 0 && no_interact.size() != n_snap)
+        return "'no_interact' must be empty or match the number of snapshots.";
+    else if (no_interact.size() == n_snap && interact_coord.size() != n_snap)
+        return "'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.";
+    else if (no_interact.size() == 0 && interact_coord.size() != 0)
+        return "'interact_coord' is provided but 'no_interact' is missing.";
+    else if (no_interact.size() == n_snap && interact_coord.size() == n_snap)
+        for (auto i = 0ULL; i < n_snap; ++i)
+        {
+            if (no_interact[i].n_elem != n_pth[i])
+                return "Size mismatch in 'no_interact[" + std::to_string(i) + "]'.";
+
+            if (interact_coord[i].n_rows != 3ULL)
+                return "'interact_coord[" + std::to_string(i) + "]' must have 3 rows.";
+
+            unsigned cnt = 0;
+            for (const unsigned *p = no_interact[i].begin(); p < no_interact[i].end(); ++p)
+                cnt += *p;
+
+            if (interact_coord[i].n_cols != cnt)
+                return "Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'no_interact'.";
+        }
 
     if (par_names.size() != par_data.size())
         return "Number of elements in 'par_data' must match number of elements in 'par_name'.";
 
-    for (uword i = 0ULL; i < par_names.size(); ++i)
+    for (auto i = 0ULL; i < par_names.size(); ++i)
         if (any_type_id(&par_data[i]) < 0)
             return "Unsupported datatype in unstructured data.";
 
@@ -983,7 +1033,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 
 // Save data to HDF
 template <typename dtype>
-int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw) const
+int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw, bool assume_valid) const
 {
     // Commonly reused variables
     hid_t file_id, dspace_id, dset_id, group_id, type_id, snap_id;
@@ -991,12 +1041,16 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     int return_code = 0;
 
     // Validate the channel data
-    std::string error_message = is_valid();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+    bool channel_is_empty = false;
+    if (!assume_valid)
+    {
+        std::string error_message = is_valid();
+        if (error_message.length() != 0)
+            throw std::invalid_argument(error_message.c_str());
 
-    // Determine if the channel object has no structured data fields
-    bool channel_is_empty = empty();
+        // Determine if the channel object has no structured data fields
+        channel_is_empty = empty();
+    }
 
     // Are there unstructured fields?
     if (channel_is_empty && par_names.size() == 0)
@@ -1164,8 +1218,8 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     }
 
     // Snapshot data
-    uword n_snapshots = this->n_snap();
-    for (uword i = 0ULL; i < n_snapshots; ++i)
+    unsigned long long n_snapshots = this->n_snap();
+    for (auto i = 0ULL; i < n_snapshots; ++i)
     {
         if (n_snapshots == 1ULL)
             snap_id = group_id;
@@ -1310,20 +1364,70 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
             H5Sclose(dspace_id);
         }
 
-        // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
-        if (path_coord.size() == n_snapshots && path_coord[i].n_elem != 0ULL)
+        // First-bounce scatterer positions, matrices of size [3, n_path]
+        if (path_fbs_pos.size() == n_snapshots && path_fbs_pos[i].n_elem != 0ULL)
         {
-            dims[0] = path_coord[i].n_slices;
-            dims[1] = path_coord[i].n_cols;
-            dims[2] = path_coord[i].n_rows;
-            dspace_id = H5Screate_simple(3, dims, NULL);
-            dset_id = H5Dcreate2(snap_id, "path_coord", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            dims[0] = path_fbs_pos[i].n_cols;
+            dims[1] = path_fbs_pos[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_fbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
             if (data_is_float)
-                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_coord[i].memptr());
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_fbs_pos[i].memptr());
             else
             {
-                data = new float[path_coord[i].n_elem];
-                qHDF_cast_to_float(path_coord[i].memptr(), data, path_coord[i].n_elem);
+                data = new float[path_fbs_pos[i].n_elem];
+                qHDF_cast_to_float(path_fbs_pos[i].memptr(), data, path_fbs_pos[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Last-bounce scatterer positions, matrices of size [3, n_path]
+        if (path_lbs_pos.size() == n_snapshots && path_lbs_pos[i].n_elem != 0ULL)
+        {
+            dims[0] = path_lbs_pos[i].n_cols;
+            dims[1] = path_lbs_pos[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_lbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_lbs_pos[i].memptr());
+            else
+            {
+                data = new float[path_lbs_pos[i].n_elem];
+                qHDF_cast_to_float(path_lbs_pos[i].memptr(), data, path_lbs_pos[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Number interaction points of a path with the environment, 0 = LOS, vectors of length [n_path]
+        if (no_interact.size() == n_snapshots && no_interact[i].n_elem != 0ULL)
+        {
+            dims[0] = no_interact[i].n_elem;
+            dspace_id = H5Screate_simple(1, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "no_interact", H5T_NATIVE_UINT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, no_interact[i].memptr());
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
+        if (interact_coord.size() == n_snapshots && interact_coord[i].n_elem != 0ULL)
+        {
+            dims[0] = interact_coord[i].n_cols;
+            dims[1] = interact_coord[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "interact_coord", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, interact_coord[i].memptr());
+            else
+            {
+                data = new float[interact_coord[i].n_elem];
+                qHDF_cast_to_float(interact_coord[i].memptr(), data, interact_coord[i].n_elem);
                 H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
                 delete[] data;
             }
@@ -1353,7 +1457,7 @@ template class quadriga_lib::channel<float>;
 template class quadriga_lib::channel<double>;
 
 // Returns type ID of a std::any field:
-int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **dataptr)
+int quadriga_lib::any_type_id(const std::any *par_data, unsigned long long *dims, void **dataptr)
 {
     if (par_data == nullptr || !par_data->has_value())
         return -2;
@@ -1367,7 +1471,7 @@ int quadriga_lib::any_type_id(const std::any *par_data, uword *dims, void **data
         {
             auto *data = std::any_cast<std::string>(par_data);
             if (dims != nullptr)
-                *dims = (uword)data->length();
+                *dims = (unsigned long long)data->length();
             if (dataptr != nullptr)
                 *dataptr = (void *)data->c_str();
         }
@@ -1829,7 +1933,7 @@ arma::Col<unsigned> quadriga_lib::hdf5_read_layout(std::string fn, arma::Col<uns
     {
         unsigned *p_ChannelDims = ChannelDims.memptr();
         unsigned n_order = p_ChannelDims[0] * p_ChannelDims[1] * p_ChannelDims[2] * p_ChannelDims[3];
-        channelID->set_size((uword)n_order);
+        channelID->set_size((arma::uword)n_order);
 
         dset_id = H5Dopen(file_id, "Order", H5P_DEFAULT);
         if (dset_id == H5I_INVALID_HID)
@@ -1909,10 +2013,10 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         c.name = std::any_cast<std::string>(val);
 
     // Read the number of snapshots
-    uword n_snapshots = 0ULL;
+    unsigned long long n_snapshots = 0ULL;
     val = qHDF_read_data(group_id, "NumSnap");
     if (val.has_value())
-        n_snapshots = (uword)std::any_cast<unsigned int>(val);
+        n_snapshots = (unsigned long long)std::any_cast<unsigned int>(val);
 
     // If there are no snapshots, we don't nee to continue
     if (n_snapshots == 0ULL)
@@ -1953,7 +2057,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
     if (val.has_value())
         c.rx_orientation = std::any_cast<arma::Mat<dtype>>(val);
 
-    for (uword i = 0ULL; i < n_snapshots; ++i)
+    for (auto i = 0ULL; i < n_snapshots; ++i)
     {
         // Open group containing snapshot data
         hid_t snap_id = group_id;
@@ -1997,10 +2101,25 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         if (val.has_value())
             c.path_angles.push_back(std::any_cast<arma::Mat<dtype>>(val));
 
-        // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
-        val = qHDF_read_data(snap_id, "path_coord", float2double);
+        // First-bounce scatterer positions, matrices of size [3, n_path]
+        val = qHDF_read_data(snap_id, "path_fbs_pos", float2double);
         if (val.has_value())
-            c.path_coord.push_back(std::any_cast<arma::Cube<dtype>>(val));
+            c.path_fbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
+
+        // Last-bounce scatterer positions, matrices of size [3, n_path]
+        val = qHDF_read_data(snap_id, "path_lbs_pos", float2double);
+        if (val.has_value())
+            c.path_lbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
+
+        // Number interaction points of a path with the environment, 0 = LOS
+        val = qHDF_read_data(snap_id, "no_interact");
+        if (val.has_value())
+            c.no_interact.push_back(std::any_cast<arma::Col<unsigned>>(val));
+
+        // Interaction coordinates of paths with the environment, matrices of size [3, sum(no_interact)]
+        val = qHDF_read_data(snap_id, "interact_coord", float2double);
+        if (val.has_value())
+            c.interact_coord.push_back(std::any_cast<arma::Mat<dtype>>(val));
 
         if (n_snapshots != 1ULL)
             H5Gclose(snap_id);
@@ -2097,9 +2216,9 @@ std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
 }
 
 // Read names of the unstructured data fields from the HDF file
-uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
-                                         unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                         std::string prefix)
+unsigned long long quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
+                                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                                      std::string prefix)
 {
     if (!qHDF_file_exists(fn))
         throw std::invalid_argument("File does not exist.");
@@ -2125,13 +2244,13 @@ uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string
     hid_t group_id = H5Gopen2(file_id, group_name.c_str(), H5P_DEFAULT);
 
     // Read names
-    sword no_par_names = qHDF_read_par_names(group_id, par_names, &prefix);
+    long long no_par_names = qHDF_read_par_names(group_id, par_names, &prefix);
     qHDF_close_file(file_id);
 
     if (no_par_names < 0LL)
         throw std::invalid_argument("Failed to get group info.");
 
-    return (uword)no_par_names;
+    return (unsigned long long)no_par_names;
 }
 
 // Writes unstructured data to a hdf5 file

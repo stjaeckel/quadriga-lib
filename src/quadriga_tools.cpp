@@ -34,13 +34,13 @@ arma::cube quadriga_lib::calc_rotation_matrix(const arma::Cube<dtype> orientatio
     if (orientation.n_rows != 3)
         throw std::invalid_argument("Input must have 3 rows.");
 
-    uword n_row = orientation.n_cols, n_col = orientation.n_slices;
+    unsigned long long n_row = orientation.n_cols, n_col = orientation.n_slices;
     arma::cube rotation = arma::cube(9, n_row, n_col, arma::fill::zeros); // Always double precision
     const dtype *p_orientation = orientation.memptr();
     double *p_rotation = rotation.memptr();
 
-    for (uword iC = 0; iC < n_col; iC++)
-        for (uword iR = 0; iR < n_row; iR++)
+    for (auto iC = 0ULL; iC < n_col; ++iC)
+        for (auto iR = 0ULL; iR < n_row; ++iR)
         {
             double cc = (double)*p_orientation++, sc = sin(cc);
             double cb = (double)*p_orientation++, sb = sin(cb);
@@ -93,16 +93,16 @@ arma::cube quadriga_lib::geo2cart(const arma::Mat<dtype> azimuth, const arma::Ma
         elevation.n_cols != azimuth.n_cols || length.n_cols != azimuth.n_cols)
         throw std::invalid_argument("Inputs must have the same size.");
 
-    uword n_row = azimuth.n_rows, n_col = azimuth.n_cols;
+    unsigned long long n_row = azimuth.n_rows, n_col = azimuth.n_cols;
     arma::cube cart = arma::cube(3, n_row, n_col, arma::fill::zeros); // Always double precision
 
-    for (uword i = 0; i < azimuth.n_elem; i++)
+    for (auto i = 0ULL; i < azimuth.n_elem; ++i)
     {
         double ca = (double)azimuth(i), sa = sin(ca), r = (double)length(i);
         double ce = (double)elevation(i), se = sin(ce);
         ca = cos(ca), ce = cos(ce);
 
-        uword rw = i % n_row, co = i / n_row;
+        unsigned long long rw = i % n_row, co = i / n_row;
         cart(0, rw, co) = r * ce * ca;
         cart(1, rw, co) = r * ce * sa;
         cart(2, rw, co) = r * se;
@@ -124,11 +124,11 @@ arma::cube quadriga_lib::cart2geo(const arma::Cube<dtype> cart)
     if (cart.n_rows != 3)
         throw std::invalid_argument("Input must have 3 rows.");
 
-    uword n_row = cart.n_cols, n_col = cart.n_slices;
+    unsigned long long n_row = cart.n_cols, n_col = cart.n_slices;
     arma::cube geo = arma::cube(n_row, n_col, 3, arma::fill::zeros); // Always double precision
 
-    for (uword r = 0; r < n_row; r++)
-        for (uword c = 0; c < n_col; c++)
+    for (auto r = 0ULL; r < n_row; ++r)
+        for (auto c = 0ULL; c < n_col; ++c)
         {
             double x = (double)cart(0, r, c), y = (double)cart(1, r, c), z = (double)cart(2, r, c);
             double len = sqrt(x * x + y * y + z * z), rlen = 1.0 / len;
@@ -145,14 +145,29 @@ template arma::cube quadriga_lib::cart2geo(const arma::Cube<double> cart);
 
 // Convert path interaction coordinates into FBS/LBS positions, path length and angles
 template <typename dtype>
-void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz, const arma::Cube<dtype> *coord,
-                              arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos, arma::Mat<dtype> *path_angles)
+void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz,
+                              const arma::Col<unsigned> *no_interact, const arma::Mat<dtype> *interact_coord,
+                              arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
+                              arma::Mat<dtype> *path_angles)
 {
-    if (coord == nullptr || coord->n_elem == 0 || coord->n_rows != 3)
-        throw std::invalid_argument("Input 'coord' must have 3 rows.");
+    if (no_interact == nullptr)
+        throw std::invalid_argument("Input 'no_interact' cannot be NULL.");
 
-    arma::uword n_interact = coord->n_cols;
-    arma::uword n_path = coord->n_slices;
+    unsigned long long n_path = no_interact->n_elem;
+
+    // Calculate the total number of interactions
+    unsigned interact_cnt = 0;
+    const unsigned *p_interact = no_interact->memptr();
+    for (auto i = 0ULL; i < n_path; ++i)
+        interact_cnt += p_interact[i];
+
+    unsigned long long n_interact = (unsigned long long)interact_cnt;
+
+    if (interact_coord == nullptr || interact_coord->n_elem == 0 || interact_coord->n_rows != 3ULL)
+        throw std::invalid_argument("Input 'interact_coord' must have 3 rows.");
+
+    if (interact_coord->n_cols != n_interact)
+        throw std::invalid_argument("Number of columns of 'interact_coord' must match the sum of 'no_interact'.");
 
     constexpr dtype zero = dtype(0.0);
     constexpr dtype half = dtype(0.5);
@@ -169,7 +184,7 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
         path_angles->set_size(n_path, 4);
 
     // Get pointers
-    const dtype *p_coord = coord->memptr();
+    const dtype *p_coord = interact_coord->memptr();
     dtype *p_length = path_length == nullptr ? nullptr : path_length->memptr();
     dtype *p_fbs = fbs_pos == nullptr ? nullptr : fbs_pos->memptr();
     dtype *p_lbs = lbs_pos == nullptr ? nullptr : lbs_pos->memptr();
@@ -179,19 +194,16 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     dtype TRx = Rx - Tx, TRy = Ry - Ty, TRz = Rz - Tz;
     TRx = Tx + half * TRx, TRy = Ty + half * TRy, TRz = Tz + half * TRz;
 
-    for (arma::uword ip = 0; ip < n_path; ip++)
+    for (auto ip = 0ULL; ip < n_path; ++ip)
     {
-        dtype fx = TRx, fy = TRy, fz = TRz;     // Initial FBS-Pos
-        dtype lx = TRx, ly = TRy, lz = TRz;     // Initial LBS-Pos
-        dtype x = Tx, y = Ty, z = Tz, d = zero; // Initial length
+        dtype fx = TRx, fy = TRy, fz = TRz;     // Initial FBS-Pos = half way point
+        dtype lx = TRx, ly = TRy, lz = TRz;     // Initial LBS-Pos = half way point
+        dtype x = Tx, y = Ty, z = Tz, d = zero; // Initial length = 0
 
         // Get FBS and LBS positions
-        for (arma::uword ii = 0; ii < n_interact; ii++)
+        for (unsigned ii = 0; ii < p_interact[ip]; ++ii)
         {
-            arma::uword ix = 3 * ip * n_interact + 3 * ii, iy = ix + 1, iz = ix + 2;
-            if (std::isnan(p_coord[ix]) || std::isnan(p_coord[iy]) || std::isnan(p_coord[iz]))
-                break;
-            lx = p_coord[ix], ly = p_coord[iy], lz = p_coord[iz];
+            lx = *p_coord++, ly = *p_coord++, lz = *p_coord++;
             x -= lx, y -= ly, z -= lx, d += std::sqrt(x * x + y * y + z * z);
             x = lx, y = ly, z = lz;
             fx = ii == 0 ? lx : fx, fy = ii == 0 ? ly : fy, fz = ii == 0 ? lz : fz;
@@ -218,14 +230,14 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
         }
     }
 }
-template void quadriga_lib::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Cube<float> *coord,
+template void quadriga_lib::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Col<unsigned> *no_interact, const arma::Mat<float> *interact_coord,
                                        arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles);
-template void quadriga_lib::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Cube<double> *coord,
+template void quadriga_lib::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Col<unsigned> *no_interact, const arma::Mat<double> *interact_coord,
                                        arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles);
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 template <typename dtype>
-uword quadriga_lib::icosphere(uword n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length, arma::Mat<dtype> *vert, arma::Mat<dtype> *direction)
+unsigned long long quadriga_lib::icosphere(unsigned long long n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length, arma::Mat<dtype> *vert, arma::Mat<dtype> *direction)
 {
     if (n_div == 0ULL)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
@@ -233,7 +245,7 @@ uword quadriga_lib::icosphere(uword n_div, dtype radius, arma::Mat<dtype> *cente
     if (radius < dtype(0.0))
         throw std::invalid_argument("Input 'radius' cannot be negative.");
 
-    uword n_faces = n_div * n_div * 20ULL;
+    unsigned long long n_faces = n_div * n_div * 20ULL;
 
     // Set sizes
     if (center == nullptr)
@@ -297,7 +309,7 @@ uword quadriga_lib::icosphere(uword n_div, dtype radius, arma::Mat<dtype> *cente
     // Process all faces
     constexpr dtype one = dtype(1.0), none = -one;
     dtype ri = one / r;
-    for (uword n = 0ULL; n < n_faces; ++n)
+    for (auto n = 0ULL; n < n_faces; ++n)
     {
         // Project triangles onto the unit sphere
         // First vertex
@@ -392,8 +404,8 @@ uword quadriga_lib::icosphere(uword n_div, dtype radius, arma::Mat<dtype> *cente
     return n_faces;
 }
 
-template uword quadriga_lib::icosphere(uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length, arma::Mat<float> *vert, arma::Mat<float> *direction);
-template uword quadriga_lib::icosphere(uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length, arma::Mat<double> *vert, arma::Mat<double> *direction);
+template unsigned long long quadriga_lib::icosphere(unsigned long long n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length, arma::Mat<float> *vert, arma::Mat<float> *direction);
+template unsigned long long quadriga_lib::icosphere(unsigned long long n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length, arma::Mat<double> *vert, arma::Mat<double> *direction);
 
 // 2D linear interpolation
 template <typename dtype>
@@ -401,8 +413,8 @@ std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col
                                  const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
 {
     constexpr dtype one = dtype(1.0), zero = dtype(0.0);
-    const arma::uword nx = input->n_cols, ny = input->n_rows, ne = input->n_slices, nxy = nx * ny;
-    const arma::uword mx = xo->n_elem, my = yo->n_elem;
+    const unsigned long long nx = input->n_cols, ny = input->n_rows, ne = input->n_slices, nxy = nx * ny;
+    const unsigned long long mx = xo->n_elem, my = yo->n_elem;
 
     if (input->n_elem == 0 || xi->n_elem != nx || yi->n_elem != ny || ne == 0)
         return "Data dimensions must match the given number of sample points.";
@@ -413,35 +425,35 @@ std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col
     if (output->n_rows != my || output->n_cols != mx || output->n_slices != ne)
         output->set_size(my, mx, ne);
 
-    arma::uword *i_xp_vec = new arma::uword[mx], *i_xn_vec = new arma::uword[mx];
+    unsigned long long *i_xp_vec = new unsigned long long[mx], *i_xn_vec = new unsigned long long[mx];
     dtype *xp_vec = new dtype[mx], *xn_vec = new dtype[mx];
 
-    arma::uword *i_yp_vec = new arma::uword[my], *i_yn_vec = new arma::uword[my];
+    unsigned long long *i_yp_vec = new unsigned long long[my], *i_yn_vec = new unsigned long long[my];
     dtype *yp_vec = new dtype[my], *yn_vec = new dtype[my];
 
     {
         // Calculate the x-interpolation parameters
         bool sorted = xi->is_sorted();
         arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, nx - 1) : arma::sort_index(*xi);
-        arma::uword *p_ind = ind.memptr();
+        unsigned long long *p_ind = ind.memptr();
         const dtype *pi = xi->memptr();
 
         dtype *p_grid_srt = new dtype[nx];
         if (!sorted)
-            for (arma::uword i = 0; i < nx; i++)
+            for (auto i = 0ULL; i < nx; ++i)
                 p_grid_srt[i] = pi[p_ind[i]];
         const dtype *p_grid = sorted ? pi : p_grid_srt;
 
         dtype *p_diff = new dtype[nx];
         *p_diff = one;
-        for (arma::uword i = 1; i < nx; i++)
+        for (auto i = 1ULL; i < nx; ++i)
             p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
 
         const dtype *po = xo->memptr();
-        for (arma::uword i = 0; i < mx; i++)
+        for (auto i = 0ULL; i < mx; ++i)
         {
-            arma::uword ip = 0, in = 0;             // Indices for reading the input data
-            dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+            unsigned long long ip = 0ULL, in = 0ULL; // Indices for reading the input data
+            dtype val = po[i], wp = one, wn = zero;  // Relative weights for interpolation
             while (ip < nx && p_grid[ip] <= val)
                 ip++;
             if (ip == nx)
@@ -464,25 +476,25 @@ std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col
         // Calculate the y-interpolation parameters
         bool sorted = yi->is_sorted();
         arma::uvec ind = sorted ? arma::regspace<arma::uvec>(0, ny - 1) : arma::sort_index(*yi);
-        arma::uword *p_ind = ind.memptr();
+        unsigned long long *p_ind = ind.memptr();
         const dtype *pi = yi->memptr();
 
         dtype *p_grid_srt = new dtype[ny];
         if (!sorted)
-            for (arma::uword i = 0; i < ny; i++)
+            for (auto i = 0ULL; i < ny; ++i)
                 p_grid_srt[i] = pi[p_ind[i]];
         const dtype *p_grid = sorted ? pi : p_grid_srt;
 
         dtype *p_diff = new dtype[ny];
         *p_diff = one;
-        for (arma::uword i = 1; i < ny; i++)
+        for (auto i = 1ULL; i < ny; ++i)
             p_diff[i] = one / (p_grid[i] - p_grid[i - 1]);
 
         const dtype *po = yo->memptr();
-        for (arma::uword i = 0; i < my; i++)
+        for (auto i = 0ULL; i < my; ++i)
         {
-            arma::uword ip = 0, in = 0;             // Indices for reading the input data
-            dtype val = po[i], wp = one, wn = zero; // Relative weights for interpolation
+            unsigned long long ip = 0ULL, in = 0ULL; // Indices for reading the input data
+            dtype val = po[i], wp = one, wn = zero;  // Relative weights for interpolation
             while (ip < ny && p_grid[ip] <= val)
                 ip++;
             if (ip == ny)
@@ -507,15 +519,15 @@ std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col
     for (int ie = 0; ie < int(ne); ie++)
     {
         dtype *p_output = output->slice_memptr(ie);
-        arma::uword offset = ie * nxy;
-        for (arma::uword ix = 0; ix < mx; ix++)
+        unsigned long long offset = ie * nxy;
+        for (auto ix = 0ULL; ix < mx; ++ix)
         {
-            for (arma::uword iy = 0; iy < my; iy++)
+            for (auto iy = 0ULL; iy < my; ++iy)
             {
-                arma::uword iA = offset + i_xp_vec[ix] * ny + i_yp_vec[iy];
-                arma::uword iB = offset + i_xn_vec[ix] * ny + i_yp_vec[iy];
-                arma::uword iC = offset + i_xp_vec[ix] * ny + i_yn_vec[iy];
-                arma::uword iD = offset + i_xn_vec[ix] * ny + i_yn_vec[iy];
+                unsigned long long iA = offset + i_xp_vec[ix] * ny + i_yp_vec[iy];
+                unsigned long long iB = offset + i_xn_vec[ix] * ny + i_yp_vec[iy];
+                unsigned long long iC = offset + i_xp_vec[ix] * ny + i_yn_vec[iy];
+                unsigned long long iD = offset + i_xn_vec[ix] * ny + i_yn_vec[iy];
 
                 dtype wA = xp_vec[ix] * yp_vec[iy];
                 dtype wB = xn_vec[ix] * yp_vec[iy];
@@ -548,8 +560,8 @@ template <typename dtype>
 std::string quadriga_lib::interp(const arma::Mat<dtype> *input, const arma::Col<dtype> *xi,
                                  const arma::Col<dtype> *xo, arma::Mat<dtype> *output)
 {
-    const arma::uword nx = input->n_rows, ne = input->n_cols;
-    const arma::uword mx = xo->n_elem;
+    const unsigned long long nx = input->n_rows, ne = input->n_cols;
+    const unsigned long long mx = xo->n_elem;
 
     if (input->n_elem == 0 || xi->n_elem != nx)
         return "Data dimensions must match the given number of sample points.";
@@ -576,7 +588,7 @@ template std::string quadriga_lib::interp(const arma::Mat<double> *input, const 
 // Read Wavefront .obj file
 template <typename dtype>
 unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
-                                      arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind)
+                                     arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind)
 {
     // Open file for reading
     std::ifstream fileR = std::ifstream(fn, std::ios::in);
@@ -645,9 +657,9 @@ unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arm
     dtype *p_vert;
     if (vert_list == nullptr)
         p_vert = new dtype[n_vert * 3];
-    else if (vert_list->n_rows != (arma::uword)n_vert || vert_list->n_cols != 3ULL)
+    else if (vert_list->n_rows != (unsigned long long)n_vert || vert_list->n_cols != 3ULL)
     {
-        vert_list->set_size((arma::uword)n_vert, 3ULL);
+        vert_list->set_size((unsigned long long)n_vert, 3ULL);
         p_vert = vert_list->memptr();
     }
     else
@@ -657,27 +669,27 @@ unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arm
     unsigned *p_face_ind;
     if (face_ind == nullptr)
         p_face_ind = new unsigned[n_faces * 3];
-    else if (face_ind->n_rows != (arma::uword)n_faces || face_ind->n_cols != 3ULL)
+    else if (face_ind->n_rows != (unsigned long long)n_faces || face_ind->n_cols != 3ULL)
     {
-        face_ind->set_size((arma::uword)n_faces, 3ULL);
+        face_ind->set_size((unsigned long long)n_faces, 3ULL);
         p_face_ind = face_ind->memptr();
     }
     else
         p_face_ind = face_ind->memptr();
 
     // Set size of "mtl_prop"
-    if (mtl_prop != nullptr && (mtl_prop->n_rows != (arma::uword)n_faces || mtl_prop->n_cols != 5ULL))
-        mtl_prop->set_size((arma::uword)n_faces, 5ULL);
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != (unsigned long long)n_faces || mtl_prop->n_cols != 5ULL))
+        mtl_prop->set_size((unsigned long long)n_faces, 5ULL);
     dtype *p_mtl_prop = mtl_prop == nullptr ? nullptr : mtl_prop->memptr();
 
     // Set size of "mtl_ind"
-    if (mtl_ind != nullptr && mtl_ind->n_elem != (arma::uword)n_faces)
-        mtl_ind->set_size((arma::uword)n_faces);
+    if (mtl_ind != nullptr && mtl_ind->n_elem != (unsigned long long)n_faces)
+        mtl_ind->set_size((unsigned long long)n_faces);
     unsigned *p_mtl_ind = mtl_ind == nullptr ? nullptr : mtl_ind->memptr();
 
     // Set size of "obj_ind"
-    if (obj_ind != nullptr && obj_ind->n_elem != (arma::uword)n_faces)
-        obj_ind->set_size((arma::uword)n_faces);
+    if (obj_ind != nullptr && obj_ind->n_elem != (unsigned long long)n_faces)
+        obj_ind->set_size((unsigned long long)n_faces);
     unsigned *p_obj_ind = obj_ind == nullptr ? nullptr : obj_ind->memptr();
 
     // Process file
@@ -786,8 +798,8 @@ unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arm
     // Calculate the triangle mesh from vertices and faces
     if (mesh != nullptr)
     {
-        if (mesh->n_rows != (arma::uword)n_faces || mesh->n_cols != 9ULL)
-            mesh->set_size((arma::uword)n_faces, 9ULL);
+        if (mesh->n_rows != (unsigned long long)n_faces || mesh->n_cols != 9ULL)
+            mesh->set_size((unsigned long long)n_faces, 9ULL);
         dtype *p_mesh = mesh->memptr();
 
         for (unsigned n = 0; n < n_faces; ++n)
@@ -826,13 +838,13 @@ unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arm
 }
 
 template unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
-                                               arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
+                                              arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
 template unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
-                                               arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
+                                              arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind);
 
 // Subdivide triangles into smaller triangles
 template <typename dtype>
-uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out)
+unsigned long long quadriga_lib::subdivide_triangles(unsigned long long n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out)
 {
     if (n_div == 0ULL)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
@@ -846,19 +858,19 @@ uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<dtype> *tri
     if (triangles_out == nullptr)
         throw std::invalid_argument("Output 'triangles_out' cannot be NULL.");
 
-    uword n_triangles_in = triangles_in->n_rows;
-    uword n_triangles_out = n_triangles_in * n_div * n_div;
+    unsigned long long n_triangles_in = triangles_in->n_rows;
+    unsigned long long n_triangles_out = n_triangles_in * n_div * n_div;
 
     if (triangles_out->n_cols != 9ULL || triangles_out->n_rows != n_triangles_out)
         triangles_out->set_size(n_triangles_out, 9ULL);
 
     // Process each triangle
-    uword cnt = 0ULL;                                     // Counter
+    unsigned long long cnt = 0ULL;                        // Counter
     dtype stp = dtype(1.0) / dtype(n_div);                // Step size
     const dtype *p_triangles_in = triangles_in->memptr(); // Pointer to input memory
     dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
 
-    for (uword n = 0ULL; n < n_triangles_in; ++n)
+    for (auto n = 0ULL; n < n_triangles_in; ++n)
     {
         // Read current triangle vertices
         dtype v1x = p_triangles_in[n];
@@ -871,12 +883,12 @@ uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<dtype> *tri
         dtype e13y = p_triangles_in[n + 7ULL * n_triangles_in] - v1y;
         dtype e13z = p_triangles_in[n + 8ULL * n_triangles_in] - v1z;
 
-        for (uword u = 0ULL; u < n_div; ++u)
+        for (auto u = 0ULL; u < n_div; ++u)
         {
             dtype ful = dtype(u) * stp;
             dtype fuu = ful + stp;
 
-            for (uword v = 0ULL; v < n_div - u; ++v)
+            for (auto v = 0ULL; v < n_div - u; ++v)
             {
                 dtype fvl = dtype(v) * stp;
                 dtype fvu = fvl + stp;
@@ -921,5 +933,5 @@ uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<dtype> *tri
     return n_triangles_out;
 }
 
-template uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out);
-template uword quadriga_lib::subdivide_triangles(uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out);
+template unsigned long long quadriga_lib::subdivide_triangles(unsigned long long n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out);
+template unsigned long long quadriga_lib::subdivide_triangles(unsigned long long n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out);

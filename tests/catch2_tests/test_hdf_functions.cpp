@@ -68,10 +68,15 @@ TEST_CASE("HDF - Minimal Test")
     c.path_polarization[0](6, 0) = -1.0;
     c.path_polarization[0](6, 1) = -1.0;
 
-    c.path_coord.push_back(arma::cube(3, 4, 2, arma::fill::value(arma::datum::nan)));
-    c.path_coord[0](0, 0, 1) = 0.0;
-    c.path_coord[0](1, 0, 1) = 10.0;
-    c.path_coord[0](2, 0, 1) = 11.0;
+    // The second path has 1 interaction with the environment
+    c.no_interact.push_back(arma::u32_vec(2));
+    c.no_interact[0](1) = 1; // 2nd path
+
+    // List of interactions = length 1
+    c.interact_coord.push_back(arma::mat(3, 1));
+    c.interact_coord[0](0, 0) = 0.0;
+    c.interact_coord[0](1, 0) = 10.0;
+    c.interact_coord[0](2, 0) = 11.0;
 
     arma::mat fbs_pos, lbs_pos;
 
@@ -84,7 +89,7 @@ TEST_CASE("HDF - Minimal Test")
 
     unsigned s = 0; // Snapshot index
     quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
-                               &c.path_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
+                               &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,
                                                  c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.tx_orientation(0), c.tx_orientation(1), c.tx_orientation(2),
@@ -95,7 +100,8 @@ TEST_CASE("HDF - Minimal Test")
     // Second snapshot
     c.path_gain.push_back(c.path_gain[0]);
     c.path_polarization.push_back(c.path_polarization[0]);
-    c.path_coord.push_back(c.path_coord[0]);
+    c.no_interact.push_back(c.no_interact[0]);
+    c.interact_coord.push_back(c.interact_coord[0]);
     c.path_length.push_back(arma::vec());
     c.path_angles.push_back(arma::mat());
     c.coeff_re.push_back(arma::cube());
@@ -104,7 +110,7 @@ TEST_CASE("HDF - Minimal Test")
 
     s = 1;
     quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
-                               &c.path_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
+                               &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,
                                                  c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.tx_orientation(0), c.tx_orientation(1), c.tx_orientation(2),
@@ -276,7 +282,7 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For col, uword (64 bit unsigned integer) - 21
         auto t = arma::ucolvec(8);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; ++i)
             t.at(i) = 221ULL * i;
         c.par_names.push_back("col_uword");
         c.par_data.push_back(t);
@@ -284,15 +290,15 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For col, sword (64 bit integer) - 22
         auto t = arma::icolvec(18);
-        for (uword i = 0; i < t.n_elem; i++)
-            t.at(i) = -13LL * (sword)i;
+        for (auto i = 0ULL; i < t.n_elem; ++i)
+            t.at(i) = -13LL * (long long)i;
         c.par_names.push_back("col_sword");
         c.par_data.push_back(t);
     }
 
     { // For col, unsigned - 23
         auto t = arma::Col<unsigned>(13);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; ++i)
             t.at(i) = 11 * (unsigned)i;
         c.par_names.push_back("col_unsigned");
         c.par_data.push_back(t);
@@ -300,7 +306,7 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For col, int - 24
         auto t = arma::Col<int>(13);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; ++i)
             t.at(i) = -13 * (int)i;
         c.par_names.push_back("col_int");
         c.par_data.push_back(t);
@@ -320,7 +326,7 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For row, uword (64 bit unsigned integer) - 27
         auto t = arma::urowvec(7);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; i++)
             t.at(i) = 111ULL * i;
         c.par_names.push_back("row_uword");
         c.par_data.push_back(t);
@@ -328,15 +334,15 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For row, sword (64 bit integer) - 28
         auto t = arma::irowvec(8);
-        for (uword i = 0; i < t.n_elem; i++)
-            t.at(i) = -17LL * (sword)i;
+        for (auto i = 0ULL; i < t.n_elem; i++)
+            t.at(i) = -17LL * (long long)i;
         c.par_names.push_back("row_sword");
         c.par_data.push_back(t);
     }
 
     { // For row, unsigned - 29
         auto t = arma::Row<unsigned>(14);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; i++)
             t.at(i) = 3 * (unsigned)i;
         c.par_names.push_back("row_unsigned");
         c.par_data.push_back(t);
@@ -344,7 +350,7 @@ TEST_CASE("HDF - Minimal Test")
 
     { // For row, int - 30
         auto t = arma::Row<int>(12);
-        for (uword i = 0; i < t.n_elem; i++)
+        for (auto i = 0ULL; i < t.n_elem; i++)
             t.at(i) = -4 * (int)i;
         c.par_names.push_back("row_int");
         c.par_data.push_back(t);
@@ -366,7 +372,7 @@ TEST_CASE("HDF - Minimal Test")
     }
 
     // Write all unstructured data fields individually to slot [0]
-    for (uword i = 0; i < c.par_names.size(); i++)
+    for (auto i = 0ULL; i < c.par_names.size(); i++)
         quadriga_lib::hdf5_write_dset("test.hdf5", c.par_names[i], &c.par_data[i]);
 
     // Read channelIDs
@@ -398,7 +404,7 @@ TEST_CASE("HDF - Minimal Test")
 
     // Read float
     void *dataptr;
-    uword dims[3];
+    unsigned long long dims[3];
     value = quadriga_lib::hdf5_read_dset("test.hdf5", "scalar_float", 7);
     CHECK(quadriga_lib::any_type_id(&value, dims, &dataptr) == 10);
     CHECK(*(float *)dataptr == 3.14f);
@@ -571,7 +577,7 @@ TEST_CASE("HDF - Minimal Test")
     CHECK(arma::approx_equal(d.rx_orientation, c.rx_orientation, "absdiff", 1e-14));
 
     // Storage as float reduces precision
-    for (uword i = 0ULL; i < c.coeff_re.size(); ++i)
+    for (auto i = 0ULL; i < c.coeff_re.size(); ++i)
     {
         CHECK(arma::approx_equal(d.coeff_re[i], c.coeff_re[i], "absdiff", 1e-6));
         CHECK(arma::approx_equal(d.coeff_im[i], c.coeff_im[i], "absdiff", 1e-6));
@@ -580,17 +586,12 @@ TEST_CASE("HDF - Minimal Test")
         CHECK(arma::approx_equal(d.path_length[i], c.path_length[i], "absdiff", 1e-6));
         CHECK(arma::approx_equal(d.path_polarization[i], c.path_polarization[i], "absdiff", 1e-14));
         CHECK(arma::approx_equal(d.path_angles[i], c.path_angles[i], "absdiff", 1e-6));
-
-        for (uword j = 0LL; j < c.path_coord[i].n_elem; ++j)
-            if (std::isnan(c.path_coord[i].at(j)))
-                CHECK(std::isnan(d.path_coord[i].at(j)));
-            else
-                CHECK(c.path_coord[i].at(j) == d.path_coord[i].at(j));
+        CHECK(arma::approx_equal(d.interact_coord[i], c.interact_coord[i], "absdiff", 1e-6));
     }
 
     // Check if the unstructured data fields are in the same order as written
     CHECK(d.par_names.size() == c.par_names.size());
-    for (uword i = 0ULL; i < c.par_names.size(); ++i)
+    for (auto i = 0ULL; i < c.par_names.size(); ++i)
     {
         CHECK(c.par_names[i] == d.par_names[i]);
         int a = quadriga_lib::any_type_id(&c.par_data[i]);

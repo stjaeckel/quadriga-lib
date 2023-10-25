@@ -73,7 +73,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 yo = qd_mex_typecast_Col<float>(prhs[4], "yo");
         }
 
-        uword n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        unsigned long long n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
         mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
 
         plhs[0] = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
@@ -111,7 +111,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 yo = qd_mex_typecast_Col<double>(prhs[4], "yo");
         }
 
-        uword n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
+        unsigned long long n_yo = yo.n_elem, n_xo = xo.n_elem, n_el = input.n_slices;
         mwSize dims[3] = {(mwSize)n_yo, (mwSize)n_xo, (mwSize)n_el};
 
         plhs[0] = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);

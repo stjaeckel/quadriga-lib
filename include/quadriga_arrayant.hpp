@@ -21,9 +21,6 @@
 #include <armadillo>
 #include <string>
 
-typedef unsigned long long int uword;
-typedef long long int sword;
-
 namespace quadriga_lib
 {
     template <typename dtype> // float or double
@@ -48,10 +45,10 @@ namespace quadriga_lib
         arrayant(){};                                // Default constructor
 
         // Functions to determine the size of the array antenna properties
-        uword n_elevation() const; // Number of elevation angles
-        uword n_azimuth() const;   // Number of azimuth angles
-        uword n_elements() const;  // Number of antenna elements
-        uword n_ports() const;     // Number of ports (after coupling of elements)
+        unsigned long long n_elevation() const; // Number of elevation angles
+        unsigned long long n_azimuth() const;   // Number of azimuth angles
+        unsigned long long n_elements() const;  // Number of antenna elements
+        unsigned long long n_ports() const;     // Number of ports (after coupling of elements)
 
         // Calculate the directivity of an antenna element in dBi
         dtype calc_directivity_dBi(unsigned element) const;
@@ -64,8 +61,8 @@ namespace quadriga_lib
         arrayant<dtype> copy() const;
 
         // Copy antenna elements, enlarges array size if needed (0-based indices)
-        void copy_element(uword source, arma::uvec destination);
-        void copy_element(uword source, uword destination);
+        void copy_element(unsigned long long source, arma::uvec destination);
+        void copy_element(unsigned long long source, unsigned long long destination);
 
         // Interpolation of the antenna pattern
         void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
@@ -110,7 +107,7 @@ namespace quadriga_lib
         // - Data in other properties may contain garbage
         // - Only performs a size update if exisiting size is different from new size
         // - Returns error when read-only
-        void set_size(uword n_elevation, uword n_azimuth, uword n_elements, uword n_ports);
+        void set_size(unsigned long long n_elevation, unsigned long long n_azimuth, unsigned long long n_elements, unsigned long long n_ports);
 
         // Validate integrity
         std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
@@ -153,14 +150,14 @@ namespace quadriga_lib
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_3GPP(uword M = 1,                               // Number of vertical elements
-                                           uword N = 1,                               // Number of horizontal elements
+    arrayant<dtype> generate_arrayant_3GPP(unsigned long long M = 1,                  // Number of vertical elements
+                                           unsigned long long N = 1,                  // Number of horizontal elements
                                            dtype center_freq = 299792458.0,           // The center frequency in [Hz]
                                            unsigned pol = 1,                          // Polarization indicator
                                            dtype tilt = 0.0,                          // The electric downtilt angle in [deg] for pol = 4,5,6
                                            dtype spacing = 0.5,                       // Element spacing in [λ]
-                                           uword Mg = 1,                              // Number of nested panels in a column (Mg)
-                                           uword Ng = 1,                              // Number of nested panels in a row (Ng)
+                                           unsigned long long Mg = 1,                 // Number of nested panels in a column (Mg)
+                                           unsigned long long Ng = 1,                 // Number of nested panels in a row (Ng)
                                            dtype dgv = 0.5,                           // Panel spacing in vertical direction (dg,V) in [λ]
                                            dtype dgh = 0.5,                           // Panel spacing in horizontal direction (dg,H) in [λ]
                                            const arrayant<dtype> *pattern = nullptr); // Optional custom per-element pattern

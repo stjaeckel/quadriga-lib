@@ -175,4 +175,6 @@ catch ME
     end
 end
 
+delete(fn);
+
 end

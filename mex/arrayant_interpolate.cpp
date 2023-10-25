@@ -93,9 +93,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (!error_message.empty())
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:import_error", error_message.c_str());
 
-    uword n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
-    uword n_out = (unsigned)mxGetM(prhs[6]); // Number of rows in "azimuth"
-    uword n_ang = (unsigned)mxGetN(prhs[6]); // Number of angles for interpolation
+    unsigned long long n_elements = use_single ? arrayant_single.n_elements() : arrayant_double.n_elements();
+    unsigned long long n_out = (unsigned)mxGetM(prhs[6]); // Number of rows in "azimuth"
+    unsigned long long n_ang = (unsigned)mxGetN(prhs[6]); // Number of angles for interpolation
 
     if ((unsigned)mxGetM(prhs[7]) != n_out || (unsigned)mxGetN(prhs[7]) != n_ang)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Number of elements in 'elevation' does not match number of elements in 'azimuth'.");
@@ -131,9 +131,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:wrong_type", "Input 'orientation' must be given in double or single precision.");
 
-    uword o1 = use_single ? orientation_single.n_rows : orientation_double.n_rows;
-    uword o2 = use_single ? orientation_single.n_cols : orientation_double.n_cols;
-    uword o3 = use_single ? orientation_single.n_slices : orientation_double.n_slices;
+    unsigned long long o1 = use_single ? orientation_single.n_rows : orientation_double.n_rows;
+    unsigned long long o2 = use_single ? orientation_single.n_cols : orientation_double.n_cols;
+    unsigned long long o3 = use_single ? orientation_single.n_slices : orientation_double.n_slices;
 
     if (o1 != 3ULL)
         mexErrMsgIdAndTxt("quadriga_lib:arrayant_interpolate:size_mismatch", "Input 'orientation' must have 3 elements on the first dimension.");
