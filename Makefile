@@ -175,6 +175,18 @@ clean:
 	del "+quadriga_lib"\*.lib
 	del "+quadriga_lib"\*.mexw64
 
-tidy: clean
+tidy:   clean
 	- rmdir /s /q external\Catch2-$(catch2version)-win64
 	- rmdir /s /q external\hdf5-$(hdf5version)-win64
+
+build\quadriga-lib-version.exe:   src/version.cpp   lib/quadriga_lib.lib
+	$(CC) $(CCFLAGS) /Febuild\quadriga-lib-version.exe $** /Iinclude /I$(ARMA_H)
+
+releasex:   all   build\quadriga-lib-version.exe
+	@setlocal
+	@for /f %%i in ('build\quadriga-lib-version.exe') do \
+		tar -c -f release\quadrigalib-v%%i-Win64.zip lib\*.lib +quadriga_lib\*.m +quadriga_lib\*.mexw64 include
+	@endlocal
+
+
+
