@@ -5,7 +5,7 @@ CC    = g++
 MEX   = /usr/local/MATLAB/R2021a/bin/mex
 OCT   = mkoctfile
 
-all:        dirs   mex_octave  mex_matlab 
+all:        dirs   mex_octave  mex_matlab   mex_docu
 
 # External libraries
 hdf5version    = 1.14.2
@@ -31,9 +31,11 @@ tests 		= $(wildcard tests/catch2_tests/*.cpp)
 dirs:
 	- mkdir build
 	- mkdir lib
+	- mkdir +quadriga_lib
 
-mex_matlab: $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave: $(mex:mex/%.cpp=+quadriga_lib/%.mex)
+mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
+mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
+mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
 test:   tests/test_bin   #mex_octave
 #	octave --eval "cd tests; quadriga_lib_mex_tests;"
@@ -75,6 +77,11 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 # MEX Ocate interface
 +quadriga_lib/%.mex:   mex/%.cpp   lib/quadriga_lib.a
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s
+
+# Documentation of MEX files
++quadriga_lib/%.m:   mex/%.cpp
+	rm -f $@
+	python3 tools/extract_matlab_comments.py $< $@
 
 # Maintainance section
 hdf5lib:
