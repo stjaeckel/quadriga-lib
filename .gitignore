@@ -3,7 +3,5 @@ lib/*
 +quadriga_lib/*.mex*
 external/Catch2-3.3.2-Linux
 external/Catch2-3.3.2-win64
-external/hdf5-1.14.2-Linux
-external/hdf5-1.14.2-win64
 tests/test*
 quadrigalib*.tar.gz
