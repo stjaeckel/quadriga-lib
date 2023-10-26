@@ -18,23 +18,28 @@ This library implements an interface to both, Matlab and Octave as well as to c+
 `build` | Folder for temporary build files
 `external` | External tools used in the project
 `include` | Public header files for the `quadriga-lib` library
+`lib` | Library files for static linking
 `mex` | Source files for the MEX interface
+`release` | Precompiled versions of `quadriga-lib`
 `src` | C++ source files and private header files
 `tests` | Test files
 `tools` | Other tools used in the project
 
 ## Compilation
 
-Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are already included in the `+quadriga_lib` folder. To use them e.g. in QuaDRiGa-NG (https://github.com/stjaeckel/QuaDRiGa-NG), simply add the arrayant_lib folder to your MATLAB/Octave path.
+Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are already included in the `release` folder. To use them e.g. in QuaDRiGa-NG (https://github.com/stjaeckel/QuaDRiGa-NG), simply add the arrayant_lib folder to your MATLAB/Octave path.
 
 ### Linux / Ubuntu
-* You need to install "`libhdf5-dev`" from the system package manager
-* Optional: Install Octave from https://octave.org or use the system package installer
-* Optional: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
+
+* [**OPTIONAL**]: Install Octave 8.0 (or higher) from https://octave.org or use the system package installer
+* [**OPTIONAL**]: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
 * Open the `GNUmakefile` (e.g. by `gedit GNUmakefile`)
 * Set the compiler paths for your system (`CC`, `MEX` and `OCT` variables)
 * Remove the unwanted targets in the all section (e.g. if only octave is needed, remove `mex_matlab`)
-* Run `make`
+* Compile the HDF5 library by running `make hdf5lib`
+* Run `make` to compile `quadriga-lib` and the MEX Matlab / Octave interface
+* [**OPTIONAL**]: Compile the Catch2 unit testing library by running `make catch2lib`
+* [**OPTIONAL**]: Compile and run the unit tests by running `make test`
 
 
 ### Windows
@@ -46,30 +51,13 @@ Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are al
 * Open "x64 Native Tools Command Prompt" from start menu
 * Navigate to library path, e.g. `cd Z:\quadriga-lib`
 * Open the `Makefile` (e.g. by `notepad Makefile`) set the correct MATLAB mex path 
-* Run `nmake`
+* Compile the HDF5 library by running `nmake hdf5lib`
+* Run `nmake` to compile `quadriga-lib` and the MEX Matlab interface
+* [**OPTIONAL**]: To compile the Catch2 library, you need NSIS (https://nsis.sourceforge.io)
+* [**OPTIONAL**]: Compile the Catch2 unit testing library by running `nmake catch2lib`
+* [**OPTIONAL**]: Compile and run the unit tests by running `nmake test`
 
-### Armadillo Library
-* Armadillo is a high quality linear algebra library used by `quadriga-lib`
-* Armadillo is a "header-only" library and does not need to be compiled
-* Extract the "include"-folder from the armadillo zip-file from "https://arma.sourceforge.net" into external
-* Make sure the correct path is set in the "GNUMakefile" (Linux) and/or "Makefile" (Windows)
-* Compiling for Linux (optional):
-```
-cd external
-mkdir build && mkdir armadillo-12.6.3-Linux
-cmake -S armadillo-12.6.3 -B build/ -D CMAKE_INSTALL_PREFIX=armadillo-12.6.3-Linux -D BUILD_SHARED_LIBS=OFF
-cd build && make && make install
-cd .. && rm -rf build
-```
-* For Windows, you need the Build Tools for Visual Studio (see above)
-* Open "x64 Native Tools Command Prompt" and run the following commands (optional)
-```
-cd external
-mkdir build 
-mkdir armadillo-12.6.3-win64
-cmake -S armadillo-12.6.3 -B build -D CMAKE_INSTALL_PREFIX=armadillo-12.6.3-win64
-cmake --build build --config Release --target install
-```
+
 ### Pugixml Library
 * pugixml (https://pugixml.org) is used to read/write QDANT-Files
 * It can be used in "header-only" mode
@@ -77,58 +65,6 @@ cmake --build build --config Release --target install
 * Navigate to "`external/pugixml-1.13/src`" and open the file "`pugiconfig.hpp`"
 * Uncomment the line "`#define PUGIXML_HEADER_ONLY`"
 * Make sure the correct path is set in the "GNUMakefile" (Linux) and/or "Makefile" (Windows)
-
-### HDF5 Library
-* Hierarchical Data Format version 5 (HDF5), is an open source file format that supports large, complex, heterogeneous data. It is used to store channel coefficients and metadata.
-* If you intend to use Octave, you will need at least Octave 8. Older versions cause a crash with HDF5
-* For Windows, you need to compile the library using Build Tools for Visual Studio (see above)
-* Extract the hdf5 tar.gz-file from "https://arma.sourceforge.net" into external
-* Open "x64 Native Tools Command Prompt" and run the following commands
-```
-cd external
-mkdir build 
-mkdir hdf5-1.14.2-win64
-cmake -S hdf5-1.14.2 -B build -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
-cmake --build build --config Release --target install
-```
-* Compiling for Linux:
-```
-cd external
-mkdir build && mkdir hdf5-1.14.2-Linux
-cmake -S hdf5-1.14.2 -B build/ -D CMAKE_INSTALL_PREFIX=hdf5-1.14.2-Linux -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF -D BUILD_TESTING=OFF -D CMAKE_C_FLAGS=-O3
-cd build && make -j32 && make install
-cd .. && rm -rf build
-```
-* Make sure the correct path is set in the "GNUMakefile" (Linux) and/or "Makefile" (Windows)
-
-### Catch2 (v3) Unit Test Framework
-* This is only needed if you want to run the tests
-* `quadriga-lib` uses the Catch2 v3 framework. This is not supported yet by all system distributions (e.g. ubuntu22.04).
-* Follow these steps to compile Catch2 locally
-* Extract the zip-file from "https://github.com/catchorg/Catch2" to external
-* Compiling for Linux:
-```
-cd external
-mkdir build && mkdir Catch2-3.3.2-Linux
-cmake -S Catch2-3.3.2 -B build
-cd build && make && make package
-tar -xzf Catch2-*-Linux.tar.gz -C ../
-cd .. && rm -rf build
-```
-* You should now be able to run `make test` from the `quadriga-lib` base Folder
-* For Windows, you need the Build Tools for Visual Studio (see above) and NSIS (https://nsis.sourceforge.io)
-* Open "x64 Native Tools Command Prompt" and run the following commands
-```
-cd external
-mkdir build
-cmake -S Catch2-3.3.2 -B build
-cmake --build build --config Release --target package
-```
-* This creates an exe-File inside of the `build`-Folder that can be installed to the "Catch2-3.3.2-win64" folder in `external`
-* Alternatively, you can extract the exe-File
-* After this, you can delete the `build` and `Catch2-3.3.2` folders
-* You should now be able to run `nmake test` from the `quadriga-lib` base Folder
-
 
 ## Distribution License
 
