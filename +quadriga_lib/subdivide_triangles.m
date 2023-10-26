@@ -8,19 +8,19 @@
 %   triangles_in
 %   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
 %   points in 3D-space: [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; singe or double precision;
-%   Dimensions: [ n_triangles_in x 9 ]
+%   Dimensions: [ n_triangles_in, 9 ]
 %
 %   n_div
 %   Number of divisions per edge of the input mesh. The resulting number of faces is equal to
-%   n_triangles_out = n_triangles_in · n_div^2
+%   n_triangles_out = n_triangles_in * n_div^2
 %
 % Output:
 %   triangles_out
 %   Vertices of the sub-divided mesh in global Cartesian coordinates; singe or double precision;
-%   Dimensions: [ n_triangles_out x 9 ]
+%   Dimensions: [ n_triangles_out, 9 ]
 %
 %
-% arrayant-lib c++/MEX Array antenna support library
+% quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 % Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
 % All rights reserved.
 %

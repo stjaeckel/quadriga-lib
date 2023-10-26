@@ -27,11 +27,11 @@
 %   in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; Size: [ no_face x 9 ]
 %
 %   direction
-%   The directions of the vertice-rays in geographic coordinates (azimuth and elevation angle in
+%   The directions of the vertex-rays in geographic coordinates (azimuth and elevation angle in
 %   rad); the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]; Size: [ no_face x 6 ]
 %
 %
-% arrayant-lib c++/MEX Array antenna support library
+% quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 % Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
 % All rights reserved.
 %

@@ -1,8 +1,9 @@
-GEO2CART Transforms geographic coordinates to Cartesian coordinates
+%GEO2CART Transforms geographic coordinates to Cartesian coordinates
 %
 % Description:
-%   cart = arrayant_lib.cart2geo(azimuth,elevation,length) 
-%   transforms corresponding elements of the Cartesian coordinate system (x, y, and z) to geographic coordinates azimuth, elevation, and length.
+%   cart = arrayant_lib.cart2geo(azimuth, elevation, length) 
+%   transforms corresponding elements of the Cartesian coordinate system (x, y, and z) to geographic 
+%   coordinates azimuth, elevation, and length.
 %
 % Inputs:
 %   azimuth
@@ -23,7 +24,7 @@ GEO2CART Transforms geographic coordinates to Cartesian coordinates
 %   Single or double precision (same as input), Size: [3, n_row, n_col]
 %
 %
-% arrayant-lib c++/MEX Array antenna support library
+% quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 % Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
 % All rights reserved.
 %
