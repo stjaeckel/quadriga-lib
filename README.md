@@ -14,7 +14,7 @@ This library implements an interface to both, Matlab and Octave as well as to c+
 
 | Folder | Content |
 |:---|:---|
-`++quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
+`+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
 `build` | Folder for temporary build files
 `external` | External tools used in the project
 `include` | Public header files for the `quadriga-lib` library

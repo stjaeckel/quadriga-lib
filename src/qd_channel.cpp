@@ -1064,13 +1064,17 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     if (!qHDF_file_exists(fn))
         quadriga_lib::hdf5_create(fn);
 
+    // Initialize HDF5 library and disable the error handler
+    H5open();                              
+    H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+
     // Open file for writing
     htri_t status = H5Fis_hdf5(fn.c_str());
     if (status <= 0)
         throw std::invalid_argument("Not an HDF5 file.");
     file_id = H5Fopen(fn.c_str(), H5F_ACC_RDWR, H5P_DEFAULT);
     if (file_id == H5I_INVALID_HID)
-        throw std::invalid_argument("Error opening file.");
+        throw std::invalid_argument("Error opening file. It may be opened by another program.");
 
     // Get channel ID
     return_code = (qHDF_get_channel_ID(file_id, ix, iy, iz, iw, 0) != 0) ? 1 : 0;
@@ -1448,6 +1452,9 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
 
     // Close the group and file
     qHDF_close_file(file_id);
+
+    // Close HDF5 library
+    H5close();
 
     return return_code;
 }
