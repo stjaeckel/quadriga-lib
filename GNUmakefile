@@ -114,5 +114,10 @@ tidy: clean
 	- rm -rf external/Catch2-$(catch2version)-Linux
 	- rm -rf external/hdf5-$(hdf5version)-Linux
 
-archive:  mex_octave   mex_matlab
-	tar czf quadrigalib-0.1.9.tar.gz +quadriga_lib include lib
+build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
+	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
+
+release:  all   build/quadriga-lib-version
+	- mkdir release
+	tar czf release/quadrigalib-v$(shell build/quadriga-lib-version)-Ubuntu-$(shell lsb_release -r -s)-amd64.tar.gz \
+		+quadriga_lib/*.mex +quadriga_lib/*.mexa64 +quadriga_lib/*.m include lib/*.a

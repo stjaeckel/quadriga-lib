@@ -4,4 +4,3 @@ lib/*
 external/Catch2-*/
 external/hdf5-*/
 tests/test*
-quadrigalib*.tar.gz
