@@ -11,10 +11,13 @@ CC    = cl
 MEX   = "C:\Program Files\MATLAB\R2022b\bin\win64\mex.exe"
 
 # External libraries
+hdf5version    = 1.14.2
+catch2version  = 3.4.0
+
 ARMA_H      = external\armadillo-12.6.3\include
 PUGIXML_H   = external\pugixml-1.13\src
-CATCH2      = external\Catch2-3.3.2-win64
-HDF5        = external\hdf5-1.14.2-win64
+CATCH2      = external\Catch2-$(catch2version)-win64
+HDF5        = external\hdf5-$(hdf5version)-win64
 
 # Configurations
 CCFLAGS     = /EHsc /std:c++17 /Zc:__cplusplus /nologo /MD #/Wall 
@@ -139,12 +142,39 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Maintainance section
+hdf5lib:
+	- rmdir /s /q external\build
+	- rmdir /s /q external\hdf5-$(hdf5version)
+	- rmdir /s /q external\hdf5-$(hdf5version)-win64
+	tar -xf external/hdf5-$(hdf5version).zip
+	move hdf5-$(hdf5version) external
+	mkdir external\build
+	cmake -S external\hdf5-$(hdf5version) -B external\build -D CMAKE_INSTALL_PREFIX=external\hdf5-$(hdf5version)-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
+	cmake --build external\build --config Release --target install
+	rmdir /s /q external\build
+	rmdir /s /q external\hdf5-$(hdf5version)
+
+catch2lib:
+	- rmdir /s /q external\build
+	- rmdir /s /q external\Catch2-$(catch2version)
+	- rmdir /s /q external\Catch2-$(catch2version)-win64
+	tar -xf external/Catch2-$(catch2version).zip
+	move Catch2-$(catch2version) external
+	mkdir external\build
+	cmake -S external\Catch2-$(catch2version) -B external\build
+	cmake --build external\build --config Release --target package
+	move external\build\_CPack_Packages\win64\NSIS\Catch2-$(catch2version)-win64 external
+	rmdir /s /q external\build
+	rmdir /s /q external\Catch2-$(catch2version)
+
 clean:
 	del build\*.obj
 	del build\*.lib
 	del "+quadriga_lib"\*.manifest
 	del "+quadriga_lib"\*.exp
 	del "+quadriga_lib"\*.lib
+	del "+quadriga_lib"\*.mexw64
 
 tidy: clean
-	del "+quadriga_lib"\*.mexw64
+	- rmdir /s /q external\Catch2-$(catch2version)-win64
+	- rmdir /s /q external\hdf5-$(hdf5version)-win64
