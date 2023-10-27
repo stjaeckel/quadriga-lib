@@ -41,6 +41,105 @@ assertTrue( B(1,1) ~= 0 );
 assertTrue( C(1,1) ~= 0 );
 assertTrue( D(1,1) ~= 0 );
 
+[A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    azimuth_grid, elevation_grid);
+
+assertElementsAlmostEqual( A, e_theta_re, 'absolute', 1e-14 );
+assertElementsAlmostEqual( B, e_theta_im, 'absolute', 1e-14 );
+assertElementsAlmostEqual( C, e_phi_re, 'absolute', 1e-14 );
+assertElementsAlmostEqual( D, e_phi_im, 'absolute', 1e-14 );
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Need at least 6 inputs.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Can have at most 10 inputs.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D,~] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Must have exactly 4 outputs.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( 1, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Sizes of ''e_theta_re'', ''e_theta_im'', ''e_phi_re'', ''e_phi_im'' do not match.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, 1,elevation_grid);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Number of elements in ''azimuth_grid'' does not match number of columns in pattern data.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Size of ''element_pos'' must be either empty or match [3, n_elements]';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid, [], [1;1]);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''Coupling'' must be a matrix with rows equal to number of elements';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid, [], [], 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Imaginary part of coupling matrix (phase component) defined without real part (absolute component)';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid, [], 1, [1;1]);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = '''coupling_im'' must be empty or its size must match ''coupling_re''';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 end
 
 
