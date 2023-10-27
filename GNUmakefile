@@ -37,8 +37,8 @@ mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
-test:   tests/test_bin   #mex_octave
-#	octave --eval "cd tests; quadriga_lib_mex_tests;"
+test:   tests/test_bin   mex_octave
+	octave --eval "cd tests; quadriga_lib_mex_tests;"
 	tests/test_bin
 	
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
@@ -107,7 +107,6 @@ catch2lib:
 	- rm -rf external/Catch2-$(catch2version)
 
 clean:
-	- rm quadrigalib*.tar.gz
 	- rm build/*
 	- rm lib/*
 	- rm +quadriga_lib/*.mex*
@@ -116,6 +115,7 @@ clean:
 	- rm +quadriga_lib/*.lib
 	- rm *.obj
 	- rm tests/test_bin
+	- rm tests/test.exe
 
 tidy: clean 
 	- rm -rf external/Catch2-$(catch2version)-Linux
