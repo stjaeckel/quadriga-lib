@@ -1246,8 +1246,8 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     if (coupling_re.empty() && !coupling_im.empty())
         return "Imaginary part of coupling matrix (phase component) defined without real part (absolute component)";
 
-    if (!coupling_im.empty() && (coupling_im.n_rows != n_elements && coupling_im.n_cols != coupling_re.n_rows))
-        return "'Coupling' must be a matrix with rows equal to number of elements and columns equal to number of ports";
+    if (!coupling_im.empty() && (coupling_im.n_rows != n_elements || coupling_im.n_cols != coupling_re.n_cols))
+        return "'coupling_im' must be empty or its size must match 'coupling_re'";
 
     return "";
 }
