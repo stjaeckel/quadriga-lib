@@ -19,7 +19,7 @@
 #include "quadriga_lib.hpp"
 
 /*!MATLAB
-%VERSION Returns the arrayant-lib version number
+%VERSION Returns the quadriga-lib version number
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 % Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
