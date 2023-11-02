@@ -69,7 +69,6 @@ arguments are then specific to this type.
 ```
 
 ## Input Arguments for type 'custom':
-
 - **`az_3dB`**<br>
   3dB beam width in azimuth direction in [deg], scalar
 
@@ -80,7 +79,6 @@ arguments are then specific to this type.
   Isotropic gain (linear scale) at the back of the antenna, scalar
 
 ## Input Arguments for type '3GPP':
-
 - **`M`**<br>
   Number of vertically stacked elements, scalar, default = 1
 
@@ -141,7 +139,6 @@ arguments are then specific to this type.
   Elevation angles (phi) in [rad], double precision, <br>Size: `[n_elevation]`
   
 ## Output Arguments:
-
 - **`e_theta_re`**<br>
   Real part of the e-theta component (vertical component) of the far field of each antenna element in 
   the array antenna, double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`

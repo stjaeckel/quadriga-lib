@@ -56,7 +56,6 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ```
 
 ## Input Arguments:
-
 - **`e_theta_re`**<br>
   Real part of the e-theta component (vertical component) of the far field of each antenna element in 
   the array antenna. Single or double precision. <br>Size: `[n_elevation, n_azimuth, n_elements]`
