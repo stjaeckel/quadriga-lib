@@ -4,3 +4,6 @@ lib/*
 external/Catch2-*/
 external/hdf5-*/
 tests/test*
+tools/html_parts/*
+tools/extract_html_mex_api.py
+html_docu/*

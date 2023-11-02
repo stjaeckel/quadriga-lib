@@ -2,47 +2,53 @@ function test_cart2geo
 
 e = rand(3,6,2);
 
-f = @() quadriga_lib.cart2geo;
-assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_input')
-
-f = @() quadriga_lib.cart2geo(e,[]);
-assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_input')
-
-f = @() quadriga_lib.cart2geo(e);
-assertExceptionThrown( f, 'quadriga_lib:cart2geo:no_output')
-
-% empty
 try
-    [~,~] = quadriga_lib.cart2geo([]);
+    quadriga_lib.cart2geo;
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
-    end
-end
-
-% size_mismatch
-try
-    [~,~] = quadriga_lib.cart2geo(rand(2,2,2,2));
-catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Cartesian coordinates not given.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
-    [~,~] = quadriga_lib.cart2geo(rand(2,2,2));
+    quadriga_lib.cart2geo(e,[]);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Too many input arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-% wrong_type
 try
-    [~,~] = quadriga_lib.cart2geo(int32([1;1;1]));
+    quadriga_lib.cart2geo([]);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Input cannot be empty.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.cart2geo(rand(2,2,2,2));
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input must have 3 rows.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.cart2geo(int32([1;1;1]));
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input must be provided in ''single'' or ''double'' precision.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -70,3 +76,5 @@ assertElementsAlmostEqual( le, 2, 'absolute', 1e-5 );
 assertElementsAlmostEqual( az, [pi/2;pi/4], 'absolute', 1e-5 );
 assertElementsAlmostEqual( el, pi/4*[1;-1], 'absolute', 1e-5 );
 assertElementsAlmostEqual( le, sqrt(2)*[1;1], 'absolute', 1e-5 );
+
+end

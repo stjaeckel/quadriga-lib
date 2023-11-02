@@ -19,6 +19,43 @@
 #include "quadriga_tools.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+ Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# SUBDIVIDE_TRIANGLES
+Subdivide the faces of a triangle mesh into smaller faces
+
+## Description:
+This function splits the triangles of a mesh into smaller triangles by subdividing the edges
+into `n_div` sub-edges. This creates `n_div^2` sub-faces per face.
+
+## Usage:
+
+```
+triangles_out = quadriga_lib.subdivide_triangles( triangles_in, no_div );
+```
+
+## Input Arguments:
+
+- **`triangles_in`**<br>
+  Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
+  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; singe or double precision;
+  <br>Size: `[ n_triangles_in, 9 ]`
+
+- **`no_div`**<br>
+  Number of divisions per edge of the input mesh. The resulting number of faces is equal to
+  `n_triangles_out = n_triangles_in * n_div^2`
+
+## Output Argument:
+
+- **`triangles_out`**<br>
+  Vertices of the sub-divided mesh in global Cartesian coordinates; singe or double precision;
+  <br>Size: `[ n_triangles_out, 9 ]`
+MD!*/
+
+
 /*!MATLAB
 %SUBDIVIDE_TRIANGLES Subdivides the faces of a triangle mesh into smaller faces
 %
