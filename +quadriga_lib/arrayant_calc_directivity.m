@@ -26,7 +26,6 @@
 %        e_phi_im, azimuth_grid, elevation_grid);
 %    
 % Input Arguments:
-%    
 %    - e_theta_re
 %      Real part of the e-theta component (vertical component) of the far field of each antenna element in 
 %      the array antenna. Single or double precision. Size: [n_elevation, n_azimuth, n_elements]

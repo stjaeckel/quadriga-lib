@@ -41,7 +41,6 @@
 %        e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c, azimuth_grid_c, elevation_grid_c );
 %    
 % Input Arguments for type 'custom':
-%    
 %    - az_3dB
 %      3dB beam width in azimuth direction in [deg], scalar
 %    
@@ -52,7 +51,6 @@
 %      Isotropic gain (linear scale) at the back of the antenna, scalar
 %    
 % Input Arguments for type '3GPP':
-%    
 %    - M
 %      Number of vertically stacked elements, scalar, default = 1
 %    
@@ -113,7 +111,6 @@
 %      Elevation angles (phi) in [rad], double precision, Size: [n_elevation]
 %      
 % Output Arguments:
-%    
 %    - e_theta_re
 %      Real part of the e-theta component (vertical component) of the far field of each antenna element in 
 %      the array antenna, double precision, Size: [n_elevation, n_azimuth, n_elements]
