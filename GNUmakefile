@@ -5,7 +5,7 @@ CC    = g++
 MEX   = /usr/local/MATLAB/R2021a/bin/mex
 OCT   = mkoctfile
 
-all:        dirs   mex_octave  mex_matlab   mex_docu
+all:        dirs   mex_octave  mex_matlab   
 
 # External libraries
 hdf5version    = 1.14.2
@@ -82,6 +82,9 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 +quadriga_lib/%.m:   mex/%.cpp
 	rm -f $@
 	python3 tools/extract_matlab_comments.py $< $@
+
+documentation:   mex_docu
+	python3 tools/extract_html_mex_api.py mex/ html_docu/mex_api.html
 
 # Maintainance section
 hdf5lib:
