@@ -84,7 +84,9 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 	python3 tools/extract_matlab_comments.py $< $@
 
 documentation:   mex_docu
-	python3 tools/extract_html_mex_api.py mex/ html_docu/mex_api.html
+	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
+	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part mex/ 
+	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
 
 # Maintainance section
 hdf5lib:

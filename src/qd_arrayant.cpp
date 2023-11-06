@@ -25,7 +25,78 @@
 
 #include "helper_functions.cpp"
 
-// ARRAYANT METHODS : Return number of elevation angles, azimuth angles and elemets
+/*!SECTION
+Array antenna class
+SECTION!*/
+
+/*!MD
+# arrayant <++>
+Class for storing and manipulating array antenna models
+
+## Description:
+- An array antenna consists of multiple individual elements. 
+- Each element occupies a specific position relative to the array's phase-center, its local origin. 
+- Elements can also be inter-coupled, represented by a coupling matrix.
+
+## Attributes:
+`arma::Cube<dtype> e_theta_re`    | Vertical component of the electric field, real part
+`arma::Cube<dtype> e_theta_im`    | Vertical component of the electric field, imaginary part
+`arma::Cube<dtype> e_phi_re`      | Horizontal component of the electric field, real part
+`arma::Cube<dtype> e_phi_im`      | Horizontal component of the electric field, imaginary part
+`arma::Col<dtype> azimuth_grid`   | Azimuth angles in pattern (theta) in [rad], between -pi and pi, sorted
+`arma::Col<dtype> elevation_grid` | Elevation angles in pattern (phi) in [rad], between -pi/2 and pi/2, sorted
+`arma::Mat<dtype> element_pos`    | Element positions (optional), Size: Empty or [3, n_elements]
+`arma::Mat<dtype> coupling_re`    | Coupling matrix, real part (optional), Size: [n_elements, n_ports]
+`arma::Mat<dtype> coupling_im`    | Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]
+`dtype center_frequency`          | Center frequency in [Hz]
+
+- Allowed datatypes (`dtype`): `float` and `double`
+- `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im` must have size `[n_elevation, n_azimuth, n_elements]`
+
+## Example:
+```
+float pi = arma::datum::pi;
+
+quadriga_lib::arrayant<float> ant;
+ant.azimuth_grid = {-0.75f * pi, 0.0f, 0.75f * pi, pi};
+ant.elevation_grid = {-0.45f * pi, 0.0f, 0.45f * pi};
+
+arma::mat A = arma::linspace(1.0, 12.0, 12);
+A.reshape(3, 4);
+
+arma::fcube B;
+B.zeros(3, 4, 1);
+B.slice(0) = arma::conv_to<arma::fmat>::from(A);
+
+ant.e_theta_re = B * 0.5f;
+ant.e_theta_im = B * 0.002f;
+ant.e_phi_re = -B;
+ant.e_phi_im = -B * 0.001f;
+
+arma::fmat C = {1.0f, 2.0f, 4.0f};
+ant.element_pos = C.t();
+
+ant.coupling_re = {1.0f};
+ant.coupling_im = {0.1f};
+ant.center_frequency = 2.0e9f;
+ant.name = "name";
+```
+
+## Simple member functions:
+`.n_elevation()` | Returns number of elevation angles as 64bit integer
+`.n_azimuth()`   | Returns number of azimuth angles as 64bit integer
+`.n_elements()`  | Returns number of antenna elements as 64bit integer
+`.n_ports()`     | Returns number of ports (after coupling) as 64bit integer
+`.copy()`        | Creates a copy of the array antenna object
+`.reset()`       | Reset the size to zero (the arrayant object will contain no data)
+`.is_valid()`    | Returns an empty string if arrayant object is valid or an error message otherwise
+
+## Complex member fuctions:
+- <a href="#.calc_directivity_dBi">.calc_directivity_dBi</a>
+- <a href="#.combine_pattern">.combine_pattern</a>
+
+MD!*/
+
 template <typename dtype>
 unsigned long long quadriga_lib::arrayant<dtype>::n_elevation() const
 {
@@ -52,7 +123,32 @@ unsigned long long quadriga_lib::arrayant<dtype>::n_ports() const
         return coupling_re.n_cols;
 }
 
-// ARRAYANT METHOD : Calculate the directivity of an antenna element in dBi
+/*!MD
+# .calc_directivity_dBi
+Calculate the directivity (in dBi) of array antenna elements
+
+## Description:
+- Member function of <a href="#arrayant">arrayant</a>
+- Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
+  is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
+  from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
+  of a hypothetical isotropic radiator is 1, or 0 dBi.
+- Allowed datatypes (`dtype`): `float` and `double`
+
+## Declaration:
+```
+dtype calc_directivity_dBi(unsigned element) const;
+```
+## Arguments:
+`unsigned element` | Element index
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_dipole<float>();
+float directivity = ant.calc_directivity_dBi( 0 );
+```
+MD!*/
+
 template <typename dtype>
 dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) const
 {
@@ -121,7 +217,31 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
     return dtype(directivity);
 }
 
-// Calculates a virtual pattern of the given array by applying coupling and element positions
+/*!MD
+# .combine_pattern
+Calculate effective radiation patterns for array antennas
+
+## Description:
+- Member function of <a href="#arrayant">arrayant</a>
+- By integrating element radiation patterns, element positions, and the coupling weights, one can 
+  determine an effective radiation pattern observable by a receiver in the antenna's far field. 
+- Leveraging these effective patterns is especially beneficial in antenna design, beamforming 
+  applications such as in 5G systems, and in planning wireless communication networks in complex 
+  environments like urban areas. This streamlined approach offers a significant boost in computation 
+  speed when calculating MIMO channel coefficients, as it reduces the number of necessary operations. 
+- Allowed datatypes (`dtype`): `float` and `double`
+
+## Declaration:
+```
+void combine_pattern(arrayant<dtype> *output);
+```
+
+## Arguments:
+- `arrayant<dtype> *output`<br>
+  Pointer to an arrayant object the the results should be written to. Calling this function without 
+  an argument or passing `nullptr` updates the arrayant properties of `this` arrayant inplace.
+MD!*/
+
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype> *output)
 {
