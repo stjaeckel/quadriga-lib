@@ -979,7 +979,7 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 
     if (n_snap != 0ULL && path_angles.size() == n_snap)
         for (auto i = 0ULL; i < n_snap; ++i)
-            if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4)
+            if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4ULL)
                 return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
 
     if (path_fbs_pos.size() != 0 && path_fbs_pos.size() != n_snap)
@@ -1088,12 +1088,6 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
 
     // Read number of snapshots
     auto n_snapshots = this->n_snap();
-
-    // Check if there is data
-    bool has_data = true;
-    if (coeff_re.empty() && delay.empty() && path_gain.empty() && path_length.empty() && path_polarization.empty() &&
-        path_angles.empty() && path_fbs_pos.empty() && path_lbs_pos.empty() && no_interact.empty())
-        has_data = false;
 
     // Store the number of snapshots
     if (!channel_is_empty)
@@ -1231,226 +1225,241 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     }
 
     // Snapshot data
-    if (has_data)
-        for (auto i = 0ULL; i < n_snapshots; ++i)
+    for (auto i = 0ULL; i < n_snapshots; ++i)
+    {
+        // Check if there is any data to write
+        bool write_coeff = coeff_re.size() == n_snapshots && coeff_im.size() == n_snapshots && coeff_re[i].n_elem != 0 && coeff_im[i].n_elem != 0,
+             write_delay = delay.size() == n_snapshots && delay[i].n_elem != 0ULL,
+             write_path_gain = path_gain.size() == n_snapshots && path_gain[i].n_elem != 0ULL,
+             write_path_length = path_length.size() == n_snapshots && path_length[i].n_elem != 0ULL,
+             write_path_polarization = path_polarization.size() == n_snapshots && path_polarization[i].n_elem != 0ULL,
+             write_path_angles = path_angles.size() == n_snapshots && path_angles[i].n_elem != 0ULL,
+             write_path_fbs_pos = path_fbs_pos.size() == n_snapshots && path_fbs_pos[i].n_elem != 0ULL,
+             write_path_lbs_pos = path_lbs_pos.size() == n_snapshots && path_lbs_pos[i].n_elem != 0ULL,
+             write_no_interact = no_interact.size() == n_snapshots && no_interact[i].n_elem != 0ULL,
+             write_interact_coord = interact_coord.size() == n_snapshots && interact_coord[i].n_elem != 0ULL;
+
+        if (!(write_coeff || write_delay || write_path_gain || write_path_length || write_path_polarization ||
+              write_path_angles || write_path_fbs_pos || write_path_lbs_pos || write_no_interact || write_interact_coord))
+            continue;
+
+        if (n_snapshots == 1ULL)
+            snap_id = group_id;
+        else
         {
-            if (n_snapshots == 1ULL)
-                snap_id = group_id;
+            std::string snap_name = "Snap_" + std::to_string(i);
+            snap_id = H5Gcreate2(group_id, snap_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        }
+
+        // Channel coefficients, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+        if (write_coeff)
+        {
+            dims[0] = coeff_re[i].n_slices;
+            dims[1] = coeff_re[i].n_cols;
+            dims[2] = coeff_re[i].n_rows;
+            dspace_id = H5Screate_simple(3, dims, NULL);
+
+            // Real part
+            dset_id = H5Dcreate2(snap_id, "coeff_re", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, coeff_re[i].memptr());
             else
             {
-                std::string snap_name = "Snap_" + std::to_string(i);
-                snap_id = H5Gcreate2(group_id, snap_name.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                data = new float[coeff_re[i].n_elem];
+                qHDF_cast_to_float(coeff_re[i].memptr(), data, coeff_re[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
             }
+            H5Dclose(dset_id);
 
-            // Channel coefficients, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            if (coeff_re.size() == n_snapshots && coeff_im.size() == n_snapshots && coeff_re[i].n_elem != 0 && coeff_im[i].n_elem != 0)
+            // Imaginary part
+            dset_id = H5Dcreate2(snap_id, "coeff_im", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, coeff_im[i].memptr());
+            else
             {
-                dims[0] = coeff_re[i].n_slices;
-                dims[1] = coeff_re[i].n_cols;
-                dims[2] = coeff_re[i].n_rows;
-                dspace_id = H5Screate_simple(3, dims, NULL);
-
-                // Real part
-                dset_id = H5Dcreate2(snap_id, "coeff_re", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, coeff_re[i].memptr());
-                else
-                {
-                    data = new float[coeff_re[i].n_elem];
-                    qHDF_cast_to_float(coeff_re[i].memptr(), data, coeff_re[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-
-                // Imaginary part
-                dset_id = H5Dcreate2(snap_id, "coeff_im", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, coeff_im[i].memptr());
-                else
-                {
-                    data = new float[coeff_im[i].n_elem];
-                    qHDF_cast_to_float(coeff_im[i].memptr(), data, coeff_im[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
+                data = new float[coeff_im[i].n_elem];
+                qHDF_cast_to_float(coeff_im[i].memptr(), data, coeff_im[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
             }
-
-            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            if (delay.size() == n_snapshots && delay[i].n_elem != 0ULL)
-            {
-                dims[0] = delay[i].n_slices;
-                dims[1] = delay[i].n_cols;
-                dims[2] = delay[i].n_rows;
-                dspace_id = H5Screate_simple(3, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "delay", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, delay[i].memptr());
-                else
-                {
-                    data = new float[delay[i].n_elem];
-                    qHDF_cast_to_float(delay[i].memptr(), data, delay[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
-            if (path_gain.size() == n_snapshots && path_gain[i].n_elem != 0ULL)
-            {
-                dims[0] = path_gain[i].n_elem;
-                dspace_id = H5Screate_simple(1, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_gain", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_gain[i].memptr());
-                else
-                {
-                    data = new float[path_gain[i].n_elem];
-                    qHDF_cast_to_float(path_gain[i].memptr(), data, path_gain[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
-            if (path_length.size() == n_snapshots && path_length[i].n_elem != 0ULL)
-            {
-                dims[0] = path_length[i].n_elem;
-                dspace_id = H5Screate_simple(1, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_length", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_length[i].memptr());
-                else
-                {
-                    data = new float[path_length[i].n_elem];
-                    qHDF_cast_to_float(path_length[i].memptr(), data, path_length[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
-            if (path_polarization.size() == n_snapshots && path_polarization[i].n_elem != 0ULL)
-            {
-                dims[0] = path_polarization[i].n_cols;
-                dims[1] = path_polarization[i].n_rows;
-                dspace_id = H5Screate_simple(2, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_polarization", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_polarization[i].memptr());
-                else
-                {
-                    data = new float[path_polarization[i].n_elem];
-                    qHDF_cast_to_float(path_polarization[i].memptr(), data, path_polarization[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
-            if (path_angles.size() == n_snapshots && path_angles[i].n_elem != 0ULL)
-            {
-                dims[0] = path_angles[i].n_cols;
-                dims[1] = path_angles[i].n_rows;
-                dspace_id = H5Screate_simple(2, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_angles", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_angles[i].memptr());
-                else
-                {
-                    data = new float[path_angles[i].n_elem];
-                    qHDF_cast_to_float(path_angles[i].memptr(), data, path_angles[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // First-bounce scatterer positions, matrices of size [3, n_path]
-            if (path_fbs_pos.size() == n_snapshots && path_fbs_pos[i].n_elem != 0ULL)
-            {
-                dims[0] = path_fbs_pos[i].n_cols;
-                dims[1] = path_fbs_pos[i].n_rows;
-                dspace_id = H5Screate_simple(2, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_fbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_fbs_pos[i].memptr());
-                else
-                {
-                    data = new float[path_fbs_pos[i].n_elem];
-                    qHDF_cast_to_float(path_fbs_pos[i].memptr(), data, path_fbs_pos[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Last-bounce scatterer positions, matrices of size [3, n_path]
-            if (path_lbs_pos.size() == n_snapshots && path_lbs_pos[i].n_elem != 0ULL)
-            {
-                dims[0] = path_lbs_pos[i].n_cols;
-                dims[1] = path_lbs_pos[i].n_rows;
-                dspace_id = H5Screate_simple(2, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "path_lbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_lbs_pos[i].memptr());
-                else
-                {
-                    data = new float[path_lbs_pos[i].n_elem];
-                    qHDF_cast_to_float(path_lbs_pos[i].memptr(), data, path_lbs_pos[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Number interaction points of a path with the environment, 0 = LOS, vectors of length [n_path]
-            if (no_interact.size() == n_snapshots && no_interact[i].n_elem != 0ULL)
-            {
-                dims[0] = no_interact[i].n_elem;
-                dspace_id = H5Screate_simple(1, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "no_interact", H5T_NATIVE_UINT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, no_interact[i].memptr());
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
-            if (interact_coord.size() == n_snapshots && interact_coord[i].n_elem != 0ULL)
-            {
-                dims[0] = interact_coord[i].n_cols;
-                dims[1] = interact_coord[i].n_rows;
-                dspace_id = H5Screate_simple(2, dims, NULL);
-                dset_id = H5Dcreate2(snap_id, "interact_coord", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-                if (data_is_float)
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, interact_coord[i].memptr());
-                else
-                {
-                    data = new float[interact_coord[i].n_elem];
-                    qHDF_cast_to_float(interact_coord[i].memptr(), data, interact_coord[i].n_elem);
-                    H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                    delete[] data;
-                }
-                H5Dclose(dset_id);
-                H5Sclose(dspace_id);
-            }
-
-            if (n_snapshots != 1ULL)
-                H5Gclose(snap_id);
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
         }
+
+        // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+        if (write_delay)
+        {
+            dims[0] = delay[i].n_slices;
+            dims[1] = delay[i].n_cols;
+            dims[2] = delay[i].n_rows;
+            dspace_id = H5Screate_simple(3, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "delay", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, delay[i].memptr());
+            else
+            {
+                data = new float[delay[i].n_elem];
+                qHDF_cast_to_float(delay[i].memptr(), data, delay[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
+        if (write_path_gain)
+        {
+            dims[0] = path_gain[i].n_elem;
+            dspace_id = H5Screate_simple(1, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_gain", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_gain[i].memptr());
+            else
+            {
+                data = new float[path_gain[i].n_elem];
+                qHDF_cast_to_float(path_gain[i].memptr(), data, path_gain[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
+        if (write_path_length)
+        {
+            dims[0] = path_length[i].n_elem;
+            dspace_id = H5Screate_simple(1, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_length", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_length[i].memptr());
+            else
+            {
+                data = new float[path_length[i].n_elem];
+                qHDF_cast_to_float(path_length[i].memptr(), data, path_length[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
+        if (write_path_polarization)
+        {
+            dims[0] = path_polarization[i].n_cols;
+            dims[1] = path_polarization[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_polarization", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_polarization[i].memptr());
+            else
+            {
+                data = new float[path_polarization[i].n_elem];
+                qHDF_cast_to_float(path_polarization[i].memptr(), data, path_polarization[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
+        if (write_path_angles)
+        {
+            dims[0] = path_angles[i].n_cols;
+            dims[1] = path_angles[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_angles", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_angles[i].memptr());
+            else
+            {
+                data = new float[path_angles[i].n_elem];
+                qHDF_cast_to_float(path_angles[i].memptr(), data, path_angles[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // First-bounce scatterer positions, matrices of size [3, n_path]
+        if (write_path_fbs_pos)
+        {
+            dims[0] = path_fbs_pos[i].n_cols;
+            dims[1] = path_fbs_pos[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_fbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_fbs_pos[i].memptr());
+            else
+            {
+                data = new float[path_fbs_pos[i].n_elem];
+                qHDF_cast_to_float(path_fbs_pos[i].memptr(), data, path_fbs_pos[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Last-bounce scatterer positions, matrices of size [3, n_path]
+        if (write_path_lbs_pos)
+        {
+            dims[0] = path_lbs_pos[i].n_cols;
+            dims[1] = path_lbs_pos[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "path_lbs_pos", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, path_lbs_pos[i].memptr());
+            else
+            {
+                data = new float[path_lbs_pos[i].n_elem];
+                qHDF_cast_to_float(path_lbs_pos[i].memptr(), data, path_lbs_pos[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Number interaction points of a path with the environment, 0 = LOS, vectors of length [n_path]
+        if (write_no_interact)
+        {
+            dims[0] = no_interact[i].n_elem;
+            dspace_id = H5Screate_simple(1, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "no_interact", H5T_NATIVE_UINT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            H5Dwrite(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, no_interact[i].memptr());
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        // Interaction coordinates, NAN-padded, vector (n_snap) of tensors of size [3, n_coord, n_path]
+        if (write_interact_coord)
+        {
+            dims[0] = interact_coord[i].n_cols;
+            dims[1] = interact_coord[i].n_rows;
+            dspace_id = H5Screate_simple(2, dims, NULL);
+            dset_id = H5Dcreate2(snap_id, "interact_coord", H5T_NATIVE_FLOAT, dspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+            if (data_is_float)
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, interact_coord[i].memptr());
+            else
+            {
+                data = new float[interact_coord[i].n_elem];
+                qHDF_cast_to_float(interact_coord[i].memptr(), data, interact_coord[i].n_elem);
+                H5Dwrite(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                delete[] data;
+            }
+            H5Dclose(dset_id);
+            H5Sclose(dspace_id);
+        }
+
+        if (n_snapshots != 1ULL)
+            H5Gclose(snap_id);
+    }
 
     // Write unstructured data
     for (std::size_t i = 0; i < par_names.size(); ++i)
@@ -2041,9 +2050,6 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         return c;
     }
 
-    // There are snapshots, but there might be no data
-    bool has_data = n_snapshots != 1ULL && H5Lexists(group_id, "Snap_0", H5P_DEFAULT) > 0;
-
     // Center frequency in [Hz]
     val = qHDF_read_data(group_id, "CenterFrequency", float2double);
     if (val.has_value() && quadriga_lib::any_type_id(&val) < 20) // scalar vale
@@ -2077,74 +2083,153 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         c.rx_orientation = std::any_cast<arma::Mat<dtype>>(val);
 
     // Read snapshot data
-    if (has_data)
-        for (auto i = 0ULL; i < n_snapshots; ++i)
+    unsigned long long j_coeff = 0ULL,
+                       j_delay = 0ULL,
+                       j_path_gain = 0ULL,
+                       j_path_length = 0ULL,
+                       j_path_polarization = 0ULL,
+                       j_path_angles = 0ULL,
+                       j_path_fbs_pos = 0ULL,
+                       j_path_lbs_pos = 0ULL,
+                       j_no_interact = 0ULL,
+                       j_interact_coord = 0ULL;
+
+    unsigned long long n_rx = 0ULL, n_tx = 0ULL;
+    for (auto i = 0ULL; i < n_snapshots; ++i)
+    {
+        std::string snap_name = "Snap_" + std::to_string(i);
+
+        // Open group containing snapshot data
+        hid_t snap_id = group_id;
+        if (n_snapshots != 1ULL)
         {
-            // Open group containing snapshot data
-            hid_t snap_id = group_id;
-            if (n_snapshots != 1ULL)
-            {
-                std::string snap_name = "Snap_" + std::to_string(i);
+            if (H5Lexists(group_id, snap_name.c_str(), H5P_DEFAULT) > 0)
                 snap_id = H5Gopen2(group_id, snap_name.c_str(), H5P_DEFAULT);
-            }
-
-            // Channel coefficients, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            val = qHDF_read_data(snap_id, "coeff_re", float2double);
-            if (val.has_value())
-            {
-                c.coeff_re.push_back(std::any_cast<arma::Cube<dtype>>(val));
-                val = qHDF_read_data(snap_id, "coeff_im", float2double);
-                c.coeff_im.push_back(std::any_cast<arma::Cube<dtype>>(val));
-            }
-
-            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-            val = qHDF_read_data(snap_id, "delay", float2double);
-            if (val.has_value())
-                c.delay.push_back(std::any_cast<arma::Cube<dtype>>(val));
-
-            // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
-            val = qHDF_read_data(snap_id, "path_gain", float2double);
-            if (val.has_value())
-                c.path_gain.push_back(std::any_cast<arma::Col<dtype>>(val));
-
-            // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
-            val = qHDF_read_data(snap_id, "path_length", float2double);
-            if (val.has_value())
-                c.path_length.push_back(std::any_cast<arma::Col<dtype>>(val));
-
-            // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
-            val = qHDF_read_data(snap_id, "path_polarization", float2double);
-            if (val.has_value())
-                c.path_polarization.push_back(std::any_cast<arma::Mat<dtype>>(val));
-
-            // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
-            val = qHDF_read_data(snap_id, "path_angles", float2double);
-            if (val.has_value())
-                c.path_angles.push_back(std::any_cast<arma::Mat<dtype>>(val));
-
-            // First-bounce scatterer positions, matrices of size [3, n_path]
-            val = qHDF_read_data(snap_id, "path_fbs_pos", float2double);
-            if (val.has_value())
-                c.path_fbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
-
-            // Last-bounce scatterer positions, matrices of size [3, n_path]
-            val = qHDF_read_data(snap_id, "path_lbs_pos", float2double);
-            if (val.has_value())
-                c.path_lbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
-
-            // Number interaction points of a path with the environment, 0 = LOS
-            val = qHDF_read_data(snap_id, "no_interact");
-            if (val.has_value())
-                c.no_interact.push_back(std::any_cast<arma::Col<unsigned>>(val));
-
-            // Interaction coordinates of paths with the environment, matrices of size [3, sum(no_interact)]
-            val = qHDF_read_data(snap_id, "interact_coord", float2double);
-            if (val.has_value())
-                c.interact_coord.push_back(std::any_cast<arma::Mat<dtype>>(val));
-
-            if (n_snapshots != 1ULL)
-                H5Gclose(snap_id);
+            else
+                continue;
         }
+
+        // Channel coefficients, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+        val = qHDF_read_data(snap_id, "coeff_re", float2double);
+        if (val.has_value())
+        {
+            if(n_rx == 0ULL)
+            {
+                auto data = std::any_cast<arma::Cube<dtype>>(val);
+                n_rx = data.n_rows, n_tx = data.n_cols;
+            }
+            
+            for (auto j = j_coeff; j < i; ++j)
+                c.coeff_re.push_back(arma::Cube<dtype>(n_rx, n_tx, 0ULL)), c.coeff_im.push_back(arma::Cube<dtype>(n_rx, n_tx, 0ULL));
+
+            c.coeff_re.push_back(std::any_cast<arma::Cube<dtype>>(val));
+            val = qHDF_read_data(snap_id, "coeff_im", float2double);
+            c.coeff_im.push_back(std::any_cast<arma::Cube<dtype>>(val));
+            j_coeff = i + 1ULL;
+        }
+
+        // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
+        val = qHDF_read_data(snap_id, "delay", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_delay; j < i; ++j)
+                c.delay.push_back(arma::Cube<dtype>(n_rx, n_tx, 0ULL));
+
+            c.delay.push_back(std::any_cast<arma::Cube<dtype>>(val));
+            j_delay = i + 1ULL;
+        }
+
+        // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
+        val = qHDF_read_data(snap_id, "path_gain", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_gain; j < i; ++j)
+                c.path_gain.push_back(arma::Col<dtype>());
+
+            c.path_gain.push_back(std::any_cast<arma::Col<dtype>>(val));
+            j_path_gain = i + 1ULL;
+        }
+
+        // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
+        val = qHDF_read_data(snap_id, "path_length", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_length; j < i; ++j)
+                c.path_length.push_back(arma::Col<dtype>());
+
+            c.path_length.push_back(std::any_cast<arma::Col<dtype>>(val));
+            j_path_length = i + 1ULL;
+        }
+
+        // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
+        val = qHDF_read_data(snap_id, "path_polarization", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_polarization; j < i; ++j)
+                c.path_polarization.push_back(arma::Mat<dtype>(8ULL, 0ULL));
+
+            c.path_polarization.push_back(std::any_cast<arma::Mat<dtype>>(val));
+            j_path_polarization = i + 1ULL;
+        }
+
+        // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
+        val = qHDF_read_data(snap_id, "path_angles", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_angles; j < i; ++j)
+                c.path_angles.push_back(arma::Mat<dtype>(0ULL, 4ULL));
+
+            c.path_angles.push_back(std::any_cast<arma::Mat<dtype>>(val));
+            j_path_angles = i + 1ULL;
+        }
+
+        // First-bounce scatterer positions, matrices of size [3, n_path]
+        val = qHDF_read_data(snap_id, "path_fbs_pos", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_fbs_pos; j < i; ++j)
+                c.path_fbs_pos.push_back(arma::Mat<dtype>(3ULL, 0ULL));
+
+            c.path_fbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
+            j_path_fbs_pos = i + 1ULL;
+        }
+
+        // Last-bounce scatterer positions, matrices of size [3, n_path]
+        val = qHDF_read_data(snap_id, "path_lbs_pos", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_path_lbs_pos; j < i; ++j)
+                c.path_lbs_pos.push_back(arma::Mat<dtype>(3ULL, 0ULL));
+
+            c.path_lbs_pos.push_back(std::any_cast<arma::Mat<dtype>>(val));
+            j_path_lbs_pos = i + 1ULL;
+        }
+
+        // Number interaction points of a path with the environment, 0 = LOS
+        val = qHDF_read_data(snap_id, "no_interact");
+        if (val.has_value())
+        {
+            for (auto j = j_no_interact; j < i; ++j)
+                c.no_interact.push_back(arma::Col<unsigned>());
+
+            c.no_interact.push_back(std::any_cast<arma::Col<unsigned>>(val));
+            j_no_interact = i + 1ULL;
+        }
+
+        // Interaction coordinates of paths with the environment, matrices of size [3, sum(no_interact)]
+        val = qHDF_read_data(snap_id, "interact_coord", float2double);
+        if (val.has_value())
+        {
+            for (auto j = j_interact_coord; j < i; ++j)
+                c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
+
+            c.interact_coord.push_back(std::any_cast<arma::Mat<dtype>>(val));
+            j_interact_coord = i + 1ULL;
+        }
+
+        if (n_snapshots != 1ULL)
+            H5Gclose(snap_id);
+    }
 
     qHDF_close_file(file_id);
     return c;
