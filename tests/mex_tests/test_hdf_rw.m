@@ -170,11 +170,11 @@ for n = 1:length(fieldsPar)
     field = fieldsPar{n};
     assertEqual( class(par.(field)), class(parR.(field)));  % Same data type
     assertTrue(  isequal(par.(field), parR.(field)) );      % Same data
-    
+
     % Load single fields
     data = quadriga_lib.hdf5_read_dset(fn, 1, field);
     assertTrue(  isequal(par.(field), data) );      % Same data
-    
+
     % Add a copy of the data to new storage location
     quadriga_lib.hdf5_write_dset(fn, [1,2], field, data);
 end

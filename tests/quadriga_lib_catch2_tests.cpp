@@ -27,7 +27,7 @@
 #include "catch2_tests/test_get_channels_spherical.cpp"
 #include "catch2_tests/test_get_channels_planar.cpp"
 #include "catch2_tests/test_hdf_functions.cpp"
-
+#include "catch2_tests/test_channel.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

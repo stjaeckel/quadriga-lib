@@ -34,7 +34,7 @@ namespace quadriga_lib
         std::string name = "empty";                      // Name of the channel object
         arma::Col<dtype> center_frequency;               // Center frequency in [Hz], vector of length [1] or [n_snap] or []
         arma::Mat<dtype> tx_pos;                         // Transmitter positions, matrix of size [3, n_snap] or [3, 1]
-        arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap]
+        arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap] or [3, 1]
         arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
         arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
         std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
@@ -53,14 +53,21 @@ namespace quadriga_lib
         int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
         channel(){};                                     // Default constructor
 
-        unsigned long long n_snap() const; // Number of snapshots
-        unsigned long long n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
-        unsigned long long n_tx() const;   // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
-        arma::uvec n_path() const;         // Number of paths per snapshot (unsigned long long)
-        bool empty() const;                // Returns true if the channel object contains no structured data
+        arma::uword n_snap() const; // Number of snapshots
+        arma::uword n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
+        arma::uword n_tx() const;   // Number of transmit antennas in coefficient matrix, returns 0 if there are no coefficients
+        arma::uvec n_path() const;  // Number of paths per snapshot as arma::uword
+        bool empty() const;         // Returns true if the channel object contains no structured data
 
         // Validate integrity
         std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
+
+        // Calculate the the effective path gain (linear scale)
+        // - sum up the power of all paths and average over the transmit and receive antennas
+        // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
+        // - throws an error if neither coeff_re/im nor path_polarization is available
+        // - returns one value for each snapshot (vector with n_snap elements)
+        arma::Col<dtype> calc_effective_path_gain(bool assume_valid = false) const;
 
         // Save data to HDF file
         // - All data is stored in single precision
