@@ -16,13 +16,9 @@
 // ------------------------------------------------------------------------
 
 #include <catch2/catch_test_macros.hpp>
+#include <iostream>
 
 #include "quadriga_lib.hpp"
-#include "quadriga_tools.hpp"
-
-#include <iostream>
-#include <string>
-#include <any>
 
 TEST_CASE("HDF - Minimal Test")
 {

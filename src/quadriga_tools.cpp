@@ -163,7 +163,7 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
 
     unsigned long long n_interact = (unsigned long long)interact_cnt;
 
-    if (interact_coord == nullptr || interact_coord->n_elem == 0 || interact_coord->n_rows != 3ULL)
+    if (interact_coord == nullptr || interact_coord->n_rows != 3ULL)
         throw std::invalid_argument("Input 'interact_coord' must have 3 rows.");
 
     if (interact_coord->n_cols != n_interact)
@@ -176,12 +176,12 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     // Set the output size
     if (path_length != nullptr && path_length->n_elem != n_path)
         path_length->set_size(n_path);
-    if (fbs_pos != nullptr && (fbs_pos->n_rows != 3 || fbs_pos->n_cols != n_path))
+    if (fbs_pos != nullptr && (fbs_pos->n_rows != 3ULL || fbs_pos->n_cols != n_path))
         fbs_pos->set_size(3, n_path);
-    if (lbs_pos != nullptr && (lbs_pos->n_rows != 3 || lbs_pos->n_cols != n_path))
+    if (lbs_pos != nullptr && (lbs_pos->n_rows != 3ULL || lbs_pos->n_cols != n_path))
         lbs_pos->set_size(3, n_path);
-    if (path_angles != nullptr && (path_angles->n_rows != n_path || path_angles->n_cols != 4))
-        path_angles->set_size(n_path, 4);
+    if (path_angles != nullptr && (path_angles->n_rows != n_path || path_angles->n_cols != 4ULL))
+        path_angles->set_size(n_path, 4ULL);
 
     // Get pointers
     const dtype *p_coord = interact_coord->memptr();
