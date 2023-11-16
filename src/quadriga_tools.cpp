@@ -198,17 +198,19 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     {
         dtype fx = TRx, fy = TRy, fz = TRz;     // Initial FBS-Pos = half way point
         dtype lx = TRx, ly = TRy, lz = TRz;     // Initial LBS-Pos = half way point
-        dtype x = Tx, y = Ty, z = Tz, d = zero; // Initial length = 0
+        dtype x = Tx, y = Ty, z = Tz, d = zero; // Set segment start to TX position
 
         // Get FBS and LBS positions
         for (unsigned ii = 0; ii < p_interact[ip]; ++ii)
         {
-            lx = *p_coord++, ly = *p_coord++, lz = *p_coord++;
-            x -= lx, y -= ly, z -= lx, d += std::sqrt(x * x + y * y + z * z);
-            x = lx, y = ly, z = lz;
-            fx = ii == 0 ? lx : fx, fy = ii == 0 ? ly : fy, fz = ii == 0 ? lz : fz;
+            lx = *p_coord++, ly = *p_coord++, lz = *p_coord++;                      // Read segment end coordinate
+            x -= lx, y -= ly, z -= lz;                                              // Calculate vector pointing from segment start to segment end
+            d += std::sqrt(x * x + y * y + z * z);                                  // Add segment length to total path length
+            x = lx, y = ly, z = lz;                                                 // Update segment start for next segment
+            fx = ii == 0 ? lx : fx, fy = ii == 0 ? ly : fy, fz = ii == 0 ? lz : fz; // Sore FBS position (segment 0)
         }
-        x -= Rx, y -= Ry, z -= Rz, d += std::sqrt(x * x + y * y + z * z);
+        x -= Rx, y -= Ry, z -= Rz;             // Calculate vector pointing last segment start to RX position
+        d += std::sqrt(x * x + y * y + z * z); // Add last segment length to total path length
 
         if (p_length != nullptr)
             p_length[ip] = d;
