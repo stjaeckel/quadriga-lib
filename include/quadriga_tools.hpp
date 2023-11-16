@@ -43,6 +43,33 @@ namespace quadriga_lib
                     arma::Mat<dtype> *lbs_pos = nullptr,      // Last-bounce scatterer positions, matrix of size [3, n_path]
                     arma::Mat<dtype> *path_angles = nullptr); // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
 
+    // Generate diffraction ellipsoid
+    // - Each ellipsoid consists of 'n_path' diffraction paths
+    // - Diffraction paths can be free, blocked or partially blocked (not calculated here)
+    // - Each diffraction path has 'n_seg' segments
+    // - All diffraction paths originate at 'orig' and arrive at 'dest' (these points are not duplicated in the output)
+    // - Points 'orig' and 'dest' lay on the semi-major axis of the ellipsoid
+    // - Generated rays sample the volume of the ellipsoid
+    // - Weights are calculated from the Knife-edge diffraction model when parts of the ellipsoid are shadowed
+    // - Initial weights are normalized such that their sum is 1.0
+    // - There are 4 levels of detail:
+    //      lod = 1 : n_path =  7, n_seg = 3
+    //      lod = 2 : n_path = 19, n_seg = 3
+    //      lod = 3 : n_path = 37, n_seg = 4
+    //      lod = 4 : n_path = 61, n_seg = 5
+    //      lod = 5 : n_path =  1, n_seg = 2 (for debugging)
+    //      lod = 6 : n_path =  2, n_seg = 2 (for debugging)
+    // - Optional estimation of the diffracted path interaction coordinates by supplying a gain (0-1) for each path (0=blocked, 1=free)
+    template <typename dtype>                                     // float or double
+    void generate_diffraction_paths(const arma::Mat<dtype> *orig, // Origin points of the ellipsoid, Size [ n_pos, 3 ]
+                                    const arma::Mat<dtype> *dest, // Destination points of the ellipsoid [ n_pos, 3 ]
+                                    dtype center_frequency,       // Frequency in [Hz]
+                                    int lod,                      // Level of detail: Scalar 1-6
+                                    arma::Cube<dtype> *ray_x,     // X-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
+                                    arma::Cube<dtype> *ray_y,     // Y-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
+                                    arma::Cube<dtype> *ray_z,     // Z-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
+                                    arma::Cube<dtype> *weight);   // Weights, Size [ n_pos, n_path, n_seg ]
+
     template <typename dtype> // float or double
     arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);
 
