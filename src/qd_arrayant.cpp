@@ -92,7 +92,7 @@ ant.name = "name";
 `.is_valid()`    | Returns an empty string if arrayant object is valid or an error message otherwise
 
 ## Complex member fuctions:
-- <a href="#.calc_directivity_dBi">.calc_directivity_dBi</a>
+- <a href="#.calc_directivity_dbi">.calc_directivity_dBi</a>
 - <a href="#.combine_pattern">.combine_pattern</a>
 
 MD!*/

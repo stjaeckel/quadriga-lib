@@ -5,7 +5,7 @@
 %    Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
 %    is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
 %    from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
-%    of a hypothetical isotropic radiator is 1, or 0 dBi. [Wikipedia]
+%    of a hypothetical isotropic radiator is 1, or 0 dBi.
 %    
 % Usage:
 %    
