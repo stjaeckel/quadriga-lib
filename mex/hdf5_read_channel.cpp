@@ -22,7 +22,7 @@
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
-    //  0 - fn              Filename of the QDANT file
+    //  0 - fn              Filename of the HDF5 file
     //  1 - location        Storage location, 1-based, vector with 1-4 elements, i.e. [ix], [ix, iy], [ix,iy,iz] or [ix,iy,iz,iw]
     //  2 - snap            Snapshot range, optional, vector, default = all
 

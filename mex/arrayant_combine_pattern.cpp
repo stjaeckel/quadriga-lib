@@ -186,7 +186,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     for (int i = 1; i < 9; ++i)
         if (nrhs > i)
             if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
-                mexErrMsgIdAndTxt("quadriga_lib:arrayant_combine_pattern:wrong_type", "All floating-point inputs must have the same type: 'single' or 'double' precision");
+                mexErrMsgIdAndTxt("quadriga_lib:arrayant_combine_pattern:IO_error", "All floating-point inputs must have the same type: 'single' or 'double' precision");
 
     // Create arrayant object from the input data
     quadriga_lib::arrayant<float> arrayant_single;
