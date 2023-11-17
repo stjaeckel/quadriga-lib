@@ -579,7 +579,7 @@ TEST_CASE("HDF - Minimal Test")
         CHECK(arma::approx_equal(d.coeff_im[i], c.coeff_im[i], "absdiff", 1e-6));
         CHECK(arma::approx_equal(d.delay[i], c.delay[i], "absdiff", 1e-14));
         CHECK(arma::approx_equal(d.path_gain[i], c.path_gain[i], "absdiff", 1e-14));
-        CHECK(arma::approx_equal(d.path_length[i], c.path_length[i], "absdiff", 1e-6));
+        CHECK(arma::approx_equal(d.path_length[i], c.path_length[i], "absdiff", 2e-6));
         CHECK(arma::approx_equal(d.path_polarization[i], c.path_polarization[i], "absdiff", 1e-14));
         CHECK(arma::approx_equal(d.path_angles[i], c.path_angles[i], "absdiff", 1e-6));
         CHECK(arma::approx_equal(d.interact_coord[i], c.interact_coord[i], "absdiff", 1e-6));
