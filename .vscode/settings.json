@@ -106,6 +106,7 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "shared_mutex": "cpp",
-        "any": "cpp"
+        "any": "cpp",
+        "cfenv": "cpp"
     }
 }

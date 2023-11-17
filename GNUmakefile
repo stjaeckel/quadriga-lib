@@ -20,7 +20,7 @@ HDF5_LIB    = external/hdf5-$(hdf5version)-Linux/lib
 # Configurations
 CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion #   -Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
 
-# Sourcees
+# Sources
 src     	= $(wildcard src/*.cpp)
 mex         = $(wildcard mex/*.cpp)
 tests 		= $(wildcard tests/catch2_tests/*.cpp)
@@ -29,9 +29,9 @@ tests 		= $(wildcard tests/catch2_tests/*.cpp)
 .SECONDARY: $(src:src/%.cpp=build/%.o)
 
 dirs:
-	- mkdir build
-	- mkdir lib
-	- mkdir +quadriga_lib
+	mkdir -p build
+	mkdir -p lib
+	mkdir -p +quadriga_lib
 
 mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
