@@ -48,7 +48,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ```
 % Generate dipole antenna
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid] = ...
-    <a href="#arrayant_generate">quadriga_lib.arrayant_generate</a>('dipole');
+    quadriga_lib.arrayant_generate('dipole');
 
 % Calculate directivity 
 directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
@@ -56,32 +56,16 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ```
 
 ## Input Arguments:
-- **`e_theta_re`**<br>
-  Real part of the e-theta component (vertical component) of the far field of each antenna element in 
-  the array antenna. Single or double precision. <br>Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`e_theta_im`**<br>
-  Imaginary part of the e-theta component of the electric field. Single or double precision, 
-  <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`e_phi_re`**<br>
-  Real part of the e-phi component (horizontal component) of the far field of each antenna element in 
-  the array antenna. Single or double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`e_phi_im`**<br>
-  Imaginary part of the e-phi component of the electric field. Single or double precision, 
-  <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`azimuth_grid`**<br>
-  Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values must be between 
-  -pi and pi, sorted in ascending order. Single or double precision, <br>Size: `[n_azimuth]`<br>
-  
-- **`elevation_grid`**<br>
-  Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values must be between 
-  -pi/2 and pi/2, sorted in ascending order. Single or double precision, <br>Size: `[n_elevation]`<br>
-  
+- **Antenna data:** (inputs 1-6, single or double precision)
+  `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
+
 - **`i_element`** (optional)<br> 
-  Element index. If ot is not provided or empty, the directivity is calculated for all elements in the 
+  Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the 
   array antenna. <br>Size: `[n_out]` or empty<br>
 
 ## Output Argument:

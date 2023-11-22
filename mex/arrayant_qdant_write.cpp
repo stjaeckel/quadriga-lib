@@ -39,64 +39,35 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, e_theta_re, e_theta_im, e_ph
 
 ## Caveat:
 - Inputs can be single or double precision, but type must match for all inputs
-- Multiple array antennas can be stored in the same file unsing the `id` parameter.
+- Multiple array antennas can be stored in the same file using the `id` parameter.
 - If writing to an exisiting file without specifying an `id`, the data gests appended at the end.  
-  The output `id_in_file` idntifies the location inside the file.
+  The output `id_in_file` identifies the location inside the file.
 - An optional storage `layout` can be provided to organize data inside the file.
 
 ## Input Arguments:
 - **`fn`**<br>
-  Filename of the QDANT file
+  Filename of the QDANT file, string
 
-- **`e_theta_re`**<br>
-  Real part of the (vertical) e-theta component of the electric field; <br>
-  Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`e_theta_im`**<br>
-  Imaginary part of the (vertical) e-theta component of the electric field; <br>
-  Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`e_phi_re`**<br>
-  Real part of the (horizontal) e-phi component of the electric field; <br>
-  Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`e_phi_im`**<br>
-  Imaginary part of the (horizontal) e-phi component of the electric field; <br>
-  Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`azimuth_grid`**<br>
-  Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values must be between 
-  -pi and pi, sorted in ascending order. Single or double precision, <br>Size: `[n_azimuth]`<br>
-  
-- **`elevation_grid`**<br>
-  Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values must be between 
-  -pi/2 and pi/2, sorted in ascending order. Single or double precision, <br>Size: `[n_elevation]`<br>
-
-- **`element_pos`** (optional)<br>
-  Antenna element (x,y,z) positions relative to the array's phase-center in units of [m].<br>
-  Size: `[3, n_elements]` or []; empty input assumes position `[0;0;0]` for all elements
-
-- **`coupling_re`** (optional)<br>
-  Real part of the array antenna coupling matrix. <br>
-  Size: `[n_elements, n_ports]` or []; empty assumes perfect isolation
-
-- **`coupling_im`** (optional)<br>
-  Real part of the array antenna coupling matrix. Must have identical size as "coupling_re".<br>
-  Size: `[n_elements, n_ports]` or []
-
-- **`center_frequency`** (optional)<br>
-  Center frequency in [Hz]); Default = 299,792,458 Hz; Scalar
-  
-- **`name`** (optional)<br>
-  Name of the array antenna object, string
+- **Antenna data:** (inputs 2-12, single or double)
+  `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]` or `[]`
+  `coupling_re`    | Real part of coupling matrix, optional                | Size: `[n_elements, n_ports]` or `[]`
+  `coupling_im`    | Imaginary part of coupling matrix, optional           | Size: `[n_elements, n_ports]` or `[]`
+  `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
+  `name`           | Name of the array antenna object                      | String
 
 - **`id`** (optional)<br>
   ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1
 
 - **`layout`** (optional)<br>
-  Layout of multiple array antennas, uint32 Matrix, optional
+  Layout of multiple array antennas. Must only contain element ids that are present in the file. optional
 
-## Output Arguments:
+## Output Argument:
 - **`id_in_file`**<br>
   ID of the antenna in the file after writing
 MD!*/
@@ -117,7 +88,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 10 - center_frequency   Center frequency in [Hz]                                     Scalar
     // 11 - name            Name of the array antenna object, string
     // 12 - id              ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1
-    // 13 - layout          Layout of multiple array antennas, uint32 Matrix, optional
+    // 13 - layout          Layout of multiple array antennas, optional
 
     // Output:
     //  0 - id_in_file      ID of the antenna in the file
