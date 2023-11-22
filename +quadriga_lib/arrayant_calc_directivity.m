@@ -26,32 +26,16 @@
 %        e_phi_im, azimuth_grid, elevation_grid);
 %    
 % Input Arguments:
-%    - e_theta_re
-%      Real part of the e-theta component (vertical component) of the far field of each antenna element in 
-%      the array antenna. Single or double precision. Size: [n_elevation, n_azimuth, n_elements]
-%      
-%    - e_theta_im
-%      Imaginary part of the e-theta component of the electric field. Single or double precision, 
-%      Size: [n_elevation, n_azimuth, n_elements]
-%      
-%    - e_phi_re
-%      Real part of the e-phi component (horizontal component) of the far field of each antenna element in 
-%      the array antenna. Single or double precision, Size: [n_elevation, n_azimuth, n_elements]
-%      
-%    - e_phi_im
-%      Imaginary part of the e-phi component of the electric field. Single or double precision, 
-%      Size: [n_elevation, n_azimuth, n_elements]
-%      
-%    - azimuth_grid
-%      Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values must be between 
-%      -pi and pi, sorted in ascending order. Single or double precision, Size: [n_azimuth]
-%      
-%    - elevation_grid
-%      Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values must be between 
-%      -pi/2 and pi/2, sorted in ascending order. Single or double precision, Size: [n_elevation]
-%      
+%    - Antenna data: (inputs 1-6, single or double precision)
+%      e_theta_re     | Real part of e-theta field component                  | Size: [n_elevation, n_azimuth, n_elements]
+%      e_theta_im     | Imaginary part of e-theta field component             | Size: [n_elevation, n_azimuth, n_elements]
+%      e_phi_re       | Real part of e-phi field component                    | Size: [n_elevation, n_azimuth, n_elements]
+%      e_phi_im       | Imaginary part of e-phi field component               | Size: [n_elevation, n_azimuth, n_elements]
+%      azimuth_grid   | Azimuth angles in [rad] -pi to pi, sorted             | Size: [n_azimuth]
+%      elevation_grid | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: [n_elevation]
+%    
 %    - i_element (optional) 
-%      Element index. If ot is not provided or empty, the directivity is calculated for all elements in the 
+%      Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the 
 %      array antenna. Size: [n_out] or empty
 %    
 % Output Argument:

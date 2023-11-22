@@ -50,50 +50,17 @@
 %    
 %    
 % Input Arguments:
-%    - e_theta_re
-%      Real part of the e-theta component (vertical component) of the far field of each antenna element
-%      in the array antenna. Single or double precision, Size: [n_elevation, n_azimuth, n_elements]
-%    
-%    - e_theta_im
-%      Imaginary part of the e-theta component of the electric field.
-%      Single or double precision, Size: [n_elevation, n_azimuth, n_elements]
-%    
-%    - e_phi_re
-%      Real part of the e-phi component (horizontal component) of the far field of each antenna element
-%      in the array antenna. Single or double precision, Size: [n_elevation, n_azimuth, n_elements]
-%    
-%    - e_phi_im
-%      Imaginary part of the e-phi component of the electric field.
-%      Single or double precision, Size: [n_elevation, n_azimuth, n_elements]
-%    
-%    - azimuth_grid
-%      Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values must be
-%      between -pi and pi, sorted in ascending order. Single or double precision, Size: [n_azimuth]
-%    
-%    - elevation_grid
-%      Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values must be
-%      between -pi/2 and pi/2, sorted in ascending order. Single or double precision, Size: [n_elevation]
-%    
-%    - element_pos (optional)
-%      Antenna element (x,y,z) positions relative to the array's phase-center in units of [m].
-%      Size: [3, n_elements] or []; empty input assumes position [0;0;0] for all elements
-%    
-%    - coupling_re (optional)
-%      Real part of the array antenna coupling matrix. This matrix describes a pre- or post-processing
-%      of the signals that are fed to or received by the antenna elements. The rows in the matrix
-%      correspond to the antenna elements, the columns to the signal ports. By default, coupling is set
-%      to an identity matrix which indicates perfect isolation between the antenna elements.
-%      Size: [n_elements, n_ports] or []; empty assumes perfect isolation
-%    
-%    - coupling_im (optional)
-%      Real part of the array antenna coupling matrix. Must have identical size as "coupling_re".
-%      Size: [n_elements, n_ports] or []
-%    
-%    - center_frequency (optional)
-%      Center frequency in [Hz] (optional). Default value is 299,792,458 Hz, which corresponds to a
-%      wavelength of 1 m. In this case, element positions element_pos can be provided as multiple of
-%      the wavelength. Scalar
-%    
+%    - Antenna data: (inputs 1-10, single or double)
+%      e_theta_re     | Real part of e-theta field component                  | Size: [n_elevation, n_azimuth, n_elements]
+%      e_theta_im     | Imaginary part of e-theta field component             | Size: [n_elevation, n_azimuth, n_elements]
+%      e_phi_re       | Real part of e-phi field component                    | Size: [n_elevation, n_azimuth, n_elements]
+%      e_phi_im       | Imaginary part of e-phi field component               | Size: [n_elevation, n_azimuth, n_elements]
+%      azimuth_grid   | Azimuth angles in [rad] -pi to pi, sorted             | Size: [n_azimuth]
+%      elevation_grid | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: [n_elevation]
+%      element_pos    | Antenna element (x,y,z) positions, optional           | Size: [3, n_elements] or []
+%      coupling_re    | Real part of coupling matrix, optional                | Size: [n_elements, n_ports] or []
+%      coupling_im    | Imaginary part of coupling matrix, optional           | Size: [n_elements, n_ports] or []
+%      center_freq    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
 %    
 % Output Arguments:
 %    - e_theta_re_c

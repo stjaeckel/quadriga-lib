@@ -45,33 +45,14 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 ```
 
 ## Input Arguments:
-- **`e_theta_re`**<br>
-  Real part of the e-theta component (vertical component) of the far field of each antenna element
-  in the array antenna. Single or double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`
-
-- **`e_theta_im`**<br>
-  Imaginary part of the e-theta component of the electric field.
-  Single or double precision, <br>Size: [n_elevation, n_azimuth, n_elements]
-
-- **`e_phi_re`**<br>
-  Real part of the e-phi component (horizontal component) of the far field of each antenna element
-  in the array antenna. Single or double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`
-
-- **`e_phi_im`**<br>
-  Imaginary part of the e-phi component of the electric field.
-  Single or double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`
-
-- **`azimuth_grid`**<br>
-  Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values must be
-  between -pi and pi, sorted in ascending order. Single or double precision, Size: `[n_azimuth]`
-
-- **`elevation_grid`**<br>
-  Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values must be
-  between -pi/2 and pi/2, sorted in ascending order. Single or double precision, <br>Size: `[n_elevation]`
-
-- **`element_pos`**<br>
-  Antenna element (x,y,z) positions relative to the array's phase-center in units of [m].<br>
-  Size: `[3, n_elements]` or `[]`; empty input assumes position `[0;0;0]` for all elements
+- **Antenna data:** (inputs 1-7, single or double)
+  `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]` or `[]`
 
 - **`x_deg`**<br>
   The rotation angle around x-axis (bank angle) in [degrees]
@@ -90,30 +71,14 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
   `usage = 3` | Rotate both, but do not adjust the sampling grid
 
 ## Output Arguments:
-- **`e_theta_re_r`**<br>
-  Real part of the e-theta component (vertical component) of the rotated array antenna.<br>
-  Size: `[n_elevation_r, n_azimuth_r, n_elements]`
-
-- **`e_theta_im_r`**<br>
-  Imaginary part of the e-theta component (vertical component) of the rotated array antenna.<br>
-  Size: `[n_elevation_r, n_azimuth_r, n_elements]`
-
-- **`e_phi_re_r`**<br>
-  Real part of the e-phi component (horizontal component) of the rotated array antenna.<br>
-  Size: `[n_elevation_r, n_azimuth_r, n_elements]`
-
-- **`e_phi_im_r`**<br>
-  Imaginary part of the e-phi component (horizontal component) of the rotated array antenna.<br>
-  Size: `[n_elevation_r, n_azimuth_r, n_elements]`
-
-- **`azimuth_grid_r`**<br>
-  Azimuth angles (theta) in [rad] of the updated sampling grid, Size: `[n_azimuth_r]`
-
-- **`elevation_grid_r`**<br>
-  Elevation angles (phi) in [rad] of the updated sampling grid, Size: `[n_elevation_r]`
-
-- **`element_pos_r`**<br>
-  Antenna element (x,y,z) positions of the rotated array antenna
+- **Antenna data of the rotated antenna:** (outputs 1-7, single or double)
+  `e_theta_re_r`     | Real part of e-theta field component                  | Size: `[n_elevation_r, n_azimuth_r, n_elements]`
+  `e_theta_im_r`     | Imaginary part of e-theta field component             | Size: `[n_elevation_r, n_azimuth_r, n_elements]`
+  `e_phi_re_r`       | Real part of e-phi field component                    | Size: `[n_elevation_r, n_azimuth_r, n_elements]`
+  `e_phi_im_r`       | Imaginary part of e-phi field component               | Size: `[n_elevation_r, n_azimuth_r, n_elements]`
+  `azimuth_grid_r`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth_r]`
+  `elevation_grid_r` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation_r]`
+  `element_pos_r`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

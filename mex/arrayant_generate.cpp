@@ -116,71 +116,29 @@ arguments are then specific to this type.
 - **`dgh`**<br>
   Panel spacing in vertical horizontal in [λ], scalar, default = 0.5
 
-- **`e_theta_re_c`** (optional)<br>
-  Real part of the e-theta component of the custom pattern, double precision. 
-  <br>Size: `[n_elevation, n_azimuth, n_elements_c]`
+- **Antenna data for custom pattern data:** (inputs 11-16, double precision, optional)
+  `e_theta_re_c`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_theta_im_c`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_phi_re_c`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_phi_im_c`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `azimuth_grid_c`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `elevation_grid_c` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
   
-- **`e_theta_im_c`** (optional)<br>
-  Imaginary part of the e-theta component of the custom pattern, double precision. 
-  <br>Size: `[n_elevation, n_azimuth, n_elements_c]`
-  
-- **`e_phi_re_c`** (optional)<br>
-  Real part of the e-phi component of the custom pattern, double precision. 
-  <br>Size: `[n_elevation, n_azimuth, n_elements_c]`
-  
-- **`e_phi_im_c`** (optional)<br>
-  Imaginary part of the e-phi component of the custom pattern, double precision. 
-  <br>Size: `[n_elevation, n_azimuth, n_elements_c]`
-  
-- **`azimuth_grid_c`** (optional)<br>
-  Azimuth angles (theta) in [rad], double precision, <br>Size: `[n_azimuth]`
-  
-- **`elevation_grid_c`** (optional)<br>
-  Elevation angles (phi) in [rad], double precision, <br>Size: `[n_elevation]`
+  If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
   
 ## Output Arguments:
-- **`e_theta_re`**<br>
-  Real part of the e-theta component (vertical component) of the far field of each antenna element in 
-  the array antenna, double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`
-  
-- **`e_theta_im`**<br>
-  Imaginary part of the e-theta component of the electric field, double precision, 
-  <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`e_phi_re`**<br>
-  Real part of the e-phi component (horizontal component) of the far field of each antenna element in 
-  the array antenna, double precision, <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`e_phi_im`**<br>
-  Imaginary part of the e-phi component of the electric field, double precision, 
-  <br>Size: `[n_elevation, n_azimuth, n_elements]`<br>
-  
-- **`azimuth_grid`**<br>
-  Azimuth angles (theta) in [rad] were samples of the field patterns are provided. Values are between 
-  -pi and pi, sorted in ascending order, double precision, <br>Size: `[n_azimuth]`<br>
-  
-- **`elevation_grid`**<br>
-  Elevation angles (phi) in [rad] where samples of the field patterns are provided. Values are between 
-  -pi/2 and pi/2, sorted in ascending order, double precision, <br>Size: `[n_elevation]`<br>
-
-- **`element_pos`**<br>
-  Antenna element (x,y,z) positions relative to the array's phase-center in units of [m].<br>
-  Size: `[3, n_elements]`
-
-- **`coupling_re`**<br>
-  Real part of the array antenna coupling matrix. This matrix describes a pre- or post-processing
-  of the signals that are fed to or received by the antenna elements. The rows in the matrix
-  correspond to the antenna elements, the columns to the signal ports. <br>
-  Size: `[n_elements, n_ports]`
-
-- **`coupling_im`**<br>
-  Real part of the array antenna coupling matrix, Size: `[n_elements, n_ports]`
-
-- **`center_frequency`**<br>
-  Center frequency in [Hz] (optional). Default value is 299,792,458 Hz, Scalar
-
-- **`name`**<br>
-  Name of the array antenna, string
+- **Antenna data of the generated array antenna:** (outputs 1-11, double precision)
+  `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]` or `[]`
+  `coupling_re`    | Real part of coupling matrix, optional                | Size: `[n_elements, n_ports]` or `[]`
+  `coupling_im`    | Imaginary part of coupling matrix, optional           | Size: `[n_elements, n_ports]` or `[]`
+  `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
+  `name`           | Name of the array antenna object                      | String
 MD!*/
 
 
