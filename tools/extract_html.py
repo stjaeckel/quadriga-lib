@@ -65,15 +65,15 @@ def format_tables(text):
         html_content = '<table style="border-collapse: separate; border-spacing: 20px 0;">\n'
         # Identify alignment line if present
         alignment_line = None
-        if len(table_lines) > 1 and all(c in "|-:" for c in table_lines[1]):
+        if len(table_lines) > 1 and all(c in "|-: " for c in table_lines[1]):
             alignment_line = table_lines.pop(1)
         # Process table content
         for i, line in enumerate(table_lines):
             cols = line.strip('|').split('|')
             html_content += "<tr>\n"
             for col in cols:
-                if i == 0 and alignment_line is None and line.strip().startswith('|'):
-                    # If this is the first line, no alignment line was found, and line starts with '|', use <th>
+                if i == 0 and alignment_line is not None:
+                    # If this is the first line, and an alignment line was found, use <th>
                     html_content += f"  <th>{col.strip()}</th>\n"
                 else:
                     html_content += f"  <td>{col.strip()}</td>\n"
@@ -161,9 +161,9 @@ def generate_html(folder_name, html_output_file, html_preamble):
                             if function_name not in [func[0] for func in section_dict[section]]:
                                 section_dict[section].append((function_name, md_section, add_space))
 
-        section_dict = dict(sorted(section_dict.items(), reverse=True))
+        section_dict = dict(sorted(section_dict.items()))
         sections = list(section_dict.keys())
-
+        
         for idx, section in enumerate(sections):
             html_content += f'<li><a href="#part_{idx + 1}">{section}</a></li>\n'
 

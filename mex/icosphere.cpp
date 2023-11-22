@@ -20,7 +20,7 @@
 #include "mex_helper_functions.cpp"
 
 /*!SECTION
- Miscellaneous / Tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
@@ -40,7 +40,6 @@ The approximate equilateral triangles have roughly the same edge length and surf
 ```
 
 ## Input Arguments:
-
 - **`no_div`**<br>
   Number of divisions per edge of the generating icosahedron. The resulting number of faces is
   equal to `no_face = 20 · no_div^2`
@@ -50,7 +49,6 @@ The approximate equilateral triangles have roughly the same edge length and surf
 
 
 ## Output Arguments:
-
 - **`center`**<br>
   Position of the center point of each triangle; Size: `[ no_face x 3 ]`
 

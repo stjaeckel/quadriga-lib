@@ -89,12 +89,12 @@
 %      Panel spacing in vertical horizontal in [λ], scalar, default = 0.5
 %    
 %    - Antenna data for custom pattern data: (inputs 11-16, double precision, optional)
-%      e_theta_re_c     | Real part of e-theta field component                  | Size: [n_elevation, n_azimuth, n_elements_c]
-%      e_theta_im_c     | Imaginary part of e-theta field component             | Size: [n_elevation, n_azimuth, n_elements_c]
-%      e_phi_re_c       | Real part of e-phi field component                    | Size: [n_elevation, n_azimuth, n_elements_c]
-%      e_phi_im_c       | Imaginary part of e-phi field component               | Size: [n_elevation, n_azimuth, n_elements_c]
-%      azimuth_grid_c   | Azimuth angles in [rad] -pi to pi, sorted             | Size: [n_azimuth]
-%      elevation_grid_c | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: [n_elevation]
+%      e_theta_re_c     | Real part of e-theta field component             | Size: [n_elevation, n_azimuth, n_elements_c]
+%      e_theta_im_c     | Imaginary part of e-theta field component        | Size: [n_elevation, n_azimuth, n_elements_c]
+%      e_phi_re_c       | Real part of e-phi field component               | Size: [n_elevation, n_azimuth, n_elements_c]
+%      e_phi_im_c       | Imaginary part of e-phi field component          | Size: [n_elevation, n_azimuth, n_elements_c]
+%      azimuth_grid_c   | Azimuth angles in [rad] -pi to pi, sorted        | Size: [n_azimuth]
+%      elevation_grid_c | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: [n_elevation]
 %      
 %      If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
 %      

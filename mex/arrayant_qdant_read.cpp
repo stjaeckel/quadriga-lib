@@ -32,6 +32,7 @@ The QuaDRiGa array antenna exchange format (QDANT) is a file format used to stor
 data in XML. This function reads pattern data from the specified file.
 
 ## Usage:
+
 ```
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re,
    coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id, use_single );

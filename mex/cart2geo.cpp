@@ -20,7 +20,7 @@
 #include "mex_helper_functions.cpp"
 
 /*!SECTION
- Miscellaneous / Tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
@@ -41,13 +41,11 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
 ```
 
 ## Input Argument:
-
 - **`cart`**<br>
   Cartesian coordinates (x,y,z)
   Single or double precision, Size: `[3, n_row, n_col]`
 
 ## Output Arguments:
-
 - **`azimuth`**<br>
   Azimuth angles in [rad], values between -pi and pi.
   Single or double precision (same as input), Size `[n_row, n_col]`
