@@ -20,7 +20,7 @@
 #include "mex_helper_functions.cpp"
 
 /*!SECTION
- Miscellaneous / Tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
@@ -41,7 +41,6 @@ cart = arrayant_lib.geo2cart( azimuth, elevation, length )
 ```
 
 ## Input Arguments:
-
 - **`azimuth`**<br>
   Azimuth angles in [rad], values between -pi and pi.
   Single or double precision (same as input), Size `[n_row, n_col]`
@@ -55,7 +54,6 @@ cart = arrayant_lib.geo2cart( azimuth, elevation, length )
   Single or double precision (same as input), Size `[n_row, n_col]` or empty `[]`
 
 ## Output Argument:
-
 - **`cart`**<br>
   Cartesian coordinates (x,y,z)
   Single or double precision, Size: `[3, n_row, n_col]`

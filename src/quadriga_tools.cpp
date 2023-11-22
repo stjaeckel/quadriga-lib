@@ -21,7 +21,7 @@
 #include <stdexcept>
 
 /*!SECTION
- Miscellaneous / Tools
+Miscellaneous / Tools
 SECTION!*/
 
 // Helper function : repeat sequence of values
@@ -924,10 +924,10 @@ unsigned quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arm
     mtl_lib.push_back({"Metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0});
     mtl_lib.push_back({"Ground_dry", 3.0, 0.0, 0.00015, 2.52, 0.0, 0});
     mtl_lib.push_back({"Ground_medium", 15.0, -0.1, 0.035, 1.63, 0.0, 0});
-    mtl_lib.push_back({"Ground_wet", 30.0, -0.4, 0.15, 1.30, 0.0, 0});
-    mtl_lib.push_back({"Vegetation", 1.0, 0.0, 1e-4, 1.1, 0.0, 0});       // Rec. ITU-R P.833-9, Figure 2
+    mtl_lib.push_back({"Ground_wet", 30.0, -0.4, 0.15, 1.3, 0.0, 0});
+    mtl_lib.push_back({"Vegetation", 1.0, 0.0, 1.0e-4, 1.1, 0.0, 0});       // Rec. ITU-R P.833-9, Figure 2
     mtl_lib.push_back({"Water", 80.0, 0.0, 0.2, 2.0, 0.0, 0});            // Rec. ITU-R P.527-3, Figure 1
-    mtl_lib.push_back({"Ice", 3.0, 0.0, 3e-4, 0.7, 0.0, 0});              // Rec. ITU-R P.527-3, Figure 1
+    mtl_lib.push_back({"Ice", 3.0, 0.0, 3.0e-4, 0.7, 0.0, 0});              // Rec. ITU-R P.527-3, Figure 1
     mtl_lib.push_back({"IRR_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
 
     // Reset the file pointer to the beginning of the file

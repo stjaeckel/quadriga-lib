@@ -2,7 +2,6 @@
 %    Calculates a 3x3 rotation matrix from a 3-element orientation vector
 %    
 % Description:
-%    
 %    In linear algebra, a rotation matrix is a transformation matrix that is used to perform a rotation 
 %    in Euclidean space. The rotation of a rigid body (or three-dimensional coordinate system with a 
 %    fixed origin) is described by a single rotation about some axis. Such a rotation may be uniquely 

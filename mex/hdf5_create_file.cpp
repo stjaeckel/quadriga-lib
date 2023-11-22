@@ -19,10 +19,43 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_CREATE_FILE
+Create a new HDF5 channel file with a custom storage layout
+
+## Description:
+Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this
+library is its ability to organize multiple channels within a single HDF5 file while enabling access
+to individual data sets without the need to read the entire file. In this system, channels can be
+structured in a multi-dimensional array. For instance, the first dimension might represent the Base
+Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important
+to note that the dimensions of the storage layout must be defined when the file is initially created
+and cannot be altered thereafter. The function `quadriga_lib.hdf5_create_file` is used to create an
+empty file with a predetermined custom storage layout.
+
+## Usage:
+
+```
+quadriga_lib.hdf5_create_file( fn, storage_dims );
+```
+
+## Input Arguments:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+- **`storage_dims`** (optional)<br>
+  Size of the dimensions of the storage space, vector with 1-4 elements, i.e. `[nx]`, `[nx, ny]`, 
+  `[nx,ny,nz]` or `[nx,ny,nz,nw]`. By default, `nx = 65536, ny = 1, nz = 1, nw = 1`
+MD!*/
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
-    //  0 - fn              Filename of the QDANT file
+    //  0 - fn              Filename of the HDF5 file
     //  1 - storage_dims    Dimensions of the storage space, vector with 1-4 elements, i.e. [nx], [nx, ny], [nx,ny,nz] or [nx,ny,nz,nw]
 
     // Output:
@@ -36,6 +69,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (!mxIsClass(prhs[0], "char"))
         mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:wrong_type", "Input 'fn' must be a string");
+
+    // Read file name
+    if (!mxIsClass(prhs[0], "char"))
+        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:IO_error", "Input 'fn' must be a string.");
 
     auto mx_fn = mxArrayToString(prhs[0]);
     std::string fn = std::string(mx_fn);

@@ -13,13 +13,11 @@
 %    [ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart )
 %    
 % Input Argument:
-%    
 %    - cart
 %      Cartesian coordinates (x,y,z)
 %      Single or double precision, Size: [3, n_row, n_col]
 %    
 % Output Arguments:
-%    
 %    - azimuth
 %      Azimuth angles in [rad], values between -pi and pi.
 %      Single or double precision (same as input), Size [n_row, n_col]

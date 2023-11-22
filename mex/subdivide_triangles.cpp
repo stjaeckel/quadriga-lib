@@ -20,7 +20,7 @@
 #include "mex_helper_functions.cpp"
 
 /*!SECTION
- Miscellaneous / Tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD

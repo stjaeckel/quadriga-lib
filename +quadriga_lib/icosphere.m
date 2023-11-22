@@ -12,7 +12,6 @@
 %    [ center, length, vert, direction ] = quadriga_lib.icosphere( no_div, radius );
 %    
 % Input Arguments:
-%    
 %    - no_div
 %      Number of divisions per edge of the generating icosahedron. The resulting number of faces is
 %      equal to no_face = 20 · no_div^2
@@ -22,7 +21,6 @@
 %    
 %    
 % Output Arguments:
-%    
 %    - center
 %      Position of the center point of each triangle; Size: [ no_face x 3 ]
 %    
