@@ -19,6 +19,41 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_READ_DSET_NAMES
+Read the names of unstructured data fields from an HDF5 file
+
+## Description:
+Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. Users can add any number of such unstructured datasets, each identified by a unique 
+dataset name. The function `quadriga_lib.hdf5_read_dset_names` retrieves the names of all these 
+datasets, returning them as a cell array of strings.
+
+## Usage:
+
+```
+names = quadriga_lib.hdf5_read_dset_names( fn, location );
+```
+
+## Input Arguments:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+- **`location`** (optional)<br>
+  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`, 
+  `[ix,iy,iz]` or `[ix,iy,iz,iw]`; Default: `ix = iy = iz = iw = 1`
+
+## Output Argument:
+- **`names`**<br>
+  List of names of all these at the given location in the files; Cell array of strings
+MD!*/
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:

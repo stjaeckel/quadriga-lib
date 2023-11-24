@@ -19,6 +19,38 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_RESHAPE_LAYOUT
+Reshapes the storage layout inside an existing HDF5 file
+
+## Description:
+Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
+notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+file. In this framework, channels can be arranged in a multi-dimensional array format.
+Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
+However, it is possible to reshape the layout using `quadriga_lib.hdf5_reshape_layout`. 
+
+## Usage:
+
+```
+quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+```
+
+## Input Arguments:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+- **`storage_dims`**<br>
+  Size of the dimensions of the storage space, vector with 1-4 elements, i.e. `[nx]`, `[nx, ny]`, 
+  `[nx,ny,nz]` or `[nx,ny,nz,nw]`. By default, `nx = 65536, ny = 1, nz = 1, nw = 1`<br>
+  An error is thrown if the number of elements in the file is different from the given size.
+MD!*/
+
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
