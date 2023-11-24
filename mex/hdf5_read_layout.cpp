@@ -19,6 +19,42 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_READ_LAYOUT
+Read the storage layout of channel data inside an HDF5 file
+
+## Description:
+Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
+notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+file. In this framework, channels can be arranged in a multi-dimensional array format.
+
+The function `quadriga_lib.hdf5_read_layout` is designed to read the storage layout from an 
+existing file. Furthermore, it also generates an array that marks the locations within the layout 
+where data already exists. This functionality aids in efficiently managing and accessing channel 
+data within the HDF5 file structure.
+
+## Usage:
+
+```
+[ storage_dims, has_data ] = quadriga_lib.hdf5_read_layout( fn );
+```
+
+## Input Argument:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+## Output Arguments:
+- **`storage_dims`**<br>
+  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
+
+- **`has_data`**<br>
+  Array indicating if data exists (value 1) or not (value 0); uint32; Size: `[nx,ny,nz,nw]`
+MD!*/
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
