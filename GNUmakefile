@@ -1,7 +1,7 @@
 # This Makefile is for Linux / GCC environments
 
 # Compilers
-CC    = g++
+CC    = g++ # afl-g++
 MEX   = /usr/local/MATLAB/R2021a/bin/mex
 OCT   = mkoctfile
 
