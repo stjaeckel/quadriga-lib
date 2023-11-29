@@ -958,152 +958,152 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     arma::uvec n_pth_v = this->n_path();
 
     if (name.length() > 255)
-        return "Name can have at most 255 characters.";
+        return std::string("Name can have at most 255 characters.");
 
     if (n_pth_v.n_elem != n_snap_arma)
-        return "Number of elements returned by 'n_path()' does not match number of snapshots.";
+        return std::string("Number of elements returned by 'n_path()' does not match number of snapshots.");
     auto n_pth = n_pth_v.memptr();
 
     if (n_snap_arma != 0ULL && rx_pos.n_rows != 3ULL)
-        return "'rx_pos' is missing or ill-formatted (must have 3 rows).";
+        return std::string("'rx_pos' is missing or ill-formatted (must have 3 rows).");
 
     if (rx_pos.n_cols != 1ULL && rx_pos.n_cols != n_snap_arma)
-        return "Number of columns in 'rx_pos' must be 1 or match the number of snapshots.";
+        return std::string("Number of columns in 'rx_pos' must be 1 or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && tx_pos.n_rows != 3ULL)
-        return "'tx_pos' is missing or ill-formatted (must have 3 rows).";
+        return std::string("'tx_pos' is missing or ill-formatted (must have 3 rows).");
 
     if (tx_pos.n_cols != 1ULL && tx_pos.n_cols != n_snap_arma)
-        return "Number of columns in 'tx_pos' must be 1 or match the number of snapshots.";
+        return std::string("Number of columns in 'tx_pos' must be 1 or match the number of snapshots.");
 
     if (center_frequency.n_elem != 0ULL && center_frequency.n_elem != 1ULL && center_frequency.n_elem != n_snap_arma)
-        return "Number of entries in 'center_frequency' must be 0, 1 or match the number of snapshots.";
+        return std::string("Number of entries in 'center_frequency' must be 0, 1 or match the number of snapshots.");
 
     if (tx_orientation.n_elem != 0ULL && tx_orientation.n_rows != 3ULL)
-        return "'tx_orientation' must be empty or have 3 rows.";
+        return std::string("'tx_orientation' must be empty or have 3 rows.");
 
     if (tx_orientation.n_elem != 0ULL && tx_orientation.n_cols != 1ULL && tx_orientation.n_cols != n_snap_arma)
-        return "Number of columns in 'tx_orientation' must be 1 or match the number of snapshots.";
+        return std::string("Number of columns in 'tx_orientation' must be 1 or match the number of snapshots.");
 
     if (rx_orientation.n_elem != 0ULL && rx_orientation.n_rows != 3ULL)
-        return "'rx_orientation' must be empty or have 3 rows.";
+        return std::string("'rx_orientation' must be empty or have 3 rows.");
 
     if (rx_orientation.n_elem != 0ULL && rx_orientation.n_cols != 1ULL && rx_orientation.n_cols != n_snap_arma)
-        return "Number of columns in 'rx_orientation' must be 1 or match the number of snapshots.";
+        return std::string("Number of columns in 'rx_orientation' must be 1 or match the number of snapshots.");
 
     if (coeff_re.size() != 0 && coeff_re.size() != n_snap_vector)
-        return "'coeff_re' must be empty or match the number of snapshots.";
+        return std::string("'coeff_re' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && coeff_re.size() == n_snap_vector)
     {
         if (coeff_im.size() != n_snap_vector)
-            return "Imaginary part of channel coefficients 'coeff_im' is missing or incomplete.";
+            return std::string("Imaginary part of channel coefficients 'coeff_im' is missing or incomplete.");
 
         if (delay.size() != n_snap_vector)
-            return "Delays are missing or incomplete.";
+            return std::string("Delays are missing or incomplete.");
 
         n_rx = coeff_re[0].n_rows, n_tx = coeff_re[0].n_cols;
 
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
             if (coeff_re[i].n_rows != n_rx || coeff_re[i].n_cols != n_tx || coeff_re[i].n_slices != n_pth[i])
-                return "Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'coeff_re[" + std::to_string(i) + "]'.");
 
             if (coeff_im[i].n_rows != n_rx || coeff_im[i].n_cols != n_tx || coeff_im[i].n_slices != n_pth[i])
-                return "Size mismatch in 'coeff_im[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'coeff_im[" + std::to_string(i) + "]'.");
 
             if ((delay[i].n_rows != 1 && delay[i].n_rows != n_rx) ||
                 (delay[i].n_cols != 1 && delay[i].n_cols != n_tx) ||
                 delay[i].n_slices != n_pth[i])
-                return "Size mismatch in 'delay[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
         }
     }
     else if (!coeff_im.empty())
-        return "Real part of channel coefficients 'coeff_re' is missing or incomplete.";
+        return std::string("Real part of channel coefficients 'coeff_re' is missing or incomplete.");
     else if (!delay.empty())
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (delay[i].n_rows != 1 || delay[i].n_cols != 1 || delay[i].n_slices != n_pth[i])
-                return "Size mismatch in 'delay[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
 
     if (path_gain.size() != 0 && path_gain.size() != n_snap_vector)
-        return "'path_gain' must be empty or match the number of snapshots.";
+        return std::string("'path_gain' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_gain.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_gain[i].n_elem != n_pth[i])
-                return "Size mismatch in 'path_gain[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_gain[" + std::to_string(i) + "]'.");
 
     if (path_length.size() != 0 && path_length.size() != n_snap_vector)
-        return "'path_length' must be empty or match the number of snapshots.";
+        return std::string("'path_length' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_length.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_length[i].n_elem != n_pth[i])
-                return "Size mismatch in 'path_length[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_length[" + std::to_string(i) + "]'.");
 
     if (path_polarization.size() != 0 && path_polarization.size() != n_snap_vector)
-        return "'path_polarization' must be empty or match the number of snapshots.";
+        return std::string("'path_polarization' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_polarization.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_polarization[i].n_rows != 8ULL || path_polarization[i].n_cols != n_pth[i])
-                return "Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_polarization[" + std::to_string(i) + "]'.");
 
     if (path_angles.size() != 0 && path_angles.size() != n_snap_vector)
-        return "'path_angles' must be empty or match the number of snapshots.";
+        return std::string("'path_angles' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_angles.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_angles[i].n_rows != n_pth[i] || path_angles[i].n_cols != 4ULL)
-                return "Size mismatch in 'path_angles[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_angles[" + std::to_string(i) + "]'.");
 
     if (path_fbs_pos.size() != 0 && path_fbs_pos.size() != n_snap_vector)
-        return "'path_fbs_pos' must be empty or match the number of snapshots.";
+        return std::string("'path_fbs_pos' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_fbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_fbs_pos[i].n_rows != 3ULL || path_fbs_pos[i].n_cols != n_pth[i])
-                return "Size mismatch in 'path_fbs_pos[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_fbs_pos[" + std::to_string(i) + "]'.");
 
     if (path_lbs_pos.size() != 0 && path_lbs_pos.size() != n_snap_vector)
-        return "'path_lbs_pos' must be empty or match the number of snapshots.";
+        return std::string("'path_lbs_pos' must be empty or match the number of snapshots.");
 
     if (n_snap_arma != 0ULL && path_lbs_pos.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
             if (path_lbs_pos[i].n_rows != 3ULL || path_lbs_pos[i].n_cols != n_pth[i])
-                return "Size mismatch in 'path_lbs_pos[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'path_lbs_pos[" + std::to_string(i) + "]'.");
 
     if (no_interact.size() != 0 && no_interact.size() != n_snap_vector)
-        return "'no_interact' must be empty or match the number of snapshots.";
+        return std::string("'no_interact' must be empty or match the number of snapshots.");
     else if (no_interact.size() == n_snap_vector && interact_coord.size() != n_snap_vector)
-        return "'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.";
+        return std::string("'no_interact' is provided but 'interact_coord' is missing or has wrong number of snapshots.");
     else if (no_interact.size() == 0 && interact_coord.size() != 0)
-        return "'interact_coord' is provided but 'no_interact' is missing.";
+        return std::string("'interact_coord' is provided but 'no_interact' is missing.");
     else if (no_interact.size() == n_snap_vector && interact_coord.size() == n_snap_vector)
         for (size_t i = 0; i < n_snap_vector; ++i)
         {
             if (no_interact[i].n_elem != n_pth[i])
-                return "Size mismatch in 'no_interact[" + std::to_string(i) + "]'.";
+                return std::string("Size mismatch in 'no_interact[" + std::to_string(i) + "]'.");
 
             if (interact_coord[i].n_rows != 3ULL)
-                return "'interact_coord[" + std::to_string(i) + "]' must have 3 rows.";
+                return std::string("'interact_coord[" + std::to_string(i) + "]' must have 3 rows.");
 
             unsigned cnt = 0;
             for (const unsigned *p = no_interact[i].begin(); p < no_interact[i].end(); ++p)
                 cnt += *p;
 
             if (interact_coord[i].n_cols != (arma::uword)cnt)
-                return "Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'no_interact'.";
+                return std::string("Number of columns in 'interact_coord[" + std::to_string(i) + "]' must match the sum of 'no_interact'.");
         }
 
     if (par_names.size() != par_data.size())
-        return "Number of elements in 'par_data' must match number of elements in 'par_name'.";
+        return std::string("Number of elements in 'par_data' must match number of elements in 'par_name'.");
 
     for (size_t i = 0; i < par_names.size(); ++i)
         if (any_type_id(&par_data[i]) < 0)
-            return "Unsupported datatype in unstructured data.";
+            return std::string("Unsupported datatype in unstructured data.");
 
-    return "";
+    return std::string("");
 }
 
 // Calculate the the effective path gain (linear scale)
