@@ -19,6 +19,52 @@
 #include "quadriga_tools.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# INTERP
+2D and 1D linear interpolation. 
+
+## Description:
+This function implements 2D and 1D linear interpolation. 
+
+## Usage:
+
+```
+dataI = quadriga_lib.interp( x, y, data, xI, yI );      % 2D case
+
+dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
+```
+
+## Input Arguments:
+- **`x`**<br>
+  Vector of sample points in x direction for which data is provided; single or double; Length: `[nx]`
+
+- **`y`**<br>
+  Vector of sample points in y direction for which data is provided; single or double; Length: `[ny]`<br>
+  Must be an empty array `[]` in case of 1D interpolation.
+
+- **`data`**<br>
+  The input data tensor; single or double; Size: `[ny, nx, ne]` or `[1, nx, ne]` for 1D case <br>
+  The 3rd dimension enables interpolation for mutiple datasets simultaneously. 
+
+- **`xI`**<br>
+  Vector of sample points in x direction for which data should be interpolated; single or double; 
+  Length: `[nxI]`
+
+- **`yI`**<br>
+  Vector of sample points in y direction for which data should be interpolated; single or double; 
+  Length: `[nyI]`
+
+## Output Arguments:
+- **`dataI`**<br>
+  The interpolated dat; single or double (same as `data`); 
+  Size: `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case <br>
+MD!*/
+
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
