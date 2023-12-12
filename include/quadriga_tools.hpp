@@ -123,6 +123,16 @@ namespace quadriga_lib
                            arma::Col<unsigned> *obj_ind = nullptr,  // Object index, 1-based, Size: [ n_mesh ]
                            arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
 
+    template <typename dtype>
+    void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                arma::Mat<dtype> *fbs = nullptr,            // First interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Mat<dtype> *sbs = nullptr,            // Second interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Col<unsigned> *no_interact = nullptr, // Number of mesh between orig and dest, Size [ n_ray ]
+                                arma::Col<unsigned> *fbs_ind = nullptr,     // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                arma::Col<unsigned> *sbs_ind = nullptr);    // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
     // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]

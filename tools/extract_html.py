@@ -22,7 +22,6 @@ def format_text(text):
 
     # Replace `code` with <code>code</code>
     text = text.replace('<dtype>','&lt;dtype&gt;');
-
     
     return text
 
@@ -40,7 +39,7 @@ def format_nested_lists(text):
             else:
                 formatted_text += "</li>"
             formatted_text += '<li style="margin-bottom: 0.4em;">' + line[2:] + '\n'
-        elif line.startswith("  ") and inside_list:  # Continuation of the current list item
+        elif (line.startswith("  ") or line.startswith("  ")) and inside_list:  # Continuation of the current list item
             formatted_text += " " + line + "\n"
         else:  # End of the list or some other content
             if inside_list:

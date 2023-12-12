@@ -1,41 +1,72 @@
 # This Makefile is for Linux / GCC environments
 
-# Compilers
-CC    = g++ # afl-g++
-MEX   = /usr/local/MATLAB/R2021a/bin/mex
-OCT   = mkoctfile
+# Required tools and libraries:
+# make, cmake, g++
 
-all:        dirs   mex_octave  mex_matlab   
+# Set path to your MATLAB installation (optional):
+# Leave this empty if you don't want to use MATLAB (you can still use Octave).
+MATLAB_PATH = /usr/local/MATLAB/R2021a
 
 # External libraries
-hdf5version    = 1.14.2
-catch2version  = 3.4.0
+# External libraries are located in the 'external' folder. Set the version numbers here.
+# You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
+armadillo_version = 12.6.3
+hdf5_version      = 1.14.2
+catch2_version    = 3.4.0
+pugixml_version   = 1.13
 
-ARMA_H      = external/armadillo-12.6.3/include
-PUGIXML_H   = external/pugixml-1.13/src
-CATCH2      = external/Catch2-$(catch2version)-Linux
-HDF5_H      = external/hdf5-$(hdf5version)-Linux/include
-HDF5_LIB    = external/hdf5-$(hdf5version)-Linux/lib
+# The following sections should not require editing.
 
-# Configurations
-CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion #   -Werror  #   # -Wall#-Wl,--gc-sections -Wall -Wextra -Wpedantic -Wconversion
+# Conditional compilation of MATLAB targets (check if MATLAB path is set)
+ifeq ($(MATLAB_PATH),)
+	MATLAB_TARGETS =
+else
+	MATLAB_TARGETS = mex_matlab
+endif
 
-# Sources
-src     	= $(wildcard src/*.cpp)
-mex         = $(wildcard mex/*.cpp)
-tests 		= $(wildcard tests/catch2_tests/*.cpp)
+# Check if Octave is installed by trying to run mkoctfile
+OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
+
+# Conditional compilation of Octave targets
+ifeq ($(OCTAVE_VERSION),)
+	OCTAVE_TARGETS =
+else
+	OCTAVE_TARGETS = mex_octave
+endif
+
+# Compilers
+CC   = g++
+MEX  = $(MATLAB_PATH)/bin/mex
+OCT  = mkoctfile
+
+# Headers and Libraries
+ARMA_H      = external/armadillo-$(armadillo_version)/include
+PUGIXML_H   = external/pugixml-$(pugixml_version)/src
+CATCH2      = external/Catch2-$(catch2_version)-Linux
+HDF5_H      = external/hdf5-$(hdf5_version)-Linux/include
+HDF5_LIB    = external/hdf5-$(hdf5_version)-Linux/lib
+
+# Compiler flags
+CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion
+
+# Compilations targets
+all:        dirs   lib/quadriga_lib.a   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)   
 
 .PHONY: 	clean all tidy mex_matlab mex_octave
 .SECONDARY: $(src:src/%.cpp=build/%.o)
+
+src     	= $(wildcard src/*.cpp)
+mex         = $(wildcard mex/*.cpp)
+tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
 dirs:
 	mkdir -p build
 	mkdir -p lib
 	mkdir -p +quadriga_lib
 
-mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
-mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
+mex_matlab:  dirs $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
+mex_octave:  dirs $(mex:mex/%.cpp=+quadriga_lib/%.mex)
+mex_docu:    dirs $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
 test:   tests/test_bin   mex_octave
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
@@ -63,9 +94,13 @@ build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
 build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
+build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 # Archive file for static linking
 lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
-                      build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o
+                      build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
+					  build/ray_triangle_intersect.o
 	cp $(HDF5_LIB)/libhdf5.a build/
 	( cd build/ && ar x libhdf5.a && cd .. )
 	ar rcs $@ $^ build/H5*.o
@@ -83,33 +118,34 @@ lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channe
 	rm -f $@
 	python3 tools/extract_matlab_comments.py $< $@
 
-documentation:   mex_docu
+documentation:   dirs   mex_docu
+	mkdir -p +quadriga_lib
 	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
 	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part mex/ 
 	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
 
 # Maintainance section
 hdf5lib:
-	- rm -rf external/hdf5-$(hdf5version)
-	- rm -rf external/hdf5-$(hdf5version)-Linux
-	unzip external/hdf5-$(hdf5version).zip -d external/
-	( cd external/hdf5-$(hdf5version) && ./configure CFLAGS="-O3 -march=native -fPIC" \
+	- rm -rf external/hdf5-$(hdf5_version)
+	- rm -rf external/hdf5-$(hdf5_version)-Linux
+	unzip external/hdf5-$(hdf5_version).zip -d external/
+	( cd external/hdf5-$(hdf5_version) && ./configure CFLAGS="-O3 -march=native -fPIC" \
 	   --enable-tools=no --enable-tests=no --enable-shared=no --enable-hl=no --enable-optimization=high --with-zlib=no)
-	( cd external/hdf5-$(hdf5version) && make -j8 && make install )
-	mv external/hdf5-$(hdf5version)/hdf5 external/hdf5-$(hdf5version)-Linux
-	- rm -rf external/hdf5-$(hdf5version)
+	( cd external/hdf5-$(hdf5_version) && make -j8 && make install )
+	mv external/hdf5-$(hdf5_version)/hdf5 external/hdf5-$(hdf5_version)-Linux
+	- rm -rf external/hdf5-$(hdf5_version)
 
 catch2lib:
 	- rm -rf external/build
-	- rm -rf external/Catch2-$(catch2version)
-	- rm -rf external/Catch2-$(catch2version)-Linux
-	unzip external/Catch2-$(catch2version).zip -d external/
+	- rm -rf external/Catch2-$(catch2_version)
+	- rm -rf external/Catch2-$(catch2_version)-Linux
+	unzip external/Catch2-$(catch2_version).zip -d external/
 	mkdir external/build
-	cmake -S external/Catch2-$(catch2version) -B external/build
+	cmake -S external/Catch2-$(catch2_version) -B external/build
 	( cd external/build && make -j8 && make package )
-	tar -xzf external/build/Catch2-$(catch2version)-Linux.tar.gz -C external/
+	tar -xzf external/build/Catch2-$(catch2_version)-Linux.tar.gz -C external/
 	- rm -rf external/build
-	- rm -rf external/Catch2-$(catch2version)
+	- rm -rf external/Catch2-$(catch2_version)
 
 clean:
 	- rm build/*
@@ -123,8 +159,12 @@ clean:
 	- rm tests/test.exe
 
 tidy: clean 
-	- rm -rf external/Catch2-$(catch2version)-Linux
-	- rm -rf external/hdf5-$(hdf5version)-Linux
+	- rm -rf external/Catch2-$(catch2_version)-Linux
+	- rm -rf external/hdf5-$(hdf5_version)-Linux
+	- rm +quadriga_lib/*.m
+	- rm -rf +quadriga_lib
+	- rm -rf lib
+	- rm -rf build
 
 build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
 	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
