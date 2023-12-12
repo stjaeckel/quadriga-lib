@@ -88,7 +88,7 @@ file.
 - Empty outputs are returned if data set does not exist in the file
 - All structured data is stored in single precision. Hence, outputs are also in single precision.
 - Unstructured datatypes are returned as stored in the HDF file (same type, dimensions and storage order)
-- Typically, n_path may vary for each snapshot. In such cases, n_path is set to the maximum value found 
+- Typically, `n_path` may vary for each snapshot. In such cases, `n_path` is set to the maximum value found 
   within the range of snapshots, and any missing paths are padded with zeroes.
 MD!*/
 
