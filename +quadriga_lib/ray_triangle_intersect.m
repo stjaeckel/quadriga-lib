@@ -2,7 +2,7 @@
 %    Calculates the intersection of rays and triangles in three dimensions
 %    
 % Description:
-%    - This function implements the Möller–Trumbore ray-triangle intersection algorithm, renowned for its
+%    - This function implements the Möller–Trumbore ray-triangle intersection algorithm, known for its
 %      efficiency in calculating the intersection of a ray and a triangle in three-dimensional space.
 %      This method achieves its speed by eliminating the need for precomputed plane equations of the plane
 %      containing the triangle.
@@ -10,8 +10,10 @@
 %    - For further information, refer to [Wikipedia: Möller–Trumbore intersection algorithm].
 %    
 %    - The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle
-%      is specified by its three vertices. To enhance performance, this implementation leverages AVX2
-%      intrinsic functions and OpenMP, when available, to expedite the computational process.
+%      is specified by its three vertices. 
+%      
+%    - To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
+%      available, to speed up the computational process.
 %    
 % Usage:
 %    
@@ -50,8 +52,8 @@
 % Caveat:
 %    - orig, dest, and mesh can be provided in single or double precision; fbs and lbs will have
 %      the same type.
-%    - All internal computation are done in single precision to achieve a 2x improvement in speed using
-%      AVX2 intrinsic instructions
+%    - All internal computation are done in single precision to achieve an additional 2x improvement in 
+%      speed compared to double precision when using AVX2 intrinsic instructions
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations

@@ -8,7 +8,7 @@
 %    
 %    dataI = quadriga_lib.interp( x, y, data, xI, yI );      % 2D case
 %    
-%    dataI = quadriga_lib.interp( x, 0, data, xI );          % 1D case
+%    dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 %    
 % Input Arguments:
 %    - x
@@ -16,6 +16,7 @@
 %    
 %    - y
 %      Vector of sample points in y direction for which data is provided; single or double; Length: [ny]
+%      Must be an empty array [] in case of 1D interpolation.
 %    
 %    - data
 %      The input data tensor; single or double; Size: [ny, nx, ne] or [1, nx, ne] for 1D case 
