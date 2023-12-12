@@ -1,7 +1,10 @@
 # This Makefile is for Linux / GCC environments
 
-# Required tools and libraries:
-# make, cmake, g++
+# Steps for compiling Quadriga-Lib (Linux):
+# - Get required tools and libraries: make, cmake, g++
+# - Compile HDF5 library by "make hdf5lib"
+# - Set MATLAB path below (or leave empty)
+# - Run "make"
 
 # Set path to your MATLAB installation (optional):
 # Leave this empty if you don't want to use MATLAB (you can still use Octave).
@@ -50,10 +53,10 @@ HDF5_LIB    = external/hdf5-$(hdf5_version)-Linux/lib
 CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion
 
 # Compilations targets
-all:        dirs   lib/quadriga_lib.a   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)   
-
-.PHONY: 	clean all tidy mex_matlab mex_octave
-.SECONDARY: $(src:src/%.cpp=build/%.o)
+.PHONY: dirs
+all:        
+	@$(MAKE) dirs
+	@$(MAKE) lib/quadriga_lib.a   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)
 
 src     	= $(wildcard src/*.cpp)
 mex         = $(wildcard mex/*.cpp)
@@ -64,9 +67,9 @@ dirs:
 	mkdir -p lib
 	mkdir -p +quadriga_lib
 
-mex_matlab:  dirs $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave:  dirs $(mex:mex/%.cpp=+quadriga_lib/%.mex)
-mex_docu:    dirs $(mex:mex/%.cpp=+quadriga_lib/%.m)
+mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
+mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
+mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
 test:   tests/test_bin   mex_octave
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
@@ -98,19 +101,77 @@ build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadr
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 # Archive file for static linking
-lib/quadriga_lib.a:   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
+build/libhdf5.a:
+	cp $(HDF5_LIB)/libhdf5.a build/
+
+lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
 					  build/ray_triangle_intersect.o
-	cp $(HDF5_LIB)/libhdf5.a build/
 	( cd build/ && ar x libhdf5.a && cd .. )
 	ar rcs $@ $^ build/H5*.o
 
 # MEX MATLAB interface
-+quadriga_lib/%.mexa64:   mex/%.cpp   lib/quadriga_lib.a
++quadriga_lib/arrayant_calc_directivity.mexa64:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_combine_pattern.mexa64:    build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_generate.mexa64:           build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_interpolate.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_qdant_read.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_qdant_write.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_rotate_pattern.mexa64:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_rotation_matrix.mexa64:        build/quadriga_tools.o
++quadriga_lib/cart2geo.mexa64:                    build/quadriga_tools.o
++quadriga_lib/generate_diffraction_paths.mexa64:  build/quadriga_tools.o
++quadriga_lib/geo2cart.mexa64:                    build/quadriga_tools.o
++quadriga_lib/get_channels_planar.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/get_channels_spherical.mexa64:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/hdf5_create_file.mexa64:            build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_channel.mexa64:           build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_dset.mexa64:              build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_dset_names.mexa64:        build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_layout.mexa64:            build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_reshape_layout.mexa64:         build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_write_channel.mexa64:          build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_write_dset.mexa64:             build/qd_channel.o   build/libhdf5.a
++quadriga_lib/icosphere.mexa64:                   build/quadriga_tools.o
++quadriga_lib/interp.mexa64:                      build/quadriga_tools.o
++quadriga_lib/obj_file_read.mexa64:               build/quadriga_tools.o
++quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
++quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
++quadriga_lib/version.mexa64:                     build/quadriga_lib.o
+
++quadriga_lib/%.mexa64:   mex/%.cpp
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp
 
 # MEX Ocate interface
-+quadriga_lib/%.mex:   mex/%.cpp   lib/quadriga_lib.a
++quadriga_lib/arrayant_calc_directivity.mex:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_combine_pattern.mex:    build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_generate.mex:           build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_interpolate.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_qdant_read.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_qdant_write.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_rotate_pattern.mex:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_rotation_matrix.mex:        build/quadriga_tools.o
++quadriga_lib/cart2geo.mex:                    build/quadriga_tools.o
++quadriga_lib/generate_diffraction_paths.mex:  build/quadriga_tools.o
++quadriga_lib/geo2cart.mex:                    build/quadriga_tools.o
++quadriga_lib/get_channels_planar.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/get_channels_spherical.mex:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/hdf5_create_file.mex:            build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_channel.mex:           build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_dset.mex:              build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_dset_names.mex:        build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_read_layout.mex:            build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_reshape_layout.mex:         build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_write_channel.mex:          build/qd_channel.o   build/libhdf5.a
++quadriga_lib/hdf5_write_dset.mex:             build/qd_channel.o   build/libhdf5.a
++quadriga_lib/icosphere.mex:                   build/quadriga_tools.o
++quadriga_lib/interp.mex:                      build/quadriga_tools.o
++quadriga_lib/obj_file_read.mex:               build/quadriga_tools.o
++quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
++quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
++quadriga_lib/version.mex:                     build/quadriga_lib.o
+
++quadriga_lib/%.mex:   mex/%.cpp
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s
 
 # Documentation of MEX files
@@ -157,6 +218,7 @@ clean:
 	- rm *.obj
 	- rm tests/test_bin
 	- rm tests/test.exe
+	- rm -rf build
 
 tidy: clean 
 	- rm -rf external/Catch2-$(catch2_version)-Linux
@@ -164,7 +226,6 @@ tidy: clean
 	- rm +quadriga_lib/*.m
 	- rm -rf +quadriga_lib
 	- rm -rf lib
-	- rm -rf build
 
 build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
 	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
