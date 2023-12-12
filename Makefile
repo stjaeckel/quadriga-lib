@@ -30,7 +30,8 @@ all:   +quadriga_lib/calc_rotation_matrix.mexw64   +quadriga_lib/cart2geo.mexw64
 	   +quadriga_lib/get_channels_spherical.mexw64   +quadriga_lib/get_channels_planar.mexw64 \
 	   +quadriga_lib/hdf5_create_file.mexw64   +quadriga_lib/hdf5_read_channel.mexw64   +quadriga_lib/hdf5_read_dset.mexw64   +quadriga_lib/hdf5_read_dset_names.mexw64   \
 	   +quadriga_lib/hdf5_read_layout.mexw64   +quadriga_lib/hdf5_reshape_layout.mexw64   +quadriga_lib/hdf5_write_channel.mexw64   +quadriga_lib/hdf5_write_dset.mexw64   \
-	   +quadriga_lib/icosphere.mexw64   +quadriga_lib/subdivide_triangles.mexw64   +quadriga_lib/obj_file_read.mexw64
+	   +quadriga_lib/icosphere.mexw64   +quadriga_lib/subdivide_triangles.mexw64   +quadriga_lib/obj_file_read.mexw64   \
+	   +quadriga_lib/ray_triangle_intersect.mexw64
 
 test:   tests\test.exe
 	tests\test.exe
@@ -58,9 +59,13 @@ build\quadriga_tools.obj:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
 	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
+build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
+	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 # Archive file for static linking
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
-                        build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj
+                        build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
+						build\ray_triangle_intersect.obj
 	lib /OUT:temp_quadriga_lib.lib $**
     lib /OUT:$@ temp_quadriga_lib.lib $(HDF5)\lib\libhdf5.lib Shlwapi.lib
     del temp_quadriga_lib.lib
@@ -139,6 +144,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib/obj_file_read.mexw64:   mex\obj_file_read.cpp   lib\quadriga_lib.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib/ray_triangle_intersect.mexw64:   mex\ray_triangle_intersect.cpp   lib\quadriga_lib.lib
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Maintainance section
