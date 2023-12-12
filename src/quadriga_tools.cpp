@@ -699,6 +699,9 @@ template <typename dtype>
 std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
                                  const arma::Col<dtype> *xo, const arma::Col<dtype> *yo, arma::Cube<dtype> *output)
 {
+    if (input == nullptr || xi == nullptr || yi == nullptr || xo == nullptr || output == nullptr)
+        return "Arguments cannot be NULL.";
+
     constexpr dtype one = dtype(1.0), zero = dtype(0.0);
     const unsigned long long nx = input->n_cols, ny = input->n_rows, ne = input->n_slices, nxy = nx * ny;
     const unsigned long long mx = xo->n_elem, my = yo->n_elem;
