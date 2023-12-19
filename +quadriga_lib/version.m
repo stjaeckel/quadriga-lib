@@ -3,6 +3,10 @@
 %    
 % Usage:
 %    version = quadriga_lib.version;
+%    
+% Caveat:
+%    - If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
+%      an suffix _AVX2 is added after the version number
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
