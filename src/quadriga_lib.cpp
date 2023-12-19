@@ -15,10 +15,11 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <stdexcept>
-#include <cstring> // For std::memcopy
-
+#include <immintrin.h>
 #include "quadriga_lib.hpp"
+
+// Vector size for AVX2
+#define VEC_SIZE 8
 
 // Template for time measuring:
 // #include <chrono>
@@ -33,6 +34,27 @@
 // ts = te;
 // std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
 
+// Testing for AVX2 support at runtime
+#if defined(_MSC_VER) // Windows
+#include <intrin.h>
+#include <malloc.h> // Include for _aligned_malloc and _aligned_free
+#else               // Linux
+#include <cpuid.h>
+#endif
+
+bool isAVX2Supported()
+{
+    std::vector<int> cpuidInfo(4);
+
+#if defined(_MSC_VER) // Windows
+    __cpuidex(cpuidInfo.data(), 7, 0);
+#else // Linux
+    __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
+#endif
+
+    return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
+}
+
 // Returns the arrayant_lib version number as a string
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
@@ -45,4 +67,47 @@ std::string quadriga_lib::quadriga_lib_version()
     str.replace(found, 1, ".");
     str = str.substr(1, str.length());
     return str;
+}
+
+// Check if AVX2 is supported
+bool quadriga_lib::quadriga_lib_has_AVX2()
+{
+    // Create an aligned dataset
+    size_t no_data = 16;
+#if defined(_MSC_VER) // Windows
+    float *X = (float *)_aligned_malloc(no_data * sizeof(float), 32);
+#else // Linux
+    float *X = (float *)aligned_alloc(32, no_data * sizeof(float));
+#endif
+
+    // Fill
+    for (size_t i = 0; i < 16; ++i)
+        X[i] = (float)i;
+
+    float Z[8];
+    for (size_t i = 0; i < 8; ++i)
+        Z[i] = 0.0f;
+
+#if defined(__AVX2__)      // Compiler support for AVX2
+    if (isAVX2Supported()) // CPU support for AVX2
+    {
+        __m256 tx = _mm256_load_ps(X);
+        __m256 ty = _mm256_load_ps(&X[8]);
+        const __m256 r2 = _mm256_set1_ps(2.0f);
+        __m256 z = _mm256_fmadd_ps(tx, ty, r2);
+        _mm256_store_ps(Z, z);
+    }
+#endif
+
+    // Free aligned memory
+#if defined(_MSC_VER) // Windows
+    _aligned_free(X);
+#else // Linux
+    free(X);
+#endif
+
+    if (Z[0] == 2.0f && Z[7] == 107.0f)
+        return true;
+
+    return false;
 }

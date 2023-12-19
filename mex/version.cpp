@@ -30,6 +30,10 @@ Returns the quadriga-lib version number
 ```
 version = quadriga_lib.version;
 ```
+
+## Caveat:
+- If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
+  an suffix `_AVX2` is added after the version number
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -45,5 +49,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:version:no_output", "Incorrect number of output arguments.");
 
     std::string quadriga_lib_version = quadriga_lib::quadriga_lib_version();
+
+    if (quadriga_lib::quadriga_lib_has_AVX2())
+        quadriga_lib_version += "_AVX2";
+
     plhs[0] = mxCreateString(quadriga_lib_version.c_str());
 }

@@ -95,7 +95,7 @@ build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
 
 build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)

@@ -33,6 +33,9 @@ namespace quadriga_lib
 {
     // Returns the version number as a string in format (x.y.z)
     std::string quadriga_lib_version();
+
+    // Check if AVX2 is supported
+    bool quadriga_lib_has_AVX2();
 }
 
 #endif
