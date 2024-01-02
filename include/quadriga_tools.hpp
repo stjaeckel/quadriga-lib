@@ -123,6 +123,10 @@ namespace quadriga_lib
                            arma::Col<unsigned> *obj_ind = nullptr,  // Object index, 1-based, Size: [ n_mesh ]
                            arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
 
+    // Calculates the intersection of rays and triangles in three dimensions
+    // - implements the Möller–Trumbore ray-triangle intersection algorithm
+    // - uses AVX2 intrinsic functions to process 8 mesh elements in parallel
+    // - all internal computations are done using <float>
     template <typename dtype>
     void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
                                 const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
