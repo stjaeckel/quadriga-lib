@@ -1,8 +1,8 @@
 clear all
 close all
 
-no_mesh = 1e6;
-no_pos  = 1e6;
+no_mesh = 1e5;
+no_pos  = 1e5;
 
 % Cube
 cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
