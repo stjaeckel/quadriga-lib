@@ -189,10 +189,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     catch (const std::invalid_argument &ex)
     {
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_combine_pattern:unknown_error", ex.what());
+        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:unknown_error", ex.what());
     }
     catch (...)
     {
-        mexErrMsgIdAndTxt("quadriga_lib:arrayant_combine_pattern:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:unknown_error", "Unknown failure occurred. Possible memory corruption!");
     }
 }

@@ -100,13 +100,16 @@ build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
+build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 # Archive file for static linking
 build/libhdf5.a:
 	cp $(HDF5_LIB)/libhdf5.a build/
 
 lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-					  build/ray_triangle_intersect.o
+					  build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 	( cd build/ && ar x libhdf5.a && cd .. )
 	ar rcs $@ $^ build/H5*.o
 
@@ -135,6 +138,7 @@ lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.
 +quadriga_lib/icosphere.mexa64:                   build/quadriga_tools.o
 +quadriga_lib/interp.mexa64:                      build/quadriga_tools.o
 +quadriga_lib/obj_file_read.mexa64:               build/quadriga_tools.o
++quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
 +quadriga_lib/version.mexa64:                     build/quadriga_lib.o
@@ -167,6 +171,7 @@ lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.
 +quadriga_lib/icosphere.mex:                   build/quadriga_tools.o
 +quadriga_lib/interp.mex:                      build/quadriga_tools.o
 +quadriga_lib/obj_file_read.mex:               build/quadriga_tools.o
++quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
 +quadriga_lib/version.mex:                     build/quadriga_lib.o

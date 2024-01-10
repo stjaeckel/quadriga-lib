@@ -29,7 +29,7 @@
 #include "catch2_tests/test_hdf_functions.cpp"
 #include "catch2_tests/test_channel.cpp"
 #include "catch2_tests/test_ray_triangle_intersect.cpp"
-
+#include "catch2_tests/test_ray_mesh_interact.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

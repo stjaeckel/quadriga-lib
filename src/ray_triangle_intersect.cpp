@@ -443,7 +443,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     if (dest == nullptr)
         throw std::invalid_argument("Input 'dest' cannot be NULL.");
     if (mesh == nullptr)
-        throw std::invalid_argument("Input 'dest' cannot be NULL.");
+        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
     if (orig->n_elem == 0 || dest->n_elem == 0 || mesh->n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty.");
     if (orig->n_cols != 3)

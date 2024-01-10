@@ -124,9 +124,9 @@ namespace quadriga_lib
                            arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
 
     // Calculates the intersection of rays and triangles in three dimensions
-    // - implements the Möller–Trumbore ray-triangle intersection algorithm
-    // - uses AVX2 intrinsic functions to process 8 mesh elements in parallel
-    // - all internal computations are done using <float>
+    // - Implements the Möller–Trumbore ray-triangle intersection algorithm
+    // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
+    // - All internal computations are done using single precision
     template <typename dtype>
     void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
                                 const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
@@ -136,6 +136,37 @@ namespace quadriga_lib
                                 arma::Col<unsigned> *no_interact = nullptr, // Number of mesh between orig and dest, Size [ n_ray ]
                                 arma::Col<unsigned> *fbs_ind = nullptr,     // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                                 arma::Col<unsigned> *sbs_ind = nullptr);    // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+
+    // Calculate the interaction of rays with a triangle mesh
+    // - Number of input rays: n_ray
+    // - Only returns rays that interact with the mesh, i.e. n_rayN <= n_ray
+    // - Outputs {trivecN, tridirN, orig_lengthN} will be empty if inputs {trivec, tridir, orig_length} are not provided
+    // - In refraction mode, paths exhibiting 'total reflection' will have zero-power
+    template <typename dtype>
+    void ray_mesh_interact(int interaction_type,                          // Interaction type: (0) Reflection, (1) Transmission, (2) Refraction
+                           dtype center_frequency,                        // Center frequency in [Hz]
+                           const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
+                           const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
+                           const arma::Mat<dtype> *fbs,                   // First interaction points in GCS, Size [ n_ray, 3 ]
+                           const arma::Mat<dtype> *sbs,                   // Second interaction points in GCS, Size [ n_ray, 3 ]
+                           const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                           const arma::Mat<dtype> *mtl_prop,              // Material properties, Size: [ n_mesh, 5 ]
+                           const arma::Col<unsigned> *fbs_ind,            // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                           const arma::Col<unsigned> *sbs_ind,            // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                           const arma::Mat<dtype> *trivec = nullptr,      // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [n_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                           const arma::Mat<dtype> *tridir = nullptr,      // Directions of the vertex-rays in rad; Size [n_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+                           const arma::Col<dtype> *orig_length = nullptr, // Path length at origin point, Size [ n_ray ]
+                           arma::Mat<dtype> *origN = nullptr,             // New ray origin points in GCS, Size [ n_rayN, 3 ]
+                           arma::Mat<dtype> *destN = nullptr,             // New ray destination points in GCS, Size [ n_rayN, 3 ]
+                           arma::Col<dtype> *gainN = nullptr,             // Average interaction gain, Size [ n_rayN ]
+                           arma::Mat<dtype> *xprmatN = nullptr,           // Polarization transfer matrix, Size [n_rayN, 8], Columns: [Re(VV), Im(VV), Re(HV), Im(HV), Re(VH), Im(VH), Re(HH), Im(HH) ]
+                           arma::Mat<dtype> *trivecN = nullptr,           // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
+                           arma::Mat<dtype> *tridirN = nullptr,           // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
+                           arma::Col<dtype> *orig_lengthN = nullptr,      // Path length at the new origin point, Size [ n_rayN ]
+                           arma::Col<dtype> *fbs_angleN = nullptr,        // Angle between incoming ray and FBS in [rad], Size [ n_rayN ]
+                           arma::Col<dtype> *thicknessN = nullptr,        // Material thickness in meters calculated from the difference between FBS and SBS, Size [ n_rayN ]
+                           arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
+                           arma::Mat<dtype> *normal_vecN = nullptr);      // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
 
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision

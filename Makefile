@@ -1,5 +1,24 @@
 # This Makefile is for Windows / MSVC environments
-# Cheat sheet:
+
+# Steps for compiling Quadriga-Lib (Linux):
+# - Get Build Tools for Visual Studio
+# - Compile HDF5 library by "nmake hdf5lib"
+# - Set MATLAB path below
+# - Run "nmake"
+
+# Set path to your MATLAB installation (optional):
+# Leave this empty if you don't want to use MATLAB
+MATLAB_PATH = C:\Program Files\MATLAB\R2022b
+
+# External libraries
+# External libraries are located in the 'external' folder. Set the version numbers here.
+# You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
+armadillo_version = 12.6.3
+hdf5_version      = 1.14.2
+catch2_version    = 3.4.0
+pugixml_version   = 1.13
+
+# nmake cheat sheet:
 #	$@    Current target's full name (path, base name, extension)
 #	$*    Current target's path and base name minus file extension.
 #	$**   All dependents of the current target
@@ -8,16 +27,13 @@
 
 # Compilers
 CC    = cl
-MEX   = "C:\Program Files\MATLAB\R2022b\bin\win64\mex.exe"
+MEX   = "$(MATLAB_PATH)\bin\win64\mex.exe"
 
-# External libraries
-hdf5version    = 1.14.2
-catch2version  = 3.4.0
-
-ARMA_H      = external\armadillo-12.6.3\include
-PUGIXML_H   = external\pugixml-1.13\src
-CATCH2      = external\Catch2-$(catch2version)-win64
-HDF5        = external\hdf5-$(hdf5version)-win64
+# Header files
+ARMA_H      = external\armadillo-$(armadillo_version)\include
+PUGIXML_H   = external\pugixml-$(pugixml_version)\src
+CATCH2      = external\Catch2-$(catch2_version)-win64
+HDF5        = external\hdf5-$(hdf5_version)-win64
 
 # Configurations
 CCFLAGS     = /EHsc /std:c++17 /Zc:__cplusplus /nologo /MD #/Wall 
@@ -47,6 +63,7 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\icosphere.mexw64 \
 	   +quadriga_lib\interp.mexw64 \
 	   +quadriga_lib\obj_file_read.mexw64 \
+	   +quadriga_lib\ray_mesh_interact.mexw64 \
 	   +quadriga_lib\ray_triangle_intersect.mexw64 \
 	   +quadriga_lib\subdivide_triangles.mexw64 \
 	   +quadriga_lib\version.mexw64
@@ -77,6 +94,9 @@ build\quadriga_tools.obj:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
 	$(CC) /arch:AVX2 $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
+build\ray_mesh_interact.obj:   src\ray_mesh_interact.cpp   include\quadriga_tools.hpp
+	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
 	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
@@ -86,7 +106,7 @@ build\libhdf5.lib:
 
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
-						build\ray_triangle_intersect.obj   build\libhdf5.lib
+						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\libhdf5.lib
     lib /OUT:$@ $**
 
 # MEX MATLAB interface
@@ -162,6 +182,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 +quadriga_lib\obj_file_read.mexw64:   mex\obj_file_read.cpp   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
++quadriga_lib\ray_mesh_interact.mexw64:   mex\ray_mesh_interact.cpp   build\ray_mesh_interact.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
 +quadriga_lib\ray_triangle_intersect.mexw64:   mex\ray_triangle_intersect.cpp   build\ray_triangle_intersect.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
@@ -174,28 +197,28 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 # Maintainance section
 hdf5lib:
 	- rmdir /s /q external\build
-	- rmdir /s /q external\hdf5-$(hdf5version)
-	- rmdir /s /q external\hdf5-$(hdf5version)-win64
-	tar -xf external/hdf5-$(hdf5version).zip
-	move hdf5-$(hdf5version) external
+	- rmdir /s /q external\hdf5-$(hdf5_version)
+	- rmdir /s /q external\hdf5-$(hdf5_version)-win64
+	tar -xf external/hdf5-$(hdf5_version).zip
+	move hdf5-$(hdf5_version) external
 	mkdir external\build
-	cmake -S external\hdf5-$(hdf5version) -B external\build -D CMAKE_INSTALL_PREFIX=external\hdf5-$(hdf5version)-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
+	cmake -S external\hdf5-$(hdf5_version) -B external\build -D CMAKE_INSTALL_PREFIX=external\hdf5-$(hdf5_version)-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
 	cmake --build external\build --config Release --target install
 	rmdir /s /q external\build
-	rmdir /s /q external\hdf5-$(hdf5version)
+	rmdir /s /q external\hdf5-$(hdf5_version)
 
 catch2lib:
 	- rmdir /s /q external\build
-	- rmdir /s /q external\Catch2-$(catch2version)
-	- rmdir /s /q external\Catch2-$(catch2version)-win64
-	tar -xf external/Catch2-$(catch2version).zip
-	move Catch2-$(catch2version) external
+	- rmdir /s /q external\Catch2-$(catch2_version)
+	- rmdir /s /q external\Catch2-$(catch2_version)-win64
+	tar -xf external/Catch2-$(catch2_version).zip
+	move Catch2-$(catch2_version) external
 	mkdir external\build
-	cmake -S external\Catch2-$(catch2version) -B external\build
+	cmake -S external\Catch2-$(catch2_version) -B external\build
 	cmake --build external\build --config Release --target package
-	move external\build\_CPack_Packages\win64\NSIS\Catch2-$(catch2version)-win64 external
+	move external\build\_CPack_Packages\win64\NSIS\Catch2-$(catch2_version)-win64 external
 	rmdir /s /q external\build
-	rmdir /s /q external\Catch2-$(catch2version)
+	rmdir /s /q external\Catch2-$(catch2_version)
 
 clean:
 	del build\*.obj
@@ -206,8 +229,8 @@ clean:
 	del "+quadriga_lib"\*.mexw64
 
 tidy:   clean
-	- rmdir /s /q external\Catch2-$(catch2version)-win64
-	- rmdir /s /q external\hdf5-$(hdf5version)-win64
+	- rmdir /s /q external\Catch2-$(catch2_version)-win64
+	- rmdir /s /q external\hdf5-$(hdf5_version)-win64
 
 build\quadriga-lib-version.exe:   src/version.cpp   lib/quadriga_lib.lib
 	$(CC) $(CCFLAGS) /Febuild\quadriga-lib-version.exe $** /Iinclude /I$(ARMA_H)
