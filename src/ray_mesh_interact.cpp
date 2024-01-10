@@ -16,7 +16,6 @@
 // ------------------------------------------------------------------------
 
 #include <cstring> // For std::memcopy
-#include <complex>
 #include "quadriga_tools.hpp"
 
 template <typename dtype>
