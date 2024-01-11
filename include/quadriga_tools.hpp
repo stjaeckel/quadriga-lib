@@ -23,15 +23,45 @@
 
 namespace quadriga_lib
 {
-    template <typename dtype> // float or double
-    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation,
-                                    bool invert_y_axis = false, bool transposeR = false);
 
-    template <typename dtype> // float or double
+    // ---- Miscellaneous / Tools ----
+
+    // Calculates a 3x3 rotation matrix from a 3-element orientation vector
+    template <typename dtype>
+    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation,
+                                    bool invert_y_axis = false,
+                                    bool transposeR = false);
+
+    // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+    template <typename dtype>
     arma::cube cart2geo(const arma::Cube<dtype> cart);
 
+    // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
+    template <typename dtype>
+    arma::cube geo2cart(const arma::Mat<dtype> azimuth,
+                        const arma::Mat<dtype> elevation,
+                        const arma::Mat<dtype> length);
+
+    // 2D linear interpolation (returns error message or empty string in case of no error)
+    template <typename dtype>                          // Supported types: float or double
+    std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
+                       const arma::Col<dtype> *xi,     // x sample points of input; vector length nx
+                       const arma::Col<dtype> *yi,     // y sample points of input; vector length ny
+                       const arma::Col<dtype> *xo,     // x sample points of output; vector length mx
+                       const arma::Col<dtype> *yo,     // y sample points of output; vector length my
+                       arma::Cube<dtype> *output);     // Interpolated data; size [ my, mx, ne ]
+
+    // 1D linear interpolation (returns error message or empty string)
+    template <typename dtype>                         // Supported types: float or double
+    std::string interp(const arma::Mat<dtype> *input, // Input data; size [ nx, ne ], ne = multiple data sets
+                       const arma::Col<dtype> *xi,    // x sample points of input; vector length nx
+                       const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
+                       arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
+
+    // ----  Site-Specific Simulation Tools ----
+
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
-    // - FBS / LBS position of the LOS path is place half way between TX and RX
+    // - FBS / LBS position of the LOS path is placed half way between TX and RX
     // - Size of the output arguments is adjusted if it does not match the required size
     template <typename dtype>                                 // Supported types: float or double
     void coord2path(dtype Tx, dtype Ty, dtype Tz,             // Transmitter position in Cartesian coordinates
@@ -70,9 +100,6 @@ namespace quadriga_lib
                                     arma::Cube<dtype> *ray_z,     // Z-Coordinate of the generated rays, Size [ n_pos, n_path, n_seg-1 ]
                                     arma::Cube<dtype> *weight);   // Weights, Size [ n_pos, n_path, n_seg ]
 
-    template <typename dtype> // float or double
-    arma::cube geo2cart(const arma::Mat<dtype> azimuth, const arma::Mat<dtype> elevation, const arma::Mat<dtype> length);
-
     // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
     // - Returns the number of faces
     template <typename dtype>                                            // Allowed types: float or double
@@ -82,22 +109,6 @@ namespace quadriga_lib
                                  arma::Col<dtype> *length = nullptr,     // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
                                  arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
                                  arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
-
-    // 2D linear interpolation (returns error message or empty string in case of no error)
-    template <typename dtype>                          // Supported types: float or double
-    std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                       const arma::Col<dtype> *xi,     // x sample points of input; vector length nx
-                       const arma::Col<dtype> *yi,     // y sample points of input; vector length ny
-                       const arma::Col<dtype> *xo,     // x sample points of output; vector length mx
-                       const arma::Col<dtype> *yo,     // y sample points of output; vector length my
-                       arma::Cube<dtype> *output);     // Interpolated data; size [ my, mx, ne ]
-
-    // 1D linear interpolation (returns error message or empty string)
-    template <typename dtype>                         // Supported types: float or double
-    std::string interp(const arma::Mat<dtype> *input, // Input data; size [ nx, ne ], ne = multiple data sets
-                       const arma::Col<dtype> *xi,    // x sample points of input; vector length nx
-                       const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
-                       arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
 
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -122,20 +133,6 @@ namespace quadriga_lib
                            arma::Mat<unsigned> *face_ind = nullptr, // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
                            arma::Col<unsigned> *obj_ind = nullptr,  // Object index, 1-based, Size: [ n_mesh ]
                            arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
-
-    // Calculates the intersection of rays and triangles in three dimensions
-    // - Implements the Möller–Trumbore ray-triangle intersection algorithm
-    // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
-    // - All internal computations are done using single precision
-    template <typename dtype>
-    void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                arma::Mat<dtype> *fbs = nullptr,            // First interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Mat<dtype> *sbs = nullptr,            // Second interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Col<unsigned> *no_interact = nullptr, // Number of mesh between orig and dest, Size [ n_ray ]
-                                arma::Col<unsigned> *fbs_ind = nullptr,     // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                arma::Col<unsigned> *sbs_ind = nullptr);    // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
 
     // Calculate the interaction of rays with a triangle mesh
     // - Number of input rays: n_ray
@@ -167,6 +164,20 @@ namespace quadriga_lib
                            arma::Col<dtype> *thicknessN = nullptr,        // Material thickness in meters calculated from the difference between FBS and SBS, Size [ n_rayN ]
                            arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
                            arma::Mat<dtype> *normal_vecN = nullptr);      // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
+
+    // Calculates the intersection of rays and triangles in three dimensions
+    // - Implements the Möller–Trumbore ray-triangle intersection algorithm
+    // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
+    // - All internal computations are done using single precision
+    template <typename dtype>
+    void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                arma::Mat<dtype> *fbs = nullptr,            // First interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Mat<dtype> *sbs = nullptr,            // Second interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Col<unsigned> *no_interact = nullptr, // Number of mesh between orig and dest, Size [ n_ray ]
+                                arma::Col<unsigned> *fbs_ind = nullptr,     // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                arma::Col<unsigned> *sbs_ind = nullptr);    // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
 
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
