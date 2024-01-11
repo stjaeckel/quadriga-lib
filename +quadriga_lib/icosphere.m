@@ -22,19 +22,19 @@
 %    
 % Output Arguments:
 %    - center
-%      Position of the center point of each triangle; Size: [ no_face x 3 ]
+%      Position of the center point of each triangle; Size: [ no_face, 3 ]
 %    
 %    - length
 %      Length of the vector pointing from the origin to the center point. This number is smaller than
-%      1 since the triangles are located inside the unit sphere; Size: [ no_face x 1 ]
+%      1 since the triangles are located inside the unit sphere; Size: [ no_face ]
 %    
 %    - vert
 %      The 3 vectors pointing from the center point to the vertices of each triangle; the values are
-%      in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; Size: [ no_face x 9 ]
+%      in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; Size: [ no_face, 9 ]
 %    
 %    - direction
 %      The directions of the vertex-rays in geographic coordinates (azimuth and elevation angle in
-%      rad); the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]; Size: [ no_face x 6 ]
+%      rad); the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]; Size: [ no_face, 6 ]
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
