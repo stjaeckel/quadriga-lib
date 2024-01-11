@@ -16,12 +16,12 @@
 // ------------------------------------------------------------------------
 
 /*!SECTION
-Miscellaneous / Tools
+Site-Specific Simulation Tools
 SECTION!*/
 
 /*!MD
 # RAY_MESH_INTERACT
-Calculates interactions (reflection, transmission, refraction) of radio wave with objects
+Calculates interactions (reflection, transmission, refraction) of radio waves with objects
 
 ## Description:
 - Radio waves that interact with a building, or other objects in the environment, will produce losses 
