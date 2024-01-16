@@ -476,19 +476,23 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         // Calculate Reflection coefficients  ITU-R P.2040-1, eq. (31)
         std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;
         std::complex<double> R_eTM = total_reflection ? 1.0 : 0.0;
-        if (!total_reflection && interaction_type == 0) // Reflection
+        double reflection_gain = total_reflection ? 1.0 : 0.0;
+        if (!total_reflection && interaction_type != 2) // Reflection and Transmission
             R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
-            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
+            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
+            reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
 
-        // Calculate Transmission coefficients  ITU-R P.2040-1, eq. (31)
+        // Calculate Transmission coefficients  ITU-R P.2040-1, eq. (32)
         std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
+        double refraction_gain = 0.0;
         if (!total_reflection && interaction_type != 0) // Transmission and Refraction
             T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
-            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
+            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
+            refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
 
         // Special Case: Transmission from inside a medium without refraction
-        if (interaction_type == 1 && ray_starts_inside)
-            T_eTE = 1.0, T_eTM = 1.0;
+        if (interaction_type == 1 && ray_starts_inside && total_reflection)
+            T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0;
 
         // Select corresponding type
         double eTE_Re = (interaction_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
@@ -522,8 +526,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         if (p_gainN != nullptr)
         {
             // Include average medium transition gain
+            if (interaction_type == 0)
+                scl = gain * reflection_gain;
+            else if (interaction_type == 1)
+                scl = gain * (1.0 - reflection_gain);
+            else
+                scl = gain * refraction_gain;
 
-            scl = 0.5 * (eTE_Re * eTE_Re + eTE_Im * eTE_Im + eTM_Re * eTM_Re + eTM_Im * eTM_Im) * gain;
             p_gainN[i_rayN] = dtype(scl);
         }
 
@@ -563,6 +572,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             // Note: eTE = perpendicular to face normal vector = Horizontal polarization
             //       eTM = parallel to face normal vector = Vertical polarization
             double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
+            if (interaction_type == 1)          // Scale amplitude in case of transmission
+                amplitude *= std::sqrt((1.0 - reflection_gain) / refraction_gain);
 
             double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
                    VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
