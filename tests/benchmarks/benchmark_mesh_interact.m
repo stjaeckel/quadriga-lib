@@ -39,6 +39,7 @@ tic
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, cube, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
 toc
 % 35 seconds, single core @ 100 million rays
+% 3.7 seconds, 16 cores (32 threads) @ 100 million rays
 
 clear all
 
