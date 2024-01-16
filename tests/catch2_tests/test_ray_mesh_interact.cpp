@@ -507,7 +507,7 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &msh, &mtl_prop, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
                                     &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    double transition_gain = std::pow(10.0, -0.1*3.0);
+    double transition_gain = std::pow(10.0, -0.1 * 3.0);
 
     double th2 = std::acos(cos_th2);
     double x = std::cos(th2) * 0.001 + 1.0;
@@ -646,7 +646,7 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-7));
 
-    x = std::real(cos_th2) * std::sqrt(2) + 1.0;
+    x = std::real(cos_th2) * std::sqrt(2.0) + 1.0;
     y = std::real(std::sin(th2)) * std::sqrt(2) + 0.6;
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-3));

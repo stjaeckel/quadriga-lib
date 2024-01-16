@@ -16,6 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <cstring> // For std::memcopy
+#include <complex>
 #include "quadriga_tools.hpp"
 
 template <typename dtype>
@@ -256,6 +257,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta); // Boundary fix
         double theta = std::acos(cos_theta) - 1.570796326794897;                     // Angle between face and incoming ray, negative values illuminate back side
 
+        // Condition for a ray starting inside an object
+        bool ray_starts_inside = (theta < 0.0 || FS_length < ray_offset);
+
         // Flip normal vector in case of back side illumination
         if (theta < 0.0)
             Nx = -Nx, Ny = -Ny, Nz = -Nz,
@@ -307,30 +311,17 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
         // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
         scl = -17.98 / fGHz;
-        double eta1_Re = kR1 * std::pow(fGHz, kR2);       // Real part of the relative permittivity of material 1
-        double eta1_Im = scl * kR3 * std::pow(fGHz, kR4); // Imaginary part of the relative permittivity of material 1
-        double eta2_Re = kS1 * std::pow(fGHz, kS2);       // Real part of the relative permittivity of material 1
-        double eta2_Im = scl * kS3 * std::pow(fGHz, kS4); // Imaginary part of the relative permittivity of material 1
+        std::complex<double> eta1(kR1 * std::pow(fGHz, kR2), scl * kR3 * std::pow(fGHz, kR4)); // Material 1
+        std::complex<double> eta2(kS1 * std::pow(fGHz, kS2), scl * kS3 * std::pow(fGHz, kS4)); // Material 2
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
-        double a = eta1_Re * eta2_Re + eta1_Im * eta2_Im;                  // Nominator of real part
-        double b = eta1_Im * eta2_Re - eta1_Re * eta2_Im;                  // Nominator of imaginary part
-        double c = eta2_Re * eta2_Re + eta2_Im * eta2_Im;                  // Denominator of complex division
-        c = 1.0 / c;                                                       // 1 / denominator
-        double eta_Re = a * c;                                             // Real part of eta1 / eta2
-        double eta_Im = b * c;                                             // Imaginary part of eta1 / eta2
-        double eta = std::pow(eta_Re * eta_Re + eta_Im * eta_Im, 0.25);    // sgrt( abs( eta1 / eta2 ) )
         double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
+        std::complex<double> eta1_div_eta2 = eta1 / eta2;                  // Complex division
+        double eta = std::sqrt(std::abs(eta1_div_eta2));                   // sgrt( abs( eta1 / eta2 ) )
         bool total_reflection = eta * sin_theta >= 1.0;                    // Total reflection condition
 
-        // Calculate cos_theta2 from Rec. ITU-R P.2040-1, eq. (33) with eta1 / eta2 = a + jb
-        sin_theta = sin_theta * sin_theta;                   // sin(theta)^2
-        c = 1.0 - eta_Re * sin_theta;                        // Real part under the square root
-        double d = -eta_Im * sin_theta;                      // Imaginary part under the square root
-        b = std::sqrt(c * c + d * d);                        // abs( c + jd )
-        double cos_theta2_Re = std::sqrt(0.5 * b + 0.5 * c); // Real part of cos_theta2
-        double cos_theta2_Im = std::sqrt(0.5 * b - 0.5 * c); // Imaginary part of cos_theta2
-        cos_theta2_Im = (d < 0.0) ? -cos_theta2_Im : cos_theta2_Im;
+        // Calculate cos_theta2 from Rec. ITU-R P.2040-1, eq. (33)
+        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
 
         // Calculate the center path direction after medium interaction (normalized to length 1)
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz;              // Vector from FBS to destination
@@ -344,7 +335,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             FDx = OFx, FDy = OFy, FDz = OFz; // New path direction = same as incoming ray, already normalized
         else                                 // Refraction
         {
-            scl = eta * abs_cos_theta - cos_theta2_Re;                                                    // Temporary variable, ignoring imaginary part of cos_theta2
+            scl = eta * abs_cos_theta - std::real(cos_theta2);                                            // Temporary variable, ignoring imaginary part of cos_theta2
             FDx = eta * OFx + scl * Nx, FDy = eta * OFy + scl * Ny, FDz = eta * OFz + scl * Nz;           // Refraction into medium
             scl = 1.0 / std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz), FDx *= scl, FDy *= scl, FDz *= scl; // Normalize
         }
@@ -419,18 +410,18 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                     // Vertex ray directions remains the same for Transmission
                     if (interaction_type == 2) // Refraction
                     {
-                        double cos_thetaV = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);              // Cosine of incidence angle
-                        double sin_thetaV = std::sqrt(1.0 - cos_thetaV * cos_thetaV);           // Sine of incidence angle
-                        total_reflection = total_reflection | (eta * sin_thetaV >= 1.0);        // Check total reflection condition
-                        double a = sin_thetaV * sin_thetaV, c = 1.0 - a * eta_Re;               // Temporary computations
-                        double d = -eta_Im * a, b = std::sqrt(c * c + d * d);                   // Temporary computations
-                        double cos_theta2V = std::sqrt(0.5 * b + 0.5 * c);                      // Real part of cos_theta2
-                        b = eta * cos_thetaV - cos_theta2V;                                     // Temporary variable
-                        Vx = eta * Vx + b * Nx, Vy = eta * Vy + b * Ny, Vz = eta * Vz + b * Nz; // Refraction into medium - updates V
-                        double scl = 1.0 / std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);              // Normalize
-                        Vx *= scl, Vy *= scl, Vz *= scl;
+                        double cos_thetaV = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);       // Cosine of incidence angle
+                        double sin_thetaV = std::sqrt(1.0 - cos_thetaV * cos_thetaV);    // Sine of incidence angle
+                        total_reflection = total_reflection | (eta * sin_thetaV >= 1.0); // Check total reflection condition
+
+                        // Refraction into medium
+                        std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV * sin_thetaV);
+                        double scl = eta * cos_thetaV - std::real(cos_theta2V);
+                        Vx = eta * Vx + scl * Nx, Vy = eta * Vy + scl * Ny, Vz = eta * Vz + scl * Nz;
+                        scl = 1.0 / std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
+                        Vx *= scl, Vy *= scl, Vz *= scl;                 // Normalize
                         Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
-                        az = std::atan2(Vy, Vx), el = std::asin(Vz);
+                        az = std::atan2(Vy, Vx), el = std::asin(Vz);     // Angles
                     }
                 }
 
@@ -460,94 +451,50 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         }
 
         // Calculate in-medium attenuation
-        double thickness = 0.0;                    // Thickness of the medium in [m]
-        double gain = 1.0;                         // Gain caused by conductive medium
-        if (theta < 0.0 || FS_length < ray_offset) // Condition for ray starting inside an object
-        {
-            thickness = OF_length;                                           // Thickness of the medium from origin to FBS
-            double tan_delta = eta1_Im / eta1_Re;                            // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
-            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
+        double thickness = ray_starts_inside ? OF_length : ray_offset; // Ray travel distance inside the medium
 
-            // Attenuation distance at which the field amplitude falls by 1/e, ITU-R P.2040-1, eq. (23b)
-            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(eta1_Re));
+        // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
+        scl = ray_starts_inside ? std::real(eta1) : std::real(eta2);
+        double tan_delta = ray_starts_inside ? std::imag(eta1) / scl : std::imag(eta2) / scl;
+        double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
 
-            double A = thickness * 8.686 / Delta; // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
-            gain = std::pow(10.0, -0.1 * A);      // Gain caused by conductive medium in linear scale
-        }
+        // Attenuation distance at which the field amplitude falls by 1/e, ITU-R P.2040-1, eq. (23b)
+        double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+        Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));
+
+        double A = thickness * 8.686 / Delta;   // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
+        double gain = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
 
         // Add additional transition gain
         if (interaction_type != 0) // Only for transmission and refraction
             gain *= transition_gain;
 
         // Calculate sqrt(eta1) and sqrt(eta2) needed for ITU-R P.2040-1, eq. (31) and (32)
-        c = std::sqrt(eta1_Re * eta1_Re + eta1_Im * eta1_Im); // abs(eta1)
-        eta1_Im = (eta1_Im < 0.0) ? -std::sqrt(0.5 * c - 0.5 * eta1_Re) : 0.0;
-        eta1_Re = std::sqrt(0.5 * c + 0.5 * eta1_Re);
-        c = std::sqrt(eta2_Re * eta2_Re + eta2_Im * eta2_Im); // abs(eta2)
-        eta2_Im = (eta2_Im < 0.0) ? -std::sqrt(0.5 * c - 0.5 * eta2_Re) : 0.0;
-        eta2_Re = std::sqrt(0.5 * c + 0.5 * eta2_Re);
+        eta1 = std::sqrt(eta1); // Complex square root
+        eta2 = std::sqrt(eta2); // Complex square root
 
-        // Calculate E-field coefficients
-        double R_eTE_Re, R_eTE_Im, R_eTM_Re, R_eTM_Im;
-        if (interaction_type == 0) // Reflection
-        {
-            // E-field reflection coefficient for TE polarization, ITU-R P.2040-1, eq. (31a), in form: ( a + jb ) / ( c + jd )
-            double c = eta2_Re * cos_theta2_Re - eta2_Im * cos_theta2_Im; // real( eta2 * cos_theta2 )
-            double d = eta2_Re * cos_theta2_Im + eta2_Im * cos_theta2_Re; // imag( eta2 * cos_theta2 )
-            double scl = eta1_Re * abs_cos_theta;                         // real( eta1 * |cos_theta| )
-            double a = scl - c;                                           // real( eta1 * |cos_theta| ) - real( eta2 * cos_theta2 )
-            c = scl + c;                                                  // real( eta1 * |cos_theta| ) + real( eta2 * cos_theta2 )
-            scl = eta1_Im * abs_cos_theta;                                // imag( eta1 * |cos_theta| )
-            double b = scl - d;                                           // imag( eta1 * |cos_theta| ) - imag( eta2 * cos_theta2 )
-            d = scl + d;                                                  // imag( eta1 * |cos_theta| ) + imag( eta2 * cos_theta2 )
-            scl = 1.0 / (c * c + d * d);                                  // Complex division denominator
-            R_eTE_Re = total_reflection ? 1.0 : (a * c + b * d) * scl;
-            R_eTE_Im = total_reflection ? 0.0 : (b * c - a * d) * scl;
+        // Calculate Reflection coefficients  ITU-R P.2040-1, eq. (31)
+        std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;
+        std::complex<double> R_eTM = total_reflection ? 1.0 : 0.0;
+        if (!total_reflection && interaction_type == 0) // Reflection
+            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
+            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
 
-            // E-field reflection coefficient for TM polarization, ITU-R P.2040-1, eq. (31b), in form: ( a + jb ) / ( c + jd )
-            c = eta1_Re * cos_theta2_Re - eta1_Im * cos_theta2_Im; // real( eta1 * cos_theta2 )
-            d = eta1_Re * cos_theta2_Im + eta1_Im * cos_theta2_Re; // imag( eta1 * cos_theta2 )
-            scl = eta2_Re * abs_cos_theta;                         // real( eta2 * |cos_theta| )
-            a = scl - c;                                           // real( eta2 * |cos_theta| ) - real( eta1 * cos_theta2 )
-            c = scl + c;                                           // real( eta2 * |cos_theta| ) + real( eta1 * cos_theta2 )
-            scl = eta2_Im * abs_cos_theta;                         // imag( eta2 * |cos_theta| )
-            b = scl - d;                                           // imag( eta2 * |cos_theta| ) - imag( eta1 * cos_theta2 )
-            d = scl + d;                                           // imag( eta2 * |cos_theta| ) + imag( eta1 * cos_theta2 )
-            scl = 1.0 / (c * c + d * d);                           // Complex division denominator
-            R_eTM_Re = total_reflection ? 1.0 : (a * c + b * d) * scl;
-            R_eTM_Im = total_reflection ? 0.0 : (b * c - a * d) * scl;
-        }
-        else // Transmission
-        {
-            // E-field transmission coefficient for TE polarization, ITU-R P.2040-1, eq. (32a), in form: ( a + jb ) / ( c + jd )
-            double c = eta2_Re * cos_theta2_Re - eta2_Im * cos_theta2_Im; // real( eta2 * cos_theta2 )
-            double d = eta2_Re * cos_theta2_Im + eta2_Im * cos_theta2_Re; // imag( eta2 * cos_theta2 )
-            double scl = eta1_Re * abs_cos_theta;                         // real( eta1 * |cos_theta| )
-            double a = 2.0 * scl;                                         // 2 * real( eta1 * |cos_theta| )
-            c = scl + c;                                                  // real( eta1 * |cos_theta| ) + real( eta2 * cos_theta2 )
-            scl = eta1_Im * abs_cos_theta;                                // imag( eta1 * |cos_theta| )
-            double b = 2.0 * scl;                                         // 2 * imag( eta1 * |cos_theta| )
-            d = scl + d;                                                  // imag( eta1 * |cos_theta| ) + imag( eta2 * cos_theta2 )
-            scl = 1.0 / (c * c + d * d);                                  // Complex division denominator
-            R_eTE_Re = total_reflection ? 0.0 : (a * c + b * d) * scl;
-            R_eTE_Im = total_reflection ? 0.0 : (b * c - a * d) * scl;
+        // Calculate Transmission coefficients  ITU-R P.2040-1, eq. (31)
+        std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
+        if (!total_reflection && interaction_type != 0) // Transmission and Refraction
+            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
+            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
 
-            // E-field transmission coefficient for TE polarization, ITU-R P.2040-1, eq. (32b), in form: ( a + jb ) / ( c + jd )
-            a = 2.0 * eta1_Re * abs_cos_theta;                     // 2 * real( eta1 * |cos_theta| )
-            b = 2.0 * eta1_Im * abs_cos_theta;                     // 2 * imag( eta1 * |cos_theta| )
-            c = eta1_Re * cos_theta2_Re - eta1_Im * cos_theta2_Im; // real( eta1 * cos_theta2 )
-            c = eta2_Re * abs_cos_theta + c;                       // real( eta2 * |cos_theta| ) + real( eta1 * cos_theta2 )
-            d = eta1_Re * cos_theta2_Im + eta1_Im * cos_theta2_Re; // imag( eta1 * cos_theta2 )
-            d = eta2_Im * abs_cos_theta + d;                       // imag( eta2 * |cos_theta| ) + imag( eta1 * cos_theta2 )
-            scl = 1.0 / (c * c + d * d);                           // Complex division denominator
-            R_eTM_Re = total_reflection ? 0.0 : (a * c + b * d) * scl;
-            R_eTM_Im = total_reflection ? 0.0 : (b * c - a * d) * scl;
+        // Special Case: Transmission from inside a medium without refraction
+        if (interaction_type == 1 && ray_starts_inside)
+            T_eTE = 1.0, T_eTM = 1.0;
 
-            // Special Case: Transmission from inside a medium without refraction
-            if (interaction_type == 1 && (theta < 0.0 || FS_length < ray_offset))
-                R_eTE_Re = 1.0, R_eTE_Im = 0.0, R_eTM_Re = 1.0, R_eTM_Im = 0.0;
-        }
+        // Select corresponding type
+        double eTE_Re = (interaction_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
+               eTE_Im = (interaction_type == 0) ? std::imag(R_eTE) : std::imag(T_eTE),
+               eTM_Re = (interaction_type == 0) ? std::real(R_eTM) : std::real(T_eTM),
+               eTM_Im = (interaction_type == 0) ? std::imag(R_eTM) : std::imag(T_eTM);
 
         // Read the output ray index
         size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
@@ -575,7 +522,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         if (p_gainN != nullptr)
         {
             // Include average medium transition gain
-            scl = 0.5 * (R_eTE_Re * R_eTE_Re + R_eTE_Im * R_eTE_Im + R_eTM_Re * R_eTM_Re + R_eTM_Im * R_eTM_Im) * gain;
+
+            scl = 0.5 * (eTE_Re * eTE_Re + eTE_Im * eTE_Im + eTM_Re * eTM_Re + eTM_Im * eTM_Im) * gain;
             p_gainN[i_rayN] = dtype(scl);
         }
 
@@ -615,14 +563,15 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             // Note: eTE = perpendicular to face normal vector = Horizontal polarization
             //       eTM = parallel to face normal vector = Vertical polarization
             double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
-            double VV_Re = amplitude * (U1 * Q1 * R_eTM_Re + U3 * Q2 * R_eTE_Re);
-            double VV_Im = amplitude * (U1 * Q1 * R_eTM_Im + U3 * Q2 * R_eTE_Im);
-            double HV_Re = amplitude * (U2 * Q1 * R_eTM_Re + U4 * Q2 * R_eTE_Re);
-            double HV_Im = amplitude * (U2 * Q1 * R_eTM_Im + U4 * Q2 * R_eTE_Im);
-            double VH_Re = amplitude * (U1 * Q3 * R_eTM_Re + U3 * Q4 * R_eTE_Re);
-            double VH_Im = amplitude * (U1 * Q3 * R_eTM_Im + U3 * Q4 * R_eTE_Im);
-            double HH_Re = amplitude * (U2 * Q3 * R_eTM_Re + U4 * Q4 * R_eTE_Re);
-            double HH_Im = amplitude * (U2 * Q3 * R_eTM_Im + U4 * Q4 * R_eTE_Im);
+
+            double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
+                   VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
+                   HV_Re = amplitude * (U2 * Q1 * eTM_Re + U4 * Q2 * eTE_Re),
+                   HV_Im = amplitude * (U2 * Q1 * eTM_Im + U4 * Q2 * eTE_Im),
+                   VH_Re = amplitude * (U1 * Q3 * eTM_Re + U3 * Q4 * eTE_Re),
+                   VH_Im = amplitude * (U1 * Q3 * eTM_Im + U3 * Q4 * eTE_Im),
+                   HH_Re = amplitude * (U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re),
+                   HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
 
             // Write XPRMAT
             p_xprmatN[i_rayN] = (dtype)VV_Re;
