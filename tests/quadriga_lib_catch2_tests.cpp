@@ -16,6 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <catch2/catch_session.hpp>
+#include "catch2_tests/catch2_helper_functions.cpp"
 
 // Include test cases
 #include "catch2_tests/test_quadriga_tools.cpp"
@@ -30,6 +31,7 @@
 #include "catch2_tests/test_channel.cpp"
 #include "catch2_tests/test_ray_triangle_intersect.cpp"
 #include "catch2_tests/test_ray_mesh_interact.cpp"
+#include "catch2_tests/test_calc_diffraction_gain.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

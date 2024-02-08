@@ -104,7 +104,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Too many output arguments.");
 
-    // Read inputs
     // Validate data types
     bool use_single = false;
     if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))

@@ -27,7 +27,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                                      const arma::Mat<dtype> *trivec, const arma::Mat<dtype> *tridir, const arma::Col<dtype> *orig_length,
                                      arma::Mat<dtype> *origN, arma::Mat<dtype> *destN, arma::Col<dtype> *gainN, arma::Mat<dtype> *xprmatN,
                                      arma::Mat<dtype> *trivecN, arma::Mat<dtype> *tridirN, arma::Col<dtype> *orig_lengthN,
-                                     arma::Col<dtype> *fbs_angleN, arma::Col<dtype> *thicknessN, arma::Col<dtype> *edge_lengthN, arma::Mat<dtype> *normal_vecN)
+                                     arma::Col<dtype> *fbs_angleN, arma::Col<dtype> *thicknessN, arma::Col<dtype> *edge_lengthN,
+                                     arma::Mat<dtype> *normal_vecN, arma::Col<int> *out_typeN)
 {
     // Ray offset is used to detect co-location of points, value in meters
     const double ray_offset = 0.001;
@@ -185,6 +186,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
     if (normal_vecN != nullptr && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
         normal_vecN->set_size(n_rayN, 6);
 
+    if (out_typeN != nullptr && out_typeN->n_elem != n_rayN)
+        out_typeN->set_size(n_rayN);
+
     // Get output pointers
     dtype *p_origN = (origN == nullptr) ? nullptr : origN->memptr();
     dtype *p_destN = (destN == nullptr) ? nullptr : destN->memptr();
@@ -197,6 +201,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
     dtype *p_thicknessN = (thicknessN == nullptr) ? nullptr : thicknessN->memptr();
     dtype *p_edge_lengthN = (edge_lengthN == nullptr) ? nullptr : edge_lengthN->memptr();
     dtype *p_normal_vecN = (normal_vecN == nullptr) ? nullptr : normal_vecN->memptr();
+    int *p_out_typeN = (out_typeN == nullptr) ? nullptr : out_typeN->memptr();
 
     // Only calculate ray tube if it is required in the output
     if (use_ray_tube && p_trivecN == nullptr && p_tridirN == nullptr)
@@ -257,8 +262,52 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta); // Boundary fix
         double theta = std::acos(cos_theta) - 1.570796326794897;                     // Angle between face and incoming ray, negative values illuminate back side
 
-        // Condition for a ray starting inside an object
-        bool ray_starts_inside = (theta < 0.0 || FS_length < ray_offset);
+        // Calculate normal vector of the SBS mesh element, if needed
+        double Mx = 0.0, My = 0.0, Mz = 0.0; // SBS normal vector
+        double theta_sbs = 0.0;
+        if (iSBS != 0 && (FS_length < ray_offset || p_normal_vecN != nullptr))
+        {
+            V1x = (double)p_mesh[iSBS - 1],
+            V1y = (double)p_mesh[iSBS - 1 + n_mesh_t],
+            V1z = (double)p_mesh[iSBS - 1 + 2 * n_mesh_t];
+            E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh_t] - V1x,
+            E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh_t] - V1y,
+            E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh_t] - V1z;
+            E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh_t] - V1x,
+            E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh_t] - V1y,
+            E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh_t] - V1z;
+            Mx = E1y * E2z - E1z * E2y, My = E1z * E2x - E1x * E2z, Mz = E1x * E2y - E1y * E2x;  // Mesh surface normal
+            scl = 1.0 / std::sqrt(Mx * Mx + My * My + Mz * Mz), Mx *= scl, My *= scl, Mz *= scl; // Normalize to 1
+
+            // Incidence angle at SBS
+            theta_sbs = OFx * Mx + OFy * My + OFz * Mz;
+            theta_sbs = (theta_sbs < -1.0) ? -1.0 : (theta_sbs > 1.0 ? 1.0 : theta_sbs);
+            theta_sbs = std::acos(theta_sbs) - 1.570796326794897;
+        }
+
+        // Determine the type of the interaction
+        int out_type = (theta >= 0.0) ? 1 : (theta < 0.0 ? 2 : 0); // Output type (0 = undefined, 1 = outside to inside, 2 = inside to outside)
+        bool material_to_material = false;                         // Assume no material to material transition
+        bool ray_starts_inside = theta < 0.0;                      // Hitting a face back side at the FBS is a certain sign
+        if (FS_length < ray_offset && iSBS != 0)                   // Two colocated faces
+        {
+            const double lim = 1.0e-4;
+            if (std::abs(Nx + Mx) < lim && std::abs(Ny + My) < lim && std::abs(Nz + Mz) < lim) // Opposing normal vectors = material to material transition
+                material_to_material = true, ray_starts_inside = true,
+                out_type = (theta >= 0.0) ? 4 : (theta < 0.0 ? 5 : 0);
+            else if (std::abs(Nx - Mx) < lim && std::abs(Ny - My) < lim && std::abs(Nz - Mz) < lim) // Equal normal vectors = overlapping or duplicate faces
+                out_type = (theta >= 0.0) ? 7 : (theta < 0.0 ? 8 : 0);
+            else if (theta >= 0.0 && theta_sbs <= 0.0)
+                out_type = 10; // Edge Hit, o-i-o
+            else if (theta < 0.0 && theta_sbs >= 0.0)
+                out_type = 11; // Edge Hit, i-o-i
+            else if ((theta >= 0.0 && theta_sbs >= 0.0))
+                out_type = 13; // Edge Hit, o-i
+            else if ((theta < 0.0 && theta_sbs <= 0.0))
+                out_type = 14; // Edge Hit, i-o
+            else // Undefined state
+                out_type = 0;
+        }
 
         // Flip normal vector in case of back side illumination
         if (theta < 0.0)
@@ -290,7 +339,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             kR4 = (double)p_mtl_prop[iFBS + 3 * n_mesh_t];
         }
 
-        if (FS_length < ray_offset && iSBS != 0) // Material to material transition
+        if (material_to_material) // Material to material transition
         {
             if (theta >= 0.0) // SBS (front side) is hit first
             {
@@ -313,6 +362,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         scl = -17.98 / fGHz;
         std::complex<double> eta1(kR1 * std::pow(fGHz, kR2), scl * kR3 * std::pow(fGHz, kR4)); // Material 1
         std::complex<double> eta2(kS1 * std::pow(fGHz, kS2), scl * kS3 * std::pow(fGHz, kS4)); // Material 2
+        bool dense_to_light = std::real(eta1) > std::real(eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
         double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
@@ -450,20 +500,29 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             }
         }
 
-        // Calculate in-medium attenuation
-        double thickness = ray_starts_inside ? OF_length : ray_offset; // Ray travel distance inside the medium
-
-        // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
-        scl = ray_starts_inside ? std::real(eta1) : std::real(eta2);
-        double tan_delta = ray_starts_inside ? std::imag(eta1) / scl : std::imag(eta2) / scl;
-        double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
-
-        // Attenuation distance at which the field amplitude falls by 1/e, ITU-R P.2040-1, eq. (23b)
-        double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-        Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));
-
-        double A = thickness * 8.686 / Delta;   // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
-        double gain = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
+        // Determine the in-medium gain
+        double gain = 1.0;     // Initial gain
+        if (ray_starts_inside) // First medium attenuation, from origin to FBS
+        {
+            // First medium attenuation, from origin to FBS
+            // in case of reflection, ray continues in the same medium (account for ray offset)
+            double thickness = (interaction_type == 0) ? OF_length + ray_offset : OF_length;
+            scl = std::real(eta1);
+            double tan_delta = std::imag(eta1) / scl;                        // Loss tangent
+            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
+            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);              // Attenuation distance (1)
+            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));  // Attenuation distance (2)
+            gain *= std::pow(10.0, -0.1 * thickness * 8.686 / Delta);        // Gain update
+        }
+        if (interaction_type != 0) // Attenuation caused by the medium after transition
+        {
+            scl = std::real(eta2);
+            double tan_delta = std::imag(eta2) / scl;                        // Loss tangent
+            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
+            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);              // Attenuation distance (1)
+            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));  // Attenuation distance (2)
+            gain *= std::pow(10.0, -0.1 * ray_offset * 8.686 / Delta);       // Gain update
+        }
 
         // Add additional transition gain
         if (interaction_type != 0) // Only for transmission and refraction
@@ -477,7 +536,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;
         std::complex<double> R_eTM = total_reflection ? 1.0 : 0.0;
         double reflection_gain = total_reflection ? 1.0 : 0.0;
-        if (!total_reflection && interaction_type != 2) // Reflection and Transmission
+        if (interaction_type == 1 || (interaction_type == 0 && !total_reflection)) // Reflection and Transmission
             R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
             R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
             reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
@@ -490,9 +549,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
             refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
 
-        // Special Case: Transmission from inside a medium without refraction
-        if (interaction_type == 1 && ray_starts_inside && total_reflection)
-            T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0;
+        // Special Case: Transmission from a dense medium (such as glass) to a light medium (e.g. air)
+        // Transmission mode assumed no change of direction (unlike refraction) and no total reflection is possible.
+        // This may violate the conservation of energy principle (e.g. cause false amplification).
+        // To obtain meaningful results, we ignore the losses in this case.
+        if (interaction_type == 1 && dense_to_light)
+            T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type
         double eTE_Re = (interaction_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
@@ -644,33 +706,14 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             p_normal_vecN[i_rayN] = (dtype)Nx;
             p_normal_vecN[i_rayN + n_rayN_t] = (dtype)Ny;
             p_normal_vecN[i_rayN + 2 * n_rayN_t] = (dtype)Nz;
-
-            // SBS normal vector
-            if (iSBS != 0)
-            {
-                V1x = (double)p_mesh[iSBS - 1],
-                V1y = (double)p_mesh[iSBS - 1 + n_mesh_t],
-                V1z = (double)p_mesh[iSBS - 1 + 2 * n_mesh_t];
-                E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh_t] - V1x,
-                E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh_t] - V1y,
-                E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh_t] - V1z;
-                E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh_t] - V1x,
-                E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh_t] - V1y,
-                E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh_t] - V1z;
-                Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;  // Mesh surface normal
-                scl = 1.0 / std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz), Nx *= scl, Ny *= scl, Nz *= scl; // Normalize to 1
-
-                p_normal_vecN[i_rayN + 3 * n_rayN_t] = (dtype)Nx;
-                p_normal_vecN[i_rayN + 4 * n_rayN_t] = (dtype)Ny;
-                p_normal_vecN[i_rayN + 5 * n_rayN_t] = (dtype)Nz;
-            }
-            else
-            {
-                p_normal_vecN[i_rayN + 3 * n_rayN_t] = (dtype)0.0;
-                p_normal_vecN[i_rayN + 4 * n_rayN_t] = (dtype)0.0;
-                p_normal_vecN[i_rayN + 5 * n_rayN_t] = (dtype)0.0;
-            }
+            p_normal_vecN[i_rayN + 3 * n_rayN_t] = (dtype)Mx;
+            p_normal_vecN[i_rayN + 4 * n_rayN_t] = (dtype)My;
+            p_normal_vecN[i_rayN + 5 * n_rayN_t] = (dtype)Mz;
         }
+
+        // Write out_typeN
+        if (p_out_typeN != nullptr)
+            p_out_typeN[i_rayN] = (out_type != 0 && interaction_type == 2 && total_reflection) ? out_type + 1 : out_type;
     }
 
     // Delete ray index
@@ -684,7 +727,8 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
                                               const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, const arma::Col<float> *orig_length,
                                               arma::Mat<float> *origN, arma::Mat<float> *destN, arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
                                               arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Col<float> *orig_lengthN,
-                                              arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN, arma::Mat<float> *normal_vecN);
+                                              arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
+                                              arma::Mat<float> *normal_vecN, arma::Col<int> *out_typeN);
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, double center_frequency,
                                               const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
@@ -693,4 +737,5 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, const arma::Col<double> *orig_length,
                                               arma::Mat<double> *origN, arma::Mat<double> *destN, arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
-                                              arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN, arma::Mat<double> *normal_vecN);
+                                              arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
+                                              arma::Mat<double> *normal_vecN, arma::Col<int> *out_typeN);
