@@ -46,6 +46,7 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\arrayant_qdant_read.mexw64 \
 	   +quadriga_lib\arrayant_qdant_write.mexw64 \
 	   +quadriga_lib\arrayant_rotate_pattern.mexw64 \
+	   +quadriga_lib\calc_diffraction_gain.mexw64 \
 	   +quadriga_lib\calc_rotation_matrix.mexw64 \
 	   +quadriga_lib\cart2geo.mexw64 \
 	   +quadriga_lib\generate_diffraction_paths.mexw64 \
@@ -97,6 +98,9 @@ build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
 build\ray_mesh_interact.obj:   src\ray_mesh_interact.cpp   include\quadriga_tools.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
+build\calc_diffraction_gain.obj:   src\calc_diffraction_gain.cpp   include\quadriga_tools.hpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
 	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
@@ -106,7 +110,8 @@ build\libhdf5.lib:
 
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
-						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\libhdf5.lib
+						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\calc_diffraction_gain.obj \
+						build\libhdf5.lib
     lib /OUT:$@ $**
 
 # MEX MATLAB interface
@@ -127,6 +132,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 
 +quadriga_lib\arrayant_qdant_write.mexw64:   mex\arrayant_qdant_write.cpp   build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\calc_diffraction_gain.mexw64:   mex\calc_diffraction_gain.cpp   build\calc_diffraction_gain.obj   build\quadriga_tools.obj   build\ray_triangle_intersect.obj   build\ray_mesh_interact.obj
+   $(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\arrayant_rotate_pattern.mexw64:   mex\arrayant_rotate_pattern.cpp   build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)

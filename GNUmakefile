@@ -86,16 +86,19 @@ build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.h
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H)
 
 build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_interpolate.hpp
-	$(CC) $(CCFLAGS) -fopenmp -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/qd_channel.o:   src/qd_channel.cpp   include/quadriga_channel.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(HDF5_H)
 
+build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
+	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
 
-build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
-	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+build/calc_diffraction_gain.o:   src/calc_diffraction_gain.cpp   include/quadriga_tools.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
 
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
@@ -109,7 +112,7 @@ build/libhdf5.a:
 
 lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-					  build/ray_triangle_intersect.o   build/ray_mesh_interact.o
+					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 	( cd build/ && ar x libhdf5.a && cd .. )
 	ar rcs $@ $^ build/H5*.o
 
@@ -121,6 +124,7 @@ lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.
 +quadriga_lib/arrayant_qdant_read.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mexa64:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mexa64:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mexa64:                    build/quadriga_tools.o
 +quadriga_lib/generate_diffraction_paths.mexa64:  build/quadriga_tools.o
@@ -154,6 +158,7 @@ lib/quadriga_lib.a:   build/libhdf5.a   build/quadriga_lib.o  build/qd_arrayant.
 +quadriga_lib/arrayant_qdant_read.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mex:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mex:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mex:                    build/quadriga_tools.o
 +quadriga_lib/generate_diffraction_paths.mex:  build/quadriga_tools.o

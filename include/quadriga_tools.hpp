@@ -60,6 +60,18 @@ namespace quadriga_lib
 
     // ----  Site-Specific Simulation Tools ----
 
+    // Calculate diffraction gain for multiple transmit and receive positions
+    template <typename dtype>                                      // Supported types: float or double
+    void calc_diffraction_gain(const arma::Mat<dtype> *orig,       // Origin points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *dest,       // Destination points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *mesh,       // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
+                               const arma::Mat<dtype> *mtl_prop,   // Material properties; Size: [ no_mesh, 5 ]
+                               dtype center_frequency,             // Center frequency in [Hz]
+                               int lod = 2,                        // Level of detail, scalar values 0-6
+                               arma::Col<dtype> *gain = nullptr,   // Diffraction gain; linear scale; Size: [ n_pos ]
+                               arma::Cube<dtype> *coord = nullptr, // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
+                               int verbose = 0);                   // Verbosity level
+
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
     // - Size of the output arguments is adjusted if it does not match the required size
@@ -138,7 +150,7 @@ namespace quadriga_lib
     // - Number of input rays: n_ray
     // - Only returns rays that interact with the mesh, i.e. n_rayN <= n_ray
     // - Outputs {trivecN, tridirN, orig_lengthN} will be empty if inputs {trivec, tridir, orig_length} are not provided
-    // - In refraction mode, paths exhibiting 'total reflection' will have zero-power
+    // - In refraction mode, paths exhibiting 'total reflection' will have zero-power, but will be included in the output
     template <typename dtype>
     void ray_mesh_interact(int interaction_type,                          // Interaction type: (0) Reflection, (1) Transmission, (2) Refraction
                            dtype center_frequency,                        // Center frequency in [Hz]
@@ -163,7 +175,8 @@ namespace quadriga_lib
                            arma::Col<dtype> *fbs_angleN = nullptr,        // Angle between incoming ray and FBS in [rad], Size [ n_rayN ]
                            arma::Col<dtype> *thicknessN = nullptr,        // Material thickness in meters calculated from the difference between FBS and SBS, Size [ n_rayN ]
                            arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
-                           arma::Mat<dtype> *normal_vecN = nullptr);      // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
+                           arma::Mat<dtype> *normal_vecN = nullptr,       // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
+                           arma::Col<int> *out_typeN = nullptr);          // Output type code
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
