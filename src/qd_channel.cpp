@@ -239,7 +239,7 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
 
         // Add an attribute to store the number of contained snapshots
         unsigned value = 0;
-        size_t dims = 3;
+        const hsize_t dims = 3;
         hid_t dspace_scalar = H5Screate(H5S_SCALAR);
         hid_t dspace_id = H5Screate_simple(1, &dims, NULL);
 
