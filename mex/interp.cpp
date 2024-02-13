@@ -25,10 +25,10 @@ SECTION!*/
 
 /*!MD
 # INTERP
-2D and 1D linear interpolation. 
+2D and 1D linear interpolation.
 
 ## Description:
-This function implements 2D and 1D linear interpolation. 
+This function implements 2D and 1D linear interpolation.
 
 ## Usage:
 
@@ -48,22 +48,21 @@ dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 
 - **`data`**<br>
   The input data tensor; single or double; Size: `[ny, nx, ne]` or `[1, nx, ne]` for 1D case <br>
-  The 3rd dimension enables interpolation for mutiple datasets simultaneously. 
+  The 3rd dimension enables interpolation for mutiple datasets simultaneously.
 
 - **`xI`**<br>
-  Vector of sample points in x direction for which data should be interpolated; single or double; 
+  Vector of sample points in x direction for which data should be interpolated; single or double;
   Length: `[nxI]`
 
 - **`yI`**<br>
-  Vector of sample points in y direction for which data should be interpolated; single or double; 
+  Vector of sample points in y direction for which data should be interpolated; single or double;
   Length: `[nyI]`
 
 ## Output Arguments:
 - **`dataI`**<br>
-  The interpolated dat; single or double (same as `data`); 
+  The interpolated dat; single or double (same as `data`);
   Size: `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case <br>
 MD!*/
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -78,7 +77,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // zi   The interpolated data; size [ nyi, nxi, ne ]
 
     // Number of in and outputs
-    if (nlhs != 1 || nrhs < 4)
+    if (nlhs != 1 || nrhs < 4 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:interp:no_input", "Wrong number of input/output arguments.");
 
     bool use_single = false;
