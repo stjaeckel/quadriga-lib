@@ -6,7 +6,7 @@ res = 0.02;
 no_pos  = 1e5;
 scl = 10;
 
-lod = 5;
+lod = 4;
 
 s1  = 1;
 xo1 = 0  ;

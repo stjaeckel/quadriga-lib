@@ -314,12 +314,47 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
 
         // Build global ray index for the current segment
         arma::Col<size_t> s_iRAY = arma::regspace<arma::Col<size_t>>(0, n_ray_t - 1);
+        size_t n_ray_r = n_ray_t; // Number of rays in reduced set (starts with all rays)
+
+        // Check which rays have been discontinued in a previous segment
+        if (iS != 0) // Only for second segment and onwards
+        {
+            // Allocate memory for continued rays start and end points
+            arma::Mat<dtype> c_orig(n_ray_t, 3, arma::fill::none);
+            arma::Mat<dtype> c_dest(n_ray_t, 3, arma::fill::none);
+            arma::Col<size_t> c_iRAY(n_ray_t); // New ray index
+
+            size_t n_continue = 0;
+            size_t previous_segment_ind = (iS - 1) * n_ray_t;
+            for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
+            {
+                size_t iG = s_iRAY.at(iR);
+                dtype power = p_weight[previous_segment_ind + iG];
+                if (power > (dtype)1.0e-20) // Continue ray
+                {
+                    size_t iC = n_continue++;
+                    c_orig.at(iC, 0) = s_orig.at(iR, 0), c_orig.at(iC, 1) = s_orig.at(iR, 1), c_orig.at(iC, 2) = s_orig.at(iR, 2);
+                    c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                    c_iRAY.at(iC) = iG;
+                }
+                else // Set current segment power to 0 as well
+                    p_weight[iS * n_ray_t + iG] = (dtype)0.0;
+            }
+
+            // Create reduced set of rays
+            if (n_continue < n_ray_t)
+            {
+                s_orig = arma::resize(c_orig, n_continue, 3);
+                s_dest = arma::resize(c_dest, n_continue, 3);
+                s_iRAY = arma::resize(c_iRAY, n_continue, 1);
+                n_ray_r = n_continue;
+            }
+        }
 
         // Trace the rays of the current segment. Find where they are blocked by objects.
         // Calculate losses caused by materials until destination point is reached.
 
-        size_t n_ray_r = n_ray_t; // Number of rays in reduced set (starts with all rays)
-        while (n_ray_r > 0)       // Run until there is no ray left to trace
+        while (n_ray_r > 0) // Run until there is no ray left to trace
         {
             if (verbose) // Debug output
                 std::cout << "  Seg. " << iS << " : " << MioNum(n_ray_r) << " rays" << std::flush;
@@ -364,35 +399,32 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
             int *p_typeN = typeN.memptr();   // Pointer to 'typeN'
 
             // Count double and multi-interactions
-            size_t n_tripple = 0; // Counter for 3 or more hits
-            if (no_mesh_hit != 0)
-            {
-                for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
-                {
-                    if (p_no_interact[iR] > 1)
-                        ++n_tripple;
-                }
-            }
+            size_t n_continue = 0;                  // Counter for continued rays
+            for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
+                if (p_no_interact[iR] > 1)
+                    ++n_continue;
 
             // Allocate memory for multi-hit start and end points
-            arma::Mat<dtype> origT(n_tripple, 3, arma::fill::none);
-            arma::Mat<dtype> destT(n_tripple, 3, arma::fill::none);
-            arma::Col<size_t> iRAY_T(n_tripple); // New ray index
+            arma::Mat<dtype> c_orig(n_continue, 3, arma::fill::none);
+            arma::Mat<dtype> c_dest(n_continue, 3, arma::fill::none);
+            arma::Col<size_t> c_iRAY(n_continue); // New ray index
 
             // Update path weights, taking material effects into account
-            n_tripple = 0;                          // Rest counter
+            n_continue = 0;                         // Rest counter
             for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
             {
-                unsigned nH = p_no_interact[iR];           // Number of mesh-hits between "orig" and "dest"
-                size_t iH = p_hit_ind[iR];                 // Ray index in reduced set
+                unsigned nH = p_no_interact[iR]; // Number of mesh-hits between "orig" and "dest"
+                unsigned iM1 = p_fbs_ind[iR];    // Material index of FBS, 1-based
+                unsigned iM2 = p_sbs_ind[iR];    // Material index of SBS, 1-based
+
                 size_t iG = s_iRAY.at(iR);                 // Ray index in global set
-                int typeH = (nH == 0) ? 0 : p_typeN[iH];   // Hit-type
-                unsigned iM1 = p_fbs_ind[iR];              // Material index of FBS, 1-based
-                unsigned iM2 = p_sbs_ind[iR];              // Material index of SBS, 1-based
                 unsigned RS = p_ray_state[iG];             // Ray state, 0 = outside, otherwise material index of current material
                 unsigned NT = p_next_transition[iG];       // Next transition buffer, usually 0 unless mesh overlap
                 dtype power = p_weight[iS * n_ray_t + iG]; // Current segment weight
-                dtype interaction_gain = p_gainN[iH];      // Gain calculated by "quadriga_lib::ray_mesh_interact"
+
+                size_t iH = p_hit_ind[iR];                                     // Ray index in reduced set
+                int typeH = (nH == 0) ? 0 : p_typeN[iH];                       // Hit-type
+                dtype interaction_gain = (nH == 0) ? (dtype)1.0 : p_gainN[iH]; // Gain calculated by "quadriga_lib::ray_mesh_interact"
 
                 if (nH == 0 && RS != 0) // Entire ray is inside the object
                 {
@@ -472,10 +504,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         // Add path to next iteration
                         if (power > (dtype)1.0e-20)
                         {
-                            size_t iT = n_tripple++;
-                            origT.at(iT, 0) = origN.at(iH, 0), origT.at(iT, 1) = origN.at(iH, 1), origT.at(iT, 2) = origN.at(iH, 2);
-                            destT.at(iT, 0) = s_dest.at(iR, 0), destT.at(iT, 1) = s_dest.at(iR, 1), destT.at(iT, 2) = s_dest.at(iR, 2);
-                            iRAY_T.at(iT) = iG;
+                            size_t iC = n_continue++;
+                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
+                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                            c_iRAY.at(iC) = iG;
                         }
                     }
                     else // Double hit, (i) + o-i-o, overlapping mesh
@@ -487,10 +519,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         // Add path to next iteration
                         if (power > (dtype)1.0e-20)
                         {
-                            size_t iT = n_tripple++;
-                            origT.at(iT, 0) = origN.at(iH, 0), origT.at(iT, 1) = origN.at(iH, 1), origT.at(iT, 2) = origN.at(iH, 2);
-                            destT.at(iT, 0) = s_dest.at(iR, 0), destT.at(iT, 1) = s_dest.at(iR, 1), destT.at(iT, 2) = s_dest.at(iR, 2);
-                            iRAY_T.at(iT) = iG;
+                            size_t iC = n_continue++;
+                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
+                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                            c_iRAY.at(iC) = iG;
                         }
                     }
                 }
@@ -508,10 +540,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             // Add path to next iteration
                             if (power > (dtype)1.0e-20)
                             {
-                                size_t iT = n_tripple++;
-                                origT.at(iT, 0) = origN.at(iH, 0), origT.at(iT, 1) = origN.at(iH, 1), origT.at(iT, 2) = origN.at(iH, 2);
-                                destT.at(iT, 0) = s_dest.at(iR, 0), destT.at(iT, 1) = s_dest.at(iR, 1), destT.at(iT, 2) = s_dest.at(iR, 2);
-                                iRAY_T.at(iT) = iG;
+                                size_t iC = n_continue++;
+                                c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
+                                c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                                c_iRAY.at(iC) = iG;
                             }
                         }
                     }
@@ -536,10 +568,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         // Add path to next iteration
                         if (power > (dtype)1.0e-20)
                         {
-                            size_t iT = n_tripple++;
-                            origT.at(iT, 0) = origN.at(iH, 0), origT.at(iT, 1) = origN.at(iH, 1), origT.at(iT, 2) = origN.at(iH, 2);
-                            destT.at(iT, 0) = s_dest.at(iR, 0), destT.at(iT, 1) = s_dest.at(iR, 1), destT.at(iT, 2) = s_dest.at(iR, 2);
-                            iRAY_T.at(iT) = iG;
+                            size_t iC = n_continue++;
+                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
+                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                            c_iRAY.at(iC) = iG;
                         }
                     }
                     else
@@ -794,10 +826,10 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     // Add path to next iteration
                     if (power > (dtype)1.0e-20)
                     {
-                        size_t iT = n_tripple++;
-                        origT.at(iT, 0) = origN.at(iH, 0), origT.at(iT, 1) = origN.at(iH, 1), origT.at(iT, 2) = origN.at(iH, 2);
-                        destT.at(iT, 0) = s_dest.at(iR, 0), destT.at(iT, 1) = s_dest.at(iR, 1), destT.at(iT, 2) = s_dest.at(iR, 2);
-                        iRAY_T.at(iT) = iG;
+                        size_t iC = n_continue++;
+                        c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
+                        c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
+                        c_iRAY.at(iC) = iG;
                     }
                 }
                 else // Drop ray
@@ -822,16 +854,16 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
             }
 
             if (verbose == 1) // Debug output
-                std::cout << " (" << MioNum(n_tripple) << " continued)" << std::endl;
+                std::cout << " (" << MioNum(n_continue) << " continued)" << std::endl;
 
             // Add multi-hits to a new launch config
-            if (n_tripple > 0)
+            if (n_continue > 0)
             {
-                s_orig = arma::resize(origT, n_tripple, 3);
-                s_dest = arma::resize(destT, n_tripple, 3);
-                s_iRAY = arma::resize(iRAY_T, n_tripple, 1);
+                s_orig = arma::resize(c_orig, n_continue, 3);
+                s_dest = arma::resize(c_dest, n_continue, 3);
+                s_iRAY = arma::resize(c_iRAY, n_continue, 1);
             }
-            n_ray_r = n_tripple;
+            n_ray_r = n_continue;
 
             // Clear hit index
             delete[] p_hit_ind;

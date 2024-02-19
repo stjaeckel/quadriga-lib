@@ -1,8 +1,8 @@
 % INTERP
-%    2D and 1D linear interpolation. 
+%    2D and 1D linear interpolation.
 %    
 % Description:
-%    This function implements 2D and 1D linear interpolation. 
+%    This function implements 2D and 1D linear interpolation.
 %    
 % Usage:
 %    
@@ -20,19 +20,19 @@
 %    
 %    - data
 %      The input data tensor; single or double; Size: [ny, nx, ne] or [1, nx, ne] for 1D case 
-%      The 3rd dimension enables interpolation for mutiple datasets simultaneously. 
+%      The 3rd dimension enables interpolation for mutiple datasets simultaneously.
 %    
 %    - xI
-%      Vector of sample points in x direction for which data should be interpolated; single or double; 
+%      Vector of sample points in x direction for which data should be interpolated; single or double;
 %      Length: [nxI]
 %    
 %    - yI
-%      Vector of sample points in y direction for which data should be interpolated; single or double; 
+%      Vector of sample points in y direction for which data should be interpolated; single or double;
 %      Length: [nyI]
 %    
 % Output Arguments:
 %    - dataI
-%      The interpolated dat; single or double (same as data); 
+%      The interpolated dat; single or double (same as data);
 %      Size: [nyI, nxI, ne] or [1, nxI, ne] for 1D case 
 %
 %
