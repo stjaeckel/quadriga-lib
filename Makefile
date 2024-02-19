@@ -61,6 +61,7 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\hdf5_reshape_layout.mexw64 \
 	   +quadriga_lib\hdf5_write_channel.mexw64 \
 	   +quadriga_lib\hdf5_write_dset.mexw64 \
+	   +quadriga_lib\hdf5_version.mexw64 \
 	   +quadriga_lib\icosphere.mexw64 \
 	   +quadriga_lib\interp.mexw64 \
 	   +quadriga_lib\obj_file_read.mexw64 \
@@ -179,6 +180,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\hdf5_write_dset.mexw64:   mex\hdf5_write_dset.cpp   build\qd_channel.obj   build\libhdf5.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\hdf5_version.mexw64:   mex\hdf5_version.cpp   build\qd_channel.obj   build\libhdf5.lib
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\icosphere.mexw64:   mex\icosphere.cpp   build\quadriga_tools.obj
