@@ -30,7 +30,7 @@
 #include <cpuid.h>
 #endif
 
-bool isAVX2Supported()
+static bool isAVX2Supported()
 {
     std::vector<int> cpuidInfo(4);
 
