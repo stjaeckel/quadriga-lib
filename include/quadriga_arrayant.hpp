@@ -45,13 +45,18 @@ namespace quadriga_lib
         arrayant(){};                                // Default constructor
 
         // Functions to determine the size of the array antenna properties
-        unsigned long long n_elevation() const; // Number of elevation angles
-        unsigned long long n_azimuth() const;   // Number of azimuth angles
-        unsigned long long n_elements() const;  // Number of antenna elements
-        unsigned long long n_ports() const;     // Number of ports (after coupling of elements)
+        arma::uword n_elevation() const; // Number of elevation angles
+        arma::uword n_azimuth() const;   // Number of azimuth angles
+        arma::uword n_elements() const;  // Number of antenna elements
+        arma::uword n_ports() const;     // Number of ports (after coupling of elements)
+
+        // Adds elements of "new_arrayant" to the current one
+        // - Returns a new arrayant that is a combination of the two
+        // - Throws an error if grids don't match
+        arrayant<dtype> append(const arrayant<dtype> *new_arrayant) const;
 
         // Calculate the directivity of an antenna element in dBi
-        dtype calc_directivity_dBi(unsigned element) const;
+        dtype calc_directivity_dBi(arma::uword i_element) const;
 
         // Calculates a virtual pattern of the given array by applying coupling and element positions
         // Calling this function without an argument updates the arrayant properties inplace
@@ -61,8 +66,8 @@ namespace quadriga_lib
         arrayant<dtype> copy() const;
 
         // Copy antenna elements, enlarges array size if needed (0-based indices)
-        void copy_element(unsigned long long source, arma::uvec destination);
-        void copy_element(unsigned long long source, unsigned long long destination);
+        void copy_element(arma::uword source, arma::uvec destination);
+        void copy_element(arma::uword source, arma::uword destination);
 
         // Interpolation of the antenna pattern
         void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
@@ -107,7 +112,7 @@ namespace quadriga_lib
         // - Data in other properties may contain garbage
         // - Only performs a size update if exisiting size is different from new size
         // - Returns error when read-only
-        void set_size(unsigned long long n_elevation, unsigned long long n_azimuth, unsigned long long n_elements, unsigned long long n_ports);
+        void set_size(arma::uword n_elevation, arma::uword n_azimuth, arma::uword n_elements, arma::uword n_ports);
 
         // Validate integrity
         std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise

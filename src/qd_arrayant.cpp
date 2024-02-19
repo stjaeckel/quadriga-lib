@@ -34,8 +34,8 @@ SECTION!*/
 Class for storing and manipulating array antenna models
 
 ## Description:
-- An array antenna consists of multiple individual elements. 
-- Each element occupies a specific position relative to the array's phase-center, its local origin. 
+- An array antenna consists of multiple individual elements.
+- Each element occupies a specific position relative to the array's phase-center, its local origin.
 - Elements can also be inter-coupled, represented by a coupling matrix.
 
 ## Attributes:
@@ -98,22 +98,22 @@ ant.name = "name";
 MD!*/
 
 template <typename dtype>
-unsigned long long quadriga_lib::arrayant<dtype>::n_elevation() const
+arma::uword quadriga_lib::arrayant<dtype>::n_elevation() const
 {
     return e_theta_re.n_rows;
 }
 template <typename dtype>
-unsigned long long quadriga_lib::arrayant<dtype>::n_azimuth() const
+arma::uword quadriga_lib::arrayant<dtype>::n_azimuth() const
 {
     return e_theta_re.n_cols;
 }
 template <typename dtype>
-unsigned long long quadriga_lib::arrayant<dtype>::n_elements() const
+arma::uword quadriga_lib::arrayant<dtype>::n_elements() const
 {
     return e_theta_re.n_slices;
 }
 template <typename dtype>
-unsigned long long quadriga_lib::arrayant<dtype>::n_ports() const
+arma::uword quadriga_lib::arrayant<dtype>::n_ports() const
 {
     if (coupling_re.empty() && coupling_im.empty())
         return e_theta_re.n_slices;
@@ -123,15 +123,79 @@ unsigned long long quadriga_lib::arrayant<dtype>::n_ports() const
         return coupling_re.n_cols;
 }
 
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadriga_lib::arrayant<dtype> *new_arrayant) const
+{
+    // Check if arrayant objects are valid
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+    error_message = new_arrayant->is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Check if grids are identical
+    bool eq = arma::approx_equal(azimuth_grid, new_arrayant->azimuth_grid, "absdiff", (dtype)1.0e-6);
+    if (!eq)
+    {
+        error_message = "Azimuth sampling grids don't match.";
+        throw std::invalid_argument(error_message.c_str());
+    }
+    eq = arma::approx_equal(elevation_grid, new_arrayant->elevation_grid, "absdiff", (dtype)1.0e-6);
+    if (!eq)
+    {
+        error_message = "Elevation sampling grids don't match.";
+        throw std::invalid_argument(error_message.c_str());
+    }
+
+    arma::uword n_elevation = this->n_elevation();
+    arma::uword n_azimuth = this->n_azimuth();
+    arma::uword n_elements_1 = this->n_elements();
+    arma::uword n_elements_2 = new_arrayant->n_elements();
+    arma::uword n_ports_1 = this->n_ports();
+    arma::uword n_ports_2 = new_arrayant->n_ports();
+
+    quadriga_lib::arrayant<dtype> output;
+    output.set_size(n_elevation, n_azimuth, n_elements_1 + n_elements_2, n_ports_1 + n_ports_2);
+
+    // Copy data from first antenna
+    std::memcpy(output.azimuth_grid.memptr(), this->azimuth_grid.memptr(), n_azimuth * sizeof(dtype));
+    std::memcpy(output.elevation_grid.memptr(), this->elevation_grid.memptr(), n_elevation * sizeof(dtype));
+    std::memcpy(output.e_theta_re.slice_memptr(0), this->e_theta_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
+    std::memcpy(output.e_theta_im.slice_memptr(0), this->e_theta_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
+    std::memcpy(output.e_phi_re.slice_memptr(0), this->e_phi_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
+    std::memcpy(output.e_phi_im.slice_memptr(0), this->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_1 * sizeof(dtype));
+    std::memcpy(output.element_pos.colptr(0), this->element_pos.colptr(0), 3 * n_elements_1 * sizeof(dtype));
+    for (arma::uword n = 0; n < n_ports_1; ++n)
+    {
+        std::memcpy(output.coupling_re.colptr(n), this->coupling_re.colptr(n), n_elements_1 * sizeof(dtype));
+        std::memcpy(output.coupling_im.colptr(n), this->coupling_im.colptr(n), n_elements_1 * sizeof(dtype));
+    }
+
+    // Copy data from second antenna
+    std::memcpy(output.e_theta_re.slice_memptr(n_elements_1), new_arrayant->e_theta_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
+    std::memcpy(output.e_theta_im.slice_memptr(n_elements_1), new_arrayant->e_theta_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
+    std::memcpy(output.e_phi_re.slice_memptr(n_elements_1), new_arrayant->e_phi_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
+    std::memcpy(output.e_phi_im.slice_memptr(n_elements_1), new_arrayant->e_phi_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
+    std::memcpy(output.element_pos.colptr(n_elements_1), new_arrayant->element_pos.colptr(0), 3 * n_elements_2 * sizeof(dtype));
+    for (arma::uword n = 0; n < n_ports_2; ++n)
+    {
+        std::memcpy(output.coupling_re.colptr(n + n_ports_1) + n_elements_1, new_arrayant->coupling_re.colptr(n), n_elements_2 * sizeof(dtype));
+        std::memcpy(output.coupling_im.colptr(n + n_ports_1) + n_elements_1, new_arrayant->coupling_im.colptr(n), n_elements_2 * sizeof(dtype));
+    }
+
+    return output;
+}
+
 /*!MD
 # .calc_directivity_dBi
 Calculate the directivity (in dBi) of array antenna elements
 
 ## Description:
 - Member function of <a href="#arrayant">arrayant</a>
-- Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
-  is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
-  from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
+- Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted
+  is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction
+  from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity
   of a hypothetical isotropic radiator is 1, or 0 dBi.
 - Allowed datatypes (`dtype`): `float` and `double`
 
@@ -150,18 +214,18 @@ float directivity = ant.calc_directivity_dBi( 0 );
 MD!*/
 
 template <typename dtype>
-dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) const
+dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const
 {
     // Check if arrayant object is valid
     std::string error_message = is_valid();
-    if (error_message.length() == 0 && element >= n_elements())
+    if (error_message.length() == 0 && i_element >= n_elements())
         error_message = "Element index out of bound.";
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
     // Constants
     double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
-    unsigned long long naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
+    arma::uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
 
     // Az and El grid as double
     arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
@@ -170,19 +234,19 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
     // Calculate the azimuth weights
     arma::vec waz(naz, arma::fill::none);
     double *ptr = waz.memptr();
-    for (auto i = 0ULL; i < naz; ++i)
+    for (arma::uword i = 0; i < naz; ++i)
     {
-        double x = i == 0ULL ? az.at(naz - 1) - pi2 : az.at(i - 1);
-        double y = i == naz - 1 ? az.at(0ULL) + pi2 : az.at(i + 1);
+        double x = i == 0 ? az.at(naz - 1) - pi2 : az.at(i - 1);
+        double y = i == naz - 1 ? az.at(0) + pi2 : az.at(i + 1);
         ptr[i] = y - x;
     }
 
     // Calculate the elevation weights
     arma::vec wel(nel, arma::fill::none);
     ptr = wel.memptr();
-    for (auto i = 0ULL; i < nel; ++i)
+    for (arma::uword i = 0; i < nel; ++i)
     {
-        double x = i == 0ULL ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
+        double x = i == 0 ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
         double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * elevation_grid.at(i + 1);
         arma::vec tmp = arma::linspace<arma::vec>(x, y, 21);
         double val = arma::accu(arma::cos(tmp));
@@ -198,14 +262,14 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(unsigned element) cons
             *ptr = *row * *col, norm += *ptr++;
     ptr = W.memptr();
     norm = 1.0 / norm;
-    for (auto i = 0ULL; i < naz * nel; ++i)
+    for (arma::uword i = 0; i < naz * nel; ++i)
         ptr[i] *= norm;
 
     // Calculate the directivity
     double p_sum = 0.0, p_max = 0.0;
-    const dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr();
-    const dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();
-    for (auto i = 0ULL; i < naz * nel; ++i)
+    const dtype *p_theta_re = e_theta_re.slice_memptr(i_element), *p_theta_im = e_theta_im.slice_memptr(i_element);
+    const dtype *p_phi_re = e_phi_re.slice_memptr(i_element), *p_phi_im = e_phi_im.slice_memptr(i_element);
+    for (arma::uword i = 0; i < naz * nel; ++i)
     {
         double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
         double pow = a * a + b * b + c * c + d * d;
@@ -223,12 +287,12 @@ Calculate effective radiation patterns for array antennas
 
 ## Description:
 - Member function of <a href="#arrayant">arrayant</a>
-- By integrating element radiation patterns, element positions, and the coupling weights, one can 
-  determine an effective radiation pattern observable by a receiver in the antenna's far field. 
-- Leveraging these effective patterns is especially beneficial in antenna design, beamforming 
-  applications such as in 5G systems, and in planning wireless communication networks in complex 
-  environments like urban areas. This streamlined approach offers a significant boost in computation 
-  speed when calculating MIMO channel coefficients, as it reduces the number of necessary operations. 
+- By integrating element radiation patterns, element positions, and the coupling weights, one can
+  determine an effective radiation pattern observable by a receiver in the antenna's far field.
+- Leveraging these effective patterns is especially beneficial in antenna design, beamforming
+  applications such as in 5G systems, and in planning wireless communication networks in complex
+  environments like urban areas. This streamlined approach offers a significant boost in computation
+  speed when calculating MIMO channel coefficients, as it reduces the number of necessary operations.
 - Allowed datatypes (`dtype`): `float` and `double`
 
 ## Declaration:
@@ -238,7 +302,7 @@ void combine_pattern(arrayant<dtype> *output);
 
 ## Arguments:
 - `arrayant<dtype> *output`<br>
-  Pointer to an arrayant object the the results should be written to. Calling this function without 
+  Pointer to an arrayant object the the results should be written to. Calling this function without
   an argument or passing `nullptr` updates the arrayant properties of `this` arrayant inplace.
 MD!*/
 
@@ -399,19 +463,19 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
 
 // Copy antenna elements, enlarge array size if needed
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, arma::uvec destination)
+void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination)
 {
     // Check if arrayant object is valid
     std::string error_message = validate(); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    unsigned long long n_el = e_theta_re.n_rows;
-    unsigned long long n_az = e_theta_re.n_cols;
-    unsigned long long n_ang = n_el * n_az;
-    unsigned long long n_elements = e_theta_re.n_slices;
-    unsigned long long n_element_max = (unsigned long long)destination.max() + 1ULL;
-    unsigned long long n_ports = coupling_re.n_cols;
+    arma::uword n_el = e_theta_re.n_rows;
+    arma::uword n_az = e_theta_re.n_cols;
+    arma::uword n_ang = n_el * n_az;
+    arma::uword n_elements = e_theta_re.n_slices;
+    arma::uword n_element_max = destination.max() + 1;
+    arma::uword n_ports = coupling_re.n_cols;
 
     if (source >= n_elements)
         error_message = "Source index out of bound";
@@ -421,7 +485,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, arma
     // Enlarge existing arrayant object
     if (n_element_max > n_elements)
     {
-        unsigned long long added_elements = n_element_max - n_elements;
+        arma::uword added_elements = n_element_max - n_elements;
         e_theta_re.resize(n_el, n_az, n_element_max);
         e_theta_im.resize(n_el, n_az, n_element_max);
         e_phi_re.resize(n_el, n_az, n_element_max);
@@ -429,8 +493,8 @@ void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, arma
         element_pos.resize(3, n_element_max);
         coupling_re.resize(n_element_max, n_ports + added_elements);
         coupling_im.resize(n_element_max, n_ports + added_elements);
-        for (auto i = 0ULL; i < added_elements; ++i)
-            coupling_re.at(n_elements + i, n_ports + i) = dtype(1.0);
+        for (arma::uword i = 0; i < added_elements; ++i)
+            coupling_re.at(n_elements + i, n_ports + i) = (dtype)1.0;
     }
 
     // Copy data from source to destination
@@ -457,7 +521,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, arma
 }
 
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::copy_element(unsigned long long source, unsigned long long destination)
+void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword destination)
 {
     arma::uvec dest(1);
     dest.at(0) = destination;
@@ -1258,8 +1322,8 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::set_size(unsigned long long n_elevation, unsigned long long n_azimuth,
-                                             unsigned long long n_elements, unsigned long long n_ports)
+void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uword n_azimuth,
+                                             arma::uword n_elements, arma::uword n_ports)
 {
     if (read_only)
     {
