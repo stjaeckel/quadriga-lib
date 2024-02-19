@@ -24,6 +24,7 @@
 #include "catch2_tests/test_qdant_write.cpp"
 #include "catch2_tests/test_arrayant_interpolate.cpp"
 #include "catch2_tests/test_arrayant_combine_pattern.cpp"
+#include "catch2_tests/test_arrayant.cpp"
 #include "catch2_tests/test_arrayant_generate.cpp"
 #include "catch2_tests/test_get_channels_spherical.cpp"
 #include "catch2_tests/test_get_channels_planar.cpp"
