@@ -16,7 +16,6 @@
 // ------------------------------------------------------------------------
 
 #include <catch2/catch_session.hpp>
-#include "catch2_tests/catch2_helper_functions.cpp"
 
 // Include test cases
 #include "catch2_tests/test_quadriga_tools.cpp"
