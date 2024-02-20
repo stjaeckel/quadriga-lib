@@ -23,7 +23,221 @@
 #include "qd_arrayant_qdant.hpp"
 #include "qd_arrayant_interpolate.hpp"
 
-#include "helper_functions.cpp"
+// #include "helper_functions.cpp"
+
+// Helper-function "quick_rotate"
+template <typename dtype>
+static inline void quick_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, size_t N)
+{
+    dtype cc = std::cos(bank), sc = std::sin(bank);
+    dtype cb = std::cos(tilt), sb = std::sin(tilt);
+    dtype ca = std::cos(heading), sa = std::sin(heading);
+
+    dtype R[9]; // Rotation Matrix
+    R[0] = ca * cb;
+    R[1] = sa * cb;
+    R[2] = -sb;
+    R[3] = ca * sb * sc - sa * cc;
+    R[4] = sa * sb * sc + ca * cc;
+    R[5] = cb * sc;
+    R[6] = ca * sb * cc + sa * sc;
+    R[7] = sa * sb * cc - ca * sc;
+    R[8] = cb * cc;
+
+    for (size_t i = 0; i < N; ++i)
+    {
+        size_t ix = 3 * i, iy = ix + 1, iz = ix + 2;
+        dtype a = R[0] * data3xN[ix] + R[3] * data3xN[iy] + R[6] * data3xN[iz];
+        dtype b = R[1] * data3xN[ix] + R[4] * data3xN[iy] + R[7] * data3xN[iz];
+        dtype c = R[2] * data3xN[ix] + R[5] * data3xN[iy] + R[8] * data3xN[iz];
+        data3xN[ix] = a, data3xN[iy] = b, data3xN[iz] = c;
+    }
+}
+
+// Helper function "quick_geo2cart"
+template <typename dtype>
+static inline void quick_geo2cart(size_t n,                  // Number of values
+                                  const dtype *az,           // Input azimuth angles
+                                  dtype *x, dtype *y,        // 2D Output coordinates (x, y)
+                                  const dtype *el = nullptr, // Input elevation angles (optional)
+                                  dtype *z = nullptr,        // Output z-coordinate (optional)
+                                  const dtype *r = nullptr)  // Input vector length (optional)
+{
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+    for (size_t in = 0; in < n; ++in)
+    {
+        dtype ca = az[in], sa = std::sin(ca);
+        ca = std::cos(ca);
+
+        dtype ce = (el == nullptr) ? one : std::cos(el[in]);
+        dtype se = (el == nullptr) ? zero : std::sin(el[in]);
+        dtype le = (r == nullptr) ? one : r[in];
+
+        x[in] = le * ce * ca;
+        y[in] = le * ce * sa;
+
+        if (z != nullptr)
+            z[in] = le * se;
+    }
+}
+
+// Helper function "quick_cart2geo"
+template <typename dtype>
+static inline void quick_cart2geo(size_t n,                       // Number of values
+                                  dtype *az,                      // Output azimuth angles
+                                  const dtype *x, const dtype *y, // 2D Input coordinates (x, y)
+                                  dtype *el = nullptr,            // Output elevation angles (optional)
+                                  const dtype *z = nullptr,       // Input z-coordinate (optional)
+                                  dtype *r = nullptr)             // Output vector length (optional)
+{
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+    for (size_t in = 0; in < n; ++in)
+    {
+        dtype xx = x[in], yy = y[in], zz = (z == nullptr) ? zero : z[in];
+        dtype le = std::sqrt(xx * xx + yy * yy + zz * zz);
+
+        if (r != nullptr)
+            r[in] = le;
+
+        le = one / le;
+        xx *= le, yy *= le, zz *= le;
+        xx = xx > one ? one : xx, yy = yy > one ? one : yy, zz = zz > one ? one : zz;
+
+        if (az != nullptr)
+            az[in] = std::atan2(yy, xx);
+
+        if (el != nullptr)
+            el[in] = std::asin(zz);
+    }
+}
+
+// Helper function "quick_multiply_3_mat"
+// Calculates the matrix product X = A^T * B * C
+// A, C can be NULL
+template <typename dtype>
+static inline void quick_multiply_3_mat(const dtype *A, // n rows, m columns
+                                        const dtype *B, // n rows, o columns
+                                        const dtype *C, // o rows, p columns
+                                        dtype *X,       // m rows, p columns
+                                        size_t n, size_t m, size_t o, size_t p)
+{
+    // Avoid expensive typecasts
+    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+
+    // Calculate the output row by row
+    for (size_t im = 0; im < m; ++im)
+    {
+        for (size_t ip = 0; ip < p; ip++) // Initialize output to zero
+            X[ip * m + im] = zero;
+
+        // Process temporary matrix T = A^H * B column-wise
+        for (size_t io = 0; io < o; ++io)
+        {
+            // Calculate one value of the temporary matrix T
+            dtype t = zero;
+            for (size_t in = 0; in < n; ++in)
+            {
+                dtype a = (A == nullptr) ? (im == in ? one : zero) : A[im * n + in];
+                t += a * B[io * n + in];
+            }
+
+            // Update all values of an entire row of the output matrix X = T * C
+            for (size_t ip = 0; ip < p; ++ip)
+            {
+                dtype c = (C == nullptr) ? (io == ip ? one : zero) : C[ip * o + io];
+                X[ip * m + im] += t * c;
+            }
+        }
+    }
+}
+
+// Helper function "quick_multiply_3_complex_mat"
+// Calculates the matrix product X = A^T * B * C
+// Ar, Ai, Cr, Ci can be NULL
+template <typename dtype>
+static inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n rows, m columns
+                                                const dtype *Br, const dtype *Bi, // n rows, o columns
+                                                const dtype *Cr, const dtype *Ci, // o rows, p columns
+                                                dtype *Xr, dtype *Xi,             // m rows, p columns
+                                                size_t n, size_t m, size_t o, size_t p)
+{
+    // Avoid expensive typecasts
+    constexpr dtype zero = (dtype)0.0, one = (dtype)1.0;
+
+    // Calculate the output row by row
+    for (size_t im = 0; im < m; ++im)
+    {
+        // Initialize output to zero
+        for (size_t ip = 0; ip < p; ++ip)
+            Xr[ip * m + im] = zero, Xi[ip * m + im] = zero;
+
+        // Process temporary matrix T = A^H * B column-wise
+        for (size_t io = 0; io < o; ++io)
+        {
+            // Calculate one value of the temporary matrix T
+            dtype tR = zero, tI = zero;
+            for (size_t in = 0; in < n; ++in)
+            {
+                dtype a_real = (Ar == nullptr) ? (im == in ? one : zero) : Ar[im * n + in];
+                dtype a_imag = (Ai == nullptr) ? zero : Ai[im * n + in];
+                tR += a_real * Br[io * n + in] - a_imag * Bi[io * n + in];
+                tI += a_real * Bi[io * n + in] + a_imag * Br[io * n + in];
+            }
+
+            // Update all values of an entire row of the output matrix X = T * C
+            for (size_t ip = 0; ip < p; ++ip)
+            {
+                dtype c_real = (Cr == nullptr) ? (io == ip ? one : zero) : Cr[ip * o + io];
+                dtype c_imag = (Ci == nullptr) ? zero : Ci[ip * o + io];
+                Xr[ip * m + im] += tR * c_real - tI * c_imag;
+                Xi[ip * m + im] += tR * c_imag + tI * c_real;
+            }
+        }
+    }
+}
+
+// Helper function "quick_power_mat"
+// - Calculates X = abs( A ).^2 + abs ( B ).^2
+// - Optional normalization of the columns by their sum-power
+// - Returns identity matrix normalization is true and inputs A/B are NULL
+template <typename dtype>
+static inline void quick_power_mat(size_t n, size_t m,                                   // Matrix dimensions (n=rows, m=columns)
+                                   dtype *X,                                             // Output X with n rows, m columns
+                                   bool normalize_columns = false,                       // Optional normalization
+                                   const dtype *Ar = nullptr, const dtype *Ai = nullptr, // Input A with n rows, m columns
+                                   const dtype *Br = nullptr, const dtype *Bi = nullptr) // Input B with n rows, m columns
+{
+    constexpr dtype zero = (dtype)0.0, one = (dtype)1.0, limit = (dtype)1.0e-10;
+    dtype avg = one / (dtype)n;
+
+    for (size_t im = 0; im < n * m; im += n)
+    {
+        dtype sum = zero;
+        for (size_t in = im; in < im + n; ++in)
+        {
+            X[in] = zero;
+            X[in] += (Ar == nullptr) ? zero : Ar[in] * Ar[in];
+            X[in] += (Ai == nullptr) ? zero : Ai[in] * Ai[in];
+            X[in] += (Br == nullptr) ? zero : Br[in] * Br[in];
+            X[in] += (Bi == nullptr) ? zero : Bi[in] * Bi[in];
+            sum += X[in];
+        }
+        if (normalize_columns)
+        {
+            if (Ar == nullptr && Ai == nullptr && Br == nullptr && Bi == nullptr) // Return identity matrix
+                X[im + im / n] = one;
+            else if (sum > limit) // Scale values by sum
+            {
+                sum = one / sum;
+                for (size_t in = im; in < im + n; ++in)
+                    X[in] *= sum;
+            }
+            else
+                for (size_t in = im; in < im + n; ++in)
+                    X[in] = avg;
+        }
+    }
+}
 
 /*!SECTION
 Array antenna class
@@ -1946,12 +2160,11 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa)
 {
     // Constants
-    constexpr dtype los_limit = dtype(1.0e-4);
-    constexpr dtype zero = dtype(0.0);
-    constexpr dtype one = dtype(1.0);
+    constexpr dtype los_limit = (dtype)1.0e-4;
+    constexpr dtype zero = (dtype)0.0;
     constexpr dtype rC = dtype(1.0 / 299792458.0); // 1 / (Speed of light)
-    dtype wavelength = center_frequency > zero ? dtype(299792458.0) / center_frequency : one;
-    dtype wave_number = dtype(2.095845021951682e-08) * center_frequency; // 2 * pi / C
+    dtype wavelength = (center_frequency > zero) ? (dtype)299792458.0 / center_frequency : (dtype)1.0;
+    dtype wave_number = (dtype)2.095845021951682e-08 * center_frequency; // 2 * pi / C
 
     // Catch NULL-Pointers
     std::string error_message;
@@ -1990,14 +2203,26 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // 64-bit integers used by Armadillo
-    unsigned long long n_path = fbs_pos->n_cols;                        // Number of paths
-    unsigned long long n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    unsigned long long n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    unsigned long long n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
-    unsigned long long n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    unsigned long long n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
-    unsigned long long n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
-    unsigned long long n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
+    const arma::uword n_path = fbs_pos->n_cols;                        // Number of paths
+    const arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
+    const arma::uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
+    const arma::uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
+    const arma::uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
+    const arma::uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
+    const arma::uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
+    const arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
+
+    // Size types for loops and indexing
+    // const size_t n_out_t = (size_t)n_out;
+    const size_t n_tx_t = (size_t)n_tx;
+    const size_t n_rx_t = (size_t)n_rx;
+    const size_t n_links_t = (size_t)n_links;
+    const size_t n_tx_ports_t = (size_t)n_tx_ports;
+    const size_t n_rx_ports_t = (size_t)n_rx_ports;
+    const size_t n_ports_t = (size_t)n_ports;
+
+    // Integer types
+    const int n_out_i = (int)n_out;
 
     if (lbs_pos->n_cols != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
     {
@@ -2081,8 +2306,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     // Convert inputs to orientation vector
     arma::Cube<dtype> tx_orientation(3, 1, 1);
     arma::Cube<dtype> rx_orientation(3, 1, 1);
-    bool tx_orientation_not_zero = Tb != zero || Tt != zero || Th != zero;
-    bool rx_orientation_not_zero = Rb != zero || Rt != zero || Rh != zero;
+    bool tx_orientation_not_zero = (Tb != zero || Tt != zero || Th != zero);
+    bool rx_orientation_not_zero = (Rb != zero || Rt != zero || Rh != zero);
 
     if (tx_orientation_not_zero)
         ptr = tx_orientation.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
@@ -2094,19 +2319,19 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     arma::Mat<dtype> tx_element_pos(3, n_tx), rx_element_pos(3, n_rx);
     dtype *p_tx = tx_element_pos.memptr(), *p_rx = rx_element_pos.memptr();
 
-    if (tx_array->element_pos.n_elem != 0ULL)
-        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
+    if (tx_array->element_pos.n_elem != 0)
+        std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     if (tx_orientation_not_zero) // Apply TX antenna orientation
         quick_rotate_inplace(Tb, -Tt, Th, p_tx, n_tx);
-    for (auto t = 0ULL; t < 3ULL * n_tx; t += 3ULL) // Add TX position
-        p_tx[t] += Tx, p_tx[t + 1ULL] += Ty, p_tx[t + 2ULL] += Tz;
+    for (size_t t = 0; t < 3 * n_tx_t; t += 3) // Add TX position
+        p_tx[t] += Tx, p_tx[t + 1] += Ty, p_tx[t + 2] += Tz;
 
-    if (rx_array->element_pos.n_elem != 0ULL)
-        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
+    if (rx_array->element_pos.n_elem != 0)
+        std::memcpy(p_rx, rx_array->element_pos.memptr(), 3 * n_rx * sizeof(dtype));
     if (rx_orientation_not_zero) // Apply RX antenna orientation
         quick_rotate_inplace(Rb, -Rt, Rh, p_rx, n_rx);
-    for (auto r = 0ULL; r < 3ULL * n_rx; r += 3ULL) // Add RX position
-        p_rx[r] += Rx, p_rx[r + 1ULL] += Ry, p_rx[r + 2ULL] += Rz;
+    for (size_t r = 0; r < 3 * n_rx_t; r += 3) // Add RX position
+        p_rx[r] += Rx, p_rx[r + 1] += Ry, p_rx[r + 2] += Rz;
 
     // Calculate the Freespace distance
     dtype x = Rx - Tx, y = Ry - Ty, z = Rz - Tz;
@@ -2114,18 +2339,21 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
 
     // There may be multiple LOS paths. We need to find the real one
     // Detection is done by sing the shortest length difference to the TX-RX line
-    auto true_los_path = 0ULL;
+    arma::uword true_los_path = 0;
     dtype shortest_path = los_limit;
 
     // Calculate angles and delays
-    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
+    // Cannot be parallelized due to "true_los_path" and "shortest_path"
+    for (int i_out = 0; i_out < n_out_i; ++i_out) // Loop over paths
     {
-        unsigned long long i = add_fake_los_path ? j - 1ULL : j;
-        unsigned long long ix = 3ULL * i, iy = ix + 1ULL, iz = ix + 2ULL;
+        const size_t j = (size_t)i_out;
+        const size_t i = add_fake_los_path ? j - 1 : j;
+        const size_t ix = 3 * i, iy = ix + 1, iz = ix + 2;
+        const size_t o = j * n_links_t; // Slice offset
 
         // Calculate the shortest possible path length (TX > FBS > LBS > RX)
         dtype d_shortest = dist_rx_tx, d_length = dist_rx_tx, d_fbs_lbs = zero;
-        if (!add_fake_los_path || j != 0ULL)
+        if (!add_fake_los_path || j != 0)
         {
             x = p_fbs[ix] - Tx, y = p_fbs[iy] - Ty, z = p_fbs[iz] - Tz;
             d_shortest = std::sqrt(x * x + y * y + z * z);
@@ -2134,56 +2362,60 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
             d_shortest += d_fbs_lbs;
             x = Rx - p_lbs[ix], y = Ry - p_lbs[iy], z = Rz - p_lbs[iz];
             d_shortest += std::sqrt(x * x + y * y + z * z);
-            d_length = p_length[i] < d_shortest ? d_shortest : p_length[i];
+            d_length = (p_length[i] < d_shortest) ? d_shortest : p_length[i];
         }
 
         // Calculate path delays, departure angles and arrival angles
-        unsigned long long o = j * n_links, o0 = o;          // Slice offset
+        // size_t o = j * n_links, o0 = o;
         if (std::abs(d_length - dist_rx_tx) < shortest_path) // LOS path
         {
-            if (!add_fake_los_path || j != 0ULL)
+            if (!add_fake_los_path || j != 0)
                 true_los_path = j, shortest_path = std::abs(d_length - dist_rx_tx);
 
-            for (auto t = 0ULL; t < n_tx; ++t)
-                for (auto r = 0ULL; r < n_rx; ++r)
+            for (size_t t = 0; t < n_tx_t; ++t)
+                for (size_t r = 0; r < n_rx_t; ++r)
                 {
-                    x = p_rx[3ULL * r] - p_tx[3ULL * t];
-                    y = p_rx[3ULL * r + 1ULL] - p_tx[3ULL * t + 1ULL];
-                    z = p_rx[3ULL * r + 2ULL] - p_tx[3ULL * t + 2ULL];
+                    x = p_rx[3 * r] - p_tx[3 * t];
+                    y = p_rx[3 * r + 1] - p_tx[3 * t + 1];
+                    z = p_rx[3 * r + 2] - p_tx[3 * t + 2];
                     dtype d = std::sqrt(x * x + y * y + z * z);
 
-                    p_aod[o] = std::atan2(y, x);
-                    p_eod[o] = d < los_limit ? zero : std::asin(z / d);
-                    p_aoa[o] = std::atan2(-y, -x);
-                    p_eoa[o] = -p_eod[o];
-                    p_delays[o++] = d;
+                    size_t io = o + t * n_rx_t + r;
+                    p_aod[io] = std::atan2(y, x);
+                    p_eod[io] = (d < los_limit) ? zero : std::asin(z / d);
+                    p_aoa[io] = std::atan2(-y, -x);
+                    p_eoa[io] = -p_eod[io];
+                    p_delays[io] = d;
                 }
         }
         else // NLOS path
         {
             dtype *dr = new dtype[n_rx];
-            for (auto r = 0ULL; r < n_rx; ++r)
-                x = p_lbs[ix] - p_rx[3ULL * r],
-                y = p_lbs[iy] - p_rx[3ULL * r + 1ULL],
-                z = p_lbs[iz] - p_rx[3ULL * r + 2ULL],
+            for (size_t r = 0; r < n_rx_t; ++r)
+                x = p_lbs[ix] - p_rx[3 * r],
+                y = p_lbs[iy] - p_rx[3 * r + 1],
+                z = p_lbs[iz] - p_rx[3 * r + 2],
                 dr[r] = std::sqrt(x * x + y * y + z * z),
-                p_aoa[o0 + r] = std::atan2(y, x),
-                p_eoa[o0 + r] = dr[r] < los_limit ? zero : std::asin(z / dr[r]);
+                p_aoa[o + r] = std::atan2(y, x),
+                p_eoa[o + r] = (dr[r] < los_limit) ? zero : std::asin(z / dr[r]);
 
-            for (auto t = 0ULL; t < n_tx; ++t)
+            for (size_t t = 0; t < n_tx_t; ++t)
             {
-                x = p_fbs[ix] - p_tx[3ULL * t],
-                y = p_fbs[iy] - p_tx[3ULL * t + 1ULL],
-                z = p_fbs[iz] - p_tx[3ULL * t + 2ULL];
+                x = p_fbs[ix] - p_tx[3 * t],
+                y = p_fbs[iy] - p_tx[3 * t + 1],
+                z = p_fbs[iz] - p_tx[3 * t + 2];
 
                 dtype dt = std::sqrt(x * x + y * y + z * z),
                       at = std::atan2(y, x),
-                      et = dt < los_limit ? zero : std::asin(z / dt);
+                      et = (dt < los_limit) ? zero : std::asin(z / dt);
 
-                for (auto r = 0ULL; r < n_rx; ++r)
-                    p_aod[o] = at, p_eod[o] = et,
-                    p_aoa[o] = p_aoa[o0 + r], p_eoa[o] = p_eoa[o0 + r],
-                    p_delays[o++] = dt + d_fbs_lbs + dr[r];
+                for (size_t r = 0; r < n_rx_t; ++r)
+                {
+                    size_t io = o + t * n_rx_t + r;
+                    p_aod[io] = at, p_eod[io] = et;
+                    p_aoa[io] = p_aoa[o + r], p_eoa[io] = p_eoa[o + r];
+                    p_delays[io] = dt + d_fbs_lbs + dr[r];
+                }
             }
             delete[] dr;
         }
@@ -2206,8 +2438,8 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         std::memcpy(p_tx, tx_array->element_pos.memptr(), 3 * n_tx * sizeof(dtype));
     else
         tx_element_pos.zeros();
-    for (unsigned t = 0; t < unsigned(n_tx); ++t)
-        for (unsigned r = 0; r < unsigned(n_rx); ++r)
+    for (unsigned t = 0; t < (unsigned)n_tx; ++t)
+        for (unsigned r = 0; r < (unsigned)n_rx; ++r)
             *p_element++ = t + 1, *ptr++ = p_tx[3 * t], *ptr++ = p_tx[3 * t + 1], *ptr++ = p_tx[3 * t + 2];
 
     qd_arrayant_interpolate(&tx_array->e_theta_re, &tx_array->e_theta_im, &tx_array->e_phi_re, &tx_array->e_phi_im,
@@ -2229,26 +2461,29 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                             &rx_array->azimuth_grid, &rx_array->elevation_grid, &AOA, &EOA,
                             &i_element, &rx_orientation, &element_pos_interp,
                             &Vr_re, &Vr_im, &Hr_re, &Hr_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+
     element_pos_interp.reset();
 
     // Calculate the MIMO channel coefficients for each path
-    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
+    //#pragma omp parallel for
+    for (int i_out = 0; i_out < n_out_i; ++i_out) // Loop over paths
     {
-        unsigned long long i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
+        const size_t j = (size_t)i_out;
+        const arma::uword i = add_fake_los_path ? (j == 0 ? 0 : j - 1) : j;
 
         const dtype *pM = M->colptr(i);
-        dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
-              *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
-              *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
-              *pHtr = Ht_re.colptr(j), *pHti = Ht_im.colptr(j);
+        const dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
+                    *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
+                    *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
+                    *pHtr = Ht_re.colptr(j), *pHti = Ht_im.colptr(j);
 
-        dtype path_amplitude = add_fake_los_path && j == 0 ? zero : std::sqrt(p_gain[i]);
+        const dtype path_amplitude = (add_fake_los_path && j == 0) ? zero : std::sqrt(p_gain[i]);
 
-        unsigned long long O = j * n_links; // Slice offset
-        for (auto t = 0ULL; t < n_tx; ++t)
-            for (auto r = 0ULL; r < n_rx; ++r)
+        size_t O = size_t(j * n_links); // Slice offset
+        for (size_t t = 0; t < n_tx_t; ++t)
+            for (size_t r = 0; r < n_rx_t; ++r)
             {
-                unsigned long long R = t * n_rx + r;
+                size_t R = t * n_rx_t + r;
 
                 dtype re = zero, im = zero;
                 re += pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
@@ -2274,10 +2509,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     }
 
     // Set the true LOS path as the first path
-    if (add_fake_los_path && true_los_path != 0ULL)
+    if (add_fake_los_path && true_los_path != 0)
     {
-        std::memcpy(p_coeff_re, CR.slice_memptr(true_los_path), n_links * sizeof(dtype));
-        std::memcpy(p_coeff_im, CI.slice_memptr(true_los_path), n_links * sizeof(dtype));
+        std::memcpy(p_coeff_re, CR.slice_memptr(true_los_path), n_links_t * sizeof(dtype));
+        std::memcpy(p_coeff_im, CI.slice_memptr(true_los_path), n_links_t * sizeof(dtype));
         CR.slice(true_los_path).zeros();
         CI.slice(true_los_path).zeros();
     }
@@ -2293,15 +2528,15 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         quick_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
 
         // Allocate memory for temporary data
-        unsigned long long N = n_ports > n_links ? n_ports : n_links;
+        size_t N = (n_ports > n_links) ? n_ports_t : n_links_t;
         dtype *tempX = new dtype[N];
         dtype *tempY = new dtype[N];
         dtype *tempZ = new dtype[N];
         dtype *tempT = new dtype[N];
 
-        for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
+        for (arma::uword j = 0; j < n_out; ++j) // Loop over paths
         {
-            unsigned long long o = j * n_links; // Slice offset
+            size_t o = size_t(j * n_links); // Slice offset
 
             // Process coefficients and delays
             if (different_output_size) // Data is stored in internal memory, we can write directly to the output
@@ -2311,10 +2546,10 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                              &p_coeff_re[o], &p_coeff_im[o],
                                              tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
                                              coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
-                                             n_rx, n_rx_ports, n_tx, n_tx_ports);
+                                             n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
 
                 // Apply coupling to delays
-                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
             }
             else // Data has been written to external memory
             {
@@ -2323,58 +2558,58 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                              &p_coeff_re[o], &p_coeff_im[o],
                                              tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
                                              tempX, tempY,
-                                             n_rx, n_rx_ports, n_tx, n_tx_ports);
+                                             n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
 
-                std::memcpy(&p_coeff_re[o], tempX, n_ports * sizeof(dtype));
-                std::memcpy(&p_coeff_im[o], tempY, n_ports * sizeof(dtype));
+                std::memcpy(&p_coeff_re[o], tempX, n_ports_t * sizeof(dtype));
+                std::memcpy(&p_coeff_im[o], tempY, n_ports_t * sizeof(dtype));
 
                 // Apply coupling to delays
-                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                std::memcpy(&p_delays[o], tempT, n_ports * sizeof(dtype));
+                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempT, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
+                std::memcpy(&p_delays[o], tempT, n_ports_t * sizeof(dtype));
             }
 
             // Process departure angles
             if (aod != nullptr || eod != nullptr)
             {
                 // Convert AOD and EOD to Cartesian coordinates
-                quick_geo2cart(n_links, &p_aod[o], tempX, tempY, &p_eod[o], tempZ);
+                quick_geo2cart(n_links_t, &p_aod[o], tempX, tempY, &p_eod[o], tempZ);
 
                 // Apply coupling to the x, y, z, component independently
-                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n_rx, n_rx_ports, n_tx, n_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
+                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
+                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
 
                 // Convert back to geographic coordinates and save to external memory
                 if (!different_output_size) // External memory is mapped to "p_aod" and "p_eod"
-                    quick_cart2geo(n_ports, &p_aod[o], tempT, tempX, &p_eod[o], tempY);
+                    quick_cart2geo(n_ports_t, &p_aod[o], tempT, tempX, &p_eod[o], tempY);
                 else if (aod == nullptr)
-                    quick_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eod->slice_memptr(j), tempY);
+                    quick_cart2geo<dtype>(n_ports_t, NULL, tempT, tempX, eod->slice_memptr(j), tempY);
                 else if (eod == nullptr)
-                    quick_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, NULL, tempY);
+                    quick_cart2geo<dtype>(n_ports_t, aod->slice_memptr(j), tempT, tempX, NULL, tempY);
                 else
-                    quick_cart2geo<dtype>(n_ports, aod->slice_memptr(j), tempT, tempX, eod->slice_memptr(j), tempY);
+                    quick_cart2geo<dtype>(n_ports_t, aod->slice_memptr(j), tempT, tempX, eod->slice_memptr(j), tempY);
             }
 
             // Process arrival angles
             if (aoa != nullptr || eoa != nullptr)
             {
                 // Convert AOD and EOD to Cartesian coordinates
-                quick_geo2cart(n_links, &p_aoa[o], tempX, tempY, &p_eoa[o], tempZ);
+                quick_geo2cart(n_links_t, &p_aoa[o], tempX, tempY, &p_eoa[o], tempZ);
 
                 // Apply coupling to the x, y, z, component independently
-                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
-                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n_rx, n_rx_ports, n_tx, n_tx_ports);
+                quick_multiply_3_mat(p_rx_cpl, tempX, p_tx_cpl, tempT, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
+                quick_multiply_3_mat(p_rx_cpl, tempY, p_tx_cpl, tempX, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
+                quick_multiply_3_mat(p_rx_cpl, tempZ, p_tx_cpl, tempY, n_rx_t, n_rx_ports_t, n_tx_t, n_tx_ports_t);
 
                 // Convert back to geographic coordinates and save to external memory
                 if (!different_output_size) // External memory is mapped to "p_aoa" and "p_eoa"
-                    quick_cart2geo(n_ports, &p_aoa[o], tempT, tempX, &p_eoa[o], tempY);
+                    quick_cart2geo(n_ports_t, &p_aoa[o], tempT, tempX, &p_eoa[o], tempY);
                 else if (aoa == nullptr)
-                    quick_cart2geo<dtype>(n_ports, NULL, tempT, tempX, eoa->slice_memptr(j), tempY);
+                    quick_cart2geo<dtype>(n_ports_t, NULL, tempT, tempX, eoa->slice_memptr(j), tempY);
                 else if (eoa == nullptr)
-                    quick_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, NULL, tempY);
+                    quick_cart2geo<dtype>(n_ports_t, aoa->slice_memptr(j), tempT, tempX, NULL, tempY);
                 else
-                    quick_cart2geo<dtype>(n_ports, aoa->slice_memptr(j), tempT, tempX, eoa->slice_memptr(j), tempY);
+                    quick_cart2geo<dtype>(n_ports_t, aoa->slice_memptr(j), tempT, tempX, eoa->slice_memptr(j), tempY);
             }
         }
 
