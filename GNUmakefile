@@ -94,7 +94,7 @@ tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(t
 
 # Individual quadriga-lib objects
 build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_arrayant.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H)
