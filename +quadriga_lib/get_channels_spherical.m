@@ -55,7 +55,8 @@
 %      Path gain (linear scale); Size: [ 1, n_path ] or [ n_path, 1 ]
 %    
 %    - path_length
-%      Total path length in meters; Size: [ 1, n_path ] or [ n_path, 1 ]
+%      Total path length in meters; If path_length is shorter than the shortest possible path from TX to 
+%      FBS to LBS to RX, it is replaced by the shortest path length. Size: [ 1, n_path ] or [ n_path, 1 ]
 %    
 %    - M
 %      Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH);
