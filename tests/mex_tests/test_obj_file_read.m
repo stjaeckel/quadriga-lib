@@ -39,7 +39,7 @@ mesh_correct = [ vert_list_correct( face_ind_correct(:,1),: ), vert_list_correct
 quadriga_lib.obj_file_read(fn);
 
 % Read all
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind ] = quadriga_lib.obj_file_read(fn);
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn);
 
 assertEqual( size(mesh), [12,9] );
 assertEqual( size(mtl_prop), [12,5] );
@@ -47,6 +47,8 @@ assertEqual( size(vert_list), [8,3] );
 assertEqual( size(face_ind), [12,3] );
 assertEqual( size(obj_ind), [12,1] );
 assertEqual( size(mtl_ind), [12,1] );
+assertEqual( size(obj_names), [1,1] );
+assertTrue( isempty(mtl_names) );
 
 assertTrue( isa(mesh, "double") );
 assertTrue( isa(mtl_prop, "double") );
@@ -64,6 +66,7 @@ assertElementsAlmostEqual( mesh, mesh_correct, 'absolute', 1e-14 );
 
 assertTrue( all( obj_ind == 1 ) );
 assertTrue( all( mtl_ind == 0 ) );
+assertEqual( obj_names{1,1}, 'Cube' );
 
 % Two planes
 delete(fn);
@@ -95,7 +98,10 @@ fprintf(f,'%s\n','f 6/5 8/8 7/6');
 fclose(f);
 
 % Read all
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind ] = quadriga_lib.obj_file_read(fn,1);
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn,1);
+
+assertEqual( size(obj_names), [2,1] );
+assertEqual( size(mtl_names), [1,1] );
 
 assertTrue( isa(mesh, "single") );
 assertTrue( isa(mtl_prop, "single") );
@@ -106,6 +112,8 @@ assertTrue( all( mtl_prop([3,4],1) > 1.5 ) );
 assertEqual( face_ind, uint32([2,3,1;2,4,3;6,7,5;6,8,7]) );
 assertEqual( obj_ind, uint32([1;1;2;2]) );
 assertEqual( mtl_ind, uint32([0;0;1;1]) );
+
+assertEqual( mtl_names{1,1}, 'Wood' );
 
 % Custom Material
 
@@ -127,11 +135,13 @@ fprintf(f,'%s\n','usemtl Cst::2.1:2.2:2.3:2.4:20');
 fprintf(f,'%s\n','f 2/1/1 4/4/1 3/2/1');
 fclose(f);
 
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind ] = quadriga_lib.obj_file_read(fn,0);
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn,0);
 assertTrue( isa(mesh, "double") );
 
 assertElementsAlmostEqual( mtl_prop(1,:), [1.1, 1.2, 1.3, 1.4, 10], 'absolute', 1e-14 );
 assertElementsAlmostEqual( mtl_prop(2,:), [2.1, 2.2, 2.3, 2.4, 20], 'absolute', 1e-14 );
+assertEqual( mtl_names{1,1}, 'Cst::1.1:1.2:1.3:1.4:10' );
+assertEqual( mtl_names{2,1}, 'Cst::2.1:2.2:2.3:2.4:20' );
 assertEqual( obj_ind, uint32([1;1]) );
 assertEqual( mtl_ind, uint32([1;2]) );
 
@@ -140,18 +150,20 @@ try
     quadriga_lib.obj_file_read(fn,0,1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Too many input arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 % Too many outputs
 try
-    [~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn,0);
+    [~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn,0);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Too many output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -160,8 +172,9 @@ try
     quadriga_lib.obj_file_read;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Filename is missing.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -170,8 +183,9 @@ try
     quadriga_lib.obj_file_read('bla.obj');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Error opening file.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
