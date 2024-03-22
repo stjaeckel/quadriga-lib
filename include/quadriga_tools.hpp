@@ -20,6 +20,7 @@
 
 #include <armadillo>
 #include <string>
+#include <vector>
 
 namespace quadriga_lib
 {
@@ -137,14 +138,16 @@ namespace quadriga_lib
     // - Unknown materials are treated as Vacuum
     // - Returns number of mesh elements "n_mesh"
     // - Attempts to change the size of the output if it does not have correct size already
-    template <typename dtype>                                       // Supported types: float or double
-    unsigned obj_file_read(std::string fn,                          // File name
-                           arma::Mat<dtype> *mesh = nullptr,        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                           arma::Mat<dtype> *mtl_prop = nullptr,    // Material properties, Size: [ n_mesh, 5 ]
-                           arma::Mat<dtype> *vert_list = nullptr,   // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
-                           arma::Mat<unsigned> *face_ind = nullptr, // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
-                           arma::Col<unsigned> *obj_ind = nullptr,  // Object index, 1-based, Size: [ n_mesh ]
-                           arma::Col<unsigned> *mtl_ind = nullptr); // Material index, 1-based, Size: [ n_mesh ]
+    template <typename dtype>                                            // Supported types: float or double
+    size_t obj_file_read(std::string fn,                                 // File name
+                         arma::Mat<dtype> *mesh = nullptr,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                         arma::Mat<dtype> *mtl_prop = nullptr,           // Material properties, Size: [ n_mesh, 5 ]
+                         arma::Mat<dtype> *vert_list = nullptr,          // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
+                         arma::Mat<unsigned> *face_ind = nullptr,        // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
+                         arma::Col<unsigned> *obj_ind = nullptr,         // Object index, 1-based, Size: [ n_mesh ]
+                         arma::Col<unsigned> *mtl_ind = nullptr,         // Material index, 1-based, Size: [ n_mesh ]
+                         std::vector<std::string> *obj_names = nullptr,  // Object names, Size: [ max(obj_ind) - 1 ]
+                         std::vector<std::string> *mtl_names = nullptr); // Material names, Size: [ max(mtl_ind) - 1 ]
 
     // Calculate the interaction of rays with a triangle mesh
     // - Number of input rays: n_ray

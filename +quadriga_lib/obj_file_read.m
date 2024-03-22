@@ -2,17 +2,18 @@
 %    Reads a triangulated 3D polygon mesh from a Wavefront OBJ file
 %    
 % Description:
-%    The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data 
-%    format, exclusively representing 3D geometry. It details the position of each vertex and defines 
-%    polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order, 
-%    eliminating the need for explicit declaration of face normals. When exporting the mesh from software 
-%    like Blender, it's essential to triangulate the mesh and include material definitions. If the 
-%    material name exists in the material database, the function loads the corresponding properties. 
+%    The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data
+%    format, exclusively representing 3D geometry. It details the position of each vertex and defines
+%    polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order,
+%    eliminating the need for explicit declaration of face normals. When exporting the mesh from software
+%    like Blender, it's essential to triangulate the mesh and include material definitions. If the
+%    material name exists in the material database, the function loads the corresponding properties.
 %    Otherwise, it defaults to using standard properties.
 %    
 % Usage:
 %    
-%    [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind ] = quadriga_lib.obj_file_read( fn, use_single );
+%    [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
+%        quadriga_lib.obj_file_read( fn, use_single );
 %    
 % Input Arguments:
 %    - fn
@@ -23,37 +24,45 @@
 %    
 % Output Arguments:
 %    - mesh
-%      Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
+%      Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
 %      in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; 
 %      Size: [ no_mesh, 9 ]
 %    
 %    - mtl_prop
-%      Material properties of each mesh element; Size: [ no_mesh, 5 ]
+%      Material properties of each mesh element; If no material is defined for an object, the properties 
+%      for vacuum are used. Size: [ no_mesh, 5 ]
 %    
 %    - vert_list
 %      List of vertices found in the OBJ file; Size: [ no_vert, 3 ]
 %    
 %    - face_ind
-%      Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements 
+%      Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
 %      of the previously defined vert_list (1-based indexing). 
 %      uint32; Size: [ no_mesh, 3 ]
 %    
 %    - obj_id
-%      Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a 
+%      Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
 %      cube). Each object is identified by a unique ID (1-based index). 
 %      uint32; Size: [ no_mesh, 1 ]
 %    
 %    - mtl_id
-%      Each mesh element gets assigned a material and each unique material gets assigned an ID. Different 
-%      faces of an object can have different materials. 
+%      Each mesh element gets assigned a material and each unique material gets assigned an ID. Different
+%      faces of an object can have different materials. If no material is defined in the OBJ file, the 
+%      id is set to 0 and no entry is made in mtl_names. 
 %      uint32; Size: [ no_mesh, 1 ]
 %    
+%    - obj_names
+%      Names of the objects in the OBJ file; Cell array of strings
+%    
+%    - mtl_names
+%      Names of the materials in the OBJ file; Cell array of strings
+%    
 % Material properties:
-%    Each material is defined by its electrical properties. Radio waves that interact with a building will 
-%    produce losses that depend on the electrical properties of the building materials, the material 
-%    structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical 
-%    permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is 
-%    obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies. 
+%    Each material is defined by its electrical properties. Radio waves that interact with a building will
+%    produce losses that depend on the electrical properties of the building materials, the material
+%    structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical
+%    permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is
+%    obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies.
 %    The five parameters returned in mtl_prop then are:
 %    
 %    - Real part of relative permittivity at f = 1 GHz (a)
@@ -62,10 +71,10 @@
 %    - Frequency dependence of conductivity (d) such that σ = c· f^d
 %    - Fixed attenuation in dB applied to each transition
 %    
-%    A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following 
+%    A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following
 %    list of material is currently supported and the material can be selected by using the usemtl tag
 %    in the OBJ file. When using Blender, the simply assign a material with that name to an object or face.
-%    In addition, custom properties can be set by assigning adding the 5 properties after the material 
+%    In addition, custom properties can be set by assigning adding the 5 properties after the material
 %    name, separated by :, e.g.:
 %    
 %    usemtl custom::2.1:0.1:0.1:0.5:20

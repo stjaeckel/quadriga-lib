@@ -36,7 +36,7 @@ Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are al
 * Open the `GNUmakefile` (e.g. by `gedit GNUmakefile`)
 * Set the compiler paths for your system (`CC`, `MEX` and `OCT` variables)
 * Remove the unwanted targets in the all section (e.g. if only octave is needed, remove `mex_matlab`)
-* Compile the HDF5 library by running `make hdf5lib`
+* [**OPTIONAL**]: Compile the HDF5 library by running `make hdf5lib`
 * Run `make` to compile `quadriga-lib` and the MEX Matlab / Octave interface
 * [**OPTIONAL**]: Compile the Catch2 unit testing library by running `make catch2lib`
 * [**OPTIONAL**]: Compile and run the unit tests by running `make test`

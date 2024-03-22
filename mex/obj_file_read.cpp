@@ -28,18 +28,19 @@ SECTION!*/
 Reads a triangulated 3D polygon mesh from a Wavefront OBJ file
 
 ## Description:
-The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data 
-format, exclusively representing 3D geometry. It details the position of each vertex and defines 
-polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order, 
-eliminating the need for explicit declaration of face normals. When exporting the mesh from software 
-like Blender, it's essential to triangulate the mesh and include material definitions. If the 
-material name exists in the material database, the function loads the corresponding properties. 
+The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data
+format, exclusively representing 3D geometry. It details the position of each vertex and defines
+polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order,
+eliminating the need for explicit declaration of face normals. When exporting the mesh from software
+like Blender, it's essential to triangulate the mesh and include material definitions. If the
+material name exists in the material database, the function loads the corresponding properties.
 Otherwise, it defaults to using standard properties.
 
 ## Usage:
 
 ```
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind ] = quadriga_lib.obj_file_read( fn, use_single );
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
+    quadriga_lib.obj_file_read( fn, use_single );
 ```
 
 ## Input Arguments:
@@ -51,37 +52,45 @@ Otherwise, it defaults to using standard properties.
 
 ## Output Arguments:
 - **`mesh`**<br>
-  Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
+  Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br>
   Size: `[ no_mesh, 9 ]`
 
 - **`mtl_prop`**<br>
-  Material properties of each mesh element; Size: `[ no_mesh, 5 ]`
+  Material properties of each mesh element; If no material is defined for an object, the properties 
+  for vacuum are used. Size: `[ no_mesh, 5 ]`
 
 - **`vert_list`**<br>
   List of vertices found in the OBJ file; Size: `[ no_vert, 3 ]`
 
 - **`face_ind`**<br>
-  Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements 
+  Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
   of the previously defined `vert_list` (1-based indexing). <br>
   uint32; Size: `[ no_mesh, 3 ]`
 
 - **`obj_id`**<br>
-  Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a 
+  Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
   cube). Each object is identified by a unique ID (1-based index). <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
 - **`mtl_id`**<br>
-  Each mesh element gets assigned a material and each unique material gets assigned an ID. Different 
-  faces of an object can have different materials. <br>
+  Each mesh element gets assigned a material and each unique material gets assigned an ID. Different
+  faces of an object can have different materials. If no material is defined in the OBJ file, the 
+  id is set to `0` and no entry is made in `mtl_names`. <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
+- **`obj_names`**<br>
+  Names of the objects in the OBJ file; Cell array of strings
+
+- **`mtl_names`**<br>
+  Names of the materials in the OBJ file; Cell array of strings
+
 ## Material properties:
-Each material is defined by its electrical properties. Radio waves that interact with a building will 
-produce losses that depend on the electrical properties of the building materials, the material 
-structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical 
-permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is 
-obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies. 
+Each material is defined by its electrical properties. Radio waves that interact with a building will
+produce losses that depend on the electrical properties of the building materials, the material
+structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical
+permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is
+obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies.
 The five parameters returned in `mtl_prop` then are:
 
 - Real part of relative permittivity at f = 1 GHz (a)
@@ -90,10 +99,10 @@ The five parameters returned in `mtl_prop` then are:
 - Frequency dependence of conductivity (d) such that σ = c· f^d
 - Fixed attenuation in dB applied to each transition
 
-A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following 
+A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following
 list of material is currently supported and the material can be selected by using the `usemtl` tag
 in the OBJ file. When using Blender, the simply assign a material with that name to an object or face.
-In addition, custom properties can be set by assigning adding the 5 properties after the material 
+In addition, custom properties can be set by assigning adding the 5 properties after the material
 name, separated by `:`, e.g.:
 
 ```
@@ -134,6 +143,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  3 - face_ind        Face indices (=entries in vert_list); uint32; 1-based; Size [ no_mesh, 3 ]
     //  4 - obj_id          Object index; uint32; Size [ no_mesh, 1 ]
     //  5 - mtl_id          Material index; uint32; Size [ no_mesh, 1 ]
+    //  6 - obj_names       Names of the objects in the OBJ file; Cell array of strings
+    //  7 - mtl_names       Names of the materials in the OBJ file; Cell array of strings
 
     // Notes:
     // Material values are:
@@ -149,7 +160,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:io_error", "Too many input arguments.");
 
-    if (nlhs > 6)
+    if (nlhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:io_error", "Too many output arguments.");
 
     // Read filename
@@ -168,14 +179,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Mat<float> mesh_single, mtl_prop_single, vert_list_single;
     arma::Mat<unsigned> face_ind;
     arma::Col<unsigned> obj_ind, mtl_ind;
+    std::vector<std::string> obj_names, mtl_names;
 
     // Read data from file
     try
     {
         if (use_single)
-            quadriga_lib::obj_file_read<float>(fn, &mesh_single, &mtl_prop_single, &vert_list_single, &face_ind, &obj_ind, &mtl_ind);
+            quadriga_lib::obj_file_read<float>(fn, &mesh_single, &mtl_prop_single, &vert_list_single, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
         else
-            quadriga_lib::obj_file_read<double>(fn, &mesh_double, &mtl_prop_double, &vert_list_double, &face_ind, &obj_ind, &mtl_ind);
+            quadriga_lib::obj_file_read<double>(fn, &mesh_double, &mtl_prop_double, &vert_list_double, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
     }
     catch (const std::invalid_argument &ex)
     {
@@ -213,4 +225,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (nlhs > 5)
         plhs[5] = qd_mex_copy2matlab(&mtl_ind);
+
+    if (nlhs > 6)
+    {
+        size_t n_obj = obj_names.size();
+        auto *cellArray = mxCreateCellMatrix((mwSize)n_obj, 1);
+        for (size_t i = 0; i < n_obj; ++i)
+        {
+            auto *mxStr = mxCreateString(obj_names[i].c_str());
+            mxSetCell(cellArray, i, mxStr);
+        }
+        plhs[6] = cellArray;
+    }
+
+    if (nlhs > 7)
+    {
+        size_t n_mtl = mtl_names.size();
+        auto *cellArray = mxCreateCellMatrix((mwSize)n_mtl, 1);
+        for (size_t i = 0; i < n_mtl; ++i)
+        {
+            auto *mxStr = mxCreateString(mtl_names[i].c_str());
+            mxSetCell(cellArray, i, mxStr);
+        }
+        plhs[7] = cellArray;
+    }
 }
