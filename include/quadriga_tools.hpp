@@ -115,13 +115,13 @@ namespace quadriga_lib
 
     // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
     // - Returns the number of faces
-    template <typename dtype>                                            // Allowed types: float or double
-    unsigned long long icosphere(unsigned long long n_div,               // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
-                                 dtype radius,                           // Radius of the icosphere in meters
-                                 arma::Mat<dtype> *center,               // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
-                                 arma::Col<dtype> *length = nullptr,     // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
-                                 arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-                                 arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+    template <typename dtype>                                // Allowed types: float or double
+    size_t icosphere(arma::uword n_div,                      // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
+                     dtype radius,                           // Radius of the icosphere in meters
+                     arma::Mat<dtype> *center,               // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
+                     arma::Col<dtype> *length = nullptr,     // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
+                     arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                     arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
 
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -198,10 +198,10 @@ namespace quadriga_lib
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
     // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
-    template <typename dtype>                                                    // Supported types: float or double
-    unsigned long long subdivide_triangles(unsigned long long n_div,             // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
-                                           const arma::Mat<dtype> *triangles_in, // Input, matrix of size [n_triangles_in, 9]
-                                           arma::Mat<dtype> *triangles_out);     // Output, matrix of size [n_triangles_out, 9]
+    template <typename dtype>                                        // Supported types: float or double
+    size_t subdivide_triangles(arma::uword n_div,                    // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
+                               const arma::Mat<dtype> *triangles_in, // Input, matrix of size [n_triangles_in, 9]
+                               arma::Mat<dtype> *triangles_out);     // Output, matrix of size [n_triangles_out, 9]
 
 }
 
