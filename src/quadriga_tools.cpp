@@ -695,6 +695,456 @@ size_t quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype>
 template size_t quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length, arma::Mat<float> *vert, arma::Mat<float> *direction);
 template size_t quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length, arma::Mat<double> *vert, arma::Mat<double> *direction);
 
+// Calculate the axis-aligned bounding box (AABB) of a 3D mesh
+template <typename dtype>
+arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh, const arma::Col<unsigned> *sub_mesh_index, size_t vec_size)
+{
+    // Input validation
+    if (mesh == nullptr)
+        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
+    if (mesh->n_cols != 9)
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (mesh->n_rows == 0)
+        throw std::invalid_argument("Input 'mesh' must have at least one face.");
+    if (vec_size == 0)
+        throw std::invalid_argument("Input 'vec_size' cannot be 0.");
+
+    size_t n_face_t = (size_t)mesh->n_rows;
+    size_t n_mesh_t = (size_t)mesh->n_elem;
+    const dtype *p_mesh = mesh->memptr();
+
+    const unsigned first_sub_mesh_ind = 0;
+    const unsigned *p_sub = &first_sub_mesh_ind;
+    size_t n_sub = 1;
+
+    if (sub_mesh_index != nullptr && sub_mesh_index->n_elem > 0)
+    {
+        n_sub = (size_t)sub_mesh_index->n_elem;
+        if (n_sub == 0)
+            throw std::invalid_argument("Input 'sub_mesh_index' must have at least one element.");
+
+        p_sub = sub_mesh_index->memptr();
+
+        if (*p_sub != 0U)
+            throw std::invalid_argument("First sub-mesh must start at index 0.");
+
+        for (size_t i = 1; i < n_sub; ++i)
+            if (p_sub[i] <= p_sub[i - 1])
+                throw std::invalid_argument("Sub-mesh indices must be sorted in ascending order.");
+
+        if (p_sub[n_sub - 1] >= (unsigned)n_face_t)
+            throw std::invalid_argument("Sub-mesh indices cannot exceed number of faces.");
+    }
+
+    // Reserve memory for the output
+    size_t n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
+    arma::Mat<dtype> output(n_out, 6); // Initialized to 0
+
+    dtype *x_min = output.colptr(0), *x_max = output.colptr(1),
+          *y_min = output.colptr(2), *y_max = output.colptr(3),
+          *z_min = output.colptr(4), *z_max = output.colptr(5);
+
+    for (size_t i = 0; i < n_sub; ++i)
+    {
+        x_min[i] = INFINITY, x_max[i] = -INFINITY,
+        y_min[i] = INFINITY, y_max[i] = -INFINITY,
+        z_min[i] = INFINITY, z_max[i] = -INFINITY;
+    }
+
+    size_t i_sub = 0, i_next = n_face_t;
+    for (size_t i_mesh = 0; i_mesh < n_mesh_t; ++i_mesh)
+    {
+        dtype v = p_mesh[i_mesh];         // Mesh value
+        size_t i_col = i_mesh / n_face_t; // Column index in mesh
+        size_t i_row = i_mesh % n_face_t; // Row index in mesh
+
+        if (i_row == 0)
+        {
+            i_sub = 0;
+            i_next = (i_sub == n_sub - 1) ? n_face_t : (size_t)p_sub[i_sub + 1];
+        }
+        else if (i_row == i_next)
+        {
+            ++i_sub;
+            i_next = (i_sub == n_sub - 1) ? n_face_t : (size_t)p_sub[i_sub + 1];
+        }
+
+        if (i_col % 3 == 0)
+        {
+            x_min[i_sub] = (v < x_min[i_sub]) ? v : x_min[i_sub];
+            x_max[i_sub] = (v > x_max[i_sub]) ? v : x_max[i_sub];
+        }
+        else if (i_col % 3 == 1)
+        {
+            y_min[i_sub] = (v < y_min[i_sub]) ? v : y_min[i_sub];
+            y_max[i_sub] = (v > y_max[i_sub]) ? v : y_max[i_sub];
+        }
+        else
+        {
+            z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
+            z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
+        }
+    }
+
+    return output;
+}
+template arma::Mat<float> quadriga_lib::triangle_mesh_aabb(const arma::Mat<float> *mesh, const arma::Col<unsigned> *sub_mesh_index, size_t vec_size);
+template arma::Mat<double> quadriga_lib::triangle_mesh_aabb(const arma::Mat<double> *mesh, const arma::Col<unsigned> *sub_mesh_index, size_t vec_size);
+
+// Reorganize mesh into smaller sub-meshes for faster processing
+template <typename dtype>
+size_t quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mesh, arma::Mat<dtype> *meshR,
+                                                arma::Col<unsigned> *sub_mesh_index, size_t target_size, size_t vec_size,
+                                                const arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *mtl_propR, arma::Col<unsigned> *mesh_index)
+{
+    // Input validation
+    if (mesh == nullptr)
+        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
+    if (mesh->n_cols != 9)
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (mesh->n_rows == 0)
+        throw std::invalid_argument("Input 'mesh' must have at least one face.");
+
+    size_t n_mesh_t = (size_t)mesh->n_rows;
+
+    if (meshR == nullptr)
+        throw std::invalid_argument("Output 'meshR' cannot be NULL.");
+    if (sub_mesh_index == nullptr)
+        throw std::invalid_argument("Output 'sub_mesh_index' cannot be NULL.");
+
+    if (target_size == 0)
+        throw std::invalid_argument("Input 'target_size' cannot be 0.");
+    if (vec_size == 0)
+        throw std::invalid_argument("Input 'vec_size' cannot be 0.");
+
+    bool process_mtl_prop = (mtl_prop != nullptr) && (mtl_propR != nullptr) && (mtl_prop->n_elem != 0);
+
+    if (process_mtl_prop)
+    {
+        if (mtl_prop->n_cols != 5)
+            throw std::invalid_argument("Input 'mtl_prop' must have 5 columns.");
+
+        if (mtl_prop->n_rows != mesh->n_rows)
+            throw std::invalid_argument("Number of rows in 'mesh' and 'mtl_prop' dont match.");
+    }
+
+    // Create a vector of meshes
+    std::vector<arma::Mat<dtype>> c; // Vector of sub-meshes
+
+    // Add first mesh (creates a copy of the data)
+    c.push_back(*mesh);
+
+    // Create base index (0-based)
+    std::vector<arma::Col<size_t>> face_ind; // Index list
+    {
+        arma::Col<size_t> base_index(mesh->n_rows, arma::fill::none);
+        size_t *p = base_index.memptr();
+        for (size_t i = 0; i < n_mesh_t; ++i)
+            p[i] = (size_t)i;
+        face_ind.push_back(std::move(base_index));
+    }
+
+    // Iterate through all elements
+    for (auto sub_mesh_it = c.begin(); sub_mesh_it != c.end();)
+    {
+        size_t n_sub_faces = (size_t)(*sub_mesh_it).n_rows;
+        if (n_sub_faces > target_size)
+        {
+            arma::Mat<dtype> meshA, meshB;
+            arma::Col<int> split_ind;
+
+            // Split the mesh on its longest axis
+            int split_success = quadriga_lib::triangle_mesh_split(&(*sub_mesh_it), &meshA, &meshB, 0, &split_ind);
+
+            // Check the split proportions, must have at least a 10 / 90 split
+            float p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
+            split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+
+            // Attempt to split along another axis if failed for longest axis
+            int first_test = std::abs(split_success);
+            if (split_success < 0) // Failed condition
+            {
+                // Test second axis
+                if (first_test == 2 || first_test == 3) // Test x-axis
+                    split_success = quadriga_lib::triangle_mesh_split(&(*sub_mesh_it), &meshA, &meshB, 1, &split_ind);
+                else // Test y-axis
+                    split_success = quadriga_lib::triangle_mesh_split(&(*sub_mesh_it), &meshA, &meshB, 2, &split_ind);
+
+                p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
+                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+
+                // If we still failed, we test the third axis
+                if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
+                    split_success = quadriga_lib::triangle_mesh_split(&(*sub_mesh_it), &meshA, &meshB, 3, &split_ind);
+                else if (first_test == 3 && split_success == -1)
+                    split_success = quadriga_lib::triangle_mesh_split(&(*sub_mesh_it), &meshA, &meshB, 2, &split_ind);
+
+                p = (split_success > 0) ? (float)meshA.n_rows / (float)n_sub_faces : 0.5f;
+                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+            }
+
+            // Update the mesh data in memory
+            int *ps = split_ind.memptr();
+            if (split_success > 0)
+            {
+                // Split the index list
+                size_t i_sub = sub_mesh_it - c.begin();      // Sub-mesh index
+                auto face_ind_it = face_ind.begin() + i_sub; // Face index iterator
+                size_t *pi = (*face_ind_it).memptr();        // Current face index list
+
+                arma::Col<size_t> meshA_index(meshA.n_rows, arma::fill::none);
+                arma::Col<size_t> meshB_index(meshB.n_rows, arma::fill::none);
+                size_t *pA = meshA_index.memptr(); // New face index list of mesh A
+                size_t *pB = meshB_index.memptr(); // New face index list of mesh B
+
+                size_t iA = 0, iB = 0;
+                for (size_t i_face = 0; i_face < n_sub_faces; ++i_face)
+                {
+                    if (ps[i_face] == 1)
+                        pA[iA++] = pi[i_face];
+                    else if (ps[i_face] == 2)
+                        pB[iB++] = pi[i_face];
+                }
+
+                face_ind.erase(face_ind_it);
+                face_ind.push_back(std::move(meshA_index));
+                face_ind.push_back(std::move(meshB_index));
+
+                // Update the vector of sub-meshes
+                c.erase(sub_mesh_it);
+                c.push_back(std::move(meshA));
+                c.push_back(std::move(meshB));
+                sub_mesh_it = c.begin();
+            }
+            else
+                ++sub_mesh_it;
+        }
+        else
+            ++sub_mesh_it;
+    }
+
+    // Get the sub-mesh indices
+    size_t n_sub = c.size(), n_out = 0;
+    sub_mesh_index->set_size(n_sub);
+    unsigned *p_sub_ind = sub_mesh_index->memptr();
+
+    for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        size_t n_sub_faces = c[i_sub].n_rows;
+        size_t n_align = (n_sub_faces % vec_size == 0) ? n_sub_faces : (n_sub_faces / vec_size + 1) * vec_size;
+        p_sub_ind[i_sub] = (unsigned)n_out;
+        n_out += n_align;
+    }
+
+    // Assemble output
+    meshR->set_size(n_out, 9);
+    dtype *p_mesh_out = meshR->memptr();
+
+    const dtype *p_mtl_in = process_mtl_prop ? mtl_prop->memptr() : nullptr;
+    dtype *p_mtl_out = nullptr;
+    if (process_mtl_prop)
+    {
+        mtl_propR->set_size(n_out, 5);
+        p_mtl_out = mtl_propR->memptr();
+    }
+
+    unsigned *p_mesh_index = nullptr;
+    if (mesh_index != nullptr)
+    {
+        mesh_index->zeros(n_out);
+        p_mesh_index = mesh_index->memptr();
+    }
+
+    for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        size_t n_sub_faces = c[i_sub].n_rows;  // Number of faces in the sub-mesh
+        dtype *p_sub_mesh = c[i_sub].memptr(); // Pointer to sub-mesh data
+        size_t *pi = face_ind[i_sub].memptr(); // Face index list of current sub-mesh
+
+        // Copy sub-mesh data columns by column
+        for (size_t i_col = 0; i_col < 9; ++i_col)
+        {
+            size_t offset = i_col * n_out + (size_t)p_sub_ind[i_sub];
+            std::memcpy(&p_mesh_out[offset], &p_sub_mesh[i_col * n_sub_faces], n_sub_faces * sizeof(dtype));
+        }
+
+        // Copy material data
+        if (process_mtl_prop)
+            for (size_t i_col = 0; i_col < 5; ++i_col)
+            {
+                size_t offset_out = i_col * n_out + (size_t)p_sub_ind[i_sub];
+                size_t offset_in = i_col * n_mesh_t;
+                for (size_t i_sub_face = 0; i_sub_face < n_sub_faces; ++i_sub_face)
+                    p_mtl_out[offset_out + i_sub_face] = p_mtl_in[offset_in + pi[i_sub_face]];
+            }
+
+        // Write mesh index
+        if (p_mesh_index != nullptr)
+        {
+            size_t offset = (size_t)p_sub_ind[i_sub];
+            for (size_t i_sub_face = 0; i_sub_face < n_sub_faces; ++i_sub_face)
+                p_mesh_index[offset + i_sub_face] = (unsigned)pi[i_sub_face] + 1;
+        }
+
+        // Add padding data
+        if (n_sub_faces % vec_size != 0)
+        {
+            // Calculate bounding box of current sub-mesh
+            arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(&c[i_sub]);
+            dtype *p_box = aabb.memptr();
+
+            dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);
+            dtype y = p_box[2] + (dtype)0.5 * (p_box[3] - p_box[2]);
+            dtype z = p_box[4] + (dtype)0.5 * (p_box[5] - p_box[4]);
+
+            size_t i_start = (size_t)p_sub_ind[i_sub] + n_sub_faces;
+            size_t i_end = (i_sub == n_sub - 1) ? n_out : (size_t)p_sub_ind[i_sub + 1];
+
+            for (size_t i_col = 0; i_col < 9; ++i_col)
+                for (size_t i_pad = i_start; i_pad < i_end; ++i_pad)
+                {
+                    size_t offset = i_col * n_out + i_pad;
+                    if (i_col % 3 == 0)
+                        p_mesh_out[offset] = x;
+                    else if (i_col % 3 == 1)
+                        p_mesh_out[offset] = y;
+                    else
+                        p_mesh_out[offset] = z;
+
+                    if (process_mtl_prop && i_col == 0)
+                        p_mtl_out[offset] = (dtype)1.0;
+                    else if (process_mtl_prop && i_col < 5)
+                        p_mtl_out[offset] = (dtype)0.0;
+                }
+        }
+    }
+
+    return n_sub;
+}
+
+template size_t quadriga_lib::triangle_mesh_segmentation(const arma::Mat<float> *mesh, arma::Mat<float> *meshR,
+                                                         arma::Col<unsigned> *sub_mesh_index, size_t target_size, size_t vec_size,
+                                                         const arma::Mat<float> *mtl_prop, arma::Mat<float> *mtl_propR, arma::Col<unsigned> *mesh_index);
+
+template size_t quadriga_lib::triangle_mesh_segmentation(const arma::Mat<double> *mesh, arma::Mat<double> *meshR,
+                                                         arma::Col<unsigned> *sub_mesh_index, size_t target_size, size_t vec_size,
+                                                         const arma::Mat<double> *mtl_prop, arma::Mat<double> *mtl_propR, arma::Col<unsigned> *mesh_index);
+
+// Split the mesh into two along a given axis of the Coordinate system
+template <typename dtype>
+int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh, arma::Mat<dtype> *meshA, arma::Mat<dtype> *meshB, int axis, arma::Col<int> *split_ind)
+{
+    if (mesh == nullptr)
+        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
+    if (meshA == nullptr)
+        throw std::invalid_argument("Output 'meshA' cannot be NULL.");
+    if (meshB == nullptr)
+        throw std::invalid_argument("Output 'meshB' cannot be NULL.");
+
+    // Calculate bounding box
+    arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb(mesh);
+
+    size_t n_face_t = (size_t)mesh->n_rows;
+    size_t n_mesh_t = (size_t)mesh->n_elem;
+    const dtype *p_mesh = mesh->memptr();
+
+    // Find longest axis
+    dtype x = aabb.at(0, 1) - aabb.at(0, 0);
+    dtype y = aabb.at(0, 3) - aabb.at(0, 2);
+    dtype z = aabb.at(0, 5) - aabb.at(0, 4);
+
+    if (axis == 0)
+    {
+        if (z >= y && z >= x)
+            axis = 3;
+        else if (y >= x && y >= z)
+            axis = 2;
+        else
+            axis = 1;
+    }
+    else if (axis != 1 && axis != 2 && axis != 3)
+        throw std::invalid_argument("Input 'axis' must have values 0, 1, 2 or 3.");
+
+    // Define bounding box A
+    dtype x_max = (axis == 1) ? aabb.at(0, 0) + (dtype)0.5 * x : aabb.at(0, 1),
+          y_max = (axis == 2) ? aabb.at(0, 2) + (dtype)0.5 * y : aabb.at(0, 3),
+          z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
+
+    // Determine all mesh elements that are outside box A
+    bool *isB = new bool[n_face_t](); // Init to false
+
+    for (size_t i_mesh = 0; i_mesh < n_mesh_t; ++i_mesh)
+    {
+        dtype v = p_mesh[i_mesh];         // Mesh value
+        size_t i_col = i_mesh / n_face_t; // Column index in mesh
+        size_t i_row = i_mesh % n_face_t; // Row index in mesh
+
+        if (i_col % 3 == 0)
+            isB[i_row] = (v > x_max) ? true : isB[i_row];
+        else if (i_col % 3 == 1)
+            isB[i_row] = (v > y_max) ? true : isB[i_row];
+        else
+            isB[i_row] = (v > z_max) ? true : isB[i_row];
+    }
+
+    // Count items in both sub-meshes
+    size_t n_faceA = 0, n_faceB = 0;
+    for (size_t i = 0; i < n_face_t; ++i)
+        if (isB[i])
+            ++n_faceB;
+        else
+            ++n_faceA;
+
+    // Check if the mesh was split
+    if (n_faceA == 0 || n_faceB == 0)
+        return -axis;
+
+    // Adjust output size
+    meshA->set_size(n_faceA, 9);
+    meshB->set_size(n_faceB, 9);
+
+    dtype *p_meshA = meshA->memptr();
+    dtype *p_meshB = meshB->memptr();
+
+    bool write_split_ind = false;
+    int *p_split_ind = nullptr;
+    if (split_ind != nullptr)
+    {
+        write_split_ind = true;
+        if (split_ind->n_elem != mesh->n_elem)
+            split_ind->zeros(mesh->n_elem);
+        else
+            split_ind->zeros();
+        p_split_ind = split_ind->memptr();
+    }
+
+    // Copy data
+    size_t i_meshA = 0, i_meshB = 0;
+    for (size_t i_mesh = 0; i_mesh < n_mesh_t; ++i_mesh)
+    {
+        dtype v = p_mesh[i_mesh];         // Mesh value
+        size_t i_row = i_mesh % n_face_t; // Row index in mesh
+
+        if (isB[i_row])
+        {
+            p_meshB[i_meshB++] = v;
+            if (write_split_ind)
+                p_split_ind[i_row] = 2;
+        }
+        else
+        {
+            p_meshA[i_meshA++] = v;
+            if (write_split_ind)
+                p_split_ind[i_row] = 1;
+        }
+    }
+
+    delete[] isB;
+    return axis;
+}
+template int quadriga_lib::triangle_mesh_split(const arma::Mat<float> *mesh, arma::Mat<float> *meshA, arma::Mat<float> *meshB, int axis, arma::Col<int> *split_ind);
+template int quadriga_lib::triangle_mesh_split(const arma::Mat<double> *mesh, arma::Mat<double> *meshA, arma::Mat<double> *meshB, int axis, arma::Col<int> *split_ind);
+
 // 2D linear interpolation
 template <typename dtype>
 std::string quadriga_lib::interp(const arma::Cube<dtype> *input, const arma::Col<dtype> *xi, const arma::Col<dtype> *yi,
@@ -1151,7 +1601,8 @@ template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *m
 
 // Subdivide triangles into smaller triangles
 template <typename dtype>
-size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out)
+size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out,
+                                         const arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *mtl_prop_out)
 {
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
@@ -1172,11 +1623,27 @@ size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtyp
     if (triangles_out->n_cols != 9 || triangles_out->n_rows != n_triangles_out)
         triangles_out->set_size(n_triangles_out, 9);
 
+    bool process_mtl_prop = (mtl_prop != nullptr) && (mtl_prop_out != nullptr) && (mtl_prop->n_elem != 0);
+
+    if (process_mtl_prop)
+    {
+        if (mtl_prop->n_cols != 5)
+            throw std::invalid_argument("Input 'mtl_prop' must have 5 columns.");
+
+        if (mtl_prop->n_rows != n_triangles_in)
+            throw std::invalid_argument("Number of rows in 'triangles_in' and 'mtl_prop' dont match.");
+
+        if (mtl_prop_out->n_cols != 5 || mtl_prop_out->n_rows != n_triangles_out)
+            mtl_prop_out->set_size(n_triangles_out, 5);
+    }
+
     // Process each triangle
     size_t cnt = 0;                                       // Counter
     dtype stp = dtype(1.0) / dtype(n_div);                // Step size
     const dtype *p_triangles_in = triangles_in->memptr(); // Pointer to input memory
     dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
+    const dtype *p_mtl_prop = process_mtl_prop ? mtl_prop->memptr() : nullptr;
+    dtype *p_mtl_prop_out = process_mtl_prop ? mtl_prop_out->memptr() : nullptr;
 
     for (size_t n = 0; n < n_triangles_in; ++n)
     {
@@ -1190,6 +1657,15 @@ size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtyp
         dtype e13x = p_triangles_in[n + 6 * n_triangles_in] - v1x;
         dtype e13y = p_triangles_in[n + 7 * n_triangles_in] - v1y;
         dtype e13z = p_triangles_in[n + 8 * n_triangles_in] - v1z;
+
+        // Read current material
+        dtype mtl[5];
+        if (process_mtl_prop)
+            mtl[0] = p_mtl_prop[n],
+            mtl[1] = p_mtl_prop[n + n_triangles_in],
+            mtl[2] = p_mtl_prop[n + 2 * n_triangles_in],
+            mtl[3] = p_mtl_prop[n + 3 * n_triangles_in],
+            mtl[4] = p_mtl_prop[n + 4 * n_triangles_in];
 
         for (size_t u = 0; u < n_div_t; ++u)
         {
@@ -1215,6 +1691,15 @@ size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtyp
                 p_triangles_out[cnt + 6 * n_triangles_out] = v1x + fvl * e12x + fuu * e13x; // w2x
                 p_triangles_out[cnt + 7 * n_triangles_out] = v1y + fvl * e12y + fuu * e13y; // w2y
                 p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w2z
+
+                // Material
+                if (process_mtl_prop)
+                    p_mtl_prop_out[cnt] = mtl[0],
+                    p_mtl_prop_out[cnt + n_triangles_out] = mtl[1],
+                    p_mtl_prop_out[cnt + 2 * n_triangles_out] = mtl[2],
+                    p_mtl_prop_out[cnt + 3 * n_triangles_out] = mtl[3],
+                    p_mtl_prop_out[cnt + 4 * n_triangles_out] = mtl[4];
+
                 ++cnt;
 
                 if (v < n_div - u - 1)
@@ -1233,6 +1718,15 @@ size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtyp
                     p_triangles_out[cnt + 3 * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w2x
                     p_triangles_out[cnt + 4 * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w2y
                     p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w2z
+
+                    // Material
+                    if (process_mtl_prop)
+                        p_mtl_prop_out[cnt] = mtl[0],
+                        p_mtl_prop_out[cnt + n_triangles_out] = mtl[1],
+                        p_mtl_prop_out[cnt + 2 * n_triangles_out] = mtl[2],
+                        p_mtl_prop_out[cnt + 3 * n_triangles_out] = mtl[3],
+                        p_mtl_prop_out[cnt + 4 * n_triangles_out] = mtl[4];
+
                     ++cnt;
                 }
             }
@@ -1241,5 +1735,8 @@ size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtyp
     return n_triangles_out;
 }
 
-template size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out);
-template size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out);
+template size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out,
+                                                  const arma::Mat<float> *mtl_prop, arma::Mat<float> *mtl_prop_out);
+
+template size_t quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out,
+                                                  const arma::Mat<double> *mtl_prop, arma::Mat<double> *mtl_prop_out);

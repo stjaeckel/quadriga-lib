@@ -160,6 +160,8 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 +quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
++quadriga_lib/triangle_mesh_aabb.mexa64:          build/quadriga_tools.o
++quadriga_lib/triangle_mesh_segmentation.mexa64:  build/quadriga_tools.o
 +quadriga_lib/version.mexa64:                     build/quadriga_lib.o
 
 +quadriga_lib/%.mexa64:   mex/%.cpp
@@ -195,6 +197,8 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 +quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
++quadriga_lib/triangle_mesh_aabb.mex:          build/quadriga_tools.o
++quadriga_lib/triangle_mesh_segmentation.mex:  build/quadriga_tools.o
 +quadriga_lib/version.mex:                     build/quadriga_lib.o
 
 +quadriga_lib/%.mex:   mex/%.cpp

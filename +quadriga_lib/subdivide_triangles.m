@@ -8,23 +8,31 @@
 % Usage:
 %    
 %    triangles_out = quadriga_lib.subdivide_triangles( triangles_in, no_div );
+%    [ triangles_out, mtl_prop_out ] = quadriga_lib.subdivide_triangles( triangles_in, no_div, mtl_prop_in );
 %    
 % Input Arguments:
 %    
 %    - triangles_in
 %      Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
-%      points in 3D-space: [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; singe or double precision;
+%      points in 3D-space: [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; single or double precision;
 %      Size: [ n_triangles_in, 9 ]
 %    
 %    - no_div
 %      Number of divisions per edge of the input mesh. The resulting number of faces is equal to
 %      n_triangles_out = n_triangles_in  n_div^2
 %    
-% Output Argument:
+%    - mtl_prop_in (optional)
+%      Material properties of each mesh element; Size: [ n_triangles_in, 5 ]
+%    
+% Output Arguments:
 %    
 %    - triangles_out
 %      Vertices of the sub-divided mesh in global Cartesian coordinates; singe or double precision;
 %      Size: [ n_triangles_out, 9 ]
+%    
+%    - mtl_prop_out
+%      Material properties for the sub-divided triangle mesh elements. The values for the new faces are 
+%      copied from mtl_prop_in; Size: [ n_triangles_out, 5 ]
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
