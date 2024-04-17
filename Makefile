@@ -68,6 +68,8 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\ray_mesh_interact.mexw64 \
 	   +quadriga_lib\ray_triangle_intersect.mexw64 \
 	   +quadriga_lib\subdivide_triangles.mexw64 \
+	   +quadriga_lib\triangle_mesh_aabb.mexw64 \
+	   +quadriga_lib\triangle_mesh_segmentation.mexw64 \
 	   +quadriga_lib\version.mexw64
 
 test:   tests\test.exe
@@ -201,6 +203,12 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\subdivide_triangles.mexw64:   mex\subdivide_triangles.cpp   build\quadriga_tools.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\triangle_mesh_aabb.mexw64:   mex\triangle_mesh_aabb.cpp   build\quadriga_tools.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\triangle_mesh_segmentation.mexw64:   mex\triangle_mesh_segmentation.cpp   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\version.mexw64:   mex\version.cpp   build\quadriga_lib.obj

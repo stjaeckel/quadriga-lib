@@ -123,6 +123,43 @@ namespace quadriga_lib
                      arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
                      arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
 
+    // Calculate the axis-aligned bounding box (AABB) of a 3D mesh
+    // - The mesh can be composed of sub-meshes, where each new sub_mesh is indicated by an index (=row number)
+    // - Output is a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-mesh
+    template <typename dtype>
+    arma::Mat<dtype> triangle_mesh_aabb(const arma::Mat<dtype> *mesh,                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                        const arma::Col<unsigned> *sub_mesh_index = nullptr, // Sub-mesh index, Length: [ n_sub ]
+                                        size_t vec_size = 1);                                // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+
+    // Reorganize a 3D mesh into smaller sub-meshes for faster processing
+    // - Recursively calls "mesh_split" until number of elements per sub-mesh is below a target size
+    // - Creates the "sub_mesh_index" indicating the start index of each sub-mesh
+    // - A "vec_size" can be used to align the sub-meshes to a given vector size for SIMD processing (AVX or CUDA)
+    // - For vec_size > 1, unused elements in a sub-mesh are padded with 0-size faces at the center of the sub-mesh AABB
+    // - If "mtl_prop" is given as an input, "mtl_propR" contains the reorganized materials, padded with "Air" for vec_size > 1
+    // - "mesh_index" contains the map of elements in "mesh" to "meshR" in 1-based notation, padded with 0s for vec_size > 1
+    // - Returns number of sub-meshes "n_sub"
+    template <typename dtype>
+    size_t triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
+                                      arma::Mat<dtype> *meshR,                    // Reorganized mesh (output), Size: [ n_meshR, 9 ]
+                                      arma::Col<unsigned> *sub_mesh_index,        // Sub-mesh index, 0-based, Length: [ n_sub ]
+                                      size_t target_size = 1024,                  // Target value for the sub-mesh size
+                                      size_t vec_size = 1,                        // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+                                      const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_mesh, 5 ], optional
+                                      arma::Mat<dtype> *mtl_propR = nullptr,      // Material properties (output), Size: [ n_meshR, 5 ], optional
+                                      arma::Col<unsigned> *mesh_index = nullptr); // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
+
+    // Split a 3D mesh into sub-meshes two along a given axis
+    // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
+    // - If the split failed, i.e. all elements would be in one of the two outputs, the output value is negated (-1 = x, -2 = y, -3 = z)
+    //   In this case, the arguments "meshA" and "meshB" remain unchanged
+    template <typename dtype>
+    int triangle_mesh_split(const arma::Mat<dtype> *mesh,         // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                             arma::Mat<dtype> *meshA,              // First half, Size: [ n_meshA, 9 ]
+                             arma::Mat<dtype> *meshB,              // Second half, Size: [ n_meshB, 9 ]
+                             int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
+                             arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
+
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
     // - 3D model must be triangularized
@@ -198,10 +235,13 @@ namespace quadriga_lib
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
     // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
-    template <typename dtype>                                        // Supported types: float or double
-    size_t subdivide_triangles(arma::uword n_div,                    // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
-                               const arma::Mat<dtype> *triangles_in, // Input, matrix of size [n_triangles_in, 9]
-                               arma::Mat<dtype> *triangles_out);     // Output, matrix of size [n_triangles_out, 9]
+    // - Optional processing of materials (copy of the original material)
+    template <typename dtype>                                              // Supported types: float or double
+    size_t subdivide_triangles(arma::uword n_div,                          // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
+                               const arma::Mat<dtype> *triangles_in,       // Input, matrix of size [n_triangles_in, 9]
+                               arma::Mat<dtype> *triangles_out,            // Output, matrix of size [n_triangles_out, 9]
+                               const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_triangles_in, 5 ], optional
+                               arma::Mat<dtype> *mtl_prop_out = nullptr);  // Material properties (output), Size: [ n_triangles_out, 5 ], optional
 
 }
 

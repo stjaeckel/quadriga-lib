@@ -10,6 +10,7 @@
                 "external/hdf5-1.14.2-win64/include",
                 "external/Catch2-3.4.0-Linux/include",
                 "/usr/local/MATLAB/R2021a/extern/include/",
+                "/usr/include/octave-8.3.0/octave",
                 "${default}"
             ],
             "defines": [
