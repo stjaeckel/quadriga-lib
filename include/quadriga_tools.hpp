@@ -62,16 +62,17 @@ namespace quadriga_lib
     // ----  Site-Specific Simulation Tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
-    template <typename dtype>                                      // Supported types: float or double
-    void calc_diffraction_gain(const arma::Mat<dtype> *orig,       // Origin points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *dest,       // Destination points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *mesh,       // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
-                               const arma::Mat<dtype> *mtl_prop,   // Material properties; Size: [ no_mesh, 5 ]
-                               dtype center_frequency,             // Center frequency in [Hz]
-                               int lod = 2,                        // Level of detail, scalar values 0-6
-                               arma::Col<dtype> *gain = nullptr,   // Diffraction gain; linear scale; Size: [ n_pos ]
-                               arma::Cube<dtype> *coord = nullptr, // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
-                               int verbose = 0);                   // Verbosity level
+    template <typename dtype>                                                        // Supported types: float or double
+    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                         // Origin points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *dest,                         // Destination points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *mesh,                         // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
+                               const arma::Mat<dtype> *mtl_prop,                     // Material properties; Size: [ no_mesh, 5 ]
+                               dtype center_frequency,                               // Center frequency in [Hz]
+                               int lod = 2,                                          // Level of detail, scalar values 0-6
+                               arma::Col<dtype> *gain = nullptr,                     // Diffraction gain; linear scale; Size: [ n_pos ]
+                               arma::Cube<dtype> *coord = nullptr,                   // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
+                               int verbose = 0,                                      // Verbosity level
+                               const arma::Col<unsigned> *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
@@ -155,10 +156,10 @@ namespace quadriga_lib
     //   In this case, the arguments "meshA" and "meshB" remain unchanged
     template <typename dtype>
     int triangle_mesh_split(const arma::Mat<dtype> *mesh,         // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                             arma::Mat<dtype> *meshA,              // First half, Size: [ n_meshA, 9 ]
-                             arma::Mat<dtype> *meshB,              // Second half, Size: [ n_meshB, 9 ]
-                             int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
-                             arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
+                            arma::Mat<dtype> *meshA,              // First half, Size: [ n_meshA, 9 ]
+                            arma::Mat<dtype> *meshB,              // Second half, Size: [ n_meshB, 9 ]
+                            int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
+                            arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
 
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -223,14 +224,15 @@ namespace quadriga_lib
     // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
     // - All internal computations are done using single precision
     template <typename dtype>
-    void ray_triangle_intersect(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *dest,               // Ray destination points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                arma::Mat<dtype> *fbs = nullptr,            // First interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Mat<dtype> *sbs = nullptr,            // Second interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Col<unsigned> *no_interact = nullptr, // Number of mesh between orig and dest, Size [ n_ray ]
-                                arma::Col<unsigned> *fbs_ind = nullptr,     // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                arma::Col<unsigned> *sbs_ind = nullptr);    // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+    void ray_triangle_intersect(const arma::Mat<dtype> *orig,                         // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *dest,                         // Ray destination points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *mesh,                         // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                arma::Mat<dtype> *fbs = nullptr,                      // First interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Mat<dtype> *sbs = nullptr,                      // Second interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Col<unsigned> *no_interact = nullptr,           // Number of mesh between orig and dest, Size [ n_ray ]
+                                arma::Col<unsigned> *fbs_ind = nullptr,               // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                arma::Col<unsigned> *sbs_ind = nullptr,               // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                const arma::Col<unsigned> *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
 
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision

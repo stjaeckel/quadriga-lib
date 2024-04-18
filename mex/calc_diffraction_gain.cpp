@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  4 - center_freq     Center frequency in [Hz]
     //  5 - lod             Level of detail, scalar value 0-6
     //  6 - verbose         Verbosity level 0-2, default = 0
+    //  7 - sub_mesh_index  Sub-mesh index, 0-based, uint32, Length: [ n_sub ], optional
 
     // Outputs:
     //  0 - gain            Diffraction gain; linear scale; Size: [ n_pos ]
@@ -37,7 +38,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 4)
         mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Need at least 4 input arguments.");
 
-    if (nrhs > 7)
+    if (nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Too many input arguments.");
 
     if (nlhs > 2)
@@ -77,6 +78,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = (nrhs < 5) ? 1.0e9 : qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
     int lod = (nrhs < 6) ? 2 : qd_mex_get_scalar<int>(prhs[5], "lod", 2);
     int verbose = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "verbose", 0);
+
+    arma::u32_vec sub_mesh_index;
+    if (nrhs > 7 && !mxIsEmpty(prhs[7]))
+    {
+        if (!mxIsUint32(prhs[7]))
+            mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Input 'sub_mesh_index' must be provided as 'uint32'.");
+
+        sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[7]);
+    }
 
     unsigned long long n_pos = use_single ? orig_single.n_rows : orig_double.n_rows;
     unsigned long long n_seg = 0;
@@ -122,12 +132,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (use_single)
         {
             quadriga_lib::calc_diffraction_gain<float>(&orig_single, &dest_single, &mesh_single, &mtl_prop_single,
-                                                       (float)center_freq, lod, p_gain_single, p_coord_single, verbose);
+                                                       (float)center_freq, lod, p_gain_single, p_coord_single, verbose,
+                                                       &sub_mesh_index);
         }
         else // double
         {
             quadriga_lib::calc_diffraction_gain<double>(&orig_double, &dest_double, &mesh_double, &mtl_prop_double,
-                                                        center_freq, lod, p_gain_double, p_coord_double, verbose);
+                                                        center_freq, lod, p_gain_double, p_coord_double, verbose,
+                                                        &sub_mesh_index);
         }
     }
     catch (const std::invalid_argument &ex)
