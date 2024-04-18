@@ -1,8 +1,10 @@
 clear all
 close all
 
-no_mesh = 1e5;
+no_mesh = 1e6;
 no_pos  = 1e5;
+
+use_sub_mesh = 1; % 1 or 0
 
 % Cube
 cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
@@ -20,9 +22,18 @@ cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
 
 % Plane
 cube(:,[1,2,4,5,7,8]) = cube(:,[1,2,4,5,7,8]) * 100;
+%cube = cube([1,7],:);
 
 % Subdivide
 mesh = quadriga_lib.subdivide_triangles(cube, round(sqrt(no_mesh/12)));
+
+sub_mesh_index = [];
+if use_sub_mesh
+    target_size = max(1024, sqrt(no_mesh) );
+    tic 
+    [ mesh, sub_mesh_index ] = quadriga_lib.triangle_mesh_segmentation( mesh, target_size, 8 );
+    toc
+end
 
 x_min = -99; x_max = 99; y_min = -99; y_max = 99;   % Map edges (set by model size)
 pixel_size = 198 / round(sqrt(no_pos));                 % in [m]
@@ -41,6 +52,7 @@ destS = single(dest);
 meshS = single(mesh);
 
 tic
-[ fbs, sbs, no_hit, ifbs, isbs ] = quadriga_lib.ray_triangle_intersect( origS, destS, meshS );
+[ fbs, sbs, no_hit, ifbs, isbs ] = quadriga_lib.ray_triangle_intersect( origS, destS, meshS, sub_mesh_index );
 toc
+
 

@@ -29,6 +29,10 @@ quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9 );
 assertElementsAlmostEqual( gain, [10^(-0.3);10^(-0.3)], 'absolute', 1e-14 );
 assertElementsAlmostEqual( coord, permute([0,0 ; 0,0 ; 0.5,-0.5],[1,3,2]), 'absolute', 1e-14 );
 
+% Empty sub-mesh index
+[~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, [] );
+[~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32(0) );
+
 try % 3 outputs
     [~, ~, ~,] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 5 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
@@ -39,8 +43,8 @@ catch ME
     end
 end
 
-try % 8 input arguments
-    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, 1 );
+try % 9 input arguments
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, [], 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Too many input arguments.';
@@ -74,6 +78,52 @@ try % wrong mtl_prop
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Number of rows in ''mesh'' and ''mtl_prop'' dont match.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try % wrong sub_mesh_index
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, 0);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Input ''sub_mesh_index'' must be provided as ''uint32''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try % wrong sub_mesh_index
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32(1));
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'First sub-mesh must start at index 0.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+x = quadriga_lib.version;
+if strcmp( x(end-3:end), 'AVX2' )
+    % Should be OK
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,8]));
+
+    try % wrong sub_mesh_index alignemnt
+        [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,5]));
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    catch ME
+        expectedErrorMessage = 'Sub-meshes must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).';
+        if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+            error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+        end
+    end
+end
+
+try % wrong sub_mesh_index
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,32]));
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Sub-mesh indices cannot exceed number of mesh elements.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

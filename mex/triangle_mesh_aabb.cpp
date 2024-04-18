@@ -28,13 +28,13 @@ SECTION!*/
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
 ## Description:
-The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum 
-bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian) 
-coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of 
-triangles. In order to find intersections with the triangles (e.g. using ray tracing), the 
-initial check is the intersections between the rays and the AABBs. Since it is usually a much 
-less expensive operation than the check of the actual intersection (because it only requires 
-comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart. 
+The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum
+bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian)
+coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of
+triangles. In order to find intersections with the triangles (e.g. using ray tracing), the
+initial check is the intersections between the rays and the AABBs. Since it is usually a much
+less expensive operation than the check of the actual intersection (because it only requires
+comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
 
 ## Usage:
 
@@ -50,21 +50,18 @@ aabb = quadriga_lib.subdivide_triangles( triangle_mesh, sub_mesh_index, vec_size
   Size: `[ n_triangles, 9 ]`
 
 - **`sub_mesh_index`** (optional)<br>
-  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of 
+  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
   the entire triangle mesh is returned. Type: uint32; Vector of length `[ n_sub_mesh ]`
 
 - **`vec_size`** (optional)<br>
   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1,
-  the number of rows in the output is increased to a multiple of `vec_size`, padded with zeros. 
+  the number of rows in the output is increased to a multiple of `vec_size`, padded with zeros.
 
 ## Output Argument:
 
 - **`aabb`**<br>
-  Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values: 
+  Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values:
   `[ x_min, x_max, y_min, y_max, z_min, z_max ]`; Size: `[ n_sub_mesh, 6 ]`
-
-
-
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -99,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mesh_in_double = qd_mex_reinterpret_Mat<double>(prhs[0]);
 
     arma::u32_vec sub_mesh_index;
-    if (nrhs > 1)
+    if (nrhs > 1 && !mxIsEmpty(prhs[1]))
     {
         if (!mxIsUint32(prhs[1]))
             mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:IO_error", "Input 'sub_mesh_index' must be provided as 'uint32'.");

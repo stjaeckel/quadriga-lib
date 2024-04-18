@@ -85,7 +85,7 @@ mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
-test:   tests/test_bin   mex_octave
+test:   tests/test_bin   #mex_octave
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 	tests/test_bin
 	

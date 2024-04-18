@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,9 +36,9 @@ Calculates the intersection of rays and triangles in three dimensions
 - For further information, refer to [Wikipedia: <a href="https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm">Möller–Trumbore intersection algorithm</a>].
 
 - The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle
-  is specified by its three vertices. 
-  
-- To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
+  is specified by its three vertices.
+
+- To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when
   available, to speed up the computational process.
 
 ## Usage:
@@ -58,6 +58,11 @@ Calculates the intersection of rays and triangles in three dimensions
   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br>
   Size: `[ no_mesh, 9 ]`
+
+- **`sub_mesh_index`** (optional)<br>
+  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections
+  are calculated for each mesh element, leading to poor performance for large meshed. 
+  Type: uint32; Vector of length `[ n_sub_mesh ]`
 
 ## Output Arguments:
 - **`fbs`**<br>
@@ -80,26 +85,27 @@ Calculates the intersection of rays and triangles in three dimensions
 ## Caveat:
 - `orig`, `dest`, and `mesh` can be provided in single or double precision; `fbs` and `lbs` will have
   the same type.
-- All internal computation are done in single precision to achieve an additional 2x improvement in 
+- All internal computation are done in single precision to achieve an additional 2x improvement in
   speed compared to double precision when using AVX2 intrinsic instructions
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
-    //  0 - orig        Ray origin points in GCS, Size [ n_ray, 3 ]
-    //  1 - dest        Ray destination points in GCS, Size [ n_ray, 3 ]
-    //  3 - mesh        Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+    //  0 - orig            Ray origin points in GCS, Size [ n_ray, 3 ]
+    //  1 - dest            Ray destination points in GCS, Size [ n_ray, 3 ]
+    //  3 - mesh            Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+    //  4 - sub_mesh_index  Sub-mesh index, 0-based, uint32, Length: [ n_sub ], optional
 
     // Outputs:
-    //  0 - fbs         First interaction points in GCS, Size [ n_ray, 3 ]
-    //  1 - sbs         Second interaction points in GCS, Size [ n_ray, 3 ]
-    //  2 - no_interact   Number of mesh between orig and dest, Size [ n_ray, 1 ]
-    //  3 - fbs_ind     Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-    //  4 - sbs_ind     Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+    //  0 - fbs             First interaction points in GCS, Size [ n_ray, 3 ]
+    //  1 - sbs             Second interaction points in GCS, Size [ n_ray, 3 ]
+    //  2 - no_interact     Number of mesh between orig and dest, Size [ n_ray, 1 ]
+    //  3 - fbs_ind         Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+    //  4 - sbs_ind         Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
 
-    if (nrhs != 3)
-        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Need exactly 3 input arguments: orig, dest and mesh.");
+    if (nrhs < 3 || nrhs > 4)
+        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Wrong number of input arguments.");
 
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Too many output arguments.");
@@ -133,6 +139,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mesh_double = qd_mex_reinterpret_Mat<double>(prhs[2]);
     }
 
+    arma::u32_vec sub_mesh_index;
+    if (nrhs > 3 && !mxIsEmpty(prhs[3]))
+    {
+        if (!mxIsUint32(prhs[3]))
+            mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Input 'sub_mesh_index' must be provided as 'uint32'.");
+
+        sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[3]);
+    }
+
     // Number of rays
     arma::uword n_rays = use_single ? orig_single.n_rows : orig_double.n_rows;
 
@@ -162,28 +177,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (use_single)
         {
             if (nlhs == 1)
-                quadriga_lib::ray_triangle_intersect(&orig_single, &dest_single, &mesh_single, &fbs_single);
+                quadriga_lib::ray_triangle_intersect<float>(&orig_single, &dest_single, &mesh_single, &fbs_single, nullptr, nullptr, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 2)
-                quadriga_lib::ray_triangle_intersect(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single);
+                quadriga_lib::ray_triangle_intersect<float>(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, nullptr, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 3)
-                quadriga_lib::ray_triangle_intersect(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact);
+                quadriga_lib::ray_triangle_intersect<float>(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 4)
-                quadriga_lib::ray_triangle_intersect(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact, &fbs_ind);
+                quadriga_lib::ray_triangle_intersect<float>(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact, &fbs_ind, nullptr, &sub_mesh_index);
             else if (nlhs == 5)
-                quadriga_lib::ray_triangle_intersect(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact, &fbs_ind, &sbs_ind);
+                quadriga_lib::ray_triangle_intersect<float>(&orig_single, &dest_single, &mesh_single, &fbs_single, &sbs_single, &no_interact, &fbs_ind, &sbs_ind, &sub_mesh_index);
         }
         else // double
         {
             if (nlhs == 1)
-                quadriga_lib::ray_triangle_intersect(&orig_double, &dest_double, &mesh_double, &fbs_double);
+                quadriga_lib::ray_triangle_intersect<double>(&orig_double, &dest_double, &mesh_double, &fbs_double, nullptr, nullptr, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 2)
-                quadriga_lib::ray_triangle_intersect(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double);
+                quadriga_lib::ray_triangle_intersect<double>(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, nullptr, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 3)
-                quadriga_lib::ray_triangle_intersect(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact);
+                quadriga_lib::ray_triangle_intersect<double>(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact, nullptr, nullptr, &sub_mesh_index);
             else if (nlhs == 4)
-                quadriga_lib::ray_triangle_intersect(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact, &fbs_ind);
+                quadriga_lib::ray_triangle_intersect<double>(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact, &fbs_ind, nullptr, &sub_mesh_index);
             else if (nlhs == 5)
-                quadriga_lib::ray_triangle_intersect(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact, &fbs_ind, &sbs_ind);
+                quadriga_lib::ray_triangle_intersect<double>(&orig_double, &dest_double, &mesh_double, &fbs_double, &sbs_double, &no_interact, &fbs_ind, &sbs_ind, &sub_mesh_index);
         }
     }
     catch (const std::invalid_argument &ex)

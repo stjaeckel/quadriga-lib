@@ -211,7 +211,8 @@ template <typename dtype>
 void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
                                          const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
                                          dtype center_frequency, int lod,
-                                         arma::Col<dtype> *gain, arma::Cube<dtype> *coord, int verbose)
+                                         arma::Col<dtype> *gain, arma::Cube<dtype> *coord, int verbose,
+                                         const arma::Col<unsigned> *sub_mesh_index)
 {
     // Ray offset is used to detect co-location of points, value in meters
     const dtype ray_offset = (dtype)0.001;
@@ -362,7 +363,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
             // Calculate interaction points of rays and 3D mesh
             arma::Mat<dtype> fbs, sbs;
             arma::Col<unsigned> no_interact, fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, mesh, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
+            quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, mesh, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, sub_mesh_index);
 
             // Pointers
             unsigned *p_no_interact = no_interact.memptr(); // Pointer to 'no_interact'
@@ -931,9 +932,11 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> *orig, const arma::Mat<float> *dest,
                                                   const arma::Mat<float> *mesh, const arma::Mat<float> *mtl_prop,
                                                   float center_frequency, int lod,
-                                                  arma::Col<float> *gain, arma::Cube<float> *coord, int verbose);
+                                                  arma::Col<float> *gain, arma::Cube<float> *coord, int verbose,
+                                                  const arma::Col<unsigned> *sub_mesh_index);
 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                                   const arma::Mat<double> *mesh, const arma::Mat<double> *mtl_prop,
                                                   double center_frequency, int lod,
-                                                  arma::Col<double> *gain, arma::Cube<double> *coord, int verbose);
+                                                  arma::Col<double> *gain, arma::Cube<double> *coord, int verbose,
+                                                  const arma::Col<unsigned> *sub_mesh_index);
