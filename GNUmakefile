@@ -10,6 +10,21 @@
 # Leave this empty if you don't want to use MATLAB (you can still use Octave).
 MATLAB_PATH = /usr/local/MATLAB/R2021a
 
+# Set path to your CUDA installation
+# Leave this empty if you don't want to use GPU acceleration
+# You can get CUDA from: https://developer.nvidia.com/cuda-toolkit
+CUDA_PATH = /usr/local/cuda-12.4
+
+# If needed, adjust the NVIDIA compute capability (50 should run on most modern GPUs). 
+# Adjusting the value to match your GPUs capability may improve performance and load times, but is not required.
+# Minimum supported capability for CUDA-11 is 35 and for CUDA-12 it is 50.
+# For more info: https://developer.nvidia.com/cuda-gpus
+COMPUTE_CAPABILITY = 50
+
+# Leave empty for using system library (recommended)
+# Static linking the HDF5 library may cause Octave to crash
+hdf5_version      = # 1.14.2
+
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
@@ -17,33 +32,44 @@ armadillo_version = 12.6.3
 pugixml_version   = 1.13
 catch2_version    = 3.4.0
 
-# Leave empty for using system library (recommended)
-# Static linking the HDF5 library may cause Octave to crash
-hdf5_version      = # 1.14.2
-
 # The following sections should not require editing.
 
 # Conditional compilation of MATLAB targets (check if MATLAB path is set)
-ifeq ($(MATLAB_PATH),)
-	MATLAB_TARGETS =
-else
+ifneq ($(MATLAB_PATH),)
+ifeq ($(CUDA_PATH),)
 	MATLAB_TARGETS = mex_matlab
+else
+	MATLAB_TARGETS = mex_matlab   mex_matlab_cuda
+endif
 endif
 
 # Check if Octave is installed by trying to run mkoctfile
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
 # Conditional compilation of Octave targets
-ifeq ($(OCTAVE_VERSION),)
-	OCTAVE_TARGETS =
-else
+ifneq ($(OCTAVE_VERSION),)
+ifeq ($(CUDA_PATH),)
 	OCTAVE_TARGETS = mex_octave
+else
+	OCTAVE_TARGETS = mex_octave   mex_octave_cuda
+endif
 endif
 
 # Compilers
 CC   = g++
 MEX  = $(MATLAB_PATH)/bin/mex
 OCT  = mkoctfile
+
+# Conditional compilation of CUDA targets (check if CUDA path is set)
+ifneq ($(CUDA_PATH),)
+	CUDA_A     = lib/quadriga_cuda.a
+	CUDA_TEST  = tests/test_cuda_bin
+	NVCC       = $(CUDA_PATH)/bin/nvcc
+	NV_LIB     = -L$(CUDA_PATH)/lib64 -lcudart
+	NVCCFLAGS  = --std c++17 -ccbin=$(CC) --gpu-architecture=compute_$(COMPUTE_CAPABILITY) \
+					--gpu-code=compute_$(COMPUTE_CAPABILITY) -Wno-deprecated-gpu-targets \
+					-Xcompiler '-fPIC -fopenmp' -I$(CUDA_PATH)/include -lineinfo
+endif
 
 # Headers and Libraries
 ARMA_H      = external/armadillo-$(armadillo_version)/include
@@ -70,10 +96,11 @@ CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion #-g
 .PHONY: dirs
 all:        
 	@$(MAKE) dirs
-	@$(MAKE) lib/quadriga_lib.a   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)
+	@$(MAKE) lib/quadriga_lib.a   $(CUDA_A)   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)
 
 src     	= $(wildcard src/*.cpp)
 mex         = $(wildcard mex/*.cpp)
+mex_cuda    = $(wildcard mex_cuda/*.cpp)
 tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
 dirs:
@@ -81,16 +108,24 @@ dirs:
 	mkdir -p lib
 	mkdir -p +quadriga_lib
 
-mex_matlab:  $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave:  $(mex:mex/%.cpp=+quadriga_lib/%.mex)
-mex_docu:    $(mex:mex/%.cpp=+quadriga_lib/%.m)
+mex_matlab:      $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
+mex_matlab_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mexa64)
+mex_octave:      $(mex:mex/%.cpp=+quadriga_lib/%.mex)
+mex_octave_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mex)
+mex_docu:        $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
-test:   tests/test_bin   #mex_octave
+test:   tests/test_bin   $(CUDA_TEST)   mex_octave
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 	tests/test_bin
-	
+ifneq ($(CUDA_PATH),)
+	tests/test_cuda_bin
+endif
+
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
 	$(CC) -std=c++17 $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
+
+tests/test_cuda_bin:   tests/quadriga_lib_catch2_cuda_tests.cpp   lib/quadriga_lib.a   $(CUDA_A)   $(tests)
+	$(CC) -std=c++17 $< lib/quadriga_lib.a $(CUDA_A) -o $@ -Iinclude -I$(ARMA_H) -I$(CATCH2)/include -L$(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN) $(NV_LIB)
 
 # Individual quadriga-lib objects
 build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_arrayant.hpp
@@ -120,6 +155,9 @@ build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadr
 build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
+build/get_CUDA_compute_capability.o:   src/get_CUDA_compute_capability.cu   include/quadriga_CUDA_tools.cuh
+	$(NVCC) $(NVCCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 # Archive file for static linking
 build/libhdf5.a:
 	cp external/hdf5-$(hdf5_version)-Linux/lib/libhdf5.a build/
@@ -129,6 +167,12 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
 					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 		ar rcs $@ $^ $(HDF5_OBJ)
+
+build/%_link.o:   build/%.o
+	$(NVCC) -dlink $< -o $@
+
+lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_compute_capability_link.o
+	ar rcs $@ $^
 
 # MEX MATLAB interface
 +quadriga_lib/arrayant_calc_directivity.mexa64:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
@@ -145,6 +189,7 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 +quadriga_lib/geo2cart.mexa64:                    build/quadriga_tools.o
 +quadriga_lib/get_channels_planar.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/get_channels_spherical.mexa64:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/get_CUDA_compute_capability.mexa64: build/get_CUDA_compute_capability.o
 +quadriga_lib/hdf5_create_file.mexa64:            build/qd_channel.o   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_channel.mexa64:           build/qd_channel.o   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_dset.mexa64:              build/qd_channel.o   $(HDF5_STATIC)
@@ -167,6 +212,9 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 +quadriga_lib/%.mexa64:   mex/%.cpp
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN)
 
++quadriga_lib/%.mexa64:   mex_cuda/%.cpp
+	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN) $(NV_LIB)
+
 # MEX Ocate interface
 +quadriga_lib/arrayant_calc_directivity.mex:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_combine_pattern.mex:    build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
@@ -182,6 +230,7 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 +quadriga_lib/geo2cart.mex:                    build/quadriga_tools.o
 +quadriga_lib/get_channels_planar.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/get_channels_spherical.mex:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/get_CUDA_compute_capability.mex: build/get_CUDA_compute_capability.o
 +quadriga_lib/hdf5_create_file.mex:            build/qd_channel.o   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_channel.mex:           build/qd_channel.o   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_dset.mex:              build/qd_channel.o   $(HDF5_STATIC)
@@ -203,6 +252,9 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o
 
 +quadriga_lib/%.mex:   mex/%.cpp
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s 
+
++quadriga_lib/%.mex:   mex_cuda/%.cpp
+	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) $(NV_LIB) -s
 
 # Documentation of MEX files
 +quadriga_lib/%.m:   mex/%.cpp
