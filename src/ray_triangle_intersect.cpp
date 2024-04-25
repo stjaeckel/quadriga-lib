@@ -613,27 +613,33 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
-    arma::uword n_rays = orig->n_rows;
+    size_t n_ray_t = orig->n_rows;
     size_t n_mesh_t = (size_t)mesh->n_rows;
 
-    if (dest->n_rows != n_rays)
+    if (dest->n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
 
     // Convert orig and dest to aligned floats and calculate (dest - orig)
-    arma::uword n_rayA = n_rays; // (n_rays % VEC_SIZE == 0) ? n_rays : VEC_SIZE * (n_rays / VEC_SIZE + 1);
-    auto origA = arma::fmat(n_rayA, 3);
-    auto dest_minus_origA = arma::fmat(n_rayA, 3);
+    size_t n_ray_s = n_ray_t; // (n_ray_t % VEC_SIZE == 0) ? n_ray_t : VEC_SIZE * (n_ray_t / VEC_SIZE + 1);
+    auto origA = arma::fmat(n_ray_s, 3, arma::fill::none);
+    auto dest_minus_origA = arma::fmat(n_ray_s, 3, arma::fill::none);
     {
         const dtype *p_orig = orig->memptr(), *p_dest = dest->memptr();
         float *p_origA = origA.memptr(), *p_dest_minus_origA = dest_minus_origA.memptr();
-        for (arma::uword i = 0; i < n_rays; ++i)
-        {
-            dtype x = p_orig[i], y = p_orig[i + n_rays], z = p_orig[i + 2 * n_rays];
-            p_origA[i] = (float)x, p_origA[i + n_rayA] = (float)y, p_origA[i + 2 * n_rayA] = (float)z;
-            p_dest_minus_origA[i] = float(p_dest[i] - x);
-            p_dest_minus_origA[i + n_rayA] = float(p_dest[i + n_rays] - y);
-            p_dest_minus_origA[i + 2 * n_rayA] = float(p_dest[i + 2 * n_rays] - z);
-        }
+        size_t n_elem = 3 * n_ray_s, i = 0;
+        for (size_t j = 0; j < n_elem; ++j)
+            if ((j % n_ray_s) / n_ray_t) // = 1 for rows where n_ray_s > n_ray_t
+            {
+                p_origA[j] = 0.0f;
+                p_dest_minus_origA[j] = 0.0f;
+            }
+            else
+            {
+                dtype v_orig = p_orig[i];                          // Load orig
+                p_origA[j] = (float)v_orig;                        // Cast to float
+                p_dest_minus_origA[j] = float(p_dest[i] - v_orig); // Calculate dest - orig
+                ++i;
+            }
     }
 
     // Check if the sub-mesh indices are valid
@@ -796,9 +802,9 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Define and initialize temporary variables
-    arma::fvec Wf(n_rayA), Ws(n_rayA);    // Normalized FBS and SBS hit distances, initialized to 0
-    arma::u32_vec If(n_rayA), Is(n_rayA); // Index of mesh element hit at FBS/SBS, initialized to 0
-    arma::u32_vec hit_cnt(n_rayA);        // Hit counter
+    arma::fvec Wf(n_ray_s), Ws(n_ray_s);    // Normalized FBS and SBS hit distances, initialized to 0
+    arma::u32_vec If(n_ray_s), Is(n_ray_s); // Index of mesh element hit at FBS/SBS, initialized to 0
+    arma::u32_vec hit_cnt(n_ray_s);         // Hit counter
 
     // Pointer to hit counter
     unsigned *p_hit_cnt = (no_interact == nullptr) ? nullptr : hit_cnt.memptr();
@@ -810,8 +816,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
                     smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     origA.colptr(0), origA.colptr(1), origA.colptr(2),
                     dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                    (size_t)n_rayA,
-                    Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+                    n_ray_s, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
     else
     {
@@ -819,16 +824,14 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
                        smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                        origA.colptr(0), origA.colptr(1), origA.colptr(2),
                        dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                       (size_t)n_rayA,
-                       Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+                       n_ray_s, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
 #else
     qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_t,
                    smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                    origA.colptr(0), origA.colptr(1), origA.colptr(2),
                    dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                   (size_t)n_rayA,
-                   Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+                   n_ray_s, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
 #endif
 
     // Free aligned memory
@@ -857,13 +860,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     // Compute FBS location in GCS
     if (fbs != nullptr)
     {
-        if (fbs->n_rows != n_rays || fbs->n_cols != 3)
-            fbs->set_size(n_rays, 3);
+        if (fbs->n_rows != n_ray_t || fbs->n_cols != 3)
+            fbs->set_size(n_ray_t, 3);
 
         dtype *px = fbs->colptr(0), *py = fbs->colptr(1), *pz = fbs->colptr(2);
         float *w = Wf.memptr();
 
-        for (arma::uword i = 0; i < n_rays; ++i)
+        for (size_t i = 0; i < n_ray_t; ++i)
         {
             px[i] = ox[i] + dtype(w[i] * dx[i]);
             py[i] = oy[i] + dtype(w[i] * dy[i]);
@@ -874,13 +877,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     // Compute SBS location in GCS
     if (sbs != nullptr)
     {
-        if (sbs->n_rows != n_rays || sbs->n_cols != 3)
-            sbs->set_size(n_rays, 3);
+        if (sbs->n_rows != n_ray_t || sbs->n_cols != 3)
+            sbs->set_size(n_ray_t, 3);
 
         dtype *px = sbs->colptr(0), *py = sbs->colptr(1), *pz = sbs->colptr(2);
         float *w = Ws.memptr();
 
-        for (arma::uword i = 0; i < n_rays; ++i)
+        for (size_t i = 0; i < n_ray_t; ++i)
         {
             px[i] = ox[i] + dtype(w[i] * dx[i]);
             py[i] = oy[i] + dtype(w[i] * dy[i]);
@@ -889,23 +892,23 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Copy the rest
-    size_t no_bytes = (size_t)n_rays * sizeof(unsigned);
+    size_t no_bytes = (size_t)n_ray_t * sizeof(unsigned);
     if (no_interact != nullptr)
     {
-        if (no_interact->n_elem != n_rays)
-            no_interact->set_size(n_rays);
+        if (no_interact->n_elem != n_ray_t)
+            no_interact->set_size(n_ray_t);
         std::memcpy(no_interact->memptr(), p_hit_cnt, no_bytes);
     }
     if (fbs_ind != nullptr)
     {
-        if (fbs_ind->n_elem != n_rays)
-            fbs_ind->set_size(n_rays);
+        if (fbs_ind->n_elem != n_ray_t)
+            fbs_ind->set_size(n_ray_t);
         std::memcpy(fbs_ind->memptr(), If.memptr(), no_bytes);
     }
     if (sbs_ind != nullptr)
     {
-        if (sbs_ind->n_elem != n_rays)
-            sbs_ind->set_size(n_rays);
+        if (sbs_ind->n_elem != n_ray_t)
+            sbs_ind->set_size(n_ray_t);
         std::memcpy(sbs_ind->memptr(), Is.memptr(), no_bytes);
     }
 }

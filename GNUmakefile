@@ -13,7 +13,8 @@ MATLAB_PATH = /usr/local/MATLAB/R2021a
 # Set path to your CUDA installation
 # Leave this empty if you don't want to use GPU acceleration
 # You can get CUDA from: https://developer.nvidia.com/cuda-toolkit
-CUDA_PATH = /usr/local/cuda-12.4
+#  !!! THERE ARE CURRENTLY NO CUDA EXENSIONS AVAILABLE  !!!
+CUDA_PATH = #/usr/local/cuda-12.4
 
 # If needed, adjust the NVIDIA compute capability (50 should run on most modern GPUs). 
 # Adjusting the value to match your GPUs capability may improve performance and load times, but is not required.
