@@ -10,9 +10,9 @@
 %    - For further information, refer to [Wikipedia: Möller–Trumbore intersection algorithm].
 %    
 %    - The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle
-%      is specified by its three vertices. 
-%      
-%    - To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
+%      is specified by its three vertices.
+%    
+%    - To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when
 %      available, to speed up the computational process.
 %    
 % Usage:
@@ -30,6 +30,11 @@
 %      Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
 %      in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; 
 %      Size: [ no_mesh, 9 ]
+%    
+%    - sub_mesh_index (optional)
+%      Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections
+%      are calculated for each mesh element, leading to poor performance for large meshed. 
+%      Type: uint32; Vector of length [ n_sub_mesh ]
 %    
 % Output Arguments:
 %    - fbs
@@ -52,7 +57,7 @@
 % Caveat:
 %    - orig, dest, and mesh can be provided in single or double precision; fbs and lbs will have
 %      the same type.
-%    - All internal computation are done in single precision to achieve an additional 2x improvement in 
+%    - All internal computation are done in single precision to achieve an additional 2x improvement in
 %      speed compared to double precision when using AVX2 intrinsic instructions
 %
 %

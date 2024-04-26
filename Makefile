@@ -65,6 +65,8 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\icosphere.mexw64 \
 	   +quadriga_lib\interp.mexw64 \
 	   +quadriga_lib\obj_file_read.mexw64 \
+	   +quadriga_lib\point_cloud_aabb.mexw64 \
+	   +quadriga_lib\point_cloud_segmentation.mexw64 \
 	   +quadriga_lib\ray_mesh_interact.mexw64 \
 	   +quadriga_lib\ray_triangle_intersect.mexw64 \
 	   +quadriga_lib\subdivide_triangles.mexw64 \
@@ -194,6 +196,12 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
  	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\obj_file_read.mexw64:   mex\obj_file_read.cpp   build\quadriga_tools.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\point_cloud_aabb.mexw64:   mex\point_cloud_aabb.cpp   build\quadriga_tools.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\point_cloud_segmentation.mexw64:   mex\point_cloud_segmentation.cpp   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\ray_mesh_interact.mexw64:   mex\ray_mesh_interact.cpp   build\ray_mesh_interact.obj

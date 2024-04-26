@@ -122,6 +122,7 @@
         "cfenv": "cpp",
         "charconv": "cpp",
         "format": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "__split_buffer": "cpp"
     }
 }

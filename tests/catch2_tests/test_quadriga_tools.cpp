@@ -125,7 +125,7 @@ TEST_CASE("Quadriga tools - Icosphere")
     CHECK(allElementsWithinRange);
 }
 
-TEST_CASE("Quadriga tools - Mesh reorganization")
+TEST_CASE("Quadriga tools - Mesh Segmentation")
 {
     // Default cube
     arma::fmat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
@@ -153,7 +153,7 @@ TEST_CASE("Quadriga tools - Mesh reorganization")
     arma::fmat cube_re, mtl_prop_re;
     arma::u32_vec cube_index, mesh_index;
     auto n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 1024, 8,
-                                                &mtl_prop_sub, &mtl_prop_re, &mesh_index);
+                                                          &mtl_prop_sub, &mtl_prop_re, &mesh_index);
 
     CHECK(n_sub == 1);
     CHECK(cube_re.n_rows == 112);     // Multiple of 8
@@ -178,7 +178,7 @@ TEST_CASE("Quadriga tools - Mesh reorganization")
 
     // Case 2 - Subdivide, no padding
     n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 64, 1,
-                                           &mtl_prop_sub, &mtl_prop_re, &mesh_index);
+                                                     &mtl_prop_sub, &mtl_prop_re, &mesh_index);
 
     CHECK(n_sub == 3);
     CHECK(cube_re.n_rows == 108);
@@ -193,4 +193,78 @@ TEST_CASE("Quadriga tools - Mesh reorganization")
     auto I = arma::conv_to<arma::uvec>::from(mesh_index - 1);
     CHECK(arma::approx_equal(cube_re, cube_sub.rows(I), "absdiff", 1e-14));
     CHECK(arma::approx_equal(mtl_prop_re, mtl_prop_sub.rows(I), "absdiff", 1e-14));
+}
+
+TEST_CASE("Quadriga tools - Point Cloud Segmentation")
+{
+    // Generate set of points
+    arma::fmat points(4, 3);
+    points.col(0) = arma::regspace<arma::fvec>(0.0f, 0.1f, 0.3f);
+    points = repmat(points, 2, 1);
+    points.submat(4, 0, 7, 0) += 40.0f;
+    points = repmat(points, 2, 1);
+    points.submat(0, 1, 7, 1) -= 50.0f;
+    points.submat(8, 1, 15, 1) += 50.0f;
+    points.col(2) += 1.0f;
+
+    // Calculate bounding box
+    auto aabb = quadriga_lib::point_cloud_aabb(&points);
+
+    arma::fmat T;
+    T = {{0.0f, 40.3f, -50.0f, 50.0f, 1.0f, 1.0f}};
+    CHECK(arma::approx_equal(aabb, T, "absdiff", 1e-14));
+
+    arma::fmat pointsA, pointsB;
+    arma::s32_vec split_ind;
+
+    // Split along longest axis
+    int res = quadriga_lib::point_cloud_split(&points, &pointsA, &pointsB, 0, &split_ind);
+
+    CHECK(res == 2);
+    CHECK(arma::approx_equal(pointsA, points.submat(0, 0, 7, 2), "absdiff", 1e-14));
+    CHECK(arma::approx_equal(pointsB, points.submat(8, 0, 15, 2), "absdiff", 1e-14));
+    CHECK(split_ind.n_elem == 16);
+    CHECK(split_ind.at(0) == 1);
+    CHECK(split_ind.at(8) == 2);
+
+    arma::fmat pointsR;
+    arma::u32_vec sub_cloud_index, forward_index, reverse_index;
+
+    points.col(1) *= 0.1f;
+
+    size_t n_sub = quadriga_lib::point_cloud_segmentation(&points, &pointsR, &sub_cloud_index, 4, 5,
+                                                          &forward_index, &reverse_index);
+
+    arma::u32_vec I;
+    I = {0, 5, 10, 15};
+    CHECK(arma::all(sub_cloud_index == I));
+
+    CHECK(arma::approx_equal(pointsR.submat(0, 0, 3, 2), points.submat(0, 0, 3, 2), "absdiff", 1e-14));
+    T = {{0.15f, -5.0f, 1.0f}};
+    CHECK(arma::approx_equal(pointsR.submat(4, 0, 4, 2), T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(pointsR.submat(5, 0, 8, 2), points.submat(8, 0, 11, 2), "absdiff", 1e-14));
+    T = {{0.15f, 5.0f, 1.0f}};
+    CHECK(arma::approx_equal(pointsR.submat(9, 0, 9, 2), T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(pointsR.submat(10, 0, 13, 2), points.submat(4, 0, 7, 2), "absdiff", 1e-14));
+    T = {{40.15f, -5.0f, 1.0f}};
+    CHECK(arma::approx_equal(pointsR.submat(14, 0, 14, 2), T, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(pointsR.submat(15, 0, 18, 2), points.submat(12, 0, 15, 2), "absdiff", 1e-14));
+    T = {{40.15f, 5.0f, 1.0f}};
+    CHECK(arma::approx_equal(pointsR.submat(19, 0, 19, 2), T, "absdiff", 1e-14));
+
+    I = {1, 2, 3, 4, 0, 9, 10, 11, 12, 0, 5, 6, 7, 8, 0, 13, 14, 15, 16, 0};
+    CHECK(arma::all(forward_index == I));
+
+    I = {0, 1, 2, 3, 10, 11, 12, 13, 5, 6, 7, 8, 15, 16, 17, 18};
+    CHECK(arma::all(reverse_index == I));
+
+    // Test AABB of sub-clouds
+    aabb = quadriga_lib::point_cloud_aabb(&pointsR, &sub_cloud_index);
+    
+    T = {{0.0f, 0.3f, -5.0f, -5.0f, 1.0f, 1.0f},
+         {0.0f, 0.3f, 5.0f, 5.0f, 1.0f, 1.0f},
+         {40.0f, 40.3f, -5.0f, -5.0f, 1.0f, 1.0f},
+         {40.0f, 40.3f, 5.0f, 5.0f, 1.0f, 1.0f}};
+
+    CHECK(arma::approx_equal(aabb, T, "absdiff", 1e-14));
 }

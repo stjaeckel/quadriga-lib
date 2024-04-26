@@ -2,13 +2,13 @@
 %    Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 %    
 % Description:
-%    The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum 
-%    bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian) 
-%    coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of 
-%    triangles. In order to find intersections with the triangles (e.g. using ray tracing), the 
-%    initial check is the intersections between the rays and the AABBs. Since it is usually a much 
-%    less expensive operation than the check of the actual intersection (because it only requires 
-%    comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart. 
+%    The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum
+%    bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian)
+%    coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of
+%    triangles. In order to find intersections with the triangles (e.g. using ray tracing), the
+%    initial check is the intersections between the rays and the AABBs. Since it is usually a much
+%    less expensive operation than the check of the actual intersection (because it only requires
+%    comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
 %    
 % Usage:
 %    
@@ -22,17 +22,17 @@
 %      Size: [ n_triangles, 9 ]
 %    
 %    - sub_mesh_index (optional)
-%      Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of 
+%      Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
 %      the entire triangle mesh is returned. Type: uint32; Vector of length [ n_sub_mesh ]
 %    
 %    - vec_size (optional)
 %      Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1,
-%      the number of rows in the output is increased to a multiple of vec_size, padded with zeros. 
+%      the number of rows in the output is increased to a multiple of vec_size, padded with zeros.
 %    
 % Output Argument:
 %    
 %    - aabb
-%      Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values: 
+%      Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values:
 %      [ x_min, x_max, y_min, y_max, z_min, z_max ]; Size: [ n_sub_mesh, 6 ]
 %
 %
