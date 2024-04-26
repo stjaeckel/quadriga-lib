@@ -203,6 +203,8 @@ lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_comp
 +quadriga_lib/icosphere.mexa64:                   build/quadriga_tools.o
 +quadriga_lib/interp.mexa64:                      build/quadriga_tools.o
 +quadriga_lib/obj_file_read.mexa64:               build/quadriga_tools.o
++quadriga_lib/point_cloud_aabb.mexa64:            build/quadriga_tools.o
++quadriga_lib/point_cloud_segmentation.mexa64:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
@@ -244,6 +246,8 @@ lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_comp
 +quadriga_lib/icosphere.mex:                   build/quadriga_tools.o
 +quadriga_lib/interp.mex:                      build/quadriga_tools.o
 +quadriga_lib/obj_file_read.mex:               build/quadriga_tools.o
++quadriga_lib/point_cloud_aabb.mex:            build/quadriga_tools.o
++quadriga_lib/point_cloud_segmentation.mex:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
 +quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o

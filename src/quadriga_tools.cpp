@@ -1111,8 +1111,8 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh, arma::Mat<dt
     if (split_ind != nullptr)
     {
         write_split_ind = true;
-        if (split_ind->n_elem != mesh->n_elem)
-            split_ind->zeros(mesh->n_elem);
+        if (split_ind->n_elem != mesh->n_rows)
+            split_ind->zeros(mesh->n_rows);
         else
             split_ind->zeros();
         p_split_ind = split_ind->memptr();
@@ -1595,9 +1595,443 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
 template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
                                             arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
                                             std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
+
 template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
                                             arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
                                             std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
+
+// Calculate the axis-aligned bounding box (AABB) of a point cloud
+template <typename dtype>
+arma::Mat<dtype> quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> *points, const arma::Col<unsigned> *sub_cloud_index, size_t vec_size)
+{
+    // Input validation
+    if (points == nullptr)
+        throw std::invalid_argument("Input 'points' cannot be NULL.");
+    if (points->n_cols != 3)
+        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
+    if (points->n_rows == 0)
+        throw std::invalid_argument("Input 'points' must have at least one entry.");
+    if (vec_size == 0)
+        throw std::invalid_argument("Input 'vec_size' cannot be 0.");
+
+    size_t n_points_t = (size_t)points->n_rows;
+    size_t n_values_t = (size_t)points->n_elem;
+    const dtype *p_points = points->memptr();
+
+    const unsigned first_sub_cloud_ind = 0;
+    const unsigned *p_sub = &first_sub_cloud_ind;
+    size_t n_sub = 1;
+
+    if (sub_cloud_index != nullptr && sub_cloud_index->n_elem > 0)
+    {
+        n_sub = (size_t)sub_cloud_index->n_elem;
+        if (n_sub == 0)
+            throw std::invalid_argument("Input 'sub_cloud_index' must have at least one element.");
+
+        p_sub = sub_cloud_index->memptr();
+
+        if (*p_sub != 0U)
+            throw std::invalid_argument("First sub-cloud must start at index 0.");
+
+        for (size_t i = 1; i < n_sub; ++i)
+            if (p_sub[i] <= p_sub[i - 1])
+                throw std::invalid_argument("Sub-cloud indices must be sorted in ascending order.");
+
+        if (p_sub[n_sub - 1] >= (unsigned)n_points_t)
+            throw std::invalid_argument("Sub-cloud indices cannot exceed number of points.");
+    }
+
+    // Reserve memory for the output
+    size_t n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
+    arma::Mat<dtype> output(n_out, 6); // Initialized to 0
+
+    dtype *x_min = output.colptr(0), *x_max = output.colptr(1),
+          *y_min = output.colptr(2), *y_max = output.colptr(3),
+          *z_min = output.colptr(4), *z_max = output.colptr(5);
+
+    for (size_t i = 0; i < n_sub; ++i)
+    {
+        x_min[i] = INFINITY, x_max[i] = -INFINITY,
+        y_min[i] = INFINITY, y_max[i] = -INFINITY,
+        z_min[i] = INFINITY, z_max[i] = -INFINITY;
+    }
+
+    size_t i_sub = 0, i_next = n_points_t;
+    for (size_t i_point = 0; i_point < n_values_t; ++i_point)
+    {
+        dtype v = p_points[i_point];         // Point value
+        size_t i_col = i_point / n_points_t; // Column index in mesh
+        size_t i_row = i_point % n_points_t; // Row index in mesh
+
+        if (i_row == 0)
+        {
+            i_sub = 0;
+            i_next = (i_sub == n_sub - 1) ? n_points_t : (size_t)p_sub[i_sub + 1];
+        }
+        else if (i_row == i_next)
+        {
+            ++i_sub;
+            i_next = (i_sub == n_sub - 1) ? n_points_t : (size_t)p_sub[i_sub + 1];
+        }
+
+        if (i_col == 0)
+        {
+            x_min[i_sub] = (v < x_min[i_sub]) ? v : x_min[i_sub];
+            x_max[i_sub] = (v > x_max[i_sub]) ? v : x_max[i_sub];
+        }
+        else if (i_col == 1)
+        {
+            y_min[i_sub] = (v < y_min[i_sub]) ? v : y_min[i_sub];
+            y_max[i_sub] = (v > y_max[i_sub]) ? v : y_max[i_sub];
+        }
+        else
+        {
+            z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
+            z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
+        }
+    }
+
+    return output;
+}
+
+template arma::Mat<float> quadriga_lib::point_cloud_aabb(const arma::Mat<float> *points, const arma::Col<unsigned> *sub_cloud_index, size_t vec_size);
+template arma::Mat<double> quadriga_lib::point_cloud_aabb(const arma::Mat<double> *points, const arma::Col<unsigned> *sub_cloud_index, size_t vec_size);
+
+// Reorganize a point cloud into smaller sub-clouds for faster processing
+template <typename dtype>
+size_t quadriga_lib::point_cloud_segmentation(const arma::Mat<dtype> *points, arma::Mat<dtype> *pointsR, arma::Col<unsigned> *sub_cloud_index,
+                                              size_t target_size, size_t vec_size, arma::Col<unsigned> *forward_index, arma::Col<unsigned> *reverse_index)
+{
+
+    // Input validation
+    if (points == nullptr)
+        throw std::invalid_argument("Input 'points' cannot be NULL.");
+    if (points->n_cols != 3)
+        throw std::invalid_argument("Input 'points' must have 3 columns containing x,y,z coordinates.");
+    if (points->n_rows == 0)
+        throw std::invalid_argument("Input 'points' must have at least one face.");
+
+    size_t n_points_t = (size_t)points->n_rows;
+
+    if (pointsR == nullptr)
+        throw std::invalid_argument("Output 'pointsR' cannot be NULL.");
+    if (sub_cloud_index == nullptr)
+        throw std::invalid_argument("Output 'sub_cloud_index' cannot be NULL.");
+
+    if (target_size == 0)
+        throw std::invalid_argument("Input 'target_size' cannot be 0.");
+    if (vec_size == 0)
+        throw std::invalid_argument("Input 'vec_size' cannot be 0.");
+
+    // Create a vector of sub-clouds
+    std::vector<arma::Mat<dtype>> c; // Vector of sub-clouds
+
+    // Add first item (creates a copy of the data)
+    c.push_back(*points);
+
+    // Create base index (0-based)
+    std::vector<arma::Col<size_t>> fwd_ind; // Index list
+    {
+        arma::Col<size_t> base_index(points->n_rows, arma::fill::none);
+        size_t *p = base_index.memptr();
+        for (size_t i = 0; i < n_points_t; ++i)
+            p[i] = (size_t)i;
+        fwd_ind.push_back(std::move(base_index));
+    }
+
+    // Iterate through all elements
+    for (auto sub_cloud_it = c.begin(); sub_cloud_it != c.end();)
+    {
+        size_t n_sub_points = (size_t)(*sub_cloud_it).n_rows;
+        if (n_sub_points > target_size)
+        {
+            arma::Mat<dtype> pointsA, pointsB;
+            arma::Col<int> split_ind;
+
+            // Split on longest axis
+            int split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 0, &split_ind);
+
+            // Check the split proportions, must have at least a 10 / 90 split
+            float p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
+            split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+
+            // Attempt to split along another axis if failed for longest axis
+            int first_test = std::abs(split_success);
+            if (split_success < 0) // Failed condition
+            {
+                // Test second axis
+                if (first_test == 2 || first_test == 3) // Test x-axis
+                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 1, &split_ind);
+                else // Test y-axis
+                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 2, &split_ind);
+
+                p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
+                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+
+                // If we still failed, we test the third axis
+                if ((first_test == 1 && split_success == -2) || (first_test == 2 && split_success == -1))
+                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 3, &split_ind);
+                else if (first_test == 3 && split_success == -1)
+                    split_success = quadriga_lib::point_cloud_split(&(*sub_cloud_it), &pointsA, &pointsB, 2, &split_ind);
+
+                p = (split_success > 0) ? (float)pointsA.n_rows / (float)n_sub_points : 0.5f;
+                split_success = (p < 0.1f || p > 0.9f) ? -split_success : split_success;
+            }
+
+            // Update the point cloud data in memory
+            int *ps = split_ind.memptr();
+            if (split_success > 0)
+            {
+                // Split the index list
+                size_t i_sub = sub_cloud_it - c.begin();   // Sub-cloud index
+                auto fwd_ind_it = fwd_ind.begin() + i_sub; // Forward index iterator
+                size_t *pi = (*fwd_ind_it).memptr();       // Current cloud index list
+
+                arma::Col<size_t> pointsA_index(pointsA.n_rows, arma::fill::none);
+                arma::Col<size_t> pointsB_index(pointsB.n_rows, arma::fill::none);
+                size_t *pA = pointsA_index.memptr(); // New face index list of mesh A
+                size_t *pB = pointsB_index.memptr(); // New face index list of mesh B
+
+                size_t iA = 0, iB = 0;
+                for (size_t i_point = 0; i_point < n_sub_points; ++i_point)
+                {
+                    if (ps[i_point] == 1)
+                        pA[iA++] = pi[i_point];
+                    else if (ps[i_point] == 2)
+                        pB[iB++] = pi[i_point];
+                }
+
+                fwd_ind.erase(fwd_ind_it);
+                fwd_ind.push_back(std::move(pointsA_index));
+                fwd_ind.push_back(std::move(pointsB_index));
+
+                // Update the vector of sub-meshes
+                c.erase(sub_cloud_it);
+                c.push_back(std::move(pointsA));
+                c.push_back(std::move(pointsB));
+                sub_cloud_it = c.begin();
+            }
+            else
+                ++sub_cloud_it;
+        }
+        else
+            ++sub_cloud_it;
+    }
+
+    // Get the sub-cloud indices
+    size_t n_sub = c.size(), n_out = 0;
+    sub_cloud_index->set_size(n_sub);
+    unsigned *p_sub_ind = sub_cloud_index->memptr();
+
+    for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        size_t n_sub_points = c[i_sub].n_rows;
+        size_t n_align = (n_sub_points % vec_size == 0) ? n_sub_points : (n_sub_points / vec_size + 1) * vec_size;
+        p_sub_ind[i_sub] = (unsigned)n_out;
+        n_out += n_align;
+    }
+
+    // Assemble output
+    pointsR->set_size(n_out, 3);
+    dtype *p_points_out = pointsR->memptr();
+
+    unsigned *p_forward_index = nullptr;
+    if (forward_index != nullptr || reverse_index != nullptr)
+        p_forward_index = new unsigned[n_out]();
+
+    for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
+    {
+        size_t n_sub_points = c[i_sub].n_rows;  // Number of points in the sub-cloud
+        dtype *p_sub_cloud = c[i_sub].memptr(); // Pointer to sub-cloud data
+        size_t *pi = fwd_ind[i_sub].memptr();   // Point index list of current sub-cloud
+
+        // Copy sub-cloud data columns by column
+        for (size_t i_col = 0; i_col < 3; ++i_col)
+        {
+            size_t offset = i_col * n_out + (size_t)p_sub_ind[i_sub];
+            std::memcpy(&p_points_out[offset], &p_sub_cloud[i_col * n_sub_points], n_sub_points * sizeof(dtype));
+        }
+
+        // Write index
+        if (p_forward_index != nullptr)
+        {
+            size_t offset = (size_t)p_sub_ind[i_sub];
+            for (size_t i_sub_point = 0; i_sub_point < n_sub_points; ++i_sub_point)
+                p_forward_index[offset + i_sub_point] = (unsigned)pi[i_sub_point] + 1;
+        }
+
+        // Add padding data
+        if (n_sub_points % vec_size != 0)
+        {
+            // Calculate bounding box of current sub-mesh
+            arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(&c[i_sub]);
+            dtype *p_box = aabb.memptr();
+
+            dtype x = p_box[0] + (dtype)0.5 * (p_box[1] - p_box[0]);
+            dtype y = p_box[2] + (dtype)0.5 * (p_box[3] - p_box[2]);
+            dtype z = p_box[4] + (dtype)0.5 * (p_box[5] - p_box[4]);
+
+            size_t i_start = (size_t)p_sub_ind[i_sub] + n_sub_points;
+            size_t i_end = (i_sub == n_sub - 1) ? n_out : (size_t)p_sub_ind[i_sub + 1];
+
+            for (size_t i_col = 0; i_col < 3; ++i_col)
+                for (size_t i_pad = i_start; i_pad < i_end; ++i_pad)
+                {
+                    size_t offset = i_col * n_out + i_pad;
+                    if (i_col == 0)
+                        p_points_out[offset] = x;
+                    else if (i_col == 1)
+                        p_points_out[offset] = y;
+                    else
+                        p_points_out[offset] = z;
+                }
+        }
+    }
+
+    // Copy forward index
+    if (forward_index != nullptr)
+    {
+        forward_index->set_size(n_out);
+        std::memcpy(forward_index->memptr(), p_forward_index, n_out * sizeof(unsigned));
+    }
+
+    // Generate reverse index
+    if (reverse_index != nullptr)
+    {
+        reverse_index->set_size(n_points_t);
+        unsigned *p = reverse_index->memptr();
+        for (unsigned i = 0; i < n_out; ++i)
+            if (p_forward_index[i] != 0)
+                p[p_forward_index[i] - 1] = i;
+    }
+
+    if (forward_index != nullptr || reverse_index != nullptr)
+        delete[] p_forward_index;
+
+    return n_sub;
+}
+
+template size_t quadriga_lib::point_cloud_segmentation(const arma::Mat<float> *points, arma::Mat<float> *pointsR, arma::Col<unsigned> *sub_cloud_index,
+                                                       size_t target_size, size_t vec_size, arma::Col<unsigned> *forward_index, arma::Col<unsigned> *reverse_index);
+
+template size_t quadriga_lib::point_cloud_segmentation(const arma::Mat<double> *points, arma::Mat<double> *pointsR, arma::Col<unsigned> *sub_cloud_index,
+                                                       size_t target_size, size_t vec_size, arma::Col<unsigned> *forward_index, arma::Col<unsigned> *reverse_index);
+
+// Split a point cloud into two sub-clouds along a given axis
+template <typename dtype>
+int quadriga_lib::point_cloud_split(const arma::Mat<dtype> *points, arma::Mat<dtype> *pointsA, arma::Mat<dtype> *pointsB, int axis, arma::Col<int> *split_ind)
+{
+    if (points == nullptr)
+        throw std::invalid_argument("Input 'points' cannot be NULL.");
+    if (pointsA == nullptr)
+        throw std::invalid_argument("Output 'pointsA' cannot be NULL.");
+    if (pointsB == nullptr)
+        throw std::invalid_argument("Output 'pointsB' cannot be NULL.");
+
+    // Calculate bounding box
+    arma::Mat<dtype> aabb = quadriga_lib::point_cloud_aabb(points);
+
+    size_t n_points_t = (size_t)points->n_rows;
+    size_t n_values_t = (size_t)points->n_elem;
+    const dtype *p_points = points->memptr();
+
+    // Find longest axis
+    dtype x = aabb.at(0, 1) - aabb.at(0, 0);
+    dtype y = aabb.at(0, 3) - aabb.at(0, 2);
+    dtype z = aabb.at(0, 5) - aabb.at(0, 4);
+
+    if (axis == 0)
+    {
+        if (z >= y && z >= x)
+            axis = 3;
+        else if (y >= x && y >= z)
+            axis = 2;
+        else
+            axis = 1;
+    }
+    else if (axis != 1 && axis != 2 && axis != 3)
+        throw std::invalid_argument("Input 'axis' must have values 0, 1, 2 or 3.");
+
+    // Define bounding box A
+    dtype x_max = (axis == 1) ? aabb.at(0, 0) + (dtype)0.5 * x : aabb.at(0, 1),
+          y_max = (axis == 2) ? aabb.at(0, 2) + (dtype)0.5 * y : aabb.at(0, 3),
+          z_max = (axis == 3) ? aabb.at(0, 4) + (dtype)0.5 * z : aabb.at(0, 5);
+
+    // Determine all points that are outside box A
+    bool *isB = new bool[n_points_t](); // Init to false
+
+    for (size_t i_val = 0; i_val < n_values_t; ++i_val)
+    {
+        dtype v = p_points[i_val];         // Mesh value
+        size_t i_col = i_val / n_points_t; // Column index in mesh
+        size_t i_row = i_val % n_points_t; // Row index in mesh
+
+        if (i_col == 0)
+            isB[i_row] = (v > x_max) ? true : isB[i_row];
+        else if (i_col == 1)
+            isB[i_row] = (v > y_max) ? true : isB[i_row];
+        else
+            isB[i_row] = (v > z_max) ? true : isB[i_row];
+    }
+
+    // Count items in both sub-meshes
+    size_t n_pointsA = 0, n_pointsB = 0;
+    for (size_t i = 0; i < n_points_t; ++i)
+        if (isB[i])
+            ++n_pointsB;
+        else
+            ++n_pointsA;
+
+    // Check if the mesh was split
+    if (n_pointsA == 0 || n_pointsB == 0)
+        return -axis;
+
+    // Adjust output size
+    pointsA->set_size(n_pointsA, 3);
+    pointsB->set_size(n_pointsB, 3);
+
+    dtype *p_pointsA = pointsA->memptr();
+    dtype *p_pointsB = pointsB->memptr();
+
+    bool write_split_ind = false;
+    int *p_split_ind = nullptr;
+    if (split_ind != nullptr)
+    {
+        write_split_ind = true;
+        if (split_ind->n_elem != points->n_rows)
+            split_ind->zeros(points->n_rows);
+        else
+            split_ind->zeros();
+        p_split_ind = split_ind->memptr();
+    }
+
+    // Copy data
+    size_t i_pointA = 0, i_pointB = 0;
+    for (size_t i_val = 0; i_val < n_values_t; ++i_val)
+    {
+        dtype v = p_points[i_val];         // Mesh value
+        size_t i_row = i_val % n_points_t; // Row index in mesh
+
+        if (isB[i_row])
+        {
+            p_pointsB[i_pointB++] = v;
+            if (write_split_ind)
+                p_split_ind[i_row] = 2;
+        }
+        else
+        {
+            p_pointsA[i_pointA++] = v;
+            if (write_split_ind)
+                p_split_ind[i_row] = 1;
+        }
+    }
+
+    delete[] isB;
+    return axis;
+}
+
+template int quadriga_lib::point_cloud_split(const arma::Mat<float> *points, arma::Mat<float> *pointsA, arma::Mat<float> *pointsB, int axis, arma::Col<int> *split_ind);
+template int quadriga_lib::point_cloud_split(const arma::Mat<double> *points, arma::Mat<double> *pointsA, arma::Mat<double> *pointsB, int axis, arma::Col<int> *split_ind);
 
 // Subdivide triangles into smaller triangles
 template <typename dtype>
