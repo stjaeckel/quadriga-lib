@@ -82,47 +82,68 @@ TEST_CASE("Quadriga tools - 1D Interpolation")
 
 TEST_CASE("Quadriga tools - Icosphere")
 {
-    arma::Mat<double> center;
-    arma::Col<double> length;
-    arma::Mat<double> vert;
-    arma::Mat<double> direction;
+    arma::Mat<float> center;
+    arma::Col<float> length;
+    arma::Mat<float> vert;
+    arma::Mat<float> direction;
 
     // Number of subdivisions cannot be zero
-    REQUIRE_THROWS_AS(quadriga_lib::icosphere<double>(0, 1.0, &center), std::invalid_argument);
+    REQUIRE_THROWS_AS(quadriga_lib::icosphere<float>(0, 1.0, &center), std::invalid_argument);
 
-    auto n = quadriga_lib::icosphere<double>(1, 1.0, &center);
-    CHECK(n == 20ULL);
+    size_t n = quadriga_lib::icosphere<float>(1, 1.0, &center);
+    CHECK(n == 20);
 
-    n = quadriga_lib::icosphere<double>(1, 1.0, &center, &length);
-    arma::vec sumRow = sqrt(sum(arma::abs(pow(center, 2)), 1));
-    CHECK(arma::approx_equal(length, sumRow, "absdiff", 1e-14));
+    n = quadriga_lib::icosphere<float>(1, 1.0, &center, &length);
+    arma::fvec sumRow = arma::sqrt(sum(arma::abs(pow(center, 2)), 1));
+    CHECK(arma::approx_equal(length, sumRow, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<double>(2, 1.0, &center, &length);
-    CHECK(n == 80ULL);
-    sumRow = sqrt(sum(arma::abs(pow(center, 2)), 1));
-    CHECK(arma::approx_equal(length, sumRow, "absdiff", 1e-14));
+    n = quadriga_lib::icosphere<float>(2, 1.0, &center, &length);
+    CHECK(n == 80);
+    sumRow = arma::sqrt(sum(arma::abs(pow(center, 2)), 1));
+    CHECK(arma::approx_equal(length, sumRow, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<double>(2, 1.0, &center, &length, &vert);
-    arma::vec squaredSum = sum(arma::square(arma::abs(center + vert.cols(0, 2))), 1);
-    auto test = arma::vec(80, arma::fill::ones);
-    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+    n = quadriga_lib::icosphere<float>(2, 1.0, &center, &length, &vert);
+    arma::fvec squaredSum = arma::sum(arma::square(arma::abs(center + vert.cols(0, 2))), 1);
+    auto test = arma::fvec(80, arma::fill::ones);
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 2e-7));
 
     squaredSum = sum(arma::square(arma::abs(center + vert.cols(3, 5))), 1);
-    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 2e-7));
 
     squaredSum = sum(arma::square(arma::abs(center + vert.cols(6, 8))), 1);
-    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 2e-7));
 
-    n = quadriga_lib::icosphere<double>(2, 2.0, &center, &length, &vert, &direction);
-    CHECK(direction.n_rows == 80ULL);
-    CHECK(direction.n_cols == 6ULL);
+    n = quadriga_lib::icosphere<float>(2, 2.0, &center, &length, &vert, &direction);
+    CHECK(direction.n_rows == 80);
+    CHECK(direction.n_cols == 6);
 
     test = 4.0 * test;
     squaredSum = sum(arma::square(arma::abs(center + vert.cols(6, 8))), 1);
-    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(squaredSum, test, "absdiff", 5e-7));
 
     bool allElementsWithinRange = arma::all(arma::vectorise(arma::abs(direction)) <= arma::datum::pi);
     CHECK(allElementsWithinRange);
+
+    quadriga_lib::icosphere<float>(2, 2.0, &center, &length, &vert, &direction, 1);
+    test.ones(80);
+
+    arma::fvec x = direction.col(0) % direction.col(0) +
+                   direction.col(1) % direction.col(1) +
+                   direction.col(2) % direction.col(2);
+
+    CHECK(arma::approx_equal(x, test, "absdiff", 2e-7));
+
+    x = direction.col(3) % direction.col(3) +
+        direction.col(4) % direction.col(4) +
+        direction.col(5) % direction.col(5);
+
+    CHECK(arma::approx_equal(x, test, "absdiff", 2e-7));
+
+    x = direction.col(6) % direction.col(6) +
+        direction.col(7) % direction.col(7) +
+        direction.col(8) % direction.col(8);
+
+    CHECK(arma::approx_equal(x, test, "absdiff", 2e-7));
 }
 
 TEST_CASE("Quadriga tools - Mesh Segmentation")
@@ -260,7 +281,7 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 
     // Test AABB of sub-clouds
     aabb = quadriga_lib::point_cloud_aabb(&pointsR, &sub_cloud_index);
-    
+
     T = {{0.0f, 0.3f, -5.0f, -5.0f, 1.0f, 1.0f},
          {0.0f, 0.3f, 5.0f, 5.0f, 1.0f, 1.0f},
          {40.0f, 40.3f, -5.0f, -5.0f, 1.0f, 1.0f},
