@@ -36,7 +36,7 @@ The approximate equilateral triangles have roughly the same edge length and surf
 ## Usage:
 
 ```
-[ center, length, vert, direction ] = quadriga_lib.icosphere( no_div, radius );
+[ center, length, vert, direction ] = quadriga_lib.icosphere( no_div, radius, direction_xyz );
 ```
 
 ## Input Arguments:
@@ -46,6 +46,9 @@ The approximate equilateral triangles have roughly the same edge length and surf
 
 - **`radius`**<br>
   Radius of the sphere in meters
+
+  - **`direction_xyz`**<br>
+  Direction format indicator: 0 = Spherical (default), 1 = Cartesian
 
 
 ## Output Arguments:
@@ -61,8 +64,11 @@ The approximate equilateral triangles have roughly the same edge length and surf
   in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; <br>Size: `[ no_face, 9 ]`
 
 - **`direction`**<br>
-  The directions of the vertex-rays in geographic coordinates (azimuth and elevation angle in
-  rad); the values are in the order `[ v1az, v1el, v2az, v2el, v3az, v3el ]`; <br>Size: `[ no_face, 6 ]`
+  The directions of the vertex-rays. If the format indicator `direction_xyz` is set to `0`, the
+  output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the
+  order `[ v1az, v1el, v2az, v2el, v3az, v3el ]`;Size: `[ no_face, 6 ]` If the format indicator
+  `direction_xyz` is set to `1`, the output is in Cartesian coordinates and the values are in the
+  order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`; Size: `[ no_face, 9 ]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -70,6 +76,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Inputs:
     //  0 - n_div           Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
     //  1 - radius          Radius of the icosphere in meters
+    //  2 - direction_xyz   Direction format indicator: 0 = Spherical (default), 1 = Cartesian
 
     // Output:
     //  0 - center          Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
@@ -77,15 +84,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     //  2 - vert            Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
     //  3 - direction       Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
 
-    if (nrhs > 2)
+    if (nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:icosphere:io_error", "Too many input arguments.");
 
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:icosphere:io_error", "Too many output arguments.");
 
     // Read inputs
-    unsigned long long n_div = nrhs < 1 ? 1ULL : qd_mex_get_scalar<unsigned long long>(prhs[0], "n_div", 1ULL);
-    double radius = nrhs < 2 ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "radius", 1.0);
+    arma::uword n_div = (nrhs < 1) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[0], "n_div", 1);
+    double radius = (nrhs < 2) ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "radius", 1.0);
+    bool direction_xyz = (nrhs < 3) ? 0 : qd_mex_get_scalar<bool>(prhs[2], "direction_xyz", 0);
 
     // Calculate number of rows in the output
     mwSize n_rows = 20 * (mwSize)n_div * (mwSize)n_div;
@@ -95,19 +103,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec length;
 
     if (nlhs > 0)
-        plhs[0] = qd_mex_init_output(&center, n_rows, 3ULL);
+        plhs[0] = qd_mex_init_output(&center, n_rows, 3);
+
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&length, n_rows);
+
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&vert, n_rows, 9ULL);
-    if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&direction, n_rows, 6ULL);
+        plhs[2] = qd_mex_init_output(&vert, n_rows, 9);
+
+    if (nlhs > 3 && direction_xyz)
+        plhs[3] = qd_mex_init_output(&direction, n_rows, 9);
+    else if (nlhs > 3)
+        plhs[3] = qd_mex_init_output(&direction, n_rows, 6);
 
     // Call the quadriga-lib function
     try
     {
         if (nlhs > 3)
-            quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction);
+            quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
         else if (nlhs > 2)
             quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert);
         else if (nlhs > 1)

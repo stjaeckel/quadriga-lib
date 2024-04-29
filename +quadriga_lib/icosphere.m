@@ -9,7 +9,7 @@
 %    
 % Usage:
 %    
-%    [ center, length, vert, direction ] = quadriga_lib.icosphere( no_div, radius );
+%    [ center, length, vert, direction ] = quadriga_lib.icosphere( no_div, radius, direction_xyz );
 %    
 % Input Arguments:
 %    - no_div
@@ -18,6 +18,9 @@
 %    
 %    - radius
 %      Radius of the sphere in meters
+%    
+%      - direction_xyz
+%      Direction format indicator: 0 = Spherical (default), 1 = Cartesian
 %    
 %    
 % Output Arguments:
@@ -33,8 +36,11 @@
 %      in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; Size: [ no_face, 9 ]
 %    
 %    - direction
-%      The directions of the vertex-rays in geographic coordinates (azimuth and elevation angle in
-%      rad); the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]; Size: [ no_face, 6 ]
+%      The directions of the vertex-rays. If the format indicator direction_xyz is set to 0, the
+%      output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the
+%      order [ v1az, v1el, v2az, v2el, v3az, v3el ];Size: [ no_face, 6 ] If the format indicator
+%      direction_xyz is set to 1, the output is in Cartesian coordinates and the values are in the
+%      order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]; Size: [ no_face, 9 ]
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
