@@ -116,13 +116,17 @@ namespace quadriga_lib
 
     // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
     // - Returns the number of faces
-    template <typename dtype>                                // Allowed types: float or double
-    size_t icosphere(arma::uword n_div,                      // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
-                     dtype radius,                           // Radius of the icosphere in meters
-                     arma::Mat<dtype> *center,               // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
-                     arma::Col<dtype> *length = nullptr,     // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
-                     arma::Mat<dtype> *vert = nullptr,       // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-                     arma::Mat<dtype> *direction = nullptr); // Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+    // - The optional output "direction"can have 2 Formats: Spherical or Cartesian
+    // - For spherical directions, the values of "direction" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+    // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
+    template <typename dtype>                               // Allowed types: float or double
+    size_t icosphere(arma::uword n_div,                     // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
+                     dtype radius,                          // Radius of the icosphere in meters
+                     arma::Mat<dtype> *center,              // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
+                     arma::Col<dtype> *length = nullptr,    // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
+                     arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                     arma::Mat<dtype> *direction = nullptr, // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
+                     bool direction_xyz = false);           // Direction format indicator: true = Cartesian, false = Spherical
 
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
