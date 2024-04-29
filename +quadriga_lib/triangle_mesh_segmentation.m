@@ -55,7 +55,7 @@
 %    
 %    - mesh_index
 %      Indices for mapping elements of "triangles_in" to "triangles_out"; 1-based; 
-%      Length: [ n_mesh_out ]; For vec_size > 1, the added elements not contained in the input
+%      Length: [ n_triangles_out ]; For vec_size > 1, the added elements not contained in the input
 %      are indicated by zeros.
 %    
 %    - mtl_prop_out

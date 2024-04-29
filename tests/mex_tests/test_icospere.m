@@ -20,21 +20,30 @@ assertElementsAlmostEqual( sum((center + vert(:,7:9)).^2,2), ones(80,1), 'absolu
 assertTrue( all(all(abs(dir(:,[1,3,5]) )<=pi)) );
 assertTrue( all(all(abs(dir(:,[2,4,6]) )<=pi/2)) );
 
-try
+[~, ~, ~, dir] = quadriga_lib.icosphere(2, [], 1);
+
+assertTrue( all(sum(dir(:,1:3).^2,2) - 1 < 1e-14));
+assertTrue( all(sum(dir(:,4:6).^2,2) - 1 < 1e-14));
+assertTrue( all(sum(dir(:,7:9).^2,2) - 1 < 1e-14));
+
+
+try % 4 imputs
     [~,~,~,~,~] = quadriga_lib.icosphere;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Too many output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
-try
-    quadriga_lib.icosphere(1,2,3);
+try % 4 imputs
+    quadriga_lib.icosphere(1,2,3,4);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Too many input arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
