@@ -19,7 +19,7 @@
 %    - radius
 %      Radius of the sphere in meters
 %    
-%      - direction_xyz
+%    - direction_xyz
 %      Direction format indicator: 0 = Spherical (default), 1 = Cartesian
 %    
 %    

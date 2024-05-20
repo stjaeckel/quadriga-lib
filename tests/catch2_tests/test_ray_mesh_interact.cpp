@@ -108,9 +108,21 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     arma::vec orig_length = {2.7}; // Assuming 2.7 m  previous length
 
     arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
-    arma::mat tridir(1, 6);
-    tridir.at(4) = 1.0 * deg2rad;
-    tridir.at(1) = 1.0 * deg2rad;
+    arma::mat tridir_sph(1, 6);
+    tridir_sph.at(4) = 1.0 * deg2rad;
+    tridir_sph.at(1) = 1.0 * deg2rad;
+
+    // Convert to Cartesian
+    arma::mat tridir_crt(1, 9);
+    tridir_crt.col(0) = arma::cos(tridir_sph.col(1)) % arma::cos(tridir_sph.col(0));
+    tridir_crt.col(1) = arma::cos(tridir_sph.col(1)) % arma::sin(tridir_sph.col(0));
+    tridir_crt.col(2) = arma::sin(tridir_sph.col(1));
+    tridir_crt.col(3) = arma::cos(tridir_sph.col(3)) % arma::cos(tridir_sph.col(2));
+    tridir_crt.col(4) = arma::cos(tridir_sph.col(3)) % arma::sin(tridir_sph.col(2));
+    tridir_crt.col(5) = arma::sin(tridir_sph.col(3));
+    tridir_crt.col(6) = arma::cos(tridir_sph.col(5)) % arma::cos(tridir_sph.col(4));
+    tridir_crt.col(7) = arma::cos(tridir_sph.col(5)) % arma::sin(tridir_sph.col(4));
+    tridir_crt.col(8) = arma::sin(tridir_sph.col(5));
 
     // Calculate interaction location
     arma::mat fbs, sbs;
@@ -124,7 +136,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-14));
 
     // Output containers
-    arma::mat origN, destN, xprmatN, trivecN, tridirN, normal_vecN;
+    arma::mat origN, destN, xprmatN, trivecN, tridir_sphN, normal_vecN, tridir_crtN;
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, U;
     double a;
 
@@ -133,9 +145,34 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     mtl_prop = repmat(mtl_prop, 12, 1);
 
     // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_prop, &fbs_ind, &sbs_ind, &trivec, &tridir, &orig_length,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN,
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_prop, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir_sph, &orig_length,
+                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_sphN,
                                     &orig_lengthN, &fbs_angleN, &thicknessN, &edge_lengthN, &normal_vecN);
+
+    CHECK(tridir_sphN.n_cols == 6);
+
+
+
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_prop, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir_crt, &orig_length,
+                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_crtN,
+                                    &orig_lengthN, &fbs_angleN, &thicknessN, &edge_lengthN, &normal_vecN);
+
+    CHECK(tridir_crtN.n_cols == 9);
+
+    T.zeros(1,9);
+    T.col(0) = arma::cos(tridir_sphN.col(1)) % arma::cos(tridir_sphN.col(0));
+    T.col(1) = arma::cos(tridir_sphN.col(1)) % arma::sin(tridir_sphN.col(0));
+    T.col(2) = arma::sin(tridir_sphN.col(1));
+    T.col(3) = arma::cos(tridir_sphN.col(3)) % arma::cos(tridir_sphN.col(2));
+    T.col(4) = arma::cos(tridir_sphN.col(3)) % arma::sin(tridir_sphN.col(2));
+    T.col(5) = arma::sin(tridir_sphN.col(3));
+    T.col(6) = arma::cos(tridir_sphN.col(5)) % arma::cos(tridir_sphN.col(4));
+    T.col(7) = arma::cos(tridir_sphN.col(5)) % arma::sin(tridir_sphN.col(4));
+    T.col(8) = arma::sin(tridir_sphN.col(5));
+
+    CHECK(arma::approx_equal(tridir_crtN, T, "absdiff", 1e-14));
 
     T = {{-1.001, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-14));
@@ -154,7 +191,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-14));
 
     T = {{180.0, 1.0, 180.0, 0.0, 179.0, 0.0}};
-    CHECK(arma::approx_equal(tridirN, T * deg2rad, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(tridir_sphN, T * deg2rad, "absdiff", 1e-14));
 
     U = {2.7 + 9.0 + 0.001};
     CHECK(arma::approx_equal(orig_lengthN, U, "absdiff", 1e-14));
@@ -172,8 +209,8 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(normal_vecN, T, "absdiff", 1e-14));
 
     // Test transmission on air
-    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_prop, &fbs_ind, &sbs_ind, &trivec, &tridir, &orig_length,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_prop, &fbs_ind, &sbs_ind, &trivec, &tridir_sph, &orig_length,
+                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_sphN);
 
     T = {{-0.999, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-14));
@@ -192,7 +229,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-14));
 
     T = {{0.0, 1.0, 0.0, 0.0, 1.0, 0.0}};
-    CHECK(arma::approx_equal(tridirN, T * deg2rad, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(tridir_sphN, T * deg2rad, "absdiff", 1e-14));
 }
 
 TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
@@ -733,7 +770,7 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     U = {0.5 * std::abs(T_tm) * std::abs(T_tm) + 0.5 * std::abs(T_te) * std::abs(T_te)}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-3));
 
-   // x-y plane swaps base vectors
+    // x-y plane swaps base vectors
     T = {{std::real(T_te), std::imag(T_te), 0.0, 0.0, 0.0, 0.0, std::real(T_tm), std::imag(T_tm)}};
     CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-3));
 }

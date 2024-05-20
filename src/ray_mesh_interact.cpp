@@ -99,7 +99,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         throw std::invalid_argument("Number of elements in 'sbs_ind' does not match number of rows in 'orig'.");
 
     // Check input data for ray tube
-    bool use_ray_tube = false;
+    int use_ray_tube = 0;
     if (trivec != nullptr && !trivec->is_empty())
     {
         if (tridir == nullptr || tridir->is_empty())
@@ -108,11 +108,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             throw std::invalid_argument("Input 'trivec' must have 9 columns.");
         if (trivec->n_rows != n_ray)
             throw std::invalid_argument("Number of rows in 'orig' and 'trivec' dont match.");
-        if (tridir->n_cols != 6)
-            throw std::invalid_argument("Input 'tridir' must have 6 columns.");
+        if (tridir->n_cols != 6 && tridir->n_cols != 9)
+            throw std::invalid_argument("Input 'tridir' must have 6 or 9 columns.");
         if (tridir->n_rows != n_ray)
             throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
-        use_ray_tube = true;
+        use_ray_tube = (tridir->n_cols == 6) ? 1 : 2;
     }
     else if (tridir != nullptr && !tridir->is_empty())
         throw std::invalid_argument("In order to use ray tubes, both 'trivec' and 'tridir' must be given.");
@@ -166,8 +166,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
     else if (trivecN != nullptr && !use_ray_tube && !trivecN->is_empty())
         trivecN->reset();
 
-    if (tridirN != nullptr && use_ray_tube && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
+    if (tridirN != nullptr && use_ray_tube == 1 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
         tridirN->set_size(n_rayN, 6);
+    else if (tridirN != nullptr && use_ray_tube == 2 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
+        tridirN->set_size(n_rayN, 9);
     else if (tridirN != nullptr && !use_ray_tube && !tridirN->is_empty())
         tridirN->reset();
 
@@ -205,7 +207,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
     // Only calculate ray tube if it is required in the output
     if (use_ray_tube && p_trivecN == nullptr && p_tridirN == nullptr)
-        use_ray_tube = false;
+        use_ray_tube = 0;
 
 #pragma omp parallel for
     for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
@@ -305,7 +307,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                 out_type = 13; // Edge Hit, o-i
             else if ((theta < 0.0 && theta_sbs <= 0.0))
                 out_type = 14; // Edge Hit, i-o
-            else // Undefined state
+            else               // Undefined state
                 out_type = 0;
         }
 
@@ -392,7 +394,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
         // Update origin and direction of the ray tube vertices
         double p_trivec_tmp[9] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-        double p_tridir_tmp[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double p_tridir_tmp[9] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
         double edge_length_tmp = 0.0;
         if (use_ray_tube)
         {
@@ -400,20 +402,49 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             for (int iTube = 1; iTube <= 3; ++iTube)
             {
                 // Load origin and direction
-                double Tx = Ox, Ty = Oy, Tz = Oz, az = 0.0, el = 0.0;
+                double Tx = Ox, Ty = Oy, Tz = Oz, az = 0.0, el = 0.0, Vx = 0.0, Vy = 0.0, Vz = 0.0;
                 if (iTube == 1)
-                    Tx += (double)p_trivec[iRx], Ty += (double)p_trivec[iRy], Tz += (double)p_trivec[iRz],
+                {
+                    Tx += (double)p_trivec[iRx], Ty += (double)p_trivec[iRy], Tz += (double)p_trivec[iRz];
+                    if (use_ray_tube == 1)
                         az = (double)p_tridir[iRx], el = (double)p_tridir[iRy];
+                    else
+                        Vx = (double)p_tridir[iRx], Vy = (double)p_tridir[iRy], Vz = (double)p_tridir[iRz];
+                }
                 else if (iTube == 2)
-                    Tx += (double)p_trivec[iRx + 3 * n_ray_t], Ty += (double)p_trivec[iRx + 4 * n_ray_t], Tz += (double)p_trivec[iRx + 5 * n_ray_t],
+                {
+                    Tx += (double)p_trivec[iRx + 3 * n_ray_t], Ty += (double)p_trivec[iRx + 4 * n_ray_t], Tz += (double)p_trivec[iRx + 5 * n_ray_t];
+                    if (use_ray_tube == 1)
                         az = (double)p_tridir[iRx + 2 * n_ray_t], el = (double)p_tridir[iRx + 3 * n_ray_t];
+                    else
+                        Vx = (double)p_tridir[iRx + 3 * n_ray_t], Vy = (double)p_tridir[iRx + 4 * n_ray_t], Vz = (double)p_tridir[iRx + 5 * n_ray_t];
+                }
                 else if (iTube == 3)
-                    Tx += (double)p_trivec[iRx + 6 * n_ray_t], Ty += (double)p_trivec[iRx + 7 * n_ray_t], Tz += (double)p_trivec[iRx + 8 * n_ray_t],
+                {
+                    Tx += (double)p_trivec[iRx + 6 * n_ray_t], Ty += (double)p_trivec[iRx + 7 * n_ray_t], Tz += (double)p_trivec[iRx + 8 * n_ray_t];
+                    if (use_ray_tube == 1)
                         az = (double)p_tridir[iRx + 4 * n_ray_t], el = (double)p_tridir[iRx + 5 * n_ray_t];
+                    else
+                        Vx = (double)p_tridir[iRx + 6 * n_ray_t], Vy = (double)p_tridir[iRx + 7 * n_ray_t], Vz = (double)p_tridir[iRx + 8 * n_ray_t];
+                }
+
+                // Calculate vertex ray direction (V)
+                if (use_ray_tube == 1) // Spherical input
+                {
+                    scl = std::cos(el);
+                    Vx = std::cos(az) * scl, Vy = std::sin(az) * scl, Vz = std::sin(el);
+                }
+                else // Cartesian input
+                {
+                    double scl = Vx * Vx + Vy * Vy + Vz * Vz;
+                    if (std::abs(scl - 1.0) > 2e-7)
+                    {
+                        scl = 1.0 / std::sqrt(scl);
+                        Vx *= scl, Vy *= scl, Vz *= scl; // Normalize
+                    }
+                }
 
                 // Calculate intersect point of the vertex-ray with the face
-                scl = std::cos(el);
-                double Vx = std::cos(az) * scl, Vy = std::sin(az) * scl, Vz = std::sin(el);                    // Vertex ray direction (V)
                 double d = ((Fx - Tx) * Nx + (Fy - Ty) * Ny + (Fz - Tz) * Nz) / (Vx * Nx + Vy * Ny + Vz * Nz); // Distance from vert. origin to face (d)
                 double Wx = Tx + Vx * d, Wy = Ty + Vy * d, Wz = Tz + Vz * d;                                   // Intersect point with face (W)
 
@@ -441,8 +472,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                     // Update vertex direction
                     double a = 2.0 * (Vx * Nx + Vy * Ny + Vz * Nz);
                     Vx -= a * Nx, Vy -= a * Ny, Vz -= a * Nz;
-                    Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
-                    az = std::atan2(Vy, Vx), el = std::asin(Vz);
+                    if (use_ray_tube == 1)
+                    {
+                        Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
+                        az = std::atan2(Vy, Vx), el = std::asin(Vz);
+                    }
                 }
                 else // Transmission and Refraction
                 {
@@ -468,20 +502,42 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                         std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV * sin_thetaV);
                         double scl = eta * cos_thetaV - std::real(cos_theta2V);
                         Vx = eta * Vx + scl * Nx, Vy = eta * Vy + scl * Ny, Vz = eta * Vz + scl * Nz;
+
                         scl = 1.0 / std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
-                        Vx *= scl, Vy *= scl, Vz *= scl;                 // Normalize
-                        Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
-                        az = std::atan2(Vy, Vx), el = std::asin(Vz);     // Angles
+                        Vx *= scl, Vy *= scl, Vz *= scl; // Normalize
+                        if (use_ray_tube == 1)
+                        {
+                            Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
+                            az = std::atan2(Vy, Vx), el = std::asin(Vz);     // Angles
+                        }
                     }
                 }
 
                 // Write new vertex ray origin and direction - convert back to dtype
                 if (iTube == 1)
-                    p_trivec_tmp[0] = Tx, p_trivec_tmp[1] = Ty, p_trivec_tmp[2] = Tz, p_tridir_tmp[0] = az, p_tridir_tmp[1] = el;
+                {
+                    p_trivec_tmp[0] = Tx, p_trivec_tmp[1] = Ty, p_trivec_tmp[2] = Tz;
+                    if (use_ray_tube == 1)
+                        p_tridir_tmp[0] = az, p_tridir_tmp[1] = el;
+                    else
+                        p_tridir_tmp[0] = Vx, p_tridir_tmp[1] = Vy, p_tridir_tmp[2] = Vz;
+                }
                 else if (iTube == 2)
-                    p_trivec_tmp[3] = Tx, p_trivec_tmp[4] = Ty, p_trivec_tmp[5] = Tz, p_tridir_tmp[2] = az, p_tridir_tmp[3] = el;
+                {
+                    p_trivec_tmp[3] = Tx, p_trivec_tmp[4] = Ty, p_trivec_tmp[5] = Tz;
+                    if (use_ray_tube == 1)
+                        p_tridir_tmp[2] = az, p_tridir_tmp[3] = el;
+                    else
+                        p_tridir_tmp[3] = Vx, p_tridir_tmp[4] = Vy, p_tridir_tmp[5] = Vz;
+                }
                 else if (iTube == 3)
-                    p_trivec_tmp[6] = Tx, p_trivec_tmp[7] = Ty, p_trivec_tmp[8] = Tz, p_tridir_tmp[4] = az, p_tridir_tmp[5] = el;
+                {
+                    p_trivec_tmp[6] = Tx, p_trivec_tmp[7] = Ty, p_trivec_tmp[8] = Tz;
+                    if (use_ray_tube == 1)
+                        p_tridir_tmp[4] = az, p_tridir_tmp[5] = el;
+                    else
+                        p_tridir_tmp[6] = Vx, p_tridir_tmp[7] = Vy, p_tridir_tmp[8] = Vz;
+                }
             }
 
             // Calculate the maximum edge length
@@ -672,7 +728,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         }
 
         // Write tridirN
-        if (use_ray_tube && p_tridirN != nullptr)
+        if (use_ray_tube == 1 && p_tridirN != nullptr)
         {
             p_tridirN[i_rayN] = (dtype)p_tridir_tmp[0];
             p_tridirN[i_rayN + n_rayN_t] = (dtype)p_tridir_tmp[1];
@@ -680,6 +736,18 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             p_tridirN[i_rayN + 3 * n_rayN_t] = (dtype)p_tridir_tmp[3];
             p_tridirN[i_rayN + 4 * n_rayN_t] = (dtype)p_tridir_tmp[4];
             p_tridirN[i_rayN + 5 * n_rayN_t] = (dtype)p_tridir_tmp[5];
+        }
+        else if (use_ray_tube == 2 && p_tridirN != nullptr)
+        {
+            p_tridirN[i_rayN] = (dtype)p_tridir_tmp[0];
+            p_tridirN[i_rayN + n_rayN_t] = (dtype)p_tridir_tmp[1];
+            p_tridirN[i_rayN + 2 * n_rayN_t] = (dtype)p_tridir_tmp[2];
+            p_tridirN[i_rayN + 3 * n_rayN_t] = (dtype)p_tridir_tmp[3];
+            p_tridirN[i_rayN + 4 * n_rayN_t] = (dtype)p_tridir_tmp[4];
+            p_tridirN[i_rayN + 5 * n_rayN_t] = (dtype)p_tridir_tmp[5];
+            p_tridirN[i_rayN + 6 * n_rayN_t] = (dtype)p_tridir_tmp[6];
+            p_tridirN[i_rayN + 7 * n_rayN_t] = (dtype)p_tridir_tmp[7];
+            p_tridirN[i_rayN + 8 * n_rayN_t] = (dtype)p_tridir_tmp[8];
         }
 
         // Write orig_lengthN
