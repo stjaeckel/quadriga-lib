@@ -44,7 +44,7 @@ each cluster.
 ## Input Arguments:
 
 - **`points_in`**<br>
-  Points in 3D-Cartesian space; Size: [ n_points_in, 3 ]
+  Points in 3D-Cartesian space; Size: `[ n_points_in, 3 ]`
 
 - **`target_size`** (optional)<br>
   The target number of elements of each sub-cloud. Default value = 1024. For best performance, the

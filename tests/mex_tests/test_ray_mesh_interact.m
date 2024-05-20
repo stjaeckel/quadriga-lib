@@ -326,7 +326,7 @@ try % wrong tridir
     quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, mesh, mtl_prop, fbs_ind, sbs_ind, trivec, tridir(:,1) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''tridir'' must have 6 columns.';
+    expectedErrorMessage = 'Input ''tridir'' must have 6 or 9 columns.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

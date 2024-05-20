@@ -68,6 +68,7 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\point_cloud_aabb.mexw64 \
 	   +quadriga_lib\point_cloud_segmentation.mexw64 \
 	   +quadriga_lib\ray_mesh_interact.mexw64 \
+	   +quadriga_lib\ray_point_intersect.mexw64 \
 	   +quadriga_lib\ray_triangle_intersect.mexw64 \
 	   +quadriga_lib\subdivide_triangles.mexw64 \
 	   +quadriga_lib\triangle_mesh_aabb.mexw64 \
@@ -82,6 +83,9 @@ tests\test.exe:   tests\quadriga_lib_catch2_tests.cpp   lib\quadriga_lib.lib
 	del quadriga_lib_catch2_tests.obj
 
 # Individual Library files
+build\calc_diffraction_gain.obj:   src\calc_diffraction_gain.cpp   include\quadriga_tools.hpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 build\qd_arrayant.obj:   src\qd_arrayant.cpp   include\quadriga_arrayant.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
@@ -103,8 +107,8 @@ build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
 build\ray_mesh_interact.obj:   src\ray_mesh_interact.cpp   include\quadriga_tools.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
-build\calc_diffraction_gain.obj:   src\calc_diffraction_gain.cpp   include\quadriga_tools.hpp
-	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+build\ray_point_intersect.obj:   src\ray_point_intersect.cpp   include\quadriga_tools.hpp
+	$(CC) /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
 	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
@@ -116,7 +120,7 @@ build\libhdf5.lib:
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
 						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\calc_diffraction_gain.obj \
-						build\libhdf5.lib
+						build\libhdf5.lib   build\ray_point_intersect.obj
     lib /OUT:$@ $**
 
 # MEX MATLAB interface
@@ -205,6 +209,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\ray_mesh_interact.mexw64:   mex\ray_mesh_interact.cpp   build\ray_mesh_interact.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\ray_point_intersect.mexw64:   mex\ray_point_intersect.cpp   build\ray_point_intersect.obj   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\ray_triangle_intersect.mexw64:   mex\ray_triangle_intersect.cpp   build\ray_triangle_intersect.obj

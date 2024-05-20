@@ -8,7 +8,7 @@
 
 # Set path to your MATLAB installation (optional):
 # Leave this empty if you don't want to use MATLAB (you can still use Octave).
-MATLAB_PATH = /usr/local/MATLAB/R2021a
+MATLAB_PATH = /usr/local/MATLAB/R2023a
 
 # Set path to your CUDA installation
 # Leave this empty if you don't want to use GPU acceleration
@@ -129,6 +129,9 @@ tests/test_cuda_bin:   tests/quadriga_lib_catch2_cuda_tests.cpp   lib/quadriga_l
 	$(CC) -std=c++17 $< lib/quadriga_lib.a $(CUDA_A) -o $@ -Iinclude -I$(ARMA_H) -I$(CATCH2)/include -L$(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN) $(NV_LIB)
 
 # Individual quadriga-lib objects
+build/calc_diffraction_gain.o:   src/calc_diffraction_gain.cpp   include/quadriga_tools.hpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
+
 build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_arrayant.hpp
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
@@ -147,14 +150,14 @@ build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
 build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
 
-build/calc_diffraction_gain.o:   src/calc_diffraction_gain.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
+build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
+build/ray_point_intersect.o:   src/ray_point_intersect.cpp   include/quadriga_tools.hpp
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/get_CUDA_compute_capability.o:   src/get_CUDA_compute_capability.cu   include/quadriga_CUDA_tools.cuh
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
@@ -166,7 +169,8 @@ build/libhdf5.a:
 
 lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
+					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o \
+					  build/ray_point_intersect.o
 		ar rcs $@ $^ $(HDF5_OBJ)
 
 build/%_link.o:   build/%.o
@@ -206,6 +210,7 @@ lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_comp
 +quadriga_lib/point_cloud_aabb.mexa64:            build/quadriga_tools.o
 +quadriga_lib/point_cloud_segmentation.mexa64:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
++quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/quadriga_tools.o
 +quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_aabb.mexa64:          build/quadriga_tools.o
@@ -249,6 +254,7 @@ lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_comp
 +quadriga_lib/point_cloud_aabb.mex:            build/quadriga_tools.o
 +quadriga_lib/point_cloud_segmentation.mex:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
++quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/quadriga_tools.o
 +quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
 +quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_aabb.mex:          build/quadriga_tools.o

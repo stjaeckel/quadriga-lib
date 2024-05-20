@@ -116,7 +116,7 @@ namespace quadriga_lib
 
     // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
     // - Returns the number of faces
-    // - The optional output "direction"can have 2 Formats: Spherical or Cartesian
+    // - The optional output "direction" can have 2 Formats: Spherical or Cartesian
     // - For spherical directions, the values of "direction" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
     // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
     template <typename dtype>                               // Allowed types: float or double
@@ -195,6 +195,10 @@ namespace quadriga_lib
     // - Only returns rays that interact with the mesh, i.e. n_rayN <= n_ray
     // - Outputs {trivecN, tridirN, orig_lengthN} will be empty if inputs {trivec, tridir, orig_length} are not provided
     // - In refraction mode, paths exhibiting 'total reflection' will have zero-power, but will be included in the output
+    // - The optional input "tridir" can have 2 Formats: Spherical or Cartesian
+    // - For spherical directions, the values of "tridir" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+    // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
+    // - The output "tridirN" will have the same format as the input
     template <typename dtype>
     void ray_mesh_interact(int interaction_type,                          // Interaction type: (0) Reflection, (1) Transmission, (2) Refraction
                            dtype center_frequency,                        // Center frequency in [Hz]
@@ -207,7 +211,7 @@ namespace quadriga_lib
                            const arma::Col<unsigned> *fbs_ind,            // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                            const arma::Col<unsigned> *sbs_ind,            // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                            const arma::Mat<dtype> *trivec = nullptr,      // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [n_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-                           const arma::Mat<dtype> *tridir = nullptr,      // Directions of the vertex-rays in rad; Size [n_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
+                           const arma::Mat<dtype> *tridir = nullptr,      // Directions of the vertex-rays; Size Spherical [n_ray, 6], Size Cartesian [n_ray, 9]
                            const arma::Col<dtype> *orig_length = nullptr, // Path length at origin point, Size [ n_ray ]
                            arma::Mat<dtype> *origN = nullptr,             // New ray origin points in GCS, Size [ n_rayN, 3 ]
                            arma::Mat<dtype> *destN = nullptr,             // New ray destination points in GCS, Size [ n_rayN, 3 ]
@@ -221,6 +225,19 @@ namespace quadriga_lib
                            arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
                            arma::Mat<dtype> *normal_vecN = nullptr,       // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
                            arma::Col<int> *out_typeN = nullptr);          // Output type code
+
+    // Calculate the intersections of ray tubes with point clouds
+    // - Returns the number of hits per point and the indices of the rays that hit each point
+    // - It is strongly recommended to use "point_cloud_segmentation" to speed up computations
+    // - Returns the indices of the rays that hit the points; 0-based; Length (std::vector) [ n_points ]
+    // - All internal computations are done using single precision
+    template <typename dtype>
+    std::vector<arma::Col<unsigned>> ray_point_intersect(const arma::Mat<dtype> *points,                       // Points in 3D Space, Size: [ n_points, 3 ]
+                                                         const arma::Mat<dtype> *orig,                         // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                                         const arma::Mat<dtype> *trivec,                       // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
+                                                         const arma::Mat<dtype> *tridir,                       // Directions of the vertex-rays; Cartesian format; Size [ n_ray, 9 ]
+                                                         const arma::Col<unsigned> *sub_cloud_index = nullptr, // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
+                                                         arma::Col<unsigned> *hit_count = nullptr);            // Hit counter; Optional Output; Length [ n_points ]
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm

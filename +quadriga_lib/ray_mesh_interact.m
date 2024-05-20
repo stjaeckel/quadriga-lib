@@ -75,8 +75,11 @@
 %      Size: [ no_ray, 9 ]
 %    
 %    - tridir (optional)
-%      The directions of the vertex-rays in geographic coordinates (azimuth and elevation angle in rad);
-%      the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]; Size: [ no_ray, 6 ]
+%      The directions of the vertex-rays. Size: [ n_ray, 6 ] or [ n_ray, 9 ]
+%      For 6 columns, values are in geographic coordinates (azimuth and elevation angle in rad); the 
+%      values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ];
+%      For 9 columns, the input is in Cartesian coordinates and the values are in the  order 
+%      [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]
 %    
 %    - orig_length (optional)
 %      Path length at origin point, default is 0, Size: [ n_ray ]
@@ -109,8 +112,8 @@
 %      propagation tube.  Size: [ no_rayN, 9 ]
 %    
 %    - tridirN
-%      The directions of the vertex-rays after interaction with the medium in geographic coordinates
-%      (azimuth and elevation angle in rad); Size: [ no_rayN, 6 ]
+%      The directions of the vertex-rays after interaction with the medium; 
+%      Size: [ no_rayN, 6 ] or [ no_rayN, 9 ] depending on input size
 %    
 %    - orig_lengthN
 %      Length of the ray from orig to origN. If orig_length is given as input, its value is added.

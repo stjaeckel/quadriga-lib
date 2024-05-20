@@ -47,7 +47,7 @@ The approximate equilateral triangles have roughly the same edge length and surf
 - **`radius`**<br>
   Radius of the sphere in meters
 
-  - **`direction_xyz`**<br>
+- **`direction_xyz`**<br>
   Direction format indicator: 0 = Spherical (default), 1 = Cartesian
 
 
