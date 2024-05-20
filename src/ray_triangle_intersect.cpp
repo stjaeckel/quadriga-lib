@@ -55,23 +55,23 @@ static bool isAVX2Supported()
 // }
 
 // AVX2 accelerated implementation of RayTriangleIntersect
-inline void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, aligned to 32 byte, length n_mesh
-                        const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, aligned to 32 byte, length n_mesh
-                        const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, aligned to 32 byte, length n_mesh
-                        const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
-                        const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                        const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                        const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                        const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
-                        const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
-                        const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
-                        const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
-                        const size_t n_ray,                                   // Number of rays
-                        float *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                        float *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                        unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                        unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                        unsigned *hit_cnt = nullptr)                          // Number of hits between orig and dest, length n_ray, uninitialized, optional
+static inline void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, aligned to 32 byte, length n_mesh
+                               const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, aligned to 32 byte, length n_mesh
+                               const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, aligned to 32 byte, length n_mesh
+                               const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
+                               const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
+                               const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
+                               const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
+                               const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
+                               const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                               const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
+                               const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
+                               const size_t n_ray,                                   // Number of rays
+                               float *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                               float *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                               unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                               unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                               unsigned *hit_cnt = nullptr)                          // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh % VEC_SIZE != 0) // Check alignment
         throw std::invalid_argument("Number of triangles must be a multiple of 8.");
@@ -176,9 +176,11 @@ inline void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    //
             t0_high = _mm256_blendv_ps(t2_high, t0_high, M); // t0_high = min( t0_high, t2_high ) = t_max
 
             // If t0_high < 0, the ray is intersecting AABB, but the whole AABB is behind us
-            // If t0_low > t0_high, ray doesn't intersect AABB
-            M = _mm256_cmp_ps(r0, t0_high, _CMP_LE_OQ);     // t0_high > 0 ?
-            T = _mm256_cmp_ps(t0_low, t0_high, _CMP_LE_OQ); // t0_high > t0_low ?
+            // If t0_low >= t0_high, ray doesn't intersect AABB
+            M = _mm256_cmp_ps(t0_high, r0, _CMP_GT_OQ);     // t0_high > 0 ?
+            T = _mm256_cmp_ps(t0_high, t0_low, _CMP_GE_OQ); // t0_high >= t0_low ?
+            M = _mm256_and_ps(M, T);                        // AND
+            T = _mm256_cmp_ps(t0_low, r1, _CMP_LE_OQ);      // t0_low <= 1
             M = _mm256_and_ps(M, T);                        // AND
 
             // Read output
@@ -392,23 +394,23 @@ inline void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    //
 }
 
 // Generic C++ implementation of RayTriangleIntersect
-inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
-                           const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
-                           const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
-                           const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
-                           const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                           const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                           const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                           const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
-                           const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
-                           const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
-                           const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
-                           const size_t n_ray,                                   // Number of rays
-                           float *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                           float *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                           unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                           unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                           unsigned *hit_cnt = nullptr)                          // Number of hits between orig and dest, length n_ray, uninitialized, optional
+static inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
+                                  const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
+                                  const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
+                                  const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
+                                  const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
+                                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
+                                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
+                                  const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
+                                  const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                                  const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
+                                  const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
+                                  const size_t n_ray,                                   // Number of rays
+                                  float *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                                  float *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                                  unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                                  unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                                  unsigned *hit_cnt = nullptr)                          // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
         throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
@@ -489,7 +491,9 @@ inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float *Tz,   
 
             // If t0_high < 0, the ray is intersecting AABB, but the whole AABB is behind us
             // If t0_low > t0_high, ray doesn't intersect AABB
-            p_sub_mesh_hit[i_sub] = t0_high > 0.0f && t0_high > t0_low;
+            // If t0_low > 1, the destination point lays before the AABB
+            bool C1 = t0_high > 0.0f && t0_high >= t0_low && t0_low <= 1.0f;
+            p_sub_mesh_hit[i_sub] = int(C1);
         }
 
         // Step 2 - Check intersection with triangles within the sub-meshes
