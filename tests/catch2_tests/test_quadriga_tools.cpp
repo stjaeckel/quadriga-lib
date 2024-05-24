@@ -289,3 +289,63 @@ TEST_CASE("Quadriga tools - Point Cloud Segmentation")
 
     CHECK(arma::approx_equal(aabb, T, "absdiff", 1e-14));
 }
+
+TEST_CASE("Quadriga tools - Subdivide Rays")
+{
+    arma::Mat<float> orig;
+    arma::Mat<float> trivec;
+    arma::Mat<float> tridir;
+
+    quadriga_lib::icosphere<float>(2, 2.0, &orig, nullptr, &trivec, &tridir);
+
+    arma::Mat<float> origN;
+    arma::Mat<float> trivecN;
+    arma::Mat<float> tridirN;
+
+    // No index given
+    size_t n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN);
+    CHECK(n_rayN == 4 * orig.n_rows);
+
+    // Empty index
+    arma::u32_vec index;
+    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    CHECK(n_rayN == 4 * orig.n_rows);
+
+    // Select two beams
+    index = {2, 1};
+    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN, nullptr, &index);
+    CHECK(n_rayN == 8);
+
+    // Check for directions that are equal (beam 1)
+    CHECK(tridir(2, 0) == tridirN(0, 0));
+    CHECK(tridir(2, 1) == tridirN(0, 1));
+    CHECK(tridir(2, 2) == tridirN(3, 2));
+    CHECK(tridir(2, 3) == tridirN(3, 3));
+    CHECK(tridir(2, 4) == tridirN(2, 4));
+    CHECK(tridir(2, 5) == tridirN(2, 5));
+
+    // Check for directions that are equal (beam 2)
+    CHECK(tridir(1, 0) == tridirN(4, 0));
+    CHECK(tridir(1, 1) == tridirN(4, 1));
+    CHECK(tridir(1, 2) == tridirN(7, 2));
+    CHECK(tridir(1, 3) == tridirN(7, 3));
+    CHECK(tridir(1, 4) == tridirN(6, 4));
+    CHECK(tridir(1, 5) == tridirN(6, 5));
+
+    // Check corner points
+    CHECK(arma::approx_equal(orig.row(2) + trivec.submat(2, 0, 2, 2), origN.row(0) + trivecN.submat(0, 0, 0, 2), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(orig.row(2) + trivec.submat(2, 3, 2, 5), origN.row(3) + trivecN.submat(3, 3, 3, 5), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(orig.row(2) + trivec.submat(2, 6, 2, 8), origN.row(2) + trivecN.submat(2, 6, 2, 8), "absdiff", 1e-6));
+
+    CHECK(arma::approx_equal(orig.row(1) + trivec.submat(1, 0, 1, 2), origN.row(4) + trivecN.submat(4, 0, 4, 2), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(orig.row(1) + trivec.submat(1, 3, 1, 5), origN.row(7) + trivecN.submat(7, 3, 7, 5), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(orig.row(1) + trivec.submat(1, 6, 1, 8), origN.row(6) + trivecN.submat(6, 6, 6, 8), "absdiff", 1e-6));
+
+    arma::fmat dest = 2.0f * orig;
+    arma::fmat destN;
+
+    index = {0};
+    n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, &dest, &origN, &trivecN, &tridirN, &destN, &index, 0.1);
+
+    CHECK(n_rayN == 4);
+}
