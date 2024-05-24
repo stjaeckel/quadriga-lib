@@ -284,13 +284,13 @@ clean:
 	- del "+quadriga_lib"\*.exp
 	- del "+quadriga_lib"\*.lib
 	
-
 cleaner:   clean
 	- rmdir /s /q external\build
 	- rmdir /s /q external\Catch2-$(catch2_version)
 	- rmdir /s /q external\hdf5-$(hdf5_version)
 	- del "+quadriga_lib"\*.mex*
 	- rmdir /s /q lib
+	- del tests\test.exe
 
 tidy:   cleaner
 	- rmdir /s /q external\build
