@@ -13,7 +13,7 @@ MATLAB_PATH = C:\Program Files\MATLAB\R2022b
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
-armadillo_version = 12.6.3
+armadillo_version = 12.8.3
 hdf5_version      = 1.14.2
 catch2_version    = 3.4.0
 pugixml_version   = 1.13
@@ -39,7 +39,8 @@ HDF5        = external\hdf5-$(hdf5_version)-win64
 CCFLAGS     = /EHsc /std:c++17 /Zc:__cplusplus /nologo /MD #/Wall 
 MEXFLAGS    = /std:c++17 /MD
 
-all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
+all:   dirs \
+       +quadriga_lib\arrayant_calc_directivity.mexw64 \
        +quadriga_lib\arrayant_combine_pattern.mexw64 \
 	   +quadriga_lib\arrayant_generate.mexw64 \
 	   +quadriga_lib\arrayant_interpolate.mexw64 \
@@ -74,6 +75,11 @@ all:   +quadriga_lib\arrayant_calc_directivity.mexw64 \
 	   +quadriga_lib\triangle_mesh_aabb.mexw64 \
 	   +quadriga_lib\triangle_mesh_segmentation.mexw64 \
 	   +quadriga_lib\version.mexw64
+
+dirs:
+	- mkdir build
+	- mkdir lib
+	- mkdir +quadriga_lib
 
 test:   tests\test.exe
 	tests\test.exe
@@ -230,19 +236,31 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
  	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Maintainance section
-hdf5lib:
+external:   armadillo-lib   pugixml-lib   hdf5-lib   catch2-lib   moxunit-lib
+
+armadillo-lib:
+	- rmdir /s /q external\armadillo-$(armadillo_version)
+	tar -xf external/armadillo-$(armadillo_version).zip
+	move armadillo-$(armadillo_version) external
+
+pugixml-lib:
+	- rmdir /s /q external\pugixml-$(pugixml_version)
+	tar -xf external/pugixml-$(pugixml_version).zip
+	move pugixml-$(pugixml_version) external
+
+hdf5-lib:
 	- rmdir /s /q external\build
 	- rmdir /s /q external\hdf5-$(hdf5_version)
 	- rmdir /s /q external\hdf5-$(hdf5_version)-win64
 	tar -xf external/hdf5-$(hdf5_version).zip
 	move hdf5-$(hdf5_version) external
 	mkdir external\build
-	cmake -S external\hdf5-$(hdf5_version) -B external\build -D CMAKE_INSTALL_PREFIX=external\hdf5-$(hdf5_version)-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF
+	cmake -S external\hdf5-$(hdf5_version) -B external\build -D CMAKE_INSTALL_PREFIX=external\hdf5-$(hdf5_version)-win64 -D BUILD_SHARED_LIBS=OFF -D HDF5_ENABLE_Z_LIB_SUPPORT=OFF -D BUILD_TESTING=OFF
 	cmake --build external\build --config Release --target install
 	rmdir /s /q external\build
 	rmdir /s /q external\hdf5-$(hdf5_version)
 
-catch2lib:
+catch2-lib:
 	- rmdir /s /q external\build
 	- rmdir /s /q external\Catch2-$(catch2_version)
 	- rmdir /s /q external\Catch2-$(catch2_version)-win64
@@ -255,17 +273,33 @@ catch2lib:
 	rmdir /s /q external\build
 	rmdir /s /q external\Catch2-$(catch2_version)
 
-clean:
-	del build\*.obj
-	del build\*.lib
-	del "+quadriga_lib"\*.manifest
-	del "+quadriga_lib"\*.exp
-	del "+quadriga_lib"\*.lib
-	del "+quadriga_lib"\*.mexw64
+moxunit-lib:
+	- rmdir /s /q external\MOxUnit-master
+	tar -xf external/MOxUnit.zip
+	move MOxUnit-master external
 
-tidy:   clean
+clean:
+	- rmdir /s /q build
+	- del "+quadriga_lib"\*.manifest
+	- del "+quadriga_lib"\*.exp
+	- del "+quadriga_lib"\*.lib
+	
+
+cleaner:   clean
+	- rmdir /s /q external\build
+	- rmdir /s /q external\Catch2-$(catch2_version)
+	- rmdir /s /q external\hdf5-$(hdf5_version)
+	- del "+quadriga_lib"\*.mex*
+	- rmdir /s /q lib
+
+tidy:   cleaner
+	- rmdir /s /q external\build
 	- rmdir /s /q external\Catch2-$(catch2_version)-win64
 	- rmdir /s /q external\hdf5-$(hdf5_version)-win64
+	- rmdir /s /q external\armadillo-$(armadillo_version)
+	- rmdir /s /q external\pugixml-$(pugixml_version)
+	- rmdir /s /q external\MOxUnit-master
+	- rmdir /s /q +quadriga_lib
 
 build\quadriga-lib-version.exe:   src/version.cpp   lib/quadriga_lib.lib
 	$(CC) $(CCFLAGS) /Febuild\quadriga-lib-version.exe $** /Iinclude /I$(ARMA_H)

@@ -7,8 +7,9 @@
 # - Run "make"
 
 # Set path to your MATLAB installation (optional):
-# Leave this empty if you don't want to use MATLAB (you can still use Octave).
-MATLAB_PATH = /usr/local/MATLAB/R2023a
+# If left empty, the build script trys to autodetect the MATLAB path. 
+# If none is found, MATLAB targets are not compiled.
+MATLAB_PATH = #/usr/local/MATLAB/R2023a
 
 # Set path to your CUDA installation
 # Leave this empty if you don't want to use GPU acceleration
@@ -29,13 +30,18 @@ hdf5_version      = # 1.14.2
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
-armadillo_version = 12.6.3
+armadillo_version = 12.8.3
 pugixml_version   = 1.13
 catch2_version    = 3.4.0
 
 # The following sections should not require editing.
 
-# Conditional compilation of MATLAB targets (check if MATLAB path is set)
+# Autodetect MATLAB path
+ifeq ($(MATLAB_PATH),)
+	MATLAB_PATH := $(shell readlink -f $(shell readlink -f $(shell which matlab)) | sed 's/\/bin\/matlab//')
+endif
+
+# Conditional compilation of MATLAB targets 
 ifneq ($(MATLAB_PATH),)
 ifeq ($(CUDA_PATH),)
 	MATLAB_TARGETS = mex_matlab
@@ -278,8 +284,19 @@ documentation:   dirs   mex_docu
 	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part mex/ 
 	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
 
-# Maintainance section
-hdf5lib:
+# External libraries
+external:   armadillo-lib   pugixml-lib   hdf5-lib   catch2-lib   moxunit-lib
+
+armadillo-lib:
+	- rm -rf external/armadillo-$(armadillo_version)
+	unzip external/armadillo-$(armadillo_version).zip -d external/
+
+pugixml-lib:
+	- rm -rf external/pugixml-$(pugixml_version)
+	unzip external/pugixml-$(pugixml_version).zip -d external/
+
+hdf5-lib:
+ifneq ($(hdf5_version),)
 	- rm -rf external/hdf5-$(hdf5_version)
 	- rm -rf external/hdf5-$(hdf5_version)-Linux
 	unzip external/hdf5-$(hdf5_version).zip -d external/
@@ -288,8 +305,9 @@ hdf5lib:
 	( cd external/hdf5-$(hdf5_version) && make -j8 && make install )
 	mv external/hdf5-$(hdf5_version)/hdf5 external/hdf5-$(hdf5_version)-Linux
 	- rm -rf external/hdf5-$(hdf5_version)
+endif
 
-catch2lib:
+catch2-lib:
 	- rm -rf external/build
 	- rm -rf external/Catch2-$(catch2_version)
 	- rm -rf external/Catch2-$(catch2_version)-Linux
@@ -301,10 +319,12 @@ catch2lib:
 	- rm -rf external/build
 	- rm -rf external/Catch2-$(catch2_version)
 
+moxunit-lib:
+	- rm -rf external/MOxUnit-master
+	unzip external/MOxUnit.zip -d external/
+
 clean:
 	- rm build/*
-	- rm lib/*
-	- rm +quadriga_lib/*.mex*
 	- rm +quadriga_lib/*.manifest
 	- rm +quadriga_lib/*.exp
 	- rm +quadriga_lib/*.lib
@@ -313,9 +333,16 @@ clean:
 	- rm tests/test.exe
 	- rm -rf build
 
-tidy: clean 
+cleaner:  clean
+	- rm lib/*
+	- rm +quadriga_lib/*.mex*
+
+tidy: cleaner 
 	- rm -rf external/Catch2-$(catch2_version)-Linux
 	- rm -rf external/hdf5-$(hdf5_version)-Linux
+	- rm -rf external/armadillo-$(armadillo_version)
+	- rm -rf external/pugixml-$(pugixml_version)
+	- rm -rf external/MOxUnit-master
 	- rm +quadriga_lib/*.m
 	- rm -rf +quadriga_lib
 	- rm -rf lib
@@ -327,3 +354,28 @@ release:  all   build/quadriga-lib-version
 	- mkdir release
 	tar czf release/quadrigalib-v$(shell build/quadriga-lib-version)-Ubuntu-$(shell lsb_release -r -s)-amd64.tar.gz \
 		+quadriga_lib/*.mex +quadriga_lib/*.mexa64 +quadriga_lib/*.m include lib/*.a
+
+package:  all  build/quadriga-lib-version
+	- mkdir release
+	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)
+	- rm release/quadriga_lib-$(shell build/quadriga-lib-version).zip
+	mkdir release/quadriga_lib-$(shell build/quadriga-lib-version)
+	mkdir release/quadriga_lib-$(shell build/quadriga-lib-version)/external
+	cp external/armadillo-$(armadillo_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp external/pugixml-$(pugixml_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp external/Catch2-$(catch2_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp external/hdf5-*.zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp external/MOxUnit.zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp -R include release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R mex release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R mex_cuda release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R src release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R tests release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R tools release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R html_docu release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp GNUmakefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp LICENSE release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp Makefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp README.md release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	( cd release && zip -r quadriga_lib-$(shell build/quadriga-lib-version).zip quadriga_lib-$(shell build/quadriga-lib-version)/ )
+	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)
