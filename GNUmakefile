@@ -330,7 +330,7 @@ clean:
 	- rm +quadriga_lib/*.lib
 	- rm *.obj
 	- rm tests/test_bin
-	- rm tests/test.exe
+	- rm tests/test_cuda_bin
 	- rm -rf build
 
 cleaner:  clean

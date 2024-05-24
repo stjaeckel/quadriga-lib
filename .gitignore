@@ -1,6 +1,9 @@
 build/*
 lib/*
 +quadriga_lib/*.mex*
+external/armadillo-*/
+external/MOxUnit-master/
+external/pugixml-*/
 external/Catch2-*/
 external/hdf5-*/
 tests/test*
