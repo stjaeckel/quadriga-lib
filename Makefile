@@ -279,27 +279,23 @@ moxunit-lib:
 	move MOxUnit-master external
 
 clean:
+	- rmdir /s /q external\build
+	- rmdir /s /q external\Catch2-$(catch2_version)
+	- rmdir /s /q external\hdf5-$(hdf5_version)
 	- rmdir /s /q build
 	- del "+quadriga_lib"\*.manifest
 	- del "+quadriga_lib"\*.exp
 	- del "+quadriga_lib"\*.lib
-	
-cleaner:   clean
-	- rmdir /s /q external\build
-	- rmdir /s /q external\Catch2-$(catch2_version)
-	- rmdir /s /q external\hdf5-$(hdf5_version)
-	- del "+quadriga_lib"\*.mex*
-	- rmdir /s /q lib
 	- del tests\test.exe
-
-tidy:   cleaner
-	- rmdir /s /q external\build
+	
+tidy:   clean
 	- rmdir /s /q external\Catch2-$(catch2_version)-win64
 	- rmdir /s /q external\hdf5-$(hdf5_version)-win64
 	- rmdir /s /q external\armadillo-$(armadillo_version)
 	- rmdir /s /q external\pugixml-$(pugixml_version)
 	- rmdir /s /q external\MOxUnit-master
 	- rmdir /s /q +quadriga_lib
+	- rmdir /s /q lib
 
 build\quadriga-lib-version.exe:   src/version.cpp   lib/quadriga_lib.lib
 	$(CC) $(CCFLAGS) /Febuild\quadriga-lib-version.exe $** /Iinclude /I$(ARMA_H)
