@@ -324,7 +324,9 @@ moxunit-lib:
 	unzip external/MOxUnit.zip -d external/
 
 clean:
-	- rm build/*
+	- rm -rf external/build
+	- rm -rf external/Catch2-$(catch2_version)
+	- rm -rf external/hdf5-$(hdf5_version)
 	- rm +quadriga_lib/*.manifest
 	- rm +quadriga_lib/*.exp
 	- rm +quadriga_lib/*.lib
@@ -333,17 +335,12 @@ clean:
 	- rm tests/test_cuda_bin
 	- rm -rf build
 
-cleaner:  clean
-	- rm lib/*
-	- rm +quadriga_lib/*.mex*
-
-tidy: cleaner 
+tidy: clean 
 	- rm -rf external/Catch2-$(catch2_version)-Linux
 	- rm -rf external/hdf5-$(hdf5_version)-Linux
 	- rm -rf external/armadillo-$(armadillo_version)
 	- rm -rf external/pugixml-$(pugixml_version)
 	- rm -rf external/MOxUnit-master
-	- rm +quadriga_lib/*.m
 	- rm -rf +quadriga_lib
 	- rm -rf lib
 

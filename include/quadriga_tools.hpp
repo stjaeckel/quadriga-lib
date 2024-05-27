@@ -227,7 +227,7 @@ namespace quadriga_lib
                            arma::Col<int> *out_typeN = nullptr);          // Output type code
 
     // Calculate the intersections of ray tubes with point clouds
-    // - Returns the number of hits per point and the indices of the rays that hit each point
+    // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
     // - It is strongly recommended to use "point_cloud_segmentation" to speed up computations
     // - Returns the indices of the rays that hit the points; 0-based; Length (std::vector) [ n_points ]
     // - All internal computations are done using single precision
