@@ -49,7 +49,6 @@ TEST_CASE("Ray-Point Intersect - Simple Mode")
     // Call intersect
     arma::u32_vec hit_count;
     auto ind = quadriga_lib::ray_point_intersect(&pointsR, &orig, &trivec, &tridir, &sub_cloud_index, &hit_count);
-
     CHECK(arma::all(hit_count == 1));
 }
 

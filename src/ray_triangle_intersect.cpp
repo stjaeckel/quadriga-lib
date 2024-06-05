@@ -17,6 +17,7 @@
 
 #include <immintrin.h>
 #include <cstring> // For std::memcopy
+
 #include <cmath>   // For std::isnan
 #include "quadriga_tools.hpp"
 
@@ -31,6 +32,7 @@
 #include <cpuid.h>
 #endif
 
+#if defined(__AVX2__) // Compiler support for AVX2
 static bool isAVX2Supported()
 {
     std::vector<int> cpuidInfo(4);
@@ -43,6 +45,7 @@ static bool isAVX2Supported()
 
     return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
 }
+#endif
 
 // Use this to print the contents of a __m256 to stdout
 // { // Display the elements of a __m256
