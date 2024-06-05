@@ -160,7 +160,7 @@ build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_point_intersect.o:   src/ray_point_intersect.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)

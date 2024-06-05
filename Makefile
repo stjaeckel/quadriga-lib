@@ -114,7 +114,7 @@ build\ray_mesh_interact.obj:   src\ray_mesh_interact.cpp   include\quadriga_tool
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_point_intersect.obj:   src\ray_point_intersect.cpp   include\quadriga_tools.hpp
-	$(CC) /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
 	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
