@@ -1,4 +1,7 @@
 {
+    "python.analysis.extraPaths": [
+        "/sjc/quadriga-lib/lib"
+    ],
     "cSpell.words": [
         "Aclose",
         "Acreate",
@@ -24,12 +27,15 @@
         "Gcreate",
         "Gopen",
         "icosphere",
+        "isinstance",
         "isohedron",
         "Lexists",
         "memptr",
         "MIMO",
         "ndiv",
+        "numpy",
         "permutevar",
+        "pybind11",
         "randu",
         "Raphson",
         "Sclose",
