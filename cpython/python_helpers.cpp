@@ -24,6 +24,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
+// Convert to std::any
 inline std::any qd_python_anycast(pybind11::handle obj, std::string var_name = "")
 {
 
