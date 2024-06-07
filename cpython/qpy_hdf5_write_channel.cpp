@@ -24,13 +24,13 @@
 pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
                                                unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                                const pybind11::dict par,
-                                               const pybind11::array_t<double> rx_position,
-                                               const pybind11::array_t<double> tx_position,
+                                               const pybind11::array_t<double> rx_pos,
+                                               const pybind11::array_t<double> tx_pos,
                                                const pybind11::array_t<std::complex<double>> coeff,
                                                const pybind11::array_t<double> delay,
-                                               const double center_frequency,
+                                               const pybind11::array_t<double> center_frequency,
                                                const std::string name,
-                                               const unsigned initial_position,
+                                               const int initial_position,
                                                const pybind11::array_t<double> path_gain,
                                                const pybind11::array_t<double> path_length,
                                                const pybind11::array_t<std::complex<double>> path_polarization,
@@ -44,6 +44,8 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
 {
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
+    c.initial_position = initial_position;
+    c.name = name;
 
     // Process the unstructured data
     for (auto item : par)
@@ -54,9 +56,65 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
         c.par_data.push_back(qd_python_anycast(item.second, fieldName));
     }
 
-    // Write to HDF File
-    auto storage_space = quadriga_lib::hdf5_read_layout(fn);
+    if (rx_pos.size() != 0)
+    {
+        pybind11::buffer_info buf = rx_pos.request();
+        if (buf.ndim != 2)
+            throw std::invalid_argument("'rx_pos' must be a Matrix (2 dimensions).");
+        c.rx_pos = arma::mat(reinterpret_cast<double *>(buf.ptr), buf.shape[0], buf.shape[1], false, true);
+    }
 
+    if (tx_pos.size() != 0)
+    {
+        pybind11::buffer_info buf = tx_pos.request();
+        if (buf.ndim != 2)
+            throw std::invalid_argument("'tx_pos' must be a Matrix (2 dimensions).");
+        c.tx_pos = arma::mat(reinterpret_cast<double *>(buf.ptr), buf.shape[0], buf.shape[1], false, true);
+    }
+
+    if (coeff.size() != 0)
+    {
+        pybind11::buffer_info buf = coeff.request();
+        std::complex<double> *ptr_python = reinterpret_cast<std::complex<double> *>(buf.ptr);
+
+        size_t n_rx = buf.shape[0];
+        size_t n_tx = (buf.ndim > 1) ? buf.shape[1] : 1;
+        size_t n_path = (buf.ndim > 2) ? buf.shape[2] : 1;
+        size_t n_snap = (buf.ndim > 3) ? buf.shape[3] : 1;
+
+        auto data_real = std::vector<arma::cube>();
+        auto data_imag = std::vector<arma::cube>();
+
+        for (size_t i_snap = 0; i_snap < n_snap; ++i_snap)
+        {
+            auto tmp_real = arma::cube(n_rx, n_tx, n_path, arma::fill::none);
+            auto tmp_imag = arma::cube(n_rx, n_tx, n_path, arma::fill::none);
+            double *ptr_real = tmp_real.memptr();
+            double *ptr_imag = tmp_imag.memptr();
+
+            for (size_t i = 0; i < n_rx * n_tx * n_path; ++i)
+            {
+                std::complex<double> value = ptr_python[i];
+                ptr_real[i] = value.real();
+                ptr_imag[i] = value.imag();
+            }
+
+            data_real.push_back(tmp_real);
+            data_imag.push_back(tmp_imag);
+        }
+
+        c.coeff_re = data_real;
+        c.coeff_im = data_imag;
+    }
+
+    if (center_frequency.size() != 0)
+    {
+        pybind11::buffer_info buf = center_frequency.request();
+        c.center_frequency = arma::vec(reinterpret_cast<double *>(buf.ptr), buf.size, false, true);
+    }
+
+    // Create HDF File if it dies not already exist
+    auto storage_space = quadriga_lib::hdf5_read_layout(fn);
     if (storage_space.at(0) == 0) // File does not exist
     {
         unsigned nx = 1, ny = 1, nz = 1, nw = 1;
@@ -86,6 +144,7 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
     if (ix > storage_space.at(0) || iy > storage_space.at(1) || iz > storage_space.at(2) || iw > storage_space.at(3))
         throw std::invalid_argument("Location exceeds storage space in HDF file");
 
+    // Write data to file
     c.hdf5_write(fn, ix, iy, iz, iw);
 
     return pybind11::array_t<unsigned>(4ULL, storage_space.memptr());

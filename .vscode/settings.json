@@ -32,6 +32,7 @@
         "Lexists",
         "memptr",
         "MIMO",
+        "ndim",
         "ndiv",
         "numpy",
         "permutevar",

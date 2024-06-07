@@ -101,6 +101,16 @@ class test_hdf_rw(unittest.TestCase):
         tst = np.array([128,8,8,8], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
 
-       
+        rx_pos = np.random.rand(3, 4)
+        tx_pos = np.random.rand(3, 1)
+        coeff = np.random.random((2, 3, 5, 4)) + 1j * np.random.random((2, 3, 5, 4))
+
+        quadriga_lib.hdf5_write_channel(fn,ix=2,rx_pos=rx_pos, tx_pos=tx_pos, center_frequency=1e6)
+
+        
+
+
+
+
 if __name__ == '__main__':
     unittest.main()
