@@ -1,0 +1,32 @@
+<big><b>Python API Documentation for Quadriga-Lib</b></big>
+<br><br><br>
+
+<b>Notes:</b>
+<br>
+
+<ul>
+<li>The Quadriga-Lib Python interface of implemented using pybind11. 
+Before getting started, make sure that the Python library is compiled for your system and python environment.</li>
+<br>
+<li>Unless otherwise stated, the Quadriga-Lib Python API reads and writes data to and from Numpy arrays in 
+    double precision. Hence, you need to have numpy installed and imported in your python file.</li>
+<br>    
+<li>There is currently no Microsoft Windows version of the Quadriga-Lib Python interface.
+    This os planned for a later stage.</li>
+<br>    
+<li>The Quadriga-Lib Python package is compiled into a single ".so" file located in the "lib" folder. 
+To import it in Python, the "lib" folder must be on your Python path, which is usually not the case
+unless you install a package using pip or conda. To import the "quadriga_lib" from a custom location,
+you can do the following:
+<pre>
+import sys
+import numpy as np
+
+sys.path.append("/path_to/quadriga-lib/lib")
+import quadriga_lib
+</pre></li>
+
+
+</ul>
+
+<br> 

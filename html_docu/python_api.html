@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta content="text/html;" http-equiv="Content-Type">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
+  <link type="text/css" rel="stylesheet" href="style2.css">
+  <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
+</head>
+ 
+<body>
+
+  <div id="quadriga-lib_header">
+    <div id="quadriga-lib_header_row">
+      <div id="quadriga-lib_header_cell_logo_img">
+        <a href="https://arma.sourceforge.net">
+          <img id="quadriga-lib_logo_img" src="img/quadriga-lib-logo80.png" alt="armadillo" align="top" border="0">
+        </a>
+      </div>
+      <div id="quadriga-lib_header_spacer"></div>
+      <div id="quadriga-lib_header_cell_logo_txt">
+        <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
+          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+      </div>
+    </div>
+  </div>
+
+  <div id="quadriga-lib_menu">
+    <ul class="quadriga-lib_menu">
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="index.html">About</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="cpp_api.html">C++ API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="mex_api.html">MATLAB API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu_selected" href="python_api.html">Python API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="formats.html">Data Formats</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="download.html">Download</a></li>
+    </ul>
+  </div>
+
+  <div id="quadriga-lib_content">
+
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib</b></big>
+<br><br><br>
+
+<b>Notes:</b>
+<br>
+
+<ul>
+<li>The Quadriga-Lib Python interface of implemented using pybind11. 
+Before getting started, make sure that the Python library is compiled for your system and python environment.</li>
+<br>
+<li>Unless otherwise stated, the Quadriga-Lib Python API reads and writes data to and from Numpy arrays in 
+    double precision. Hence, you need to have numpy installed and imported in your python file.</li>
+<br>    
+<li>There is currently no Microsoft Windows version of the Quadriga-Lib Python interface.
+    This os planned for a later stage.</li>
+<br>    
+<li>The Quadriga-Lib Python package is compiled into a single ".so" file located in the "lib" folder. 
+To import it in Python, the "lib" folder must be on your Python path, which is usually not the case
+unless you install a package using pip or conda. To import the "quadriga_lib" from a custom location,
+you can do the following:
+<pre>
+import sys
+import numpy as np
+
+sys.path.append("/path_to/quadriga-lib/lib")
+import quadriga_lib
+</pre></li>
+
+
+</ul>
+
+<br> 
+<b>Overview</b>
+<ul>
+<li><a href="#part_1">Channel functions</a></li>
+<li><a href="#part_2">Miscellaneous / Tools</a></li>
+<li><a href="#part_3">Site-Specific Simulation Tools</a></li>
+</ul>
+<br>
+<a name="part_1"></a>
+<b>Channel functions</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
+<tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<a name="part_2"></a>
+<b>Miscellaneous / Tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<a name="part_3"></a>
+<b>Site-Specific Simulation Tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Channel functions</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_create_file"></a>
+<b>hdf5_create_file</b> - Create a new HDF5 channel file with a custom storage layout
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this 
+library is its ability to organize multiple channels within a single HDF5 file while enabling access 
+to individual data sets without the need to read the entire file. In this system, channels can be 
+structured in a multi-dimensional array. For instance, the first dimension might represent the Base 
+Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important 
+to note that the dimensions of the storage layout must be defined when the file is initially created 
+and cannot be altered thereafter. The function <code>quadriga_lib.hdf5_create_file</code> is used to create an 
+empty file with a predetermined custom storage layout.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the HDF5 file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nx</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 65536 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ny</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nz</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nw</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_layout"></a>
+<b>hdf5_read_layout</b> - Read the storage layout of channel data inside an HDF5 file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
+notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+file. In this framework, channels can be arranged in a multi-dimensional array format. 
+ 
+The function <code>quadriga_lib.hdf5_read_layout</code> is designed to read the storage layout from an 
+existing file. Furthermore, it also generates an array that marks the locations within the layout 
+where data already exists. This functionality aids in efficiently managing and accessing channel 
+data within the HDF5 file structure.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+storage_dims, has_data = quadriga_lib.hdf5_read_layout( fn )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the HDF5 file, string 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>storage_dims</code></b><br> 
+   Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>has_data</code></b><br> 
+   Array indicating if data exists (value 1) or not (value 0); uint32; Size: <code>[nx,ny,nz,nw]</code> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_reshape_layout"></a>
+<b>hdf5_reshape_layout</b> - Reshapes the storage layout inside an existing HDF5 file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A  
+notable feature of this library is its capacity to manage multiple channels within a single HDF5  
+file. In this framework, channels can be arranged in a multi-dimensional array format. 
+Once an HDF5 file has been created, the number of channels in the storage layout is fixed.  
+However, it is possible to reshape the layout using <code>quadriga_lib.hdf5_reshape_layout</code>.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the HDF5 file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nx</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 65536 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ny</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nz</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>nw</code></b> (optional)<br> 
+   Number of elements on the x-dimension, Default = 1 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Miscellaneous / Tools</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="cart2geo"></a>
+<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
+coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
+points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
+where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
+θ = 90° points to the zenith and θ = 0° points to the horizon.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+geo_coords = quadriga_lib.cart2geo(cart_coords)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
+   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
+   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
+   First row: Azimuth angles in [rad], values between -pi and pi.<br> 
+   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
+   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Site-Specific Simulation Tools</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="icosphere"></a>
+<b>icosphere</b> - Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>An icosphere is constructed by subdividing faces of an icosahedron, a polyhedron with 20 faces, 
+12 vertices and 30 edges, and then projecting the new vertices onto the surface of a sphere. The 
+resulting mesh has 6 triangles at each vertex, except for 12 vertices which have 5 triangles. 
+The approximate equilateral triangles have roughly the same edge length and surface area.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+center, length, vert, direction = quadriga_lib.icosphere( no_div, radius, direction_xyz )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>no_div</code></b><br> 
+   Number of divisions per edge of the generating icosahedron. The resulting number of faces is 
+   equal to <code>no_face = 20 · no_div^2</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>radius</code></b><br> 
+   Radius of the sphere in meters 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>direction_xyz</code></b><br> 
+   Direction format indicator: 0 = Spherical (default), 1 = Cartesian 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments (tuple containing 4 values):</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>center</code></b><br> 
+   Position of the center point of each triangle; Size: <code>[ no_face, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>length</code></b><br> 
+   Length of the vector pointing from the origin to the center point. This number is smaller than 
+   1 since the triangles are located inside the unit sphere; <br>Size: <code>[ no_face ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vert</code></b><br> 
+   The 3 vectors pointing from the center point to the vertices of each triangle; the values are 
+   in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; <br>Size: <code>[ no_face, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>direction</code></b><br> 
+   The directions of the vertex-rays. If the format indicator <code>direction_xyz</code> is set to <code>0</code>, the 
+   output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the 
+   order <code>[ v1az, v1el, v2az, v2el, v3az, v3el ]</code>;Size: <code>[ no_face, 6 ]</code> If the format indicator 
+   <code>direction_xyz</code> is set to <code>1</code>, the output is in Cartesian coordinates and the values are in the 
+   order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Size: <code>[ no_face, 9 ]</code> 
+</li></ul>
+</li>
+</ul>
+    <!-- CONTENT END -->
+
+    <br>
+    <!-- <br> -->
+
+    <div id="quadriga-lib_sf_line"></div>
+
+  </div>
+
+</body>
+
+</html>
