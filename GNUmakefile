@@ -33,6 +33,7 @@ hdf5_version      = # 1.14.2
 armadillo_version = 12.8.3
 pugixml_version   = 1.13
 catch2_version    = 3.4.0
+pybind11_version  = 2.12.0
 
 # The following sections should not require editing.
 
@@ -62,6 +63,15 @@ else
 endif
 endif
 
+# Autodetect the Python include path
+PYTHON_H = $(shell python3 -c "from sysconfig import get_paths as gp; print(gp()['include'])")
+ifeq ($(wildcard $(PYTHON_H)/Python.h),)
+    PYTHON_H =
+else
+	PYTHON_EXTENSION_SUFFIX = $(shell python3-config --extension-suffix)
+	PYTHON_TARGET = lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX)
+endif
+
 # Compilers
 CC   = g++
 MEX  = $(MATLAB_PATH)/bin/mex
@@ -82,6 +92,7 @@ endif
 ARMA_H      = external/armadillo-$(armadillo_version)/include
 PUGIXML_H   = external/pugixml-$(pugixml_version)/src
 CATCH2      = external/Catch2-$(catch2_version)-Linux
+PYBIND11_H  = external/pybind11-$(pybind11_version)/include
 
 # Linking options for HDF5 library
 ifeq ($(hdf5_version),) # Dynamic linking
@@ -103,11 +114,12 @@ CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion #-g
 .PHONY: dirs
 all:        
 	@$(MAKE) dirs
-	@$(MAKE) lib/quadriga_lib.a   $(CUDA_A)   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)
+	@$(MAKE) lib/quadriga_lib.a   $(CUDA_A)   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)   $(PYTHON_TARGET)
 
 src     	= $(wildcard src/*.cpp)
 mex         = $(wildcard mex/*.cpp)
 mex_cuda    = $(wildcard mex_cuda/*.cpp)
+cpython     = $(wildcard cpython/*.cpp)
 tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
 dirs:
@@ -121,11 +133,16 @@ mex_octave:      $(mex:mex/%.cpp=+quadriga_lib/%.mex)
 mex_octave_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mex)
 mex_docu:        $(mex:mex/%.cpp=+quadriga_lib/%.m)
 
-test:   tests/test_bin   $(CUDA_TEST)   mex_octave
-	octave --eval "cd tests; quadriga_lib_mex_tests;"
+test:   all   tests/test_bin   $(CUDA_TEST)
 	tests/test_bin
+ifneq ($(OCTAVE_VERSION),)
+	octave --eval "cd tests; quadriga_lib_mex_tests;"
+endif
 ifneq ($(CUDA_PATH),)
 	tests/test_cuda_bin
+endif
+ifneq ($(PYTHON_TARGET),)
+	pytest tests/python_tests
 endif
 
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
@@ -184,6 +201,12 @@ build/%_link.o:   build/%.o
 
 lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_compute_capability_link.o
 	ar rcs $@ $^
+
+# Python interface
+python: $(PYTHON_TARGET)
+
+lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadriga_lib.a $(cpython)
+	$(CC) -shared $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
 
 # MEX MATLAB interface
 +quadriga_lib/arrayant_calc_directivity.mexa64:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
@@ -283,13 +306,22 @@ documentation:   dirs   mex_docu
 	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
 	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part mex/ 
 	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
+	python3 tools/extract_html.py html_docu/python_api.html tools/html_parts/python_api.html.part cpython/ 
+	python3 tools/extract_html.py html_docu/formats.html tools/html_parts/index.html.part
+	python3 tools/extract_html.py html_docu/faq.html tools/html_parts/index.html.part
+	python3 tools/extract_html.py html_docu/contact.html tools/html_parts/index.html.part
+	python3 tools/extract_html.py html_docu/download.html tools/html_parts/index.html.part
 
 # External libraries
-external:   armadillo-lib   pugixml-lib   hdf5-lib   catch2-lib   moxunit-lib
+external:   armadillo-lib   pybind11-lib   pugixml-lib   hdf5-lib   catch2-lib   moxunit-lib   
 
 armadillo-lib:
 	- rm -rf external/armadillo-$(armadillo_version)
 	unzip external/armadillo-$(armadillo_version).zip -d external/
+
+pybind11-lib:
+	- rm -rf external/pybind11-$(pybind11_version)
+	unzip external/pybind11-$(pybind11_version).zip -d external/
 
 pugixml-lib:
 	- rm -rf external/pugixml-$(pugixml_version)
@@ -334,16 +366,19 @@ clean:
 	- rm tests/test_bin
 	- rm tests/test_cuda_bin
 	- rm -rf build
+	- rm -rf tests/python_tests/__pycache__
+	- rm *.hdf5
 
 tidy: clean 
 	- rm -rf external/Catch2-$(catch2_version)-Linux
 	- rm -rf external/hdf5-$(hdf5_version)-Linux
 	- rm -rf external/armadillo-$(armadillo_version)
 	- rm -rf external/pugixml-$(pugixml_version)
+	- rm -rf external/pybind11-$(pybind11_version)
 	- rm -rf external/MOxUnit-master
 	- rm -rf +quadriga_lib
 	- rm -rf lib
-
+	
 build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
 	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
 
