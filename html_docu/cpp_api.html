@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta content="text/html;" http-equiv="Content-Type">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
+  <link type="text/css" rel="stylesheet" href="style2.css">
+  <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
+</head>
+ 
+<body>
+
+  <div id="quadriga-lib_header">
+    <div id="quadriga-lib_header_row">
+      <div id="quadriga-lib_header_cell_logo_img">
+        <a href="https://arma.sourceforge.net">
+          <img id="quadriga-lib_logo_img" src="img/quadriga-lib-logo80.png" alt="armadillo" align="top" border="0">
+        </a>
+      </div>
+      <div id="quadriga-lib_header_spacer"></div>
+      <div id="quadriga-lib_header_cell_logo_txt">
+        <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
+          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+      </div>
+    </div>
+  </div>
+
+  <div id="quadriga-lib_menu">
+    <ul class="quadriga-lib_menu">
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="index.html">About</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu_selected" href="cpp_api.html">C++ API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="mex_api.html">MATLAB API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="python_api.html">Python API</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="formats.html">Data Formats</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
+      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="download.html">Download</a></li>
+    </ul>
+  </div>
+
+  <div id="quadriga-lib_content">
+
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib</b></big>
+<br><br><br>
+
+<b>Overview</b>
+<ul>
+<li><a href="#part_1">Array antenna class</a></li>
+<li><a href="#part_2">Miscellaneous / Tools</a></li>
+</ul>
+<br>
+<a name="part_1"></a>
+<b>Array antenna class</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td style="padding-bottom: 10px;"><a href="#arrayant ">arrayant </a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
+<tr><td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td><td>Calculate the directivity (in dBi) of array antenna elements</td></tr>
+<tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<a name="part_2"></a>
+<b>Miscellaneous / Tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Array antenna class</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant "></a>
+<b>arrayant </b> - Class for storing and manipulating array antenna models
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">An array antenna consists of multiple individual elements. 
+</li><li style="margin-bottom: 0.4em;">Each element occupies a specific position relative to the array's phase-center, its local origin. 
+</li><li style="margin-bottom: 0.4em;">Elements can also be inter-coupled, represented by a coupling matrix. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Attributes:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>arma::Cube&lt;dtype&gt; e_theta_re</code></td>
+  <td>Vertical component of the electric field, real part</td>
+</tr>
+<tr>
+  <td><code>arma::Cube&lt;dtype&gt; e_theta_im</code></td>
+  <td>Vertical component of the electric field, imaginary part</td>
+</tr>
+<tr>
+  <td><code>arma::Cube&lt;dtype&gt; e_phi_re</code></td>
+  <td>Horizontal component of the electric field, real part</td>
+</tr>
+<tr>
+  <td><code>arma::Cube&lt;dtype&gt; e_phi_im</code></td>
+  <td>Horizontal component of the electric field, imaginary part</td>
+</tr>
+<tr>
+  <td><code>arma::Col&lt;dtype&gt; azimuth_grid</code></td>
+  <td>Azimuth angles in pattern (theta) in [rad], between -pi and pi, sorted</td>
+</tr>
+<tr>
+  <td><code>arma::Col&lt;dtype&gt; elevation_grid</code></td>
+  <td>Elevation angles in pattern (phi) in [rad], between -pi/2 and pi/2, sorted</td>
+</tr>
+<tr>
+  <td><code>arma::Mat&lt;dtype&gt; element_pos</code></td>
+  <td>Element positions (optional), Size: Empty or [3, n_elements]</td>
+</tr>
+<tr>
+  <td><code>arma::Mat&lt;dtype&gt; coupling_re</code></td>
+  <td>Coupling matrix, real part (optional), Size: [n_elements, n_ports]</td>
+</tr>
+<tr>
+  <td><code>arma::Mat&lt;dtype&gt; coupling_im</code></td>
+  <td>Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]</td>
+</tr>
+<tr>
+  <td><code>dtype center_frequency</code></td>
+  <td>Center frequency in [Hz]</td>
+</tr>
+</table><br>
+ 
+<ul><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li><li style="margin-bottom: 0.4em;"><code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code> must have size <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+float pi = arma::datum::pi;
+
+quadriga_lib::arrayant&lt;float&gt; ant;
+ant.azimuth_grid = {-0.75f * pi, 0.0f, 0.75f * pi, pi};
+ant.elevation_grid = {-0.45f * pi, 0.0f, 0.45f * pi};
+
+arma::mat A = arma::linspace(1.0, 12.0, 12);
+A.reshape(3, 4);
+
+arma::fcube B;
+B.zeros(3, 4, 1);
+B.slice(0) = arma::conv_to&lt;arma::fmat&gt;::from(A);
+
+ant.e_theta_re = B * 0.5f;
+ant.e_theta_im = B * 0.002f;
+ant.e_phi_re = -B;
+ant.e_phi_im = -B * 0.001f;
+
+arma::fmat C = {1.0f, 2.0f, 4.0f};
+ant.element_pos = C.t();
+
+ant.coupling_re = {1.0f};
+ant.coupling_im = {0.1f};
+ant.center_frequency = 2.0e9f;
+ant.name = "name";
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Simple member functions:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>.n_elevation()</code></td>
+  <td>Returns number of elevation angles as 64bit integer</td>
+</tr>
+<tr>
+  <td><code>.n_azimuth()</code></td>
+  <td>Returns number of azimuth angles as 64bit integer</td>
+</tr>
+<tr>
+  <td><code>.n_elements()</code></td>
+  <td>Returns number of antenna elements as 64bit integer</td>
+</tr>
+<tr>
+  <td><code>.n_ports()</code></td>
+  <td>Returns number of ports (after coupling) as 64bit integer</td>
+</tr>
+<tr>
+  <td><code>.copy()</code></td>
+  <td>Creates a copy of the array antenna object</td>
+</tr>
+<tr>
+  <td><code>.reset()</code></td>
+  <td>Reset the size to zero (the arrayant object will contain no data)</td>
+</tr>
+<tr>
+  <td><code>.is_valid()</code></td>
+  <td>Returns an empty string if arrayant object is valid or an error message otherwise</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Complex member fuctions:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#.calc_directivity_dbi">.calc_directivity_dBi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#.combine_pattern">.combine_pattern</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name=".calc_directivity_dbi"></a>
+<b>.calc_directivity_dbi</b> - Calculate the directivity (in dBi) of array antenna elements
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
+   is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
+   from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
+   of a hypothetical isotropic radiator is 1, or 0 dBi. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+dtype calc_directivity_dBi(unsigned element) const;
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>unsigned element</code></td>
+  <td>Element index</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+auto ant = quadriga_lib::generate_arrayant_dipole&lt;float&gt;();
+float directivity = ant.calc_directivity_dBi( 0 );
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name=".combine_pattern"></a>
+<b>.combine_pattern</b> - Calculate effective radiation patterns for array antennas
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">By integrating element radiation patterns, element positions, and the coupling weights, one can 
+   determine an effective radiation pattern observable by a receiver in the antenna's far field. 
+</li><li style="margin-bottom: 0.4em;">Leveraging these effective patterns is especially beneficial in antenna design, beamforming 
+   applications such as in 5G systems, and in planning wireless communication networks in complex 
+   environments like urban areas. This streamlined approach offers a significant boost in computation 
+   speed when calculating MIMO channel coefficients, as it reduces the number of necessary operations. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void combine_pattern(arrayant&lt;dtype&gt; *output);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt; *output</code><br> 
+   Pointer to an arrayant object the the results should be written to. Calling this function without 
+   an argument or passing <code>nullptr</code> updates the arrayant properties of <code>this</code> arrayant inplace. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Miscellaneous / Tools</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_diffraction_paths"></a>
+<b>generate_diffraction_paths</b> - Generate propagation paths for estimating the diffraction gain
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Diffraction refers to the phenomenon where waves bend or interfere around the edges of an obstacle, 
+extending into the region that would otherwise be in the obstacle's geometrical shadow. The object 
+causing the diffraction acts as a secondary source for the wave's propagation. A specific example of 
+this is the knife-edge effect, or knife-edge diffraction, where a sharp, well-defined obstacle—like 
+a mountain range or a building wall—partially truncates the incident radiation.<br><br> 
+ 
+To estimate the diffraction gain in a three-dimensional space, one can assess the extent to which the 
+Fresnel ellipsoid is obstructed by objects, and then evaluate the impact of this obstruction on the 
+received power. This method presupposes that diffracted waves travel along slightly varied paths 
+before arriving at a receiver. These waves may reach the receiver out of phase with the primary wave 
+due to their different travel lengths, leading to either constructive or destructive interference.<br><br> 
+ 
+The process of estimating the gain involves dividing the wave propagation from a transmitter to a 
+receiver into <code>n_path</code> paths. These paths are represented by elliptic arcs, which are further 
+approximated using <code>n_seg</code> line segments. Each segment can be individually blocked or attenuated 
+by environmental objects. To determine the overall diffraction gain, a weighted sum of these 
+individual path contributions is calculated. The weighting is adjusted to align with the uniform 
+theory of diffraction (UTD) coefficients in two dimensions, but the methodology is adapted for 
+any 3D object shape. This function generates the elliptic propagation paths and corresponding weights 
+necessary for this calculation.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Each ellipsoid consists of <code>n_path</code> diffraction paths. The number of paths is determined by the 
+   level of detail (<code>lod</code>). 
+</li><li style="margin-bottom: 0.4em;">All diffraction paths of an ellipsoid originate at <code>orig</code> and arrive at <code>dest</code> 
+</li><li style="margin-bottom: 0.4em;">Each diffraction path has <code>n_seg</code> segments 
+</li><li style="margin-bottom: 0.4em;">Points <code>orig</code> and <code>dest</code> lay on the semi-major axis of the ellipsoid 
+</li><li style="margin-bottom: 0.4em;">The generated rays sample the volume of the ellipsoid 
+</li><li style="margin-bottom: 0.4em;">Weights are calculated from the Knife-edge diffraction model when parts of the ellipsoid are shadowed 
+</li><li style="margin-bottom: 0.4em;">Initial weights are normalized such that <code>sum(prod(weights,3),2) = 1</code> 
+</li><li style="margin-bottom: 0.4em;">Inputs <code>orig</code> and <code>dest</code> may be provided as double or single precision 
+</li><li style="margin-bottom: 0.4em;">Supported datatypes <code>dtype</code> are <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void generate_diffraction_paths(const arma::Mat&lt;dtype&gt; *orig, const arma::Mat&lt;dtype&gt; *dest,
+                                dtype center_frequency, int lod,
+                                arma::Cube&lt;dtype&gt; *ray_x, arma::Cube&lt;dtype&gt; *ray_y,
+                                arma::Cube&lt;dtype&gt; *ray_z, arma::Cube&lt;dtype&gt; *weight);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>const arma::Mat&lt;dtype&gt; *orig</code></b><br> 
+   Pointer to Armadillo matrix containing the origin points of the propagation ellipsoid (e.g. 
+   transmitter positions). Size: <code>[ n_pos, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>const arma::Mat&lt;dtype&gt; *dest</code></b><br> 
+   Pointer to Armadillo matrix containing the destination point of the propagation ellipsoid (e.g. 
+   receiver positions). Size: <code>[ n_pos, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dtype center_frequency</code></b><br> 
+   The center frequency in [Hz], scalar, default = 299792458 Hz 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>int lod</code></b><br> 
+   Level of detail, scalar value 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>lod = 1</code></td>
+  <td>results in <code>n_path = 7</code> and <code>n_seg = 3</code></td>
+</tr>
+<tr>
+  <td><code>lod = 2</code></td>
+  <td>results in <code>n_path = 19</code> and <code>n_seg = 3</code></td>
+</tr>
+<tr>
+  <td><code>lod = 3</code></td>
+  <td>results in <code>n_path = 37</code> and <code>n_seg = 4</code></td>
+</tr>
+<tr>
+  <td><code>lod = 4</code></td>
+  <td>results in <code>n_path = 61</code> and <code>n_seg = 5</code></td>
+</tr>
+<tr>
+  <td><code>lod = 5</code></td>
+  <td>results in <code>n_path = 1</code> and <code>n_seg = 2</code> (for debugging)</td>
+</tr>
+<tr>
+  <td><code>lod = 6</code></td>
+  <td>results in <code>n_path = 2</code> and <code>n_seg = 2</code> (for debugging)</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arma::Cube&lt;dtype&gt; *ray_x</code></b><br> 
+   Pointer to an Armadillo cube for the x-coordinates of the generated rays; Size: <code>[ n_pos, n_path, n_seg-1 ]</code> 
+   Size will be adjusted if not set correctly. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arma::Cube&lt;dtype&gt; *ray_y</code></b><br> 
+   Pointer to an Armadillo cube for the y-coordinates of the generated rays; Size: <code>[ n_pos, n_path, n_seg-1 ]</code> 
+   Size will be adjusted if not set correctly. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arma::Cube&lt;dtype&gt; *ray_z</code></b><br> 
+   Pointer to an Armadillo cube for the z-coordinates of the generated rays; Size: <code>[ n_pos, n_path, n_seg-1 ]</code> 
+   Size will be adjusted if not set correctly. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arma::Cube&lt;dtype&gt; *weight</code></b><br> 
+   Pointer to an Armadillo cube for the  weights; Size: <code>[ n_pos, n_path, n_seg ]</code> 
+   Size will be adjusted if not set correctly. 
+</li></ul>
+</li>
+</ul>
+    <!-- CONTENT END -->
+
+    <br>
+    <!-- <br> -->
+
+    <div id="quadriga-lib_sf_line"></div>
+
+  </div>
+
+</body>
+
+</html>

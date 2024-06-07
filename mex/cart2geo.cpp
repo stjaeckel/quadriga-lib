@@ -32,7 +32,7 @@ This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, e
 coordinates. A geographic coordinate system is a three-dimensional reference system that locates
 points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length
 where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle
-θ = 90◦ points to the zenith and θ = 0◦ points to the horizon.
+θ = 90° points to the zenith and θ = 0° points to the horizon.
 
 ## Usage:
 

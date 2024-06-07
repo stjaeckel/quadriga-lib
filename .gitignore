@@ -6,9 +6,8 @@ external/MOxUnit-master/
 external/pugixml-*/
 external/Catch2-*/
 external/hdf5-*/
+external/pybind11-*/
 tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
-tools/html_parts/*
 tools/extract_html_mex_api.py
-html_docu/*
