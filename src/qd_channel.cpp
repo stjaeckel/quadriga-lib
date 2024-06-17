@@ -1289,7 +1289,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
         H5Awrite(attribute_id, H5T_NATIVE_FLOAT, &data);
         H5Aclose(attribute_id);
     }
-    else if (center_frequency.n_elem == n_snap_arma) // Different for each snapshot
+    else if (center_frequency.n_elem == n_snap_arma && n_snap_arma != 0) // Different for each snapshot
     {
         dims[0] = (hsize_t)center_frequency.n_elem;
         dspace_id = H5Screate_simple(1, dims, NULL);
@@ -1318,7 +1318,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
         H5Awrite(attribute_id, H5T_NATIVE_FLOAT, data);
         H5Aclose(attribute_id);
     }
-    else if (tx_pos.n_cols == n_snap_arma)
+    else if (tx_pos.n_cols == n_snap_arma && n_snap_arma != 0)
     {
         dims[0] = tx_pos.n_cols;
         dims[1] = 3;
@@ -1348,7 +1348,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
         H5Awrite(attribute_id, H5T_NATIVE_FLOAT, data);
         H5Aclose(attribute_id);
     }
-    else if (rx_pos.n_cols == n_snap_arma)
+    else if (rx_pos.n_cols == n_snap_arma && n_snap_arma != 0)
     {
         dims[0] = rx_pos.n_cols;
         dims[1] = 3;
@@ -1378,7 +1378,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
         H5Awrite(attribute_id, H5T_NATIVE_FLOAT, data);
         H5Aclose(attribute_id);
     }
-    else if (tx_orientation.n_cols == n_snap_arma)
+    else if (tx_orientation.n_cols == n_snap_arma && n_snap_arma != 0)
     {
         dims[0] = tx_orientation.n_cols;
         dims[1] = 3;
@@ -1408,7 +1408,7 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
         H5Awrite(attribute_id, H5T_NATIVE_FLOAT, data);
         H5Aclose(attribute_id);
     }
-    else if (rx_orientation.n_cols == n_snap_arma)
+    else if (rx_orientation.n_cols == n_snap_arma && n_snap_arma != 0)
     {
         dims[0] = rx_orientation.n_cols;
         dims[1] = 3;
