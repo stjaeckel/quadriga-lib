@@ -1,5 +1,6 @@
 build/*
 lib/*
+.vscode/*
 +quadriga_lib/*.mex*
 external/armadillo-*/
 external/MOxUnit-master/
@@ -11,3 +12,4 @@ tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
 tools/extract_html_mex_api.py
+

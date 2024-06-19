@@ -19,6 +19,53 @@
 #include "quadriga_lib.hpp"
 #include "mex_helper_functions.cpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_WRITE_DSET
+Writes unstructured data to a HDF5 file
+
+## Description:
+Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. The function `quadriga_lib.hdf5_write_dset` writes a single unstructured dataset. 
+
+## Usage:
+
+```
+storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
+```
+
+## Input Arguments:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+- **`location`** (optional)<br>
+  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`, 
+  `[ix,iy,iz]` or `[ix,iy,iz,iw]`; Default: `ix = iy = iz = iw = 1`
+
+- **`name`**<br>
+  Name of the dataset; String
+
+- **`data`**<br>
+  Data to be written
+
+## Output Argument:
+- **`storage_dims`**<br>
+  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
+
+## Caveat:
+- Throws an error if dataset already exists at this location
+- Throws an error if file does not exist (use hdf5_create_file)
+- Supported types: string, double, float, (u)int32, (u)int64
+- Supported size: up to 3 dimensions
+- Storage order is maintained
+MD!*/
+
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:

@@ -25,7 +25,7 @@ SECTION!*/
 
 /*!MD
 # HDF5_READ_CHANNEL
-Read channel data from an HDF5 file
+Reads channel data from HDF5 files
 
 ## Description:
 Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 

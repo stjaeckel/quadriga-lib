@@ -21,6 +21,86 @@
 
 #include "python_helpers.cpp" // qd_python_anycast
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# HDF5_WRITE_CHANNEL
+Writes channel data to HDF5 files
+
+## Description:
+Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This function
+can be used to write structured and unstructured data to an HDF5 file.
+
+## Usage:
+
+```
+storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position, tx_position, ...
+   coeff_re, coeff_im, delay, center_freq, name, initial_pos, path_gain, path_length, ...
+   path_polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
+   rx_orientation, tx_orientation )
+```
+
+## Input Arguments:
+- **`fn`**<br>
+  Filename of the HDF5 file, string
+
+- **`ix`**<br>
+  Number of elements on the x-dimension, Default = 0
+
+- **`iy`**<br>
+  Number of elements on the x-dimension, Default = 0
+
+- **`iz`**<br>
+  Number of elements on the x-dimension, Default = 0
+
+- **`iw`**<br>
+  Number of elements on the x-dimension, Default = 0
+
+- **`par`**<br>
+  Dictionary of unstructured data, can be empty if no unstructured data should be written
+
+- **Structured data:** (double precision)
+  `rx_position`    | Receiver positions                                       | `[3, n_snap]` or `[3, 1]`
+  `tx_position`    | Transmitter positions                                    | `[3, n_snap]` or `[3, 1]`
+  `coeff`          | Channel coefficients, complex valued                     | `[n_rx, n_tx, n_path, n_snap]`
+  `delay`          | Propagation delays in seconds                            | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`
+  `center_freq`    | Center frequency in [Hz]                                 | `[n_snap, 1]` or scalar
+  `name`           | Name of the channel                                      | String
+  `initial_pos`    | Index of reference position, 1-based                     | uint32, scalar
+  `path_gain`      | Path gain before antenna, linear scale                   | `[n_path, n_snap]`
+  `path_length`    | Path length from TX to RX phase center in m              | `[n_path, n_snap]`
+  `polarization`   | Polarization transfer function, complex valued           | `[4, n_path, n_snap]`
+  `path_angles`    | Departure and arrival angles {AOD, EOD, AOA, EOA} in rad | `[n_path, 4, n_snap]`
+  `path_fbs_pos`   | First-bounce scatterer positions                         | `[3, n_path, n_snap]`
+  `path_lbs_pos`   | Last-bounce scatterer positions                          | `[3, n_path, n_snap]`
+  `no_interact`    | Number interaction points of paths with the environment  | uint32, `[n_path, n_snap]`
+  `interact_coord` | Interaction coordinates                                  | `[3, max(sum(no_interact)), n_snap]`
+  `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3, 1]`
+  `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3, 1]`
+
+## Output Arguments:
+- **`storage_dims`**<br>
+  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
+
+## Caveat:
+- If the file exists already, the new data is added to the exisiting file
+- If a new file is created, a storage layout is created to store the location of datasets in the file
+- For `location = [ix]` storage layout is `[65536,1,1,1]` or `[ix,1,1,1]` if (`ix > 65536`)
+- For `location = [ix,iy]` storage layout is `[1024,64,1,1]`
+- For `location = [ix,iy,iz]` storage layout is `[256,16,16,1]`
+- For `location = [ix,iy,iz,iw]` storage layout is `[128,8,8,8]`
+- You can create a custom storage layout by creating the file first using "`hdf5_create_file`"
+- You can reshape the storage layout by using "`hdf5_reshape_storage`", but the total number of elements must not change
+- Inputs can be empty or missing.
+- All structured data is written in single precision (but can can be provided as single or double)
+- Unstructured datatypes are maintained in the HDF file
+- Supported unstructured types: string, double, float, (u)int32, (u)int64
+- Supported unstructured size: up to 3 dimensions
+- Storage order of the unstructured data is maintained
+MD!*/
+
 pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
                                                unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                                                const pybind11::dict par,
@@ -57,61 +137,75 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
     }
 
     if (rx_pos.size() != 0)
-    {
-        pybind11::buffer_info buf = rx_pos.request();
-        if (buf.ndim != 2)
-            throw std::invalid_argument("'rx_pos' must be a Matrix (2 dimensions).");
-        c.rx_pos = arma::mat(reinterpret_cast<double *>(buf.ptr), buf.shape[0], buf.shape[1], false, true);
-    }
+        c.rx_pos = qd_python_NPArray_to_Mat(&rx_pos);
 
     if (tx_pos.size() != 0)
-    {
-        pybind11::buffer_info buf = tx_pos.request();
-        if (buf.ndim != 2)
-            throw std::invalid_argument("'tx_pos' must be a Matrix (2 dimensions).");
-        c.tx_pos = arma::mat(reinterpret_cast<double *>(buf.ptr), buf.shape[0], buf.shape[1], false, true);
-    }
+        c.tx_pos = qd_python_NPArray_to_Mat(&tx_pos);
 
     if (coeff.size() != 0)
-    {
-        pybind11::buffer_info buf = coeff.request();
-        std::complex<double> *ptr_python = reinterpret_cast<std::complex<double> *>(buf.ptr);
-
-        size_t n_rx = buf.shape[0];
-        size_t n_tx = (buf.ndim > 1) ? buf.shape[1] : 1;
-        size_t n_path = (buf.ndim > 2) ? buf.shape[2] : 1;
-        size_t n_snap = (buf.ndim > 3) ? buf.shape[3] : 1;
-
-        auto data_real = std::vector<arma::cube>();
-        auto data_imag = std::vector<arma::cube>();
-
-        for (size_t i_snap = 0; i_snap < n_snap; ++i_snap)
-        {
-            auto tmp_real = arma::cube(n_rx, n_tx, n_path, arma::fill::none);
-            auto tmp_imag = arma::cube(n_rx, n_tx, n_path, arma::fill::none);
-            double *ptr_real = tmp_real.memptr();
-            double *ptr_imag = tmp_imag.memptr();
-
-            for (size_t i = 0; i < n_rx * n_tx * n_path; ++i)
-            {
-                std::complex<double> value = ptr_python[i];
-                ptr_real[i] = value.real();
-                ptr_imag[i] = value.imag();
-            }
-
-            data_real.push_back(tmp_real);
-            data_imag.push_back(tmp_imag);
-        }
-
-        c.coeff_re = data_real;
-        c.coeff_im = data_imag;
-    }
+        qd_python_complexNPArray_to_2vectorCube(&coeff, 3, &c.coeff_re, &c.coeff_im);
 
     if (center_frequency.size() != 0)
+        c.center_frequency = qd_python_NPArray_to_Col(&center_frequency);
+
+    if (path_gain.size() != 0)
+        c.path_gain = qd_python_NPArray_to_vectorCol(&path_gain, 1);
+
+    if (path_length.size() != 0)
+        c.path_length = qd_python_NPArray_to_vectorCol(&path_length, 1);
+
+    if (path_polarization.size() != 0)
+        c.path_polarization = qd_python_complexNPArray_to_vectorMat(&path_polarization, 2);
+
+    if (path_angles.size() != 0)
+        c.path_angles = qd_python_NPArray_to_vectorMat(&path_angles, 2);
+
+    if (path_fbs_pos.size() != 0)
+        c.path_fbs_pos = qd_python_NPArray_to_vectorMat(&path_fbs_pos, 2);
+
+    if (path_lbs_pos.size() != 0)
+        c.path_lbs_pos = qd_python_NPArray_to_vectorMat(&path_lbs_pos, 2);
+
+    if (no_interact.size() != 0)
+        c.no_interact = qd_python_NPArray_to_vectorCol(&no_interact, 1);
+
+    if (interact_coord.size() != 0)
+        c.interact_coord = qd_python_NPArray_to_vectorMat(&interact_coord, 2);
+
+    if (rx_orientation.size() != 0)
+        c.rx_orientation = qd_python_NPArray_to_Mat(&rx_orientation);
+
+    if (tx_orientation.size() != 0)
+        c.tx_orientation = qd_python_NPArray_to_Mat(&tx_orientation);
+
+    arma::uword n_snap = c.n_snap();
+    if (delay.size() != 0)
     {
-        pybind11::buffer_info buf = center_frequency.request();
-        c.center_frequency = arma::vec(reinterpret_cast<double *>(buf.ptr), buf.size, false, true);
+        pybind11::buffer_info buf = delay.request();
+        size_t n_dim = (size_t)buf.ndim;
+        size_t n_cols = (n_dim < 2) ? 1 : (size_t)buf.shape[1];
+
+        if (n_dim == 2 && n_cols == n_snap) // Compact mode
+        {
+            auto tmp = qd_python_NPArray_to_vectorCube(&delay, 1);
+            for (auto &d : tmp)
+                c.delay.push_back(arma::cube(d.memptr(), 1, 1, d.n_elem, true));
+        }
+        else
+            c.delay = qd_python_NPArray_to_vectorCube(&delay, 3);
     }
+
+    // Prune the size of 'interact_coord'
+    if (c.no_interact.size() == (size_t)n_snap && c.no_interact.size() == c.interact_coord.size())
+        for (arma::uword s = 0; s < n_snap; ++s)
+        {
+            unsigned cnt = 0;
+            for (auto &d : c.no_interact[s])
+                cnt += d;
+
+            if (c.interact_coord[s].n_cols > (arma::uword)cnt)
+                c.interact_coord[s].resize(c.interact_coord[s].n_rows, (arma::uword)cnt);
+        }
 
     // Create HDF File if it dies not already exist
     auto storage_space = quadriga_lib::hdf5_read_layout(fn);
