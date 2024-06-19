@@ -25,43 +25,58 @@ namespace py = pybind11;
 #include "qpy_cart2geo.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_hdf5_create_file.cpp"
+#include "qpy_hdf5_read_channel.cpp"
+#include "qpy_hdf5_read_dset_names.cpp"
 #include "qpy_hdf5_read_layout.cpp"
 #include "qpy_hdf5_reshape_layout.cpp"
 #include "qpy_hdf5_write_channel.cpp"
+#include "qpy_hdf5_write_dset.cpp"
 
 PYBIND11_MODULE(quadriga_lib, m)
 {
-    m.def("cart2geo", &cart2geo, py::arg("cart"));
+      m.def("cart2geo", &cart2geo, py::arg("cart"));
 
-    m.def("icosphere", &icosphere, py::arg("n_div") = 1,
-          py::arg("radius") = 1.0, py::arg("direction_xyz") = false);
+      m.def("icosphere", &icosphere, py::arg("n_div") = 1,
+            py::arg("radius") = 1.0, py::arg("direction_xyz") = false);
 
-    m.def("hdf5_create_file", &hdf5_create_file, py::arg("fn"),
-          py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
+      m.def("hdf5_create_file", &hdf5_create_file, py::arg("fn"),
+            py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
 
-    m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
+      m.def("hdf5_read_channel", &hdf5_read_channel, py::arg("fn"),
+            py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+            py::arg("snap") = py::array_t<unsigned>());
 
-    m.def("hdf5_reshape_layout", &hdf5_reshape_layout, py::arg("fn"),
-          py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
+      m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
+            py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0);
 
-    m.def("hdf5_write_channel", &hdf5_write_channel, py::arg("fn"),
-          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
-          py::arg("par") = py::dict(),
-          py::arg("rx_pos") = py::array_t<double>(),
-          py::arg("tx_pos") = py::array_t<double>(),
-          py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
-          py::arg("delay") = py::array_t<double>(),
-          py::arg("center_frequency") = py::array_t<double>(),
-          py::arg("name") = "New channel",
-          py::arg("initial_position") = 0,
-          py::arg("path_gain") = py::array_t<double>(),
-          py::arg("path_length") = py::array_t<double>(),
-          py::arg("path_polarization") = py::array_t<std::complex<double>>(),
-          py::arg("path_angles") = py::array_t<double>(),
-          py::arg("path_fbs_pos") = py::array_t<double>(),
-          py::arg("path_lbs_pos") = py::array_t<double>(),
-          py::arg("no_interact") = py::array_t<unsigned>(),
-          py::arg("interact_coord") = py::array_t<double>(),
-          py::arg("rx_orientation") = py::array_t<double>(),
-          py::arg("tx_orientation") = py::array_t<double>());
+      m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
+
+      m.def("hdf5_reshape_layout", &hdf5_reshape_layout, py::arg("fn"),
+            py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
+
+      m.def("hdf5_write_channel", &hdf5_write_channel, py::arg("fn"),
+            py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+            py::arg("par") = py::dict(),
+            py::arg("rx_pos") = py::array_t<double>(),
+            py::arg("tx_pos") = py::array_t<double>(),
+            py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
+            py::arg("delay") = py::array_t<double>(),
+            py::arg("center_frequency") = py::array_t<double>(),
+            py::arg("name") = "New channel",
+            py::arg("initial_position") = 0,
+            py::arg("path_gain") = py::array_t<double>(),
+            py::arg("path_length") = py::array_t<double>(),
+            py::arg("path_polarization") = py::array_t<std::complex<double>>(),
+            py::arg("path_angles") = py::array_t<double>(),
+            py::arg("path_fbs_pos") = py::array_t<double>(),
+            py::arg("path_lbs_pos") = py::array_t<double>(),
+            py::arg("no_interact") = py::array_t<unsigned>(),
+            py::arg("interact_coord") = py::array_t<double>(),
+            py::arg("rx_orientation") = py::array_t<double>(),
+            py::arg("tx_orientation") = py::array_t<double>());
+
+      m.def("hdf5_write_dset", &hdf5_write_dset, py::arg("fn"),
+            py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+            py::arg("name"),
+            py::arg("data") = py::none());
 }

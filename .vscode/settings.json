@@ -132,6 +132,7 @@
         "span": "cpp",
         "__split_buffer": "cpp",
         "__locale": "cpp",
-        "locale": "cpp"
+        "locale": "cpp",
+        "__nullptr": "cpp"
     }
 }

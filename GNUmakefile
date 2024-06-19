@@ -367,6 +367,8 @@ clean:
 	- rm tests/test_cuda_bin
 	- rm -rf build
 	- rm -rf tests/python_tests/__pycache__
+	- rm -rf .pytest_cache
+	- rm -rf tests/.pytest_cache
 	- rm *.hdf5
 
 tidy: clean 

@@ -198,7 +198,7 @@ catch ME
     end
 end
 
-% Reading from a empty location
+% Reading from an empty location
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Reading dataset from empty location"); end
 par_names = quadriga_lib.hdf5_read_dset_names(fn,[12,2,2]);
@@ -209,7 +209,7 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Snapshot range for unstructured data"); end
 quadriga_lib.hdf5_read_channel(fn,1,2);
 
-% Trying to write a complex number should greate an error
+% Trying to write a complex number should generate an error
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Complex data should fail"); end
 parC.complex = 1 + 21i;
@@ -246,7 +246,7 @@ quadriga_lib.hdf5_write_channel(fn,[2,1,1,1],[],rx_pos,tx_pos);
 coeff_re = rand(3,2,5,3);
 coeff_im = rand(3,2,5,3);
 
-% Pssing only coeff_re should cause error
+% Passing only coeff_re should cause error
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Only real-valued coefficients"); end
 try
@@ -259,7 +259,7 @@ catch ME
     end
 end
 
-% Pssing only coeff_im should cause error
+% Passing only coeff_im should cause error
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Missing real-valued coefficients"); end
 try
@@ -272,7 +272,7 @@ catch ME
     end
 end
 
-% Pssing only coeff_re and coeff_im without delays should cause error
+% Passing only coeff_re and coeff_im without delays should cause error
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Missing delays"); end
 try
