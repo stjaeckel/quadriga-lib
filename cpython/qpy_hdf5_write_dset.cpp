@@ -46,16 +46,16 @@ quadriga_lib.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
   Filename of the HDF5 file, string
 
 - **`ix`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for x-dimension, Default = 0
 
 - **`iy`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for y-dimension, Default = 0
 
 - **`iz`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for z-dimension, Default = 0
 
 - **`iw`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for w-dimension, Default = 0
 
 - **`name`**<br>
   Name of the dataset; String
