@@ -47,16 +47,16 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
   Filename of the HDF5 file, string
 
 - **`ix`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for x-dimension, Default = 0
 
 - **`iy`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for y-dimension, Default = 0
 
 - **`iz`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for z-dimension, Default = 0
 
 - **`iw`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for w-dimension, Default = 0
 
 - **`par`**<br>
   Dictionary of unstructured data, can be empty if no unstructured data should be written

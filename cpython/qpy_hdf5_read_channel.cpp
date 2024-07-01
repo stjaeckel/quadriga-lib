@@ -54,16 +54,16 @@ data = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
   Filename of the HDF5 file, string
 
 - **`ix`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for x-dimension, Default = 0
 
 - **`iy`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for y-dimension, Default = 0
 
 - **`iz`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for z-dimension, Default = 0
 
 - **`iw`**<br>
-  Number of elements on the x-dimension, Default = 0
+  Storage index for w-dimension, Default = 0
 
 - **`snap`** (optional)<br>
   Snapshot range, 0-based notation; optional; vector, default: empty = read all
