@@ -277,7 +277,7 @@ class test_hdf_rw(unittest.TestCase):
         npt.assert_almost_equal( res["tx_orientation"][:,0], tx_orientation[:,2] )
         npt.assert_almost_equal( res["rx_orientation"][:,0], rx_orientation[:,2] )
 
-
+        os.remove(fn)
 
 if __name__ == '__main__':
     unittest.main()
