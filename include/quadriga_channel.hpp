@@ -37,9 +37,9 @@ namespace quadriga_lib
         arma::Mat<dtype> rx_pos;                         // Receiver positions, matrix of size [3, n_snap] or [3, 1]
         arma::Mat<dtype> tx_orientation;                 // Transmitter orientation, matrix of size [3, n_snap] or [3, 1] or []
         arma::Mat<dtype> rx_orientation;                 // Receiver orientation, matrix of size [3, n_snap] or [3, 1] or []
-        std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-        std::vector<arma::Cube<dtype>> coeff_im;         // Channel coefficients, imaginary part, vector (n_snap) of tensors of size [n_rx, n_tx, n_path]
-        std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of tensors of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+        std::vector<arma::Cube<dtype>> coeff_re;         // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+        std::vector<arma::Cube<dtype>> coeff_im;         // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+        std::vector<arma::Cube<dtype>> delay;            // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
         std::vector<arma::Col<dtype>> path_gain;         // Path gain before antenna patterns, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Col<dtype>> path_length;       // Absolute path length from TX to RX phase center, vector (n_snap) of vectors of length [n_path]
         std::vector<arma::Mat<dtype>> path_polarization; // Polarization transfer function, vector (n_snap) of matrices of size [8, n_path], interleaved complex
@@ -51,7 +51,7 @@ namespace quadriga_lib
         std::vector<std::string> par_names;              // Names of unstructured data fields
         std::vector<std::any> par_data;                  // Unstructured data of types {string, float, double, int, long int, arma::Col<dtype>, arma::Mat<dtype>, arma::Cube<dtype>}
         int initial_position = 0;                        // Index of reference position, values between 0 and n_snap-1 (mainly used internally)
-        channel(){};                                     // Default constructor
+        channel() {};                                    // Default constructor
 
         arma::uword n_snap() const; // Number of snapshots
         arma::uword n_rx() const;   // Number of receive antennas in coefficient matrix, returns 0 if there are no coefficients
@@ -144,6 +144,34 @@ namespace quadriga_lib
     void hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,
                          unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
                          std::string prefix = "par_");
+
+    // Compute the baseband frequency response of a single MIMO channel
+    // - Inputs are given in the time domain
+    // - Calculates the discrete Fourier transform of the coefficients
+    // - Outputs are returned in the frequency domain at the given sample positions
+    // - Uses AVX2 to accelerate the computations (calculate 2 carriers in parallel)
+    // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
+    // - Internal calculations are done in single precision
+    template <typename dtype>
+    void baseband_freq_response(const arma::Cube<dtype> *coeff_re,  // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> *coeff_im,  // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> *delay,     // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                const arma::Col<dtype> *pilot_grid, // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+                                const double bandwidth,              // The baseband bandwidth in [Hz]
+                                arma::Cube<dtype> *hmat_re,         // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
+                                arma::Cube<dtype> *hmat_im);        // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
+
+    // Compute the baseband frequency response of multiple MIMO channels
+    // - Uses OpenMP to process snapshots in parallel
+    template <typename dtype>
+    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                                    const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                                    const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                    const arma::Col<dtype> *pilot_grid,             // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+                                    const double bandwidth,                          // The baseband bandwidth in [Hz]
+                                    std::vector<arma::Cube<dtype>> *hmat_re,        // Output: Channel matrices (H), real part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
+                                    std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
+                                    const arma::Col<unsigned> *i_snap = nullptr);   // Snapshot indices, 0-based, optional, vector of length "n_out"
 
 }
 

@@ -164,6 +164,9 @@ build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.h
 build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_interpolate.hpp
 	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
 
+build/baseband_freq_response.o:   src/baseband_freq_response.cpp   include/quadriga_channel.hpp
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 build/qd_channel.o:   src/qd_channel.cpp   include/quadriga_channel.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(HDF5_H)
 
@@ -193,7 +196,7 @@ build/libhdf5.a:
 lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
 					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o \
-					  build/ray_point_intersect.o
+					  build/ray_point_intersect.o   build/baseband_freq_response.o
 		ar rcs $@ $^ $(HDF5_OBJ)
 
 build/%_link.o:   build/%.o
@@ -216,6 +219,7 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/arrayant_qdant_read.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mexa64:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/baseband_freq_response.mexa64:      build/baseband_freq_response.o
 +quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mexa64:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mexa64:                    build/quadriga_tools.o
@@ -260,6 +264,7 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/arrayant_qdant_read.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mex:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/baseband_freq_response.mex:      build/baseband_freq_response.o
 +quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mex:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mex:                    build/quadriga_tools.o

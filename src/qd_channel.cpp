@@ -208,7 +208,7 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
                 H5G_info_t group_info;
                 group_name = "/channel_" + std::to_string(channel_index);
                 hid_t group_id = H5Gopen(file_id, group_name.c_str(), H5P_DEFAULT);
-                
+
                 H5Gget_info(group_id, &group_info);
                 if (group_info.nlinks != 1)
                     create_new = true;
@@ -1012,9 +1012,8 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
             if (coeff_im[i].n_rows != n_rx || coeff_im[i].n_cols != n_tx || coeff_im[i].n_slices != n_pth[i])
                 return std::string("Size mismatch in 'coeff_im[" + std::to_string(i) + "]'.");
 
-            if ((delay[i].n_rows != 1 && delay[i].n_rows != n_rx) ||
-                (delay[i].n_cols != 1 && delay[i].n_cols != n_tx) ||
-                delay[i].n_slices != n_pth[i])
+            if (!(delay[i].n_rows == n_rx && delay[i].n_cols == n_tx && delay[i].n_slices == n_pth[i]) &&
+                !(delay[i].n_rows == 1 && delay[i].n_cols == 1 && delay[i].n_slices == n_pth[i]))
                 return std::string("Size mismatch in 'delay[" + std::to_string(i) + "]'.");
         }
     }

@@ -147,11 +147,7 @@ execution of this process, several pieces of input data are required:<br><br>
 - Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance
   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
   computation.
-
-
 MD!*/
-
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {

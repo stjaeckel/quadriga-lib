@@ -47,6 +47,7 @@ all:   dirs \
 	   +quadriga_lib\arrayant_qdant_read.mexw64 \
 	   +quadriga_lib\arrayant_qdant_write.mexw64 \
 	   +quadriga_lib\arrayant_rotate_pattern.mexw64 \
+	   +quadriga_lib/baseband_freq_response.mexw64 \
 	   +quadriga_lib\calc_diffraction_gain.mexw64 \
 	   +quadriga_lib\calc_rotation_matrix.mexw64 \
 	   +quadriga_lib\cart2geo.mexw64 \
@@ -101,6 +102,9 @@ build\qd_arrayant_qdant.obj:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_qdant
 build\qd_arrayant_interpolate.obj:   src\qd_arrayant_interpolate.cpp   src\qd_arrayant_interpolate.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
+build\baseband_freq_response.obj:   src\baseband_freq_response.cpp   include\quadriga_channel.hpp
+	$(CC) /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 build\qd_channel.obj:   src\qd_channel.cpp   include\quadriga_channel.hpp
 	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H) /I$(HDF5)\include
 
@@ -126,7 +130,7 @@ build\libhdf5.lib:
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
 						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\calc_diffraction_gain.obj \
-						build\libhdf5.lib   build\ray_point_intersect.obj
+						build\libhdf5.lib   build\ray_point_intersect.obj   build\baseband_freq_response.obj
     lib /OUT:$@ $**
 
 # MEX MATLAB interface
@@ -146,6 +150,9 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\arrayant_qdant_write.mexw64:   mex\arrayant_qdant_write.cpp   build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   build\quadriga_tools.obj
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
++quadriga_lib\baseband_freq_response.mexw64:   mex\baseband_freq_response.cpp   build\baseband_freq_response.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\calc_diffraction_gain.mexw64:   mex\calc_diffraction_gain.cpp   build\calc_diffraction_gain.obj   build\quadriga_tools.obj   build\ray_triangle_intersect.obj   build\ray_mesh_interact.obj

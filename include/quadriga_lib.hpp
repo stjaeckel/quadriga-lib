@@ -27,7 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_1_13
+#define QUADRIGA_LIB_VERSION v0_1_14
 
 namespace quadriga_lib
 {
