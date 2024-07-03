@@ -41,7 +41,8 @@ Transforms the channel into frequency domain and returns the frequency response
   Channel coefficients, imaginary part, Size: `[ n_rx, n_tx, n_path, n_snap ]`
 
 - **`delays`**<br>
-  Propagation delay in seconds, Size: `[ n_rx, n_tx, n_path, n_snap ]` or `[ 1, 1, n_path, n_snap ]`
+  Propagation delay in seconds, Size: `[ n_rx, n_tx, n_path, n_snap ]` or `[ 1, 1, n_path, n_snap ]` 
+  or `[ n_path, n_snap ]`
 
 - **`pilot_grid`**<br>
   Sub-carrier positions relative to the bandwidth. The carrier positions are given relative to the
@@ -109,15 +110,37 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         coeff_re_single = qd_mex_matlab2vector_Cube<float>(prhs[0], 3);
         coeff_im_single = qd_mex_matlab2vector_Cube<float>(prhs[1], 3);
-        delay_single = qd_mex_matlab2vector_Cube<float>(prhs[2], 3);
         pilot_grid_single = qd_mex_reinterpret_Col<float>(prhs[3]);
+
+        size_t n_snap = coeff_re_single.size();
+        size_t n_dim = (size_t)mxGetNumberOfDimensions(prhs[2]);
+        size_t n_cols = (size_t)mxGetN(prhs[2]);
+        if (n_dim == 2 && n_cols == n_snap)
+        {
+            auto tmp = qd_mex_matlab2vector_Cube<float>(prhs[2], 1);
+            for (auto &d : tmp)
+                delay_single.push_back(arma::Cube<float>(d.memptr(), 1, 1, d.n_elem, true));
+        }
+        else
+            delay_single = qd_mex_matlab2vector_Cube<float>(prhs[2], 3);
     }
     else
     {
         coeff_re_double = qd_mex_matlab2vector_Cube<double>(prhs[0], 3);
         coeff_im_double = qd_mex_matlab2vector_Cube<double>(prhs[1], 3);
-        delay_double = qd_mex_matlab2vector_Cube<double>(prhs[2], 3);
         pilot_grid_double = qd_mex_reinterpret_Col<double>(prhs[3]);
+
+        size_t n_snap = coeff_re_double.size();
+        size_t n_dim = (size_t)mxGetNumberOfDimensions(prhs[2]);
+        size_t n_cols = (size_t)mxGetN(prhs[2]);
+        if (n_dim == 2 && n_cols == n_snap)
+        {
+            auto tmp = qd_mex_matlab2vector_Cube<double>(prhs[2], 1);
+            for (auto &d : tmp)
+                delay_double.push_back(arma::Cube<double>(d.memptr(), 1, 1, d.n_elem, true));
+        }
+        else
+            delay_double = qd_mex_matlab2vector_Cube<double>(prhs[2], 3);
     }
 
     double bandwidth = qd_mex_get_scalar<double>(prhs[4], "bandwidth");
