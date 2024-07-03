@@ -135,6 +135,8 @@
         "__locale": "cpp",
         "locale": "cpp",
         "__nullptr": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }
