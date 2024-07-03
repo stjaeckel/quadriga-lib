@@ -59,6 +59,8 @@ namespace quadriga_lib
                        const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
                        arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
 
+
+
     // ----  Site-Specific Simulation Tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
@@ -264,16 +266,16 @@ namespace quadriga_lib
     // - If the input "dest" is not given, the corresponding output "destN" will be empty
     // - Returns the number of rays in the output 'n_rayN'
     template <typename dtype>
-    size_t subdivide_rays(const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
-                          const arma::Mat<dtype> *trivec,                // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
-                          const arma::Mat<dtype> *tridir,                // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
-                          const arma::Mat<dtype> *dest = nullptr,        // Ray destination points in GCS, Size [ n_ray, 3 ]
-                          arma::Mat<dtype> *origN = nullptr,             // New ray origin points in GCS, Size [ n_rayN, 3 ]
-                          arma::Mat<dtype> *trivecN = nullptr,           // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
-                          arma::Mat<dtype> *tridirN = nullptr,           // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
-                          arma::Mat<dtype> *destN = nullptr,             // New ray destination points in GCS, Size [ n_rayN, 3 ]
-                          const arma::Col<unsigned> *index = nullptr,    // Optional list of indices, 0-based, Length [ n_ind ]
-                          const double ray_offset = 0.0);                // Offset of new ray origin from face plane
+    size_t subdivide_rays(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
+                          const arma::Mat<dtype> *trivec,             // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
+                          const arma::Mat<dtype> *tridir,             // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
+                          const arma::Mat<dtype> *dest = nullptr,     // Ray destination points in GCS, Size [ n_ray, 3 ]
+                          arma::Mat<dtype> *origN = nullptr,          // New ray origin points in GCS, Size [ n_rayN, 3 ]
+                          arma::Mat<dtype> *trivecN = nullptr,        // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
+                          arma::Mat<dtype> *tridirN = nullptr,        // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
+                          arma::Mat<dtype> *destN = nullptr,          // New ray destination points in GCS, Size [ n_rayN, 3 ]
+                          const arma::Col<unsigned> *index = nullptr, // Optional list of indices, 0-based, Length [ n_ind ]
+                          const double ray_offset = 0.0);             // Offset of new ray origin from face plane
 
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision

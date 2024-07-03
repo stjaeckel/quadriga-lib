@@ -36,6 +36,7 @@
         "ndiv",
         "numpy",
         "permutevar",
+        "phasor",
         "pybind11",
         "randu",
         "Raphson",
@@ -133,6 +134,7 @@
         "__split_buffer": "cpp",
         "__locale": "cpp",
         "locale": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "valarray": "cpp"
     }
 }

@@ -85,6 +85,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Transforms the channel into frequency domain and returns the frequency response</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
@@ -124,6 +125,53 @@ import quadriga_lib
 <font size=+1><b>Channel functions</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="baseband_freq_response"></a>
+<b>baseband_freq_response</b> - Transforms the channel into frequency domain and returns the frequency response
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+hmat = quadriga_lib.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff</code></b><br> 
+   Channel coefficients, complex-valued, Size: <code>[ n_rx, n_tx, n_path, n_snap ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>delay</code></b><br> 
+   Propagation delay in seconds, Size: <code>[ n_rx, n_tx, n_path, n_snap ]</code> or <code>[ 1, 1, n_path, n_snap ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>bandwidth</code></b><br> 
+   The baseband bandwidth in [Hz], scalar 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>carriers</code></b> (optional)<br> 
+   Number of carriers, equally spaced across the bandwidth. The first entry of the generated spectrum  
+   is equal to the center frequency f0. The spectrum is generated from f0 to f0+bandwidth. This 
+   argument is only evaluated if <code>pilot_grid</code> is not provided. Default value = 128 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>pilot_grid</code></b> (optional)<br> 
+   Sub-carrier positions relative to the bandwidth. The carrier positions are given relative to the 
+   bandwidth where '0' is the begin of the spectrum (i.e., the center frequency f0) and '1' is 
+   equal to f0+bandwidth. To obtain the channel frequency response centered around f0, the 
+   input variable 'pilot_grid' must be set to '(-N/2:N/2)/N', where N is the number of sub- 
+   carriers. Vector of length: <code>[ n_carriers ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>snap</code></b> (optional)<br> 
+   Snapshot indices for which the frequency response should be generated (1-based index). If this 
+   variable is not given, all snapshots are processed. Length: <code>[ n_out ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat</code></b><br> 
+   Freq. domain channel matrices (H), complex-valued, Size <code>[ n_rx, n_tx, n_carriers, n_out ]</code> 
+</li></ul>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_create_file"></a>
 <b>hdf5_create_file</b> - Create a new HDF5 channel file with a custom storage layout

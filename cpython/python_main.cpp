@@ -22,6 +22,7 @@
 namespace py = pybind11;
 
 // Include parts
+#include "qpy_baseband_freq_response.cpp"
 #include "qpy_cart2geo.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_hdf5_create_file.cpp"
@@ -34,6 +35,14 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(quadriga_lib, m)
 {
+      m.def("baseband_freq_response", &baseband_freq_response,
+            py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
+            py::arg("delay") = py::array_t<double>(),
+            py::arg("bandwidth"),
+            py::arg("carriers") = 128,
+            py::arg("pilot_grid") = py::array_t<double>(),
+            py::arg("snap") = py::array_t<unsigned>());
+
       m.def("cart2geo", &cart2geo, py::arg("cart"));
 
       m.def("icosphere", &icosphere, py::arg("n_div") = 1,
