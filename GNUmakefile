@@ -126,6 +126,7 @@ dirs:
 	mkdir -p build
 	mkdir -p lib
 	mkdir -p +quadriga_lib
+	mkdir -p release
 
 mex_matlab:      $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
 mex_matlab_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mexa64)
@@ -206,7 +207,9 @@ lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_comp
 	ar rcs $@ $^
 
 # Python interface
-python: $(PYTHON_TARGET)
+python: 
+	@$(MAKE) dirs
+	@$(MAKE) $(PYTHON_TARGET)
 
 lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadriga_lib.a $(cpython)
 	$(CC) -shared $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
@@ -384,6 +387,7 @@ tidy: clean
 	- rm -rf external/pybind11-$(pybind11_version)
 	- rm -rf external/MOxUnit-master
 	- rm -rf +quadriga_lib
+	- rm -rf release
 	- rm -rf lib
 	
 build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
@@ -412,6 +416,7 @@ package:  all  build/quadriga-lib-version
 	cp -R tests release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R tools release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R html_docu release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R cpython release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp GNUmakefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp LICENSE release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp Makefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
