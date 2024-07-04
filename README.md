@@ -16,31 +16,32 @@ This library implements an interface to both, Matlab and Octave as well as to c+
 |:---|:---|
 `+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
 `build` | Folder for temporary build files
+`cpython` | Source files for the Python API
 `external` | External tools used in the project
 `include` | Public header files for the `quadriga-lib` library
 `lib` | Library files for static linking
 `mex` | Source files for the MEX interface
-`release` | Precompiled versions of `quadriga-lib`
 `src` | C++ source files and private header files
 `tests` | Test files
 `tools` | Other tools used in the project
 
-## Compilation
+## Installation
 
 Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are already included in the `release` folder. To use them e.g. in QuaDRiGa-NG (https://github.com/stjaeckel/QuaDRiGa-NG), simply add the arrayant_lib folder to your MATLAB/Octave path.
 
 ### Linux / Ubuntu
 
-* [**OPTIONAL**]: Install Octave 8.0 (or higher) from https://octave.org or use the system package installer
 * [**OPTIONAL**]: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
-* Open the `GNUmakefile` (e.g. by `gedit GNUmakefile`)
-* Set the compiler paths for your system (`CC`, `MEX` and `OCT` variables)
-* Remove the unwanted targets in the all section (e.g. if only octave is needed, remove `mex_matlab`)
-* [**OPTIONAL**]: Compile the HDF5 library by running `make hdf5lib`
-* Run `make` to compile `quadriga-lib` and the MEX Matlab / Octave interface
-* [**OPTIONAL**]: Compile the Catch2 unit testing library by running `make catch2lib`
-* [**OPTIONAL**]: Compile and run the unit tests by running `make test`
-
+* Install dependencies (Python3 and Octave are optional): 
+```
+sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev
+```
+* Clone quadiga-lib from GitHub: `git clone https://github.com/stjaeckel/quadriga-lib`
+* Change to quadriga-lib folder: `cd quadriga-lib`
+* Build external modules: `make external`
+* Build Quadriga-Lib: `make -j16`
+* [**OPTIONAL**]: Generate documentation: `make documentation`
+* [**OPTIONAL**]: Run tests: `make test`
 
 ### Windows
 * Octave is not supported (only MATLAB is)
@@ -50,21 +51,10 @@ Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are al
 * If error: https://yingzhouli.com/posts/2020-06/mex-msvc.html
 * Open "x64 Native Tools Command Prompt" from start menu
 * Navigate to library path, e.g. `cd Z:\quadriga-lib`
-* Open the `Makefile` (e.g. by `notepad Makefile`) set the correct MATLAB mex path 
-* Compile the HDF5 library by running `nmake hdf5lib`
+* Build external modules: `nmake external`
 * Run `nmake` to compile `quadriga-lib` and the MEX Matlab interface
-* [**OPTIONAL**]: To compile the Catch2 library, you need NSIS (https://nsis.sourceforge.io)
-* [**OPTIONAL**]: Compile the Catch2 unit testing library by running `nmake catch2lib`
 * [**OPTIONAL**]: Compile and run the unit tests by running `nmake test`
 
-
-### Pugixml Library
-* pugixml (https://pugixml.org) is used to read/write QDANT-Files
-* It can be used in "header-only" mode
-* Extract the "`pugixml-1.13.tar.gz`" into external
-* Navigate to "`external/pugixml-1.13/src`" and open the file "`pugiconfig.hpp`"
-* Uncomment the line "`#define PUGIXML_HEADER_ONLY`"
-* Make sure the correct path is set in the "GNUMakefile" (Linux) and/or "Makefile" (Windows)
 
 ## Distribution License
 

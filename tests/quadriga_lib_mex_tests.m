@@ -1,5 +1,15 @@
 function quadriga_lib_mex_tests
 
+% Qudriga-lib path
+tmp = which('quadriga_lib.version');
+if isempty(strfind(tmp,'+quadriga_lib/version.mex'))
+    current_dir = pwd;
+    cd('../');
+    current_dir2 = pwd;
+    addpath(current_dir2)
+    cd(current_dir);
+end 
+
 % MOxUnit Setup
 tmp = which('MOxUnitTestSuite');
 if isempty(tmp)
