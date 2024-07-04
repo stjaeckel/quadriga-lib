@@ -9,6 +9,7 @@ external/pugixml-*/
 external/Catch2-*/
 external/hdf5-*/
 external/pybind11-*/
+release/
 tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
