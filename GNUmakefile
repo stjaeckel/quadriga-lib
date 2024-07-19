@@ -408,6 +408,7 @@ package:  all  build/quadriga-lib-version
 	cp external/pugixml-$(pugixml_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp external/Catch2-$(catch2_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp external/hdf5-*.zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
+	cp external/pybind11-$(pybind11_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp external/MOxUnit.zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp -R include release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R mex release/quadriga_lib-$(shell build/quadriga-lib-version)/
