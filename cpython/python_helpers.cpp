@@ -850,6 +850,10 @@ inline pybind11::array_t<std::complex<dtype>> qd_python_vectorMat_to_complexNPAr
         arma::uword r = input->at(k).n_rows / 2, c = input->at(k).n_cols;
         const dtype *ptr_i = input->at(k).memptr();
 
+        if (r * c != m)
+            for (std::complex<dtype> *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
+                (*p).real(0.0), (*p).imag(0.0);
+
         for (arma::uword ic = 0; ic < c; ++ic)
             for (arma::uword ir = 0; ir < r; ++ir)
             {
@@ -974,6 +978,10 @@ inline pybind11::array_t<std::complex<dtype>> qd_python_2vectorCubes_to_complexN
     {
         arma::uword k = (js[i] >= (arma::uword)input_re->size()) ? 0 : js[i];
         arma::uword r = input_re->at(k).n_rows, c = input_re->at(k).n_cols, s = input_re->at(k).n_slices;
+
+        if (r * c * s != m)
+            for (std::complex<dtype> *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
+                (*p).real(0.0), (*p).imag(0.0);
 
         const dtype *ptr_i_re = input_re->at(k).memptr();
         const dtype *ptr_i_im = input_im->at(k).memptr();
