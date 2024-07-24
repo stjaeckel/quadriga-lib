@@ -172,7 +172,7 @@ build/qd_channel.o:   src/qd_channel.cpp   include/quadriga_channel.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(HDF5_H)
 
 build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
-	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
@@ -181,23 +181,37 @@ build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_point_intersect.o:   src/ray_point_intersect.cpp   include/quadriga_tools.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/get_CUDA_compute_capability.o:   src/get_CUDA_compute_capability.cu   include/quadriga_CUDA_tools.cuh
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
+# AVX2 library files
+build/quadriga_lib_test_avx.o:   src/quadriga_lib_test_avx.cpp   src/quadriga_lib_test_avx.hpp
+	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src 
+
+build/ray_triangle_intersect_avx2.o:   src/ray_triangle_intersect_avx2.cpp   src/ray_triangle_intersect_avx2.hpp
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I $(ARMA_H)
+
+build/ray_point_intersect_avx2.o:   src/ray_point_intersect_avx2.cpp   src/ray_point_intersect_avx2.hpp
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src
+
+build/baseband_freq_response_avx2.o:   src/baseband_freq_response_avx2.cpp   src/baseband_freq_response_avx2.hpp
+	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src
 
 # Archive file for static linking
 build/libhdf5.a:
 	cp external/hdf5-$(hdf5_version)-Linux/lib/libhdf5.a build/
 	( cd build/ && ar x libhdf5.a && cd .. )
 
-lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/qd_arrayant.o  build/qd_channel.o   \
+lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/quadriga_lib_test_avx.o  build/qd_arrayant.o  build/qd_channel.o   \
                       build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o \
-					  build/ray_point_intersect.o   build/baseband_freq_response.o
+					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o  build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o \
+					  build/ray_point_intersect.o   build/baseband_freq_response.o  build/ray_point_intersect_avx2.o   \
+					  build/baseband_freq_response_avx2.o
 		ar rcs $@ $^ $(HDF5_OBJ)
 
 build/%_link.o:   build/%.o
@@ -222,8 +236,8 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/arrayant_qdant_read.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mexa64:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/baseband_freq_response.mexa64:      build/baseband_freq_response.o
-+quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
++quadriga_lib/baseband_freq_response.mexa64:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
++quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mexa64:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mexa64:                    build/quadriga_tools.o
 +quadriga_lib/generate_diffraction_paths.mexa64:  build/quadriga_tools.o
@@ -246,12 +260,12 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/point_cloud_aabb.mexa64:            build/quadriga_tools.o
 +quadriga_lib/point_cloud_segmentation.mexa64:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/quadriga_tools.o
-+quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o
++quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   build/quadriga_tools.o
++quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
 +quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_aabb.mexa64:          build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_segmentation.mexa64:  build/quadriga_tools.o
-+quadriga_lib/version.mexa64:                     build/quadriga_lib.o
++quadriga_lib/version.mexa64:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
 +quadriga_lib/%.mexa64:   mex/%.cpp
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN)
@@ -267,8 +281,8 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/arrayant_qdant_read.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_qdant_write.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
 +quadriga_lib/arrayant_rotate_pattern.mex:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/baseband_freq_response.mex:      build/baseband_freq_response.o
-+quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_mesh_interact.o
++quadriga_lib/baseband_freq_response.mex:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
++quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mex:        build/quadriga_tools.o
 +quadriga_lib/cart2geo.mex:                    build/quadriga_tools.o
 +quadriga_lib/generate_diffraction_paths.mex:  build/quadriga_tools.o
@@ -291,12 +305,12 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 +quadriga_lib/point_cloud_aabb.mex:            build/quadriga_tools.o
 +quadriga_lib/point_cloud_segmentation.mex:    build/quadriga_tools.o
 +quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/quadriga_tools.o
-+quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o
++quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   build/quadriga_tools.o
++quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
 +quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_aabb.mex:          build/quadriga_tools.o
 +quadriga_lib/triangle_mesh_segmentation.mex:  build/quadriga_tools.o
-+quadriga_lib/version.mex:                     build/quadriga_lib.o
++quadriga_lib/version.mex:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
 +quadriga_lib/%.mex:   mex/%.cpp
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s 

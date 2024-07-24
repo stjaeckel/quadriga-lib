@@ -112,25 +112,36 @@ build\quadriga_tools.obj:   src\quadriga_tools.cpp   include\quadriga_tools.hpp
 	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\quadriga_lib.obj:   src\quadriga_lib.cpp   include\quadriga_lib.hpp
-	$(CC) /arch:AVX2 $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_mesh_interact.obj:   src\ray_mesh_interact.cpp   include\quadriga_tools.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_point_intersect.obj:   src\ray_point_intersect.cpp   include\quadriga_tools.hpp
-	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC) /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
 build\ray_triangle_intersect.obj:   src\ray_triangle_intersect.cpp   include\quadriga_tools.hpp
-	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+	$(CC)  /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
+# AVX2 library files
+build\quadriga_lib_test_avx.obj:   src\quadriga_lib_test_avx.cpp   src\quadriga_lib_test_avx.hpp
+	$(CC) /arch:AVX2 $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Isrc
+
+build\ray_triangle_intersect_avx2.obj:   src\ray_triangle_intersect_avx2.cpp   src\ray_triangle_intersect_avx2.hpp
+	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Isrc /I$(ARMA_H)
+
+build\ray_point_intersect_avx2.obj:   src\ray_point_intersect_avx2.cpp   src\ray_point_intersect_avx2.hpp
+	$(CC) /arch:AVX2 /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Isrc
 
 # Archive file for static linking
 build\libhdf5.lib:
    lib /OUT:$@ $(HDF5)\lib\libhdf5.lib Shlwapi.lib
 
-lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
+lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\quadriga_lib_test_avx.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
 						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\calc_diffraction_gain.obj \
-						build\libhdf5.lib   build\ray_point_intersect.obj   build\baseband_freq_response.obj
+						build\libhdf5.lib   build\ray_point_intersect.obj   build\baseband_freq_response.obj   \
+						build\ray_triangle_intersect_avx2.obj   build\ray_point_intersect_avx2.obj
     lib /OUT:$@ $**
 
 # MEX MATLAB interface
@@ -155,7 +166,7 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 +quadriga_lib\baseband_freq_response.mexw64:   mex\baseband_freq_response.cpp   build\baseband_freq_response.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib\calc_diffraction_gain.mexw64:   mex\calc_diffraction_gain.cpp   build\calc_diffraction_gain.obj   build\quadriga_tools.obj   build\ray_triangle_intersect.obj   build\ray_mesh_interact.obj
++quadriga_lib\calc_diffraction_gain.mexw64:   mex\calc_diffraction_gain.cpp   build\calc_diffraction_gain.obj   build\quadriga_tools.obj   build\ray_triangle_intersect.obj   build\ray_mesh_interact.obj   build\ray_triangle_intersect_avx2.obj
    $(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\arrayant_rotate_pattern.mexw64:   mex\arrayant_rotate_pattern.cpp   build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   build\quadriga_tools.obj
@@ -224,10 +235,10 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 +quadriga_lib\ray_mesh_interact.mexw64:   mex\ray_mesh_interact.cpp   build\ray_mesh_interact.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib\ray_point_intersect.mexw64:   mex\ray_point_intersect.cpp   build\ray_point_intersect.obj   build\quadriga_tools.obj
++quadriga_lib\ray_point_intersect.mexw64:   mex\ray_point_intersect.cpp   build\ray_point_intersect.obj   build\quadriga_tools.obj   build\ray_point_intersect_avx2.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib\ray_triangle_intersect.mexw64:   mex\ray_triangle_intersect.cpp   build\ray_triangle_intersect.obj
++quadriga_lib\ray_triangle_intersect.mexw64:   mex\ray_triangle_intersect.cpp   build\ray_triangle_intersect.obj   build\ray_triangle_intersect_avx2.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\subdivide_triangles.mexw64:   mex\subdivide_triangles.cpp   build\quadriga_tools.obj
@@ -239,7 +250,7 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\qd_arrayant.obj   build\q
 +quadriga_lib\triangle_mesh_segmentation.mexw64:   mex\triangle_mesh_segmentation.cpp   build\quadriga_tools.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
-+quadriga_lib\version.mexw64:   mex\version.cpp   build\quadriga_lib.obj
++quadriga_lib\version.mexw64:   mex\version.cpp   build\quadriga_lib.obj   build\quadriga_lib_test_avx.obj
  	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 # Maintainance section
