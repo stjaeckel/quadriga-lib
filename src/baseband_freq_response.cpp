@@ -15,10 +15,10 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <immintrin.h>
 #include <cstring> // For std::memcopy
 #include <cmath>   // For std::isnan
 #include "quadriga_channel.hpp"
+#include "baseband_freq_response_avx2.hpp"
 
 // Vector size for AVX2
 #define VEC_SIZE 8
@@ -31,65 +31,18 @@
 #include <cpuid.h>
 #endif
 
-#if defined(__AVX2__) // Compiler support for AVX2
-
 static bool isAVX2Supported()
 {
     std::vector<int> cpuidInfo(4);
 
 #if defined(_MSC_VER) // Windows
-    __cpuidex(cpuidInfo.data(), 7, 0);
+    return false;
 #else // Linux
     __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
 #endif
 
     return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
 }
-
-#include "avx_mathfun.h"
-
-// AVX2 accelerated implementation of DFT
-template <typename dtype>
-static inline void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Size [n_ant, n_path]
-                               const dtype *CFi,       // Channel coefficients, imaginary part, Size [n_ant, n_path]
-                               const dtype *DL,        // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
-                               const size_t n_ant,     // Number of MIMO sub-links
-                               const size_t n_path,    // Number multipath components
-                               const bool planar_wave, // Indicator that same delays are used for all antennas
-                               const float *phasor,    // Phasor, -pi/2 to pi/2, aligned to 32 byte, Size [ n_carrier ]
-                               const size_t n_carrier, // Number of carriers, mutiple of 8
-                               float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
-                               float *Hi)              // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
-{
-    for (size_t i_path = 0; i_path < n_path; ++i_path) // Path loop
-        for (size_t i_ant = 0; i_ant < n_ant; ++i_ant) // Antenna loop
-        {
-            size_t i = i_path * n_ant + i_ant;
-            __m256 cr = _mm256_set1_ps((float)CFr[i]);
-            __m256 ci = _mm256_set1_ps((float)CFi[i]);
-            __m256 dl = planar_wave ? _mm256_set1_ps((float)DL[i_path]) : _mm256_set1_ps((float)DL[i]);
-
-            for (size_t i_carrier = 0; i_carrier < n_carrier; i_carrier += VEC_SIZE)
-            {
-                __m256 xmm0 = _mm256_load_ps(&phasor[i_carrier]); // Load phasor
-                xmm0 = _mm256_mul_ps(xmm0, dl);                   // Multiply with delay
-                __m256 xmm1, xmm2;                                // Registers to store the sine and cosine
-                sincos256_ps(xmm0, &xmm1, &xmm2);                 // Calculate sine and cosine
-
-                size_t o = i_ant * n_carrier + i_carrier;
-                xmm0 = _mm256_load_ps(&Hr[o]);           // Load previous Hr
-                xmm0 = _mm256_fnmadd_ps(xmm1, ci, xmm0); // Hr - si * ci
-                xmm0 = _mm256_fmadd_ps(xmm2, cr, xmm0);  // Hr + co * cr - si * ci
-                _mm256_store_ps(&Hr[o], xmm0);           // Update Hr in memory
-
-                xmm0 = _mm256_load_ps(&Hi[o]);          // Load previous Hi
-                xmm0 = _mm256_fmadd_ps(xmm1, cr, xmm0); // Hi + si * cr
-                xmm0 = _mm256_fmadd_ps(xmm2, ci, xmm0); // Hi + co * ci + si * cr
-                _mm256_store_ps(&Hi[o], xmm0);          // Update Hi in memory
-            }
-        }
-}
-#endif
 
 // Generic C++ implementation of DFT
 template <typename dtype>
@@ -191,7 +144,11 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
         Hr[i] = 0.0f, Hi[i] = 0.0f;
 
         // Call DFT function
-#if defined(__AVX2__)      // Compiler support for AVX2
+#if defined(_MSC_VER) // Windows
+    qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
+                   n_ant_t, (size_t)n_path, planar_wave,
+                   phasor, n_carrier_s, Hr, Hi);
+#else // Linux
     if (isAVX2Supported()) // CPU support for AVX2
     {
         qd_DFT_AVX2(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
@@ -204,10 +161,6 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
                        n_ant_t, (size_t)n_path, planar_wave,
                        phasor, n_carrier_s, Hr, Hi);
     }
-#else
-    qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                   n_ant_t, (size_t)n_path, planar_wave,
-                   phasor, n_carrier_s, Hr, Hi);
 #endif
 
 #if defined(_MSC_VER) // Windows

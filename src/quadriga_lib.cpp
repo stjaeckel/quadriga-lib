@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <immintrin.h>
 #include "quadriga_lib.hpp"
-
-// Vector size for AVX2
-#define VEC_SIZE 8
+#include "quadriga_lib_test_avx.hpp"
 
 // Template for time measuring:
 // #include <chrono>
@@ -88,16 +85,10 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
     for (size_t i = 0; i < 8; ++i)
         Z[i] = 0.0f;
 
-#if defined(__AVX2__)      // Compiler support for AVX2
     if (isAVX2Supported()) // CPU support for AVX2
     {
-        __m256 tx = _mm256_load_ps(X);
-        __m256 ty = _mm256_load_ps(&X[8]);
-        const __m256 r2 = _mm256_set1_ps(2.0f);
-        __m256 z = _mm256_fmadd_ps(tx, ty, r2);
-        _mm256_store_ps(Z, z);
+        quadriga_lib::avx2_test(X, Z);
     }
-#endif
 
     // Free aligned memory
 #if defined(_MSC_VER) // Windows
