@@ -20,11 +20,11 @@
 
 // Perform a simple test calculation
 void quadriga_lib::avx2_test(const float *X, // Aligned memory, 16 floats
-                             float *Z)       // Aligned memory, 8 floats
+                             float *Z)       // 8 floats
 {
     __m256 tx = _mm256_load_ps(X);
     __m256 ty = _mm256_load_ps(&X[8]);
     const __m256 r2 = _mm256_set1_ps(2.0f);
     __m256 z = _mm256_fmadd_ps(tx, ty, r2);
-    _mm256_store_ps(Z, z);
+    _mm256_storeu_ps(Z, z); // Unaligned store
 }
