@@ -116,8 +116,8 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     for (size_t a = 1; a < n_elevation; ++a)
         el_diff[a] = one / (p_elevation_grid[a] - p_elevation_grid[a - 1]);
 
-// Interpolate the pattern data using spheric interpolation
-// datatype "int" is required by MSVC to allow parallel for
+        // Interpolate the pattern data using spheric interpolation
+        // datatype "int" is required by MSVC to allow parallel for
 #pragma omp parallel for
     for (int a_i32 = 0; a_i32 < (int)n_ang; ++a_i32)
     {
@@ -257,15 +257,15 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
             {
                 dtype fAr, fBr, fCr, fDr, fAi, fBi, fCi, fDi;
                 if (VH == 0) // Read the pattern values
-                    fAr = p_theta_re[iA] + R0, fAi = p_theta_im[iA],
-                    fBr = p_theta_re[iB] + R0, fBi = p_theta_im[iB],
-                    fCr = p_theta_re[iC] + R0, fCi = p_theta_im[iC],
-                    fDr = p_theta_re[iD] + R0, fDi = p_theta_im[iD];
+                    fAr = p_theta_re[iA], fAi = p_theta_im[iA],
+                    fBr = p_theta_re[iB], fBi = p_theta_im[iB],
+                    fCr = p_theta_re[iC], fCi = p_theta_im[iC],
+                    fDr = p_theta_re[iD], fDi = p_theta_im[iD];
                 else
-                    fAr = p_phi_re[iA] + R0, fAi = p_phi_im[iA],
-                    fBr = p_phi_re[iB] + R0, fBi = p_phi_im[iB],
-                    fCr = p_phi_re[iC] + R0, fCi = p_phi_im[iC],
-                    fDr = p_phi_re[iD] + R0, fDi = p_phi_im[iD];
+                    fAr = p_phi_re[iA], fAi = p_phi_im[iA],
+                    fBr = p_phi_re[iB], fBi = p_phi_im[iB],
+                    fCr = p_phi_re[iC], fCi = p_phi_im[iC],
+                    fDr = p_phi_re[iD], fDi = p_phi_im[iD];
 
                 // Calculate amplitude
                 dtype ampA = std::sqrt(fAr * fAr + fAi * fAi);
@@ -279,13 +279,13 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                 gAr = fAr * gAr, gBr = fBr * gBr, gCr = fCr * gCr, gDr = fDr * gDr;
 
                 // Declare variables
-                dtype cPhase = gAr * gBr + gAi * gBi; // Cosine of phase
+                dtype cPhase = (ampA < R1 || ampB < R1) ? neg_one : gAr * gBr + gAi * gBi; // Cosine of phase
                 bool linear_int = cPhase < tS;
-                dtype gEr = zero, gEi = zero, ampE = zero, gFr = zero, gFi = zero, ampF = zero, fLr = zero, fLi = zero;
 
                 // Interpolation for point E
+                dtype fEr = zero, fEi = zero, gEr = zero, gEi = zero, ampE = zero;
                 if (linear_int) // Linear interpolation
-                    fLr = un * fAr + up * fBr, fLi = un * fAi + up * fBi;
+                    fEr = un * fAr + up * fBr, fEi = un * fAi + up * fBi;
                 if (cPhase > tL) // Spherical interpolation
                 {
                     dtype Phase = (cPhase >= one) ? R0 : std::acos(cPhase) + R0, sPhase = one / std::sin(Phase),
@@ -293,47 +293,63 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                     gEr = wn * gAr + wp * gBr, gEi = wn * gAi + wp * gBi, ampE = un * ampA + up * ampB;
                     if (linear_int) // Mixed mode
                         wp = (tS - cPhase) * dT, wn = one - wp,
-                        fLr = wn * gEr * ampE + wp * fLr, fLi = wn * gEi * ampE + wp * fLi;
+                        fEr = wn * gEr * ampE + wp * fEr, fEi = wn * gEi * ampE + wp * fEi;
+                    else
+                        fEr = gEr * ampE, fEi = gEi * ampE;
                 }
                 if (linear_int)
-                    ampE = std::sqrt(fLr * fLr + fLi * fLi), gEr = one / ampE, gEi = fLi * gEr, gEr = fLr * gEr;
+                {
+                    ampE = std::sqrt(fEr * fEr + fEi * fEi);
+                    gEr = one / ampE;
+                    gEi = fEi * gEr, gEr = fEr * gEr;
+                }
 
                 // Interpolation for point F
-                cPhase = gCr * gDr + gCi * gDi, linear_int = cPhase < tS;
+                dtype fFr = zero, fFi = zero, gFr = zero, gFi = zero, ampF = zero;
+                cPhase = (ampC < R1 || ampD < R1) ? neg_one : gCr * gDr + gCi * gDi;
+                linear_int = cPhase < tS;
                 if (linear_int)
-                    fLr = un * fCr + up * fDr, fLi = un * fCi + up * fDi;
+                    fFr = un * fCr + up * fDr, fFi = un * fCi + up * fDi;
                 if (cPhase > tL)
                 {
                     dtype Phase = (cPhase >= one) ? R0 : std::acos(cPhase) + R0, sPhase = one / std::sin(Phase),
                           wp = std::sin(up * Phase) * sPhase, wn = std::sin(un * Phase) * sPhase;
                     gFr = wn * gCr + wp * gDr, gFi = wn * gCi + wp * gDi, ampF = un * ampC + up * ampD;
-                    if (linear_int)
+                    if (linear_int) // Mixed mode
                         wp = (tS - cPhase) * dT, wn = one - wp,
-                        fLr = wn * gFr * ampF + wp * fLr, fLi = wn * gFi * ampF + wp * fLi;
+                        fFr = wn * gFr * ampF + wp * fFr, fFi = wn * gFi * ampF + wp * fFi;
+                    else
+                        fFr = gFr * ampF, fFi = gFi * ampF;
                 }
                 if (linear_int)
-                    ampF = std::sqrt(fLr * fLr + fLi * fLi), gFr = one / ampF, gFi = fLi * gFr, gFr = fLr * gFr;
+                {
+                    ampF = std::sqrt(fFr * fFr + fFi * fFi);
+                    gFr = one / ampF;
+                    gFi = fFi * gFr, gFr = fFr * gFr;
+                }
 
                 // Interpolation for point X
-                cPhase = gEr * gFr + gEi * gFi, linear_int = cPhase < tS;
+                dtype fXr = zero, fXi = zero;
+                cPhase = (ampE < R1 || ampF < R1) ? neg_one : gEr * gFr + gEi * gFi;
+                linear_int = cPhase < tS;
                 if (linear_int)
-                    fLr = vn * gEr * ampE + vp * gFr * ampF, fLi = vn * gEi * ampE + vp * gFi * ampF;
+                    fXr = vn * fEr + vp * fFr, fFi = vn * fEi + vp * fFi;
                 if (cPhase > tL)
                 {
                     dtype Phase = (cPhase >= one) ? R0 : std::acos(cPhase) + R0, sPhase = one / std::sin(Phase),
                           wp = std::sin(vp * Phase) * sPhase, wn = std::sin(vn * Phase) * sPhase;
-                    dtype gLr = wn * gEr + wp * gFr, gLi = wn * gEi + wp * gFi, ampL = vn * ampE + vp * ampF;
-                    if (linear_int)
+                    dtype gXr = wn * gEr + wp * gFr, gXi = wn * gEi + wp * gFi, ampX = vn * ampE + vp * ampF;
+                    if (linear_int) // Mixed mode
                         wp = (tS - cPhase) * dT, wn = one - wp,
-                        fLr = wn * gLr * ampL + wp * fLr, fLi = wn * gLi * ampL + wp * fLi;
+                        fXr = wn * gXr * ampX + wp * fXr, fXi = wn * gXi * ampX + wp * fXi;
                     else
-                        fLr = gLr * ampL, fLi = gLi * ampL;
+                        fXr = gXr * ampX, fXi = gXi * ampX;
                 }
 
                 if (VH == 0)
-                    Vr = fLr, Vi = fLi;
+                    Vr = fXr, Vi = fXi;
                 else
-                    Hr = fLr, Hi = fLi;
+                    Hr = fXr, Hi = fXi;
             }
 
             // Compute and write output
