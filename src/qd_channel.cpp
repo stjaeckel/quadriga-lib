@@ -2604,7 +2604,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         }
 
         // Departure and arrival angles, vector (n_snap) of matrices of size [n_path, 4], {AOD, EOD, AOA, EOA}
-        if (H5Lexists(snap_id, "path_polarization", H5P_DEFAULT))
+        if (H5Lexists(snap_id, "path_angles", H5P_DEFAULT))
         {
             for (unsigned j = j_path_angles; j < i; ++j)
                 c.path_angles.push_back(arma::Mat<dtype>(0, 4));
