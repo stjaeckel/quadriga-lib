@@ -116,8 +116,8 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     for (size_t a = 1; a < n_elevation; ++a)
         el_diff[a] = one / (p_elevation_grid[a] - p_elevation_grid[a - 1]);
 
-        // Interpolate the pattern data using spheric interpolation
-        // datatype "int" is required by MSVC to allow parallel for
+    // Interpolate the pattern data using spheric interpolation
+    // datatype "int" is required by MSVC to allow parallel for
 #pragma omp parallel for
     for (int a_i32 = 0; a_i32 < (int)n_ang; ++a_i32)
     {
@@ -333,7 +333,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                 cPhase = (ampE < R1 || ampF < R1) ? neg_one : gEr * gFr + gEi * gFi;
                 linear_int = cPhase < tS;
                 if (linear_int)
-                    fXr = vn * fEr + vp * fFr, fFi = vn * fEi + vp * fFi;
+                    fXr = vn * fEr + vp * fFr, fXi = vn * fEi + vp * fFi;
                 if (cPhase > tL)
                 {
                     dtype Phase = (cPhase >= one) ? R0 : std::acos(cPhase) + R0, sPhase = one / std::sin(Phase),

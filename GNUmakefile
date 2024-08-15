@@ -146,6 +146,9 @@ ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests
 endif
 
+test_catch2:    lib/quadriga_lib.a   tests/test_bin
+	tests/test_bin
+
 tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
 	$(CC) -std=c++17 $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
 

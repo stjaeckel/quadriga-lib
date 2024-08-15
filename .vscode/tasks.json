@@ -16,7 +16,7 @@
         {
             "type": "shell",
             "label": "Build and run tests",
-            "command": "make test -j32",
+            "command": "make test_catch2 -j32",
             "group": {
                 "kind": "build",
                 "isDefault": true
