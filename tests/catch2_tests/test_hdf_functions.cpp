@@ -83,9 +83,17 @@ TEST_CASE("HDF - Minimal Test")
     c.coeff_im.push_back(arma::cube());
     c.delay.push_back(arma::cube());
 
+    std::vector<arma::mat> path_coord;
+
     unsigned s = 0; // Snapshot index
     quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
-                               &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
+                             &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s], &path_coord);
+
+    // Check if path coord is correct
+    {
+        arma::mat T = {{0.0, 20.0}, {0.0, 0.0}, {1.0, 1.0}};
+        CHECK(arma::approx_equal(T, path_coord[0], "absdiff", 1e-13));
+    }
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,
                                                  c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.tx_orientation(0), c.tx_orientation(1), c.tx_orientation(2),
@@ -106,7 +114,7 @@ TEST_CASE("HDF - Minimal Test")
 
     s = 1;
     quadriga_lib::coord2path(c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.rx_pos(0, s), c.rx_pos(1, s), c.rx_pos(2, s),
-                               &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
+                             &c.no_interact[s], &c.interact_coord[s], &c.path_length[s], &fbs_pos, &lbs_pos, &c.path_angles[s]);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &ant,
                                                  c.tx_pos(0), c.tx_pos(1), c.tx_pos(2), c.tx_orientation(0), c.tx_orientation(1), c.tx_orientation(2),
