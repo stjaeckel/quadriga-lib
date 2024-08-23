@@ -17,6 +17,7 @@
 
 #include <math.h>
 #include <stdexcept>
+#include <cstdint>
 #include <immintrin.h>
 #include "ray_point_intersect_avx2.hpp"
 
