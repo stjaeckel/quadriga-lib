@@ -19,6 +19,8 @@
 #include <pybind11/numpy.h>
 #include "quadriga_lib.hpp"
 
+#include "python_helpers.cpp"
+
 /*!SECTION
 Channel functions
 SECTION!*/
@@ -57,14 +59,17 @@ MD!*/
 
 pybind11::tuple hdf5_read_layout(std::string fn)
 {
-    arma::Col<unsigned> channelID;
-    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
+  arma::Col<unsigned> channelID;
+  arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
 
-    auto nx = (unsigned long long)storage_space.at(0);
-    auto ny = (unsigned long long)storage_space.at(1);
-    auto nz = (unsigned long long)storage_space.at(2);
-    auto nw = (unsigned long long)storage_space.at(3);
+  auto nx = (unsigned long long)storage_space.at(0);
+  auto ny = (unsigned long long)storage_space.at(1);
+  auto nz = (unsigned long long)storage_space.at(2);
+  auto nw = (unsigned long long)storage_space.at(3);
 
-    return pybind11::make_tuple(pybind11::array_t<unsigned>(4ULL, storage_space.memptr()),
-                                pybind11::array_t<unsigned>({nx, ny, nz, nw}, channelID.memptr()));
+  auto sz = (unsigned long long)sizeof(unsigned);
+  size_t strides[4] = {sz, ny * sz, nx * ny * sz, nx * ny * nz * sz};
+  auto has_data = pybind11::array_t<unsigned>({nx, ny, nz, nw}, strides, channelID.memptr());
+
+  return pybind11::make_tuple(pybind11::array_t<unsigned>(4ULL, storage_space.memptr()), has_data);
 }

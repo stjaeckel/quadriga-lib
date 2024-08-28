@@ -103,6 +103,7 @@ import quadriga_lib
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
+<tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 </tbody>
 </table>
 </ul>
@@ -722,6 +723,21 @@ geo_coords = quadriga_lib.cart2geo(cart_coords)
    First row: Azimuth angles in [rad], values between -pi and pi.<br> 
    Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
    Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="version"></a>
+<b>version</b> - Returns the quadriga-lib version number
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+version = quadriga_lib.version;
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions, 
+   an suffix <code>_AVX2</code> is added after the version number 
 </li></ul>
 </li>
 </ul>
