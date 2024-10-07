@@ -2688,17 +2688,20 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
             c.no_interact.push_back(std::move(val1));
 
             arma::Mat<dtype> val = arma::Mat<dtype>(3ULL, n_coord, arma::fill::none);
-            dset_id = H5Dopen(snap_id, "interact_coord", H5P_DEFAULT);
-            if (float2double)
+            if (n_coord != 0)
             {
-                float *data = new float[3 * n_coord];
-                H5Dread(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
-                qHDF_cast(data, val.memptr(), 3 * n_coord);
-                delete[] data;
+                dset_id = H5Dopen(snap_id, "interact_coord", H5P_DEFAULT);
+                if (float2double)
+                {
+                    float *data = new float[3 * n_coord];
+                    H5Dread(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, data);
+                    qHDF_cast(data, val.memptr(), 3 * n_coord);
+                    delete[] data;
+                }
+                else
+                    H5Dread(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, val.memptr());
+                H5Dclose(dset_id);
             }
-            else
-                H5Dread(dset_id, H5T_NATIVE_FLOAT, H5S_ALL, H5S_ALL, H5P_DEFAULT, val.memptr());
-            H5Dclose(dset_id);
             c.interact_coord.push_back(std::move(val));
         }
 
