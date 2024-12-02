@@ -406,6 +406,7 @@ tidy: clean
 	- rm -rf +quadriga_lib
 	- rm -rf release
 	- rm -rf lib
+	- rm tests/test.exe
 	
 build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
 	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
@@ -415,7 +416,7 @@ release:  all   build/quadriga-lib-version
 	tar czf release/quadrigalib-v$(shell build/quadriga-lib-version)-Ubuntu-$(shell lsb_release -r -s)-amd64.tar.gz \
 		+quadriga_lib/*.mex +quadriga_lib/*.mexa64 +quadriga_lib/*.m include lib/*.a
 
-package:  all  build/quadriga-lib-version
+package:  all   build/quadriga-lib-version
 	- mkdir release
 	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)
 	- rm release/quadriga_lib-$(shell build/quadriga-lib-version).zip
@@ -439,5 +440,6 @@ package:  all  build/quadriga-lib-version
 	cp LICENSE release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp Makefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp README.md release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)/tests/afl
 	( cd release && zip -r quadriga_lib-$(shell build/quadriga-lib-version).zip quadriga_lib-$(shell build/quadriga-lib-version)/ )
 	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)
