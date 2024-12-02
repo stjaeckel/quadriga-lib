@@ -92,8 +92,8 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
     if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr || pilot_grid == nullptr || hmat_re == nullptr || hmat_im == nullptr)
         throw std::invalid_argument("Arguments cannot be NULL.");
 
-    if (coeff_re->n_elem == 0 || pilot_grid->n_elem == 0)
-        throw std::invalid_argument("Inputs cannot be empty");
+    if (pilot_grid->n_elem == 0)
+        throw std::invalid_argument("Pilot grid must have at least one element.");
 
     arma::uword n_rx = coeff_re->n_rows;
     arma::uword n_tx = coeff_re->n_cols;
@@ -113,6 +113,26 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 
     if (bandwidth < 0.0)
         throw std::invalid_argument("Bandwidth cannot be negative");
+
+    // Set output size
+    if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != n_carrier)
+        hmat_re->set_size(n_rx, n_tx, n_carrier);
+
+    if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != n_carrier)
+        hmat_im->set_size(n_rx, n_tx, n_carrier);
+
+    dtype *p_hmat_re = hmat_re->memptr();
+    dtype *p_hmat_im = hmat_im->memptr();
+
+    // Special case: Channel has no paths
+    if (n_path == 0)
+    {
+        size_t n_elem_t = (size_t)hmat_re->n_elem;
+        for (size_t i = 0; i < n_elem_t; ++i)
+            p_hmat_re[i] = (dtype)0.0, p_hmat_im[i] = (dtype)0.0;
+
+        return;
+    }
 
     // Declare constants
     const double scale = -6.283185307179586 * bandwidth;
@@ -170,15 +190,6 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 #endif
 
     // Copy data to output
-    if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != n_carrier)
-        hmat_re->set_size(n_rx, n_tx, n_carrier);
-
-    if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != n_carrier)
-        hmat_im->set_size(n_rx, n_tx, n_carrier);
-
-    dtype *p_hmat_re = hmat_re->memptr();
-    dtype *p_hmat_im = hmat_im->memptr();
-
     for (size_t i_carrier = 0; i_carrier < n_carrier_t; ++i_carrier)
         for (size_t i_ant = 0; i_ant < n_ant_t; ++i_ant)
         {
