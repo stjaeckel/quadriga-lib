@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <iostream>
-#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_functions.hpp"
 #include "quadriga_tools.hpp"
 
 // Implements signum (-1, 0, or 1)

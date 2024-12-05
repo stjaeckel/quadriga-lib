@@ -17,7 +17,7 @@
 
 #include <iostream>
 #include <algorithm>
-#include "qd_arrayant_qdant.hpp"
+#include "qd_arrayant_functions.hpp"
 #include "pugixml.hpp"
 
 // Note: Uncomment "#define PUGIXML_HEADER_ONLY" in "pugiconfig.hpp"
