@@ -20,8 +20,7 @@
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
-#include "qd_arrayant_qdant.hpp"
-#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_functions.hpp"
 
 // #include "helper_functions.cpp"
 

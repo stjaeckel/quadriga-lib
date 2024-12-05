@@ -162,10 +162,10 @@ build/calc_diffraction_gain.o:   src/calc_diffraction_gain.cpp   include/quadrig
 build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_arrayant.hpp
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
-build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_qdant.hpp
+build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_functions.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H)
 
-build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_interpolate.hpp
+build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_functions.hpp
 	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/baseband_freq_response.o:   src/baseband_freq_response.cpp   include/quadriga_channel.hpp
