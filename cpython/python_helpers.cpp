@@ -104,109 +104,6 @@ inline arma::Cube<dtype> qd_python_NPArray_to_Cube(const pybind11::array_t<dtype
     return output;
 }
 
-// Convert to std::any
-inline std::any qd_python_anycast(pybind11::handle obj, std::string var_name = "")
-{
-
-    if (pybind11::isinstance<pybind11::str>(obj))
-        return pybind11::cast<std::string>(obj);
-
-    if (pybind11::isinstance<pybind11::float_>(obj))
-        return pybind11::cast<double>(obj);
-
-    if (pybind11::isinstance<pybind11::int_>(obj))
-        return pybind11::cast<long long>(obj);
-
-    if (pybind11::isinstance<pybind11::array>(obj))
-    {
-        pybind11::array arr = pybind11::cast<pybind11::array>(obj);
-        pybind11::buffer_info buf = arr.request();
-
-        if (arr.dtype().is(pybind11::dtype::of<double>()))
-        {
-            auto arr_t = pybind11::array_t<double>(pybind11::reinterpret_borrow<pybind11::array_t<double>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<double>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<double>(&arr_t);
-        }
-
-        if (arr.dtype().is(pybind11::dtype::of<float>()))
-        {
-            auto arr_t = pybind11::array_t<float>(pybind11::reinterpret_borrow<pybind11::array_t<float>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<float>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<float>(&arr_t);
-        }
-
-        if (arr.dtype().is(pybind11::dtype::of<unsigned>()))
-        {
-            auto arr_t = pybind11::array_t<unsigned>(pybind11::reinterpret_borrow<pybind11::array_t<unsigned>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<unsigned>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<unsigned>(&arr_t);
-        }
-
-        if (arr.dtype().is(pybind11::dtype::of<int>()))
-        {
-            auto arr_t = pybind11::array_t<int>(pybind11::reinterpret_borrow<pybind11::array_t<int>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<int>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<int>(&arr_t);
-        }
-
-        if (arr.dtype().is(pybind11::dtype::of<unsigned long long>()))
-        {
-            auto arr_t = pybind11::array_t<unsigned long long>(pybind11::reinterpret_borrow<pybind11::array_t<unsigned long long>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<unsigned long long>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<unsigned long long>(&arr_t);
-        }
-
-        if (arr.dtype().is(pybind11::dtype::of<long long>()) || arr.dtype().is(pybind11::dtype::of<int64_t>()))
-        {
-            auto arr_t = pybind11::array_t<long long>(pybind11::reinterpret_borrow<pybind11::array_t<long long>>(arr));
-            if (buf.ndim == 1)
-                return arma::Row<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2 && buf.shape[1] == 1)
-                return arma::Col<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
-            else if (buf.ndim == 2)
-                return qd_python_NPArray_to_Mat<long long>(&arr_t);
-            else if (buf.ndim == 3)
-                return qd_python_NPArray_to_Cube<long long>(&arr_t);
-        }
-    }
-
-    std::string error_message = "Input '" + var_name + "' has an unsupported type.";
-    throw std::invalid_argument(error_message);
-
-    return std::any();
-}
-
 template <typename dtype>
 inline std::vector<arma::Col<dtype>> qd_python_NPArray_to_vectorCol(const pybind11::array_t<dtype> *input, size_t vec_dim)
 {
@@ -336,6 +233,152 @@ inline std::vector<arma::Mat<dtype>> qd_python_NPArray_to_vectorMat(const pybind
 }
 
 template <typename dtype>
+inline std::vector<arma::Cube<dtype>> qd_python_NPArray_to_vectorCube(const pybind11::array_t<dtype> *input, size_t vec_dim)
+{
+    pybind11::buffer_info buf = input->request();
+    size_t d1, d2, d3, d4;
+    bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+        return std::vector<arma::Cube<dtype>>();
+
+    dtype *ptr_reorg = new dtype[n_data];
+    if (!is_col_major)
+        convert_row2col_major(reinterpret_cast<dtype *>(buf.ptr), ptr_reorg, d1, d2, d3, d4);
+    const dtype *ptr_i = is_col_major ? reinterpret_cast<dtype *>(buf.ptr) : ptr_reorg;
+
+    // Convert data to armadillo output
+    auto output = std::vector<arma::Cube<dtype>>();
+    if (vec_dim == 0)
+        for (size_t n = 0; n < d1; ++n)
+        {
+            auto tmp = arma::Cube<dtype>(d2, d3, d4, arma::fill::none);
+            dtype *ptr = tmp.memptr();
+            for (size_t m = 0; m < d2 * d3 * d4; ++m)
+                ptr[m] = ptr_i[m * d1 + n];
+            output.push_back(tmp);
+        }
+    else if (vec_dim == 1)
+        for (size_t n = 0; n < d2; ++n)
+        {
+            auto tmp = arma::Cube<dtype>(d1, d3, d4, arma::fill::none);
+            dtype *ptr = tmp.memptr();
+            for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                for (size_t m1 = 0; m1 < d1; ++m1)
+                    ptr[m34 * d1 + m1] = ptr_i[m34 * d2 * d1 + n * d1 + m1];
+            output.push_back(tmp);
+        }
+    else if (vec_dim == 2)
+        for (size_t n = 0; n < d3; ++n)
+        {
+            auto tmp = arma::Cube<dtype>(d1, d2, d4, arma::fill::none);
+            dtype *ptr = tmp.memptr();
+            for (size_t m4 = 0; m4 < d4; ++m4)
+                for (size_t m12 = 0; m12 < d1 * d2; ++m12)
+                    ptr[m4 * d2 * d1 + m12] = ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
+            output.push_back(tmp);
+        }
+    else if (vec_dim == 3)
+        for (size_t n = 0; n < d4; ++n)
+        {
+            auto tmp = arma::Cube<dtype>(d1, d2, d3, arma::fill::none);
+            dtype *ptr = tmp.memptr();
+            for (size_t m = 0; m < d1 * d2 * d3; ++m)
+                ptr[m] = ptr_i[n * d3 * d2 * d1 + m];
+            output.push_back(tmp);
+        }
+    else
+        throw std::invalid_argument("Armadillo object dimensions must be 0,1,2 or 3");
+
+    delete[] ptr_reorg;
+    return output;
+}
+
+template <typename dtype>
+inline void qd_python_complexNPArray_to_2Mat(const pybind11::array_t<std::complex<dtype>> *input,
+                                             arma::Mat<dtype> *output_re,
+                                             arma::Mat<dtype> *output_im)
+{
+    if (output_re == nullptr || output_im == nullptr)
+        throw std::invalid_argument("Outputs cannot be NULL");
+
+    pybind11::buffer_info buf = input->request();
+    size_t d1, d2, d3, d4;
+    bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+    {
+        output_re->reset();
+        output_im->reset();
+        return;
+    }
+
+    std::complex<dtype> *ptr_reorg = new std::complex<dtype>[n_data];
+    if (!is_col_major)
+        convert_row2col_major(reinterpret_cast<std::complex<dtype> *>(buf.ptr), ptr_reorg, d1, d2, d3, d4);
+    const std::complex<dtype> *ptr_i = is_col_major ? reinterpret_cast<std::complex<dtype> *>(buf.ptr) : ptr_reorg;
+
+    // Convert data to armadillo output
+    output_re->set_size(d1, d2 * d3 * d4);
+    output_im->set_size(d1, d2 * d3 * d4);
+    dtype *ptr_re = output_re->memptr();
+    dtype *ptr_im = output_im->memptr();
+    for (size_t m = 0; m < d1 * d2 * d3 * d4; ++m)
+    {
+        std::complex<dtype> value = ptr_i[m];
+        ptr_re[m] = value.real();
+        ptr_im[m] = value.imag();
+    }
+
+    delete[] ptr_reorg;
+    return;
+}
+
+template <typename dtype>
+inline void qd_python_complexNPArray_to_2Cubes(const pybind11::array_t<std::complex<dtype>> *input,
+                                               arma::Cube<dtype> *output_re,
+                                               arma::Cube<dtype> *output_im)
+{
+    if (output_re == nullptr || output_im == nullptr)
+        throw std::invalid_argument("Outputs cannot be NULL");
+
+    pybind11::buffer_info buf = input->request();
+    size_t d1, d2, d3, d4;
+    bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+    {
+        output_re->reset();
+        output_im->reset();
+        return;
+    }
+
+    std::complex<dtype> *ptr_reorg = new std::complex<dtype>[n_data];
+    if (!is_col_major)
+        convert_row2col_major(reinterpret_cast<std::complex<dtype> *>(buf.ptr), ptr_reorg, d1, d2, d3, d4);
+    const std::complex<dtype> *ptr_i = is_col_major ? reinterpret_cast<std::complex<dtype> *>(buf.ptr) : ptr_reorg;
+
+    // Convert data to armadillo output
+    output_re->set_size(d1, d2, d3 * d4);
+    output_im->set_size(d1, d2, d3 * d4);
+    dtype *ptr_re = output_re->memptr();
+    dtype *ptr_im = output_im->memptr();
+    for (size_t m = 0; m < d1 * d2 * d3 * d4; ++m)
+    {
+        std::complex<dtype> value = ptr_i[m];
+        ptr_re[m] = value.real();
+        ptr_im[m] = value.imag();
+    }
+
+    delete[] ptr_reorg;
+    return;
+}
+
+// Convert a complex NParray to an vector of Matrices with interleaved real / imaginary parts
+template <typename dtype>
 inline std::vector<arma::Mat<dtype>> qd_python_complexNPArray_to_vectorMat(const pybind11::array_t<std::complex<dtype>> *input, size_t vec_dim)
 {
     pybind11::buffer_info buf = input->request();
@@ -407,69 +450,6 @@ inline std::vector<arma::Mat<dtype>> qd_python_complexNPArray_to_vectorMat(const
                 ptr[2 * m] = value.real();
                 ptr[2 * m + 1] = value.imag();
             }
-            output.push_back(tmp);
-        }
-    else
-        throw std::invalid_argument("Armadillo object dimensions must be 0,1,2 or 3");
-
-    delete[] ptr_reorg;
-    return output;
-}
-
-template <typename dtype>
-inline std::vector<arma::Cube<dtype>> qd_python_NPArray_to_vectorCube(const pybind11::array_t<dtype> *input, size_t vec_dim)
-{
-    pybind11::buffer_info buf = input->request();
-    size_t d1, d2, d3, d4;
-    bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
-    size_t n_data = d1 * d2 * d3 * d4;
-
-    if (n_data == 0)
-        return std::vector<arma::Cube<dtype>>();
-
-    dtype *ptr_reorg = new dtype[n_data];
-    if (!is_col_major)
-        convert_row2col_major(reinterpret_cast<dtype *>(buf.ptr), ptr_reorg, d1, d2, d3, d4);
-    const dtype *ptr_i = is_col_major ? reinterpret_cast<dtype *>(buf.ptr) : ptr_reorg;
-
-    // Convert data to armadillo output
-    auto output = std::vector<arma::Cube<dtype>>();
-    if (vec_dim == 0)
-        for (size_t n = 0; n < d1; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d2, d3, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            for (size_t m = 0; m < d2 * d3 * d4; ++m)
-                ptr[m] = ptr_i[m * d1 + n];
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 1)
-        for (size_t n = 0; n < d2; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d3, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            for (size_t m34 = 0; m34 < d3 * d4; ++m34)
-                for (size_t m1 = 0; m1 < d1; ++m1)
-                    ptr[m34 * d1 + m1] = ptr_i[m34 * d2 * d1 + n * d1 + m1];
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 2)
-        for (size_t n = 0; n < d3; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d2, d4, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            for (size_t m4 = 0; m4 < d4; ++m4)
-                for (size_t m12 = 0; m12 < d1 * d2; ++m12)
-                    ptr[m4 * d2 * d1 + m12] = ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
-            output.push_back(tmp);
-        }
-    else if (vec_dim == 3)
-        for (size_t n = 0; n < d4; ++n)
-        {
-            auto tmp = arma::Cube<dtype>(d1, d2, d3, arma::fill::none);
-            dtype *ptr = tmp.memptr();
-            for (size_t m = 0; m < d1 * d2 * d3; ++m)
-                ptr[m] = ptr_i[n * d3 * d2 * d1 + m];
             output.push_back(tmp);
         }
     else
@@ -663,11 +643,55 @@ inline pybind11::array_t<dtype> qd_python_Cube_to_NPArray(const arma::Cube<dtype
     return output;
 }
 
+// Copy: Complex Matrix
+template <typename dtype>
+inline pybind11::array_t<std::complex<dtype>> qd_python_2Mat_to_complexNPArray(const arma::Mat<dtype> *input_re, // Matrix, Real part
+                                                                               const arma::Mat<dtype> *input_im, // Matrix, Imaginary Part
+                                                                               arma::uword n_col_out = 0,        // Number of elements in output
+                                                                               const arma::uword *is = nullptr)  // List of elements to copy, 0-based
+{
+    if (input_re == nullptr || input_im == nullptr)
+        throw std::invalid_argument("Input data cannot be NULL");
+
+    if (input_re->empty())
+        return pybind11::array_t<std::complex<dtype>>();
+
+    if (input_re->n_rows != input_im->n_rows || input_re->n_cols != input_im->n_cols)
+        throw std::invalid_argument("Sizes of real and imaginary parts don't match.");
+
+    arma::uword n_row = input_re->n_rows;                        // Rows
+    n_col_out = (n_col_out == 0) ? input_re->n_cols : n_col_out; // Output columns
+
+    size_t strides[2] = {sizeof(std::complex<dtype>), n_row * sizeof(std::complex<dtype>)};
+    auto output = pybind11::array_t<std::complex<dtype>>({n_row, n_col_out}, strides);
+    auto buf = output.request();
+    std::complex<dtype> *ptr_o = static_cast<std::complex<dtype> *>(buf.ptr);
+
+    for (arma::uword i_col_out = 0; i_col_out < n_col_out; ++i_col_out) // Col loop
+    {
+        arma::uword i_col_in = i_col_out;
+        if (is != nullptr)
+            i_col_in = (is[i_col_out] >= input_re->n_cols) ? 0 : is[i_col_out];
+
+        const dtype *ptr_i_re = input_re->colptr(i_col_in);
+        const dtype *ptr_i_im = input_im->colptr(i_col_in);
+
+        for (arma::uword i_row = 0; i_row < n_row; ++i_row) // Row loop
+        {
+            arma::uword offset = i_col_out * n_row + i_row;
+            ptr_o[offset].real(ptr_i_re[i_row]);
+            ptr_o[offset].imag(ptr_i_im[i_row]);
+        }
+    }
+
+    return output;
+}
+
 // Copy: Complex Cube
 template <typename dtype>
 inline pybind11::array_t<std::complex<dtype>> qd_python_2Cubes_to_complexNPArray(const arma::Cube<dtype> *input_re, // Cube, Real part
                                                                                  const arma::Cube<dtype> *input_im, // Cube, Imaginary Part
-                                                                                 arma::uword ns = 0,                // Number of elements in output
+                                                                                 arma::uword n_slices_out = 0,      // Number of elements in output
                                                                                  const arma::uword *is = nullptr)   // List of elements to copy, 0-based
 {
     if (input_re == nullptr || input_im == nullptr)
@@ -679,28 +703,28 @@ inline pybind11::array_t<std::complex<dtype>> qd_python_2Cubes_to_complexNPArray
     if (input_re->n_rows != input_im->n_rows || input_re->n_cols != input_im->n_cols || input_re->n_slices != input_im->n_slices)
         throw std::invalid_argument("Sizes of real and imaginary parts don't match.");
 
-    arma::uword m = input_re->n_rows * input_re->n_cols; // Rows and columns
-    ns = (ns == 0) ? input_re->n_slices : ns;            // Slices
+    arma::uword n_elem_per_slice = input_re->n_rows * input_re->n_cols;     // No elements per slice
+    n_slices_out = (n_slices_out == 0) ? input_re->n_slices : n_slices_out; // Slices
 
-    size_t strides[3] = {sizeof(std::complex<dtype>), input_re->n_rows * sizeof(std::complex<dtype>), m * sizeof(std::complex<dtype>)};
-    auto output = pybind11::array_t<std::complex<dtype>>({input_re->n_rows, input_re->n_cols, ns}, strides);
+    size_t strides[3] = {sizeof(std::complex<dtype>), input_re->n_rows * sizeof(std::complex<dtype>), n_elem_per_slice * sizeof(std::complex<dtype>)};
+    auto output = pybind11::array_t<std::complex<dtype>>({input_re->n_rows, input_re->n_cols, n_slices_out}, strides);
     auto buf = output.request();
     std::complex<dtype> *ptr_o = static_cast<std::complex<dtype> *>(buf.ptr);
 
-    for (arma::uword i = 0; i < ns; ++i)
+    for (arma::uword i_slice_out = 0; i_slice_out < n_slices_out; ++i_slice_out)
     {
-        arma::uword k = i;
+        arma::uword i_slice_in = i_slice_out;
         if (is != nullptr)
-            k = (is[i] >= input_re->n_slices) ? 0 : is[i];
+            i_slice_in = (is[i_slice_out] >= input_re->n_slices) ? 0 : is[i_slice_out];
 
-        dtype *ptr_i_re = input_re->slice_memptr(k);
-        dtype *ptr_i_im = input_im->slice_memptr(k);
+        const dtype *ptr_i_re = input_re->slice_memptr(i_slice_in);
+        const dtype *ptr_i_im = input_im->slice_memptr(i_slice_in);
 
-        for (arma::uword j = 0; j < m; ++j)
+        for (arma::uword i_elem = 0; i_elem < n_elem_per_slice; ++i_elem)
         {
-            arma::uword offset = i * m + j;
-            ptr_o[offset].real(ptr_i_re[j]);
-            ptr_o[offset].imag(ptr_i_im[j]);
+            arma::uword offset = i_slice_out * n_elem_per_slice + i_elem;
+            ptr_o[offset].real(ptr_i_re[i_elem]);
+            ptr_o[offset].imag(ptr_i_im[i_elem]);
         }
     }
 
@@ -999,6 +1023,109 @@ inline pybind11::array_t<std::complex<dtype>> qd_python_2vectorCubes_to_complexN
 
     delete[] js;
     return output;
+}
+
+// Convert to std::any
+inline std::any qd_python_anycast(pybind11::handle obj, std::string var_name = "")
+{
+
+    if (pybind11::isinstance<pybind11::str>(obj))
+        return pybind11::cast<std::string>(obj);
+
+    if (pybind11::isinstance<pybind11::float_>(obj))
+        return pybind11::cast<double>(obj);
+
+    if (pybind11::isinstance<pybind11::int_>(obj))
+        return pybind11::cast<long long>(obj);
+
+    if (pybind11::isinstance<pybind11::array>(obj))
+    {
+        pybind11::array arr = pybind11::cast<pybind11::array>(obj);
+        pybind11::buffer_info buf = arr.request();
+
+        if (arr.dtype().is(pybind11::dtype::of<double>()))
+        {
+            auto arr_t = pybind11::array_t<double>(pybind11::reinterpret_borrow<pybind11::array_t<double>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<double>(reinterpret_cast<double *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<double>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<double>(&arr_t);
+        }
+
+        if (arr.dtype().is(pybind11::dtype::of<float>()))
+        {
+            auto arr_t = pybind11::array_t<float>(pybind11::reinterpret_borrow<pybind11::array_t<float>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<float>(reinterpret_cast<float *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<float>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<float>(&arr_t);
+        }
+
+        if (arr.dtype().is(pybind11::dtype::of<unsigned>()))
+        {
+            auto arr_t = pybind11::array_t<unsigned>(pybind11::reinterpret_borrow<pybind11::array_t<unsigned>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<unsigned>(reinterpret_cast<unsigned *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<unsigned>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<unsigned>(&arr_t);
+        }
+
+        if (arr.dtype().is(pybind11::dtype::of<int>()))
+        {
+            auto arr_t = pybind11::array_t<int>(pybind11::reinterpret_borrow<pybind11::array_t<int>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<int>(reinterpret_cast<int *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<int>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<int>(&arr_t);
+        }
+
+        if (arr.dtype().is(pybind11::dtype::of<unsigned long long>()))
+        {
+            auto arr_t = pybind11::array_t<unsigned long long>(pybind11::reinterpret_borrow<pybind11::array_t<unsigned long long>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<unsigned long long>(reinterpret_cast<unsigned long long *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<unsigned long long>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<unsigned long long>(&arr_t);
+        }
+
+        if (arr.dtype().is(pybind11::dtype::of<long long>()) || arr.dtype().is(pybind11::dtype::of<int64_t>()))
+        {
+            auto arr_t = pybind11::array_t<long long>(pybind11::reinterpret_borrow<pybind11::array_t<long long>>(arr));
+            if (buf.ndim == 1)
+                return arma::Row<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2 && buf.shape[1] == 1)
+                return arma::Col<long long>(reinterpret_cast<long long *>(buf.ptr), buf.shape[0], false, true);
+            else if (buf.ndim == 2)
+                return qd_python_NPArray_to_Mat<long long>(&arr_t);
+            else if (buf.ndim == 3)
+                return qd_python_NPArray_to_Cube<long long>(&arr_t);
+        }
+    }
+
+    std::string error_message = "Input '" + var_name + "' has an unsupported type.";
+    throw std::invalid_argument(error_message);
+
+    return std::any();
 }
 
 #endif
