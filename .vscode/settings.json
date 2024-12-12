@@ -137,6 +137,8 @@
         "__nullptr": "cpp",
         "valarray": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "__string": "cpp",
+        "filesystem": "cpp"
     }
 }
