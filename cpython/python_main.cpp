@@ -22,6 +22,8 @@
 namespace py = pybind11;
 
 // Include parts
+#include "qpy_arrayant_export_obj_file.cpp"
+#include "qpy_arrayant_qdant_read.cpp"
 #include "qpy_baseband_freq_response.cpp"
 #include "qpy_cart2geo.cpp"
 #include "qpy_icosphere.cpp"
@@ -36,8 +38,24 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(quadriga_lib, m)
 {
+      m.def("arrayant_export_obj_file", &arrayant_export_obj_file,
+            py::arg("fn"),
+            py::arg("directivity_range") = 30.0,
+            py::arg("colormap") = "jet",
+            py::arg("object_radius") = 1.0,
+            py::arg("icosphere_n_div") = 4,
+            py::arg("e_theta") = py::array_t<std::complex<double>>(),
+            py::arg("e_phi") = py::array_t<std::complex<double>>(),
+            py::arg("azimuth_grid") = py::array_t<double>(),
+            py::arg("elevation_grid") = py::array_t<double>(),
+            py::arg("element_pos") = py::array_t<double>(),
+            py::arg("name") = "antenna",
+            py::arg("i_element") = py::array_t<arma::uword>());
+
+      m.def("arrayant_qdant_read", &arrayant_qdant_read, py::arg("fn"), py::arg("id") = 1);
+
       m.def("baseband_freq_response", &baseband_freq_response,
-            py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
+            py::arg("coeff") = py::array_t<std::complex<double>>(),
             py::arg("delay") = py::array_t<double>(),
             py::arg("bandwidth"),
             py::arg("carriers") = 128,

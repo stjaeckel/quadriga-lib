@@ -143,7 +143,7 @@ ifneq ($(CUDA_PATH),)
 	tests/test_cuda_bin
 endif
 ifneq ($(PYTHON_TARGET),)
-	pytest tests/python_tests
+	pytest tests/python_tests -x -s
 endif
 
 test_catch2:    lib/quadriga_lib.a   tests/test_bin

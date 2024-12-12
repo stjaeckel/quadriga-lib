@@ -75,12 +75,24 @@ import quadriga_lib
 <br> 
 <b>Overview</b>
 <ul>
-<li><a href="#part_1">Channel functions</a></li>
-<li><a href="#part_2">Miscellaneous / Tools</a></li>
-<li><a href="#part_3">Site-Specific Simulation Tools</a></li>
+<li><a href="#part_1">Array antenna functions</a></li>
+<li><a href="#part_2">Channel functions</a></li>
+<li><a href="#part_3">Miscellaneous / Tools</a></li>
+<li><a href="#part_4">Site-Specific Simulation Tools</a></li>
 </ul>
 <br>
 <a name="part_1"></a>
+<b>Array antenna functions</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
+<tr><td><a href="#arrayant_qdant_read">arrayant_qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<a name="part_2"></a>
 <b>Channel functions</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -97,7 +109,7 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<a name="part_2"></a>
+<a name="part_3"></a>
 <b>Miscellaneous / Tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -108,7 +120,7 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<a name="part_3"></a>
+<a name="part_4"></a>
 <b>Site-Specific Simulation Tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -118,6 +130,150 @@ import quadriga_lib
 </table>
 </ul>
 <br>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<font size=+1><b>Array antenna functions</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_export_obj_file"></a>
+<b>arrayant_export_obj_file</b> - Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+quadriga_lib.arrayant_export_obj_file( fn, directivity_range, colormap, object_radius, icosphere_n_div, 
+    e_theta, e_phi, azimuth_grid, elevation_grid, element_pos, name, i_element )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the OBJ file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>directivity_range</code></b><br> 
+   Directivity range of the antenna pattern visualization in dB 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>colormap</code></b><br> 
+   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',  
+   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer'  
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>object_radius</code></b><br> 
+   Radius in meters of the exported object 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>icosphere_n_div</code></b><br> 
+   Map pattern to an Icosphere with given number of subdivisions 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>e_theta</code></b><br> 
+   e-theta field component, complex-valued, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>e_phi</code></b><br> 
+   e-phi field component, complex-valued, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_grid</code></b><br> 
+   Azimuth angles in [rad] -pi to pi, sorted, Size: <code>[n_azimuth]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation_grid</code></b><br> 
+   Elevation angles in [rad], -pi/2 to pi/2, sorted, Size: <code>[n_elevation]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element_pos</code></b><br> 
+   Antenna element (x,y,z) positions, Size: <code>[3, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>name</code></b><br> 
+   Name of the array antenna object 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b><br> 
+   Antenna element indices, 0-based, empty = export all 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_qdant_read"></a>
+<b>arrayant_qdant_read</b> - Reads array antenna data from QDANT files
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
+data in XML. This function reads pattern data from the specified file.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+data = quadriga_lib.arrayant_qdant_read( fn, id )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the QDANT file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> (optional)<br> 
+   ID of the antenna to be read from the file, optional, Default: Read first 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
+   Dictionary containing the data in the QDANT file with the following keys: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta</code></td>
+  <td>e-theta field component, complex-valued</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi</code></td>
+  <td>e-phi field component, complex-valued</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>coupling</code></td>
+  <td>Coupling matrix, complex valued</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional, default = 0.3 GHz</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>layout</code></td>
+  <td>Layout of multiple array antennas.</td>
+  <td>Matrix</td>
+</tr>
+</table><br>
+</li></ul>
+</li>
+</ul>
 <div class="pagebreak"></div>
 <hr class="greyline">
 <hr class="greyline">
