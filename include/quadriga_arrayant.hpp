@@ -42,7 +42,7 @@ namespace quadriga_lib
         dtype center_frequency = dtype(299792458.0); // Center frequency in [Hz] (optional)
         bool read_only = false;                      // Prevent member functions from writing to the properties
         dtype *check_ptr[9];                         // Data pointers for quick validation
-        arrayant(){};                                // Default constructor
+        arrayant() {};                               // Default constructor
 
         // Functions to determine the size of the array antenna properties
         arma::uword n_elevation() const; // Number of elevation angles
@@ -69,27 +69,32 @@ namespace quadriga_lib
         void copy_element(arma::uword source, arma::uvec destination);
         void copy_element(arma::uword source, arma::uword destination);
 
-        // Interpolation of the antenna pattern
-        void interpolate(const arma::Mat<dtype> azimuth,       // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
-                         const arma::Mat<dtype> elevation,     // Elevation angles for interpolation in [rad],           Size [1, n_ang] or [n_out, n_ang]
-                         const arma::Col<unsigned> i_element,  // Element indices, 1-based,                              Vector of length "n_out"
-                         const arma::Cube<dtype> orientation,  // Orientation (bank, tilt, head) in [rad],               Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
-                         const arma::Mat<dtype> element_pos_i, // Alternative element positions, optional,               Size [3, n_out] or Empty (= use element_pos from arrayant object)
-                         arma::Mat<dtype> *V_re,               // Interpolated vertical (e_theta) field, real part,      Size [n_out, n_ang]
-                         arma::Mat<dtype> *V_im,               // Interpolated vertical (e_theta) field, imaginary part, Size [n_out, n_ang]
-                         arma::Mat<dtype> *H_re,               // Interpolated horizontal (e_phi) field, real part,      Size [n_out, n_ang]
-                         arma::Mat<dtype> *H_im,               // Interpolated horizontal (e_phi) field, imaginary part, Size [n_out, n_ang]
-                         arma::Mat<dtype> *dist,               // Projected element distances for phase offset,          Size [n_out, n_ang]
-                         arma::Mat<dtype> *azimuth_loc,        // Azimuth angles [rad] in local antenna coordinates,     Size [n_out, n_ang]
-                         arma::Mat<dtype> *elevation_loc,      // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
-                         arma::Mat<dtype> *gamma) const;       // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
+        // Export the antenna pattern geometry to a Wavefront OBJ file, e.g. for visualization in Blender
+        // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
+        void export_obj_file(std::string fn,                   // Filename of the OBJ file
+                             dtype directivity_range = 30.0,   // Directivity range of the antenna pattern visualization in dB
+                             std::string colormap = "jet",     // Colormap for the visualization
+                             dtype object_radius = 1.0,        // Radius in meters of the exported object
+                             arma::uword icosphere_n_div = 4,  // Map pattern to an Icosphere with given number of subdivisions
+                             arma::uvec i_element = {}) const; // Antenna element indices, 0-based, empty = export all
 
-        void interpolate(const arma::Mat<dtype> azimuth,                 // Azimuth angles [rad],                        Size [1, n_ang] or [n_out, n_ang]
-                         const arma::Mat<dtype> elevation,               // Elevation angles for interpolation in [rad], Size [1, n_ang] or [n_out, n_ang]
-                         const arma::Cube<dtype> orientation,            // Orientation (bank, tilt, head) in [rad],     Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
-                         arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im, // Interpolated vertical (e_theta) field,       Size [n_out, n_ang]
-                         arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im, // Interpolated horizontal (e_phi) field,       Size [n_out, n_ang]
-                         arma::Mat<dtype> *dist) const;                  // Projected element distances,                 Size [n_out, n_ang]
+        // Interpolation of the antenna pattern
+        // - Takes azimuth and elevation angles as input and calculates the complex-valued antenna response
+        // - "n_out" corresponds to the number of antenna elements
+        // - "orientation" and "element_pos_i" are optional inputs
+        void interpolate(const arma::Mat<dtype> *azimuth,                 // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
+                         const arma::Mat<dtype> *elevation,               // Elevation angles [rad],                                Size [1, n_ang] or [n_out, n_ang]
+                         arma::Mat<dtype> *V_re,                          // Interpolated vertical (e_theta) field, real part,      Size [n_out, n_ang]
+                         arma::Mat<dtype> *V_im,                          // Interpolated vertical (e_theta) field, imaginary part, Size [n_out, n_ang]
+                         arma::Mat<dtype> *H_re,                          // Interpolated horizontal (e_phi) field, real part,      Size [n_out, n_ang]
+                         arma::Mat<dtype> *H_im,                          // Interpolated horizontal (e_phi) field, imaginary part, Size [n_out, n_ang]
+                         arma::uvec i_element = {},                       // Element indices, 0-based, optional,                    Vector of length "n_out"
+                         const arma::Cube<dtype> *orientation = nullptr,  // Orientation (bank, tilt, head) in [rad], optional,     Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
+                         const arma::Mat<dtype> *element_pos_i = nullptr, // Alternative element positions, optional,               Size [3, n_out] or Empty (= use element_pos from arrayant object)
+                         arma::Mat<dtype> *dist = nullptr,                // Projected element distances for phase offset,          Size [n_out, n_ang]
+                         arma::Mat<dtype> *azimuth_loc = nullptr,         // Azimuth angles [rad] in local antenna coordinates,     Size [n_out, n_ang]
+                         arma::Mat<dtype> *elevation_loc = nullptr,       // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
+                         arma::Mat<dtype> *gamma = nullptr) const;        // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
 
         // Write array antenna object and layout to QDANT file, returns id in file
         unsigned qdant_write(std::string fn, unsigned id = 0, arma::Mat<unsigned> layout = arma::Mat<unsigned>()) const;
