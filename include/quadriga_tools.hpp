@@ -37,6 +37,10 @@ namespace quadriga_lib
     template <typename dtype>
     arma::cube cart2geo(const arma::Cube<dtype> cart);
 
+    // Generate colormap
+    // Output is a 64 x 3 matrix of unsigned chars
+    arma::uchar_mat colormap(std::string map);
+
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     template <typename dtype>
     arma::cube geo2cart(const arma::Mat<dtype> azimuth,
