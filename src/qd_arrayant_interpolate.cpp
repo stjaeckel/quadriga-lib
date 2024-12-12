@@ -75,22 +75,18 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     bool per_element_rotation = orientation->n_cols > 1 ? true : false;
     bool per_angle_rotation = orientation->n_slices > 1 ? true : false;
 
-    // Determine if we need to write the angles in local antenna coordinates
-    bool write_az = !azimuth_loc->is_empty(), write_el = !elevation_loc->is_empty(),
-         write_dist = !dist->is_empty(), write_gamma = !gamma->is_empty();
-
     // Output pointers
-    dtype *p_dist = dist->memptr();
-    dtype *p_azimuth_loc = azimuth_loc->memptr();
-    dtype *p_elevation_loc = elevation_loc->memptr();
-    dtype *p_gamma = gamma->memptr();
+    dtype *p_dist = (dist == nullptr || dist->is_empty()) ? nullptr : dist->memptr();
+    dtype *p_azimuth_loc = (azimuth_loc == nullptr || azimuth_loc->is_empty()) ? nullptr : azimuth_loc->memptr();
+    dtype *p_elevation_loc = (elevation_loc == nullptr || elevation_loc->is_empty()) ? nullptr : elevation_loc->memptr();
+    dtype *p_gamma = (gamma == nullptr || gamma->is_empty()) ? nullptr : gamma->memptr();
 
     // Rotation matrix [3,3,n_out] or [3,3,1], always double output
     arma::cube R = quadriga_lib::calc_rotation_matrix(*orientation, true, true);
     const arma::Cube<dtype> R_typed = arma::conv_to<arma::Cube<dtype>>::from(R);
     R.reset();
 
-    // Obtain pointers for direct memory access (faster)
+    // Obtain pointers for direct memory access
     const unsigned *p_i_element = i_element->memptr();                                  // Elements
     const dtype *p_theta_re = e_theta_re->memptr(), *p_theta_im = e_theta_im->memptr(); // Vertical pattern
     const dtype *p_phi_re = e_phi_re->memptr(), *p_phi_im = e_phi_im->memptr();         // Horizontal pattern
@@ -176,7 +172,7 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
 
             // Calculate the projected distance
             dtype dst = zero;
-            if (write_dist)
+            if (p_dist != nullptr)
             {
                 dst = dx * p_element_pos[3 * o] + dy * p_element_pos[3 * o + 1] + dz * p_element_pos[3 * o + 2];
                 dtype dx2 = dx * dx, dy2 = dy * dy, dz2 = dz * dz;
@@ -360,13 +356,13 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
             p_h_im[ioa] = sin_gamma * Vi + cos_gamma * Hi;
 
             // Write optional azimuth and elevation angles
-            if (write_dist)
+            if (p_dist != nullptr)
                 p_dist[ioa] = dst;
-            if (write_az)
+            if (p_azimuth_loc != nullptr)
                 p_azimuth_loc[ioa] = az;
-            if (write_el)
+            if (p_elevation_loc != nullptr)
                 p_elevation_loc[ioa] = el;
-            if (write_gamma)
+            if (p_gamma != nullptr)
                 p_gamma[ioa] = std::atan2(sin_gamma, cos_gamma);
         }
     }

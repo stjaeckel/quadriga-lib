@@ -15,27 +15,24 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#ifndef quadriga_lib_H
-#define quadriga_lib_H
+#include <catch2/catch_test_macros.hpp>
 
-#include <armadillo>
+#include "quadriga_lib.hpp"
+
+#include <iostream>
 #include <string>
-#include <vector>
-#include <any>
 
-#include "quadriga_arrayant.hpp"
-#include "quadriga_channel.hpp"
-#include "quadriga_tools.hpp"
-
-#define QUADRIGA_LIB_VERSION v0_2_0
-
-namespace quadriga_lib
+TEST_CASE("Arrayant OBJ Export")
 {
-    // Returns the version number as a string in format (x.y.z)
-    std::string quadriga_lib_version();
+    auto ant = quadriga_lib::generate_arrayant_3GPP<float>(1, 2);
+    CHECK(ant.name == "3gpp");
+    ant.name = "g_pp";
 
-    // Check if AVX2 is supported
-    bool quadriga_lib_has_AVX2();
+    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obx"), std::invalid_argument);
+    REQUIRE_THROWS_AS(ant.export_obj_file("testantenna.obj", 0.0), std::invalid_argument);
+
+    ant.export_obj_file("testantenna.obj", 30.0, "jet", 0.4, 4);
+
+    std::remove("testantenna.obj");
+    std::remove("testantenna.mtl");
 }
-
-#endif

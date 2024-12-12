@@ -16,7 +16,10 @@
 // ------------------------------------------------------------------------
 
 #include <stdexcept>
-#include <cstring> // For std::memcopy
+#include <cstring>   // std::memcopy
+#include <iomanip>   // std::setprecision
+#include <algorithm> // std::replace
+#include <iostream>
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
@@ -741,18 +744,387 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword
     copy_element(source, dest);
 }
 
+// ARRAYANT METHOD : OBJ Export
+template <typename dtype>
+void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype directivity_range, std::string colormap,
+                                                    dtype object_radius, arma::uword icosphere_n_div,
+                                                    arma::uvec i_element) const
+{
+    // Check if arrayant object is valid
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Input validation
+    std::string fn_suffix = ".obj";
+    std::string fn_mtl;
+
+    if (fn.size() >= fn_suffix.size() &&
+        fn.compare(fn.size() - fn_suffix.size(), fn_suffix.size(), fn_suffix) == 0)
+    {
+        fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
+    }
+    else
+        throw std::invalid_argument("OBJ-File name must end with .obj");
+
+    // Replace spaces in ant_name
+    std::string ant_name = name;
+    std::replace(ant_name.begin(), ant_name.end(), ' ', '_');
+
+    // Extract the file name from the path
+    std::string fn_mtl_base;
+    size_t pos = fn_mtl.find_last_of("/");
+    if (pos != std::string::npos)
+        fn_mtl_base = fn_mtl.substr(pos + 1);
+    else
+        fn_mtl_base = fn_mtl;
+
+    double range = -std::abs((double)directivity_range);
+    if (range == 0.0)
+        throw std::invalid_argument("Directivity range cannot be 0.");
+
+    double radius = (double)object_radius;
+    if (radius <= 0.0)
+        throw std::invalid_argument("Object radius must be larger than 0.");
+
+    arma::uword no_elements = n_elements();
+
+    if (i_element.n_elem == 0)
+        i_element = arma::regspace<arma::uvec>(0, no_elements - 1);
+
+    if (arma::any(i_element >= no_elements))
+        throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
+
+    size_t no_elements_t = (size_t)i_element.n_elem;
+
+    // Colormap
+    arma::uchar_mat cmap(64, 3);
+    if (colormap == "jet")
+        cmap = {{0, 0, 143}, {0, 0, 159}, {0, 0, 175}, {0, 0, 191}, {0, 0, 207}, {0, 0, 223}, {0, 0, 239}, {0, 0, 255}, {0, 16, 255}, {0, 32, 255}, {0, 48, 255}, {0, 64, 255}, {0, 80, 255}, {0, 96, 255}, {0, 112, 255}, {0, 128, 255}, {0, 143, 255}, {0, 159, 255}, {0, 175, 255}, {0, 191, 255}, {0, 207, 255}, {0, 223, 255}, {0, 239, 255}, {0, 255, 255}, {16, 255, 239}, {32, 255, 223}, {48, 255, 207}, {64, 255, 191}, {80, 255, 175}, {96, 255, 159}, {112, 255, 143}, {128, 255, 128}, {143, 255, 112}, {159, 255, 96}, {175, 255, 80}, {191, 255, 64}, {207, 255, 48}, {223, 255, 32}, {239, 255, 16}, {255, 255, 0}, {255, 239, 0}, {255, 223, 0}, {255, 207, 0}, {255, 191, 0}, {255, 175, 0}, {255, 159, 0}, {255, 143, 0}, {255, 128, 0}, {255, 112, 0}, {255, 96, 0}, {255, 80, 0}, {255, 64, 0}, {255, 48, 0}, {255, 32, 0}, {255, 16, 0}, {255, 0, 0}, {239, 0, 0}, {223, 0, 0}, {207, 0, 0}, {191, 0, 0}, {175, 0, 0}, {159, 0, 0}, {143, 0, 0}, {128, 0, 0}};
+    else if (colormap == "parula")
+        cmap = {{62, 38, 168}, {64, 42, 180}, {66, 46, 192}, {68, 50, 203}, {69, 55, 213}, {70, 60, 222}, {71, 65, 229}, {71, 71, 235}, {72, 77, 240}, {72, 82, 244}, {71, 88, 248}, {70, 94, 251}, {69, 99, 253}, {66, 105, 254}, {62, 111, 255}, {56, 117, 254}, {50, 124, 252}, {47, 129, 250}, {46, 135, 247}, {45, 140, 243}, {43, 145, 239}, {39, 151, 235}, {37, 155, 232}, {35, 160, 229}, {32, 165, 227}, {28, 169, 223}, {24, 173, 219}, {18, 177, 214}, {8, 181, 208}, {1, 184, 202}, {2, 186, 195}, {11, 189, 189}, {25, 191, 182}, {36, 193, 174}, {44, 196, 167}, {49, 198, 159}, {55, 200, 151}, {63, 202, 142}, {74, 203, 132}, {87, 204, 122}, {100, 205, 111}, {114, 205, 100}, {129, 204, 89}, {143, 203, 78}, {157, 201, 67}, {171, 199, 57}, {185, 196, 49}, {197, 194, 42}, {209, 191, 39}, {220, 189, 41}, {230, 187, 45}, {240, 186, 54}, {248, 186, 61}, {254, 190, 60}, {254, 195, 56}, {254, 201, 52}, {252, 207, 48}, {250, 214, 45}, {247, 220, 42}, {245, 227, 39}, {245, 233, 36}, {246, 239, 32}, {247, 245, 27}, {249, 251, 21}};
+    else if (colormap == "winter")
+        cmap = {{0, 0, 255}, {0, 4, 253}, {0, 8, 251}, {0, 12, 249}, {0, 16, 247}, {0, 20, 245}, {0, 24, 243}, {0, 28, 241}, {0, 32, 239}, {0, 36, 237}, {0, 40, 235}, {0, 45, 233}, {0, 49, 231}, {0, 53, 229}, {0, 57, 227}, {0, 61, 225}, {0, 65, 223}, {0, 69, 221}, {0, 73, 219}, {0, 77, 217}, {0, 81, 215}, {0, 85, 213}, {0, 89, 210}, {0, 93, 208}, {0, 97, 206}, {0, 101, 204}, {0, 105, 202}, {0, 109, 200}, {0, 113, 198}, {0, 117, 196}, {0, 121, 194}, {0, 125, 192}, {0, 130, 190}, {0, 134, 188}, {0, 138, 186}, {0, 142, 184}, {0, 146, 182}, {0, 150, 180}, {0, 154, 178}, {0, 158, 176}, {0, 162, 174}, {0, 166, 172}, {0, 170, 170}, {0, 174, 168}, {0, 178, 166}, {0, 182, 164}, {0, 186, 162}, {0, 190, 160}, {0, 194, 158}, {0, 198, 156}, {0, 202, 154}, {0, 206, 152}, {0, 210, 150}, {0, 215, 148}, {0, 219, 146}, {0, 223, 144}, {0, 227, 142}, {0, 231, 140}, {0, 235, 138}, {0, 239, 136}, {0, 243, 134}, {0, 247, 132}, {0, 251, 130}, {0, 255, 128}};
+    else if (colormap == "hot")
+        cmap = {{11, 0, 0}, {21, 0, 0}, {32, 0, 0}, {43, 0, 0}, {53, 0, 0}, {64, 0, 0}, {74, 0, 0}, {85, 0, 0}, {96, 0, 0}, {106, 0, 0}, {117, 0, 0}, {128, 0, 0}, {138, 0, 0}, {149, 0, 0}, {159, 0, 0}, {170, 0, 0}, {181, 0, 0}, {191, 0, 0}, {202, 0, 0}, {213, 0, 0}, {223, 0, 0}, {234, 0, 0}, {244, 0, 0}, {255, 0, 0}, {255, 11, 0}, {255, 21, 0}, {255, 32, 0}, {255, 43, 0}, {255, 53, 0}, {255, 64, 0}, {255, 74, 0}, {255, 85, 0}, {255, 96, 0}, {255, 106, 0}, {255, 117, 0}, {255, 128, 0}, {255, 138, 0}, {255, 149, 0}, {255, 159, 0}, {255, 170, 0}, {255, 181, 0}, {255, 191, 0}, {255, 202, 0}, {255, 213, 0}, {255, 223, 0}, {255, 234, 0}, {255, 244, 0}, {255, 255, 0}, {255, 255, 16}, {255, 255, 32}, {255, 255, 48}, {255, 255, 64}, {255, 255, 80}, {255, 255, 96}, {255, 255, 112}, {255, 255, 128}, {255, 255, 143}, {255, 255, 159}, {255, 255, 175}, {255, 255, 191}, {255, 255, 207}, {255, 255, 223}, {255, 255, 239}, {255, 255, 255}};
+    else if (colormap == "turbo")
+        cmap = {{48, 18, 59}, {53, 30, 89}, {57, 42, 116}, {61, 54, 140}, {64, 65, 163}, {67, 76, 183}, {68, 87, 200}, {70, 98, 215}, {70, 108, 228}, {71, 119, 239}, {70, 129, 247}, {69, 139, 253}, {65, 149, 255}, {60, 159, 253}, {53, 170, 249}, {46, 180, 242}, {39, 189, 234}, {33, 199, 224}, {28, 207, 213}, {24, 215, 202}, {24, 222, 192}, {26, 228, 182}, {33, 234, 172}, {42, 239, 161}, {54, 243, 148}, {67, 247, 134}, {83, 250, 121}, {98, 252, 107}, {114, 254, 94}, {130, 255, 82}, {144, 255, 72}, {157, 254, 64}, {168, 252, 58}, {179, 248, 54}, {189, 244, 52}, {200, 239, 52}, {209, 233, 53}, {218, 226, 54}, {227, 219, 56}, {234, 211, 57}, {241, 203, 58}, {246, 195, 58}, {250, 186, 57}, {252, 177, 54}, {254, 166, 50}, {254, 155, 45}, {253, 143, 40}, {252, 131, 35}, {249, 119, 30}, {246, 107, 25}, {242, 95, 20}, {237, 84, 15}, {231, 74, 12}, {225, 66, 9}, {218, 57, 7}, {211, 50, 5}, {202, 42, 4}, {193, 35, 2}, {183, 29, 2}, {173, 23, 1}, {161, 18, 1}, {149, 13, 1}, {136, 8, 2}, {122, 4, 3}};
+    else if (colormap == "copper")
+        cmap = {{0, 0, 0}, {5, 3, 2}, {10, 6, 4}, {15, 9, 6}, {20, 13, 8}, {25, 16, 10}, {30, 19, 12}, {35, 22, 14}, {40, 25, 16}, {46, 28, 18}, {51, 32, 20}, {56, 35, 22}, {61, 38, 24}, {66, 41, 26}, {71, 44, 28}, {76, 47, 30}, {81, 51, 32}, {86, 54, 34}, {91, 57, 36}, {96, 60, 38}, {101, 63, 40}, {106, 66, 42}, {111, 70, 44}, {116, 73, 46}, {121, 76, 48}, {126, 79, 50}, {132, 82, 52}, {137, 85, 54}, {142, 89, 56}, {147, 92, 58}, {152, 95, 60}, {157, 98, 62}, {162, 101, 64}, {167, 104, 66}, {172, 108, 68}, {177, 111, 70}, {182, 114, 72}, {187, 117, 75}, {192, 120, 77}, {197, 123, 79}, {202, 126, 81}, {207, 130, 83}, {212, 133, 85}, {218, 136, 87}, {223, 139, 89}, {228, 142, 91}, {233, 145, 93}, {238, 149, 95}, {243, 152, 97}, {248, 155, 99}, {253, 158, 101}, {255, 161, 103}, {255, 164, 105}, {255, 168, 107}, {255, 171, 109}, {255, 174, 111}, {255, 177, 113}, {255, 180, 115}, {255, 183, 117}, {255, 187, 119}, {255, 190, 121}, {255, 193, 123}, {255, 196, 125}, {255, 199, 127}};
+    else if (colormap == "spring")
+        cmap = {{255, 0, 255}, {255, 4, 251}, {255, 8, 247}, {255, 12, 243}, {255, 16, 239}, {255, 20, 235}, {255, 24, 231}, {255, 28, 227}, {255, 32, 223}, {255, 36, 219}, {255, 40, 215}, {255, 45, 210}, {255, 49, 206}, {255, 53, 202}, {255, 57, 198}, {255, 61, 194}, {255, 65, 190}, {255, 69, 186}, {255, 73, 182}, {255, 77, 178}, {255, 81, 174}, {255, 85, 170}, {255, 89, 166}, {255, 93, 162}, {255, 97, 158}, {255, 101, 154}, {255, 105, 150}, {255, 109, 146}, {255, 113, 142}, {255, 117, 138}, {255, 121, 134}, {255, 125, 130}, {255, 130, 125}, {255, 134, 121}, {255, 138, 117}, {255, 142, 113}, {255, 146, 109}, {255, 150, 105}, {255, 154, 101}, {255, 158, 97}, {255, 162, 93}, {255, 166, 89}, {255, 170, 85}, {255, 174, 81}, {255, 178, 77}, {255, 182, 73}, {255, 186, 69}, {255, 190, 65}, {255, 194, 61}, {255, 198, 57}, {255, 202, 53}, {255, 206, 49}, {255, 210, 45}, {255, 215, 40}, {255, 219, 36}, {255, 223, 32}, {255, 227, 28}, {255, 231, 24}, {255, 235, 20}, {255, 239, 16}, {255, 243, 12}, {255, 247, 8}, {255, 251, 4}, {255, 255, 0}};
+    else if (colormap == "cool")
+        cmap = {{0, 255, 255}, {4, 251, 255}, {8, 247, 255}, {12, 243, 255}, {16, 239, 255}, {20, 235, 255}, {24, 231, 255}, {28, 227, 255}, {32, 223, 255}, {36, 219, 255}, {40, 215, 255}, {45, 210, 255}, {49, 206, 255}, {53, 202, 255}, {57, 198, 255}, {61, 194, 255}, {65, 190, 255}, {69, 186, 255}, {73, 182, 255}, {77, 178, 255}, {81, 174, 255}, {85, 170, 255}, {89, 166, 255}, {93, 162, 255}, {97, 158, 255}, {101, 154, 255}, {105, 150, 255}, {109, 146, 255}, {113, 142, 255}, {117, 138, 255}, {121, 134, 255}, {125, 130, 255}, {130, 125, 255}, {134, 121, 255}, {138, 117, 255}, {142, 113, 255}, {146, 109, 255}, {150, 105, 255}, {154, 101, 255}, {158, 97, 255}, {162, 93, 255}, {166, 89, 255}, {170, 85, 255}, {174, 81, 255}, {178, 77, 255}, {182, 73, 255}, {186, 69, 255}, {190, 65, 255}, {194, 61, 255}, {198, 57, 255}, {202, 53, 255}, {206, 49, 255}, {210, 45, 255}, {215, 40, 255}, {219, 36, 255}, {223, 32, 255}, {227, 28, 255}, {231, 24, 255}, {235, 20, 255}, {239, 16, 255}, {243, 12, 255}, {247, 8, 255}, {251, 4, 255}, {255, 0, 255}};
+    else if (colormap == "gray")
+        cmap = {{0, 0, 0}, {4, 4, 4}, {8, 8, 8}, {12, 12, 12}, {16, 16, 16}, {20, 20, 20}, {24, 24, 24}, {28, 28, 28}, {32, 32, 32}, {36, 36, 36}, {40, 40, 40}, {45, 45, 45}, {49, 49, 49}, {53, 53, 53}, {57, 57, 57}, {61, 61, 61}, {65, 65, 65}, {69, 69, 69}, {73, 73, 73}, {77, 77, 77}, {81, 81, 81}, {85, 85, 85}, {89, 89, 89}, {93, 93, 93}, {97, 97, 97}, {101, 101, 101}, {105, 105, 105}, {109, 109, 109}, {113, 113, 113}, {117, 117, 117}, {121, 121, 121}, {125, 125, 125}, {130, 130, 130}, {134, 134, 134}, {138, 138, 138}, {142, 142, 142}, {146, 146, 146}, {150, 150, 150}, {154, 154, 154}, {158, 158, 158}, {162, 162, 162}, {166, 166, 166}, {170, 170, 170}, {174, 174, 174}, {178, 178, 178}, {182, 182, 182}, {186, 186, 186}, {190, 190, 190}, {194, 194, 194}, {198, 198, 198}, {202, 202, 202}, {206, 206, 206}, {210, 210, 210}, {215, 215, 215}, {219, 219, 219}, {223, 223, 223}, {227, 227, 227}, {231, 231, 231}, {235, 235, 235}, {239, 239, 239}, {243, 243, 243}, {247, 247, 247}, {251, 251, 251}, {255, 255, 255}};
+    else if (colormap == "autumn")
+        cmap = {{255, 0, 0}, {255, 4, 0}, {255, 8, 0}, {255, 12, 0}, {255, 16, 0}, {255, 20, 0}, {255, 24, 0}, {255, 28, 0}, {255, 32, 0}, {255, 36, 0}, {255, 40, 0}, {255, 45, 0}, {255, 49, 0}, {255, 53, 0}, {255, 57, 0}, {255, 61, 0}, {255, 65, 0}, {255, 69, 0}, {255, 73, 0}, {255, 77, 0}, {255, 81, 0}, {255, 85, 0}, {255, 89, 0}, {255, 93, 0}, {255, 97, 0}, {255, 101, 0}, {255, 105, 0}, {255, 109, 0}, {255, 113, 0}, {255, 117, 0}, {255, 121, 0}, {255, 125, 0}, {255, 130, 0}, {255, 134, 0}, {255, 138, 0}, {255, 142, 0}, {255, 146, 0}, {255, 150, 0}, {255, 154, 0}, {255, 158, 0}, {255, 162, 0}, {255, 166, 0}, {255, 170, 0}, {255, 174, 0}, {255, 178, 0}, {255, 182, 0}, {255, 186, 0}, {255, 190, 0}, {255, 194, 0}, {255, 198, 0}, {255, 202, 0}, {255, 206, 0}, {255, 210, 0}, {255, 215, 0}, {255, 219, 0}, {255, 223, 0}, {255, 227, 0}, {255, 231, 0}, {255, 235, 0}, {255, 239, 0}, {255, 243, 0}, {255, 247, 0}, {255, 251, 0}, {255, 255, 0}};
+    else if (colormap == "summer")
+        cmap = {{0, 128, 102}, {4, 130, 102}, {8, 132, 102}, {12, 134, 102}, {16, 136, 102}, {20, 138, 102}, {24, 140, 102}, {28, 142, 102}, {32, 144, 102}, {36, 146, 102}, {40, 148, 102}, {45, 150, 102}, {49, 152, 102}, {53, 154, 102}, {57, 156, 102}, {61, 158, 102}, {65, 160, 102}, {69, 162, 102}, {73, 164, 102}, {77, 166, 102}, {81, 168, 102}, {85, 170, 102}, {89, 172, 102}, {93, 174, 102}, {97, 176, 102}, {101, 178, 102}, {105, 180, 102}, {109, 182, 102}, {113, 184, 102}, {117, 186, 102}, {121, 188, 102}, {125, 190, 102}, {130, 192, 102}, {134, 194, 102}, {138, 196, 102}, {142, 198, 102}, {146, 200, 102}, {150, 202, 102}, {154, 204, 102}, {158, 206, 102}, {162, 208, 102}, {166, 210, 102}, {170, 212, 102}, {174, 215, 102}, {178, 217, 102}, {182, 219, 102}, {186, 221, 102}, {190, 223, 102}, {194, 225, 102}, {198, 227, 102}, {202, 229, 102}, {206, 231, 102}, {210, 233, 102}, {215, 235, 102}, {219, 237, 102}, {223, 239, 102}, {227, 241, 102}, {231, 243, 102}, {235, 245, 102}, {239, 247, 102}, {243, 249, 102}, {247, 251, 102}, {251, 253, 102}, {255, 255, 102}};
+    else
+    {
+        throw std::invalid_argument("Colormap is not supported.");
+    }
+    size_t n_cmap = (size_t)cmap.n_rows;
+
+    // Export colormap to material file
+    std::ofstream outFile(fn_mtl);
+    if (outFile.is_open())
+    {
+        // Write some text to the file
+        outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
+        for (size_t i = 0; i < n_cmap; ++i)
+        {
+            float R = (float)cmap(i, 0) / 255.0f;
+            float G = (float)cmap(i, 1) / 255.0f;
+            float B = (float)cmap(i, 2) / 255.0f;
+            outFile << "newmtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
+            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
+        }
+        outFile.close();
+    }
+
+    // Generate vertices and faces
+    arma::mat vertices_icosphere; // double precision
+    arma::u32_mat faces_icosphere;
+    size_t no_faces, no_vert;
+    {
+        arma::mat center, vert;
+        no_faces = quadriga_lib::icosphere<double>(icosphere_n_div, 1.0, &center, nullptr, &vert);
+
+        vertices_icosphere.set_size(3 * no_faces, 3);
+        faces_icosphere.set_size(no_faces, 3);
+
+        double *pc = center.memptr(), *pv = vert.memptr(), *v = vertices_icosphere.memptr();
+        unsigned *f_ico = faces_icosphere.memptr();
+
+        for (size_t i_face = 0; i_face < no_faces; ++i_face)
+        {
+            double x, y, z;
+
+            x = pc[i_face] + pv[i_face];
+            y = pc[i_face + no_faces] + pv[i_face + no_faces];
+            z = pc[i_face + 2 * no_faces] + pv[i_face + 2 * no_faces];
+
+            v[3 * i_face] = x;
+            v[3 * i_face + 3 * no_faces] = y;
+            v[3 * i_face + 6 * no_faces] = z;
+            f_ico[i_face] = 3 * (unsigned)i_face + 1;
+
+            x = pc[i_face] + pv[i_face + 3 * no_faces];
+            y = pc[i_face + no_faces] + pv[i_face + 4 * no_faces];
+            z = pc[i_face + 2 * no_faces] + pv[i_face + 5 * no_faces];
+
+            v[3 * i_face + 1] = x;
+            v[3 * i_face + 3 * no_faces + 1] = y;
+            v[3 * i_face + 6 * no_faces + 1] = z;
+            f_ico[i_face + no_faces] = 3 * (unsigned)i_face + 2;
+
+            x = pc[i_face] + pv[i_face + 6 * no_faces];
+            y = pc[i_face + no_faces] + pv[i_face + 7 * no_faces];
+            z = pc[i_face + 2 * no_faces] + pv[i_face + 8 * no_faces];
+
+            v[3 * i_face + 2] = x;
+            v[3 * i_face + 3 * no_faces + 2] = y;
+            v[3 * i_face + 6 * no_faces + 2] = z;
+            f_ico[i_face + 2 * no_faces] = 3 * (unsigned)i_face + 3;
+        }
+    }
+    no_vert = 3 * no_faces;
+
+    // Convert vertices to angles
+    arma::Mat<dtype> azimuth, elevation;
+    azimuth.set_size(1, no_vert);
+    elevation.set_size(1, no_vert);
+    {
+        double *v = vertices_icosphere.memptr();
+        dtype *az = azimuth.memptr(), *el = elevation.memptr();
+        for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+        {
+            double x = v[i_vert];
+            double y = v[i_vert + no_vert];
+            double z = v[i_vert + 2 * no_vert];
+            x = x > 1.0 ? 1.0 : x, y = y > 1.0 ? 1.0 : y, z = z > 1.0 ? 1.0 : z;
+            x = x < -1.0 ? -1.0 : x, y = y < -1.0 ? -1.0 : y, z = z < -1.0 ? -1.0 : z;
+            az[i_vert] = (dtype)std::atan2(y, x);
+            el[i_vert] = (dtype)std::asin(z);
+        }
+    }
+
+    // Interpolate antenna patterns (for all elements in the array)
+    arma::Mat<dtype> V_re, V_im, H_re, H_im;
+    interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im, i_element);
+    dtype *vr = V_re.memptr(), *vi = V_im.memptr(), *hr = H_re.memptr(), *hi = H_im.memptr();
+
+    // Calculate maximum Power in the Pattern
+    double max_pow = 0.0;
+    for (size_t i_el = 0; i_el < no_elements_t; ++i_el)
+        for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+        {
+            size_t i = i_vert * no_elements_t + i_el;
+            double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
+            double p = a * a + b * b + c * c + d * d;
+            max_pow = (p > max_pow) ? p : max_pow;
+        }
+    max_pow = 1.0 / max_pow;
+
+    // Write OBJ File
+    outFile = std::ofstream(fn);
+    if (outFile.is_open())
+    {
+        outFile << "# QuaDRiGa " << "antenna pattern\n";
+        outFile << "mtllib " << fn_mtl_base << "\n";
+
+        // Face offset for previous element in the OBJ file
+        unsigned face_offset = 1; // OBJ starts counting at 1
+
+        // Export each element to the OBJ file
+        double scale = 1.0 / (-range);
+        for (size_t i_el = 0; i_el < no_elements_t; ++i_el)
+        {
+            arma::uword i_array_element = i_element(i_el);
+            outFile << "\no " << "QuaDRiGa_ANT_" << ant_name << "_" << std::setfill('0') << std::setw(3) << i_array_element << "\n";
+
+            // Calculate Shape
+            arma::vec pow(no_vert);
+            double *pp = pow.memptr();
+            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+            {
+                size_t i = i_vert * no_elements_t + i_el;
+                double a = (double)vr[i], b = (double)vi[i], c = (double)hr[i], d = (double)hi[i];
+                double p = a * a + b * b + c * c + d * d;
+                p *= max_pow;                // Scale by maximum power
+                p = 10.0 * std::log10(p);    // Convert to dB
+                p = (p < range) ? range : p; // Set minimum
+                p = (p - range) * scale;     // Set to range 0 ... 1
+                pp[i_vert] = p;
+            }
+
+            // Scale vertices
+            arma::mat scaled_vertices(no_vert, 3);
+            double *v_scale = scaled_vertices.memptr();  // Scaled vertices
+            double *v_ico = vertices_icosphere.memptr(); // Icosphere vertices
+            for (size_t i_vert = 0; i_vert < no_vert; ++i_vert)
+            {
+                v_scale[i_vert] = v_ico[i_vert] * pp[i_vert];                             // x
+                v_scale[i_vert + no_vert] = v_ico[i_vert + no_vert] * pp[i_vert];         // y
+                v_scale[i_vert + 2 * no_vert] = v_ico[i_vert + 2 * no_vert] * pp[i_vert]; // z
+            }
+
+            // Process faces
+            double eps = 0.001; // Co-location tolerance in [m], relative to 1 m radius
+            eps *= eps;         // Squared value
+
+            arma::mat final_vertices(no_vert, 3);
+            arma::u32_mat vert_index(no_faces, 3);
+            arma::u32_vec cmap_index(no_faces);
+
+            double *v_final = final_vertices.memptr(); // Final vertices
+            unsigned *f_final = vert_index.memptr();   // Final face indices
+            unsigned *i_cmap = cmap_index.memptr();    // Colormap index
+
+            size_t no_final_vert = 0; // Number of final vertices
+            size_t no_final_face = 0; // Number of final faces
+
+            for (size_t i_face = 0; i_face < no_faces; ++i_face)
+            {
+                // Load the 3 scaled vertices of the face
+                double x0 = v_scale[3 * i_face];
+                double y0 = v_scale[3 * i_face + no_vert];
+                double z0 = v_scale[3 * i_face + 2 * no_vert];
+
+                double x1 = v_scale[3 * i_face + 1];
+                double y1 = v_scale[3 * i_face + no_vert + 1];
+                double z1 = v_scale[3 * i_face + 2 * no_vert + 1];
+
+                double x2 = v_scale[3 * i_face + 2];
+                double y2 = v_scale[3 * i_face + no_vert + 2];
+                double z2 = v_scale[3 * i_face + 2 * no_vert + 2];
+
+                // Check if face vertices collapse to a point or line
+                double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+                double dd = dx * dx + dy * dy + dz * dz;
+
+                if (dd < eps)
+                    continue;
+
+                dx = x2 - x0, dy = y2 - y0, dz = z2 - z0;
+                dd = dx * dx + dy * dy + dz * dz;
+
+                if (dd < eps)
+                    continue;
+
+                dx = x2 - x1, dy = y2 - y1, dz = z2 - z1;
+                dd = dx * dx + dy * dy + dz * dz;
+
+                if (dd < eps)
+                    continue;
+
+                // Do for each of the 3 vertices
+                for (size_t i3 = 0; i3 < 3; ++i3)
+                {
+                    double x = x0, y = y0, z = z0;
+                    if (i3 == 1)
+                        x = x1, y = y1, z = z1;
+                    else if (i3 == 2)
+                        x = x2, y = y2, z = z2;
+
+                    // Add the vertices to the final list
+                    size_t i_vert_final = 0; // Face index
+
+                    // Get vertex ID
+                    for (size_t i = 0; i < no_final_vert; ++i) // Search exisiting vertex
+                    {
+                        dx = v_final[i] - x;
+                        dy = v_final[i + no_vert] - y;
+                        dz = v_final[i + 2 * no_vert] - z;
+                        dd = dx * dx + dy * dy + dz * dz;
+                        if (dd < eps)
+                        {
+                            i_vert_final = i;
+                            break;
+                        }
+                    }
+                    if (i_vert_final == 0) // Add new vertex to ist
+                    {
+                        i_vert_final = no_final_vert;
+                        v_final[i_vert_final] = x;
+                        v_final[i_vert_final + no_vert] = y;
+                        v_final[i_vert_final + 2 * no_vert] = z;
+                        ++no_final_vert;
+                    }
+
+                    // Write face ID
+                    f_final[no_final_face + i3 * no_faces] = (unsigned)i_vert_final;
+                }
+
+                // Get the colormap index
+                double pf = pp[3 * i_face] + pp[3 * i_face + 1] + pp[3 * i_face + 2];
+                pf *= 21.0; // 63 * 0.33
+                pf = std::round(pf);
+                unsigned c = (unsigned)pf;
+                c = (c > 63) ? 63 : c;
+                i_cmap[no_final_face] = c;
+
+                ++no_final_face;
+            }
+
+            // Write vertices to file
+            for (size_t i_vert = 0; i_vert < no_final_vert; ++i_vert)
+            {
+                double x = v_final[i_vert];
+                double y = v_final[i_vert + no_vert];
+                double z = v_final[i_vert + 2 * no_vert];
+
+                x *= radius;
+                y *= radius;
+                z *= radius;
+
+                if (element_pos.n_elem != 0)
+                {
+                    x += element_pos(0, i_array_element);
+                    y += element_pos(1, i_array_element);
+                    z += element_pos(2, i_array_element);
+                }
+
+                outFile << "v " << x << " " << y << " " << z << "\n";
+            }
+
+            // Write faces to file, ordered by color
+            for (unsigned i_color = 0; i_color < 64; ++i_color)
+            {
+                bool color_not_used = true;
+                for (size_t i_face = 0; i_face < no_final_face; ++i_face)
+                {
+                    if (i_cmap[i_face] == i_color)
+                    {
+                        if (color_not_used)
+                        {
+                            outFile << "usemtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i_color << "\n";
+                            color_not_used = false;
+                        }
+                        outFile << "f " << f_final[i_face] + face_offset << " " << f_final[i_face + no_faces] + face_offset << " " << f_final[i_face + 2 * no_faces] + face_offset << "\n";
+                    }
+                }
+            }
+            face_offset += (unsigned)no_final_vert;
+        }
+
+        outFile.close();
+    }
+}
+
 // ARRAYANT METHOD : Interpolation
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
-                                                const arma::Mat<dtype> elevation,
-                                                const arma::Col<unsigned> i_element,
-                                                const arma::Cube<dtype> orientation,
-                                                const arma::Mat<dtype> element_pos_i,
+void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
+                                                const arma::Mat<dtype> *elevation,
                                                 arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
                                                 arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                                                arma::uvec i_element,
+                                                const arma::Cube<dtype> *orientation,
+                                                const arma::Mat<dtype> *element_pos_i,
                                                 arma::Mat<dtype> *dist,
-                                                arma::Mat<dtype> *azimuth_loc,
-                                                arma::Mat<dtype> *elevation_loc,
+                                                arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc,
                                                 arma::Mat<dtype> *gamma) const
 {
     // Check if arrayant object is valid
@@ -760,63 +1132,62 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    unsigned long long n_out = azimuth.n_rows;
-    unsigned long long n_ang = azimuth.n_cols;
+    if (azimuth == nullptr)
+        throw std::invalid_argument("Input 'azimuth' cannot be NULL");
 
-    if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
-        error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
+    if (elevation == nullptr)
+        throw std::invalid_argument("Input 'elevation' cannot be NULL");
 
+    if (V_re == nullptr || V_im == nullptr || H_re == nullptr || H_im == nullptr)
+        throw std::invalid_argument("Outputs 'V_re', 'V_im', 'H_re', 'H_im' cannot be NULL");
+
+    arma::uword n_out = azimuth->n_rows;
+    arma::uword n_ang = azimuth->n_cols;
+
+    if (elevation->n_rows != n_out || elevation->n_cols != n_ang)
+        throw std::invalid_argument("Sizes of 'azimuth' and 'elevation' do not match.");
+
+    arma::uword n_elements = e_theta_re.n_slices;
     if (i_element.n_elem == 0)
-        error_message = "Input 'i_element' cannot be empty.";
-
-    if (orientation.n_elem == 0)
-        error_message = "Input 'orientation' cannot be empty.";
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Check if values are valid
-    unsigned n_elements = unsigned(e_theta_re.n_slices);
-    for (auto val = i_element.begin(); val != i_element.end(); ++val)
-        if (*val < 1 || *val > n_elements)
-            error_message = "Input 'i_element' must have values between 1 and 'n_elements'.";
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
+        i_element = arma::regspace<arma::uvec>(0, n_elements - 1);
+    else if (arma::any(i_element >= n_elements))
+        throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
 
     // Process orientation
     n_out = i_element.n_elem;
-    unsigned long long o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
-    if (o1 != 3ULL)
-        error_message = "Input 'orientation' must have 3 elements on the first dimension.";
-    else if (o2 != 1ULL && o2 != n_out)
-        error_message = "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.";
-    else if (o3 != 1ULL && o3 != n_ang)
-        error_message = "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.";
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Process element_pos
-    arma::Mat<dtype> element_pos_interp(3, n_out);
-    if (!element_pos_i.empty())
+    arma::Cube<dtype> orientation_empty = arma::Cube<dtype>(3, 1, 1);
+    const arma::Cube<dtype> *orientation_local = (orientation == nullptr || orientation->n_elem == 0) ? &orientation_empty : orientation;
+    if (orientation != nullptr)
     {
-        if (element_pos_i.n_rows != 3ULL || element_pos_i.n_cols != n_out)
-            error_message = "Alternative element positions 'element_pos_i' must have 'n_elements' elements.";
+        arma::uword o1 = orientation_local->n_rows,
+                    o2 = orientation_local->n_cols,
+                    o3 = orientation_local->n_slices;
 
-        if (error_message.length() != 0ULL)
-            throw std::invalid_argument(error_message.c_str());
-
-        const dtype *ptrI = element_pos_i.memptr();
-        dtype *ptrO = element_pos_interp.memptr();
-        std::memcpy(ptrO, ptrI, 3ULL * n_out * sizeof(dtype));
+        if (o1 != 3)
+            throw std::invalid_argument("Input 'orientation' must have 3 elements on the first dimension.");
+        else if (o2 != 1 && o2 != n_out)
+            throw std::invalid_argument("Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.");
+        else if (o3 != 1 && o3 != n_ang)
+            throw std::invalid_argument("Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.");
     }
-    else if (!element_pos.empty())
+
+    // Process alternative element positions
+    arma::Mat<dtype> element_pos_local(3, n_out);
+    if (element_pos_i != nullptr && element_pos_i->n_elem != 0)
+    {
+        if (element_pos_i->n_rows != 3 || element_pos_i->n_cols != n_out)
+            throw std::invalid_argument("Alternative element positions 'element_pos_i' must have 3 rows and 'n_out' columns.");
+
+        const dtype *ptrI = element_pos_i->memptr();
+        dtype *ptrO = element_pos_local.memptr();
+        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
+    }
+    else if (element_pos.n_elem != 0)
     {
         const dtype *ptrI = element_pos.memptr();
-        dtype *ptrO = element_pos_interp.memptr();
-        for (auto i = 0ULL; i < n_out; ++i)
-            std::memcpy(&ptrO[3ULL * i], &ptrI[3ULL * i_element[i]], 3ULL * sizeof(dtype));
+        dtype *ptrO = element_pos_local.memptr();
+        for (arma::uword i = 0; i < n_out; ++i)
+            std::memcpy(&ptrO[3 * i], &ptrI[3 * i_element[i]], 3 * sizeof(dtype));
     }
 
     // Resize output variables
@@ -828,93 +1199,30 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
         H_re->set_size(n_out, n_ang);
     if (H_im->n_rows != n_out || H_im->n_cols != n_ang)
         H_im->set_size(n_out, n_ang);
-    if (dist->n_rows != n_out || dist->n_cols != n_ang)
+
+    if (dist != nullptr && (dist->n_rows != n_out || dist->n_cols != n_ang))
         dist->set_size(n_out, n_ang);
-    if (azimuth_loc->n_rows != n_out || azimuth_loc->n_cols != n_ang)
+    if (azimuth_loc != nullptr && (azimuth_loc->n_rows != n_out || azimuth_loc->n_cols != n_ang))
         azimuth_loc->set_size(n_out, n_ang);
-    if (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang)
+    if (elevation_loc != nullptr && (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang))
         elevation_loc->set_size(n_out, n_ang);
-    if (gamma->n_rows != n_out || gamma->n_cols != n_ang)
+    if (gamma != nullptr && (gamma->n_rows != n_out || gamma->n_cols != n_ang))
         gamma->set_size(n_out, n_ang);
+
+    // Convert element index format
+    arma::u32_vec i_element_int(n_out); // 1-based
+    {
+        unsigned *pi = i_element_int.memptr();
+        arma::uword *pu = i_element.memptr();
+        for (arma::uword i = 0; i < n_out; ++i)
+            pi[i] = (unsigned)pu[i] + 1;
+    }
 
     // Call private library function
     qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, &element_pos_interp,
+                            &azimuth_grid, &elevation_grid, azimuth, elevation,
+                            &i_element_int, orientation_local, &element_pos_local,
                             V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma);
-}
-
-// ARRAYANT METHOD : Interpolation
-template <typename dtype>
-void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> azimuth,
-                                                const arma::Mat<dtype> elevation,
-                                                const arma::Cube<dtype> orientation,
-                                                arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
-                                                arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
-                                                arma::Mat<dtype> *dist) const
-{
-    // Check if arrayant object is valid
-    std::string error_message = is_valid();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    unsigned long long n_out = azimuth.n_rows;
-    unsigned long long n_ang = azimuth.n_cols;
-    unsigned n32_out = unsigned(n_out);
-
-    if (elevation.n_rows != n_out || elevation.n_cols != n_ang)
-        error_message = "Sizes of 'azimuth' and 'elevation' do not match.";
-
-    if (orientation.n_elem == 0)
-        error_message = "Input 'orientation' cannot be empty.";
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    n_out = e_theta_re.n_slices;
-    arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
-
-    // Process orientation
-    unsigned long long o1 = orientation.n_rows, o2 = orientation.n_cols, o3 = orientation.n_slices;
-    if (o1 != 3)
-        error_message = "Input 'orientation' must have 3 elements on the first dimension.";
-    else if (o2 != 1 && o2 != n_out)
-        error_message = "Input 'orientation' must have 1 or 'n_elements' elements on the second dimension.";
-    else if (o3 != 1 && o3 != n_ang)
-        error_message = "Input 'orientation' must have 1 or 'n_ang' elements on the third dimension.";
-
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Copy the element positions
-    arma::Mat<dtype> element_pos_interp(3, n_out);
-    if (!element_pos.empty())
-    {
-        const dtype *ptrI = element_pos.memptr();
-        dtype *ptrO = element_pos_interp.memptr();
-        std::memcpy(ptrO, ptrI, 3 * n_out * sizeof(dtype));
-    }
-
-    // Resize output variables
-    if (V_re->n_rows != n_out || V_re->n_cols != n_ang)
-        V_re->set_size(n_out, n_ang);
-    if (V_im->n_rows != n_out || V_im->n_cols != n_ang)
-        V_im->set_size(n_out, n_ang);
-    if (H_re->n_rows != n_out || H_re->n_cols != n_ang)
-        H_re->set_size(n_out, n_ang);
-    if (H_im->n_rows != n_out || H_im->n_cols != n_ang)
-        H_im->set_size(n_out, n_ang);
-    if (dist->n_rows != n_out || dist->n_cols != n_ang)
-        dist->set_size(n_out, n_ang);
-
-    arma::Mat<dtype> azimuth_loc;
-    arma::Mat<dtype> elevation_loc;
-    arma::Mat<dtype> gamma;
-
-    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, &element_pos_interp,
-                            V_re, V_im, H_re, H_im, dist, &azimuth_loc, &elevation_loc, &gamma);
 }
 
 // ARRAYANT : Write to QDANT file
