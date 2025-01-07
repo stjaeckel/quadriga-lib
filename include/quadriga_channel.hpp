@@ -77,6 +77,18 @@ namespace quadriga_lib
         // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
         // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
         int hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, bool assume_valid = false) const;
+
+        // Export the path data to a Wavefront OBJ file, e.g. for visualization in Blender
+        // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
+        void export_obj_file(std::string fn,               // Filename of the OBJ file
+                             size_t max_no_paths = 0,      // Maximum number of paths to be shown, Default: all
+                             dtype gain_max = -60.0,       // Maximum path gain in dB (only for color-coding)
+                             dtype gain_min = -140.0,      // Minimum path gain in dB (only for color-coding and path selection)
+                             std::string colormap = "jet", // Colormap for the visualization
+                             arma::uvec i_snap = {},       // Snapshot indices, 0-based, empty = export all
+                             dtype radius_max = 0.05,      // Maximum tube radius in meters
+                             dtype radius_min = 0.01,      // Minimum tube radius in meters
+                             size_t n_edges = 5) const;    // Number of vertices in the circle building the tube, must be >= 3
     };
 
     // Function to obtain the HDF5 library version
@@ -157,7 +169,7 @@ namespace quadriga_lib
                                 const arma::Cube<dtype> *coeff_im,  // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
                                 const arma::Cube<dtype> *delay,     // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
                                 const arma::Col<dtype> *pilot_grid, // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
-                                const double bandwidth,              // The baseband bandwidth in [Hz]
+                                const double bandwidth,             // The baseband bandwidth in [Hz]
                                 arma::Cube<dtype> *hmat_re,         // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
                                 arma::Cube<dtype> *hmat_im);        // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
 
@@ -168,7 +180,7 @@ namespace quadriga_lib
                                     const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
                                     const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
                                     const arma::Col<dtype> *pilot_grid,             // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
-                                    const double bandwidth,                          // The baseband bandwidth in [Hz]
+                                    const double bandwidth,                         // The baseband bandwidth in [Hz]
                                     std::vector<arma::Cube<dtype>> *hmat_re,        // Output: Channel matrices (H), real part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
                                     std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
                                     const arma::Col<unsigned> *i_snap = nullptr);   // Snapshot indices, 0-based, optional, vector of length "n_out"

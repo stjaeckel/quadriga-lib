@@ -27,7 +27,13 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_2_0
+#define QUADRIGA_LIB_VERSION v0_2_3
+
+// If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
+// This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
+// This requires a 64 bit platform, but will compile on Linux, Windows and macOS
+static_assert(sizeof(arma::uword) == sizeof(size_t), "arma::uword and size_t have different sizes");
+static_assert(sizeof(unsigned long long) == sizeof(size_t), "unsigned long and size_t have different sizes");
 
 namespace quadriga_lib
 {

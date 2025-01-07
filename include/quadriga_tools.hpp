@@ -159,6 +159,16 @@ namespace quadriga_lib
                          std::vector<std::string> *obj_names = nullptr,  // Object names, Size: [ max(obj_ind) - 1 ]
                          std::vector<std::string> *mtl_names = nullptr); // Material names, Size: [ max(mtl_ind) - 1 ]
 
+    // Convert paths to tubes
+    // - Internal computations are done in double precision for accuracy
+    // - Faces are provided as quads
+    template <typename dtype>
+    void path_to_tube(const arma::Mat<dtype> *path_coord, // Path coordinates, size [3, n_coord ]
+                      arma::Mat<dtype> *vert,             // Output: Vertices of the tube, size [3, n_coord * n_edges ]
+                      arma::umat *faces,                  // Output: Face indices, 0-based, size [4, (n_coord-1) * n_edges]
+                      dtype radius = 1.0,                 // Tube radius in meters
+                      size_t n_edges = 5);                // Number of points in the circle building the tube, must be >= 3
+
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
     // - The point cloud can be composed of sub-clouds, where each new sub-cloud h is indicated by an index (= starting row number)
     // - Output is a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-cloud

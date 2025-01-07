@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "qd_arrayant_functions.hpp"
-
-// #include "helper_functions.cpp"
 
 // Helper-function "quick_rotate"
 template <typename dtype>
@@ -809,9 +807,9 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
         outFile << "# QuaDRiGa " << "antenna pattern colormap\n\n";
         for (size_t i = 0; i < n_cmap; ++i)
         {
-            float R = (float)cmap(i, 0) / 255.0f;
-            float G = (float)cmap(i, 1) / 255.0f;
-            float B = (float)cmap(i, 2) / 255.0f;
+            double R = (double)cmap(i, 0) / 255.0;
+            double G = (double)cmap(i, 1) / 255.0;
+            double B = (double)cmap(i, 2) / 255.0;
             outFile << "newmtl QuaDRiGa_ANT_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
             outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
         }

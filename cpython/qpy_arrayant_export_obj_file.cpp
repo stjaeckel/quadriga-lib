@@ -45,7 +45,7 @@ quadriga_lib.arrayant_export_obj_file( fn, directivity_range, colormap, object_r
 
 - **`colormap`**<br>
   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',
-  'copper', 'spring', 'cool', 'gray', 'autumn', 'summer'
+  'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', Optional, default = 'jet'
 
 - **`object_radius`**<br>
   Radius in meters of the exported object
