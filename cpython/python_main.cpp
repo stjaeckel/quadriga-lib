@@ -35,6 +35,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
 #include "qpy_version.cpp"
+#include "qpy_channel_export_obj_file.cpp"
 
 PYBIND11_MODULE(quadriga_lib, m)
 {
@@ -63,6 +64,24 @@ PYBIND11_MODULE(quadriga_lib, m)
             py::arg("snap") = py::array_t<unsigned>());
 
       m.def("cart2geo", &cart2geo, py::arg("cart"));
+
+      m.def("channel_export_obj_file", &channel_export_obj_file,
+            py::arg("fn"),
+            py::arg("max_no_paths") = 0,
+            py::arg("gain_max") = -60.0,
+            py::arg("gain_min") = -140.0,
+            py::arg("colormap") = "jet",
+            py::arg("radius_max") = 0.05,
+            py::arg("radius_min") = 0.01,
+            py::arg("n_edges") = 5,
+            py::arg("rx_pos") = py::array_t<double>(),
+            py::arg("tx_pos") = py::array_t<double>(),
+            py::arg("no_interact") = py::array_t<unsigned>(),
+            py::arg("interact_coord") = py::array_t<double>(),
+            py::arg("center_freq") = py::array_t<double>(),
+            py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
+            py::arg("path_polarization") = py::array_t<std::complex<double>>(),
+            py::arg("i_snap") = py::array_t<arma::uword>());
 
       m.def("icosphere", &icosphere, py::arg("n_div") = 1,
             py::arg("radius") = 1.0, py::arg("direction_xyz") = false);

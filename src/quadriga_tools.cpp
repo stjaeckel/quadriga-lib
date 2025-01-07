@@ -38,6 +38,68 @@ static void qd_repeat_sequence(const dtypeIn *sequence, arma::uword sequence_len
         }
 }
 
+// Cross product
+static inline void crossp(double vx, double vy, double vz,    // Vector V
+                          double kx, double ky, double kz,    // Vector K
+                          double *rx, double *ry, double *rz, // Result V x K
+                          bool normalize_output = false)
+{
+    *rx = vy * kz - vz * ky; // x-component
+    *ry = vz * kx - vx * kz; // y-component
+    *rz = vx * ky - vy * kx; // z-component
+
+    if (normalize_output)
+    {
+        double scl = 1.0 / std::sqrt(*rx * *rx + *ry * *ry + *rz * *rz);
+        *rx *= scl, *ry *= scl, *rz *= scl;
+    }
+}
+
+// Dot product
+template <typename dtype>
+static inline dtype dotp(dtype vx, dtype vy, dtype vz, // Vector V
+                         dtype kx, dtype ky, dtype kz, // Vector K
+                         bool normalize = false)       // Option to normalize
+{
+    dtype dot = vx * kx + vy * ky + vz * kz; // Dot product calculation
+
+    if (normalize)
+    {
+        dtype v_mag = std::sqrt(vx * vx + vy * vy + vz * vz); // Magnitude of V
+        dtype k_mag = std::sqrt(kx * kx + ky * ky + kz * kz); // Magnitude of K
+        if (v_mag > 0 && k_mag > 0)                           // Normalize the dot product
+            dot /= (v_mag * k_mag);
+    }
+
+    return dot;
+}
+
+// Rotate a vector around an arbitrary axis
+static inline void rotate_vector_around_axis(double vx, double vy, double vz,    // The vector to rotate
+                                             double kx, double ky, double kz,    // The axis of rotation
+                                             double theta,                       // Rotation angle in radians
+                                             double *rx, double *ry, double *rz, // Result
+                                             bool k_is_normalized = false)
+{
+    // Step 1: Precompute values
+    double cos_theta = std::cos(theta);
+    double sin_theta = std::sin(theta);
+
+    if (!k_is_normalized)
+    {
+        double scl = kx * kx + ky * ky + kz * kz;
+        scl = 1.0 / std::sqrt(scl);
+        kx *= scl, ky *= scl, kz *= scl;
+    }
+
+    double dot = vx * kx + vy * ky + vz * kz; // Dot product of V and K
+
+    // Step 2: Rodrigues' rotation formula components
+    *rx = vx * cos_theta + (ky * vz - kz * vy) * sin_theta + kx * dot * (1.0 - cos_theta);
+    *ry = vy * cos_theta + (kz * vx - kx * vz) * sin_theta + ky * dot * (1.0 - cos_theta);
+    *rz = vz * cos_theta + (kx * vy - ky * vx) * sin_theta + kz * dot * (1.0 - cos_theta);
+}
+
 // FUNCTION: Calculate rotation matrix R from roll, pitch, and yaw angles (given by rows in the input "orientation")
 template <typename dtype>
 arma::cube quadriga_lib::calc_rotation_matrix(const arma::Cube<dtype> orientation, bool invert_y_axis, bool transposeR)
@@ -1623,6 +1685,268 @@ template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *m
                                             arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
                                             std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
 
+// Convert paths to tubes
+template <typename dtype>
+void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dtype> *vert, arma::umat *faces, dtype radius, size_t n_edges)
+{
+    if (path_coord == nullptr)
+        throw std::invalid_argument("Input 'path_coord' cannot be NULL.");
+    if (vert == nullptr)
+        throw std::invalid_argument("Output 'vert' cannot be NULL.");
+    if (faces == nullptr)
+        throw std::invalid_argument("Output 'faces' cannot be NULL.");
+
+    if (path_coord->n_rows != 3ULL)
+        throw std::invalid_argument("Input 'path_coord' must have 3 rows containing x,y,z coordinates.");
+
+    if (path_coord->n_cols < 2ULL)
+        throw std::invalid_argument("Input 'path_coord' must have 2 or more columns.");
+
+    double radius_d = (double)radius;
+    if (radius_d <= 0.0)
+        throw std::invalid_argument("Radius mut be larger than 0.");
+
+    if (n_edges < 3ULL)
+        throw std::invalid_argument("Number of edges mut be >= 3.");
+
+    size_t n_coord = path_coord->n_cols;
+    size_t n_segments = n_coord - 1ULL;
+
+    const dtype *p_coord = path_coord->memptr();
+
+    // At steep angles between path segments, the path is split and an additional ring of vertices is added
+    // Wee need to determine the number of splits
+    dtype angle_limit = (dtype)0.939692620785908; // cosd(10)
+    size_t n_split = 0ULL;
+    arma::uvec subseg_indices(n_segments);
+    arma::uword *i_subseg = subseg_indices.memptr();
+    for (size_t i_seg = 1ULL; i_seg < n_segments; ++i_seg)
+    {
+        // Read "v0"
+        dtype x0 = p_coord[3ULL * (i_seg - 1ULL)];
+        dtype y0 = p_coord[3ULL * (i_seg - 1ULL) + 1ULL];
+        dtype z0 = p_coord[3ULL * (i_seg - 1ULL) + 2ULL];
+
+        // Read "v1"
+        dtype x1 = p_coord[3ULL * i_seg];
+        dtype y1 = p_coord[3ULL * i_seg + 1ULL];
+        dtype z1 = p_coord[3ULL * i_seg + 2ULL];
+
+        // Read "v2"
+        dtype x2 = p_coord[3ULL * (i_seg + 1ULL)];
+        dtype y2 = p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
+        dtype z2 = p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+
+        // Calculate the vectors "d" and "f"
+        dtype dx = x0 - x1, dy = y0 - y1, dz = z0 - z1; // From v1 to v0
+        dtype fx = x2 - x1, fy = y2 - y1, fz = z2 - z1; // From v1 to v2
+
+        // Calculate the angle between vectors "d" and "f"
+        dtype cos_ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+
+        if (cos_ang_df > angle_limit)
+            ++n_split;
+        i_subseg[i_seg] = n_split;
+    }
+
+    size_t n_vert = (n_coord + n_split) * n_edges;
+    size_t n_faces = (n_coord - 1ULL) * n_edges;
+
+    if (vert->n_rows != 3ULL || vert->n_cols != n_vert)
+        vert->zeros(3ULL, n_vert);
+
+    if (faces->n_rows != 4 || faces->n_cols != n_faces)
+        faces->zeros(4ULL, n_faces);
+
+    dtype *p_vert = vert->memptr();
+    arma::uword *p_face = faces->memptr();
+
+    double x0 = 0.0, x1 = 0.0, x2 = 0.0;              // Point v0
+    double y0 = 0.0, y1 = 0.0, y2 = 0.0;              // Point v1
+    double z0 = 0.0, z1 = 0.0, z2 = 0.0;              // Point v2
+    double dx = 0.0, dy = 0.0, dz = 0.0, len_d = 0.0; // Vector from v0 to v1
+    double fx = 0.0, fy = 0.0, fz = 0.0, len_f = 0.0; // Vector from v1 to v2
+
+    // Vector "u" is orthogonal to "d" and points to the first edge
+    double ux = NAN, uy = NAN, uz = NAN;
+
+    // Temporary storage for the vertices
+    arma::mat orig(n_edges, 3ULL), dest(n_edges, 3ULL), fbs(n_edges, 3ULL);
+    double *p_orig = orig.memptr();
+    double *p_dest = dest.memptr();
+    double *p_fbs = fbs.memptr();
+
+    size_t i_vert = 0ULL; // Vertex counter
+    for (size_t i_seg = 0ULL; i_seg < n_segments; ++i_seg)
+    {
+        // Vector "g" is orthogonal to "-d" and "f"
+        double gx = NAN, gy = NAN, gz = NAN;
+
+        // Vector "h" lies in between "-d" and "f"
+        double hx = NAN, hy = NAN, hz = NAN;
+
+        // The angle between vectors "-d" and "f"
+        double ang_df = NAN;
+
+        // Get start and end point of the current segment
+        if (i_seg == 0ULL)
+        {
+            // Read "v0"
+            x0 = (double)p_coord[3ULL * i_seg];
+            y0 = (double)p_coord[3ULL * i_seg + 1ULL];
+            z0 = (double)p_coord[3ULL * i_seg + 2ULL];
+
+            // Read "v1"
+            x1 = (double)p_coord[3ULL * (i_seg + 1ULL)];
+            y1 = (double)p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
+            z1 = (double)p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+
+            // Calculate "d"
+            dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            len_d = std::sqrt(dx * dx + dy * dy + dz * dz);
+            double scl = 1.0 / len_d;
+            dx *= scl, dy *= scl, dz *= scl;
+
+            // Pick an arbitrary vector "u" that is orthogonal to "d"
+            if (std::abs(dx) > 1.0e-6 || std::abs(dy) > 1.0e-6)
+                ux = -dy, uy = dx, uz = 0.0;
+            else
+                ux = 0.0, uy = 1.0, uz = 0.0;
+            scl = 1.0 / std::sqrt(ux * ux + uy * uy);
+            ux *= scl, uy *= scl;
+        }
+        else // i_seg > 0
+        {
+            // Copy "v0", "v1" and "d" from the previous iteration
+            x0 = x1, y0 = y1, z0 = z1;
+            x1 = x2, y1 = y2, z1 = z2;
+            dx = fx, dy = fy, dz = fz, len_d = len_f;
+        }
+
+        if (i_seg < n_segments - 1ULL)
+        {
+            // Read "v2"
+            size_t ind = 3ULL * (i_seg + 2ULL);
+            x2 = (double)p_coord[ind];
+            y2 = (double)p_coord[ind + 1ULL];
+            z2 = (double)p_coord[ind + 2ULL];
+
+            // Calculate "f"
+            fx = x2 - x1, fy = y2 - y1, fz = z2 - z1;
+            len_f = std::sqrt(fx * fx + fy * fy + fz * fz);
+            double scl = 1.0 / len_f;
+            fx *= scl, fy *= scl, fz *= scl;
+
+            // Calculate a normal-vector "g" that is orthogonal to "-d" and "f"
+            crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz, true);
+
+            // Calculate the angle between vectors "-d" and "f"
+            ang_df = dotp(-dx, -dy, -dz, fx, fy, fz, true);
+            ang_df = std::acos(ang_df);
+
+            // Calculate vector "h" that lies in between "-d" and "f"
+            rotate_vector_around_axis(-dx, -dy, -dz, gx, gy, gz, 0.5 * ang_df, &hx, &hy, &hz, true);
+        }
+
+        // Generate origin points for the edges by rotating "u" around "d"
+        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            double ex = ux, ey = uy, ez = uz;
+            if (i_edge != 0ULL)
+            {
+                double theta = (double)i_edge * 6.283185307179586 / (double)n_edges;
+                rotate_vector_around_axis(ux, uy, uz, dx, dy, dz, theta, &ex, &ey, &ez, true);
+            }
+
+            // Scale by radius
+            ex = ex * radius_d;
+            ey = ey * radius_d;
+            ez = ez * radius_d;
+
+            // Update FBS by shifting to v1
+            if (i_seg == n_segments - 1ULL || i_subseg[i_seg] != i_subseg[i_seg + 1ULL])
+            {
+                p_fbs[i_edge] = ex + x1;
+                p_fbs[i_edge + n_edges] = ey + y1;
+                p_fbs[i_edge + 2ULL * n_edges] = ez + z1;
+            }
+
+            // Shift to v0
+            ex += x0, ey += y0, ez += z0;
+
+            // Write edge vertices to ray origin
+            p_orig[i_edge] = ex;
+            p_orig[i_edge + n_edges] = ey;
+            p_orig[i_edge + 2ULL * n_edges] = ez;
+
+            // For the first segment of a new sub-segment, these origin points ara also the starting points of the tube
+            if (i_seg == 0ULL || i_subseg[i_seg - 1ULL] != i_subseg[i_seg])
+            {
+                p_vert[i_vert] = (dtype)ex;
+                p_vert[i_vert + 1ULL] = (dtype)ey;
+                p_vert[i_vert + 2ULL] = (dtype)ez;
+                i_vert += 3ULL;
+            }
+        }
+
+        // Projection mode
+        if (i_seg < n_segments - 1ULL && i_subseg[i_seg] == i_subseg[i_seg + 1ULL])
+        {
+            // Generate destination points for the projection
+            // - Minimum angle "ang_df" = 10 deg --> tand(80°) = 5.7
+            double d = len_d + 5.7 * radius_d;
+            for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+            {
+                p_dest[i_edge] = p_orig[i_edge] + d * dx;
+                p_dest[i_edge + n_edges] = p_orig[i_edge + n_edges] + d * dy;
+                p_dest[i_edge + 2ULL * n_edges] = p_orig[i_edge + 2ULL * n_edges] + d * dz;
+            }
+
+            // Build a projection plane (triangle) to calculate the destination points of the tube
+            // - Triangle has an inner radius of "0.5 * radius"
+            // - When hitting at an incident angle of 10°, we need to scale by at lest 0.5 / sin(10°) = 2.9
+            d = 20.0 * radius_d;
+            arma::mat proj_plane = {d * gx + x1, d * gy + y1, d * gz + z1,
+                                    d * (hx - gx) + x1, d * (hy - gy) + y1, d * (hz - gz) + z1,
+                                    d * (-hx - gx) + x1, d * (-hy - gy) + y1, d * (-hz - gz) + z1};
+
+            // Calculate intersection points with the plane
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &proj_plane, &fbs);
+        }
+
+        // Write FBS coordinates to output
+        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            p_vert[i_vert] = (dtype)p_fbs[i_edge];
+            p_vert[i_vert + 1ULL] = (dtype)p_fbs[i_edge + n_edges];
+            p_vert[i_vert + 2ULL] = (dtype)p_fbs[i_edge + 2ULL * n_edges];
+            i_vert += 3ULL;
+        }
+
+        // Update "u" for the next segment by rotating it around "-g"
+        ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+        ang_df = std::acos(ang_df);
+        rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
+
+        // Build face matrix
+        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            size_t ind = 4ULL * (n_edges * i_seg + i_edge);
+            size_t offset = i_subseg[i_seg] * n_edges;
+            p_face[ind] = n_edges * i_seg + offset + i_edge;
+            p_face[ind + 1ULL] = n_edges * i_seg + offset + (i_edge + 1ULL) % n_edges;
+            p_face[ind + 2ULL] = n_edges * (i_seg + 1ULL) + offset + (i_edge + 1ULL) % n_edges;
+            p_face[ind + 3ULL] = n_edges * (i_seg + 1ULL) + offset + i_edge;
+        }
+    }
+}
+
+template void quadriga_lib::path_to_tube(const arma::Mat<float> *path_coord, arma::Mat<float> *vert, arma::umat *faces,
+                                         float radius, size_t n_edges);
+
+template void quadriga_lib::path_to_tube(const arma::Mat<double> *path_coord, arma::Mat<double> *vert, arma::umat *faces,
+                                         double radius, size_t n_edges);
+
 // Calculate the axis-aligned bounding box (AABB) of a point cloud
 template <typename dtype>
 arma::Mat<dtype> quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> *points, const arma::Col<unsigned> *sub_cloud_index, size_t vec_size)
@@ -2073,7 +2397,7 @@ size_t quadriga_lib::subdivide_rays(const arma::Mat<dtype> *orig, const arma::Ma
     if (orig->n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
 
-    const arma::uword n_ray = orig->n_rows; // Number of rays
+    const size_t n_ray = orig->n_rows; // Number of rays
     const size_t n_ray_t = (size_t)n_ray;
     const unsigned n_ray_u = (unsigned)n_ray;
 
@@ -2115,7 +2439,7 @@ size_t quadriga_lib::subdivide_rays(const arma::Mat<dtype> *orig, const arma::Ma
 
     // Number of rays in the output
     size_t n_rayN_t = 4 * n_ind_t;
-    arma::uword n_rayN = (arma::uword)n_rayN_t;
+    size_t n_rayN = (size_t)n_rayN_t;
 
     // Indicator for Cartesian Format
     bool cartesian_format = false;

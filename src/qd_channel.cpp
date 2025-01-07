@@ -16,12 +16,15 @@
 // ------------------------------------------------------------------------
 
 #include <stdexcept>
-#include <cstring> // For std::memcopy
-#include <cctype>  // For string type operations such as isalnum
+#include <cstring>   // For std::memcopy
+#include <cctype>    // For string type operations such as isalnum
+#include <iomanip>   // std::setprecision
+#include <algorithm> // std::replace
 #include <map>
 
 #include <hdf5.h>
 #include "quadriga_channel.hpp"
+#include "quadriga_tools.hpp"
 
 // Return HDF5 version info
 #define AUX(x) #x
@@ -37,7 +40,7 @@ std::string quadriga_lib::get_HDF5_version()
 }
 
 // Helper function: File exists?
-inline bool qHDF_file_exists(const std::string &name)
+static inline bool qHDF_file_exists(const std::string &name)
 {
     if (FILE *file = std::fopen(name.c_str(), "r"))
     {
@@ -49,7 +52,7 @@ inline bool qHDF_file_exists(const std::string &name)
 }
 
 // Close file
-inline void qHDF_close_file(hid_t file_id)
+static inline void qHDF_close_file(hid_t file_id)
 {
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error closing file. Invalid File ID.");
@@ -115,14 +118,14 @@ inline void qHDF_close_file(hid_t file_id)
 
 // Helper function: convert double to float
 template <typename dtypeIn, typename dtypeOut>
-inline void qHDF_cast(const dtypeIn *in, dtypeOut *out, size_t n_elem)
+static inline void qHDF_cast(const dtypeIn *in, dtypeOut *out, size_t n_elem)
 {
     for (size_t n = 0; n < n_elem; ++n)
         out[n] = (dtypeOut)in[n];
 }
 
 template <typename dtype>
-inline void qHDF_cast_to_float(const dtype *in, float *out, unsigned long long n_elem)
+static inline void qHDF_cast_to_float(const dtype *in, float *out, unsigned long long n_elem)
 {
     for (auto n = 0ULL; n < n_elem; ++n)
         out[n] = float(in[n]);
@@ -130,14 +133,14 @@ inline void qHDF_cast_to_float(const dtype *in, float *out, unsigned long long n
 
 // Helper function: convert float to double
 template <typename dtype>
-inline void qHDF_cast_to_double(const dtype *in, double *out, unsigned long long n_elem)
+static inline void qHDF_cast_to_double(const dtype *in, double *out, unsigned long long n_elem)
 {
     for (auto n = 0ULL; n < n_elem; ++n)
         out[n] = double(in[n]);
 }
 
 // Helper function: check if string contains only alphanumeric characters
-bool qHDF_isalnum(const std::string &str)
+static bool qHDF_isalnum(const std::string &str)
 {
     for (char ch : str)
         if (!std::isalnum(ch) && ch != '_')
@@ -150,7 +153,7 @@ bool qHDF_isalnum(const std::string &str)
 //        1 - Creates new channel ID. Reuses exisiting if it contains ONLY unstructured data
 //        2 - Returns ID if it exists in the file, creates new one if it does not!
 // Always returns 0 if index out of bound.
-inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, unsigned iz, unsigned iw, unsigned usage = 0)
+static inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, unsigned iz, unsigned iw, unsigned usage = 0)
 {
     // Read channel dims from file
     unsigned ChannelDims[4];
@@ -301,7 +304,7 @@ inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, uns
 }
 
 // Helper function to write unstructured data
-inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par_name, const std::any *par_data)
+static inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par_name, const std::any *par_data)
 {
 
     if (par_name->length() == 0 || !qHDF_isalnum(*par_name))
@@ -418,7 +421,7 @@ inline void qHDF_write_par(hid_t file_id, hid_t group_id, const std::string *par
 }
 
 // Helper function to write unstructured data
-inline long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = nullptr)
+static inline long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *par_names, const std::string *prefix = nullptr)
 {
     // Get information about the group
     H5G_info_t group_info;
@@ -457,7 +460,7 @@ inline long long qHDF_read_par_names(hid_t group_id, std::vector<std::string> *p
 
 // Helper function to read a dataset from a HDF file
 // Returns empty std::any on error
-inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool float2double = false)
+static inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, bool float2double = false)
 {
     if (group_id == H5I_INVALID_HID)
         return std::any();
@@ -1698,6 +1701,271 @@ int quadriga_lib::channel<dtype>::hdf5_write(std::string fn, unsigned ix, unsign
     H5close();
 
     return return_code;
+}
+
+// Export the path data to a Wavefront OBJ file
+template <typename dtype>
+void quadriga_lib::channel<dtype>::export_obj_file(std::string fn, size_t max_no_paths,
+                                                   dtype gain_max, dtype gain_min,
+                                                   std::string colormap, arma::uvec i_snap,
+                                                   dtype radius_max, dtype radius_min, size_t n_edges) const
+{
+    // Check validity
+    std::string error_message = is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    if (empty())
+        throw std::invalid_argument("Channel contains no data.");
+
+    if (center_frequency.empty())
+        throw std::invalid_argument("Center frequency is missing.");
+
+    if (no_interact.empty() || interact_coord.empty())
+        throw std::invalid_argument("Ray tracing data (no_interact, interact_coord) is missing.");
+
+    if (path_polarization.empty() && coeff_re.empty())
+        throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
+
+    // Input validation
+    std::string fn_suffix = ".obj";
+    std::string fn_mtl;
+
+    if (fn.size() >= fn_suffix.size() &&
+        fn.compare(fn.size() - fn_suffix.size(), fn_suffix.size(), fn_suffix) == 0)
+    {
+        fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
+    }
+    else
+        throw std::invalid_argument("OBJ-File name must end with .obj");
+
+    // Extract the file name from the path
+    std::string fn_mtl_base;
+    size_t pos = fn_mtl.find_last_of("/");
+    if (pos != std::string::npos)
+        fn_mtl_base = fn_mtl.substr(pos + 1ULL);
+    else
+        fn_mtl_base = fn_mtl;
+
+    if (max_no_paths == 0ULL)
+        max_no_paths = 10000ULL;
+
+    size_t n_snap_in = n_snap();
+
+    if (i_snap.n_elem == 0ULL)
+        i_snap = arma::regspace<arma::uvec>(0ULL, n_snap_in - 1ULL);
+
+    if (arma::any(i_snap >= n_snap_in))
+        throw std::invalid_argument("Snapshot indices 'i_snap' cannot exceed the number of snapshots in the channel.");
+
+    size_t n_snap_out = i_snap.n_elem;
+
+    if (radius_min < (dtype)0.0 || radius_max < (dtype)0.0)
+        throw std::invalid_argument("Radius cannot be negative.");
+
+    // Colormap
+    arma::uchar_mat cmap = quadriga_lib::colormap(colormap);
+    size_t n_cmap = (size_t)cmap.n_rows;
+
+    // Export colormap to material file
+    std::ofstream outFile(fn_mtl);
+    if (outFile.is_open())
+    {
+        // Write some text to the file
+        outFile << "# QuaDRiGa " << "path data colormap\n\n";
+        for (size_t i = 0ULL; i < n_cmap; ++i)
+        {
+            double R = (double)cmap(i, 0ULL) / 255.0;
+            double G = (double)cmap(i, 1ULL) / 255.0;
+            double B = (double)cmap(i, 2ULL) / 255.0;
+            outFile << "newmtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
+            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
+        }
+        outFile.close();
+    }
+    else
+        throw std::invalid_argument("Could not write material file.");
+
+    // Export paths to OBJ file
+    outFile = std::ofstream(fn);
+    if (outFile.is_open())
+    {
+        // Write some text to the file
+        outFile << "# QuaDRiGa Path OBJ File\n";
+        outFile << "mtllib " << fn_mtl_base << "\n";
+    }
+    else
+        throw std::invalid_argument("Could not write OBJ file.");
+
+    bool moving_tx = tx_pos.n_cols != 1ULL;
+    bool moving_rx = rx_pos.n_cols != 1ULL;
+
+    // Export each snapshot
+    size_t vert_counter = 0ULL;
+    for (size_t i_snap_out = 0ULL; i_snap_out < n_snap_out; ++i_snap_out)
+    {
+        size_t i_snap_in = i_snap(i_snap_out);
+
+        // Extract path coordinates
+        dtype tx = moving_tx ? tx_pos(0ULL, i_snap_in) : tx_pos(0ULL, 0ULL);
+        dtype ty = moving_tx ? tx_pos(1ULL, i_snap_in) : tx_pos(1ULL, 0ULL);
+        dtype tz = moving_tx ? tx_pos(2ULL, i_snap_in) : tx_pos(2ULL, 0ULL);
+
+        dtype gainF = (center_frequency.n_elem > 1ULL) ? center_frequency(i_snap_in) : center_frequency(0ULL);
+        gainF = (dtype)-32.45 - (dtype)20.0 * std::log10(gainF * (dtype)1.0e-9);
+
+        dtype rx = moving_rx ? rx_pos(0ULL, i_snap_in) : rx_pos(0ULL, 0ULL);
+        dtype ry = moving_rx ? rx_pos(1ULL, i_snap_in) : rx_pos(1ULL, 0ULL);
+        dtype rz = moving_rx ? rx_pos(2ULL, i_snap_in) : rx_pos(2ULL, 0ULL);
+
+        // Calculate path coordinates
+        arma::Col<dtype> path_length;
+        std::vector<arma::Mat<dtype>> path_coord;
+        quadriga_lib::coord2path<dtype>(tx, ty, tz, rx, ry, rz, &no_interact[i_snap_in], &interact_coord[i_snap_in],
+                                        &path_length, nullptr, nullptr, nullptr, &path_coord);
+
+        // Calculate path power
+        size_t n_path = path_coord.size();
+        arma::Col<dtype> path_power_dB(n_path);
+        arma::s32_vec color_index(n_path);
+
+        const dtype *p_xpr = path_polarization.empty() ? nullptr : path_polarization[i_snap_in].memptr();
+        dtype scl = (dtype)63.0 / (gain_max - gain_min);
+        for (size_t i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            dtype p = (dtype)0.0;
+            if (!coeff_re.empty()) // Use MIMO coefficients
+            {
+                for (auto &a : coeff_re[i_snap_in].slice(i_path))
+                    p += a * a;
+                for (auto &a : coeff_im[i_snap_in].slice(i_path))
+                    p += a * a;
+                p = (dtype)10.0 * std::log10(p);
+                path_power_dB(i_path) = p;
+            }
+            else if (p_xpr != nullptr) // Use XPR
+            {
+                for (size_t m = 0ULL; m < 8ULL; ++m) // sum( xprmat(:,n).^2 )
+                    p += *p_xpr * *p_xpr, ++p_xpr;
+                p = (dtype)10.0 * std::log10(p * (dtype)0.5); // dB, factor 0.5 accounts for XPOL
+                p += gainF - (dtype)20.0 * std::log10(path_length(i_path));
+                path_power_dB(i_path) = p;
+            }
+
+            dtype x = p;
+            x = (x < gain_min) ? gain_min : x;
+            x = (x > gain_max) ? gain_max : x;
+            x = x - gain_min;
+            x = x * scl;
+            x = (x > (dtype)63.0) ? (dtype)63.0 : x;
+            x = std::round(x);
+
+            color_index(i_path) = (p < gain_min) ? -1 : (int)x;
+        }
+
+        // Sort the path power in decreasing order and return the indices
+        arma::uvec pow_indices = arma::sort_index(path_power_dB, "descend");
+        arma::uword *i_pow_sorted = pow_indices.memptr();
+
+        // Limit the number of paths that should be shown
+        for (size_t i = max_no_paths; i < n_path; ++i)
+            color_index(i_pow_sorted[i]) = -1;
+
+        // Write some descriptive information
+        outFile << "\n# Snapshot " << i_snap_in << "\n";
+        outFile << "#  No.   Lenght[m]     Gain[dB]   ID" << "\n";
+
+        for (size_t i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            size_t i_path_sorted = i_pow_sorted[i_path];
+            dtype l = path_length(i_path_sorted);
+            dtype p = path_power_dB(i_path_sorted);
+
+            if (p > (dtype)-200.0)
+            {
+                outFile << "# " << std::setfill('0') << std::setw(4) << i_path << " ";
+                if (l < 1000.0f)
+                    outFile << " ";
+                if (l < 100.0f)
+                    outFile << " ";
+                if (l < 10.0f)
+                    outFile << " ";
+                outFile << std::fixed << std::setprecision(6) << l << "  ";
+                if (p > -100.0f)
+                    outFile << " ";
+                if (p > -10.0f)
+                    outFile << " ";
+                if (p > 10.0f)
+                    outFile << " ";
+                else if (p > 0.0f)
+                    outFile << "  ";
+
+                outFile << std::fixed << std::setprecision(6) << p;
+
+                if (color_index(i_path_sorted) >= 10)
+                    outFile << "   " << color_index(i_path_sorted);
+                else if (color_index(i_path_sorted) >= 0)
+                    outFile << "    " << color_index(i_path_sorted);
+
+                outFile << "\n";
+            }
+        }
+
+        // Write OBJ elements
+        scl = radius_max / (gain_max - gain_min);
+        for (size_t i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            size_t i_path_sorted = i_pow_sorted[i_path];
+            if (color_index(i_path_sorted) >= 0)
+            {
+                // Calculate radius
+                dtype p = path_power_dB(i_path_sorted);
+                dtype radius = p - gain_min;
+                radius = radius * scl;
+                radius = (radius > radius_max) ? radius_max : radius;
+                radius = (radius < radius_min) ? radius_min : radius;
+
+                // Write object name to OBJ file
+                outFile << "\no QuaDRiGa_path_s" << std::setfill('0') << std::setw(4) << i_snap_in << "_p" << std::setfill('0') << std::setw(4) << i_path << "\n";
+
+                ++vert_counter;
+                if (std::abs(radius) > (dtype)1.0e-4)
+                {
+                    // Calculate vertices and faces
+                    arma::Mat<dtype> vert;
+                    arma::umat faces;
+                    quadriga_lib::path_to_tube(&path_coord[i_path_sorted], &vert, &faces, radius, n_edges);
+
+                    // Write vertices to file
+                    size_t n_vert = vert.n_cols;
+                    for (size_t iV = 0ULL; iV < n_vert; ++iV)
+                        outFile << std::defaultfloat << "v " << vert(0ULL, iV) << " " << vert(1ULL, iV) << " " << vert(2ULL, iV) << "\n";
+
+                    outFile << "usemtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << color_index(i_path_sorted) << "\n";
+
+                    // Write faces to file
+                    size_t n_faces = faces.n_cols;
+                    for (size_t iF = 0ULL; iF < n_faces; ++iF)
+                        outFile << "f " << faces(0ULL, iF) + vert_counter << " " << faces(1ULL, iF) + vert_counter << " " << faces(2ULL, iF) + vert_counter << " " << faces(3ULL, iF) + vert_counter << "\n";
+
+                    vert_counter += vert.n_cols - 1ULL;
+                }
+                else
+                {
+                    // Write vertices to file
+                    size_t n_vert = path_coord[i_path_sorted].n_cols;
+                    for (size_t iV = 0ULL; iV < n_vert; ++iV)
+                        outFile << std::defaultfloat << "v " << path_coord[i_path_sorted](0ULL, iV) << " " << path_coord[i_path_sorted](1ULL, iV) << " " << path_coord[i_path_sorted](2ULL, iV) << "\n";
+
+                    outFile << "usemtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << color_index(i_path_sorted) << "\n";
+
+                    for (size_t iV = 0ULL; iV < n_vert - 1ULL; ++iV)
+                        outFile << "l " << vert_counter << " " << vert_counter + 1ULL << "\n", ++vert_counter;
+                }
+            }
+        }
+    }
+    outFile.close();
 }
 
 // Instantiate templates

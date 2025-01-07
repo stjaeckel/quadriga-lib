@@ -35,6 +35,7 @@
 #include "catch2_tests/test_ray_triangle_intersect.cpp"
 #include "catch2_tests/test_ray_mesh_interact.cpp"
 #include "catch2_tests/test_calc_diffraction_gain.cpp"
+#include "catch2_tests/test_channel_obj_export.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

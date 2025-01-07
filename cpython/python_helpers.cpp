@@ -65,6 +65,10 @@ inline arma::Col<dtype> qd_python_NPArray_to_Col(const pybind11::array_t<dtype> 
     pybind11::buffer_info buf = input->request();
     size_t d1, d2, d3, d4;
     bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+        return arma::Col<dtype>();
 
     if (is_col_major)
         return arma::Col<dtype>(reinterpret_cast<dtype *>(buf.ptr), d1 * d2 * d3 * d4, false, true);
@@ -80,6 +84,10 @@ inline arma::Mat<dtype> qd_python_NPArray_to_Mat(const pybind11::array_t<dtype> 
     pybind11::buffer_info buf = input->request();
     size_t d1, d2, d3, d4;
     bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+        return arma::Mat<dtype>();
 
     if (is_col_major)
         return arma::Mat<dtype>(reinterpret_cast<dtype *>(buf.ptr), d1, d2 * d3 * d4, false, true);
@@ -95,6 +103,10 @@ inline arma::Cube<dtype> qd_python_NPArray_to_Cube(const pybind11::array_t<dtype
     pybind11::buffer_info buf = input->request();
     size_t d1, d2, d3, d4;
     bool is_col_major = get_dims(&buf, &d1, &d2, &d3, &d4);
+    size_t n_data = d1 * d2 * d3 * d4;
+
+    if (n_data == 0)
+        return arma::Cube<dtype>();
 
     if (is_col_major)
         return arma::Cube<dtype>(reinterpret_cast<dtype *>(buf.ptr), d1, d2, d3 * d4, false, true);

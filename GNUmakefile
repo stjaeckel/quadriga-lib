@@ -231,43 +231,47 @@ python:
 lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadriga_lib.a $(cpython)
 	$(CC) -shared $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
 
+# Dependencies
+dep_quadriga_tools = build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
+dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   $(dep_quadriga_tools)
+
 # MEX MATLAB interface
-+quadriga_lib/arrayant_calc_directivity.mexa64:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_combine_pattern.mexa64:    build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_generate.mexa64:           build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_interpolate.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_qdant_read.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_qdant_write.mexa64:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_rotate_pattern.mexa64:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_calc_directivity.mexa64:   $(dep_arrayant)
++quadriga_lib/arrayant_combine_pattern.mexa64:    $(dep_arrayant)
++quadriga_lib/arrayant_generate.mexa64:           $(dep_arrayant)
++quadriga_lib/arrayant_interpolate.mexa64:        $(dep_arrayant)
++quadriga_lib/arrayant_qdant_read.mexa64:         $(dep_arrayant)
++quadriga_lib/arrayant_qdant_write.mexa64:        $(dep_arrayant)
++quadriga_lib/arrayant_rotate_pattern.mexa64:     $(dep_arrayant)
 +quadriga_lib/baseband_freq_response.mexa64:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
-+quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o
-+quadriga_lib/calc_rotation_matrix.mexa64:        build/quadriga_tools.o
-+quadriga_lib/cart2geo.mexa64:                    build/quadriga_tools.o
-+quadriga_lib/generate_diffraction_paths.mexa64:  build/quadriga_tools.o
-+quadriga_lib/geo2cart.mexa64:                    build/quadriga_tools.o
-+quadriga_lib/get_channels_planar.mexa64:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/get_channels_spherical.mexa64:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   $(dep_quadriga_tools)   build/ray_mesh_interact.o
++quadriga_lib/calc_rotation_matrix.mexa64:        $(dep_quadriga_tools)
++quadriga_lib/cart2geo.mexa64:                    $(dep_quadriga_tools)
++quadriga_lib/generate_diffraction_paths.mexa64:  $(dep_quadriga_tools)
++quadriga_lib/geo2cart.mexa64:                    $(dep_quadriga_tools)
++quadriga_lib/get_channels_planar.mexa64:         $(dep_arrayant)
++quadriga_lib/get_channels_spherical.mexa64:      $(dep_arrayant)
 +quadriga_lib/get_CUDA_compute_capability.mexa64: build/get_CUDA_compute_capability.o
-+quadriga_lib/hdf5_create_file.mexa64:            build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_channel.mexa64:           build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset.mexa64:              build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset_names.mexa64:        build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_layout.mexa64:            build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_reshape_layout.mexa64:         build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_channel.mexa64:          build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_dset.mexa64:             build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_version.mexa64:                build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/icosphere.mexa64:                   build/quadriga_tools.o
-+quadriga_lib/interp.mexa64:                      build/quadriga_tools.o
-+quadriga_lib/obj_file_read.mexa64:               build/quadriga_tools.o
-+quadriga_lib/point_cloud_aabb.mexa64:            build/quadriga_tools.o
-+quadriga_lib/point_cloud_segmentation.mexa64:    build/quadriga_tools.o
++quadriga_lib/hdf5_create_file.mexa64:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_channel.mexa64:           build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_dset.mexa64:              build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_dset_names.mexa64:        build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_layout.mexa64:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_reshape_layout.mexa64:         build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_write_channel.mexa64:          build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_write_dset.mexa64:             build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_version.mexa64:                build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/icosphere.mexa64:                   $(dep_quadriga_tools)
++quadriga_lib/interp.mexa64:                      $(dep_quadriga_tools)
++quadriga_lib/obj_file_read.mexa64:               $(dep_quadriga_tools)
++quadriga_lib/point_cloud_aabb.mexa64:            $(dep_quadriga_tools)
++quadriga_lib/point_cloud_segmentation.mexa64:    $(dep_quadriga_tools)
 +quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   build/quadriga_tools.o
++quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   $(dep_quadriga_tools)
 +quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-+quadriga_lib/subdivide_triangles.mexa64:         build/quadriga_tools.o
-+quadriga_lib/triangle_mesh_aabb.mexa64:          build/quadriga_tools.o
-+quadriga_lib/triangle_mesh_segmentation.mexa64:  build/quadriga_tools.o
++quadriga_lib/subdivide_triangles.mexa64:         $(dep_quadriga_tools)
++quadriga_lib/triangle_mesh_aabb.mexa64:          $(dep_quadriga_tools)
++quadriga_lib/triangle_mesh_segmentation.mexa64:  $(dep_quadriga_tools)
 +quadriga_lib/version.mexa64:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
 +quadriga_lib/%.mexa64:   mex/%.cpp
@@ -277,42 +281,42 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadr
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN) $(NV_LIB)
 
 # MEX Ocate interface
-+quadriga_lib/arrayant_calc_directivity.mex:   build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_combine_pattern.mex:    build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_generate.mex:           build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_interpolate.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_qdant_read.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_qdant_write.mex:        build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/arrayant_rotate_pattern.mex:     build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/arrayant_calc_directivity.mex:   $(dep_arrayant)
++quadriga_lib/arrayant_combine_pattern.mex:    $(dep_arrayant)
++quadriga_lib/arrayant_generate.mex:           $(dep_arrayant)
++quadriga_lib/arrayant_interpolate.mex:        $(dep_arrayant)
++quadriga_lib/arrayant_qdant_read.mex:         $(dep_arrayant)
++quadriga_lib/arrayant_qdant_write.mex:        $(dep_arrayant)
++quadriga_lib/arrayant_rotate_pattern.mex:     $(dep_arrayant)
 +quadriga_lib/baseband_freq_response.mex:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
-+quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o
-+quadriga_lib/calc_rotation_matrix.mex:        build/quadriga_tools.o
-+quadriga_lib/cart2geo.mex:                    build/quadriga_tools.o
-+quadriga_lib/generate_diffraction_paths.mex:  build/quadriga_tools.o
-+quadriga_lib/geo2cart.mex:                    build/quadriga_tools.o
-+quadriga_lib/get_channels_planar.mex:         build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
-+quadriga_lib/get_channels_spherical.mex:      build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   build/quadriga_tools.o
++quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   $(dep_quadriga_tools)   build/ray_mesh_interact.o
++quadriga_lib/calc_rotation_matrix.mex:        $(dep_quadriga_tools)
++quadriga_lib/cart2geo.mex:                    $(dep_quadriga_tools)
++quadriga_lib/generate_diffraction_paths.mex:  $(dep_quadriga_tools)
++quadriga_lib/geo2cart.mex:                    $(dep_quadriga_tools)
++quadriga_lib/get_channels_planar.mex:         $(dep_arrayant)
++quadriga_lib/get_channels_spherical.mex:      $(dep_arrayant)
 +quadriga_lib/get_CUDA_compute_capability.mex: build/get_CUDA_compute_capability.o
-+quadriga_lib/hdf5_create_file.mex:            build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_channel.mex:           build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset.mex:              build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset_names.mex:        build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_layout.mex:            build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_reshape_layout.mex:         build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_channel.mex:          build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_dset.mex:             build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/hdf5_version.mex:                build/qd_channel.o   $(HDF5_STATIC)
-+quadriga_lib/icosphere.mex:                   build/quadriga_tools.o
-+quadriga_lib/interp.mex:                      build/quadriga_tools.o
-+quadriga_lib/obj_file_read.mex:               build/quadriga_tools.o
-+quadriga_lib/point_cloud_aabb.mex:            build/quadriga_tools.o
-+quadriga_lib/point_cloud_segmentation.mex:    build/quadriga_tools.o
++quadriga_lib/hdf5_create_file.mex:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_channel.mex:           build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_dset.mex:              build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_dset_names.mex:        build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_read_layout.mex:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_reshape_layout.mex:         build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_write_channel.mex:          build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_write_dset.mex:             build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/hdf5_version.mex:                build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
++quadriga_lib/icosphere.mex:                   $(dep_quadriga_tools)
++quadriga_lib/interp.mex:                      $(dep_quadriga_tools)
++quadriga_lib/obj_file_read.mex:               $(dep_quadriga_tools)
++quadriga_lib/point_cloud_aabb.mex:            $(dep_quadriga_tools)
++quadriga_lib/point_cloud_segmentation.mex:    $(dep_quadriga_tools)
 +quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   build/quadriga_tools.o
++quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   $(dep_quadriga_tools)
 +quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-+quadriga_lib/subdivide_triangles.mex:         build/quadriga_tools.o
-+quadriga_lib/triangle_mesh_aabb.mex:          build/quadriga_tools.o
-+quadriga_lib/triangle_mesh_segmentation.mex:  build/quadriga_tools.o
++quadriga_lib/subdivide_triangles.mex:         $(dep_quadriga_tools)
++quadriga_lib/triangle_mesh_aabb.mex:          $(dep_quadriga_tools)
++quadriga_lib/triangle_mesh_segmentation.mex:  $(dep_quadriga_tools)
 +quadriga_lib/version.mex:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
 +quadriga_lib/%.mex:   mex/%.cpp
