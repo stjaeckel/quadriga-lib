@@ -92,7 +92,7 @@ fprintf(f,'%s\n','vt 1.000000 0.000000');
 fprintf(f,'%s\n','vt 0.000000 1.000000');
 fprintf(f,'%s\n','vt 0.000000 0.000000');
 fprintf(f,'%s\n','vt 1.000000 1.000000');
-fprintf(f,'%s\n','usemtl Wood');
+fprintf(f,'%s\n','usemtl itu_wood');
 fprintf(f,'%s\n','f 6/5 7/6 5/7');
 fprintf(f,'%s\n','f 6/5 8/8 7/6');
 fclose(f);
@@ -113,7 +113,7 @@ assertEqual( face_ind, uint32([2,3,1;2,4,3;6,7,5;6,8,7]) );
 assertEqual( obj_ind, uint32([1;1;2;2]) );
 assertEqual( mtl_ind, uint32([0;0;1;1]) );
 
-assertEqual( mtl_names{1,1}, 'Wood' );
+assertEqual( mtl_names{1,1}, 'itu_wood' );
 
 % Custom Material
 
