@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -137,10 +137,11 @@ namespace quadriga_lib
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
     // - 3D model must be triangularized
     // - Material properties are encoded in the material name using the "usemtl [material name]" tag
-    // - Default material properties are taken from ITU-R P.2040-1, Table 3
-    // - Default materials: Concrete, Brick, Plasterboard, Wood, Glass, Chipboard, Metal,
-    //                      Ground_dry, Ground_medium, Ground_wet, Vegetation, Water, Ice, IRR_glass
-    // - Supported frequency range: 1 - 100 GHz (1 - 10 GHz for Ground materials)
+    // - Default material properties are taken from ITU-R P.2040-3, Table 3
+    // - Default materials: vacuum, air, itu_concrete, itu_brick, itu_plasterboard, itu_wood, itu_glass, itu_ceiling_board, 
+    //                      itu_ceiling_board, itu_chipboard, itu_plywood, itu_marble, itu_metal, itu_very_dry_ground, 
+    //                      itu_medium_dry_ground, itu_wet_ground, itu_vegetation, itu_water, itu_ice, irr_glass
+    // - Supported frequency range: 1 - 40 GHz (1 - 10 GHz for ground materials)
     // - Custom materials can be defined by: "usemtl Name::A:B:C:D:att"
     //          - Real part of relative permittivity "eta = A * fGHz ^ B"
     //          - Conductivity "sigma = C * fGHz ^ D"

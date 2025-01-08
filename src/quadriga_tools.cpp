@@ -1455,20 +1455,26 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
 
     // Add default material data, See: Rec. ITU-R P.2040-1, Table 3
     std::vector<MaterialProp> mtl_lib;
-    mtl_lib.push_back({"Concrete", 5.31, 0.0, 0.0326, 0.8095, 0.0, 0});
-    mtl_lib.push_back({"Brick", 3.75, 0.0, 0.038, 0.0, 0.0, 0});
-    mtl_lib.push_back({"Plasterboard", 2.94, 0.0, 0.0116, 0.7076, 0.0, 0});
-    mtl_lib.push_back({"Wood", 1.99, 0.0, 0.0047, 1.0718, 0.0, 0});
-    mtl_lib.push_back({"Glass", 6.27, 0.0, 0.0043, 1.1925, 0.0, 0});
-    mtl_lib.push_back({"Chipboard", 2.58, 0.0, 0.0217, 0.78, 0.0, 0});
-    mtl_lib.push_back({"Metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0});
-    mtl_lib.push_back({"Ground_dry", 3.0, 0.0, 0.00015, 2.52, 0.0, 0});
-    mtl_lib.push_back({"Ground_medium", 15.0, -0.1, 0.035, 1.63, 0.0, 0});
-    mtl_lib.push_back({"Ground_wet", 30.0, -0.4, 0.15, 1.3, 0.0, 0});
-    mtl_lib.push_back({"Vegetation", 1.0, 0.0, 1.0e-4, 1.1, 0.0, 0});     // Rec. ITU-R P.833-9, Figure 2
-    mtl_lib.push_back({"Water", 80.0, 0.0, 0.2, 2.0, 0.0, 0});            // Rec. ITU-R P.527-3, Figure 1
-    mtl_lib.push_back({"Ice", 3.0, 0.0, 3.0e-4, 0.7, 0.0, 0});            // Rec. ITU-R P.527-3, Figure 1
-    mtl_lib.push_back({"IRR_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
+    mtl_lib.push_back({"vacuum", 1.0, 0.0, 0.0, 0.0, 0.0, 0});
+    mtl_lib.push_back({"air", 1.0, 0.0, 0.0, 0.0, 0.0, 0});
+    mtl_lib.push_back({"itu_concrete", 5.24, 0.0, 0.0462, 0.7822, 0.0, 0});
+    mtl_lib.push_back({"itu_brick", 3.91, 0.0, 0.0238, 0.16, 0.0, 0});
+    mtl_lib.push_back({"itu_plasterboard", 2.73, 0.0, 0.0085, 0.9395, 0.0, 0});
+    mtl_lib.push_back({"itu_wood", 1.99, 0.0, 0.0047, 1.0718, 0.0, 0});
+    mtl_lib.push_back({"itu_glass", 6.31, 0.0, 0.0036, 1.3394, 0.0, 0});
+    mtl_lib.push_back({"itu_ceiling_board", 1.48, 0.0, 0.0011, 1.075, 0.0, 0});
+    mtl_lib.push_back({"itu_chipboard", 2.58, 0.0, 0.0217, 0.78, 0.0, 0});
+    mtl_lib.push_back({"itu_plywood", 2.71, 0.0, 0.33, 0.0, 0.0, 0});
+    mtl_lib.push_back({"itu_marble", 7.074, 0.0, 0.0055, 0.9262, 0.0, 0});
+    // mtl_lib.push_back({"itu_floorboard", 3.66, 0.0, 0.0044, 1.3515, 0.0, 0}); # 50 - 100 GHz, omitted
+    mtl_lib.push_back({"itu_metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0});
+    mtl_lib.push_back({"itu_very_dry_ground", 3.0, 0.0, 0.00015, 2.52, 0.0, 0});
+    mtl_lib.push_back({"itu_medium_dry_ground", 15.0, -0.1, 0.035, 1.63, 0.0, 0});
+    mtl_lib.push_back({"itu_wet_ground", 30.0, -0.4, 0.15, 1.3, 0.0, 0});
+    mtl_lib.push_back({"itu_vegetation", 1.0, 0.0, 1.0e-4, 1.1, 0.0, 0}); // Rec. ITU-R P.833-9, Figure 2
+    mtl_lib.push_back({"itu_water", 80.0, 0.0, 0.2, 2.0, 0.0, 0});        // Rec. ITU-R P.527-3, Figure 1
+    mtl_lib.push_back({"itu_ice", 3.0, 0.0, 3.0e-4, 0.7, 0.0, 0});        // Rec. ITU-R P.527-3, Figure 1
+    mtl_lib.push_back({"irr_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
 
     // Reset the file pointer to the beginning of the file
     fileR.clear(); // Clear any flags
@@ -1612,7 +1618,7 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
             {
                 sscanf(mtl_name.c_str(), "%*[a-zA-Z0-9. ]::%lf:%lf:%lf:%lf:%lf", &aM, &bM, &cM, &dM, &attM);
                 if (aM == 0.0)
-                    mtl_lib.push_back({mtl_name, 1.0, 0.0, 0.0, 0.0, 0.0, 0}); // Air
+                    mtl_lib.push_back({mtl_name, 1.0, 0.0, 0.0, 0.0, 0.0, 0}); // vacuum / air
                 else
                     mtl_lib.push_back({mtl_name, aM, bM, cM, dM, attM, 0});
                 found = (int)mtl_lib.size() - 1;
