@@ -1,0 +1,8 @@
+material families:
+what is a good estimate of the electric properties of ceramic materials such as tiles, flower pots, plate and cups? I need the relative permittivity and the effective Conductivity (also taking the imaginary part of permittivity, dielectric loss, into account) in S/m for frequencies ranging from 1 to 100 GHz. Please also provide a table containing examples of difference materials with values for the frequencies 1, 10 and 100 GHz
+
+water and ice:
+what is a good estimate of the electric properties of fresh water? I need the relative permittivity and the effective Conductivity (also taking the imaginary part of permittivity, dielectric loss, into account) in S/m for frequencies ranging from 1 to 100 GHz. Please also provide a table containing  values for the frequencies 1, 10 and 100 GHz
+
+what is a good estimate of the electric properties of fresh water ice? I need the relative permittivity and the effective Conductivity (also taking the imaginary part of permittivity, dielectric loss, into account) in S/m for frequencies ranging from 1 to 100 GHz. Please also provide a table containing values for the frequencies 1, 6, 10, 20 and 100 GHz
+
