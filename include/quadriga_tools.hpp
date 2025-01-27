@@ -138,8 +138,8 @@ namespace quadriga_lib
     // - 3D model must be triangularized
     // - Material properties are encoded in the material name using the "usemtl [material name]" tag
     // - Default material properties are taken from ITU-R P.2040-3, Table 3
-    // - Default materials: vacuum, air, itu_concrete, itu_brick, itu_plasterboard, itu_wood, itu_glass, itu_ceiling_board, 
-    //                      itu_ceiling_board, itu_chipboard, itu_plywood, itu_marble, itu_metal, itu_very_dry_ground, 
+    // - Default materials: vacuum, air, itu_concrete, itu_brick, itu_plasterboard, itu_wood, itu_glass, itu_ceiling_board,
+    //                      itu_ceiling_board, itu_chipboard, itu_plywood, itu_marble, itu_metal, itu_very_dry_ground,
     //                      itu_medium_dry_ground, itu_wet_ground, itu_vegetation, itu_water, itu_ice, irr_glass
     // - Supported frequency range: 1 - 40 GHz (1 - 10 GHz for ground materials)
     // - Custom materials can be defined by: "usemtl Name::A:B:C:D:att"
@@ -159,6 +159,15 @@ namespace quadriga_lib
                          arma::Col<unsigned> *mtl_ind = nullptr,         // Material index, 1-based, Size: [ n_mesh ]
                          std::vector<std::string> *obj_names = nullptr,  // Object names, Size: [ max(obj_ind) - 1 ]
                          std::vector<std::string> *mtl_names = nullptr); // Material names, Size: [ max(mtl_ind) - 1 ]
+
+    // Tests if 3D objects overlap (have a shared volume or boolean intersection)
+    // - Returns: list of object indices (1-based) that are overlapping, length [ n_overlap ]
+    // - Overlap reasons (optional output)
+    template <typename dtype>                                                  // Supported types: float or double
+    arma::u32_vec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                   const arma::u32_vec *obj_ind,               // Object index, 1-based, Size: [ n_mesh ]
+                                   std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
+                                   dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
     // Convert paths to tubes
     // - Internal computations are done in double precision for accuracy
