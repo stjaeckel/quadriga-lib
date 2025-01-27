@@ -30,7 +30,7 @@ hdf5_version      = # 1.14.2
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
-armadillo_version = 12.8.3
+armadillo_version = 14.2.2
 pugixml_version   = 1.13
 catch2_version    = 3.4.0
 pybind11_version  = 2.12.0
@@ -178,7 +178,7 @@ build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
 	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
 build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
+	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
 
 build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
