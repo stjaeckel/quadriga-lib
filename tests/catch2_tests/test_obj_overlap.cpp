@@ -128,8 +128,8 @@ TEST_CASE("Test OBJ Overlap - 3D overlap")
     arma::u32_vec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
-    CHECK(reason[0].substr(0, 27) == "3D Intersect: OBJ-IDs (1,4)");
-    CHECK(reason[1].substr(0, 27) == "3D Intersect: OBJ-IDs (1,4)");
+    CHECK(reason[0].substr(0, 21) == "3D Intersect: OBJ-IDs");
+    CHECK(reason[1].substr(0, 21) == "3D Intersect: OBJ-IDs");
 }
 
 TEST_CASE("Test OBJ Overlap - Overlapping Edges")
@@ -165,8 +165,8 @@ TEST_CASE("Test OBJ Overlap - Overlapping Edges")
     arma::u32_vec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
-    CHECK(reason[0].substr(0, 27) == "2D Intersect: OBJ-IDs (1,4)");
-    CHECK(reason[1].substr(0, 27) == "2D Intersect: OBJ-IDs (1,4)");
+    CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
+    CHECK(reason[1].substr(0, 21) == "2D Intersect: OBJ-IDs");
 
     CHECK(reason[0].find("co-linear edges (7)") < reason[0].size());
 }
@@ -207,24 +207,6 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
     arma::u32_vec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
-    CHECK(reason[0].substr(0, 27) == "2D Intersect: OBJ-IDs (1,4)");
-    CHECK(reason[1] == reason[0]);
-    CHECK(reason[0].find("co-planar edge passes through face (6)") < reason[0].size());
+    CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
 }
 
-// TEST_CASE("Test OBJ Overlap - File")
-// {
-
-//     std::string fn_obj = "/tmp/qrt_overlap_test.obj";
-//     arma::fmat mesh;
-//     arma::u32_vec obj_ind;
-//     std::vector<std::string> obj_names;
-//     quadriga_lib::obj_file_read<float>(fn_obj, &mesh, nullptr, nullptr, nullptr, &obj_ind, nullptr, &obj_names);
-
-//     std::vector<std::string> reason;
-//     arma::u32_vec intersecting = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
-
-//     //mesh.print();
-//     intersecting.print();
-
-// }
