@@ -98,7 +98,7 @@ try
     fbs = quadriga_lib.ray_triangle_intersect( orig, dest(2:end,:), cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' dont match.';
+    expectedErrorMessage = 'Number of elements in ''orig'' and ''dest'' dont match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -158,7 +158,7 @@ try
     fbs = quadriga_lib.ray_triangle_intersect( orig(:,2:end), dest, cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''orig'' must have 3 columns containing x,y,z coordinates.';
+    expectedErrorMessage = 'Input ''orig'' must have at least 3 columns containing x,y,z coordinates.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -167,7 +167,7 @@ try
     fbs = quadriga_lib.ray_triangle_intersect( orig, dest(:,2:end), cube );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''dest'' must have 3 columns containing x,y,z coordinates.';
+    expectedErrorMessage = 'Input ''dest'' must have at least 3 columns containing x,y,z coordinates.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -176,7 +176,7 @@ try
     fbs = quadriga_lib.ray_triangle_intersect( orig, dest,cube(:,2:end) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''mesh'' must have 9 columns containing x,y,z coordinates of 3 vertices.';
+    expectedErrorMessage = 'Input ''mesh'' must have at least 9 columns containing x,y,z coordinates of 3 vertices.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

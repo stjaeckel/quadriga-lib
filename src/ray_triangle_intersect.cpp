@@ -22,7 +22,7 @@
 #include "ray_triangle_intersect_avx2.hpp"
 
 // Vector size for AVX2
-#define VEC_SIZE 8
+#define VEC_SIZE 8ULL
 
 // Testing for AVX2 support at runtime
 #if defined(_MSC_VER) // Windows
@@ -89,10 +89,10 @@ static inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float 
         float dz = Dz[i_ray];
 
         // Initialize local variables
-        float W_fbs = 1.0f;            // Set FBS location equal to dest
-        float W_sbs = W_fbs;           // Set SBS location equal to FBS location
-        unsigned I_fbs = 0, I_sbs = 0; // Set FBS index to 0
-        unsigned hit_counter = 0;      // Hit counter
+        float W_fbs = 1.0f;              // Set FBS location equal to dest
+        float W_sbs = W_fbs;             // Set SBS location equal to FBS location
+        unsigned I_fbs = 0U, I_sbs = 0U; // Set FBS index to 0
+        unsigned hit_counter = 0U;       // Hit counter
 
         // Step 1 - Check intersection with the AABBs of the sub-meshes (slab-method)
         // See: https://en.wikipedia.org/wiki/Slab_method
@@ -251,74 +251,142 @@ template <typename dtype>
 void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, const arma::Mat<dtype> *mesh,
                                           arma::Mat<dtype> *fbs, arma::Mat<dtype> *sbs, arma::Col<unsigned> *no_interact,
                                           arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                          const arma::Col<unsigned> *sub_mesh_index)
+                                          const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs)
 {
     // Input validation
     if (orig == nullptr)
         throw std::invalid_argument("Input 'orig' cannot be NULL.");
-    if (dest == nullptr)
-        throw std::invalid_argument("Input 'dest' cannot be NULL.");
+    if (orig->n_elem == 0)
+        throw std::invalid_argument("Inputs cannot be empty.");
+    if (!transpose_inputs && orig->n_cols < 3)
+        throw std::invalid_argument("Input 'orig' must have at least 3 columns containing x,y,z coordinates.");
+    if (transpose_inputs && orig->n_rows < 3)
+        throw std::invalid_argument("Input 'orig' must have at least 3 rows containing x,y,z coordinates.");
+
+    arma::uword n_ray = transpose_inputs ? orig->n_cols : orig->n_rows;
+    arma::uword o_ray = transpose_inputs ? orig->n_rows : orig->n_cols;
+
+    if (dest == nullptr && !transpose_inputs && orig->n_cols < 6)
+        throw std::invalid_argument("If input 'dest' is NULL, 'orig' must have at least 6 columns containing x,y,z coordinates.");
+    if (dest == nullptr && transpose_inputs && orig->n_rows < 6)
+        throw std::invalid_argument("If input 'dest' is NULL, 'orig' must have at least 6 rows containing x,y,z coordinates.");
+    if (dest != nullptr && !transpose_inputs && dest->n_cols < 3)
+        throw std::invalid_argument("Input 'dest' must have at least 3 columns containing x,y,z coordinates.");
+    if (dest != nullptr && transpose_inputs && dest->n_rows < 3)
+        throw std::invalid_argument("Input 'dest' must have at least 3 rows containing x,y,z coordinates.");
+
     if (mesh == nullptr)
         throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (orig->n_elem == 0 || dest->n_elem == 0 || mesh->n_elem == 0)
+    if (mesh->n_elem == 0)
         throw std::invalid_argument("Inputs cannot be empty.");
-    if (orig->n_cols != 3)
-        throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
-    if (dest->n_cols != 3)
-        throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
-    if (mesh->n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (!transpose_inputs && mesh->n_cols < 9)
+        throw std::invalid_argument("Input 'mesh' must have at least 9 columns containing x,y,z coordinates of 3 vertices.");
+    if (transpose_inputs && mesh->n_rows < 9)
+        throw std::invalid_argument("Input 'mesh' must have at least 9 rows containing x,y,z coordinates of 3 vertices.");
 
-    size_t n_ray_t = orig->n_rows;
-    size_t n_mesh_t = (size_t)mesh->n_rows;
+    arma::uword n_mesh = transpose_inputs ? mesh->n_cols : mesh->n_rows;
 
-    if (dest->n_rows != n_ray_t)
-        throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
+    // The mesh can have more than 9 values (for additional data in memory, such as normal vectors)
+    // We assume the first 9 values to be the vertex coordinates, the rest is ignored
+    arma::uword o_mesh = transpose_inputs ? mesh->n_rows : mesh->n_cols;
+
+    if (dest != nullptr && orig->n_elem != dest->n_elem)
+        throw std::invalid_argument("Number of elements in 'orig' and 'dest' dont match.");
 
     // Convert orig and dest to aligned floats and calculate (dest - orig)
-    size_t n_ray_s = n_ray_t; // (n_ray_t % VEC_SIZE == 0) ? n_ray_t : VEC_SIZE * (n_ray_t / VEC_SIZE + 1);
-    auto origA = arma::fmat(n_ray_s, 3, arma::fill::none);
-    auto dest_minus_origA = arma::fmat(n_ray_s, 3, arma::fill::none);
+    arma::fmat origA = arma::fmat(n_ray, 3ULL, arma::fill::none);
+    arma::fmat dest_minus_origA = arma::fmat(n_ray, 3ULL, arma::fill::none);
     {
-        const dtype *p_orig = orig->memptr(), *p_dest = dest->memptr();
+        const dtype *p_orig = orig->memptr();
         float *p_origA = origA.memptr(), *p_dest_minus_origA = dest_minus_origA.memptr();
-        size_t n_elem = 3 * n_ray_s, i = 0;
-        for (size_t j = 0; j < n_elem; ++j)
-            if ((j % n_ray_s) / n_ray_t) // = 1 for rows where n_ray_s > n_ray_t
+
+        if (dest == nullptr) // dest is included in orig
+        {
+            if (transpose_inputs)
             {
-                p_origA[j] = 0.0f;
-                p_dest_minus_origA[j] = 0.0f;
+                for (arma::uword i_ray = 0ULL; i_ray < n_ray; ++i_ray)
+                {
+                    arma::uword offset = i_ray * o_ray; // Ray offset
+
+                    dtype v_orig = p_orig[offset];                                     // Load orig_x
+                    p_origA[i_ray] = (float)v_orig;                                    // Cast to float
+                    p_dest_minus_origA[i_ray] = float(p_orig[offset + 3ULL] - v_orig); // Calculate dest_x - orig_x
+
+                    v_orig = p_orig[offset + 1ULL];                                            // Load orig_y
+                    p_origA[i_ray + n_ray] = (float)v_orig;                                    // Cast to float
+                    p_dest_minus_origA[i_ray + n_ray] = float(p_orig[offset + 4ULL] - v_orig); // Calculate dest_y - orig_y
+
+                    v_orig = p_orig[offset + 2ULL];                                                   // Load orig_z
+                    p_origA[i_ray + 2ULL * n_ray] = (float)v_orig;                                    // Cast to float
+                    p_dest_minus_origA[i_ray + 2ULL * n_ray] = float(p_orig[offset + 5ULL] - v_orig); // Calculate dest_z - orig_z
+                }
             }
             else
             {
-                dtype v_orig = p_orig[i];                          // Load orig
-                p_origA[j] = (float)v_orig;                        // Cast to float
-                p_dest_minus_origA[j] = float(p_dest[i] - v_orig); // Calculate dest - orig
-                ++i;
+                arma::uword offset = 3ULL * n_ray;
+                for (arma::uword i_elem = 0ULL; i_elem < offset; ++i_elem)
+                {
+                    dtype v_orig = p_orig[i_elem];                                        // Load orig
+                    p_origA[i_elem] = (float)v_orig;                                      // Cast to float
+                    p_dest_minus_origA[i_elem] = float(p_orig[i_elem + offset] - v_orig); // Calculate dest - orig
+                }
             }
+        }
+        else // Separate dest
+        {
+            const dtype *p_dest = dest->memptr();
+            if (transpose_inputs)
+            {
+                for (arma::uword i_ray = 0ULL; i_ray < n_ray; ++i_ray)
+                {
+                    arma::uword offset = i_ray * o_ray; // Ray offset
+
+                    dtype v_orig = p_orig[offset];                              // Load orig_x
+                    p_origA[i_ray] = (float)v_orig;                             // Cast to float
+                    p_dest_minus_origA[i_ray] = float(p_dest[offset] - v_orig); // Calculate dest_x - orig_x
+
+                    v_orig = p_orig[offset + 1ULL];                                            // Load orig_y
+                    p_origA[i_ray + n_ray] = (float)v_orig;                                    // Cast to float
+                    p_dest_minus_origA[i_ray + n_ray] = float(p_dest[offset + 1ULL] - v_orig); // Calculate dest_y - orig_y
+
+                    v_orig = p_orig[offset + 2ULL];                                                   // Load orig_z
+                    p_origA[i_ray + 2ULL * n_ray] = (float)v_orig;                                    // Cast to float
+                    p_dest_minus_origA[i_ray + 2ULL * n_ray] = float(p_dest[offset + 2ULL] - v_orig); // Calculate dest_z - orig_z
+                }
+            }
+            else
+            {
+                for (arma::uword i_elem = 0ULL; i_elem < 3ULL * n_ray; ++i_elem)
+                {
+                    dtype v_orig = p_orig[i_elem];                               // Load orig
+                    p_origA[i_elem] = (float)v_orig;                             // Cast to float
+                    p_dest_minus_origA[i_elem] = float(p_dest[i_elem] - v_orig); // Calculate dest - orig
+                }
+            }
+        }
     }
 
     // Check if the sub-mesh indices are valid
-    size_t n_sub_t = 1;                                           // Number of sub-meshes (at least 1)
+    arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
     arma::Col<unsigned> smi(1);                                   // Sub-mesh-index (local copy)
     if (sub_mesh_index != nullptr && sub_mesh_index->n_elem != 0) // Input is available
     {
-        n_sub_t = (size_t)sub_mesh_index->n_elem;
+        n_sub = sub_mesh_index->n_elem;
         const unsigned *p_sub = sub_mesh_index->memptr();
 
         if (*p_sub != 0U)
             throw std::invalid_argument("First sub-mesh must start at index 0.");
 
-        for (size_t i = 1; i < n_sub_t; ++i)
+        for (arma::uword i = 1ULL; i < n_sub; ++i)
         {
-            if (p_sub[i] <= p_sub[i - 1])
+            if (p_sub[i] <= p_sub[i - 1ULL])
                 throw std::invalid_argument("Sub-mesh indices must be sorted in ascending order.");
 
-            if (p_sub[i] % VEC_SIZE != 0)
+            if (p_sub[i] % VEC_SIZE != 0ULL)
                 throw std::invalid_argument("Sub-meshes must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).");
         }
 
-        if (p_sub[n_sub_t - 1] >= (unsigned)n_mesh_t)
+        if (p_sub[n_sub - 1ULL] >= (unsigned)n_mesh)
             throw std::invalid_argument("Sub-mesh indices cannot exceed number of mesh elements.");
 
         smi = *sub_mesh_index;
@@ -326,8 +394,8 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
     // Alignment to 32 byte addresses is required when loading data into AVX2 registers
     // Not doing this may cause segmentation faults (e.g. in MATLAB)
-    size_t n_mesh_s = (n_mesh_t % VEC_SIZE == 0) ? n_mesh_t : VEC_SIZE * (n_mesh_t / VEC_SIZE + 1);
-    size_t n_sub_s = (n_sub_t % VEC_SIZE == 0) ? n_sub_t : VEC_SIZE * (n_sub_t / VEC_SIZE + 1);
+    arma::uword n_mesh_s = (n_mesh % VEC_SIZE == 0ULL) ? n_mesh : VEC_SIZE * (n_mesh / VEC_SIZE + 1ULL);
+    arma::uword n_sub_s = (n_sub % VEC_SIZE == 0ULL) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1ULL);
 
 #if defined(_MSC_VER) // Windows
     float *Tx = (float *)_aligned_malloc(n_mesh_s * sizeof(float), 32);
@@ -369,18 +437,14 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     const unsigned *p_sub = smi.memptr();
 
     // Set parameters for the first AABB
-    size_t i_sub = 0, i_next = (n_sub_t == 1) ? n_mesh_t - 1 : (size_t)p_sub[1] - 1;
+    arma::uword i_sub = 0ULL, i_next = (n_sub == 1ULL) ? n_mesh - 1ULL : (arma::uword)p_sub[1] - 1ULL;
     float x_min = INFINITY, x_max = -INFINITY,
           y_min = INFINITY, y_max = -INFINITY,
           z_min = INFINITY, z_max = -INFINITY;
 
-    for (size_t i_mesh = 0; i_mesh < n_mesh_t; ++i_mesh)
+    // Lambda to process each mesh element and write the data to the aligned memory
+    auto process_mesh_element = [&](arma::uword i_mesh, dtype x1, dtype y1, dtype z1, dtype x2, dtype y2, dtype z2, dtype x3, dtype y3, dtype z3)
     {
-        // Load first vertex
-        dtype x1 = p_mesh[i_mesh],
-              y1 = p_mesh[i_mesh + n_mesh_t],
-              z1 = p_mesh[i_mesh + 2 * n_mesh_t];
-
         // Typecast to float and update AABB
         float xf = (float)x1, yf = (float)y1, zf = (float)z1;
         x_min = (xf < x_min) ? xf : x_min, x_max = (xf > x_max) ? xf : x_max;
@@ -390,37 +454,27 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
         // Write to aligned memory
         Tx[i_mesh] = xf, Ty[i_mesh] = yf, Tz[i_mesh] = zf;
 
-        // Load second vertex
-        dtype x = p_mesh[i_mesh + 3 * n_mesh_t],
-              y = p_mesh[i_mesh + 4 * n_mesh_t],
-              z = p_mesh[i_mesh + 5 * n_mesh_t];
-
         // Typecast to float and update AABB
-        xf = (float)x, yf = (float)y, zf = (float)z;
+        xf = (float)x2, yf = (float)y2, zf = (float)z2;
         x_min = (xf < x_min) ? xf : x_min, x_max = (xf > x_max) ? xf : x_max;
         y_min = (yf < y_min) ? yf : y_min, y_max = (yf > y_max) ? yf : y_max;
         z_min = (zf < z_min) ? zf : z_min, z_max = (zf > z_max) ? zf : z_max;
 
         // Calculate edge and write to aligned memory
-        E1x[i_mesh] = float(x - x1);
-        E1y[i_mesh] = float(y - y1);
-        E1z[i_mesh] = float(z - z1);
-
-        // Load third vertex
-        x = p_mesh[i_mesh + 6 * n_mesh_t],
-        y = p_mesh[i_mesh + 7 * n_mesh_t],
-        z = p_mesh[i_mesh + 8 * n_mesh_t];
+        E1x[i_mesh] = float(x2 - x1);
+        E1y[i_mesh] = float(y2 - y1);
+        E1z[i_mesh] = float(z2 - z1);
 
         // Typecast to float and update AABB
-        xf = (float)x, yf = (float)y, zf = (float)z;
+        xf = (float)x3, yf = (float)y3, zf = (float)z3;
         x_min = (xf < x_min) ? xf : x_min, x_max = (xf > x_max) ? xf : x_max;
         y_min = (yf < y_min) ? yf : y_min, y_max = (yf > y_max) ? yf : y_max;
         z_min = (zf < z_min) ? zf : z_min, z_max = (zf > z_max) ? zf : z_max;
 
         // Calculate edge and write to aligned memory
-        E2x[i_mesh] = float(x - x1);
-        E2y[i_mesh] = float(y - y1);
-        E2z[i_mesh] = float(z - z1);
+        E2x[i_mesh] = float(x3 - x1);
+        E2y[i_mesh] = float(y3 - y1);
+        E2z[i_mesh] = float(z3 - z1);
 
         // Update sub-mesh data for the next AABB
         if (i_mesh == i_next)
@@ -437,12 +491,59 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
             // Update counters
             ++i_sub;
-            i_next = (i_sub == n_sub_t - 1) ? n_mesh_t - 1 : (size_t)p_sub[i_sub + 1] - 1;
+            i_next = (i_sub == n_sub - 1ULL) ? n_mesh - 1ULL : (arma::uword)p_sub[i_sub + 1ULL] - 1ULL;
+        }
+    };
+
+    if (transpose_inputs)
+    {
+        for (arma::uword i_mesh = 0ULL; i_mesh < n_mesh; ++i_mesh)
+        {
+            arma::uword offset = o_mesh * i_mesh;
+
+            // Load first vertex
+            dtype x1 = p_mesh[offset],
+                  y1 = p_mesh[offset + 1ULL],
+                  z1 = p_mesh[offset + 2ULL];
+
+            // Load second vertex
+            dtype x2 = p_mesh[offset + 3ULL],
+                  y2 = p_mesh[offset + 4ULL],
+                  z2 = p_mesh[offset + 5ULL];
+
+            // Load third vertex
+            dtype x3 = p_mesh[offset + 6ULL],
+                  y3 = p_mesh[offset + 7ULL],
+                  z3 = p_mesh[offset + 8ULL];
+
+            process_mesh_element(i_mesh, x1, y1, z1, x2, y2, z2, x3, y3, z3);
+        }
+    }
+    else
+    {
+        for (arma::uword i_mesh = 0ULL; i_mesh < n_mesh; ++i_mesh)
+        {
+            // Load first vertex
+            dtype x1 = p_mesh[i_mesh],
+                  y1 = p_mesh[i_mesh + n_mesh],
+                  z1 = p_mesh[i_mesh + 2ULL * n_mesh];
+
+            // Load second vertex
+            dtype x2 = p_mesh[i_mesh + 3ULL * n_mesh],
+                  y2 = p_mesh[i_mesh + 4ULL * n_mesh],
+                  z2 = p_mesh[i_mesh + 5ULL * n_mesh];
+
+            // Load third vertex
+            dtype x3 = p_mesh[i_mesh + 6ULL * n_mesh],
+                  y3 = p_mesh[i_mesh + 7ULL * n_mesh],
+                  z3 = p_mesh[i_mesh + 8ULL * n_mesh];
+
+            process_mesh_element(i_mesh, x1, y1, z1, x2, y2, z2, x3, y3, z3);
         }
     }
 
     // Add padding to the aligned mesh data
-    for (size_t i_mesh = n_mesh_t; i_mesh < n_mesh_s; ++i_mesh)
+    for (arma::uword i_mesh = n_mesh; i_mesh < n_mesh_s; ++i_mesh)
     {
         Tx[i_mesh] = 0.0f, Ty[i_mesh] = 0.0f, Tz[i_mesh] = 0.0f,
         E1x[i_mesh] = 0.0f, E1y[i_mesh] = 0.0f, E1z[i_mesh] = 0.0f,
@@ -450,7 +551,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Add padding to the aligned AABB data
-    for (size_t i_sub = n_sub_t; i_sub < n_sub_s; ++i_sub)
+    for (arma::uword i_sub = n_sub; i_sub < n_sub_s; ++i_sub)
     {
         Xmin[i_sub] = 0.0f, Xmax[i_sub] = 0.0f;
         Ymin[i_sub] = 0.0f, Ymax[i_sub] = 0.0f;
@@ -458,9 +559,9 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Define and initialize temporary variables
-    arma::fvec Wf(n_ray_s), Ws(n_ray_s);    // Normalized FBS and SBS hit distances, initialized to 0
-    arma::u32_vec If(n_ray_s), Is(n_ray_s); // Index of mesh element hit at FBS/SBS, initialized to 0
-    arma::u32_vec hit_cnt(n_ray_s);         // Hit counter
+    arma::fvec Wf(n_ray), Ws(n_ray);    // Normalized FBS and SBS hit distances, initialized to 0
+    arma::u32_vec If(n_ray), Is(n_ray); // Index of mesh element hit at FBS/SBS, initialized to 0
+    arma::u32_vec hit_cnt(n_ray);       // Hit counter
 
     // Pointer to hit counter
     unsigned *p_hit_cnt = (no_interact == nullptr) ? nullptr : hit_cnt.memptr();
@@ -468,18 +569,18 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     if (isAVX2Supported()) // CPU support for AVX2
     {
         qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_s,
-                    smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                    smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                     origA.colptr(0), origA.colptr(1), origA.colptr(2),
                     dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                    n_ray_s, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+                    n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
     else
     {
-        qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_t,
-                       smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+        qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+                       smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                        origA.colptr(0), origA.colptr(1), origA.colptr(2),
                        dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                       n_ray_s, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+                       n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
 
     // Free aligned memory
@@ -508,13 +609,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     // Compute FBS location in GCS
     if (fbs != nullptr)
     {
-        if (fbs->n_rows != n_ray_t || fbs->n_cols != 3)
-            fbs->set_size(n_ray_t, 3);
+        if (fbs->n_rows != n_ray || fbs->n_cols != 3)
+            fbs->set_size(n_ray, 3);
 
         dtype *px = fbs->colptr(0), *py = fbs->colptr(1), *pz = fbs->colptr(2);
         float *w = Wf.memptr();
 
-        for (size_t i = 0; i < n_ray_t; ++i)
+        for (arma::uword i = 0; i < n_ray; ++i)
         {
             px[i] = ox[i] + dtype(w[i] * dx[i]);
             py[i] = oy[i] + dtype(w[i] * dy[i]);
@@ -525,13 +626,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     // Compute SBS location in GCS
     if (sbs != nullptr)
     {
-        if (sbs->n_rows != n_ray_t || sbs->n_cols != 3)
-            sbs->set_size(n_ray_t, 3);
+        if (sbs->n_rows != n_ray || sbs->n_cols != 3)
+            sbs->set_size(n_ray, 3);
 
         dtype *px = sbs->colptr(0), *py = sbs->colptr(1), *pz = sbs->colptr(2);
         float *w = Ws.memptr();
 
-        for (size_t i = 0; i < n_ray_t; ++i)
+        for (arma::uword i = 0; i < n_ray; ++i)
         {
             px[i] = ox[i] + dtype(w[i] * dx[i]);
             py[i] = oy[i] + dtype(w[i] * dy[i]);
@@ -540,23 +641,23 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Copy the rest
-    size_t no_bytes = (size_t)n_ray_t * sizeof(unsigned);
+    arma::uword no_bytes = (arma::uword)n_ray * sizeof(unsigned);
     if (no_interact != nullptr)
     {
-        if (no_interact->n_elem != n_ray_t)
-            no_interact->set_size(n_ray_t);
+        if (no_interact->n_elem != n_ray)
+            no_interact->set_size(n_ray);
         std::memcpy(no_interact->memptr(), p_hit_cnt, no_bytes);
     }
     if (fbs_ind != nullptr)
     {
-        if (fbs_ind->n_elem != n_ray_t)
-            fbs_ind->set_size(n_ray_t);
+        if (fbs_ind->n_elem != n_ray)
+            fbs_ind->set_size(n_ray);
         std::memcpy(fbs_ind->memptr(), If.memptr(), no_bytes);
     }
     if (sbs_ind != nullptr)
     {
-        if (sbs_ind->n_elem != n_ray_t)
-            sbs_ind->set_size(n_ray_t);
+        if (sbs_ind->n_elem != n_ray)
+            sbs_ind->set_size(n_ray);
         std::memcpy(sbs_ind->memptr(), Is.memptr(), no_bytes);
     }
 }
@@ -564,9 +665,9 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<float> *orig, const arma::Mat<float> *dest, const arma::Mat<float> *mesh,
                                                    arma::Mat<float> *fbs, arma::Mat<float> *sbs, arma::Col<unsigned> *no_interact,
                                                    arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                                   const arma::Col<unsigned> *sub_mesh_index);
+                                                   const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs);
 
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *mesh,
                                                    arma::Mat<double> *fbs, arma::Mat<double> *sbs, arma::Col<unsigned> *no_interact,
                                                    arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                                   const arma::Col<unsigned> *sub_mesh_index);
+                                                   const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs);
