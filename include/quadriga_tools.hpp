@@ -22,6 +22,12 @@
 #include <string>
 #include <vector>
 
+// If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
+// This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
+// This requires a 64 bit platform, but will compile on Linux, Windows and macOS
+static_assert(sizeof(arma::uword) == sizeof(unsigned long long), "arma::uword and unsigned long long have different sizes");
+static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned long long have different sizes");
+
 namespace quadriga_lib
 {
 
@@ -268,16 +274,19 @@ namespace quadriga_lib
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
     // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
     // - All internal computations are done using single precision
+    // - Instead of 'orig' and 'dest', rays can be provided as a combined object 'orig' with size [ n_ray, 6 ] = {xo, yo, zo, xd, yd, zd}
+    //   The input 'dest' must be a nullptr in this case. This can help to optimize memory access patterns.
     template <typename dtype>
-    void ray_triangle_intersect(const arma::Mat<dtype> *orig,                         // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *dest,                         // Ray destination points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *mesh,                         // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                arma::Mat<dtype> *fbs = nullptr,                      // First interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Mat<dtype> *sbs = nullptr,                      // Second interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Col<unsigned> *no_interact = nullptr,           // Number of mesh between orig and dest, Size [ n_ray ]
-                                arma::Col<unsigned> *fbs_ind = nullptr,               // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                arma::Col<unsigned> *sbs_ind = nullptr,               // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                const arma::Col<unsigned> *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
+    void ray_triangle_intersect(const arma::Mat<dtype> *orig,                        // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *dest,                        // Ray destination points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *mesh,                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                arma::Mat<dtype> *fbs = nullptr,                     // First interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Mat<dtype> *sbs = nullptr,                     // Second interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Col<unsigned> *no_interact = nullptr,          // Number of mesh between orig and dest, Size [ n_ray ]
+                                arma::Col<unsigned> *fbs_ind = nullptr,              // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                arma::Col<unsigned> *sbs_ind = nullptr,              // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                const arma::Col<unsigned> *sub_mesh_index = nullptr, // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
+                                bool transpose_inputs = false);                      // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
 
     // Subdivide rays
     // - Subdivides ray beams into 4 sub beams
