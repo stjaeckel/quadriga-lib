@@ -1672,9 +1672,9 @@ template std::string quadriga_lib::interp(const arma::Mat<double> *input, const 
 
 // Read Wavefront .obj file
 template <typename dtype>
-size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
-                                   arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
-                                   std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names)
+arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
+                                        arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                        std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names)
 {
     // Open file for reading
     std::ifstream fileR = std::ifstream(fn, std::ios::in);
@@ -1682,19 +1682,19 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
         throw std::invalid_argument("Error opening file.");
 
     // Obtain the number of faces and vertices from the file
-    size_t n_vert = 0, n_faces = 0;
+    arma::uword n_vert = 0ULL, n_faces = 0ULL;
     std::string line;
     while (std::getline(fileR, line))
-        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
+        if (line.length() > 2ULL && line.at(0ULL) == 118 && line.at(1ULL) == 32) // Line starts with "v "
             ++n_vert;
-        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
+        else if (line.length() > 2ULL && line.at(0ULL) == 102) // Line starts with "f "
             ++n_faces;
 
     // Stop here if no other outputs are needed
-    if (n_vert == 0 || n_faces == 0)
+    if (n_vert == 0ULL || n_faces == 0ULL)
     {
         fileR.close();
-        return 0;
+        return 0ULL;
     }
 
     if (mesh == nullptr && mtl_prop == nullptr && vert_list == nullptr && face_ind == nullptr && obj_ind == nullptr && mtl_ind == nullptr)
@@ -1703,13 +1703,19 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
         return n_faces;
     }
 
+    // We need to clear exisiting object and material names, otherwise the indices will not match
+    if (obj_names != nullptr)
+        obj_names->clear();
+    if (mtl_names != nullptr)
+        mtl_names->clear();
+
     // Define a struct to store the material properties
     struct MaterialProp
     {
         std::string name;  // Material name
         double a, b, c, d; // Electromagnetic properties
         double att;        // Additional fixed  attenuation in dB
-        size_t index;      // Material index
+        arma::uword index; // Material index
     };
 
     // Add default material data, See: Rec. ITU-R P.2040-1, Table 3
@@ -1742,21 +1748,21 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
 
     // Reset the file pointer to the beginning of the file
     fileR.clear(); // Clear any flags
-    fileR.seekg(0, std::ios::beg);
+    fileR.seekg(0ULL, std::ios::beg);
 
     // Local data
-    size_t i_vert = 0, i_face = 0, j_face = 0, i_object = 0, i_mtl = 0; // Counters for vertices, faces, objects, materials
-    size_t iM = 0;                                                      // Material index
-    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;          // Default material properties
-    bool simple_face_format = true;                                     // Selector for face format
+    arma::uword i_vert = 0ULL, i_face = 0ULL, j_face = 0ULL, i_object = 0ULL, i_mtl = 0ULL; // Counters for vertices, faces, objects, materials
+    arma::uword iM = 0ULL;                                                                  // Material index
+    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;                              // Default material properties
+    bool simple_face_format = true;                                                         // Selector for face format
 
     // Obtain memory for the vertex list
     dtype *p_vert;
     if (vert_list == nullptr)
-        p_vert = new dtype[n_vert * 3];
-    else if (vert_list->n_rows != (arma::uword)n_vert || vert_list->n_cols != 3)
+        p_vert = new dtype[n_vert * 3ULL];
+    else if (vert_list->n_rows != n_vert || vert_list->n_cols != 3ULL)
     {
-        vert_list->set_size((arma::uword)n_vert, 3);
+        vert_list->set_size(n_vert, 3ULL);
         p_vert = vert_list->memptr();
     }
     else
@@ -1765,35 +1771,35 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
     // Obtain memory for face indices
     unsigned *p_face_ind;
     if (face_ind == nullptr)
-        p_face_ind = new unsigned[n_faces * 3];
-    else if (face_ind->n_rows != (arma::uword)n_faces || face_ind->n_cols != 3)
+        p_face_ind = new unsigned[n_faces * 3ULL];
+    else if (face_ind->n_rows != n_faces || face_ind->n_cols != 3ULL)
     {
-        face_ind->set_size((arma::uword)n_faces, 3);
+        face_ind->set_size(n_faces, 3ULL);
         p_face_ind = face_ind->memptr();
     }
     else
         p_face_ind = face_ind->memptr();
 
     // Set size of "mtl_prop"
-    if (mtl_prop != nullptr && (mtl_prop->n_rows != (arma::uword)n_faces || mtl_prop->n_cols != 5))
-        mtl_prop->set_size((arma::uword)n_faces, 5);
-    dtype *p_mtl_prop = mtl_prop == nullptr ? nullptr : mtl_prop->memptr();
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 5ULL))
+        mtl_prop->set_size(n_faces, 5ULL);
+    dtype *p_mtl_prop = (mtl_prop == nullptr) ? nullptr : mtl_prop->memptr();
 
     // Set size of "mtl_ind"
-    if (mtl_ind != nullptr && mtl_ind->n_elem != (arma::uword)n_faces)
-        mtl_ind->set_size((arma::uword)n_faces);
-    unsigned *p_mtl_ind = mtl_ind == nullptr ? nullptr : mtl_ind->memptr();
+    if (mtl_ind != nullptr && mtl_ind->n_elem != n_faces)
+        mtl_ind->set_size(n_faces);
+    unsigned *p_mtl_ind = (mtl_ind == nullptr) ? nullptr : mtl_ind->memptr();
 
     // Set size of "obj_ind"
-    if (obj_ind != nullptr && obj_ind->n_elem != (arma::uword)n_faces)
-        obj_ind->set_size((arma::uword)n_faces);
-    unsigned *p_obj_ind = obj_ind == nullptr ? nullptr : obj_ind->memptr();
+    if (obj_ind != nullptr && obj_ind->n_elem != n_faces)
+        obj_ind->set_size(n_faces);
+    unsigned *p_obj_ind = (obj_ind == nullptr) ? nullptr : obj_ind->memptr();
 
     // Process file
     while (std::getline(fileR, line))
     {
         // Read vertex
-        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
+        if (line.length() > 2ULL && line.at(0ULL) == 118 && line.at(1ULL) == 32) // Line starts with "v "
         {
             if (i_vert >= n_vert)
                 throw std::invalid_argument("Error reading vertex data.");
@@ -1802,11 +1808,11 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
             std::sscanf(line.c_str(), "v %lf %lf %lf", &x, &y, &z);
             p_vert[i_vert] = (dtype)x;
             p_vert[i_vert + n_vert] = (dtype)y;
-            p_vert[i_vert++ + 2 * n_vert] = (dtype)z;
+            p_vert[i_vert++ + 2ULL * n_vert] = (dtype)z;
         }
 
         // Read face
-        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
+        else if (line.length() > 2ULL && line.at(0ULL) == 102) // Line starts with "f "
         {
             if (i_face >= n_faces)
                 throw std::invalid_argument("Error reading face data.");
@@ -1831,9 +1837,9 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
             if (p_mtl_prop != nullptr)
                 p_mtl_prop[i_face] = (dtype)aM,
                 p_mtl_prop[i_face + n_faces] = (dtype)bM,
-                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM,
-                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM,
-                p_mtl_prop[i_face + 4 * n_faces] = (dtype)attM;
+                p_mtl_prop[i_face + 2ULL * n_faces] = (dtype)cM,
+                p_mtl_prop[i_face + 3ULL * n_faces] = (dtype)dM,
+                p_mtl_prop[i_face + 4ULL * n_faces] = (dtype)attM;
 
             if (p_mtl_ind != nullptr)
                 p_mtl_ind[i_face] = (unsigned)iM;
@@ -1841,46 +1847,62 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
             // Store face indices (0-based)
             p_face_ind[i_face] = (unsigned)a - 1;
             p_face_ind[i_face + n_faces] = (unsigned)b - 1;
-            p_face_ind[i_face++ + 2 * n_faces] = (unsigned)c - 1;
+            p_face_ind[i_face++ + 2ULL * n_faces] = (unsigned)c - 1;
         }
 
         // Read objects ids (= connected faces)
         // - Object name is written to the OBJ file before vertices, materials and faces
-        else if (line.length() > 2 && line.at(0) == 111) // Line starts with "o "
+        else if (line.length() > 2ULL && line.at(0ULL) == 111) // Line starts with "o "
         {
             if (p_obj_ind != nullptr)
-                for (size_t i = j_face; i < i_face; ++i)
+                for (arma::uword i = j_face; i < i_face; ++i)
                     p_obj_ind[i] = (unsigned)i_object;
 
             // Add object name to list of object names
             if (obj_names != nullptr)
             {
-                std::string obj_name = line.substr(2, 255); // Name in OBJ File
+                std::string obj_name = line.substr(2ULL, 255ULL); // Name in OBJ File
                 obj_names->push_back(obj_name);
             }
 
             // Reset current material
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0;
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0ULL;
             j_face = i_face;
             ++i_object;
         }
 
         // Read and set material properties
         // - Material names are written before face indices
-        else if (line.length() > 7 && line.substr(0, 6).compare("usemtl") == 0) // Line contains material definition
+        else if (line.length() > 7ULL && line.substr(0ULL, 6ULL).compare("usemtl") == 0) // Line contains material definition
         {
-            std::string mtl_name = line.substr(7, 255);                 // Name in OBJ File
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0; // Reset current material
+            std::string mtl_name = line.substr(7ULL, 255ULL);              // Name in OBJ File
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0ULL; // Reset current material
             int found = -1;
 
+            // If "mtl_name" does not contain a "::", remove everything after the dot
+            if (mtl_name.find("::") == std::string::npos)
+            {
+                size_t dotPos = mtl_name.find('.');
+                if (dotPos != std::string::npos)
+                    mtl_name = mtl_name.substr(0, dotPos); // Substring up to the dot
+            }
+
             // Try to find the material name in the material library
-            for (int n = 0; n < (int)mtl_lib.size(); ++n)
+            for (size_t n = 0ULL; n < mtl_lib.size(); ++n)
                 if (mtl_lib[n].name.compare(mtl_name) == 0)
-                    aM = mtl_lib[n].a, bM = mtl_lib[n].b, cM = mtl_lib[n].c, dM = mtl_lib[n].d, attM = mtl_lib[n].att, iM = mtl_lib[n].index, found = n;
+                {
+                    aM = mtl_lib[n].a;
+                    bM = mtl_lib[n].b;
+                    cM = mtl_lib[n].c;
+                    dM = mtl_lib[n].d;
+                    attM = mtl_lib[n].att;
+                    iM = mtl_lib[n].index;
+                    found = (int)n;
+                }
 
             if (found == -1) // Add new material
             {
-                sscanf(mtl_name.c_str(), "%*[a-zA-Z0-9. ]::%lf:%lf:%lf:%lf:%lf", &aM, &bM, &cM, &dM, &attM);
+                sscanf(mtl_name.c_str(), "%*[^:]::%lf:%lf:%lf:%lf:%lf", &aM, &bM, &cM, &dM, &attM);
                 if (aM == 0.0)
                     mtl_lib.push_back({mtl_name, 1.0, 0.0, 0.0, 0.0, 0.0, 0}); // vacuum / air
                 else
@@ -1888,7 +1910,7 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
                 found = (int)mtl_lib.size() - 1;
             }
 
-            if (iM == 0) // Increase material counter
+            if (iM == 0ULL) // Increase material counter
             {
                 iM = ++i_mtl;
                 mtl_lib[found].index = i_mtl;
@@ -1900,36 +1922,36 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
     }
 
     // Set the object ID of the last object
-    i_object = i_object == 0 ? 1 : i_object; // Single unnamed object
+    i_object = (i_object == 0ULL) ? 1ULL : i_object; // Single unnamed object
     if (p_obj_ind != nullptr)
-        for (size_t i = j_face; i < i_face; ++i)
+        for (arma::uword i = j_face; i < i_face; ++i)
             p_obj_ind[i] = (unsigned)i_object;
 
     // Calculate the triangle mesh from vertices and faces
     if (mesh != nullptr)
     {
-        if (mesh->n_rows != (arma::uword)n_faces || mesh->n_cols != 9)
-            mesh->set_size((arma::uword)n_faces, 9);
+        if (mesh->n_rows != n_faces || mesh->n_cols != 9ULL)
+            mesh->set_size(n_faces, 9ULL);
         dtype *p_mesh = mesh->memptr();
 
-        for (size_t n = 0; n < n_faces; ++n)
+        for (arma::uword n = 0ULL; n < n_faces; ++n)
         {
-            size_t a = p_face_ind[n],
-                   b = p_face_ind[n + n_faces],
-                   c = p_face_ind[n + 2 * n_faces];
+            arma::uword a = p_face_ind[n],
+                        b = p_face_ind[n + n_faces],
+                        c = p_face_ind[n + 2ULL * n_faces];
 
             if (a > n_vert || b > n_vert || c > n_vert)
                 throw std::invalid_argument("Error assembling triangle mesh.");
 
             p_mesh[n] = p_vert[a];
             p_mesh[n + n_faces] = p_vert[a + n_vert];
-            p_mesh[n + 2 * n_faces] = p_vert[a + 2 * n_vert];
-            p_mesh[n + 3 * n_faces] = p_vert[b];
-            p_mesh[n + 4 * n_faces] = p_vert[b + n_vert];
-            p_mesh[n + 5 * n_faces] = p_vert[b + 2 * n_vert];
-            p_mesh[n + 6 * n_faces] = p_vert[c];
-            p_mesh[n + 7 * n_faces] = p_vert[c + n_vert];
-            p_mesh[n + 8 * n_faces] = p_vert[c + 2 * n_vert];
+            p_mesh[n + 2ULL * n_faces] = p_vert[a + 2ULL * n_vert];
+            p_mesh[n + 3ULL * n_faces] = p_vert[b];
+            p_mesh[n + 4ULL * n_faces] = p_vert[b + n_vert];
+            p_mesh[n + 5ULL * n_faces] = p_vert[b + 2ULL * n_vert];
+            p_mesh[n + 6ULL * n_faces] = p_vert[c];
+            p_mesh[n + 7ULL * n_faces] = p_vert[c + n_vert];
+            p_mesh[n + 8ULL * n_faces] = p_vert[c + 2ULL * n_vert];
         }
     }
 
@@ -1947,13 +1969,13 @@ size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma:
     return n_faces;
 }
 
-template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
-                                            arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
-                                            std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
+template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
+                                                 arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                                 std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
 
-template size_t quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
-                                            arma::Mat<unsigned> *face_ind, arma::Col<unsigned> *obj_ind, arma::Col<unsigned> *mtl_ind,
-                                            std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
+template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
+                                                 arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                                 std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names);
 
 // Tests if 3D objects overlap (have a shared volume or boolean intersection)
 template <typename dtype>
