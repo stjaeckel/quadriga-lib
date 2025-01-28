@@ -1984,74 +1984,96 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
     arma::uvec n_faces_per_object(n_obj);
     arma::uword *p_faces_per_object = n_faces_per_object.memptr();
 
-    arma::Mat<dtype> aabb(n_obj, 6ULL, arma::fill::value(INFINITY));
-    aabb.col(1).fill(-INFINITY);
-    aabb.col(3).fill(-INFINITY);
-    aabb.col(5).fill(-INFINITY);
-
+    // Direct access to mesh memory
     const dtype *p_mesh = mesh->memptr();
-    dtype *Xmin = aabb.colptr(0), *Xmax = aabb.colptr(1);
-    dtype *Ymin = aabb.colptr(2), *Ymax = aabb.colptr(3);
-    dtype *Zmin = aabb.colptr(4), *Zmax = aabb.colptr(5);
 
-    // Get the bounding boxes for each object
-    for (arma::uword i_mesh = 0ULL; i_mesh < n_mesh; ++i_mesh)
+    arma::Mat<dtype> aabb(6ULL, n_obj, arma::fill::none);
+    dtype *box = aabb.memptr(); // Object bounding box
     {
-        // Find object index
-        arma::uword i_obj = 0ULL;
-        for (arma::uword i = 0ULL; i < n_obj; ++i)
+        // Initialize bounding box coordinates
+        for (arma::uword i = 0ULL; i < aabb.n_elem; ++i)
+            box[i] = (i % 2) ? -INFINITY : INFINITY;
+
+        // Get the initial bounding box for the first object
+        arma::uword i_obj = 0ULL, i_obj_prev = 0ULL;
+        dtype Xmin = box[0ULL], Xmax = box[1ULL],
+              Ymin = box[2ULL], Ymax = box[3ULL],
+              Zmin = box[4ULL], Zmax = box[5ULL];
+
+        // Calculate the bounding boxes for each object
+        for (arma::uword i_mesh = 0ULL; i_mesh < n_mesh; ++i_mesh)
         {
-            i_obj = i;
-            if (p_obj_ids[i] == p_obj_ind[i_mesh])
-                break;
+            // Find object index
+            for (arma::uword i = 0ULL; i < n_obj; ++i)
+            {
+                i_obj = i;
+                if (p_obj_ids[i] == p_obj_ind[i_mesh])
+                    break;
+            }
+            ++p_faces_per_object[i_obj];
+
+            // Swap bounding box coordinates
+            if (i_obj != i_obj_prev)
+            {
+                box[6ULL * i_obj_prev] = Xmin, Xmin = box[6ULL * i_obj];
+                box[6ULL * i_obj_prev + 1ULL] = Xmax, Xmax = box[6ULL * i_obj + 1ULL];
+                box[6ULL * i_obj_prev + 2ULL] = Ymin, Ymin = box[6ULL * i_obj + 2ULL];
+                box[6ULL * i_obj_prev + 3ULL] = Ymax, Ymax = box[6ULL * i_obj + 3ULL];
+                box[6ULL * i_obj_prev + 4ULL] = Zmin, Zmin = box[6ULL * i_obj + 4ULL];
+                box[6ULL * i_obj_prev + 5ULL] = Zmax, Zmax = box[6ULL * i_obj + 5ULL];
+            }
+            i_obj_prev = i_obj;
+
+            dtype x = p_mesh[i_mesh],
+                  y = p_mesh[i_mesh + n_mesh],
+                  z = p_mesh[i_mesh + 2ULL * n_mesh];
+
+            Xmin = (x < Xmin) ? x : Xmin, Xmax = (x > Xmax) ? x : Xmax;
+            Ymin = (y < Ymin) ? y : Ymin, Ymax = (y > Ymax) ? y : Ymax;
+            Zmin = (z < Zmin) ? z : Zmin, Zmax = (z > Zmax) ? z : Zmax;
+
+            x = p_mesh[i_mesh + 3ULL * n_mesh],
+            y = p_mesh[i_mesh + 4ULL * n_mesh],
+            z = p_mesh[i_mesh + 5ULL * n_mesh];
+
+            Xmin = (x < Xmin) ? x : Xmin, Xmax = (x > Xmax) ? x : Xmax;
+            Ymin = (y < Ymin) ? y : Ymin, Ymax = (y > Ymax) ? y : Ymax;
+            Zmin = (z < Zmin) ? z : Zmin, Zmax = (z > Zmax) ? z : Zmax;
+
+            x = p_mesh[i_mesh + 6ULL * n_mesh],
+            y = p_mesh[i_mesh + 7ULL * n_mesh],
+            z = p_mesh[i_mesh + 8ULL * n_mesh];
+
+            Xmin = (x < Xmin) ? x : Xmin, Xmax = (x > Xmax) ? x : Xmax;
+            Ymin = (y < Ymin) ? y : Ymin, Ymax = (y > Ymax) ? y : Ymax;
+            Zmin = (z < Zmin) ? z : Zmin, Zmax = (z > Zmax) ? z : Zmax;
         }
 
-        ++p_faces_per_object[i_obj];
-
-        dtype x = p_mesh[i_mesh],
-              y = p_mesh[i_mesh + n_mesh],
-              z = p_mesh[i_mesh + 2ULL * n_mesh];
-
-        Xmin[i_obj] = (x < Xmin[i_obj]) ? x : Xmin[i_obj], Xmax[i_obj] = (x > Xmax[i_obj]) ? x : Xmax[i_obj];
-        Ymin[i_obj] = (y < Ymin[i_obj]) ? y : Ymin[i_obj], Ymax[i_obj] = (y > Ymax[i_obj]) ? y : Ymax[i_obj];
-        Zmin[i_obj] = (z < Zmin[i_obj]) ? z : Zmin[i_obj], Zmax[i_obj] = (z > Zmax[i_obj]) ? z : Zmax[i_obj];
-
-        x = p_mesh[i_mesh + 3ULL * n_mesh],
-        y = p_mesh[i_mesh + 4ULL * n_mesh],
-        z = p_mesh[i_mesh + 5ULL * n_mesh];
-
-        Xmin[i_obj] = (x < Xmin[i_obj]) ? x : Xmin[i_obj], Xmax[i_obj] = (x > Xmax[i_obj]) ? x : Xmax[i_obj];
-        Ymin[i_obj] = (y < Ymin[i_obj]) ? y : Ymin[i_obj], Ymax[i_obj] = (y > Ymax[i_obj]) ? y : Ymax[i_obj];
-        Zmin[i_obj] = (z < Zmin[i_obj]) ? z : Zmin[i_obj], Zmax[i_obj] = (z > Zmax[i_obj]) ? z : Zmax[i_obj];
-
-        x = p_mesh[i_mesh + 6ULL * n_mesh],
-        y = p_mesh[i_mesh + 7ULL * n_mesh],
-        z = p_mesh[i_mesh + 8ULL * n_mesh];
-
-        Xmin[i_obj] = (x < Xmin[i_obj]) ? x : Xmin[i_obj], Xmax[i_obj] = (x > Xmax[i_obj]) ? x : Xmax[i_obj];
-        Ymin[i_obj] = (y < Ymin[i_obj]) ? y : Ymin[i_obj], Ymax[i_obj] = (y > Ymax[i_obj]) ? y : Ymax[i_obj];
-        Zmin[i_obj] = (z < Zmin[i_obj]) ? z : Zmin[i_obj], Zmax[i_obj] = (z > Zmax[i_obj]) ? z : Zmax[i_obj];
+        // Write last update to memory
+        box[6ULL * i_obj_prev] = Xmin;
+        box[6ULL * i_obj_prev + 1ULL] = Xmax;
+        box[6ULL * i_obj_prev + 2ULL] = Ymin;
+        box[6ULL * i_obj_prev + 3ULL] = Ymax;
+        box[6ULL * i_obj_prev + 4ULL] = Zmin;
+        box[6ULL * i_obj_prev + 5ULL] = Zmax;
     }
 
     // Split the mesh into individual objects
-    std::vector<arma::Mat<dtype>> obj_faces(n_obj);   // Mesh split into individual objects
-    std::vector<arma::Mat<dtype>> obj_normals(n_obj); // Normal vectors N,U,V
-    std::vector<arma::Mat<dtype>> obj_edges_orig(n_obj);
-    std::vector<arma::Mat<dtype>> obj_edges_dest(n_obj);
+    std::vector<arma::Mat<dtype>> obj_faces(n_obj); // Mesh split into individual objects
+    std::vector<arma::Mat<dtype>> obj_edges(n_obj);
 
-    for (arma::uword i_obj = 0ULL; i_obj < n_obj; ++i_obj)
+#pragma omp parallel for
+    for (int i_obj_int = 0; i_obj_int < (int)n_obj; ++i_obj_int)
     {
+        arma::uword i_obj = (arma::uword)i_obj_int;
+
         arma::uword n_faces = p_faces_per_object[i_obj];
         arma::uword n_edges = 3ULL * n_faces;
-        obj_faces[i_obj] = arma::Mat<dtype>(n_faces, 9ULL, arma::fill::none);
-        obj_normals[i_obj] = arma::Mat<dtype>(n_faces, 9ULL, arma::fill::none);
-        obj_edges_orig[i_obj] = arma::Mat<dtype>(n_edges, 3ULL, arma::fill::none);
-        obj_edges_dest[i_obj] = arma::Mat<dtype>(n_edges, 3ULL, arma::fill::none);
+        obj_faces[i_obj] = arma::Mat<dtype>(18ULL, n_faces, arma::fill::none);
+        obj_edges[i_obj] = arma::Mat<dtype>(6ULL, n_edges, arma::fill::none);
 
         dtype *p_faces = obj_faces[i_obj].memptr();
-        dtype *p_normals = obj_normals[i_obj].memptr();
-        dtype *p_edges_orig = obj_edges_orig[i_obj].memptr();
-        dtype *p_edges_dest = obj_edges_dest[i_obj].memptr();
+        dtype *p_edges = obj_edges[i_obj].memptr();
 
         arma::uword i_face = 0ULL;
         unsigned obj_id = p_obj_ids[i_obj];
@@ -2059,56 +2081,58 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
         for (arma::uword i_mesh = 0ULL; i_mesh < n_mesh; ++i_mesh)
             if (p_obj_ind[i_mesh] == obj_id)
             {
+                arma::uword o_face = 18ULL * i_face;
+
                 // Vertex 1
                 dtype x0 = p_mesh[i_mesh];
                 dtype y0 = p_mesh[i_mesh + n_mesh];
                 dtype z0 = p_mesh[i_mesh + 2ULL * n_mesh];
 
-                p_faces[i_face] = x0;
-                p_faces[i_face + n_faces] = y0;
-                p_faces[i_face + 2ULL * n_faces] = z0;
+                p_faces[o_face] = x0;
+                p_faces[o_face + 1ULL] = y0;
+                p_faces[o_face + 2ULL] = z0;
 
-                p_edges_orig[i_face] = x0;
-                p_edges_orig[i_face + n_edges] = y0;
-                p_edges_orig[i_face + 2ULL * n_edges] = z0;
+                p_edges[6ULL * i_face] = x0;
+                p_edges[6ULL * i_face + 1ULL] = y0;
+                p_edges[6ULL * i_face + 2ULL] = z0;
 
-                p_edges_dest[i_face + 2ULL * n_faces] = x0;
-                p_edges_dest[i_face + 2ULL * n_faces + n_edges] = y0;
-                p_edges_dest[i_face + 2ULL * n_faces + 2ULL * n_edges] = z0;
+                p_edges[6ULL * (i_face + 2ULL * n_faces) + 3ULL] = x0;
+                p_edges[6ULL * (i_face + 2ULL * n_faces) + 4ULL] = y0;
+                p_edges[6ULL * (i_face + 2ULL * n_faces) + 5ULL] = z0;
 
                 // Vertex 2
                 dtype x1 = p_mesh[i_mesh + 3ULL * n_mesh];
                 dtype y1 = p_mesh[i_mesh + 4ULL * n_mesh];
                 dtype z1 = p_mesh[i_mesh + 5ULL * n_mesh];
 
-                p_faces[i_face + 3ULL * n_faces] = x1;
-                p_faces[i_face + 4ULL * n_faces] = y1;
-                p_faces[i_face + 5ULL * n_faces] = z1;
+                p_faces[o_face + 3ULL] = x1;
+                p_faces[o_face + 4ULL] = y1;
+                p_faces[o_face + 5ULL] = z1;
 
-                p_edges_orig[i_face + n_faces] = x1;
-                p_edges_orig[i_face + n_faces + n_edges] = y1;
-                p_edges_orig[i_face + n_faces + 2ULL * n_edges] = z1;
+                p_edges[6ULL * (i_face + n_faces)] = x1;
+                p_edges[6ULL * (i_face + n_faces) + 1ULL] = y1;
+                p_edges[6ULL * (i_face + n_faces) + 2ULL] = z1;
 
-                p_edges_dest[i_face] = x1;
-                p_edges_dest[i_face + n_edges] = y1;
-                p_edges_dest[i_face + 2ULL * n_edges] = z1;
+                p_edges[6ULL * i_face + 3ULL] = x1;
+                p_edges[6ULL * i_face + 4ULL] = y1;
+                p_edges[6ULL * i_face + 5ULL] = z1;
 
                 // Vertex 3
                 dtype x2 = p_mesh[i_mesh + 6ULL * n_mesh];
                 dtype y2 = p_mesh[i_mesh + 7ULL * n_mesh];
                 dtype z2 = p_mesh[i_mesh + 8ULL * n_mesh];
 
-                p_faces[i_face + 6ULL * n_faces] = x2;
-                p_faces[i_face + 7ULL * n_faces] = y2;
-                p_faces[i_face + 8ULL * n_faces] = z2;
+                p_faces[o_face + 6ULL] = x2;
+                p_faces[o_face + 7ULL] = y2;
+                p_faces[o_face + 8ULL] = z2;
 
-                p_edges_orig[i_face + 2ULL * n_faces] = x2;
-                p_edges_orig[i_face + 2ULL * n_faces + n_edges] = y2;
-                p_edges_orig[i_face + 2ULL * n_faces + 2ULL * n_edges] = z2;
+                p_edges[6ULL * (i_face + 2ULL * n_faces)] = x2;
+                p_edges[6ULL * (i_face + 2ULL * n_faces) + 1ULL] = y2;
+                p_edges[6ULL * (i_face + 2ULL * n_faces) + 2ULL] = z2;
 
-                p_edges_dest[i_face + n_faces] = x2;
-                p_edges_dest[i_face + n_faces + n_edges] = y2;
-                p_edges_dest[i_face + n_faces + 2ULL * n_edges] = z2;
+                p_edges[6ULL * (i_face + n_faces) + 3ULL] = x2;
+                p_edges[6ULL * (i_face + n_faces) + 4ULL] = y2;
+                p_edges[6ULL * (i_face + n_faces) + 5ULL] = z2;
 
                 // Calculate Edges E1 and E2
                 x1 -= x0, y1 -= y0, z1 -= z0;
@@ -2116,22 +2140,22 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
 
                 // Calculate normal vector N - store on X2
                 crossp(x1, y1, z1, x2, y2, z2, &x2, &y2, &z2, true);
-                p_normals[i_face] = x2;
-                p_normals[i_face + n_faces] = y2;
-                p_normals[i_face + 2ULL * n_faces] = z2;
+                p_faces[o_face + 9ULL] = x2;
+                p_faces[o_face + 10ULL] = y2;
+                p_faces[o_face + 11ULL] = z2;
 
                 // P0 -> P1 (X1) as a direction for U
                 dtype len = (dtype)1.0 / std::sqrt(x1 * x1 + y1 * y1 + z1 * z1);
                 x1 *= len, y1 *= len, z1 *= len;
-                p_normals[i_face + 3ULL * n_faces] = x1;
-                p_normals[i_face + 4ULL * n_faces] = y1;
-                p_normals[i_face + 5ULL * n_faces] = z1;
+                p_faces[o_face + 12ULL] = x1;
+                p_faces[o_face + 13ULL] = y1;
+                p_faces[o_face + 14ULL] = z1;
 
                 // V = N x U, store result in X2
                 crossp(x2, y2, z2, x1, y1, z1, &x2, &y2, &z2, true);
-                p_normals[i_face + 6ULL * n_faces] = x2;
-                p_normals[i_face + 7ULL * n_faces] = y2;
-                p_normals[i_face + 8ULL * n_faces] = z2;
+                p_faces[o_face + 15ULL] = x2;
+                p_faces[o_face + 16ULL] = y2;
+                p_faces[o_face + 17ULL] = z2;
 
                 ++i_face;
             }
@@ -2146,29 +2170,36 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
     // List of intersecing objects
     int *intersecting_objects = new int[n_obj]();
 
+    // Performance is better for randomized processing if large objects are clumped together
+    arma::uvec rand_obj_indices = arma::regspace<arma::uvec>(0ULL, n_obj - 1ULL);
+    rand_obj_indices = arma::shuffle(rand_obj_indices);
+
     // Pairwise tests
 #pragma omp parallel for
-    for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj - 1; ++i_obj_1_int)
+    for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj; ++i_obj_1_int)
     {
-        arma::uword i_obj_1 = (arma::uword)i_obj_1_int;
+        arma::uword i_obj_1 = rand_obj_indices(i_obj_1_int);
 
         arma::uword n_faces_1 = p_faces_per_object[i_obj_1];
         dtype *p_obj_1 = obj_faces[i_obj_1].memptr();
-        dtype ax_low = Xmin[i_obj_1] - eps, ax_high = Xmax[i_obj_1] + eps,
-              ay_low = Ymin[i_obj_1] - eps, ay_high = Ymax[i_obj_1] + eps,
-              az_low = Zmin[i_obj_1] - eps, az_high = Zmax[i_obj_1] + eps;
+        dtype ax_low = box[6ULL * i_obj_1] - eps, ax_high = box[6ULL * i_obj_1 + 1ULL] + eps,
+              ay_low = box[6ULL * i_obj_1 + 2ULL] - eps, ay_high = box[6ULL * i_obj_1 + 3ULL] + eps,
+              az_low = box[6ULL * i_obj_1 + 4ULL] - eps, az_high = box[6ULL * i_obj_1 + 5ULL] + eps;
 
-        for (arma::uword i_obj_2 = i_obj_1 + 1ULL; i_obj_2 < n_obj; ++i_obj_2)
+        for (arma::uword i_obj_2 = 0ULL; i_obj_2 < n_obj; ++i_obj_2)
         {
+            if (i_obj_1 == i_obj_2)
+                continue;
+
             // Skip if both objects are already marked as intersecting
             if (intersecting_objects[i_obj_1] && intersecting_objects[i_obj_2])
                 continue;
 
             arma::uword n_faces_2 = p_faces_per_object[i_obj_2];
             dtype *p_obj_2 = obj_faces[i_obj_2].memptr();
-            dtype bx_low = Xmin[i_obj_2] - eps, bx_high = Xmax[i_obj_2] + eps,
-                  by_low = Ymin[i_obj_2] - eps, by_high = Ymax[i_obj_2] + eps,
-                  bz_low = Zmin[i_obj_2] - eps, bz_high = Zmax[i_obj_2] + eps;
+            dtype bx_low = box[6ULL * i_obj_2] - eps, bx_high = box[6ULL * i_obj_2 + 1ULL] + eps,
+                  by_low = box[6ULL * i_obj_2 + 2ULL] - eps, by_high = box[6ULL * i_obj_2 + 3ULL] + eps,
+                  bz_low = box[6ULL * i_obj_2 + 4ULL] - eps, bz_high = box[6ULL * i_obj_2 + 5ULL] + eps;
 
             // Test if bounding boxes do not overlap
             if (!(ax_high >= bx_low && ax_low <= bx_high &&
@@ -2179,12 +2210,16 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
             // Test if all vertices are identical (duplicate objects)
             bool test_condition = n_faces_1 == n_faces_2;
             if (test_condition)
-                for (arma::uword i = 0ULL; i < 9ULL * n_faces_1; ++i)
-                    if (std::abs(p_obj_1[i] - p_obj_2[i]) > tolerance)
-                    {
-                        test_condition = false;
-                        break;
-                    }
+                for (arma::uword i_face = 0ULL; i_face < n_faces_1; ++i_face)
+                {
+                    arma::uword offset = i_face * 18ULL;
+                    for (arma::uword i_val = 0ULL; i_val < 9ULL; ++i_val)
+                        if (std::abs(p_obj_1[offset + i_val] - p_obj_2[offset + i_val]) > tolerance)
+                        {
+                            test_condition = false;
+                            break;
+                        }
+                }
 
             if (test_condition)
             {
@@ -2200,238 +2235,238 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
                 continue;
             }
 
-            // Test if edges of OBJ-1 intersect with faces of OBJ-2 or edges of OBJ-2 intersect with faces of OBJ-1
+            // Test if edges of OBJ-1 intersect with faces of OBJ-2
             test_condition = false;
             std::string findings;
             bool nothing_to_report_so_far = true;
-            for (bool i12 : {true, false})
+
+            // Skip second test if first test was already positive
+            if (test_condition)
+                break;
+
+            // Get pointers to data
+            arma::uword n_faces = n_faces_1;
+            arma::uword n_edges = 3ULL * n_faces_2;
+
+            arma::Mat<dtype> *faces = &obj_faces[i_obj_1];
+            arma::Mat<dtype> *edges = &obj_edges[i_obj_2];
+            arma::Mat<dtype> *edge_faces = &obj_faces[i_obj_2];
+
+            // Test if edges intersect with faces (3D test)
+            arma::u32_vec hit; // Face hit indicator, 1-based, 0 = no hit
+            quadriga_lib::ray_triangle_intersect<dtype>(edges, nullptr, faces, nullptr, nullptr, nullptr, &hit, nullptr, nullptr, true);
+
+            // False positives:
+            // - Edge lies in the face plane (and hits at a random place due to numeric instabilities)
+            // - Edge starts in the face plane (and causes random hit)
+            // - Edge ends in the face plane (and causes random hit)
+
+            // Use the hit indicator to test for different intersect reasons
+            // 0 - no intersection, 1 - 2D intersections, >1 3D intersections
+            unsigned *p_hit = hit.memptr();
+            for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+                if (p_hit[i_edge])
+                    ++p_hit[i_edge];
+
+            dtype *p_faces = faces->memptr();
+            dtype *p_edges = edges->memptr();
+            dtype *p_edge_faces = edge_faces->memptr();
+
+            // Iterate through all faces of OBJ-1
+            for (arma::uword i_face = 0ULL; i_face < n_faces; ++i_face)
             {
-                // Skip second test if first test was already positive
-                if (test_condition)
-                    break;
+                arma::uword o_face = i_face * 18ULL;
 
-                // Get pointers to data
-                arma::uword n_faces = i12 ? n_faces_1 : n_faces_2;
-                arma::uword n_edges = i12 ? 3ULL * n_faces_2 : 3ULL * n_faces_1;
-                arma::Mat<dtype> *orig = i12 ? &obj_edges_orig[i_obj_2] : &obj_edges_orig[i_obj_1];
-                arma::Mat<dtype> *dest = i12 ? &obj_edges_dest[i_obj_2] : &obj_edges_dest[i_obj_1];
-                arma::Mat<dtype> *edge_normals = i12 ? &obj_normals[i_obj_2] : &obj_normals[i_obj_1];
-                arma::Mat<dtype> *faces = i12 ? &obj_faces[i_obj_1] : &obj_faces[i_obj_2];
-                arma::Mat<dtype> *face_normals = i12 ? &obj_normals[i_obj_1] : &obj_normals[i_obj_2];
+                // Face vertices
+                dtype x0 = p_faces[o_face],
+                      y0 = p_faces[o_face + 1ULL],
+                      z0 = p_faces[o_face + 2ULL];
 
-                // Test if edges intersect with faces (3D test)
-                arma::u32_vec hit; // Face hit indicator, 1-based, 0 = no hit
-                quadriga_lib::ray_triangle_intersect<dtype>(orig, dest, faces, nullptr, nullptr, nullptr, &hit);
+                dtype x1 = p_faces[o_face + 3ULL],
+                      y1 = p_faces[o_face + 4ULL],
+                      z1 = p_faces[o_face + 5ULL];
 
-                // False positives:
-                // - Edge lies in the face plane (and hits at a random place due to numeric instabilities)
-                // - Edge starts in the face plane (and causes random hit)
-                // - Edge ends in the face plane (and causes random hit)
+                dtype x2 = p_faces[o_face + 6ULL],
+                      y2 = p_faces[o_face + 7ULL],
+                      z2 = p_faces[o_face + 8ULL];
 
-                // Use the hit indicator to test for different intersect reasons
-                // 0 - no intersection, 1 - 2D intersections, >1 3D intersections
-                unsigned *p_hit = hit.memptr();
-                for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
-                    if (p_hit[i_edge])
-                        ++p_hit[i_edge];
+                // Face normal vectors
+                dtype Nx = p_faces[o_face + 9ULL],
+                      Ny = p_faces[o_face + 10ULL],
+                      Nz = p_faces[o_face + 11ULL];
 
-                dtype *p_faces = faces->memptr();
-                dtype *p_face_normals = face_normals->memptr();
-                dtype *p_orig = orig->memptr();
-                dtype *p_dest = dest->memptr();
-                dtype *p_edge_normals = edge_normals->memptr();
+                dtype Ux = p_faces[o_face + 12ULL],
+                      Uy = p_faces[o_face + 13ULL],
+                      Uz = p_faces[o_face + 14ULL];
 
-                // Iterate through all faces of OBJ-1
-                for (arma::uword i_face = 0ULL; i_face < n_faces; ++i_face)
+                dtype Vx = p_faces[o_face + 15ULL],
+                      Vy = p_faces[o_face + 16ULL],
+                      Vz = p_faces[o_face + 17ULL];
+
+                // 3D to 2D projection
+                struct point2D
                 {
-                    // Face vertices
-                    dtype x0 = p_faces[i_face],
-                          y0 = p_faces[i_face + n_faces],
-                          z0 = p_faces[i_face + 2ULL * n_faces];
+                    dtype x;
+                    dtype y;
+                };
+                auto project2D = [&](dtype px, dtype py, dtype pz) -> point2D
+                {
+                    dtype dx = px - x0, dy = py - y0, dz = pz - z0;
+                    point2D res;
+                    res.x = dx * Ux + dy * Uy + dz * Uz; // coordinate along Ux
+                    res.y = dx * Vx + dy * Vy + dz * Vz; // coordinate along Uy
+                    return res;
+                };
+                auto P1 = project2D(x1, y1, z1);
+                auto P2 = project2D(x2, y2, z2);
 
-                    dtype x1 = p_faces[i_face + 3ULL * n_faces],
-                          y1 = p_faces[i_face + 4ULL * n_faces],
-                          z1 = p_faces[i_face + 5ULL * n_faces];
+                // Iterate through all edges of OBJ-2
+                for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+                {
+                    arma::uword o_edge = i_edge * 6ULL;
 
-                    dtype x2 = p_faces[i_face + 6ULL * n_faces],
-                          y2 = p_faces[i_face + 7ULL * n_faces],
-                          z2 = p_faces[i_face + 8ULL * n_faces];
+                    // Edge start and end points
+                    dtype ox = p_edges[o_edge],
+                          oy = p_edges[o_edge + 1ULL],
+                          oz = p_edges[o_edge + 2ULL];
 
-                    // Face normal vectors
-                    dtype Nx = p_face_normals[i_face],
-                          Ny = p_face_normals[i_face + n_faces],
-                          Nz = p_face_normals[i_face + 2ULL * n_faces];
+                    dtype dx = p_edges[o_edge + 3ULL],
+                          dy = p_edges[o_edge + 4ULL],
+                          dz = p_edges[o_edge + 5ULL];
 
-                    dtype Ux = p_face_normals[i_face + 3ULL * n_faces],
-                          Uy = p_face_normals[i_face + 4ULL * n_faces],
-                          Uz = p_face_normals[i_face + 5ULL * n_faces];
+                    // Distance of edge start and end points from the face plane
+                    dtype dist_o = std::fabs(Nx * (ox - x0) + Ny * (oy - y0) + Nz * (oz - z0));
+                    dtype dist_d = std::fabs(Nx * (dx - x0) + Ny * (dy - y0) + Nz * (dz - z0));
 
-                    dtype Vx = p_face_normals[i_face + 6ULL * n_faces],
-                          Vy = p_face_normals[i_face + 7ULL * n_faces],
-                          Vz = p_face_normals[i_face + 8ULL * n_faces];
-
-                    // 3D to 2D projection
-                    struct point2D
+                    // Is one point on the plane and the other outside?
+                    if ((dist_o < tolerance && dist_d > tolerance) || (dist_o > tolerance && dist_d < tolerance))
                     {
-                        dtype x;
-                        dtype y;
-                    };
-                    auto project2D = [&](dtype px, dtype py, dtype pz) -> point2D
+                        p_hit[i_edge] = 0U; // Clear potential 3D hit
+                        continue;
+                    }
+
+                    // Are both edge points in the face plane?
+                    if (dist_o < tolerance && dist_d < tolerance)
                     {
-                        dtype dx = px - x0, dy = py - y0, dz = pz - z0;
-                        point2D res;
-                        res.x = dx * Ux + dy * Uy + dz * Uz; // coordinate along Ux
-                        res.y = dx * Vx + dy * Vy + dz * Vz; // coordinate along Uy
-                        return res;
-                    };
-                    auto P1 = project2D(x1, y1, z1);
-                    auto P2 = project2D(x2, y2, z2);
+                        // Check if the normal vectors of the face and the edge point in the same direction
+                        arma::uword o_edge_face = 18ULL * (i_edge % (n_edges / 3ULL));
+                        dtype Mx = p_edge_faces[o_edge_face + 9ULL],
+                              My = p_edge_faces[o_edge_face + 10ULL],
+                              Mz = p_edge_faces[o_edge_face + 11ULL];
 
-                    // Iterate through all edges of OBJ-2
-                    for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
-                    {
-                        // Edge start and end points
-                        dtype ox = p_orig[i_edge],
-                              oy = p_orig[i_edge + n_edges],
-                              oz = p_orig[i_edge + 2ULL * n_edges];
-
-                        dtype dx = p_dest[i_edge],
-                              dy = p_dest[i_edge + n_edges],
-                              dz = p_dest[i_edge + 2ULL * n_edges];
-
-                        // Distance of edge start and end points from the face plane
-                        dtype dist_o = std::fabs(Nx * (ox - x0) + Ny * (oy - y0) + Nz * (oz - z0));
-                        dtype dist_d = std::fabs(Nx * (dx - x0) + Ny * (dy - y0) + Nz * (dz - z0));
-
-                        // Is one point on the plane and the other outside?
-                        if ((dist_o < tolerance && dist_d > tolerance) || (dist_o > tolerance && dist_d < tolerance))
+                        dtype dtp = dotp(Mx, My, Mz, Nx, Ny, Nz);
+                        if (std::fabs(dtp - (dtype)1.0) > (dtype)1e-5) // Different directions?
                         {
                             p_hit[i_edge] = 0U; // Clear potential 3D hit
                             continue;
                         }
 
-                        // Are both edge points in the face plane?
-                        if (dist_o < tolerance && dist_d < tolerance)
-                        {
-                            // Check if the normal vectors of the face and the edge point in the same direction
-                            arma::uword n_faces_o2 = n_edges / 3ULL;
-                            dtype Mx = p_edge_normals[i_edge % n_faces_o2],
-                                  My = p_edge_normals[i_edge % n_faces_o2 + n_faces_o2],
-                                  Mz = p_edge_normals[i_edge % n_faces_o2 + 2ULL * n_faces_o2];
+                        // 3D to 2D projection
+                        auto O = project2D(ox, oy, oz);
+                        auto D = project2D(dx, dy, dz);
 
-                            dtype dtp = dotp(Mx, My, Mz, Nx, Ny, Nz);
-                            if (std::fabs(dtp - (dtype)1.0) > (dtype)1e-5) // Different directions?
-                            {
-                                p_hit[i_edge] = 0U; // Clear potential 3D hit
-                                continue;
-                            }
+                        int edge_hit = line_triangle_intersect_2D(P1.x, P2.x, P2.y, O.x, O.y, D.x, D.y, tolerance);
 
-                            // 3D to 2D projection
-                            auto O = project2D(ox, oy, oz);
-                            auto D = project2D(dx, dy, dz);
+                        if (edge_hit != 0)      // Did we have a 2D hit?
+                            p_hit[i_edge] = 1U; // A 2D hit overwrites a 3D miss!
+                        else                    // Both edge points are on the plane, but no 2D hit was found
+                            p_hit[i_edge] = 0U; // Clear any detected 3D hit!
 
-                            int edge_hit = line_triangle_intersect_2D(P1.x, P2.x, P2.y, O.x, O.y, D.x, D.y, tolerance);
+                        // Debugging output
+                        // std::cout << "F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
+                        //           << " (" << x1 << "," << y1 << "," << z1 << ")"
+                        //           << " (" << x2 << "," << y2 << "," << z2 << ")} ::"
+                        //           << " {(" << 0 << "," << 0 << ")"
+                        //           << " (" << P1.x << "," << P1.y << ")"
+                        //           << " (" << P2.x << "," << P2.y << ")} ;"
+                        //           << " E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
+                        //           << " (" << dx << "," << dy << "," << dz << ")} ::"
+                        //           << " {(" << O.x << "," << O.y << ")"
+                        //           << " (" << D.x << "," << D.y << ")} ;"
+                        //           << " H:" << edge_hit << std::endl;
 
-                            if (edge_hit != 0)      // Did we have a 2D hit?
-                                p_hit[i_edge] = 1U; // A 2D hit overwrites a 3D miss!
-                            else                    // Both edge points are on the plane, but no 2D hit was found
-                                p_hit[i_edge] = 0U; // Clear any detected 3D hit!
-
-                            // Debugging output
-                            // std::cout << "F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
-                            //           << " (" << x1 << "," << y1 << "," << z1 << ")"
-                            //           << " (" << x2 << "," << y2 << "," << z2 << ")} ::"
-                            //           << " {(" << 0 << "," << 0 << ")"
-                            //           << " (" << P1.x << "," << P1.y << ")"
-                            //           << " (" << P2.x << "," << P2.y << ")} ;"
-                            //           << " E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
-                            //           << " (" << dx << "," << dy << "," << dz << ")} ::"
-                            //           << " {(" << O.x << "," << O.y << ")"
-                            //           << " (" << D.x << "," << D.y << ")} ;"
-                            //           << " H:" << edge_hit << std::endl;
-
-                            if (nothing_to_report_so_far && edge_hit != 0)
-                            {
-                                nothing_to_report_so_far = false;
-                                std::ostringstream oss;
-                                if (i12)
-                                    oss << "2D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_1] << "," << p_obj_ids[i_obj_2] << ")";
-                                else
-                                    oss << "2D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_2] << "," << p_obj_ids[i_obj_1] << ")";
-
-                                oss << " @ F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
-                                    << ",(" << x1 << "," << y1 << "," << z1 << ")"
-                                    << ",(" << x2 << "," << y2 << "," << z2 << ")}";
-
-                                oss << " vs. E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
-                                    << ",(" << dx << "," << dy << "," << dz << ")} => ";
-
-                                if (edge_hit == -1)
-                                    oss << "degenerate face (-1)";
-                                else if (edge_hit == 1)
-                                    oss << "co-planar edge starts or ends within face (1)";
-                                else if (edge_hit == 2)
-                                    oss << "co-planar edge inside face (2)";
-                                else if (edge_hit == 4)
-                                    oss << "co-planar vertices lie on face boundary (4)";
-                                else if (edge_hit == 5)
-                                    oss << "co-located vertices (5)";
-                                else if (edge_hit == 6)
-                                    oss << "co-planar edge passes through face (6)";
-                                else if (edge_hit == 7)
-                                    oss << "co-linear edges (7)";
-
-                                findings = oss.str();
-                            }
-                        }
-                    }
-                }
-
-                // Any hit?
-                for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
-                    if (p_hit[i_edge])
-                    {
-                        test_condition = true;
-                        if (nothing_to_report_so_far && p_hit[i_edge] > 1U)
+                        if (nothing_to_report_so_far && edge_hit != 0)
                         {
                             nothing_to_report_so_far = false;
                             std::ostringstream oss;
-                            if (i12)
-                                oss << "3D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_1] << "," << p_obj_ids[i_obj_2] << ")";
-                            else
-                                oss << "3D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_2] << "," << p_obj_ids[i_obj_1] << ")";
-
-                            unsigned i_face = p_hit[i_edge] - 2U;
-                            dtype x0 = p_faces[i_face],
-                                  y0 = p_faces[i_face + n_faces],
-                                  z0 = p_faces[i_face + 2ULL * n_faces];
-                            dtype x1 = p_faces[i_face + 3ULL * n_faces],
-                                  y1 = p_faces[i_face + 4ULL * n_faces],
-                                  z1 = p_faces[i_face + 5ULL * n_faces];
-                            dtype x2 = p_faces[i_face + 6ULL * n_faces],
-                                  y2 = p_faces[i_face + 7ULL * n_faces],
-                                  z2 = p_faces[i_face + 8ULL * n_faces];
+                            oss << "2D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_1] << "," << p_obj_ids[i_obj_2] << ")";
 
                             oss << " @ F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
                                 << ",(" << x1 << "," << y1 << "," << z1 << ")"
                                 << ",(" << x2 << "," << y2 << "," << z2 << ")}";
 
-                            dtype ox = p_orig[i_edge],
-                                  oy = p_orig[i_edge + n_edges],
-                                  oz = p_orig[i_edge + 2ULL * n_edges];
-                            dtype dx = p_dest[i_edge],
-                                  dy = p_dest[i_edge + n_edges],
-                                  dz = p_dest[i_edge + 2ULL * n_edges];
-
                             oss << " vs. E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
-                                << ",(" << dx << "," << dy << "," << dz << ")}";
+                                << ",(" << dx << "," << dy << "," << dz << ")} => ";
+
+                            if (edge_hit == -1)
+                                oss << "degenerate face (-1)";
+                            else if (edge_hit == 1)
+                                oss << "co-planar edge starts or ends within face (1)";
+                            else if (edge_hit == 2)
+                                oss << "co-planar edge inside face (2)";
+                            else if (edge_hit == 4)
+                                oss << "co-planar vertices lie on face boundary (4)";
+                            else if (edge_hit == 5)
+                                oss << "co-located vertices (5)";
+                            else if (edge_hit == 6)
+                                oss << "co-planar edge passes through face (6)";
+                            else if (edge_hit == 7)
+                                oss << "co-linear edges (7)";
 
                             findings = oss.str();
                         }
-                        if (test_condition && !nothing_to_report_so_far)
-                            break;
                     }
+                }
             }
+
+            // Any hit?
+            for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+                if (p_hit[i_edge])
+                {
+                    test_condition = true;
+                    if (nothing_to_report_so_far && p_hit[i_edge] > 1U)
+                    {
+                        nothing_to_report_so_far = false;
+                        std::ostringstream oss;
+                        oss << "3D Intersect: OBJ-IDs (" << p_obj_ids[i_obj_1] << "," << p_obj_ids[i_obj_2] << ")";
+
+                        unsigned i_face = p_hit[i_edge] - 2U;
+                        unsigned o_face = 18U * i_face;
+
+                        dtype x0 = p_faces[o_face],
+                              y0 = p_faces[o_face + 1ULL],
+                              z0 = p_faces[o_face + 2ULL];
+
+                        dtype x1 = p_faces[o_face + 3ULL],
+                              y1 = p_faces[o_face + 4ULL],
+                              z1 = p_faces[o_face + 5ULL];
+
+                        dtype x2 = p_faces[o_face + 6ULL],
+                              y2 = p_faces[o_face + 7ULL],
+                              z2 = p_faces[o_face + 8ULL];
+
+                        oss << " @ F:" << i_face << " {(" << x0 << "," << y0 << "," << z0 << ")"
+                            << ",(" << x1 << "," << y1 << "," << z1 << ")"
+                            << ",(" << x2 << "," << y2 << "," << z2 << ")}";
+
+                        arma::uword o_edge = 6ULL * i_edge;
+
+                        dtype ox = p_edges[o_edge],
+                              oy = p_edges[o_edge + 1ULL],
+                              oz = p_edges[o_edge + 2ULL];
+
+                        dtype dx = p_edges[o_edge + 3ULL],
+                              dy = p_edges[o_edge + 4ULL],
+                              dz = p_edges[o_edge + 5ULL];
+
+                        oss << " vs. E:" << i_edge << "(" << i_edge % n_faces << ") {(" << ox << "," << oy << "," << oz << ")"
+                            << ",(" << dx << "," << dy << "," << dz << ")}";
+
+                        findings = oss.str();
+                    }
+                    if (test_condition && !nothing_to_report_so_far)
+                        break;
+                }
 
             if (test_condition)
             {
