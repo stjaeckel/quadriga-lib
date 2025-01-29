@@ -210,3 +210,18 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
     CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
 }
 
+// TEST_CASE("Test OBJ Overlap - File")
+// {
+
+//     std::string fn_obj = "/tmp/qrt_overlap_test.obj";
+//     arma::fmat mesh;
+//     arma::u32_vec obj_ind;
+//     std::vector<std::string> obj_names;
+//     quadriga_lib::obj_file_read<float>(fn_obj, &mesh, nullptr, nullptr, nullptr, &obj_ind, nullptr, &obj_names);
+
+//     std::vector<std::string> reason;
+//     arma::u32_vec intersecting = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
+
+//     intersecting.print();
+
+// }
