@@ -2258,13 +2258,8 @@ arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const
             }
 
             // Test if edges of OBJ-1 intersect with faces of OBJ-2
-            test_condition = false;
             std::string findings;
             bool nothing_to_report_so_far = true;
-
-            // Skip second test if first test was already positive
-            if (test_condition)
-                break;
 
             // Get pointers to data
             arma::uword n_faces = n_faces_1;
