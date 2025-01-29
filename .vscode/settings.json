@@ -139,6 +139,7 @@
         "queue": "cpp",
         "stack": "cpp",
         "__string": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "__config": "cpp"
     }
 }
