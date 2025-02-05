@@ -13,7 +13,7 @@ MATLAB_PATH = C:\Program Files\MATLAB\R2022b
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
-armadillo_version = 12.8.3
+armadillo_version = 14.2.2
 hdf5_version      = 1.14.2
 catch2_version    = 3.4.0
 pugixml_version   = 1.13
