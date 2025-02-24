@@ -15,15 +15,18 @@ This library implements an interface to both, Matlab and Octave as well as to c+
 | Folder | Content |
 |:---|:---|
 `+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
-`build` | Folder for temporary build files
-`cpython` | Source files for the Python API
-`external` | External tools used in the project
-`include` | Public header files for the `quadriga-lib` library
-`lib` | Library files for static linking
-`mex` | Source files for the MEX interface
-`src` | C++ source files and private header files
-`tests` | Test files
-`tools` | Other tools used in the project
+`api_mex`       | Source files for the MATLAB / Octave MEX interface
+`api_python`    | Source files for the Python API
+`build`         | Folder for temporary build files
+`external`      | External tools used in the project
+`html_docu`     | Documentation of the API functions
+`include`       | Public header files for the `quadriga-lib` library
+`lib`           | Library files for static linking
+`references`    | Relevant external documents and papers
+`release`       | Folder for source packages and compiled binary packages
+`src`           | C++ source files and private header files
+`tests`         | Test files
+`tools`         | Other tools used in the project
 
 ## Installation
 

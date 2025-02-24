@@ -11,18 +11,6 @@
 # If none is found, MATLAB targets are not compiled.
 MATLAB_PATH = #/usr/local/MATLAB/R2023a
 
-# Set path to your CUDA installation
-# Leave this empty if you don't want to use GPU acceleration
-# You can get CUDA from: https://developer.nvidia.com/cuda-toolkit
-#  !!! THERE ARE CURRENTLY NO CUDA EXENSIONS AVAILABLE  !!!
-CUDA_PATH = #/usr/local/cuda-12.4
-
-# If needed, adjust the NVIDIA compute capability (50 should run on most modern GPUs). 
-# Adjusting the value to match your GPUs capability may improve performance and load times, but is not required.
-# Minimum supported capability for CUDA-11 is 35 and for CUDA-12 it is 50.
-# For more info: https://developer.nvidia.com/cuda-gpus
-COMPUTE_CAPABILITY = 50
-
 # Leave empty for using system library (recommended)
 # Static linking the HDF5 library may cause Octave to crash
 hdf5_version      = # 1.14.2
@@ -77,17 +65,6 @@ CC   = g++
 MEX  = $(MATLAB_PATH)/bin/mex
 OCT  = mkoctfile
 
-# Conditional compilation of CUDA targets (check if CUDA path is set)
-ifneq ($(CUDA_PATH),)
-	CUDA_A     = lib/quadriga_cuda.a
-	CUDA_TEST  = tests/test_cuda_bin
-	NVCC       = $(CUDA_PATH)/bin/nvcc
-	NV_LIB     = -L$(CUDA_PATH)/lib64 -lcudart
-	NVCCFLAGS  = --std c++17 -ccbin=$(CC) --gpu-architecture=compute_$(COMPUTE_CAPABILITY) \
-					--gpu-code=compute_$(COMPUTE_CAPABILITY) -Wno-deprecated-gpu-targets \
-					-Xcompiler '-fPIC -fopenmp' -I$(CUDA_PATH)/include -lineinfo
-endif
-
 # Headers and Libraries
 ARMA_H      = external/armadillo-$(armadillo_version)/include
 PUGIXML_H   = external/pugixml-$(pugixml_version)/src
@@ -117,9 +94,8 @@ all:
 	@$(MAKE) lib/quadriga_lib.a   $(CUDA_A)   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)   $(PYTHON_TARGET)
 
 src     	= $(wildcard src/*.cpp)
-mex         = $(wildcard mex/*.cpp)
-mex_cuda    = $(wildcard mex_cuda/*.cpp)
-cpython     = $(wildcard cpython/*.cpp)
+api_mex     = $(wildcard api_mex/*.cpp)
+api_python  = $(wildcard api_python/*.cpp)
 tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
 dirs:
@@ -128,19 +104,14 @@ dirs:
 	mkdir -p +quadriga_lib
 	mkdir -p release
 
-mex_matlab:      $(mex:mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_matlab_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave:      $(mex:mex/%.cpp=+quadriga_lib/%.mex)
-mex_octave_cuda: $(mex_cuda:mex_cuda/%.cpp=+quadriga_lib/%.mex)
-mex_docu:        $(mex:mex/%.cpp=+quadriga_lib/%.m)
+mex_matlab:      $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mexa64)
+mex_octave:      $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mex)
+mex_docu:        $(api_mex:api_mex/%.cpp=+quadriga_lib/%.m)
 
-test:   all   tests/test_bin   $(CUDA_TEST)
+test:   all   tests/test_bin
 	tests/test_bin
 ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
-endif
-ifneq ($(CUDA_PATH),)
-	tests/test_cuda_bin
 endif
 ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests -x -s
@@ -189,9 +160,6 @@ build/ray_point_intersect.o:   src/ray_point_intersect.cpp   include/quadriga_to
 build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
 	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
-build/get_CUDA_compute_capability.o:   src/get_CUDA_compute_capability.cu   include/quadriga_CUDA_tools.cuh
-	$(NVCC) $(NVCCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
 # AVX2 library files
 build/quadriga_lib_test_avx.o:   src/quadriga_lib_test_avx.cpp   src/quadriga_lib_test_avx.hpp
 	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src 
@@ -220,15 +188,12 @@ lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/quadriga_lib_
 build/%_link.o:   build/%.o
 	$(NVCC) -dlink $< -o $@
 
-lib/quadriga_cuda.a:   build/get_CUDA_compute_capability.o   build/get_CUDA_compute_capability_link.o
-	ar rcs $@ $^
-
 # Python interface
 python: 
 	@$(MAKE) dirs
 	@$(MAKE) $(PYTHON_TARGET)
 
-lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  cpython/python_main.cpp   lib/quadriga_lib.a $(cpython)
+lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/quadriga_lib.a $(api_python)
 	$(CC) -shared $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
 
 # Dependencies
@@ -274,7 +239,7 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/triangle_mesh_segmentation.mexa64:  $(dep_quadriga_tools)
 +quadriga_lib/version.mexa64:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
-+quadriga_lib/%.mexa64:   mex/%.cpp
++quadriga_lib/%.mexa64:   api_mex/%.cpp
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN)
 
 +quadriga_lib/%.mexa64:   mex_cuda/%.cpp
@@ -319,23 +284,23 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/triangle_mesh_segmentation.mex:  $(dep_quadriga_tools)
 +quadriga_lib/version.mex:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
 
-+quadriga_lib/%.mex:   mex/%.cpp
++quadriga_lib/%.mex:   api_mex/%.cpp
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s 
 
 +quadriga_lib/%.mex:   mex_cuda/%.cpp
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) $(NV_LIB) -s
 
 # Documentation of MEX files
-+quadriga_lib/%.m:   mex/%.cpp
++quadriga_lib/%.m:   api_mex/%.cpp
 	rm -f $@
 	python3 tools/extract_matlab_comments.py $< $@
 
 documentation:   dirs   mex_docu
 	mkdir -p +quadriga_lib
 	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
-	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part mex/ 
+	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part api_mex/ 
 	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
-	python3 tools/extract_html.py html_docu/python_api.html tools/html_parts/python_api.html.part cpython/ 
+	python3 tools/extract_html.py html_docu/python_api.html tools/html_parts/python_api.html.part api_python/ 
 	python3 tools/extract_html.py html_docu/formats.html tools/html_parts/index.html.part
 	python3 tools/extract_html.py html_docu/faq.html tools/html_parts/index.html.part
 	python3 tools/extract_html.py html_docu/contact.html tools/html_parts/index.html.part
@@ -433,13 +398,12 @@ package:  all   build/quadriga-lib-version
 	cp external/pybind11-$(pybind11_version).zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp external/MOxUnit.zip release/quadriga_lib-$(shell build/quadriga-lib-version)/external/
 	cp -R include release/quadriga_lib-$(shell build/quadriga-lib-version)/
-	cp -R mex release/quadriga_lib-$(shell build/quadriga-lib-version)/
-	cp -R mex_cuda release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R api_mex release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R src release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R tests release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R tools release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R html_docu release/quadriga_lib-$(shell build/quadriga-lib-version)/
-	cp -R cpython release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp -R api_python release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp GNUmakefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp LICENSE release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp Makefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
