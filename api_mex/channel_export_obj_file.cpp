@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,9 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "mex.h"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
+#include "mex_helper_functions.cpp"
 
 /*!SECTION
 Channel functions
@@ -40,7 +38,7 @@ set gain thresholds for color-coding and selection.
 ```
 quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
     radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
-    coeff, i_snap )
+    coeff_re, coeff_im, i_snap )
 ```
 
 ## Input Arguments:
@@ -84,44 +82,65 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`center_freq`**<br>
   Center frequency in [Hz], required, Size `[n_snap, 1]` or scalar
 
-- **`coeff`**<br>
-  Channel coefficients, complex valued, required only if `path_polarization` is not given,
-  Size `[n_rx, n_tx, n_path, n_snap]`
+- **`coeff_re`**<br>
+  Channel coefficients, real part, Size: `[ n_rx, n_tx, n_path, n_snap ]`
+
+- **`coeff_im`**<br>
+  Channel coefficients, imaginary part, Size: `[ n_rx, n_tx, n_path, n_snap ]`
 
 - **`i_snap`**<br> (optional)
-  Snapshot indices, optional, 0-based, range [0 ... n_snap - 1]
+  Snapshot indices, optional, 1-based, range [1 ... n_snap]
+
+## Output Argument:
+This function does not return a value. It writes the OBJ file directly to disk.
+
 MD!*/
 
-void channel_export_obj_file(const std::string fn,
-                             size_t max_no_paths,
-                             double gain_max,
-                             double gain_min,
-                             const std::string colormap,
-                             double radius_max,
-                             double radius_min,
-                             size_t n_edges,
-                             const pybind11::array_t<double> rx_pos,
-                             const pybind11::array_t<double> tx_pos,
-                             const pybind11::array_t<unsigned> no_interact,
-                             const pybind11::array_t<double> interact_coord,
-                             const pybind11::array_t<double> center_freq,
-                             const pybind11::array_t<std::complex<double>> coeff,
-                             const pybind11::array_t<arma::uword> i_snap)
+void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
+
+    // Number of in and outputs
+    if (nrhs < 15 || nrhs > 16)
+        mexErrMsgIdAndTxt("quadriga_lib:channel_export_obj_file:no_input", "Incorrect number of input arguments.");
+
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:channel_export_obj_file:no_output", "Incorrect number of output arguments.");
+
+    // Read inputs
+    std::string fn = qd_mex_get_string(prhs[0]);
+
+    arma::uword max_no_paths = qd_mex_get_scalar<arma::uword>(prhs[1], "max_no_paths", 0ULL);
+    double gain_max = qd_mex_get_scalar<double>(prhs[2], "gain_max", -60.0);
+    double gain_min = qd_mex_get_scalar<double>(prhs[3], "gain_min", -140.0);
+
+    std::string colormap = qd_mex_get_string(prhs[4], "jet");
+
+    double radius_max = qd_mex_get_scalar<double>(prhs[5], "radius_max", 0.05);
+    double radius_min = qd_mex_get_scalar<double>(prhs[6], "radius_min", 0.01);
+    arma::uword n_edges = qd_mex_get_scalar<arma::uword>(prhs[7], "n_edges", 5ULL);
+
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
 
-    c.rx_pos = qd_python_NPArray_to_Mat(&rx_pos);
-    c.tx_pos = qd_python_NPArray_to_Mat(&tx_pos);
-    c.no_interact = qd_python_NPArray_to_vectorCol(&no_interact, 1);
-    c.interact_coord = qd_python_NPArray_to_vectorMat(&interact_coord, 2);
-    c.center_frequency = qd_python_NPArray_to_Col(&center_freq);
-    qd_python_complexNPArray_to_2vectorCube(&coeff, 3, &c.coeff_re, &c.coeff_im);
+    c.rx_pos = qd_mex_typecast_Mat<double>(prhs[8], "rx_position");
+    c.tx_pos = qd_mex_typecast_Mat<double>(prhs[9], "tx_position");
+    c.no_interact = qd_mex_matlab2vector_Col<unsigned>(prhs[10], 1);
+    c.interact_coord = qd_mex_matlab2vector_Mat<double>(prhs[11], 2);
+    c.center_frequency = qd_mex_typecast_Col<double>(prhs[12], "center_freq");
+    c.coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[13], 3);
+    c.coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[14], 3);
+
+    arma::uvec i_snap;
+    if (nrhs > 15)
+    {
+        i_snap = qd_mex_typecast_Col<arma::uword>(prhs[15], "i_snap");
+        i_snap = i_snap - 1ULL; // Convert to 0-based
+    }
 
     if (c.coeff_re.size() > c.interact_coord.size())
-        throw std::invalid_argument("Number of snapshots in 'interact_coord' must match number of snapshots in coefficients.");
+        mexErrMsgIdAndTxt("quadriga_lib:channel_export_obj_file:error", "Number of snapshots in interact_coord must match coefficients.");
 
-    for (size_t i_snap_a = 0; i_snap_a < c.coeff_re.size(); ++i_snap_a)
+    for (size_t i_snap_a = 0ULL; i_snap_a < c.coeff_re.size(); ++i_snap_a)
     {
         // Add a zero-power delay matrix
         arma::cube delays(c.coeff_re[i_snap_a].n_rows, c.coeff_re[i_snap_a].n_cols, c.coeff_re[i_snap_a].n_slices);
@@ -132,7 +151,23 @@ void channel_export_obj_file(const std::string fn,
         c.interact_coord[i_snap_a] = arma::resize(c.interact_coord[i_snap_a], 3, sum_no_int);
     }
 
-    arma::uvec i_snap_a = qd_python_NPArray_to_Col(&i_snap);
+    try
+    {
+        c.export_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap, radius_max, radius_min, n_edges);
+    }
+    catch (const std::invalid_argument &ex)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:channel_export_obj_file:unknown_error", ex.what());
+    }
+    catch (...)
+    {
+        mexErrMsgIdAndTxt("quadriga_lib:channel_export_obj_file:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+    }
 
-    c.export_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
+    // Dummy output
+    if (nlhs == 1)
+    {
+        double tmp = 1.0;
+        plhs[0] = qd_mex_copy2matlab(&tmp);
+    }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -1762,6 +1762,9 @@ void quadriga_lib::channel<dtype>::export_obj_file(std::string fn, size_t max_no
 
     if (radius_min < (dtype)0.0 || radius_max < (dtype)0.0)
         throw std::invalid_argument("Radius cannot be negative.");
+
+    // Make sure that the minimum radius is smaller than the maximum
+    radius_min = (radius_min < radius_max) ? radius_min : radius_max;
 
     // Colormap
     arma::uchar_mat cmap = quadriga_lib::colormap(colormap);

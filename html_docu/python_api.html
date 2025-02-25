@@ -98,7 +98,7 @@ import quadriga_lib
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Transforms the channel into frequency domain and returns the frequency response</td></tr>
-<tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing propagation paths</td></tr>
+<tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
@@ -332,12 +332,19 @@ hmat = quadriga_lib.baseband_freq_response( coeff, delay, bandwidth, carriers, p
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="channel_export_obj_file"></a>
-<b>channel_export_obj_file</b> - Creates a Wavefront OBJ file for visualizing propagation paths
+<b>channel_export_obj_file</b> - Export path data to a Wavefront OBJ file for visualization in Blender
 <ul>
 <li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function exports path data to a Wavefront OBJ file, which can be used for visualization in 3D 
+software such as Blender. It supports various colormaps for color-coding the paths based on their 
+gain values. In addition, the function allows you to control the maximum number of paths displayed, 
+set gain thresholds for color-coding and selection.
+</li>
+<li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap,
-    rx_position, tx_position, no_interact, interact_coord, center_freq, coeff, polarization, i_snap )
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
+    radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
+    coeff, path_polarization, i_snap )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -374,11 +381,11 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
    Number of vertices in the circle building the tube, must be >= 3, optional, default = 5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_position</code></b><br> 
    Receiver positions, required, size <code>[3, n_snap]</code> or <code>[3, 1]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_position</code></b><br> 
    Transmitter positions, required, size <code>[3, n_snap]</code> or <code>[3, 1]</code> 
 </li></ul>
  
@@ -395,13 +402,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>coeff</code></b><br> 
-   Channel coefficients, complex valued, required only if <code>polarization</code> is not given, 
+   Channel coefficients, complex valued, required only if <code>path_polarization</code> is not given, 
    Size <code>[n_rx, n_tx, n_path, n_snap]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>path_polarization</code></b><br> 
-   Polarization transfer function, complex valued, required only if <code>coeff</code> is not given, 
-   Size <code>[4, n_path, n_snap]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>i_snap</code></b><br> (optional) 
