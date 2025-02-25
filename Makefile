@@ -182,6 +182,9 @@ dep_arrayant = build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build
 +quadriga_lib\cart2geo.mexw64:   api_mex\cart2geo.cpp   $(dep_quadriga_tools)
  	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
++quadriga_lib\channel_export_obj_file.mexw64:   api_mex\channel_export_obj_file.cpp   build\qd_channel.obj   $(dep_quadriga_tools)   build\libhdf5.lib
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
 +quadriga_lib\generate_diffraction_paths.mexw64:   api_mex\generate_diffraction_paths.cpp   $(dep_quadriga_tools)
  	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 

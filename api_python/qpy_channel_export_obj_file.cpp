@@ -27,13 +27,20 @@ SECTION!*/
 
 /*!MD
 # CHANNEL_EXPORT_OBJ_FILE
-Creates a Wavefront OBJ file for visualizing propagation paths
+Export path data to a Wavefront OBJ file for visualization in Blender
+
+## Description:
+This function exports path data to a Wavefront OBJ file, which can be used for visualization in 3D
+software such as Blender. It supports various colormaps for color-coding the paths based on their
+gain values. In addition, the function allows you to control the maximum number of paths displayed,
+set gain thresholds for color-coding and selection.
 
 ## Usage:
 
 ```
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap,
-    rx_position, tx_position, no_interact, interact_coord, center_freq, coeff, polarization, i_snap )
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
+    radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
+    coeff, i_snap )
 ```
 
 ## Input Arguments:
@@ -62,10 +69,10 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
 - **`n_edges`** (optional)<br>
   Number of vertices in the circle building the tube, must be >= 3, optional, default = 5
 
-- **`rx_pos`**<br>
+- **`rx_position`**<br>
   Receiver positions, required, size `[3, n_snap]` or `[3, 1]`
 
-- **`tx_pos`**<br>
+- **`tx_position`**<br>
   Transmitter positions, required, size `[3, n_snap]` or `[3, 1]`
 
 - **`no_interact`**<br>
@@ -78,12 +85,8 @@ quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colo
   Center frequency in [Hz], required, Size `[n_snap, 1]` or scalar
 
 - **`coeff`**<br>
-  Channel coefficients, complex valued, required only if `polarization` is not given,
+  Channel coefficients, complex valued, required only if `path_polarization` is not given,
   Size `[n_rx, n_tx, n_path, n_snap]`
-
-- **`path_polarization`**<br>
-  Polarization transfer function, complex valued, required only if `coeff` is not given,
-  Size `[4, n_path, n_snap]`
 
 - **`i_snap`**<br> (optional)
   Snapshot indices, optional, 0-based, range [0 ... n_snap - 1]
@@ -103,7 +106,6 @@ void channel_export_obj_file(const std::string fn,
                              const pybind11::array_t<double> interact_coord,
                              const pybind11::array_t<double> center_freq,
                              const pybind11::array_t<std::complex<double>> coeff,
-                             const pybind11::array_t<std::complex<double>> path_polarization,
                              const pybind11::array_t<arma::uword> i_snap)
 {
     // Construct channel object from input data
@@ -115,7 +117,9 @@ void channel_export_obj_file(const std::string fn,
     c.interact_coord = qd_python_NPArray_to_vectorMat(&interact_coord, 2);
     c.center_frequency = qd_python_NPArray_to_Col(&center_freq);
     qd_python_complexNPArray_to_2vectorCube(&coeff, 3, &c.coeff_re, &c.coeff_im);
-    c.path_polarization = qd_python_complexNPArray_to_vectorMat(&path_polarization, 2);
+
+    if (c.coeff_re.size() > c.interact_coord.size())
+        throw std::invalid_argument("Number of snapshots in 'interact_coord' must match number of snapshots in coefficients.");
 
     for (size_t i_snap_a = 0; i_snap_a < c.coeff_re.size(); ++i_snap_a)
     {

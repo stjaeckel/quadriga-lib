@@ -212,6 +212,7 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/calc_diffraction_gain.mexa64:       build/calc_diffraction_gain.o   $(dep_quadriga_tools)   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mexa64:        $(dep_quadriga_tools)
 +quadriga_lib/cart2geo.mexa64:                    $(dep_quadriga_tools)
++quadriga_lib/channel_export_obj_file.mexa64:     build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/generate_diffraction_paths.mexa64:  $(dep_quadriga_tools)
 +quadriga_lib/geo2cart.mexa64:                    $(dep_quadriga_tools)
 +quadriga_lib/get_channels_planar.mexa64:         $(dep_arrayant)
@@ -257,6 +258,7 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   $(dep_quadriga_tools)   build/ray_mesh_interact.o
 +quadriga_lib/calc_rotation_matrix.mex:        $(dep_quadriga_tools)
 +quadriga_lib/cart2geo.mex:                    $(dep_quadriga_tools)
++quadriga_lib/channel_export_obj_file.mex:     build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/generate_diffraction_paths.mex:  $(dep_quadriga_tools)
 +quadriga_lib/geo2cart.mex:                    $(dep_quadriga_tools)
 +quadriga_lib/get_channels_planar.mex:         $(dep_arrayant)

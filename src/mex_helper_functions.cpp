@@ -24,6 +24,7 @@
 #include <utility> // for std::move
 #include <cstring> // For std::memcopy
 #include <any>
+#include <string>
 
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
 // - Casts to <dtype>
@@ -83,6 +84,23 @@ inline dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "", 
     }
 
     return default_value;
+}
+
+// Read a string input from MATLAB and convert it to a std::string
+// - Returns default_value (e.g. "") for empty input
+inline std::string qd_mex_get_string(const mxArray *input, std::string default_value = "")
+{
+    if (mxGetNumberOfElements(input) == 0)
+        return default_value;
+
+    if (!mxIsClass(input, "char"))
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Input must be a string (character array)");
+
+    auto chr = mxArrayToString(input);
+    std::string data = std::string(chr);
+    mxFree(chr);
+    
+    return data;
 }
 
 // Reinterpret MATLAB Array to Armadillo Column Vector

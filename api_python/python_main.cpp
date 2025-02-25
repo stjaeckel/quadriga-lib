@@ -80,7 +80,6 @@ PYBIND11_MODULE(quadriga_lib, m)
             py::arg("interact_coord") = py::array_t<double>(),
             py::arg("center_freq") = py::array_t<double>(),
             py::arg("coeff") = pybind11::array_t<std::complex<double>>(),
-            py::arg("path_polarization") = py::array_t<std::complex<double>>(),
             py::arg("i_snap") = py::array_t<arma::uword>());
 
       m.def("icosphere", &icosphere, py::arg("n_div") = 1,
