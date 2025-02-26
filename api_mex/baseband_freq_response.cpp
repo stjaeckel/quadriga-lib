@@ -92,12 +92,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
         use_single = mxIsSingle(prhs[0]);
     else
-        mexErrMsgIdAndTxt("quadriga_lib:baseband_freq_response:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
-
-    for (int i = 1; i < 4; ++i)
-        if (nrhs > i)
-            if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
-                mexErrMsgIdAndTxt("quadriga_lib:baseband_freq_response:IO_error", "All floating-point inputs must have the same type: 'single' or 'double' precision");
+        mexErrMsgIdAndTxt("quadriga_lib:baseband_freq_response:IO_error", "Inputs must be provided in 'single' or 'double' precision.");
 
     // Read inputs
     std::vector<arma::fcube> coeff_re_single, coeff_im_single, delay_single;
@@ -110,7 +105,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         coeff_re_single = qd_mex_matlab2vector_Cube<float>(prhs[0], 3);
         coeff_im_single = qd_mex_matlab2vector_Cube<float>(prhs[1], 3);
-        pilot_grid_single = qd_mex_reinterpret_Col<float>(prhs[3]);
+        pilot_grid_single = qd_mex_typecast_Col<float>(prhs[3], "pilot_grid");
 
         size_t n_snap = coeff_re_single.size();
         size_t n_dim = (size_t)mxGetNumberOfDimensions(prhs[2]);
@@ -128,7 +123,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         coeff_re_double = qd_mex_matlab2vector_Cube<double>(prhs[0], 3);
         coeff_im_double = qd_mex_matlab2vector_Cube<double>(prhs[1], 3);
-        pilot_grid_double = qd_mex_reinterpret_Col<double>(prhs[3]);
+        pilot_grid_double = qd_mex_typecast_Col<double>(prhs[3], "pilot_grid");
 
         size_t n_snap = coeff_re_double.size();
         size_t n_dim = (size_t)mxGetNumberOfDimensions(prhs[2]);
