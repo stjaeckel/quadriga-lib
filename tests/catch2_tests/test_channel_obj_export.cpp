@@ -31,6 +31,19 @@ TEST_CASE("Tools - Path 2 Tube")
     quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1, 3);
 }
 
+TEST_CASE("Tools - Path 2 Tube Short segments")
+{
+    arma::fmat path = {{1.0, 1.0, 1.0, 10.0, 10.0, 12.0, 12.001},
+                      {0.0, 0.0, 0.001, 5.0, 5.0, 0.0, 0.0},
+                      {0.0, 0.0, 0.0, 1.0, 1.001, 0.0, 0.0}};
+
+    arma::fmat vert;
+    arma::umat faces;
+    quadriga_lib::path_to_tube(&path, &vert, &faces, 0.1f, 4);
+
+    CHECK(vert.n_cols == 12ULL);
+}
+
 TEST_CASE("Channel - OBJ Export")
 {
     quadriga_lib::channel<double> c;

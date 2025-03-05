@@ -1937,7 +1937,7 @@ void quadriga_lib::channel<dtype>::export_obj_file(std::string fn, size_t max_no
                     // Calculate vertices and faces
                     arma::Mat<dtype> vert;
                     arma::umat faces;
-                    quadriga_lib::path_to_tube(&path_coord[i_path_sorted], &vert, &faces, radius, n_edges);
+                    quadriga_lib::path_to_tube(&path_coord[i_path_sorted], &vert, &faces, radius, (arma::uword)n_edges);
 
                     // Write vertices to file
                     size_t n_vert = vert.n_cols;

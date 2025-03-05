@@ -183,7 +183,7 @@ namespace quadriga_lib
                       arma::Mat<dtype> *vert,             // Output: Vertices of the tube, size [3, n_coord * n_edges ]
                       arma::umat *faces,                  // Output: Face indices, 0-based, size [4, (n_coord-1) * n_edges]
                       dtype radius = 1.0,                 // Tube radius in meters
-                      size_t n_edges = 5);                // Number of points in the circle building the tube, must be >= 3
+                      arma::uword n_edges = 5);           // Number of points in the circle building the tube, must be >= 3
 
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
     // - The point cloud can be composed of sub-clouds, where each new sub-cloud h is indicated by an index (= starting row number)
