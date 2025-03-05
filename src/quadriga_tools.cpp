@@ -2531,7 +2531,7 @@ template arma::u32_vec quadriga_lib::obj_overlap_test(const arma::Mat<double> *m
 
 // Convert paths to tubes
 template <typename dtype>
-void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dtype> *vert, arma::umat *faces, dtype radius, size_t n_edges)
+void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dtype> *vert, arma::umat *faces, dtype radius, arma::uword n_edges)
 {
     if (path_coord == nullptr)
         throw std::invalid_argument("Input 'path_coord' cannot be NULL.");
@@ -2553,48 +2553,149 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
     if (n_edges < 3ULL)
         throw std::invalid_argument("Number of edges mut be >= 3.");
 
-    size_t n_coord = path_coord->n_cols;
-    size_t n_segments = n_coord - 1ULL;
-
+    // There might be co-located vertices on the path. These need to be merged together
+    arma::uword n_coord = path_coord->n_cols;
+    arma::uword n_segments_in = n_coord - 1ULL;
     const dtype *p_coord = path_coord->memptr();
+
+    dtype length_limit = (dtype)2.0 * radius;
+    arma::Col<dtype> seg_length(n_segments_in, arma::fill::none);
+    dtype *p_seg_length = seg_length.memptr();
+    arma::uword n_segments = 0ULL;
+
+    for (arma::uword i_seg = 0ULL; i_seg < n_segments_in; ++i_seg)
+    {
+        // Read "v0"
+        dtype x = p_coord[3ULL * i_seg];
+        dtype y = p_coord[3ULL * i_seg + 1ULL];
+        dtype z = p_coord[3ULL * i_seg + 2ULL];
+
+        // Vector from "v1" to "v0"
+        x -= p_coord[3ULL * (i_seg + 1ULL)];
+        y -= p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
+        z -= p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+
+        // Length
+        x = std::sqrt((x * x) + (y * y) + (z * z));
+        n_segments = (x > length_limit) ? n_segments + 1ULL : n_segments;
+        p_seg_length[i_seg] = x;
+    }
+
+    if (n_segments == 0ULL)
+        throw std::invalid_argument("All points in 'path_coord' are co-located.");
+
+    // Remove short segments from the path
+    arma::mat path_coord_local(3ULL, n_segments + 1ULL, arma::fill::none);
+    double *p_coord_local = path_coord_local.memptr();
+
+    if (n_segments == n_segments_in) // Convert to double
+    {
+        for (arma::uword i_seg = 0ULL; i_seg < 3ULL * (n_segments + 1ULL); ++i_seg)
+            p_coord_local[i_seg] = (double)p_coord[i_seg];
+    }
+    else // Path has short segments
+    {
+        double x = (double)p_coord[0];
+        double y = (double)p_coord[1];
+        double z = (double)p_coord[2];
+
+        arma::uword i_vert_out = 0ULL;        // Current index in the output stream
+        arma::uword co_location_count = 1ULL; // Counter for co-located vertices
+        for (arma::uword i_seg = 0ULL; i_seg < n_segments_in; ++i_seg)
+        {
+            // Pointer to the next coordinates
+            const dtype *p_next = &p_coord[3ULL * (i_seg + 1ULL)];
+
+            // Load values in one go
+            double xn = (double)p_next[0];
+            double yn = (double)p_next[1];
+            double zn = (double)p_next[2];
+
+            if (p_seg_length[i_seg] <= length_limit) // Short segment
+            {
+                x += xn, y += yn, z += zn;
+                ++co_location_count;
+            }
+            else if (co_location_count == 1ULL) // Long segment
+            {
+                p_coord_local[i_vert_out] = x;
+                p_coord_local[i_vert_out + 1ULL] = y;
+                p_coord_local[i_vert_out + 2ULL] = z;
+                i_vert_out += 3ULL;
+                x = xn, y = yn, z = zn;
+            }
+            else if (i_vert_out == 0ULL) // First segment - copy start point
+            {
+                p_coord_local[0] = (double)p_coord[0];
+                p_coord_local[1] = (double)p_coord[1];
+                p_coord_local[2] = (double)p_coord[2];
+                i_vert_out = 3ULL;
+                co_location_count = 1ULL;
+                x = xn, y = yn, z = zn;
+            }
+            else // Multiple co-located points that are not the start point
+            {
+                double weight = 1.0 / (double)co_location_count;
+                p_coord_local[i_vert_out] = x * weight;
+                p_coord_local[i_vert_out + 1ULL] = y * weight;
+                p_coord_local[i_vert_out + 2ULL] = z * weight;
+                i_vert_out += 3ULL;
+                co_location_count = 1ULL;
+                x = xn, y = yn, z = zn;
+            }
+
+            if (i_seg == n_segments_in - 1ULL) // Last segment - copy end point
+            {
+                p_coord_local[i_vert_out] = xn;
+                p_coord_local[i_vert_out + 1ULL] = yn;
+                p_coord_local[i_vert_out + 2ULL] = zn;
+            }
+        }
+    }
+
+    // Update number of coordinates
+    n_coord = n_segments + 1ULL;
 
     // At steep angles between path segments, the path is split and an additional ring of vertices is added
     // Wee need to determine the number of splits
-    dtype angle_limit = (dtype)0.939692620785908; // cosd(10)
-    size_t n_split = 0ULL;
+    double angle_limit = 0.939692620785908; // cosd(10)
+    arma::uword n_split = 0ULL;
     arma::uvec subseg_indices(n_segments);
     arma::uword *i_subseg = subseg_indices.memptr();
-    for (size_t i_seg = 1ULL; i_seg < n_segments; ++i_seg)
+    for (arma::uword i_seg = 1ULL; i_seg < n_segments; ++i_seg)
     {
+        // Pointer to the coordinates
+        const double *p_coord_seg = &p_coord_local[3ULL * (i_seg - 1ULL)];
+
         // Read "v0"
-        dtype x0 = p_coord[3ULL * (i_seg - 1ULL)];
-        dtype y0 = p_coord[3ULL * (i_seg - 1ULL) + 1ULL];
-        dtype z0 = p_coord[3ULL * (i_seg - 1ULL) + 2ULL];
+        double x0 = p_coord_seg[0];
+        double y0 = p_coord_seg[1];
+        double z0 = p_coord_seg[2];
 
         // Read "v1"
-        dtype x1 = p_coord[3ULL * i_seg];
-        dtype y1 = p_coord[3ULL * i_seg + 1ULL];
-        dtype z1 = p_coord[3ULL * i_seg + 2ULL];
+        double x1 = p_coord_seg[3];
+        double y1 = p_coord_seg[4];
+        double z1 = p_coord_seg[5];
 
         // Read "v2"
-        dtype x2 = p_coord[3ULL * (i_seg + 1ULL)];
-        dtype y2 = p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
-        dtype z2 = p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+        double x2 = p_coord_seg[6];
+        double y2 = p_coord_seg[7];
+        double z2 = p_coord_seg[8];
 
         // Calculate the vectors "d" and "f"
-        dtype dx = x0 - x1, dy = y0 - y1, dz = z0 - z1; // From v1 to v0
-        dtype fx = x2 - x1, fy = y2 - y1, fz = z2 - z1; // From v1 to v2
+        double dx = x0 - x1, dy = y0 - y1, dz = z0 - z1; // From v1 to v0
+        double fx = x2 - x1, fy = y2 - y1, fz = z2 - z1; // From v1 to v2
 
         // Calculate the angle between vectors "d" and "f"
-        dtype cos_ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+        double cos_ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
 
         if (cos_ang_df > angle_limit)
             ++n_split;
         i_subseg[i_seg] = n_split;
     }
 
-    size_t n_vert = (n_coord + n_split) * n_edges;
-    size_t n_faces = (n_coord - 1ULL) * n_edges;
+    arma::uword n_vert = (n_coord + n_split) * n_edges;
+    arma::uword n_faces = (n_coord - 1ULL) * n_edges;
 
     if (vert->n_rows != 3ULL || vert->n_cols != n_vert)
         vert->zeros(3ULL, n_vert);
@@ -2620,8 +2721,8 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
     double *p_dest = dest.memptr();
     double *p_fbs = fbs.memptr();
 
-    size_t i_vert = 0ULL; // Vertex counter
-    for (size_t i_seg = 0ULL; i_seg < n_segments; ++i_seg)
+    arma::uword i_vert = 0ULL; // Vertex counter
+    for (arma::uword i_seg = 0ULL; i_seg < n_segments; ++i_seg)
     {
         // Vector "g" is orthogonal to "-d" and "f"
         double gx = NAN, gy = NAN, gz = NAN;
@@ -2632,18 +2733,21 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         // The angle between vectors "-d" and "f"
         double ang_df = NAN;
 
+        // Pointer to the coordinates
+        const double *p_coord_seg = &p_coord_local[3ULL * i_seg];
+
         // Get start and end point of the current segment
         if (i_seg == 0ULL)
         {
             // Read "v0"
-            x0 = (double)p_coord[3ULL * i_seg];
-            y0 = (double)p_coord[3ULL * i_seg + 1ULL];
-            z0 = (double)p_coord[3ULL * i_seg + 2ULL];
+            x0 = p_coord_seg[0];
+            y0 = p_coord_seg[1];
+            z0 = p_coord_seg[2];
 
             // Read "v1"
-            x1 = (double)p_coord[3ULL * (i_seg + 1ULL)];
-            y1 = (double)p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
-            z1 = (double)p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+            x1 = p_coord_seg[3];
+            y1 = p_coord_seg[4];
+            z1 = p_coord_seg[5];
 
             // Calculate "d"
             dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
@@ -2670,10 +2774,9 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         if (i_seg < n_segments - 1ULL)
         {
             // Read "v2"
-            size_t ind = 3ULL * (i_seg + 2ULL);
-            x2 = (double)p_coord[ind];
-            y2 = (double)p_coord[ind + 1ULL];
-            z2 = (double)p_coord[ind + 2ULL];
+            x2 = p_coord_seg[6];
+            y2 = p_coord_seg[7];
+            z2 = p_coord_seg[8];
 
             // Calculate "f"
             fx = x2 - x1, fy = y2 - y1, fz = z2 - z1;
@@ -2693,7 +2796,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         }
 
         // Generate origin points for the edges by rotating "u" around "d"
-        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
         {
             double ex = ux, ey = uy, ez = uz;
             if (i_edge != 0ULL)
@@ -2739,7 +2842,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
             // Generate destination points for the projection
             // - Minimum angle "ang_df" = 10 deg --> tand(80°) = 5.7
             double d = len_d + 5.7 * radius_d;
-            for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+            for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
             {
                 p_dest[i_edge] = p_orig[i_edge] + d * dx;
                 p_dest[i_edge + n_edges] = p_orig[i_edge + n_edges] + d * dy;
@@ -2759,7 +2862,7 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         }
 
         // Write FBS coordinates to output
-        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
         {
             p_vert[i_vert] = (dtype)p_fbs[i_edge];
             p_vert[i_vert + 1ULL] = (dtype)p_fbs[i_edge + n_edges];
@@ -2773,10 +2876,10 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
         rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
 
         // Build face matrix
-        for (size_t i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
         {
-            size_t ind = 4ULL * (n_edges * i_seg + i_edge);
-            size_t offset = i_subseg[i_seg] * n_edges;
+            arma::uword ind = 4ULL * (n_edges * i_seg + i_edge);
+            arma::uword offset = i_subseg[i_seg] * n_edges;
             p_face[ind] = n_edges * i_seg + offset + i_edge;
             p_face[ind + 1ULL] = n_edges * i_seg + offset + (i_edge + 1ULL) % n_edges;
             p_face[ind + 2ULL] = n_edges * (i_seg + 1ULL) + offset + (i_edge + 1ULL) % n_edges;
@@ -2786,10 +2889,10 @@ void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dt
 }
 
 template void quadriga_lib::path_to_tube(const arma::Mat<float> *path_coord, arma::Mat<float> *vert, arma::umat *faces,
-                                         float radius, size_t n_edges);
+                                         float radius, arma::uword n_edges);
 
 template void quadriga_lib::path_to_tube(const arma::Mat<double> *path_coord, arma::Mat<double> *vert, arma::umat *faces,
-                                         double radius, size_t n_edges);
+                                         double radius, arma::uword n_edges);
 
 // Calculate the axis-aligned bounding box (AABB) of a point cloud
 template <typename dtype>

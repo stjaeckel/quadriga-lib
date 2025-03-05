@@ -65,15 +65,7 @@ catch ME
     end
 end
 
-try 
-    [~,~] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), single(delay), pilots, fc, [2,3,2,1] );
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'All floating-point inputs must have the same type: ''single'' or ''double'' precision';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+[~,~] = quadriga_lib.baseband_freq_response( real(coeff), imag(coeff), single(delay), pilots, fc, [2,3,2,1] );
 
 [ hmat_re_s, hmat_im_s ] = quadriga_lib.baseband_freq_response( single(real(coeff)), single(imag(coeff)), single(delay), single(pilots), fc, [2,3,2,1] );
 
