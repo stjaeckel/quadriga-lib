@@ -349,3 +349,95 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
 
     CHECK(n_rayN == 4);
 }
+
+TEST_CASE("Quadriga tools - Coord 2 Path")
+{
+    double Tx = 0.0, Ty = 0.0, Tz = 0.0;
+    double Rx = 10.0, Ry = 10.0, Rz = 10.0;
+
+    arma::u32_vec no_interact = {0};
+    arma::mat interact_coord(3, 0);
+
+    arma::vec path_length;
+    arma::mat fbs_pos, lbs_pos, path_angles;
+    std::vector<arma::mat> path_coord;
+
+    // Forward LOS path
+    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+                             &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
+
+    arma::mat M = {5.0, 5.0, 5.0};
+    CHECK(arma::approx_equal(fbs_pos, M.t(), "absdiff", 1e-14));
+    CHECK(arma::approx_equal(lbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {10.0 * std::sqrt(3.0)};
+    CHECK(arma::approx_equal(path_length, M.col(0), "absdiff", 1e-14));
+
+    double pi = 3.141592653589793;
+    double el = std::asin(1.0 / std::sqrt(3.0));
+    M = {0.25 * pi, el, -0.75 * pi, -el};
+    CHECK(arma::approx_equal(path_angles, M, "absdiff", 1e-14));
+
+    M = {{0.0, 10.0}, {0.0, 10.0}, {0.0, 10.0}};
+    CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
+
+    // Reverse LOS path
+    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+                             &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
+
+    M = {5.0, 5.0, 5.0};
+    CHECK(arma::approx_equal(fbs_pos, M.t(), "absdiff", 1e-14));
+    CHECK(arma::approx_equal(lbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {10.0 * std::sqrt(3.0)};
+    CHECK(arma::approx_equal(path_length, M.col(0), "absdiff", 1e-14));
+
+    M = {-0.75 * pi, -el, 0.25 * pi, el};
+    CHECK(arma::approx_equal(path_angles, M, "absdiff", 1e-14));
+
+    // Forward path
+    Rx = 10.0, Ry = 0.0, Rz = 0.0;
+    no_interact = {2};
+    interact_coord = {{2.0, 8.0}, {2.0, 2.0}, {2.0, 2.0}};
+
+    M = {{10.0, 0.0}, {10.0, 0.0}, {10.0, 0.0}};
+    CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
+
+    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+                             &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord);
+
+    M = {2.0, 2.0, 2.0};
+    CHECK(arma::approx_equal(fbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {8.0, 2.0, 2.0};
+    CHECK(arma::approx_equal(lbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {6.0 + 4.0 * std::sqrt(3.0)};
+    CHECK(arma::approx_equal(path_length, M.col(0), "absdiff", 1e-14));
+
+    M = {0.25 * pi, el, 0.75 * pi, el};
+    CHECK(arma::approx_equal(path_angles, M, "absdiff", 1e-14));
+
+    M = {{0.0, 2.0, 8.0, 10.0}, {0.0, 2.0, 2.0, 0.0}, {0.0, 2.0, 2.0, 0.0}};
+    CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
+
+    // Reverse path
+
+    quadriga_lib::coord2path(Tx, Ty, Tz, Rx, Ry, Rz, &no_interact, &interact_coord,
+                             &path_length, &fbs_pos, &lbs_pos, &path_angles, &path_coord, true);
+
+    M = {8.0, 2.0, 2.0};
+    CHECK(arma::approx_equal(fbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {2.0, 2.0, 2.0};
+    CHECK(arma::approx_equal(lbs_pos, M.t(), "absdiff", 1e-14));
+
+    M = {6.0 + 4.0 * std::sqrt(3.0)};
+    CHECK(arma::approx_equal(path_length, M.col(0), "absdiff", 1e-14));
+
+    M = {0.75 * pi, el, 0.25 * pi, el};
+    CHECK(arma::approx_equal(path_angles, M, "absdiff", 1e-14));
+
+    M = {{10.0, 8.0, 2.0, 0.0}, {0.0, 2.0, 2.0, 0.0}, {0.0, 2.0, 2.0, 0.0}};
+    CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
+}

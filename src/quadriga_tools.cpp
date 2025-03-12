@@ -754,7 +754,7 @@ template <typename dtype>
 void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz,
                               const arma::Col<unsigned> *no_interact, const arma::Mat<dtype> *interact_coord,
                               arma::Col<dtype> *path_length, arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
-                              arma::Mat<dtype> *path_angles, std::vector<arma::Mat<dtype>> *path_coord)
+                              arma::Mat<dtype> *path_angles, std::vector<arma::Mat<dtype>> *path_coord, bool reverse_path)
 {
     if (no_interact == nullptr)
         throw std::invalid_argument("Input 'no_interact' cannot be NULL.");
@@ -802,7 +802,7 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
     dtype TRx = Rx - Tx, TRy = Ry - Ty, TRz = Rz - Tz;
     TRx = Tx + half * TRx, TRy = Ty + half * TRy, TRz = Tz + half * TRz;
 
-    for (size_t ip = 0; ip < n_path; ++ip)
+    for (size_t i_path = 0; i_path < n_path; ++i_path)
     {
         dtype fx = TRx, fy = TRy, fz = TRz;     // Initial FBS-Pos = half way point
         dtype lx = TRx, ly = TRy, lz = TRz;     // Initial LBS-Pos = half way point
@@ -811,13 +811,13 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
         dtype *ppc = nullptr;
         if (path_coord != nullptr)
         {
-            path_coord->at(ip).set_size(3, p_interact[ip] + 2);
-            ppc = path_coord->at(ip).memptr();
+            path_coord->at(i_path).set_size(3, p_interact[i_path] + 2);
+            ppc = path_coord->at(i_path).memptr();
             *ppc++ = Tx, *ppc++ = Ty, *ppc++ = Tz;
         }
 
         // Get FBS and LBS positions
-        for (unsigned ii = 0; ii < p_interact[ip]; ++ii)
+        for (unsigned ii = 0; ii < p_interact[i_path]; ++ii)
         {
             lx = *p_coord++, ly = *p_coord++, lz = *p_coord++;                      // Read segment end coordinate
             x -= lx, y -= ly, z -= lz;                                              // Calculate vector pointing from segment start to segment end
@@ -831,33 +831,83 @@ void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, 
         d += std::sqrt(x * x + y * y + z * z); // Add last segment length to total path length
 
         if (p_length != nullptr)
-            p_length[ip] = d;
+            p_length[i_path] = d;
+
         if (p_fbs != nullptr)
-            p_fbs[3 * ip] = fx, p_fbs[3 * ip + 1] = fy, p_fbs[3 * ip + 2] = fz;
+        {
+            if (reverse_path)
+                p_fbs[3 * i_path] = lx, p_fbs[3 * i_path + 1] = ly, p_fbs[3 * i_path + 2] = lz;
+            else
+                p_fbs[3 * i_path] = fx, p_fbs[3 * i_path + 1] = fy, p_fbs[3 * i_path + 2] = fz;
+        }
+
         if (p_lbs != nullptr)
-            p_lbs[3 * ip] = lx, p_lbs[3 * ip + 1] = ly, p_lbs[3 * ip + 2] = lz;
+        {
+            if (reverse_path)
+                p_lbs[3 * i_path] = fx, p_lbs[3 * i_path + 1] = fy, p_lbs[3 * i_path + 2] = fz;
+            else
+                p_lbs[3 * i_path] = lx, p_lbs[3 * i_path + 1] = ly, p_lbs[3 * i_path + 2] = lz;
+        }
 
         if (p_angles != nullptr)
         {
             x = fx - Tx, y = fy - Ty, z = fz - Tz;
             d = std::sqrt(x * x + y * y + z * z);
-            p_angles[ip] = std::atan2(y, x);                                 // AOD
-            p_angles[n_path + ip] = d < los_limit ? zero : std::asin(z / d); // EOD
+
+            if (reverse_path)
+            {
+                p_angles[2 * n_path + i_path] = std::atan2(y, x);                        // AOD
+                p_angles[3 * n_path + i_path] = d < los_limit ? zero : std::asin(z / d); // EOD
+            }
+            else
+            {
+                p_angles[i_path] = std::atan2(y, x);                                 // AOD
+                p_angles[n_path + i_path] = d < los_limit ? zero : std::asin(z / d); // EOD
+            }
+
             x = lx - Rx, y = ly - Ry, z = lz - Rz;
             d = std::sqrt(x * x + y * y + z * z);
-            p_angles[2 * n_path + ip] = std::atan2(y, x);                        // AOA
-            p_angles[3 * n_path + ip] = d < los_limit ? zero : std::asin(z / d); // EOA
+
+            if (reverse_path)
+            {
+                p_angles[i_path] = std::atan2(y, x);                                 // AOA
+                p_angles[n_path + i_path] = d < los_limit ? zero : std::asin(z / d); // EOA
+            }
+            else
+            {
+                p_angles[2 * n_path + i_path] = std::atan2(y, x);                        // AOA
+                p_angles[3 * n_path + i_path] = d < los_limit ? zero : std::asin(z / d); // EOA
+            }
         }
         if (ppc != nullptr)
             *ppc++ = Rx, *ppc++ = Ry, *ppc++ = Rz;
+
+        if (reverse_path && path_coord != nullptr)
+        {
+            arma::uword n_elem = path_coord->at(i_path).n_elem;
+
+            ppc = path_coord->at(i_path).memptr();
+            dtype *tmp = new dtype[n_elem];
+            std::memcpy(tmp, ppc, n_elem * sizeof(dtype));
+
+            n_elem = path_coord->at(i_path).n_cols;
+            for (arma::uword i_col = 0ULL; i_col < n_elem; ++i_col)
+            {
+                arma::uword ii = 3ULL * (n_elem - i_col - 1ULL);
+                ppc[3 * i_col] = tmp[ii];
+                ppc[3 * i_col + 1] = tmp[ii + 1];
+                ppc[3 * i_col + 2] = tmp[ii + 2];
+            }
+            delete[] tmp;
+        }
     }
 }
 
 template void quadriga_lib::coord2path(float Tx, float Ty, float Tz, float Rx, float Ry, float Rz, const arma::Col<unsigned> *no_interact, const arma::Mat<float> *interact_coord,
-                                       arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles, std::vector<arma::Mat<float>> *path_coord);
+                                       arma::Col<float> *path_length, arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos, arma::Mat<float> *path_angles, std::vector<arma::Mat<float>> *path_coord, bool reverse_path);
 
 template void quadriga_lib::coord2path(double Tx, double Ty, double Tz, double Rx, double Ry, double Rz, const arma::Col<unsigned> *no_interact, const arma::Mat<double> *interact_coord,
-                                       arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles, std::vector<arma::Mat<double>> *path_coord);
+                                       arma::Col<double> *path_length, arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos, arma::Mat<double> *path_angles, std::vector<arma::Mat<double>> *path_coord, bool reverse_path);
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 template <typename dtype>
