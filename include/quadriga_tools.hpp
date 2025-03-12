@@ -87,16 +87,17 @@ namespace quadriga_lib
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
     // - Size of the output arguments is adjusted if it does not match the required size
-    template <typename dtype>                                             // Supported types: float or double
-    void coord2path(dtype Tx, dtype Ty, dtype Tz,                         // Transmitter position in Cartesian coordinates
-                    dtype Rx, dtype Ry, dtype Rz,                         // Receiver position in Cartesian coordinates
-                    const arma::Col<unsigned> *no_interact,               // Number interaction points of a path with the environment, 0 = LOS, vector of length [n_path]
-                    const arma::Mat<dtype> *interact_coord,               // Interaction coordinates of paths with the environment, matrix of size [3, sum(no_interact)]
-                    arma::Col<dtype> *path_length = nullptr,              // Absolute path length from TX to RX phase center, vector of length [n_path]
-                    arma::Mat<dtype> *fbs_pos = nullptr,                  // First-bounce scatterer positions, matrix of size [3, n_path]
-                    arma::Mat<dtype> *lbs_pos = nullptr,                  // Last-bounce scatterer positions, matrix of size [3, n_path]
-                    arma::Mat<dtype> *path_angles = nullptr,              // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
-                    std::vector<arma::Mat<dtype>> *path_coord = nullptr); // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
+    template <typename dtype>                                            // Supported types: float or double
+    void coord2path(dtype Tx, dtype Ty, dtype Tz,                        // Transmitter position in Cartesian coordinates
+                    dtype Rx, dtype Ry, dtype Rz,                        // Receiver position in Cartesian coordinates
+                    const arma::Col<unsigned> *no_interact,              // Number interaction points of a path with the environment, 0 = LOS, vector of length [n_path]
+                    const arma::Mat<dtype> *interact_coord,              // Interaction coordinates of paths with the environment, matrix of size [3, sum(no_interact)]
+                    arma::Col<dtype> *path_length = nullptr,             // Absolute path length from TX to RX phase center, vector of length [n_path]
+                    arma::Mat<dtype> *fbs_pos = nullptr,                 // First-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, matrix of size [3, n_path]
+                    arma::Mat<dtype> *path_angles = nullptr,             // Departure and arrival angles {AOD, EOD, AOA, EOA}, matrix of size [n_path, 4]
+                    std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
+                    bool reverse_path = false);                          // Option to reverse the path (swap TX and RX positions)
 
     // Generate diffraction ellipsoid
     // - Each ellipsoid consists of 'n_path' diffraction paths
