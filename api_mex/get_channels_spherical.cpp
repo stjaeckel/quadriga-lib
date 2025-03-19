@@ -28,10 +28,10 @@ SECTION!*/
 Calculate channel coefficients from path data and antenna patterns
 
 ## Description:
-In this function, the wireless propagation channel between a transmitter and a receiver is calculated, 
-based on a single transmit and receive position. Additionally, interaction points with the environment, 
-which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are 
-considered. The calculation is performed under the assumption of spherical wave propagation. For accurate 
+In this function, the wireless propagation channel between a transmitter and a receiver is calculated,
+based on a single transmit and receive position. Additionally, interaction points with the environment,
+which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are
+considered. The calculation is performed under the assumption of spherical wave propagation. For accurate
 execution of this process, several pieces of input data are required:<br><br>
 
 - The 3D Cartesian (local) coordinates of both the transmitter and the receiver.
@@ -76,28 +76,28 @@ execution of this process, several pieces of input data are required:<br><br>
   First interaction point of the rays and the environment; Size: `[ 3, n_path ]`
 
 - **`lbs_pos`**<br>
-  Last interaction point of the rays and the environment; For single-bounce models, this must be 
+  Last interaction point of the rays and the environment; For single-bounce models, this must be
   identical to `fbs_pos`. Size: `[ 3, n_path ]`
 
 - **`path_gain`**<br>
   Path gain (linear scale); Size: `[ 1, n_path ]` or `[ n_path, 1 ]`
 
 - **`path_length`**<br>
-  Total path length in meters; If `path_length` is shorter than the shortest possible path from TX to 
+  Total path length in meters; If `path_length` is shorter than the shortest possible path from TX to
   FBS to LBS to RX, it is replaced by the shortest path length. <br>Size: `[ 1, n_path ]` or `[ n_path, 1 ]`
 
 - **`M`**<br>
   Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH);
-  Size: `[ 8, n_path ]` 
+  Size: `[ 8, n_path ]`
 
 - **`tx_pos`**<br>
   Transmitter position in 3D Cartesian coordinates; Size: `[3,1]` or `[1,3]`
 
 - **`tx_orientation`**<br>
-  3-element vector describing the orientation of the transmit antenna. The The first value describes 
-  the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards), 
-  the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given 
-  in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south 
+  3-element vector describing the orientation of the transmit antenna. The The first value describes
+  the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards),
+  the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given
+  in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south
   is -pi/2, and west is equal to pi. Single or double precision, Size: `[3,1]` or `[1,3]`
 
 - **`rx_pos`**<br>
@@ -107,8 +107,8 @@ execution of this process, several pieces of input data are required:<br><br>
   3-element vector describing the orientation of the receive antenna. Size: `[3,1]` or `[1,3]`
 
 - **`center_freq`**<br>
-  Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation 
-  in coefficients is disabled, i.e. that path length has not influence on the results. This can be 
+  Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation
+  in coefficients is disabled, i.e. that path length has not influence on the results. This can be
   used to calculate the antenna response for a specific angle and polarization. Scalar value
 
 - **`use_absolute_delays`** (optional)<br>
@@ -142,10 +142,10 @@ execution of this process, several pieces of input data are required:<br><br>
   Elevation of Arrival angles in [rad], Size: `[ n_rx_ports, n_tx_ports, n_path ]`
 
 ## Caveat:
-- Antenna patterns, `fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, and `M` can be provided in 
+- Antenna patterns, `fbs_pos`, `lbs_pos`, `path_gain`, `path_length`, and `M` can be provided in
   single or double precision, but types must match. Outputs are returned in the same type.
 - Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance
-  of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
+  of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary
   computation.
 MD!*/
 

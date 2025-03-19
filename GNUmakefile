@@ -84,8 +84,8 @@ else # Static linking
 	HDF5_DYN    = 
 endif
 
-# Compiler flags
-CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wextra -Wpedantic -Wconversion #-g
+# Compiler flags (remove -Wextra to suppress unused variable warnings)
+CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wconversion -Wpedantic #-Wextra  
 
 # Compilations targets
 .PHONY: dirs
@@ -139,6 +139,15 @@ build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_functio
 build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_functions.hpp
 	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
 
+build/qd_arrayant_generate.o:   src/qd_arrayant_generate.cpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
+
+build/qd_arrayant_chan_spherical.o:   src/qd_arrayant_chan_spherical.cpp
+	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
+
+build/qd_arrayant_chan_planar.o:   src/qd_arrayant_chan_planar.cpp
+	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
+
 build/baseband_freq_response.o:   src/baseband_freq_response.cpp   include/quadriga_channel.hpp
 	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
 
@@ -179,7 +188,8 @@ build/libhdf5.a:
 	( cd build/ && ar x libhdf5.a && cd .. )
 
 lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/quadriga_lib_test_avx.o  build/qd_arrayant.o  build/qd_channel.o   \
-                      build/quadriga_tools.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
+                      build/quadriga_tools.o   build/qd_arrayant_generate.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
+					  build/qd_arrayant_chan_spherical.o   build/qd_arrayant_chan_planar.o   \
 					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o  build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o \
 					  build/ray_point_intersect.o   build/baseband_freq_response.o  build/ray_point_intersect_avx2.o   \
 					  build/baseband_freq_response_avx2.o
@@ -198,7 +208,8 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/qu
 
 # Dependencies
 dep_quadriga_tools = build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   $(dep_quadriga_tools)
+dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_generate.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
+				build/qd_arrayant_chan_spherical.o   build/qd_arrayant_chan_planar.o   $(dep_quadriga_tools)
 
 # MEX MATLAB interface
 +quadriga_lib/arrayant_calc_directivity.mexa64:   $(dep_arrayant)
@@ -217,7 +228,6 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/geo2cart.mexa64:                    $(dep_quadriga_tools)
 +quadriga_lib/get_channels_planar.mexa64:         $(dep_arrayant)
 +quadriga_lib/get_channels_spherical.mexa64:      $(dep_arrayant)
-+quadriga_lib/get_CUDA_compute_capability.mexa64: build/get_CUDA_compute_capability.o
 +quadriga_lib/hdf5_create_file.mexa64:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_channel.mexa64:           build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_dset.mexa64:              build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
@@ -263,7 +273,6 @@ dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_interpolate.o   build/qd_
 +quadriga_lib/geo2cart.mex:                    $(dep_quadriga_tools)
 +quadriga_lib/get_channels_planar.mex:         $(dep_arrayant)
 +quadriga_lib/get_channels_spherical.mex:      $(dep_arrayant)
-+quadriga_lib/get_CUDA_compute_capability.mex: build/get_CUDA_compute_capability.o
 +quadriga_lib/hdf5_create_file.mex:            build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_channel.mex:           build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
 +quadriga_lib/hdf5_read_dset.mex:              build/qd_channel.o   $(dep_quadriga_tools)   $(HDF5_STATIC)
