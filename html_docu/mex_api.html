@@ -1088,10 +1088,10 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 <b>get_channels_spherical</b> - Calculate channel coefficients from path data and antenna patterns
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>In this function, the wireless propagation channel between a transmitter and a receiver is calculated,  
-based on a single transmit and receive position. Additionally, interaction points with the environment,  
-which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are  
-considered. The calculation is performed under the assumption of spherical wave propagation. For accurate  
+<b><i>Description:</i></b><br>In this function, the wireless propagation channel between a transmitter and a receiver is calculated, 
+based on a single transmit and receive position. Additionally, interaction points with the environment, 
+which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are 
+considered. The calculation is performed under the assumption of spherical wave propagation. For accurate 
 execution of this process, several pieces of input data are required:<br><br> 
  
 <ul><li style="margin-bottom: 0.4em;">The 3D Cartesian (local) coordinates of both the transmitter and the receiver. 
@@ -1215,7 +1215,7 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>lbs_pos</code></b><br> 
-   Last interaction point of the rays and the environment; For single-bounce models, this must be  
+   Last interaction point of the rays and the environment; For single-bounce models, this must be 
    identical to <code>fbs_pos</code>. Size: <code>[ 3, n_path ]</code> 
 </li></ul>
  
@@ -1224,13 +1224,13 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b><br> 
-   Total path length in meters; If <code>path_length</code> is shorter than the shortest possible path from TX to  
+   Total path length in meters; If <code>path_length</code> is shorter than the shortest possible path from TX to 
    FBS to LBS to RX, it is replaced by the shortest path length. <br>Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
    Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); 
-   Size: <code>[ 8, n_path ]</code>  
+   Size: <code>[ 8, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
@@ -1238,10 +1238,10 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b><br> 
-   3-element vector describing the orientation of the transmit antenna. The The first value describes  
-   the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards),  
-   the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given  
-   in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south  
+   3-element vector describing the orientation of the transmit antenna. The The first value describes 
+   the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards), 
+   the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given 
+   in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south 
    is -pi/2, and west is equal to pi. Single or double precision, Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
@@ -1254,8 +1254,8 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
-   Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation  
-   in coefficients is disabled, i.e. that path length has not influence on the results. This can be  
+   Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation 
+   in coefficients is disabled, i.e. that path length has not influence on the results. This can be 
    used to calculate the antenna response for a specific angle and polarization. Scalar value 
 </li></ul>
  
@@ -1299,10 +1299,10 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Antenna patterns, <code>fbs_pos</code>, <code>lbs_pos</code>, <code>path_gain</code>, <code>path_length</code>, and <code>M</code> can be provided in  
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Antenna patterns, <code>fbs_pos</code>, <code>lbs_pos</code>, <code>path_gain</code>, <code>path_length</code>, and <code>M</code> can be provided in 
    single or double precision, but types must match. Outputs are returned in the same type. 
 </li><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance 
-   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary  
+   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
    computation. 
 </li></ul>
 </li>

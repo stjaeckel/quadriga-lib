@@ -51,6 +51,7 @@ all:   dirs \
 	   +quadriga_lib\calc_diffraction_gain.mexw64 \
 	   +quadriga_lib\calc_rotation_matrix.mexw64 \
 	   +quadriga_lib\cart2geo.mexw64 \
+	   +quadriga_lib\channel_export_obj_file.mexw64   \
 	   +quadriga_lib\generate_diffraction_paths.mexw64 \
 	   +quadriga_lib\geo2cart.mexw64 \
 	   +quadriga_lib\get_channels_planar.mexw64 \
@@ -102,6 +103,15 @@ build\qd_arrayant_qdant.obj:   src\qd_arrayant_qdant.cpp   src\qd_arrayant_funct
 build\qd_arrayant_interpolate.obj:   src\qd_arrayant_interpolate.cpp   src\qd_arrayant_functions.hpp
 	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
+build\qd_arrayant_generate.obj:   src\qd_arrayant_generate.cpp
+	$(CC) $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
+build\qd_arrayant_chan_spherical.obj:   src\qd_arrayant_chan_spherical.cpp
+	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
+build\qd_arrayant_chan_planar.obj:   src\qd_arrayant_chan_planar.cpp
+	$(CC) $(CCFLAGS) /openmp /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
+
 build\baseband_freq_response.obj:   src\baseband_freq_response.cpp   include\quadriga_channel.hpp
 	$(CC) /openmp $(CCFLAGS) /c src\$(@B).cpp /Fo$@ /Iinclude /I$(ARMA_H)
 
@@ -139,6 +149,7 @@ build\libhdf5.lib:
 
 lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\quadriga_lib_test_avx.obj   build\qd_arrayant.obj   build\qd_channel.obj   \
                         build\quadriga_tools.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   \
+						build\qd_arrayant_generate.obj   build\qd_arrayant_chan_spherical.obj   build\qd_arrayant_chan_planar.obj   \
 						build\ray_mesh_interact.obj   build\ray_triangle_intersect.obj   build\calc_diffraction_gain.obj \
 						build\libhdf5.lib   build\ray_point_intersect.obj   build\baseband_freq_response.obj   \
 						build\ray_triangle_intersect_avx2.obj   build\ray_point_intersect_avx2.obj
@@ -146,7 +157,8 @@ lib\quadriga_lib.lib:   build\quadriga_lib.obj   build\quadriga_lib_test_avx.obj
 
 # Dependencies
 dep_quadriga_tools = build\quadriga_tools.obj   build\ray_triangle_intersect.obj   build\ray_triangle_intersect_avx2.obj
-dep_arrayant = build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   $(dep_quadriga_tools)
+dep_arrayant = build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build\qd_arrayant_qdant.obj   build\qd_arrayant_generate.obj   \
+				build\qd_arrayant_chan_spherical.obj   build\qd_arrayant_chan_planar.obj   $(dep_quadriga_tools)
 
 # MEX MATLAB interface
 +quadriga_lib\arrayant_calc_directivity.mexw64:   api_mex\arrayant_calc_directivity.cpp   $(dep_arrayant)
@@ -167,14 +179,14 @@ dep_arrayant = build\qd_arrayant.obj   build\qd_arrayant_interpolate.obj   build
 +quadriga_lib\arrayant_qdant_write.mexw64:   api_mex\arrayant_qdant_write.cpp   $(dep_arrayant)
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
++quadriga_lib\arrayant_rotate_pattern.mexw64:   api_mex\arrayant_rotate_pattern.cpp   $(dep_arrayant)
+	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
+
 +quadriga_lib\baseband_freq_response.mexw64:   api_mex\baseband_freq_response.cpp   build\baseband_freq_response.obj
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\calc_diffraction_gain.mexw64:   api_mex\calc_diffraction_gain.cpp   build\calc_diffraction_gain.obj   $(dep_quadriga_tools)  build\ray_mesh_interact.obj
    $(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
-
-+quadriga_lib\arrayant_rotate_pattern.mexw64:   api_mex\arrayant_rotate_pattern.cpp   $(dep_arrayant)
-	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
 
 +quadriga_lib\calc_rotation_matrix.mexw64:   api_mex\calc_rotation_matrix.cpp   $(dep_quadriga_tools)
 	$(MEX) COMPFLAGS="$(MEXFLAGS)" -outdir +quadriga_lib $** -Iinclude -Isrc -I$(ARMA_H)
