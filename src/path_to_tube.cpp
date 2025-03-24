@@ -1,0 +1,446 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// ------------------------------------------------------------------------
+
+#include "quadriga_tools.hpp"
+
+// Cross product
+template <typename dtype>
+static inline void crossp(dtype vx, dtype vy, dtype vz,    // Vector V
+                          dtype kx, dtype ky, dtype kz,    // Vector K
+                          dtype *rx, dtype *ry, dtype *rz, // Result V x K
+                          bool normalize_output = false)
+{
+    *rx = vy * kz - vz * ky; // x-component
+    *ry = vz * kx - vx * kz; // y-component
+    *rz = vx * ky - vy * kx; // z-component
+
+    if (normalize_output)
+    {
+        dtype scl = (dtype)1.0 / std::sqrt(*rx * *rx + *ry * *ry + *rz * *rz);
+        *rx *= scl, *ry *= scl, *rz *= scl;
+    }
+}
+
+// Dot product
+template <typename dtype>
+static inline dtype dotp(dtype vx, dtype vy, dtype vz, // Vector V
+                         dtype kx, dtype ky, dtype kz, // Vector K
+                         bool normalize = false)       // Option to normalize
+{
+    dtype dot = vx * kx + vy * ky + vz * kz; // Dot product calculation
+
+    if (normalize)
+    {
+        dtype v_mag = std::sqrt(vx * vx + vy * vy + vz * vz); // Magnitude of V
+        dtype k_mag = std::sqrt(kx * kx + ky * ky + kz * kz); // Magnitude of K
+        if (v_mag > 0 && k_mag > 0)                           // Normalize the dot product
+            dot /= (v_mag * k_mag);
+    }
+
+    return dot;
+}
+
+// Rotate a vector around an arbitrary axis
+static inline void rotate_vector_around_axis(double vx, double vy, double vz,    // The vector to rotate
+                                             double kx, double ky, double kz,    // The axis of rotation
+                                             double theta,                       // Rotation angle in radians
+                                             double *rx, double *ry, double *rz, // Result
+                                             bool k_is_normalized = false)
+{
+    // Step 1: Precompute values
+    double cos_theta = std::cos(theta);
+    double sin_theta = std::sin(theta);
+
+    if (!k_is_normalized)
+    {
+        double scl = kx * kx + ky * ky + kz * kz;
+        scl = 1.0 / std::sqrt(scl);
+        kx *= scl, ky *= scl, kz *= scl;
+    }
+
+    double dot = vx * kx + vy * ky + vz * kz; // Dot product of V and K
+
+    // Step 2: Rodrigues' rotation formula components
+    *rx = vx * cos_theta + (ky * vz - kz * vy) * sin_theta + kx * dot * (1.0 - cos_theta);
+    *ry = vy * cos_theta + (kz * vx - kx * vz) * sin_theta + ky * dot * (1.0 - cos_theta);
+    *rz = vz * cos_theta + (kx * vy - ky * vx) * sin_theta + kz * dot * (1.0 - cos_theta);
+}
+
+// Convert paths to tubes
+template <typename dtype>
+void quadriga_lib::path_to_tube(const arma::Mat<dtype> *path_coord, arma::Mat<dtype> *vert, arma::umat *faces, dtype radius, arma::uword n_edges)
+{
+    if (path_coord == nullptr)
+        throw std::invalid_argument("Input 'path_coord' cannot be NULL.");
+    if (vert == nullptr)
+        throw std::invalid_argument("Output 'vert' cannot be NULL.");
+    if (faces == nullptr)
+        throw std::invalid_argument("Output 'faces' cannot be NULL.");
+
+    if (path_coord->n_rows != 3ULL)
+        throw std::invalid_argument("Input 'path_coord' must have 3 rows containing x,y,z coordinates.");
+
+    if (path_coord->n_cols < 2ULL)
+        throw std::invalid_argument("Input 'path_coord' must have 2 or more columns.");
+
+    double radius_d = (double)radius;
+    if (radius_d <= 0.0)
+        throw std::invalid_argument("Radius mut be larger than 0.");
+
+    if (n_edges < 3ULL)
+        throw std::invalid_argument("Number of edges mut be >= 3.");
+
+    // There might be co-located vertices on the path. These need to be merged together
+    arma::uword n_coord = path_coord->n_cols;
+    arma::uword n_segments_in = n_coord - 1ULL;
+    const dtype *p_coord = path_coord->memptr();
+
+    dtype length_limit = (dtype)2.0 * radius;
+    arma::Col<dtype> seg_length(n_segments_in, arma::fill::none);
+    dtype *p_seg_length = seg_length.memptr();
+    arma::uword n_segments = 0ULL;
+
+    for (arma::uword i_seg = 0ULL; i_seg < n_segments_in; ++i_seg)
+    {
+        // Read "v0"
+        dtype x = p_coord[3ULL * i_seg];
+        dtype y = p_coord[3ULL * i_seg + 1ULL];
+        dtype z = p_coord[3ULL * i_seg + 2ULL];
+
+        // Vector from "v1" to "v0"
+        x -= p_coord[3ULL * (i_seg + 1ULL)];
+        y -= p_coord[3ULL * (i_seg + 1ULL) + 1ULL];
+        z -= p_coord[3ULL * (i_seg + 1ULL) + 2ULL];
+
+        // Length
+        x = std::sqrt((x * x) + (y * y) + (z * z));
+        n_segments = (x > length_limit) ? n_segments + 1ULL : n_segments;
+        p_seg_length[i_seg] = x;
+    }
+
+    if (n_segments == 0ULL)
+        throw std::invalid_argument("All points in 'path_coord' are co-located.");
+
+    // Remove short segments from the path
+    arma::mat path_coord_local(3ULL, n_segments + 1ULL, arma::fill::none);
+    double *p_coord_local = path_coord_local.memptr();
+
+    if (n_segments == n_segments_in) // Convert to double
+    {
+        for (arma::uword i_seg = 0ULL; i_seg < 3ULL * (n_segments + 1ULL); ++i_seg)
+            p_coord_local[i_seg] = (double)p_coord[i_seg];
+    }
+    else // Path has short segments
+    {
+        double x = (double)p_coord[0];
+        double y = (double)p_coord[1];
+        double z = (double)p_coord[2];
+
+        arma::uword i_vert_out = 0ULL;        // Current index in the output stream
+        arma::uword co_location_count = 1ULL; // Counter for co-located vertices
+        for (arma::uword i_seg = 0ULL; i_seg < n_segments_in; ++i_seg)
+        {
+            // Pointer to the next coordinates
+            const dtype *p_next = &p_coord[3ULL * (i_seg + 1ULL)];
+
+            // Load values in one go
+            double xn = (double)p_next[0];
+            double yn = (double)p_next[1];
+            double zn = (double)p_next[2];
+
+            if (p_seg_length[i_seg] <= length_limit) // Short segment
+            {
+                x += xn, y += yn, z += zn;
+                ++co_location_count;
+            }
+            else if (co_location_count == 1ULL) // Long segment
+            {
+                p_coord_local[i_vert_out] = x;
+                p_coord_local[i_vert_out + 1ULL] = y;
+                p_coord_local[i_vert_out + 2ULL] = z;
+                i_vert_out += 3ULL;
+                x = xn, y = yn, z = zn;
+            }
+            else if (i_vert_out == 0ULL) // First segment - copy start point
+            {
+                p_coord_local[0] = (double)p_coord[0];
+                p_coord_local[1] = (double)p_coord[1];
+                p_coord_local[2] = (double)p_coord[2];
+                i_vert_out = 3ULL;
+                co_location_count = 1ULL;
+                x = xn, y = yn, z = zn;
+            }
+            else // Multiple co-located points that are not the start point
+            {
+                double weight = 1.0 / (double)co_location_count;
+                p_coord_local[i_vert_out] = x * weight;
+                p_coord_local[i_vert_out + 1ULL] = y * weight;
+                p_coord_local[i_vert_out + 2ULL] = z * weight;
+                i_vert_out += 3ULL;
+                co_location_count = 1ULL;
+                x = xn, y = yn, z = zn;
+            }
+
+            if (i_seg == n_segments_in - 1ULL) // Last segment - copy end point
+            {
+                p_coord_local[i_vert_out] = xn;
+                p_coord_local[i_vert_out + 1ULL] = yn;
+                p_coord_local[i_vert_out + 2ULL] = zn;
+            }
+        }
+    }
+
+    // Update number of coordinates
+    n_coord = n_segments + 1ULL;
+
+    // At steep angles between path segments, the path is split and an additional ring of vertices is added
+    // Wee need to determine the number of splits
+    double angle_limit = 0.939692620785908; // cosd(10)
+    arma::uword n_split = 0ULL;
+    arma::uvec subseg_indices(n_segments);
+    arma::uword *i_subseg = subseg_indices.memptr();
+    for (arma::uword i_seg = 1ULL; i_seg < n_segments; ++i_seg)
+    {
+        // Pointer to the coordinates
+        const double *p_coord_seg = &p_coord_local[3ULL * (i_seg - 1ULL)];
+
+        // Read "v0"
+        double x0 = p_coord_seg[0];
+        double y0 = p_coord_seg[1];
+        double z0 = p_coord_seg[2];
+
+        // Read "v1"
+        double x1 = p_coord_seg[3];
+        double y1 = p_coord_seg[4];
+        double z1 = p_coord_seg[5];
+
+        // Read "v2"
+        double x2 = p_coord_seg[6];
+        double y2 = p_coord_seg[7];
+        double z2 = p_coord_seg[8];
+
+        // Calculate the vectors "d" and "f"
+        double dx = x0 - x1, dy = y0 - y1, dz = z0 - z1; // From v1 to v0
+        double fx = x2 - x1, fy = y2 - y1, fz = z2 - z1; // From v1 to v2
+
+        // Calculate the angle between vectors "d" and "f"
+        double cos_ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+
+        if (cos_ang_df > angle_limit)
+            ++n_split;
+        i_subseg[i_seg] = n_split;
+    }
+
+    arma::uword n_vert = (n_coord + n_split) * n_edges;
+    arma::uword n_faces = (n_coord - 1ULL) * n_edges;
+
+    if (vert->n_rows != 3ULL || vert->n_cols != n_vert)
+        vert->zeros(3ULL, n_vert);
+
+    if (faces->n_rows != 4 || faces->n_cols != n_faces)
+        faces->zeros(4ULL, n_faces);
+
+    dtype *p_vert = vert->memptr();
+    arma::uword *p_face = faces->memptr();
+
+    double x0 = 0.0, x1 = 0.0, x2 = 0.0;              // Point v0
+    double y0 = 0.0, y1 = 0.0, y2 = 0.0;              // Point v1
+    double z0 = 0.0, z1 = 0.0, z2 = 0.0;              // Point v2
+    double dx = 0.0, dy = 0.0, dz = 0.0, len_d = 0.0; // Vector from v0 to v1
+    double fx = 0.0, fy = 0.0, fz = 0.0, len_f = 0.0; // Vector from v1 to v2
+
+    // Vector "u" is orthogonal to "d" and points to the first edge
+    double ux = NAN, uy = NAN, uz = NAN;
+
+    // Temporary storage for the vertices
+    arma::mat orig(n_edges, 3ULL), dest(n_edges, 3ULL), fbs(n_edges, 3ULL);
+    double *p_orig = orig.memptr();
+    double *p_dest = dest.memptr();
+    double *p_fbs = fbs.memptr();
+
+    arma::uword i_vert = 0ULL; // Vertex counter
+    for (arma::uword i_seg = 0ULL; i_seg < n_segments; ++i_seg)
+    {
+        // Vector "g" is orthogonal to "-d" and "f"
+        double gx = NAN, gy = NAN, gz = NAN;
+
+        // Vector "h" lies in between "-d" and "f"
+        double hx = NAN, hy = NAN, hz = NAN;
+
+        // The angle between vectors "-d" and "f"
+        double ang_df = NAN;
+
+        // Pointer to the coordinates
+        const double *p_coord_seg = &p_coord_local[3ULL * i_seg];
+
+        // Get start and end point of the current segment
+        if (i_seg == 0ULL)
+        {
+            // Read "v0"
+            x0 = p_coord_seg[0];
+            y0 = p_coord_seg[1];
+            z0 = p_coord_seg[2];
+
+            // Read "v1"
+            x1 = p_coord_seg[3];
+            y1 = p_coord_seg[4];
+            z1 = p_coord_seg[5];
+
+            // Calculate "d"
+            dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            len_d = std::sqrt(dx * dx + dy * dy + dz * dz);
+            double scl = 1.0 / len_d;
+            dx *= scl, dy *= scl, dz *= scl;
+
+            // Pick an arbitrary vector "u" that is orthogonal to "d"
+            if (std::abs(dx) > 1.0e-6 || std::abs(dy) > 1.0e-6)
+                ux = -dy, uy = dx, uz = 0.0;
+            else
+                ux = 0.0, uy = 1.0, uz = 0.0;
+            scl = 1.0 / std::sqrt(ux * ux + uy * uy);
+            ux *= scl, uy *= scl;
+        }
+        else // i_seg > 0
+        {
+            // Copy "v0", "v1" and "d" from the previous iteration
+            x0 = x1, y0 = y1, z0 = z1;
+            x1 = x2, y1 = y2, z1 = z2;
+            dx = fx, dy = fy, dz = fz, len_d = len_f;
+        }
+
+        if (i_seg < n_segments - 1ULL)
+        {
+            // Read "v2"
+            x2 = p_coord_seg[6];
+            y2 = p_coord_seg[7];
+            z2 = p_coord_seg[8];
+
+            // Calculate "f"
+            fx = x2 - x1, fy = y2 - y1, fz = z2 - z1;
+            len_f = std::sqrt(fx * fx + fy * fy + fz * fz);
+            double scl = 1.0 / len_f;
+            fx *= scl, fy *= scl, fz *= scl;
+
+            // Calculate a normal-vector "g" that is orthogonal to "-d" and "f"
+            crossp(-dx, -dy, -dz, fx, fy, fz, &gx, &gy, &gz, true);
+
+            // Calculate the angle between vectors "-d" and "f"
+            ang_df = dotp(-dx, -dy, -dz, fx, fy, fz, true);
+            ang_df = std::acos(ang_df);
+
+            // Calculate vector "h" that lies in between "-d" and "f"
+            rotate_vector_around_axis(-dx, -dy, -dz, gx, gy, gz, 0.5 * ang_df, &hx, &hy, &hz, true);
+        }
+
+        // Generate origin points for the edges by rotating "u" around "d"
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            double ex = ux, ey = uy, ez = uz;
+            if (i_edge != 0ULL)
+            {
+                double theta = (double)i_edge * 6.283185307179586 / (double)n_edges;
+                rotate_vector_around_axis(ux, uy, uz, dx, dy, dz, theta, &ex, &ey, &ez, true);
+            }
+
+            // Scale by radius
+            ex = ex * radius_d;
+            ey = ey * radius_d;
+            ez = ez * radius_d;
+
+            // Update FBS by shifting to v1
+            if (i_seg == n_segments - 1ULL || i_subseg[i_seg] != i_subseg[i_seg + 1ULL])
+            {
+                p_fbs[i_edge] = ex + x1;
+                p_fbs[i_edge + n_edges] = ey + y1;
+                p_fbs[i_edge + 2ULL * n_edges] = ez + z1;
+            }
+
+            // Shift to v0
+            ex += x0, ey += y0, ez += z0;
+
+            // Write edge vertices to ray origin
+            p_orig[i_edge] = ex;
+            p_orig[i_edge + n_edges] = ey;
+            p_orig[i_edge + 2ULL * n_edges] = ez;
+
+            // For the first segment of a new sub-segment, these origin points ara also the starting points of the tube
+            if (i_seg == 0ULL || i_subseg[i_seg - 1ULL] != i_subseg[i_seg])
+            {
+                p_vert[i_vert] = (dtype)ex;
+                p_vert[i_vert + 1ULL] = (dtype)ey;
+                p_vert[i_vert + 2ULL] = (dtype)ez;
+                i_vert += 3ULL;
+            }
+        }
+
+        // Projection mode
+        if (i_seg < n_segments - 1ULL && i_subseg[i_seg] == i_subseg[i_seg + 1ULL])
+        {
+            // Generate destination points for the projection
+            // - Minimum angle "ang_df" = 10 deg --> tand(80°) = 5.7
+            double d = len_d + 5.7 * radius_d;
+            for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+            {
+                p_dest[i_edge] = p_orig[i_edge] + d * dx;
+                p_dest[i_edge + n_edges] = p_orig[i_edge + n_edges] + d * dy;
+                p_dest[i_edge + 2ULL * n_edges] = p_orig[i_edge + 2ULL * n_edges] + d * dz;
+            }
+
+            // Build a projection plane (triangle) to calculate the destination points of the tube
+            // - Triangle has an inner radius of "0.5 * radius"
+            // - When hitting at an incident angle of 10°, we need to scale by at lest 0.5 / sin(10°) = 2.9
+            d = 20.0 * radius_d;
+            arma::mat proj_plane = {d * gx + x1, d * gy + y1, d * gz + z1,
+                                    d * (hx - gx) + x1, d * (hy - gy) + y1, d * (hz - gz) + z1,
+                                    d * (-hx - gx) + x1, d * (-hy - gy) + y1, d * (-hz - gz) + z1};
+
+            // Calculate intersection points with the plane
+            quadriga_lib::ray_triangle_intersect(&orig, &dest, &proj_plane, &fbs);
+        }
+
+        // Write FBS coordinates to output
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            p_vert[i_vert] = (dtype)p_fbs[i_edge];
+            p_vert[i_vert + 1ULL] = (dtype)p_fbs[i_edge + n_edges];
+            p_vert[i_vert + 2ULL] = (dtype)p_fbs[i_edge + 2ULL * n_edges];
+            i_vert += 3ULL;
+        }
+
+        // Update "u" for the next segment by rotating it around "-g"
+        ang_df = dotp(dx, dy, dz, fx, fy, fz, true);
+        ang_df = std::acos(ang_df);
+        rotate_vector_around_axis(ux, uy, uz, -gx, -gy, -gz, ang_df, &ux, &uy, &uz, true);
+
+        // Build face matrix
+        for (arma::uword i_edge = 0ULL; i_edge < n_edges; ++i_edge)
+        {
+            arma::uword ind = 4ULL * (n_edges * i_seg + i_edge);
+            arma::uword offset = i_subseg[i_seg] * n_edges;
+            p_face[ind] = n_edges * i_seg + offset + i_edge;
+            p_face[ind + 1ULL] = n_edges * i_seg + offset + (i_edge + 1ULL) % n_edges;
+            p_face[ind + 2ULL] = n_edges * (i_seg + 1ULL) + offset + (i_edge + 1ULL) % n_edges;
+            p_face[ind + 3ULL] = n_edges * (i_seg + 1ULL) + offset + i_edge;
+        }
+    }
+}
+
+template void quadriga_lib::path_to_tube(const arma::Mat<float> *path_coord, arma::Mat<float> *vert, arma::umat *faces,
+                                         float radius, arma::uword n_edges);
+
+template void quadriga_lib::path_to_tube(const arma::Mat<double> *path_coord, arma::Mat<double> *vert, arma::umat *faces,
+                                         double radius, arma::uword n_edges);
