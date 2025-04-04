@@ -17,7 +17,7 @@
 
 #include "mex.h"
 #include "quadriga_arrayant.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -103,10 +103,10 @@ arguments are then specific to this type.
 
 - **`spacing`**<br>
   Element spacing in [λ], scalar, default = 0.5
-  
+
 - **`Mg`**<br>
   Number of nested panels in a column, scalar, default = 1
-  
+
 - **`Ng`**<br>
   Number of nested panels in a row, scalar, default = 1
 
@@ -123,9 +123,9 @@ arguments are then specific to this type.
   `e_phi_im_c`       | Imaginary part of e-phi field component          | Size: `[n_elevation, n_azimuth, n_elements_c]`
   `azimuth_grid_c`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
   `elevation_grid_c` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
-  
+
   If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
-  
+
 ## Output Arguments:
 - **Antenna data of the generated array antenna:** (outputs 1-11, double precision)
   `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
@@ -140,8 +140,6 @@ arguments are then specific to this type.
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
   `name`           | Name of the array antenna object                      | String
 MD!*/
-
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -288,4 +286,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (nlhs > 10)
         plhs[10] = mxCreateString(arrayant_double.name.c_str());
-}
+
+    }

@@ -239,7 +239,7 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
         throw std::invalid_argument("Location exceeds storage space in HDF file");
 
     // Write data to file
-    c.hdf5_write(fn, ix, iy, iz, iw);
+    quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw);
 
     return pybind11::array_t<unsigned>(4ULL, storage_space.memptr());
 }

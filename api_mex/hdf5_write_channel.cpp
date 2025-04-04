@@ -17,7 +17,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Channel functions
@@ -339,7 +339,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     int return_code = 0;
     try
     {
-        return_code = c.hdf5_write(fn, ix, iy, iz, iw);
+        return_code = quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw);
     }
     catch (const std::invalid_argument &ex)
     {

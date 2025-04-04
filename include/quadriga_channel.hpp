@@ -62,33 +62,28 @@ namespace quadriga_lib
         // Validate integrity
         std::string is_valid() const; // Returns an empty string if channel object is valid or an error message otherwise
 
+        // Add paths to an exisiting channel
+        // - If a field exists in the calling channel object, it must also be provided to the method
+        // - Number of transmit and receive antennas must match
+        void add_paths(arma::uword i_snap,                                      // Snapshot index to which the paths should be added
+                       const arma::Cube<dtype> *coeff_re_add = nullptr,         // Channel coefficients, real part, Cube of size [n_rx, n_tx, n_path_add]
+                       const arma::Cube<dtype> *coeff_im_add = nullptr,         // Channel coefficients, imaginary part, Cube of size [n_rx, n_tx, n_path_add]
+                       const arma::Cube<dtype> *delay_add = nullptr,            // Path delays in seconds, Cube of size [n_rx, n_tx, n_path_add] or [1, 1, n_path_add]
+                       const arma::u32_vec *no_interact_add = nullptr,          // Number of interaction coordinates, vector of length [n_path_add]
+                       const arma::Mat<dtype> *interact_coord_add = nullptr,    // Interaction coordinates, matrix of size [3, sum(no_interact)]
+                       const arma::Col<dtype> *path_gain_add = nullptr,         // Path gain before antenna patterns, vector of length [n_path_add]
+                       const arma::Col<dtype> *path_length_add = nullptr,       // Absolute path length from TX to RX phase center, vector of length [n_path_add]
+                       const arma::Mat<dtype> *path_polarization_add = nullptr, // Polarization transfer function, Matrix of size [8, n_path_add], interleaved complex
+                       const arma::Mat<dtype> *path_angles_add = nullptr,       // Departure and arrival angles, Matrix of size [n_path_add, 4], {AOD, EOD, AOA, EOA}
+                       const arma::Mat<dtype> *path_fbs_pos_add = nullptr,      // First-bounce scatterer positions, Matrix of size [3, n_path_add]
+                       const arma::Mat<dtype> *path_lbs_pos_add = nullptr);     // Last-bounce scatterer positions, Matrix of size [3, n_path_add]
+
         // Calculate the the effective path gain (linear scale)
         // - sum up the power of all paths and average over the transmit and receive antennas
         // - if coeff_re/im are not available, use path_gain/polarization instead (assume ideal XPOL antennas)
         // - throws an error if neither coeff_re/im nor path_polarization is available
         // - returns one value for each snapshot (vector with n_snap elements)
         arma::Col<dtype> calc_effective_path_gain(bool assume_valid = false) const;
-
-        // Save data to HDF file
-        // - All data is stored in single precision
-        // - Data is added to the end of the file
-        // - The index is updated to include to the newly written data
-        // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
-        // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
-        // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
-        int hdf5_write(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, bool assume_valid = false) const;
-
-        // Export the path data to a Wavefront OBJ file, e.g. for visualization in Blender
-        // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-        void export_obj_file(std::string fn,               // Filename of the OBJ file
-                             size_t max_no_paths = 0,      // Maximum number of paths to be shown, Default: all
-                             dtype gain_max = -60.0,       // Maximum path gain in dB (only for color-coding)
-                             dtype gain_min = -140.0,      // Minimum path gain in dB (only for color-coding and path selection)
-                             std::string colormap = "jet", // Colormap for the visualization
-                             arma::uvec i_snap = {},       // Snapshot indices, 0-based, empty = export all
-                             dtype radius_max = 0.05,      // Maximum tube radius in meters
-                             dtype radius_min = 0.01,      // Minimum tube radius in meters
-                             size_t n_edges = 5) const;    // Number of vertices in the circle building the tube, must be >= 3
     };
 
     // Function to obtain the HDF5 library version
@@ -113,8 +108,34 @@ namespace quadriga_lib
     //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
     int any_type_id(const std::any *data, unsigned long long *dims = nullptr, void **dataptr = nullptr);
 
+    // Export the path data to a Wavefront OBJ file, e.g. for visualization in Blender
+    // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
+    template <typename dtype>                                    // Float or double
+    void export_obj_file(const quadriga_lib::channel<dtype> *ch, // Channel object
+                         std::string fn,                         // Filename of the OBJ file
+                         arma::uword max_no_paths = 0,           // Maximum number of paths to be shown, Default: all
+                         dtype gain_max = -60.0,                 // Maximum path gain in dB (only for color-coding)
+                         dtype gain_min = -140.0,                // Minimum path gain in dB (only for color-coding and path selection)
+                         std::string colormap = "jet",           // Colormap for the visualization
+                         arma::uvec i_snap = {},                 // Snapshot indices, 0-based, empty = export all
+                         dtype radius_max = 0.05,                // Maximum tube radius in meters
+                         dtype radius_min = 0.01,                // Minimum tube radius in meters
+                         arma::uword n_edges = 5);               // Number of vertices in the circle building the tube, must be >= 3
+
     // Create a new channel HDF file and set the index to given storage layout
     void hdf5_create(std::string fn, unsigned nx = 65536, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
+
+    // Save data to HDF file (stand alone function)
+    // - All data is stored in single precision
+    // - Data is added to the end of the file
+    // - The index is updated to include to the newly written data
+    // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
+    // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
+    // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
+    template <typename dtype> // Float or double
+    int hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string fn,
+                   unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
+                   bool assume_valid = false);
 
     // Read storage layout from HDF file
     // - Output will be a 4-element vector

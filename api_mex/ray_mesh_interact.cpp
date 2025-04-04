@@ -15,6 +15,10 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
+#include "mex.h"
+#include "quadriga_tools.hpp"
+#include "mex_helper_functions.hpp"
+
 /*!SECTION
 Site-Specific Simulation Tools
 SECTION!*/
@@ -182,10 +186,6 @@ permittivity (ϵ) and the conductivity (σ). The five parameters returned in `mt
   15 |  yes |  yes |   yes |    yes |     no |     no |    no |     yes |    no | Edge Hit, i-o, TR
   
 MD!*/
-
-#include "mex.h"
-#include "quadriga_tools.hpp"
-#include "mex_helper_functions.cpp"
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {

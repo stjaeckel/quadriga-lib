@@ -124,7 +124,7 @@ TEST_CASE("HDF - Minimal Test")
 
     std::remove("test.hdf5");
     quadriga_lib::hdf5_create("test.hdf5", 10);
-    c.hdf5_write("test.hdf5", 1);
+    quadriga_lib::hdf5_write(&c, "test.hdf5", 1);
 
     auto ChanelDims = quadriga_lib::hdf5_read_layout("test.hdf5");
     CHECK(ChanelDims.n_elem == 4);
@@ -360,7 +360,7 @@ TEST_CASE("HDF - Minimal Test")
         c.par_data.push_back(t);
     }
 
-    c.hdf5_write("test.hdf5", 7);
+    quadriga_lib::hdf5_write(&c, "test.hdf5", 7);
 
     // Read names of the unstructured data fields
     std::vector<std::string> names;

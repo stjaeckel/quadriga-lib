@@ -18,7 +18,7 @@
 #include "mex.h"
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_functions.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Array antenna functions

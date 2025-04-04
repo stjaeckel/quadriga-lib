@@ -212,11 +212,14 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                 arma::Mat<dtype> I = arma::reshape(tmp, n_azimuth, n_elevation);
                 I = I.t() * deg2rad;
 
-                e_theta_re->slice(el) = R % cos(I);
-                e_theta_im->slice(el) = R % sin(I);
+                arma::Mat<dtype> tmp = R % arma::cos(I);
+                std::memcpy(e_theta_re->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+
+                tmp = R % arma::sin(I);
+                std::memcpy(e_theta_im->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
             }
             else
-                e_theta_re->slice(el) = R;
+                std::memcpy(e_theta_re->slice_memptr(el), R.memptr(), R.n_elem * sizeof(dtype));
         }
 
         // Read magnitude if Horizontal Component
@@ -250,11 +253,14 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
                 arma::Mat<dtype> I = arma::reshape(tmp, n_azimuth, n_elevation);
                 I = I.t() * deg2rad;
 
-                e_phi_re->slice(el) = R % cos(I);
-                e_phi_im->slice(el) = R % sin(I);
+                arma::Mat<dtype> tmp = R % arma::cos(I);
+                std::memcpy(e_phi_re->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+
+                tmp = R % arma::sin(I);
+                std::memcpy(e_phi_im->slice_memptr(el), tmp.memptr(), tmp.n_elem * sizeof(dtype));
             }
             else
-                e_phi_re->slice(el) = R;
+                std::memcpy(e_phi_re->slice_memptr(el), R.memptr(), R.n_elem * sizeof(dtype));
         }
     }
 
@@ -393,7 +399,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     node_arrayant.append_child("name").text().set(name->c_str());
     node_arrayant.append_child("CenterFrequency").text().set(*center_frequency);
 
-    unsigned long long NoElements = e_theta_re->n_slices;
+    arma::uword NoElements = e_theta_re->n_slices;
     if (NoElements > 1)
         node_arrayant.append_child("NoElements").text().set(NoElements);
 
@@ -413,7 +419,6 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     }
 
     const dtype rad2deg = dtype(57.295779513082323);
-    const dtype ten = dtype(10.0);
 
     // Elevation grid
     arma::Row<dtype> row_vec_tmp = elevation_grid->t() * rad2deg;
@@ -465,17 +470,44 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         }
     }
 
+    // Lambda to calculate the power and check if the pattern has any entry > -200 dB
+    auto calc_power = [](const dtype *Re, const dtype *Im, dtype *pow, arma::uword n_elem, dtype th = dtype(-200.0)) -> bool
+    {
+        bool has_power = false;
+        for (arma::uword i = 0ULL; i < n_elem; ++i)
+        {
+            dtype p = Re[i] * Re[i] + Im[i] * Im[i];
+            p = dtype(10.0) * std::log10(p);
+            pow[i] = p;
+            if (p > th)
+                has_power = true;
+        }
+        return has_power;
+    };
+
+    auto calc_phase = [](const dtype *Re, const dtype *Im, dtype *phase, arma::uword n_elem, dtype th = dtype(0.001)) -> bool
+    {
+        bool has_phase = false;
+        for (arma::uword i = 0ULL; i < n_elem; ++i)
+        {
+            dtype p = std::atan2(Im[i], Re[i]) * dtype(57.295779513082323);
+            phase[i] = p;
+            if (std::abs(p) > th)
+                has_phase = true;
+        }
+        return has_phase;
+    };
+
     // Write filed components
     auto write_e_field = [&](const arma::Cube<dtype> *eRe, const arma::Cube<dtype> *eIm, const std::string eName)
     {
         pugi::xml_node node_pat;
         for (auto i = 0ULL; i < NoElements; ++i)
         {
-            arma::Mat<dtype> mat_tmp = arma::square(eRe->slice(i)) + arma::square(eIm->slice(i));
-            mat_tmp.transform([ten](dtype x)
-                              { return ten * std::log10(x); });
 
-            bool valid = arma::any(arma::vectorise(mat_tmp) > dtype(-200.0));
+            arma::uword n_links = eRe->n_rows * eRe->n_cols;
+            arma::Mat<dtype> mat_tmp(eRe->n_rows, eRe->n_cols, arma::fill::none);
+            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links);
 
             if (valid) // Write magnitude
             {
@@ -490,10 +522,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             }
 
             if (valid) // Calculate phase
-            {
-                mat_tmp = arma::atan2(eIm->slice(i), eRe->slice(i)) * rad2deg;
-                valid = arma::any(arma::vectorise(arma::abs(mat_tmp)) > dtype(0.001));
-            }
+                valid = calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links);
 
             if (valid) // Write phase
             {

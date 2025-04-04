@@ -141,5 +141,6 @@
         "__string": "cpp",
         "filesystem": "cpp",
         "__config": "cpp"
-    }
+    },
+    "git.ignoreLimitWarning": true
 }

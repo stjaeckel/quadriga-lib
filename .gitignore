@@ -1,4 +1,5 @@
 build/*
+build_*/*
 lib/*
 .vscode/*
 +quadriga_lib/*.mex*

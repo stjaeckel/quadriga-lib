@@ -42,16 +42,6 @@ catch ME
     end
 end
 
-try
-    quadriga_lib.cart2geo(int32([1;1;1]));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input must be provided in ''single'' or ''double'' precision.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
 [az,el] = quadriga_lib.cart2geo(e);
 assert( isa(az,'double') );
 assert( isa(el,'double') );

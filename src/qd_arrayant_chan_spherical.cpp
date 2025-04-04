@@ -761,10 +761,14 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
     // Set the true LOS path as the first path
     if (add_fake_los_path && true_los_path != 0)
     {
-        std::memcpy(p_coeff_re, CR.slice_memptr(true_los_path), n_links_t * sizeof(dtype));
-        std::memcpy(p_coeff_im, CI.slice_memptr(true_los_path), n_links_t * sizeof(dtype));
-        CR.slice(true_los_path).zeros();
-        CI.slice(true_los_path).zeros();
+        dtype *ptrR = CR.slice_memptr(true_los_path);
+        dtype *ptrI = CI.slice_memptr(true_los_path);
+
+        std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
+        std::memcpy(p_coeff_im, ptrI, n_links * sizeof(dtype));
+
+        for (arma::uword i = 0ULL; i < n_links; ++i)
+            ptrR[i] = zero, ptrI[i] = zero;
     }
 }
 

@@ -17,7 +17,7 @@
 
 #include "mex.h"
 #include "quadriga_tools.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Miscellaneous / Tools

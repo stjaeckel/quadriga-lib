@@ -2,7 +2,6 @@
 
 # Steps for compiling Quadriga-Lib (Linux):
 # - Get required tools and libraries: make, cmake, g++
-# - Compile HDF5 library by "make hdf5lib"
 # - Set MATLAB path below (or leave empty)
 # - Run "make"
 
@@ -25,41 +24,6 @@ pybind11_version  = 2.12.0
 
 # The following sections should not require editing.
 
-# Autodetect MATLAB path
-ifeq ($(MATLAB_PATH),)
-	MATLAB_PATH := $(shell readlink -f $(shell readlink -f $(shell which matlab)) | sed 's/\/bin\/matlab//')
-endif
-
-# Conditional compilation of MATLAB targets 
-ifneq ($(MATLAB_PATH),)
-ifeq ($(CUDA_PATH),)
-	MATLAB_TARGETS = mex_matlab
-else
-	MATLAB_TARGETS = mex_matlab   mex_matlab_cuda
-endif
-endif
-
-# Check if Octave is installed by trying to run mkoctfile
-OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
-
-# Conditional compilation of Octave targets
-ifneq ($(OCTAVE_VERSION),)
-ifeq ($(CUDA_PATH),)
-	OCTAVE_TARGETS = mex_octave
-else
-	OCTAVE_TARGETS = mex_octave   mex_octave_cuda
-endif
-endif
-
-# Autodetect the Python include path
-PYTHON_H = $(shell python3 -c "from sysconfig import get_paths as gp; print(gp()['include'])")
-ifeq ($(wildcard $(PYTHON_H)/Python.h),)
-    PYTHON_H =
-else
-	PYTHON_EXTENSION_SUFFIX = $(shell python3-config --extension-suffix)
-	PYTHON_TARGET = lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX)
-endif
-
 # Compilers
 CC   = g++
 MEX  = $(MATLAB_PATH)/bin/mex
@@ -70,6 +34,9 @@ ARMA_H      = external/armadillo-$(armadillo_version)/include
 PUGIXML_H   = external/pugixml-$(pugixml_version)/src
 CATCH2      = external/Catch2-$(catch2_version)-Linux
 PYBIND11_H  = external/pybind11-$(pybind11_version)/include
+
+# Compiler flags
+CCFLAGS     = -std=c++17 -O3 -fPIC -fopenmp -Wall -Wconversion -Wpedantic -Wextra
 
 # Linking options for HDF5 library
 ifeq ($(hdf5_version),) # Dynamic linking
@@ -84,19 +51,43 @@ else # Static linking
 	HDF5_DYN    = 
 endif
 
-# Compiler flags (remove -Wextra to suppress unused variable warnings)
-CCFLAGS     = -std=c++17 -O3 -fPIC -Wall -Wconversion -Wpedantic #-Wextra  
+# List of API functions for MATLAB / Octave
+api_mex = $(wildcard api_mex/*.cpp)
 
-# Compilations targets
+# Check if MATLAB is installed and derive MATLAB API file names
+ifeq ($(MATLAB_PATH),)
+	MATLAB_PATH := $(shell readlink -f $(shell readlink -f $(shell which matlab)) | sed 's/\/bin\/matlab//')
+endif
+ifneq ($(MATLAB_PATH),)
+	MATLAB_TARGETS = $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mexa64)
+endif
+
+# Check if Octave is installed and derive Octave API file names
+OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
+ifneq ($(OCTAVE_VERSION),)
+	OCTAVE_TARGETS = $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mex)
+endif
+
+# Autodetect the Python include path
+api_python = $(wildcard api_python/*.cpp)
+
+PYTHON_H = $(shell python3 -c "from sysconfig import get_paths as gp; print(gp()['include'])")
+ifeq ($(wildcard $(PYTHON_H)/Python.h),)
+    PYTHON_H =
+else
+	PYTHON_EXTENSION_SUFFIX = $(shell python3-config --extension-suffix)
+	PYTHON_TARGET = lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX)
+endif
+
+# Compilation targets
 .PHONY: dirs
-all:        
+all:
 	@$(MAKE) dirs
-	@$(MAKE) lib/quadriga_lib.a   $(CUDA_A)   $(MATLAB_TARGETS)   $(OCTAVE_TARGETS)   $(PYTHON_TARGET)
+	@$(MAKE) lib/libquadriga.a   $(PYTHON_TARGET)   $(OCTAVE_TARGETS)   $(MATLAB_TARGETS)
 
-src     	= $(wildcard src/*.cpp)
-api_mex     = $(wildcard api_mex/*.cpp)
-api_python  = $(wildcard api_python/*.cpp)
-tests 		= $(wildcard tests/catch2_tests/*.cpp)
+python: 
+	@$(MAKE) dirs
+	@$(MAKE) $(PYTHON_TARGET)
 
 dirs:
 	mkdir -p build
@@ -104,11 +95,24 @@ dirs:
 	mkdir -p +quadriga_lib
 	mkdir -p release
 
-mex_matlab:      $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mexa64)
-mex_octave:      $(api_mex:api_mex/%.cpp=+quadriga_lib/%.mex)
-mex_docu:        $(api_mex:api_mex/%.cpp=+quadriga_lib/%.m)
+lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/libquadriga.a   $(api_python)
+	$(CC) -shared $(CCFLAGS) $< lib/libquadriga.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
 
-test:   all   tests/test_bin
+# Use cmake to compile
+cmake:
+	cmake -B build_linux -D CMAKE_INSTALL_PREFIX=.
+	cmake --build build_linux -j32 
+	cmake --install build_linux
+
+cmake_static:
+	cmake -B build_linux_static -D HDF5_STATIC_LINK=ON -D CMAKE_INSTALL_PREFIX=.
+	cmake --build build_linux_static -j32 
+	cmake --install build_linux_static
+
+# Tests
+tests 		= $(wildcard tests/catch2_tests/*.cpp)
+
+test:   tests/test_bin
 	tests/test_bin
 ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
@@ -117,207 +121,47 @@ ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests -x -s
 endif
 
-test_catch2:    lib/quadriga_lib.a   tests/test_bin
+test_static:     tests/test_static_bin
+	tests/test_static_bin
+
+test_catch2:    lib/libquadriga.a   tests/test_bin
 	tests/test_bin
 
-tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/quadriga_lib.a   $(tests)
-	$(CC) -std=c++17 $< lib/quadriga_lib.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
+tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/libquadriga.a   $(tests)
+	$(CC) -std=c++17 $< lib/libquadriga.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
 
-tests/test_cuda_bin:   tests/quadriga_lib_catch2_cuda_tests.cpp   lib/quadriga_lib.a   $(CUDA_A)   $(tests)
-	$(CC) -std=c++17 $< lib/quadriga_lib.a $(CUDA_A) -o $@ -Iinclude -I$(ARMA_H) -I$(CATCH2)/include -L$(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN) $(NV_LIB)
+tests/test_static_bin:   tests/quadriga_lib_catch2_tests.cpp   $(tests)
+	$(CC) -std=c++17 $< lib/libquadriga.a lib/libhdf5.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl
 
-# Individual quadriga-lib objects
-build/calc_diffraction_gain.o:   src/calc_diffraction_gain.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
+# C++ object files
+build/%.o:   src/%.cpp
+	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H) -I $(HDF5_H)
 
-build/qd_arrayant.o:   src/qd_arrayant.cpp   include/quadriga_arrayant.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_arrayant_qdant.o:   src/qd_arrayant_qdant.cpp   src/qd_arrayant_functions.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H)
-
-build/qd_arrayant_interpolate.o:   src/qd_arrayant_interpolate.cpp   src/qd_arrayant_functions.hpp
-	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_arrayant_generate.o:   src/qd_arrayant_generate.cpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_arrayant_chan_spherical.o:   src/qd_arrayant_chan_spherical.cpp
-	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_arrayant_chan_planar.o:   src/qd_arrayant_chan_planar.cpp
-	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_arrayant_chan_irs.o:   src/qd_arrayant_chan_irs.cpp
-	$(CC) -fopenmp $(CCFLAGS)  -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/baseband_freq_response.o:   src/baseband_freq_response.cpp   include/quadriga_channel.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/qd_channel.o:   src/qd_channel.cpp   include/quadriga_channel.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(HDF5_H)
-
-build/quadriga_lib.o:   src/quadriga_lib.cpp   include/quadriga_lib.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/quadriga_tools.o:   src/quadriga_tools.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/obj_overlap_test.o:   src/obj_overlap_test.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/generate_diffraction_paths.o:   src/generate_diffraction_paths.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/icosphere.o:   src/icosphere.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/obj_file_read.o:   src/obj_file_read.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/path_to_tube.o:   src/path_to_tube.cpp   include/quadriga_tools.hpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) 
-
-build/ray_mesh_interact.o:   src/ray_mesh_interact.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/ray_point_intersect.o:   src/ray_point_intersect.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-build/ray_triangle_intersect.o:   src/ray_triangle_intersect.cpp   include/quadriga_tools.hpp
-	$(CC) -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H)
-
-# AVX2 library files
-build/quadriga_lib_test_avx.o:   src/quadriga_lib_test_avx.cpp   src/quadriga_lib_test_avx.hpp
-	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src 
-
-build/ray_triangle_intersect_avx2.o:   src/ray_triangle_intersect_avx2.cpp   src/ray_triangle_intersect_avx2.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src -I $(ARMA_H)
-
-build/ray_point_intersect_avx2.o:   src/ray_point_intersect_avx2.cpp   src/ray_point_intersect_avx2.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src
-
-build/baseband_freq_response_avx2.o:   src/baseband_freq_response_avx2.cpp   src/baseband_freq_response_avx2.hpp
-	$(CC) -mavx2 -mfma -fopenmp $(CCFLAGS) -c $< -o $@ -I src
+# C++ object files with AVX acceleration
+build/%_avx2.o:   src/%_avx2.cpp
+	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I $(ARMA_H)
 
 # Archive file for static linking
+src_cpp = $(wildcard src/*.cpp)
+
 build/libhdf5.a:
 	cp external/hdf5-$(hdf5_version)-Linux/lib/libhdf5.a build/
 	( cd build/ && ar x libhdf5.a && cd .. )
 
-lib/quadriga_lib.a:   $(HDF5_STATIC)   build/quadriga_lib.o  build/quadriga_lib_test_avx.o  build/qd_arrayant.o  build/qd_channel.o   \
-                      build/quadriga_tools.o   build/qd_arrayant_generate.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-					  build/qd_arrayant_chan_spherical.o   build/qd_arrayant_chan_planar.o   build/qd_arrayant_chan_irs.o   \
-					  build/calc_diffraction_gain.o   build/ray_triangle_intersect.o  build/ray_triangle_intersect_avx2.o   build/ray_mesh_interact.o \
-					  build/ray_point_intersect.o   build/baseband_freq_response.o  build/ray_point_intersect_avx2.o   \
-					  build/baseband_freq_response_avx2.o   build/obj_overlap_test.o   build/generate_diffraction_paths.o   \
-					  build/icosphere.o   build/obj_file_read.o   build/path_to_tube.o
-		ar rcs $@ $^ $(HDF5_OBJ)
-
-build/%_link.o:   build/%.o
-	$(NVCC) -dlink $< -o $@
-
-# Python interface
-python: 
-	@$(MAKE) dirs
-	@$(MAKE) $(PYTHON_TARGET)
-
-lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/quadriga_lib.a $(api_python)
-	$(CC) -shared $(CCFLAGS) $< lib/quadriga_lib.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
-
-# Dependencies
-dep_tools    = build/quadriga_tools.o   build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-
-dep_channel  = build/qd_channel.o   build/path_to_tube.o
-
-dep_arrayant = build/qd_arrayant.o   build/qd_arrayant_generate.o   build/qd_arrayant_interpolate.o   build/qd_arrayant_qdant.o   \
-				build/qd_arrayant_chan_spherical.o   build/qd_arrayant_chan_planar.o   build/qd_arrayant_chan_irs.o   build/icosphere.o   $(dep_tools)
+lib/libquadriga.a:   $(src_cpp:src/%.cpp=build/%.o)   $(HDF5_STATIC)
+			ar rcs $@ $^ $(HDF5_OBJ)
 
 # MEX MATLAB interface
-+quadriga_lib/arrayant_calc_directivity.mexa64:   $(dep_arrayant)
-+quadriga_lib/arrayant_combine_pattern.mexa64:    $(dep_arrayant)
-+quadriga_lib/arrayant_generate.mexa64:           $(dep_arrayant)
-+quadriga_lib/arrayant_interpolate.mexa64:        $(dep_arrayant)
-+quadriga_lib/arrayant_qdant_read.mexa64:         $(dep_arrayant)
-+quadriga_lib/arrayant_qdant_write.mexa64:        $(dep_arrayant)
-+quadriga_lib/arrayant_rotate_pattern.mexa64:     $(dep_arrayant)
-+quadriga_lib/baseband_freq_response.mexa64:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
-+quadriga_lib/calc_diffraction_gain.mexa64:       $(dep_tools)   build/calc_diffraction_gain.o   build/ray_mesh_interact.o   build/generate_diffraction_paths.o
-+quadriga_lib/calc_rotation_matrix.mexa64:        $(dep_tools)
-+quadriga_lib/cart2geo.mexa64:                    $(dep_tools)
-+quadriga_lib/channel_export_obj_file.mexa64:     $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/generate_diffraction_paths.mexa64:  $(dep_tools)   build/generate_diffraction_paths.o
-+quadriga_lib/geo2cart.mexa64:                    $(dep_tools)
-+quadriga_lib/get_channels_planar.mexa64:         $(dep_arrayant)
-+quadriga_lib/get_channels_spherical.mexa64:      $(dep_arrayant)
-+quadriga_lib/hdf5_create_file.mexa64:            $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_channel.mexa64:           $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset.mexa64:              $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset_names.mexa64:        $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_layout.mexa64:            $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_reshape_layout.mexa64:         $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_channel.mexa64:          $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_dset.mexa64:             $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_version.mexa64:                $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/icosphere.mexa64:                   $(dep_tools)   build/icosphere.o
-+quadriga_lib/interp.mexa64:                      $(dep_tools)
-+quadriga_lib/obj_file_read.mexa64:               $(dep_tools)   build/obj_file_read.o
-+quadriga_lib/point_cloud_aabb.mexa64:            $(dep_tools)
-+quadriga_lib/point_cloud_segmentation.mexa64:    $(dep_tools)
-+quadriga_lib/ray_mesh_interact.mexa64:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mexa64:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   $(dep_tools)
-+quadriga_lib/ray_triangle_intersect.mexa64:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-+quadriga_lib/subdivide_triangles.mexa64:         $(dep_tools)
-+quadriga_lib/triangle_mesh_aabb.mexa64:          $(dep_tools)
-+quadriga_lib/triangle_mesh_segmentation.mexa64:  $(dep_tools)
-+quadriga_lib/version.mexa64:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
-
-+quadriga_lib/%.mexa64:   api_mex/%.cpp
++quadriga_lib/%.mexa64:   api_mex/%.cpp   lib/libquadriga.a
 	$(MEX) CXXFLAGS="$(CCFLAGS)" -outdir +quadriga_lib $^ -Isrc -Iinclude -I$(ARMA_H) -lgomp $(HDF5_DYN)
 
 # MEX Ocate interface
-+quadriga_lib/arrayant_calc_directivity.mex:   $(dep_arrayant)
-+quadriga_lib/arrayant_combine_pattern.mex:    $(dep_arrayant)
-+quadriga_lib/arrayant_generate.mex:           $(dep_arrayant)
-+quadriga_lib/arrayant_interpolate.mex:        $(dep_arrayant)
-+quadriga_lib/arrayant_qdant_read.mex:         $(dep_arrayant)
-+quadriga_lib/arrayant_qdant_write.mex:        $(dep_arrayant)
-+quadriga_lib/arrayant_rotate_pattern.mex:     $(dep_arrayant)
-+quadriga_lib/baseband_freq_response.mex:      build/baseband_freq_response.o   build/baseband_freq_response_avx2.o
-+quadriga_lib/calc_diffraction_gain.mex:       build/calc_diffraction_gain.o   $(dep_tools)   build/ray_mesh_interact.o   build/generate_diffraction_paths.o
-+quadriga_lib/calc_rotation_matrix.mex:        $(dep_tools)
-+quadriga_lib/cart2geo.mex:                    $(dep_tools)
-+quadriga_lib/channel_export_obj_file.mex:     $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/generate_diffraction_paths.mex:  $(dep_tools)   build/generate_diffraction_paths.o
-+quadriga_lib/geo2cart.mex:                    $(dep_tools)
-+quadriga_lib/get_channels_planar.mex:         $(dep_arrayant)
-+quadriga_lib/get_channels_spherical.mex:      $(dep_arrayant)
-+quadriga_lib/hdf5_create_file.mex:            $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_channel.mex:           $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset.mex:              $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_dset_names.mex:        $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_read_layout.mex:            $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_reshape_layout.mex:         $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_channel.mex:          $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_write_dset.mex:             $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/hdf5_version.mex:                $(dep_channel)   $(dep_tools)   $(HDF5_STATIC)
-+quadriga_lib/icosphere.mex:                   $(dep_tools)   build/icosphere.o
-+quadriga_lib/interp.mex:                      $(dep_tools)
-+quadriga_lib/obj_file_read.mex:               $(dep_tools)   build/obj_file_read.o
-+quadriga_lib/point_cloud_aabb.mex:            $(dep_tools)
-+quadriga_lib/point_cloud_segmentation.mex:    $(dep_tools)
-+quadriga_lib/ray_mesh_interact.mex:           build/ray_mesh_interact.o
-+quadriga_lib/ray_point_intersect.mex:         build/ray_point_intersect.o   build/ray_point_intersect_avx2.o   $(dep_tools)
-+quadriga_lib/ray_triangle_intersect.mex:      build/ray_triangle_intersect.o   build/ray_triangle_intersect_avx2.o
-+quadriga_lib/subdivide_triangles.mex:         $(dep_tools)
-+quadriga_lib/triangle_mesh_aabb.mex:          $(dep_tools)
-+quadriga_lib/triangle_mesh_segmentation.mex:  $(dep_tools)
-+quadriga_lib/version.mex:                     build/quadriga_lib.o   build/quadriga_lib_test_avx.o
-
-+quadriga_lib/%.mex:   api_mex/%.cpp
++quadriga_lib/%.mex:   api_mex/%.cpp   lib/libquadriga.a
 	CXXFLAGS="$(CCFLAGS)" $(OCT) --mex -o $@ $^ -Isrc -Iinclude -I$(ARMA_H) -s 
 
 # Documentation of MEX files
+mex_docu:   $(api_mex:api_mex/%.cpp=+quadriga_lib/%.m)
+
 +quadriga_lib/%.m:   api_mex/%.cpp
 	rm -f $@
 	python3 tools/extract_matlab_comments.py $< $@
@@ -380,13 +224,15 @@ clean:
 	- rm -rf external/build
 	- rm -rf external/Catch2-$(catch2_version)
 	- rm -rf external/hdf5-$(hdf5_version)
-	- rm +quadriga_lib/*.manifest
-	- rm +quadriga_lib/*.exp
-	- rm +quadriga_lib/*.lib
+	- rm -rf +quadriga_lib
+	- rm -rf release
+	- rm -rf lib
 	- rm *.obj
 	- rm tests/test_bin
-	- rm tests/test_cuda_bin
+	- rm tests/test_static_bin
+	- rm tests/test.exe
 	- rm -rf build
+	- rm -rf build*
 	- rm -rf tests/python_tests/__pycache__
 	- rm -rf .pytest_cache
 	- rm -rf tests/.pytest_cache
@@ -399,12 +245,8 @@ tidy: clean
 	- rm -rf external/pugixml-$(pugixml_version)
 	- rm -rf external/pybind11-$(pybind11_version)
 	- rm -rf external/MOxUnit-master
-	- rm -rf +quadriga_lib
-	- rm -rf release
-	- rm -rf lib
-	- rm tests/test.exe
 	
-build/quadriga-lib-version:   src/version.cpp   lib/quadriga_lib.a
+build/quadriga-lib-version:   src/bin/version.cpp   lib/libquadriga.a
 	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
 
 release:  all   build/quadriga-lib-version

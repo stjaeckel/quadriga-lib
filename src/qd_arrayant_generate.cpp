@@ -70,8 +70,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
     ant.e_theta_im.zeros(181, 361, 2);
     ant.e_phi_re.ones(181, 361, 2);
     ant.e_phi_im.zeros(181, 361, 2);
-    ant.e_phi_re.slice(0).zeros();
-    ant.e_theta_re.slice(1).zeros();
+
+    dtype zero = (dtype)0.0;
+    dtype *ptr0 = ant.e_phi_re.slice_memptr(0);
+    dtype *ptr1 = ant.e_theta_re.slice_memptr(1);
+    for (arma::uword i = 0ULL; i < 65341ULL; ++i)
+        ptr0[i] = zero, ptr1[i] = zero;
+
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
     ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
     ant.element_pos.zeros(3, 2);
@@ -108,8 +113,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
     ant.e_theta_im.zeros(181, 361, 1);
     ant.e_phi_re.zeros(181, 361, 1);
     ant.e_phi_im.zeros(181, 361, 1);
-    ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
-    ant.e_theta_re = arma::cos(dtype(0.999999) * ant.e_theta_re) * dtype(std::sqrt(1.499961));
+
+    arma::Mat<dtype> tmp = arma::repmat(ant.elevation_grid, 1, 361);
+    tmp = arma::cos(dtype(0.999999) * tmp) * dtype(std::sqrt(1.499961));
+    std::memcpy(ant.e_theta_re.slice_memptr(0), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -135,9 +143,7 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
 {
     quadriga_lib::arrayant<dtype> ant;
-
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
-    constexpr dtype scale = dtype(0.999999);
 
     ant.name = "half-wave-dipole";
     ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
@@ -146,9 +152,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
     ant.e_theta_im.zeros(181, 361, 1);
     ant.e_phi_re.zeros(181, 361, 1);
     ant.e_phi_im.zeros(181, 361, 1);
-    ant.e_theta_re.slice(0) = arma::repmat(ant.elevation_grid, 1, 361);
-    ant.e_theta_re = arma::cos(pih * arma::sin(scale * ant.e_theta_re)) / arma::cos(scale * ant.e_theta_re);
-    ant.e_theta_re = ant.e_theta_re * dtype(1.280968208215292);
+
+    arma::Mat<dtype> tmp = dtype(0.999999) * arma::repmat(ant.elevation_grid, 1, 361);
+    tmp = arma::cos(pih * arma::sin(tmp)) / arma::cos(tmp);
+    tmp = tmp * dtype(1.280968208215292);
+
+    std::memcpy(ant.e_theta_re.slice_memptr(0), tmp.memptr(), tmp.n_elem * sizeof(dtype));
+
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);

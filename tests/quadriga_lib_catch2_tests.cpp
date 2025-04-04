@@ -38,6 +38,7 @@
 #include "catch2_tests/test_channel_obj_export.cpp"
 #include "catch2_tests/test_obj_overlap.cpp"
 #include "catch2_tests/test_obj_file_read.cpp"
+#include "catch2_tests/test_get_channels_irs.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
