@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_test_avx.hpp"
+#include "quadriga_lib_test_avx2.hpp"
 
 // Template for time measuring:
 // #include <chrono>

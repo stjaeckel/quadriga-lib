@@ -18,6 +18,9 @@
 // A collection of small MEX helper functions to reduce copy and pasting code
 // Include this file in th mex-cpp files to use the functions
 
+#ifndef mex_helper_H
+#define mex_helper_H
+
 #include "mex.h"
 #include <string>
 #include <armadillo>
@@ -1460,3 +1463,5 @@ inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, unsigned long lo
     *input = arma::Cube<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
+
+#endif

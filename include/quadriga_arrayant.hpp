@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -204,6 +204,49 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eoa = nullptr);   // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+
+    // Calculate channels for Intelligent Reflective Surfaces (IRS)
+    // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
+    // - Requires 2 channel segments: (1) TX -> IRS and (2) IRS -> RX
+    // - Assumes a low-rank channel where the IRS creates additional multipath components
+    // - The IRS weights (phase shifts) are provided as Coupling matrix of the IRS array (column vectors)
+    // - Multiple columns in the Coupling matrix can be seen as multiple IRS codebook entries. Only one entry can be selected
+    // - Generates n_path_irs output paths where n_path_irs <= n_path_1 * n_path_2
+    // - By default the 'irs_array' for both, the receive (TX-IRS) and receive (IRS-RX) direction.
+    // - If different IRS patterns are required for the receive (IRS-RX) direction, a second IRS array can be supplied as optional input
+    // - Returns a vector of bools indicating which of the n_path_1 * n_path_2 paths are in the output
+    template <typename dtype>                                                         // Supported types: float or double
+    std::vector<bool> get_channels_irs(const arrayant<dtype> *tx_array,               // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
+                                       const arrayant<dtype> *rx_array,               // Receive array antenna with 'n_rx' elements (= ports after element coupling)
+                                       const arrayant<dtype> *irs_array,              // IRS array with 'n_irs' elements (only one port can be selected for channel generation)
+                                       dtype Tx, dtype Ty, dtype Tz,                  // Transmitter position in Cartesian coordinates
+                                       dtype Tb, dtype Tt, dtype Th,                  // Transmitter orientation (bank, tilt, head) in [rad]
+                                       dtype Rx, dtype Ry, dtype Rz,                  // Receiver position in Cartesian coordinates
+                                       dtype Rb, dtype Rt, dtype Rh,                  // Receiver orientation (bank, tilt, head) in [rad]
+                                       dtype Ix, dtype Iy, dtype Iz,                  // IRS position in Cartesian coordinates
+                                       dtype Ib, dtype It, dtype Ih,                  // IRS orientation (bank, tilt, head) in [rad]
+                                       const arma::Mat<dtype> *fbs_pos_1,             // First-bounce scatterer positions of TX-IRS paths, matrix of size [3, n_path_1]
+                                       const arma::Mat<dtype> *lbs_pos_1,             // Last-bounce scatterer positions of TX-IRS paths, matrix of size [3, n_path_1]
+                                       const arma::Col<dtype> *path_gain_1,           // Path gain (linear scale) of TX-IRS paths, vector of length [n_path_1]
+                                       const arma::Col<dtype> *path_length_1,         // Absolute path length from TX to IRS phase center, vector of length [n_path_1]
+                                       const arma::Mat<dtype> *M_1,                   // Polarization transfer matrix of TX-IRS paths, matrix of size [8, n_path_1]
+                                       const arma::Mat<dtype> *fbs_pos_2,             // First-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
+                                       const arma::Mat<dtype> *lbs_pos_2,             // Last-bounce scatterer positions of IRS-RX paths, matrix of size [3, n_path_2]
+                                       const arma::Col<dtype> *path_gain_2,           // Path gain (linear scale) of IRS-RX paths, vector of length [n_path_2]
+                                       const arma::Col<dtype> *path_length_2,         // Absolute path length from TX to IRS phase center, vector of length [n_path_2]
+                                       const arma::Mat<dtype> *M_2,                   // Polarization transfer matrix of IRS-RX paths, matrix of size [8, n_path_2]
+                                       arma::Cube<dtype> *coeff_re,                   // Output: Channel coefficients, real part, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *coeff_im,                   // Output: Channel coefficients, imaginary part, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *delay,                      // Output: Propagation delay in seconds, tensor of size [n_rx, n_tx, n_path_irs]
+                                       arma::uword i_irs = 0,                         // IRS codebook entry (= port number in the IRS array)
+                                       dtype threshold_dB = -140.0,                   // Threshold in dB relative to path gain below which paths are discarded from the output
+                                       dtype center_frequency = 0.0,                  // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
+                                       bool use_absolute_delays = false,              // Option: If true, the LOS delay is included for all paths
+                                       arma::Cube<dtype> *aod = nullptr,              // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *eod = nullptr,              // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *aoa = nullptr,              // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       arma::Cube<dtype> *eoa = nullptr,              // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path_irs]
+                                       const arrayant<dtype> *irs_array_2 = nullptr); // Optional input: Transmit IRS for the second segment with 'n_irs' elements
 
     // Calculate channel coefficients for planar waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)

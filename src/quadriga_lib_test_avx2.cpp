@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <immintrin.h>
-#include "quadriga_lib_test_avx.hpp"
+#include "quadriga_lib_test_avx2.hpp"
 
 // Perform a simple test calculation
 void quadriga_lib::avx2_test(const float *X, // Aligned memory, 16 floats

@@ -17,7 +17,7 @@
 
 #include "mex.h"
 #include "quadriga_tools.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Miscellaneous / Tools
@@ -78,29 +78,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (mxGetNumberOfElements(prhs[0]) == 0)
         mexErrMsgIdAndTxt("quadriga_lib:cart2geo:empty", "Input cannot be empty.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:IO_error", "Input must be provided in 'single' or 'double' precision.");
-
-    arma::fcube cart_single;
-    arma::cube cart_double;
-    arma::cube geo_double;
+    arma::cube cart = mxIsDouble(prhs[0]) ? qd_mex_reinterpret_Cube<double>(prhs[0]) : qd_mex_typecast_Cube<double>(prhs[0]);
+    arma::cube geo;
 
     try
     {
-        if (use_single)
-        {
-            cart_single = qd_mex_reinterpret_Cube<float>(prhs[0]);
-            geo_double = quadriga_lib::cart2geo(cart_single);
-        }
-        else
-        {
-            cart_double = qd_mex_reinterpret_Cube<double>(prhs[0]);
-            geo_double = quadriga_lib::cart2geo(cart_double);
-        }
+        geo = quadriga_lib::cart2geo(cart);
     }
     catch (const std::invalid_argument &ex)
     {
@@ -111,27 +94,55 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:cart2geo:unknown_error", "Unknown failure occurred. Possible memory corruption!");
     }
 
-    if (nlhs > 0 && use_single)
-    {
-        auto tmp = arma::conv_to<arma::fmat>::from(geo_double.slice(0));
-        plhs[0] = qd_mex_copy2matlab(&tmp);
-    }
-    else if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&geo_double.slice(0));
+    arma::uword n_elem = geo.n_rows * geo.n_cols;
 
-    if (nlhs > 1 && use_single)
+    if (mxIsSingle(prhs[0]))
     {
-        auto tmp = arma::conv_to<arma::fmat>::from(geo_double.slice(1));
-        plhs[1] = qd_mex_copy2matlab(&tmp);
-    }
-    else if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&geo_double.slice(1));
+        arma::fmat azimuth, elevation, length;
 
-    if (nlhs > 2 && use_single)
-    {
-        auto tmp = arma::conv_to<arma::fmat>::from(geo_double.slice(2));
-        plhs[2] = qd_mex_copy2matlab(&tmp);
+        if (nlhs > 0)
+        {
+            plhs[0] = qd_mex_init_output(&azimuth, geo.n_rows, geo.n_cols);
+            float *ptrO = azimuth.memptr();
+            double *ptrI = geo.slice_memptr(0);
+            for (arma::uword i = 0ULL; i < n_elem; ++i)
+                ptrO[i] = (float)ptrI[i];
+        }
+        if (nlhs > 1)
+        {
+            plhs[1] = qd_mex_init_output(&elevation, geo.n_rows, geo.n_cols);
+            float *ptrO = elevation.memptr();
+            double *ptrI = geo.slice_memptr(1);
+            for (arma::uword i = 0ULL; i < n_elem; ++i)
+                ptrO[i] = (float)ptrI[i];
+        }
+        if (nlhs > 2)
+        {
+            plhs[2] = qd_mex_init_output(&length, geo.n_rows, geo.n_cols);
+            float *ptrO = length.memptr();
+            double *ptrI = geo.slice_memptr(2);
+            for (arma::uword i = 0ULL; i < n_elem; ++i)
+                ptrO[i] = (float)ptrI[i];
+        }
     }
-    else if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&geo_double.slice(2));
+    else // Return double
+    {
+        arma::mat azimuth, elevation, length;
+
+        if (nlhs > 0)
+        {
+            plhs[0] = qd_mex_init_output(&azimuth, geo.n_rows, geo.n_cols);
+            std::memcpy(azimuth.memptr(), geo.slice_memptr(0), n_elem * sizeof(double));
+        }
+        if (nlhs > 1)
+        {
+            plhs[1] = qd_mex_init_output(&elevation, geo.n_rows, geo.n_cols);
+            std::memcpy(elevation.memptr(), geo.slice_memptr(1), n_elem * sizeof(double));
+        }
+        if (nlhs > 2)
+        {
+            plhs[2] = qd_mex_init_output(&length, geo.n_rows, geo.n_cols);
+            std::memcpy(length.memptr(), geo.slice_memptr(2), n_elem * sizeof(double));
+        }
+    }
 }

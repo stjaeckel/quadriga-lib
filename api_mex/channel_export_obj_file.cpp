@@ -17,7 +17,7 @@
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
-#include "mex_helper_functions.cpp"
+#include "mex_helper_functions.hpp"
 
 /*!SECTION
 Channel functions
@@ -153,7 +153,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     try
     {
-        c.export_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap, radius_max, radius_min, n_edges);
+        quadriga_lib::export_obj_file(&c, fn, max_no_paths, gain_max, gain_min, colormap, i_snap, radius_max, radius_min, n_edges);
     }
     catch (const std::invalid_argument &ex)
     {
