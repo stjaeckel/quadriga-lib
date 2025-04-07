@@ -17,6 +17,10 @@
 
 #include "quadriga_tools.hpp"
 
+namespace arma {
+    thread_local std::mt19937_64 mt19937_64_instance;
+}
+
 // Cross product
 template <typename dtype>
 static inline void crossp(dtype vx, dtype vy, dtype vz,    // Vector V
