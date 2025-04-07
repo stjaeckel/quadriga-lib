@@ -27,7 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_4_0
+#define QUADRIGA_LIB_VERSION v0_4_1
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
@@ -39,6 +39,9 @@ namespace quadriga_lib
 {
     // Returns the version number as a string in format (x.y.z)
     std::string quadriga_lib_version();
+
+    // Returns the armadillo version used by quadriga-lib in format (x.y.z)
+    std::string quadriga_lib_armadillo_version();
 
     // Check if AVX2 is supported
     bool quadriga_lib_has_AVX2();

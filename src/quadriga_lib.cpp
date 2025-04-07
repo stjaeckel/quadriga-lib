@@ -66,6 +66,15 @@ std::string quadriga_lib::quadriga_lib_version()
     return str;
 }
 
+std::string quadriga_lib::quadriga_lib_armadillo_version()
+{
+    std::ostringstream versionStream;
+    versionStream << ARMA_VERSION_MAJOR << "."
+                  << ARMA_VERSION_MINOR << "."
+                  << ARMA_VERSION_PATCH;
+    return versionStream.str();
+}
+
 // Check if AVX2 is supported
 bool quadriga_lib::quadriga_lib_has_AVX2()
 {

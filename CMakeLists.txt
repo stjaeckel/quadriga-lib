@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(QuadrigaLib LANGUAGES C CXX)
 
-# Windows:
-# rmdir /s /q build_win
-# cmake -B build_win -D HDF5_STATIC_PATH=external/hdf5-1.14.2-win64
-
 # Option to enable MATLAB/Octace MEX compilation (default: ON)
 # For octave, make sure that 'mkoctfile' is installed and can be called
 option(ENABLE_MATLAB "Enable MATLAB MEX API" ON)
@@ -13,12 +9,19 @@ option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
 
 # Option to specify MATLAB path manually (leave empty for auto-detect)
-option(MATLAB_PATH "Path to MATLAB installation" "")
+option(MATLAB_PATH "Path to MATLAB" "")
 
-# If HDF5_STATIC_LINK is ON, we assume static linking (e.g. HDF5 version provided locally)
+# Path to the HDF5 library for static linking (include files and .a/.lib file)
+# If left empty, HDF location is detected automatically, if not found, HDF5 is built from sources
+option(HDF5_PATH "Location of the HDF5 library" "")
+
+# If HDF5_STATIC is ON, HDF5 is build from sources and statically linked
 # Static linking the HDF5 library may cause Octave to crash but usually works fine with MATLAB
-option(HDF5_STATIC_LINK "Link HDF5 statically" OFF)
-option(HDF5_STATIC_PATH "Location of the HDF5 library" "")
+option(HDF5_STATIC "Link HDF5 statically" OFF)
+
+# # Cmake tries to detect Armadillo include files on the system and link to these files.
+# # If Armadillo is not found, the version provided in the "external" folder is used instead.
+option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 
 # Versions for external libraries (adjust as needed)
 set(armadillo_version "14.2.2")
@@ -78,29 +81,49 @@ add_custom_command(
 )
 
 # Create a custom target for the unzip step.
-add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
 add_custom_target(pugixml_lib ALL DEPENDS ${PUGIXML_SRC_DIR}/.stamp)
 add_custom_target(pybind11_lib ALL DEPENDS ${PYBIND11_SRC_DIR}/.stamp)
+#add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
 
-# External include directories
-set(ARMA_H      "${ARMADILLO_SRC_DIR}/include")
 set(PUGIXML_H   "${PUGIXML_SRC_DIR}/src")
 set(PYBIND11_H  "${PYBIND11_SRC_DIR}/include")
+#set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
+
+# Options for armadillo
+if (ARMA_EXT)
+    add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
+    set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
+    set(ARMADILLO_FOUND OFF)
+else()
+    find_package(Armadillo)
+    if (NOT ARMADILLO_FOUND)
+        add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
+        set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
+    endif()
+endif()
+
+# External include directories
+message(STATUS "Armadillo Include dir: ${ARMADILLO_INCLUDE_DIRS}")
 
 # Components to build
-set(BUILD_HDF5 ${HDF5_STATIC_LINK})
+set(BUILD_HDF5 ${HDF5_STATIC})
 set(BUILD_MATLAB ${ENABLE_MATLAB})
 set(BUILD_OCTAVE ${ENABLE_OCTAVE})
 set(BUILD_MEX_DOC ${ENABLE_MEX_DOC})
 set(BUILD_PYTHON ${ENABLE_PYTHON})
 
-if (MSVC)
-    set(BUILD_PYTHON OFF)
+if (NOT ENABLE_PYTHON)
     set(BUILD_MEX_DOC OFF)
 endif()
 
+if (MSVC)
+    set(BUILD_PYTHON OFF)
+    set(BUILD_MEX_DOC OFF)
+    set(BUILD_OCTAVE OFF)
+endif()
+
 # Build instructions for HDF5 library
-if (NOT BUILD_HDF5)
+if (NOT HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
     find_package(HDF5 COMPONENTS C HL)
     if(HDF5_FOUND)
         get_filename_component(HDF5_LIB_DIR "${HDF5_LIBRARIES}" DIRECTORY)
@@ -109,48 +132,56 @@ if (NOT BUILD_HDF5)
     else()
         set(BUILD_HDF5 ON)
     endif()
+else()
+    set(HDF5_FOUND OFF)
 endif()
-if (BUILD_HDF5)
+
+if (HDF5_PATH OR BUILD_HDF5) # Disable Python and Octave
     if (BUILD_PYTHON)
         message(STATUS "Python API does not support static linking HDF5 library. Python disabled!")
         set(BUILD_PYTHON OFF)
     endif()
-    if (HDF5_STATIC_PATH)
-        get_filename_component(HDF5_STATIC_ABS_PATH "${HDF5_STATIC_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
-        set(HDF5_INCLUDE_DIRS "${HDF5_STATIC_PATH}/include")
-        if (MSVC)
-            set(HDF5_A "${HDF5_STATIC_ABS_PATH}/lib/libhdf5.lib")
-        else()
-            set(HDF5_A "${HDF5_STATIC_ABS_PATH}/lib/libhdf5.a")
-        endif()
-    else()
-        set(HDF5_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/include")
-        if (MSVC)
-            set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
-        else()
-            set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
-        endif()
-
-        set(HDF5_EP_ARGS
-            URL ${HDF5_ZIP}
-            BINARY_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_build"
-            INSTALL_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin"
-            CMAKE_ARGS
-                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                -DBUILD_SHARED_LIBS=OFF
-                -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF
-                -DBUILD_TESTING=OFF
-                -DHDF5_BUILD_TOOLS=OFF
-                -DHDF5_BUILD_EXAMPLES=OFF
-                -DHDF5_BUILD_HL_LIB=OFF
-        )
-
-        if(MSVC)
-            list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-        endif()
-
-        ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS})
+    if (BUILD_OCTAVE)
+        message(STATUS "Octave does not support static linking HDF5 library. Octave disabled!")
+        set(BUILD_OCTAVE OFF)
     endif()
+endif()
+
+if (HDF5_PATH) # Use given HDF5 location before building it
+    set(BUILD_HDF5 OFF)
+    get_filename_component(HDF5_PATH_ABSOLUTE "${HDF5_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+    set(HDF5_INCLUDE_DIRS "${HDF5_PATH}/include")
+    if (MSVC)
+        set(HDF5_A "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.lib")
+    else()
+        set(HDF5_A "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.a")
+    endif()
+endif()
+
+if (BUILD_HDF5)
+    set(HDF5_EP_ARGS
+        URL ${HDF5_ZIP}
+        BINARY_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_build"
+        INSTALL_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin"
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DBUILD_SHARED_LIBS=OFF
+            -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF
+            -DBUILD_TESTING=OFF
+            -DHDF5_BUILD_TOOLS=OFF
+            -DHDF5_BUILD_EXAMPLES=OFF
+            -DHDF5_BUILD_HL_LIB=OFF
+    )
+
+    if (MSVC)
+        list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
+    else()
+        set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
+    endif()
+    set(HDF5_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/include")
+
+    ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS})
 endif()
 
 # Detect MATLAB
@@ -172,10 +203,6 @@ else()
 endif()
 
 # Detect Ocatve
-if (MSVC AND BUILD_OCTAVE)
-    message(STATUS "Octave for Windows is not supported!")
-    set(BUILD_OCTAVE OFF)
-endif()
 if (BUILD_OCTAVE)
     find_program(MKOCTFILE_EXECUTABLE mkoctfile)
     if(MKOCTFILE_EXECUTABLE)
@@ -184,19 +211,12 @@ if (BUILD_OCTAVE)
         message(STATUS "Octave not found, Octave API disabled!")
         set(BUILD_OCTAVE OFF)
     endif()
-    if (BUILD_OCTAVE AND BUILD_HDF5)
-        message(STATUS "Octave is not compatible with statically linked HDF5 library. Octave compilation disabled!")
-        set(BUILD_OCTAVE OFF)
-    endif()
 else()
     message(STATUS "Octave disabled")
 endif()
 
 # Detect python
-if (NOT ENABLE_PYTHON)
-    set(BUILD_MEX_DOC OFF)
-endif()
-if (BUILD_PYTHON)
+if (BUILD_PYTHON OR BUILD_MEX_DOC)
     find_package(Python3 COMPONENTS Interpreter Development)
     if (NOT Python3_FOUND)
         set(BUILD_PYTHON OFF)
@@ -208,7 +228,7 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
-    ${ARMA_H}
+    ${ARMADILLO_INCLUDE_DIRS}
     ${PUGIXML_H}
     ${HDF5_INCLUDE_DIRS}
 )
@@ -231,24 +251,30 @@ endforeach()
 # Static library
 add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2})
 set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
-add_dependencies(quadriga_static armadillo_lib pugixml_lib pybind11_lib)
+add_dependencies(quadriga_static pugixml_lib pybind11_lib)
 
-if (BUILD_HDF5 AND NOT HDF5_STATIC_PATH)
+if (BUILD_HDF5 AND NOT HDF5_PATH)
     add_dependencies(quadriga_static hdf5_dep)
+endif()
+if (NOT ARMADILLO_FOUND)
+    add_dependencies(quadriga_static armadillo_lib)
 endif()
 
 # Shared library
-if (NOT BUILD_HDF5)
+if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
     add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2})
     set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
-    add_dependencies(quadriga_shared armadillo_lib pugixml_lib pybind11_lib)
+    add_dependencies(quadriga_shared pugixml_lib pybind11_lib)
+    if (NOT ARMADILLO_FOUND)
+        add_dependencies(quadriga_shared armadillo_lib)
+    endif()
 endif()
 
 # --- MATLAB API ---
 if(BUILD_MATLAB)
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
 
-    if (NOT HDF5_STATIC_LINK AND NOT MSVC)
+    if (HDF5_FOUND)
         set(HDF_L "-L${HDF5_LIB_DIR}")
         set(HDF_l "-lhdf5")
     endif()
@@ -266,7 +292,7 @@ if(BUILD_MATLAB)
                 COMMAND ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
                         COMPFLAGS="${MEX_CXXFLAGS}"
                         ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A} shlwapi.lib 
-                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMA_H}
+                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                 DEPENDS ${mex_src} quadriga_static
                 COMMENT "Building MATLAB MEX file ${mex_output}"
                 VERBATIM
@@ -278,7 +304,7 @@ if(BUILD_MATLAB)
                 OUTPUT ${mex_output}
                 COMMAND env CXXFLAGS="${MEX_CXXFLAGS}" ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
                         ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A}
-                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMA_H}
+                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         -lgomp ${HDF_L} ${HDF_l}
                 DEPENDS ${mex_src} quadriga_static
                 COMMENT "Building MATLAB MEX file ${mex_output}"
@@ -287,6 +313,7 @@ if(BUILD_MATLAB)
             list(APPEND MEX_MATLAB_TARGETS ${mex_output})
         endif()
     endforeach()
+
     if (NOT MSVC)
         add_custom_target(mex_matlab ALL DEPENDS ${MEX_MATLAB_TARGETS})
     endif()
@@ -306,7 +333,7 @@ if(BUILD_OCTAVE)
             OUTPUT ${octave_output}
             COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
                     ${mex_src} $<TARGET_FILE:quadriga_static>
-                    -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMA_H} -s
+                    -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
             DEPENDS ${mex_src} quadriga_static
             COMMENT "Building Octave MEX file ${octave_output}"
             VERBATIM
@@ -367,6 +394,9 @@ if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     message(STATUS "Using source dir as install dir")
 else()    
     install(DIRECTORY include/ DESTINATION include)
+    if (NOT ARMADILLO_FOUND)
+        install(DIRECTORY ${ARMADILLO_INCLUDE_DIRS} DESTINATION .)
+    endif()
 endif()
 
 install(TARGETS quadriga_static
@@ -374,7 +404,7 @@ install(TARGETS quadriga_static
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin)
 
-if (NOT BUILD_HDF5)
+if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
     install(TARGETS quadriga_shared
             ARCHIVE DESTINATION lib
             LIBRARY DESTINATION lib
@@ -392,6 +422,6 @@ if (BUILD_PYTHON)
         RUNTIME DESTINATION bin)
 endif()
 
-if (BUILD_HDF5)
+if (BUILD_HDF5 OR HDF5_PATH)
     install(FILES ${HDF5_A} DESTINATION lib)
 endif()

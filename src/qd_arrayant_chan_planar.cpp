@@ -195,14 +195,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         throw std::invalid_argument(error_message.c_str());
     }
 
-    arma::uword n_path = aod->n_elem;                            // Number of paths
-    arma::uword n_out = add_fake_los_path ? n_path + 1 : n_path; // Number of output paths
-    arma::uword n_tx = tx_array->e_theta_re.n_slices;            // Number of TX antenna elements before coupling
-    arma::uword n_rx = rx_array->e_theta_re.n_slices;            // Number of RX antenna elements before coupling
-    arma::uword n_links = n_rx * n_tx;                           // Number of MIMO channel coefficients per path (n_rx * n_tx)
-    arma::uword n_tx_ports = tx_array->n_ports();                // Number of TX antenna elements after coupling
-    arma::uword n_rx_ports = rx_array->n_ports();                // Number of RX antenna elements after coupling
-    arma::uword n_ports = n_tx_ports * n_rx_ports;               // Total number of ports
+    arma::uword n_path = aod->n_elem;                               // Number of paths
+    arma::uword n_out = add_fake_los_path ? n_path + 1ULL : n_path; // Number of output paths
+    arma::uword n_tx = tx_array->e_theta_re.n_slices;               // Number of TX antenna elements before coupling
+    arma::uword n_rx = rx_array->e_theta_re.n_slices;               // Number of RX antenna elements before coupling
+    arma::uword n_links = n_rx * n_tx;                              // Number of MIMO channel coefficients per path (n_rx * n_tx)
+    arma::uword n_tx_ports = tx_array->n_ports();                   // Number of TX antenna elements after coupling
+    arma::uword n_rx_ports = rx_array->n_ports();                   // Number of RX antenna elements after coupling
+    arma::uword n_ports = n_tx_ports * n_rx_ports;                  // Total number of ports
 
     // Check if the number of paths is consistent in all inputs
     if (n_path == 0ULL || eod->n_elem != n_path || aoa->n_elem != n_path || eoa->n_elem != n_path || path_gain->n_elem != n_path || path_length->n_elem != n_path || M->n_cols != n_path)
@@ -225,21 +225,19 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         delay->set_size(n_rx_ports, n_tx_ports, n_out);
 
     // Map output memory to internal representation
-    arma::Cube<dtype> CR, CI, DL; // Internal map for coefficients
-    bool different_output_size = n_tx != n_tx_ports || n_rx != n_rx_ports;
+    arma::Cube<dtype> CR, CI, DL;
 
+    bool different_output_size = n_tx != n_tx_ports || n_rx != n_rx_ports;
     if (different_output_size) // Temporary internal data storage
     {
         CR.set_size(n_rx, n_tx, n_out);
         CI.set_size(n_rx, n_tx, n_out);
         DL.set_size(n_rx, n_tx, n_out);
     }
-    else // Direct mapping of external memory
-    {
-        CR = arma::Cube<dtype>(coeff_re->memptr(), n_rx, n_tx, n_out, false, true);
-        CI = arma::Cube<dtype>(coeff_im->memptr(), n_rx, n_tx, n_out, false, true);
-        DL = arma::Cube<dtype>(delay->memptr(), n_rx, n_tx, n_out, false, true);
-    }
+
+    dtype *p_coeff_re = different_output_size ? CR.memptr() : coeff_re->memptr();
+    dtype *p_coeff_im = different_output_size ? CI.memptr() : coeff_im->memptr();
+    dtype *p_delays = different_output_size ? DL.memptr() : delay->memptr();
 
     // Antenna interpolation requires matrix of size [1, n_ang], 1 angle per path
     // Angles are mapped to correct value ranges during antenna interpolation
@@ -252,12 +250,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     const dtype *p_gain = path_gain->memptr();
     const dtype *p_length = path_length->memptr();
 
-    dtype *p_coeff_re = CR.memptr();
-    dtype *p_coeff_im = CI.memptr();
-    dtype *p_delays = DL.memptr();
-    dtype *ptr;
-
     // Convert inputs to orientation vector
+    dtype *ptr;
     arma::Cube<dtype> tx_orientation(3, 1, 1);
     arma::Cube<dtype> rx_orientation(3, 1, 1);
     ptr = tx_orientation.memptr(), ptr[0] = Tb, ptr[1] = Tt, ptr[2] = Th;
@@ -324,9 +318,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     }
 
     // Calculate the MIMO channel coefficients for each path
-    auto true_los_path = 0ULL;
+    arma::uword true_los_path = 0ULL;
     dtype true_los_power = zero;
-    for (auto j = 0ULL; j < n_out; ++j) // Loop over paths
+    for (arma::uword j = 0ULL; j < n_out; ++j) // Loop over paths
     {
         arma::uword i = add_fake_los_path ? (j == 0ULL ? 0ULL : j - 1ULL) : j;
 
@@ -346,8 +340,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             true_los_path = j, true_los_power = p_gain[i];
 
         arma::uword O = j * n_links; // Slice offset
-        for (auto t = 0ULL; t < n_tx; ++t)
-            for (auto r = 0ULL; r < n_rx; ++r)
+        for (arma::uword t = 0ULL; t < n_tx; ++t)
+            for (arma::uword r = 0ULL; r < n_rx; ++r)
             {
                 arma::uword R = t * n_rx + r;
 
@@ -375,10 +369,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     }
 
     // Set the true LOS path as the first path
-    if (add_fake_los_path && true_los_path != 0)
+    if (add_fake_los_path && true_los_path != 0ULL)
     {
-        dtype *ptrR = CR.slice_memptr(true_los_path);
-        dtype *ptrI = CI.slice_memptr(true_los_path);
+        dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re->slice_memptr(true_los_path);
+        dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im->slice_memptr(true_los_path);
 
         std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
         std::memcpy(p_coeff_im, ptrI, n_links * sizeof(dtype));

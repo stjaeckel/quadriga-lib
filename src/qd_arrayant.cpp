@@ -1661,12 +1661,13 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
         return std::string("");
 
     // Perform a deep check
-    if (e_theta_re.n_elem == 0 || e_theta_im.n_elem == 0 || e_phi_re.n_elem == 0 || e_phi_im.n_elem == 0 || azimuth_grid.n_elem == 0 || elevation_grid.n_elem == 0)
+    if (e_theta_re.n_elem == 0ULL || e_theta_im.n_elem == 0ULL || e_phi_re.n_elem == 0ULL || e_phi_im.n_elem == 0ULL ||
+        azimuth_grid.n_elem == 0ULL || elevation_grid.n_elem == 0ULL)
         return std::string("Missing data for any of: e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid");
 
-    unsigned long long n_elevation = e_theta_re.n_rows;
-    unsigned long long n_azimuth = e_theta_re.n_cols;
-    unsigned long long n_elements = e_theta_re.n_slices;
+    arma::uword n_elevation = e_theta_re.n_rows;
+    arma::uword n_azimuth = e_theta_re.n_cols;
+    arma::uword n_elements = e_theta_re.n_slices;
 
     if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements)
         return std::string("Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.");

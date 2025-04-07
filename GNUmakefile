@@ -12,12 +12,13 @@ MATLAB_PATH = #/usr/local/MATLAB/R2023a
 
 # Leave empty for using system library (recommended)
 # Static linking the HDF5 library may cause Octave to crash
+# Ubuntu 22.04 Armadillo system library does not work with MEX due to a bug
 hdf5_version      = # 1.14.2
+armadillo_version = 14.2.2
 
 # External libraries
 # External libraries are located in the 'external' folder. Set the version numbers here.
 # You need to compile the HDF5 and Catch2 libraries (e.g. using 'make hdf5lib' or 'make catch2lib' )
-armadillo_version = 14.2.2
 pugixml_version   = 1.13
 catch2_version    = 3.4.0
 pybind11_version  = 2.12.0
@@ -30,13 +31,20 @@ MEX  = $(MATLAB_PATH)/bin/mex
 OCT  = mkoctfile
 
 # Headers and Libraries
-ARMA_H      = external/armadillo-$(armadillo_version)/include
 PUGIXML_H   = external/pugixml-$(pugixml_version)/src
 CATCH2      = external/Catch2-$(catch2_version)-Linux
 PYBIND11_H  = external/pybind11-$(pybind11_version)/include
 
 # Compiler flags
 CCFLAGS     = -std=c++17 -O3 -fPIC -fopenmp -Wall -Wconversion -Wpedantic -Wextra
+
+# Selecting armadillo version
+ifeq ($(armadillo_version),) # Use system
+	ARMA_H = /usr/include
+else # Use package
+	ARMA_H = external/armadillo-$(armadillo_version)/include
+	ARMA_CM = -DARMA_EXT=ON
+endif
 
 # Linking options for HDF5 library
 ifeq ($(hdf5_version),) # Dynamic linking
@@ -49,6 +57,7 @@ else # Static linking
 	HDF5_STATIC = build/libhdf5.a
 	HDF5_OBJ    = build/H5*.o
 	HDF5_DYN    = 
+	HDF5_CM     = -DHDF5_STATIC=ON
 endif
 
 # List of API functions for MATLAB / Octave
@@ -100,19 +109,14 @@ lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/li
 
 # Use cmake to compile
 cmake:
-	cmake -B build_linux -D CMAKE_INSTALL_PREFIX=.
+	cmake -B build_linux -D CMAKE_INSTALL_PREFIX=. $(ARMA_CM) $(HDF5_CM)
 	cmake --build build_linux -j32 
 	cmake --install build_linux
-
-cmake_static:
-	cmake -B build_linux_static -D HDF5_STATIC_LINK=ON -D CMAKE_INSTALL_PREFIX=.
-	cmake --build build_linux_static -j32 
-	cmake --install build_linux_static
 
 # Tests
 tests 		= $(wildcard tests/catch2_tests/*.cpp)
 
-test:   tests/test_bin
+test:   lib/libquadriga.a   tests/test_bin
 	tests/test_bin
 ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
@@ -121,21 +125,28 @@ ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests -x -s
 endif
 
-test_static:     tests/test_static_bin
-	tests/test_static_bin
-
-test_catch2:    lib/libquadriga.a   tests/test_bin
+test_catch2:   lib/libquadriga.a   tests/test_bin
 	tests/test_bin
 
-tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/libquadriga.a   $(tests)
-	$(CC) -std=c++17 $< lib/libquadriga.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
+test_cmake:   tests/test_bin
+	tests/test_bin
+ifneq ($(OCTAVE_VERSION),)
+	octave --eval "cd tests; quadriga_lib_mex_tests;"
+endif
+ifneq ($(PYTHON_TARGET),)
+	pytest tests/python_tests -x -s
+endif
 
-tests/test_static_bin:   tests/quadriga_lib_catch2_tests.cpp   $(tests)
+tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   $(tests)
+ifeq ($(hdf5_version),) # Dynamic linking of HDF5
+	$(CC) -std=c++17 $< lib/libquadriga.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
+else # Static linking
 	$(CC) -std=c++17 $< lib/libquadriga.a lib/libhdf5.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl
+endif
 
 # C++ object files
 build/%.o:   src/%.cpp
-	$(CC) $(CCFLAGS) -c $< -o $@ -I src -I include -I $(ARMA_H) -I $(PUGIXML_H) -I $(HDF5_H)
+	$(CC) $(CCFLAGS) -c $< -o $@ -I include -I src -I $(PUGIXML_H) -I $(HDF5_H) -I $(ARMA_H) 
 
 # C++ object files with AVX acceleration
 build/%_avx2.o:   src/%_avx2.cpp
@@ -246,8 +257,11 @@ tidy: clean
 	- rm -rf external/pybind11-$(pybind11_version)
 	- rm -rf external/MOxUnit-master
 	
-build/quadriga-lib-version:   src/bin/version.cpp   lib/libquadriga.a
-	$(CC) -std=c++17 $^ -o $@ -I src -I include -I $(ARMA_H)
+build/quadriga-lib-version:   src/bin/version.cpp
+	$(CC) -std=c++17 $^ lib/libquadriga.a -o $@ -I src -I include -I $(ARMA_H)
+
+build/quadriga-lib-arma-version:   src/bin/arma_version.cpp
+	$(CC) -std=c++17 $^ lib/libquadriga.a -o $@ -I src -I include -I $(ARMA_H)
 
 release:  all   build/quadriga-lib-version
 	- mkdir release

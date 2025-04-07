@@ -37,7 +37,7 @@ TEST_CASE("Arrayant interpolation - Minimal test")
     arma::mat elevation = {-0.5, 0.0, 0.0, 0.5};
     arma::uvec i_element = {0};
     arma::Cube<double> orientation(3, 1, 1);
-    arma::mat element_pos_i(3, 1);
+    arma::mat element_pos_i(3, 1); 
 
     arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im,

@@ -28,7 +28,7 @@ HDF5        = external\hdf5-$(hdf5_version)-win64
 all:   quadriga-lib
 
 quadriga-lib:
-	cmake -B $(CMAKE_BUILD_DIR) -D HDF5_STATIC_PATH=external\hdf5-$(hdf5_version)-win64 -D CMAKE_INSTALL_PREFIX=.
+	cmake -B $(CMAKE_BUILD_DIR) -D HDF5_PATH=external\hdf5-$(hdf5_version)-win64 -D CMAKE_INSTALL_PREFIX=.
 	cmake --build $(CMAKE_BUILD_DIR) --config Release -- /m
 	cmake --install $(CMAKE_BUILD_DIR)
 
