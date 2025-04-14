@@ -94,6 +94,10 @@ all:
 	@$(MAKE) dirs
 	@$(MAKE) lib/libquadriga.a   $(PYTHON_TARGET)   $(OCTAVE_TARGETS)   $(MATLAB_TARGETS)
 
+cpp:
+	@$(MAKE) dirs
+	@$(MAKE) lib/libquadriga.a
+
 python: 
 	@$(MAKE) dirs
 	@$(MAKE) $(PYTHON_TARGET)
@@ -257,7 +261,7 @@ tidy: clean
 	- rm -rf external/pybind11-$(pybind11_version)
 	- rm -rf external/MOxUnit-master
 	
-build/quadriga-lib-version:   src/bin/version.cpp
+build/quadriga-lib-version:   src/bin/version.cpp   lib/libquadriga.a
 	$(CC) -std=c++17 $^ lib/libquadriga.a -o $@ -I src -I include -I $(ARMA_H)
 
 build/quadriga-lib-arma-version:   src/bin/arma_version.cpp
@@ -268,7 +272,7 @@ release:  all   build/quadriga-lib-version
 	tar czf release/quadrigalib-v$(shell build/quadriga-lib-version)-Ubuntu-$(shell lsb_release -r -s)-amd64.tar.gz \
 		+quadriga_lib/*.mex +quadriga_lib/*.mexa64 +quadriga_lib/*.m include lib/*.a
 
-package:  all   build/quadriga-lib-version
+package:  cpp   build/quadriga-lib-version
 	- mkdir release
 	- rm -rf release/quadriga_lib-$(shell build/quadriga-lib-version)
 	- rm release/quadriga_lib-$(shell build/quadriga-lib-version).zip
@@ -287,6 +291,7 @@ package:  all   build/quadriga-lib-version
 	cp -R tools release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R html_docu release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp -R api_python release/quadriga_lib-$(shell build/quadriga-lib-version)/
+	cp CMakeLists.txt release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp GNUmakefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp LICENSE release/quadriga_lib-$(shell build/quadriga-lib-version)/
 	cp Makefile release/quadriga_lib-$(shell build/quadriga-lib-version)/
