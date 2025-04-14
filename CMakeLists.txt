@@ -19,8 +19,8 @@ option(HDF5_PATH "Location of the HDF5 library" "")
 # Static linking the HDF5 library may cause Octave to crash but usually works fine with MATLAB
 option(HDF5_STATIC "Link HDF5 statically" OFF)
 
-# # Cmake tries to detect Armadillo include files on the system and link to these files.
-# # If Armadillo is not found, the version provided in the "external" folder is used instead.
+# Cmake tries to detect Armadillo include files on the system and link to these files.
+# If Armadillo is not found, the version provided in the "external" folder is used instead.
 option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 
 # Versions for external libraries (adjust as needed)
@@ -83,11 +83,9 @@ add_custom_command(
 # Create a custom target for the unzip step.
 add_custom_target(pugixml_lib ALL DEPENDS ${PUGIXML_SRC_DIR}/.stamp)
 add_custom_target(pybind11_lib ALL DEPENDS ${PYBIND11_SRC_DIR}/.stamp)
-#add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
 
 set(PUGIXML_H   "${PUGIXML_SRC_DIR}/src")
 set(PYBIND11_H  "${PYBIND11_SRC_DIR}/include")
-#set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
 
 # Options for armadillo
 if (ARMA_EXT)
@@ -95,7 +93,7 @@ if (ARMA_EXT)
     set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
     set(ARMADILLO_FOUND OFF)
 else()
-    find_package(Armadillo)
+    find_package(Armadillo) # Sets ARMADILLO_INCLUDE_DIRS and ARMADILLO_FOUND
     if (NOT ARMADILLO_FOUND)
         add_custom_target(armadillo_lib ALL DEPENDS ${ARMADILLO_SRC_DIR}/.stamp)
         set(ARMADILLO_INCLUDE_DIRS "${ARMADILLO_SRC_DIR}/include")
@@ -230,6 +228,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${ARMADILLO_INCLUDE_DIRS}
     ${PUGIXML_H}
+    ${PYBIND11_H}
     ${HDF5_INCLUDE_DIRS}
 )
 
