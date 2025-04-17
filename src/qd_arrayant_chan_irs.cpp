@@ -36,7 +36,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
                                                  arma::Cube<dtype> *coeff_re, arma::Cube<dtype> *coeff_im, arma::Cube<dtype> *delay,
                                                  arma::uword i_irs, dtype threshold_dB, dtype center_frequency, bool use_absolute_delays,
                                                  arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
-                                                 const arrayant<dtype> *irs_array_2)
+                                                 const arrayant<dtype> *irs_array_2, const std::vector<bool> *active_path)
 {
 
     // Check if IRS array is valid
@@ -183,6 +183,11 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
     dtype threshold = (dtype)std::pow<double>(10.0, 0.1 * (double)threshold_dB);
     std::vector<bool> keep_path(n_path, false);
 
+    // Do we have a path whichlist?
+    bool use_threshold = active_path == nullptr;
+    if (!use_threshold && active_path->size() != n_path)
+        throw std::invalid_argument("Optional input 'active_path' does not have the correct number of elemets.");
+
     arma::uword i_path = 0ULL, j_path = 0ULL;
     for (arma::uword i_path_1 = 0ULL; i_path_1 < n_path_1; ++i_path_1)
     {
@@ -234,8 +239,10 @@ std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<dtype> *tx_array
                     }
                 }
             }
-            i_path = (pow > threshold) ? i_path + 1ULL : i_path;
-            keep_path[j_path] = pow > threshold;
+
+            bool keep_this_path = use_threshold ? pow > threshold : active_path->at(j_path);
+            i_path = keep_this_path ? i_path + 1ULL : i_path;
+            keep_path[j_path] = keep_this_path;
             ++j_path;
         }
     }
@@ -288,7 +295,7 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<float> 
                                                           arma::Cube<float> *coeff_re, arma::Cube<float> *coeff_im, arma::Cube<float> *delay,
                                                           arma::uword i_irs, float threshold_dB, float center_frequency, bool use_absolute_delays,
                                                           arma::Cube<float> *aod, arma::Cube<float> *eod, arma::Cube<float> *aoa, arma::Cube<float> *eoa,
-                                                          const arrayant<float> *irs_array_2);
+                                                          const arrayant<float> *irs_array_2, const std::vector<bool> *active_path);
 
 template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double> *tx_array, const arrayant<double> *rx_array, const arrayant<double> *irs_array,
                                                           double Tx, double Ty, double Tz, double Tb, double Tt, double Th,
@@ -301,4 +308,4 @@ template std::vector<bool> quadriga_lib::get_channels_irs(const arrayant<double>
                                                           arma::Cube<double> *coeff_re, arma::Cube<double> *coeff_im, arma::Cube<double> *delay,
                                                           arma::uword i_irs, double threshold_dB, double center_frequency, bool use_absolute_delays,
                                                           arma::Cube<double> *aod, arma::Cube<double> *eod, arma::Cube<double> *aoa, arma::Cube<double> *eoa,
-                                                          const arrayant<double> *irs_array_2);
+                                                          const arrayant<double> *irs_array_2, const std::vector<bool> *active_path);
