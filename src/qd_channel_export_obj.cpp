@@ -175,7 +175,7 @@ void quadriga_lib::export_obj_file(const quadriga_lib::channel<dtype> *ch,
                 const dtype *p_xpr = ch->path_polarization[i_snap_in].colptr(i_path);
                 for (arma::uword m = 0ULL; m < 8ULL; ++m) // sum( xprmat(:,n).^2 )
                     p += *p_xpr * *p_xpr, ++p_xpr;
-                p = (dtype)10.0 * std::log10(p * (dtype)0.5); // dB, factor 0.5 accounts for XPOL
+                p = (dtype)10.0 * std::log10(p);
                 p += gainF - (dtype)20.0 * std::log10(path_length(i_path));
             }
             path_power_dB(i_path) = p;
