@@ -187,20 +187,20 @@ TEST_CASE("Get Channels Spherical - Tx rotation")
 
     double C = 299792458.0;
     double d0 = std::sqrt(20.0 * 20.0 + 15.0 * 15.0) - 20.0; // relative to LOS-Delay
-    CHECK(std::abs(delay.at(0, 0, 0) - d0 / C) < 1.0e-13f);
-    CHECK(std::abs(delay.at(1, 0, 0) - d0 / C) < 1.0e-13f);
-    CHECK(std::abs(delay.at(0, 1, 0) - d0 / C) < 1.0e-13f);
-    CHECK(std::abs(delay.at(1, 1, 0) - d0 / C) < 1.0e-13f);
+    CHECK(std::abs(delay.at(0, 0, 0) - d0 / C) < 1.0e-13);
+    CHECK(std::abs(delay.at(1, 0, 0) - d0 / C) < 1.0e-13);
+    CHECK(std::abs(delay.at(0, 1, 0) - d0 / C) < 1.0e-13);
+    CHECK(std::abs(delay.at(1, 1, 0) - d0 / C) < 1.0e-13);
 
-    CHECK(std::abs(coeff_re.at(0, 0, 0) - 0.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_re.at(1, 0, 0) - 1.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_re.at(0, 1, 0) - 0.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_re.at(1, 1, 0) - 2.0) < 1.0e-6f);
+    CHECK(std::abs(coeff_re.at(0, 0, 0) - 0.0) < 1.0e-6);
+    CHECK(std::abs(coeff_re.at(1, 0, 0) - 1.0) < 1.0e-6);
+    CHECK(std::abs(coeff_re.at(0, 1, 0) - 0.0) < 1.0e-6);
+    CHECK(std::abs(coeff_re.at(1, 1, 0) - 2.0) < 1.0e-6);
 
-    CHECK(std::abs(coeff_im.at(0, 0, 0) - 0.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_im.at(1, 0, 0) - 0.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_im.at(0, 1, 0) - 0.0) < 1.0e-6f);
-    CHECK(std::abs(coeff_im.at(1, 1, 0) - 0.0) < 1.0e-6f);
+    CHECK(std::abs(coeff_im.at(0, 0, 0) - 0.0) < 1.0e-6);
+    CHECK(std::abs(coeff_im.at(1, 0, 0) - 0.0) < 1.0e-6);
+    CHECK(std::abs(coeff_im.at(0, 1, 0) - 0.0) < 1.0e-6);
+    CHECK(std::abs(coeff_im.at(1, 1, 0) - 0.0) < 1.0e-6);
 
     quadriga_lib::get_channels_spherical<double>(&ant, &probe,
                                                  0.0, 0.0, 1.0, -pi / 2.0, pi / 2.0, 0.0,
