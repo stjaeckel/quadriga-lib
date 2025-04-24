@@ -129,11 +129,16 @@ ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests -x -s
 endif
 
-test_catch2:   lib/libquadriga.a   tests/test_bin
+test_catch2:   tests/test_bin
 	tests/test_bin
 
-test_cmake:   tests/test_bin
-	tests/test_bin
+test_cmake:  tests/quadriga_lib_catch2_tests.cpp   cmake
+ifeq ($(hdf5_version),) # Dynamic linking of HDF5
+	$(CC) -std=c++17 $< lib/libquadriga.a -o tests/test_cmake -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
+else # Static linking
+	$(CC) -std=c++17 $< lib/libquadriga.a lib/libhdf5.a -o tests/test_cmake -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl
+endif
+	tests/test_cmake
 ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 endif
@@ -141,7 +146,7 @@ ifneq ($(PYTHON_TARGET),)
 	pytest tests/python_tests -x -s
 endif
 
-tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   $(tests)
+tests/test_bin:   tests/quadriga_lib_catch2_tests.cpp   lib/libquadriga.a   $(tests)
 ifeq ($(hdf5_version),) # Dynamic linking of HDF5
 	$(CC) -std=c++17 $< lib/libquadriga.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl $(HDF5_DYN)
 else # Static linking

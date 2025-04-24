@@ -131,23 +131,23 @@ namespace quadriga_lib
     // Generate : Isotropic radiator, vertical polarization, 1 deg resolution
     // Usage example: auto ant = quadriga_lib::generate_omni<float>();
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_omni();
+    arrayant<dtype> generate_arrayant_omni(dtype res = 1.0);
 
     // Generate : Cross-polarized isotropic radiator, 1 deg resolution
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_xpol();
+    arrayant<dtype> generate_arrayant_xpol(dtype res = 1.0);
 
     // Generate : Short dipole radiating with vertical polarization, 1 deg resolution
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_dipole();
+    arrayant<dtype> generate_arrayant_dipole(dtype res = 1.0);
 
     // Generate : Half-wave dipole radiating with vertical polarization, 1 deg resolution
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_half_wave_dipole();
+    arrayant<dtype> generate_arrayant_half_wave_dipole(dtype res = 1.0);
 
     // Generate : An antenna with a custom 3dB beam with (in degree)
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0);
+    arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0);
 
     // Generate : Antenna model for the 3GPP-NR channel model
     // Polarization indicator:
@@ -160,17 +160,18 @@ namespace quadriga_lib
     // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
     // Values for coupling, element positions and center frequency of the custom pattern are ignored.
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_3GPP(unsigned long long M = 1,                  // Number of vertical elements
-                                           unsigned long long N = 1,                  // Number of horizontal elements
-                                           dtype center_freq = 299792458.0,           // The center frequency in [Hz]
-                                           unsigned pol = 1,                          // Polarization indicator
-                                           dtype tilt = 0.0,                          // The electric downtilt angle in [deg] for pol = 4,5,6
-                                           dtype spacing = 0.5,                       // Element spacing in [λ]
-                                           unsigned long long Mg = 1,                 // Number of nested panels in a column (Mg)
-                                           unsigned long long Ng = 1,                 // Number of nested panels in a row (Ng)
-                                           dtype dgv = 0.5,                           // Panel spacing in vertical direction (dg,V) in [λ]
-                                           dtype dgh = 0.5,                           // Panel spacing in horizontal direction (dg,H) in [λ]
-                                           const arrayant<dtype> *pattern = nullptr); // Optional custom per-element pattern
+    arrayant<dtype> generate_arrayant_3GPP(arma::uword M = 1,                        // Number of vertical elements
+                                           arma::uword N = 1,                        // Number of horizontal elements
+                                           dtype center_freq = 299792458.0,          // The center frequency in [Hz]
+                                           unsigned pol = 1,                         // Polarization indicator
+                                           dtype tilt = 0.0,                         // The electric downtilt angle in [deg] for pol = 4,5,6
+                                           dtype spacing = 0.5,                      // Element spacing in [λ]
+                                           arma::uword Mg = 1,                       // Number of nested panels in a column (Mg)
+                                           arma::uword Ng = 1,                       // Number of nested panels in a row (Ng)
+                                           dtype dgv = 0.5,                          // Panel spacing in vertical direction (dg,V) in [λ]
+                                           dtype dgh = 0.5,                          // Panel spacing in horizontal direction (dg,H) in [λ]
+                                           const arrayant<dtype> *pattern = nullptr, // Optional custom per-element pattern
+                                           dtype res = 1.0);                         // Resolution in degree, ignored if pattern is given
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)

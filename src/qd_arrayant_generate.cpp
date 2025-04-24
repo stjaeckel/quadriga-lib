@@ -24,20 +24,23 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 
-// Generate : Isotropic radiator, vertical polarization, 1 deg resolution
+// Generate : Isotropic radiator, vertical polarization
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
+    arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
+    arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
+
     ant.name = "omni";
-    ant.e_theta_re.ones(181, 361, 1);
-    ant.e_theta_im.zeros(181, 361, 1);
-    ant.e_phi_re.zeros(181, 361, 1);
-    ant.e_phi_im.zeros(181, 361, 1);
-    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
+    ant.e_theta_re.ones(no_el, no_az, 1);
+    ant.e_theta_im.zeros(no_el, no_az, 1);
+    ant.e_phi_re.zeros(no_el, no_az, 1);
+    ant.e_phi_im.zeros(no_el, no_az, 1);
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, no_az);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, no_el);
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -55,30 +58,36 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni()
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni();
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni();
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni(float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni(double res);
 
-// Generate : Cross-polarized isotropic radiator, 1 deg resolution
+// Generate : Cross-polarized isotropic radiator
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
-    ant.name = "xpol";
-    ant.e_theta_re.ones(181, 361, 2);
-    ant.e_theta_im.zeros(181, 361, 2);
-    ant.e_phi_re.ones(181, 361, 2);
-    ant.e_phi_im.zeros(181, 361, 2);
+    arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
+    arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
+    arma::uword no_val = no_az * no_el;
 
-    dtype zero = (dtype)0.0;
+    ant.name = "xpol";
+    ant.e_theta_re.set_size(no_el, no_az, 2);
+    ant.e_theta_im.zeros(no_el, no_az, 2);
+    ant.e_phi_re.set_size(no_el, no_az, 2);
+    ant.e_phi_im.zeros(no_el, no_az, 2);
+
+    dtype one = (dtype)1.0, zero = (dtype)0.0;
     dtype *ptr0 = ant.e_phi_re.slice_memptr(0);
     dtype *ptr1 = ant.e_theta_re.slice_memptr(1);
-    for (arma::uword i = 0ULL; i < 65341ULL; ++i)
-        ptr0[i] = zero, ptr1[i] = zero;
+    dtype *ptr2 = ant.e_phi_re.slice_memptr(1);
+    dtype *ptr3 = ant.e_theta_re.slice_memptr(0);
+    for (arma::uword i = 0ULL; i < no_val; ++i)
+        ptr0[i] = zero, ptr1[i] = zero, ptr2[i] = one, ptr3[i] = one;
 
-    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, no_az);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, no_el);
     ant.element_pos.zeros(3, 2);
     ant.coupling_re.eye(2, 2);
     ant.coupling_im.zeros(2, 2);
@@ -96,25 +105,28 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol()
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol();
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol();
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol(float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol(double res);
 
-// Generate : Short dipole radiating with vertical polarization, 1 deg resolution
+// Generate : Short dipole radiating with vertical polarization
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
-    ant.name = "dipole";
-    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
-    ant.e_theta_re.zeros(181, 361, 1);
-    ant.e_theta_im.zeros(181, 361, 1);
-    ant.e_phi_re.zeros(181, 361, 1);
-    ant.e_phi_im.zeros(181, 361, 1);
+    arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
+    arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
 
-    arma::Mat<dtype> tmp = arma::repmat(ant.elevation_grid, 1, 361);
+    ant.name = "dipole";
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, no_az);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, no_el);
+    ant.e_theta_re.zeros(no_el, no_az, 1);
+    ant.e_theta_im.zeros(no_el, no_az, 1);
+    ant.e_phi_re.zeros(no_el, no_az, 1);
+    ant.e_phi_im.zeros(no_el, no_az, 1);
+
+    arma::Mat<dtype> tmp = arma::repmat(ant.elevation_grid, 1, no_az);
     tmp = arma::cos(dtype(0.999999) * tmp) * dtype(std::sqrt(1.499961));
     std::memcpy(ant.e_theta_re.slice_memptr(0), tmp.memptr(), tmp.n_elem * sizeof(dtype));
 
@@ -135,25 +147,27 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole()
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole();
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole();
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole(float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole(double res);
 
 // Generate : Half-wave dipole radiating with vertical polarization
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
+    arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
+    arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
 
     ant.name = "half-wave-dipole";
-    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, 181);
-    ant.e_theta_re.zeros(181, 361, 1);
-    ant.e_theta_im.zeros(181, 361, 1);
-    ant.e_phi_re.zeros(181, 361, 1);
-    ant.e_phi_im.zeros(181, 361, 1);
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, no_az);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pih, pih, no_el);
+    ant.e_theta_re.zeros(no_el, no_az, 1);
+    ant.e_theta_im.zeros(no_el, no_az, 1);
+    ant.e_phi_re.zeros(no_el, no_az, 1);
+    ant.e_phi_im.zeros(no_el, no_az, 1);
 
-    arma::Mat<dtype> tmp = dtype(0.999999) * arma::repmat(ant.elevation_grid, 1, 361);
+    arma::Mat<dtype> tmp = dtype(0.999999) * arma::repmat(ant.elevation_grid, 1, no_az);
     tmp = arma::cos(pih * arma::sin(tmp)) / arma::cos(tmp);
     tmp = tmp * dtype(1.280968208215292);
 
@@ -176,35 +190,37 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole()
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole();
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wave_dipole();
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole(float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wave_dipole(double res);
 
 // Generate : An antenna with a custom gain in elevation and azimuth
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin, dtype res)
 {
     constexpr dtype zero = dtype(0.0), one = dtype(1.0), half = dtype(0.5),
                     limit = dtype(1e-7), step = dtype(-0.382), limit_inf = dtype(1e38);
     const dtype pi = dtype(arma::datum::pi), deg2rad = dtype(arma::datum::pi / 360.0);
+    arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
+    arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
 
     quadriga_lib::arrayant<dtype> ant;
 
-    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, 361);
-    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi * half, pi * half, 181);
+    ant.azimuth_grid = arma::linspace<arma::Col<dtype>>(-pi, pi, no_az);
+    ant.elevation_grid = arma::linspace<arma::Col<dtype>>(-pi * half, pi * half, no_el);
     arma::Col<dtype> phi_sq = ant.azimuth_grid % ant.azimuth_grid;
     arma::Col<dtype> cos_theta = arma::cos(ant.elevation_grid);
-    cos_theta.at(0) = zero, cos_theta.at(180) = zero;
+    cos_theta.at(0) = zero, cos_theta.at(no_el - 1) = zero;
     arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
     az_3dB_rad.at(0) = az_3dB * deg2rad;
     el_3db_rad.at(0) = el_3db * deg2rad;
 
     // Calculate azimuth pattern cut
     dtype a = one, d = half, x = limit_inf, delta = limit_inf;
-    arma::Col<dtype> xn(1), C(361), D(181);
+    arma::Col<dtype> xn(1), C(no_az), D(no_el);
     for (unsigned lp = 0; lp < 5000; ++lp)
     {
-        dtype an = lp == 0 ? a : a + d;
-        delta = lp == 0 ? limit_inf : std::abs(a - an);
+        dtype an = (lp == 0) ? a : a + d;
+        delta = (lp == 0) ? limit_inf : std::abs(a - an);
         C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
         quadriga_lib::interp(&C, &ant.azimuth_grid, &az_3dB_rad, &xn);
         dtype xm = std::abs(xn.at(0) - half);
@@ -220,8 +236,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     a = one, d = half, x = limit_inf, delta = limit_inf;
     for (unsigned lp = 0; lp < 5000; ++lp)
     {
-        dtype an = lp == 0 ? a : a + d;
-        delta = lp == 0 ? limit_inf : std::abs(a - an);
+        dtype an = (lp == 0) ? a : a + d;
+        delta = (lp == 0) ? limit_inf : std::abs(a - an);
         D = arma::pow(cos_theta, an);
         quadriga_lib::interp(&D, &ant.elevation_grid, &el_3db_rad, &xn);
         dtype xm = std::abs(xn.at(0) - half);
@@ -234,15 +250,15 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     D = arma::pow(cos_theta, a);
 
     // Combined pattern
-    ant.e_theta_re.zeros(181, 361, 1);
+    ant.e_theta_re.zeros(no_el, no_az, 1);
     dtype *ptr = ant.e_theta_re.memptr();
     for (dtype *col = C.begin(); col != C.end(); ++col)
         for (dtype *row = D.begin(); row != D.end(); ++row)
             *ptr++ = std::sqrt(rear_gain_lin + (one - rear_gain_lin) * *row * *col);
 
-    ant.e_theta_im.zeros(181, 361, 1);
-    ant.e_phi_re.zeros(181, 361, 1);
-    ant.e_phi_im.zeros(181, 361, 1);
+    ant.e_theta_im.zeros(no_el, no_az, 1);
+    ant.e_phi_re.zeros(no_el, no_az, 1);
+    ant.e_phi_im.zeros(no_el, no_az, 1);
     ant.element_pos.zeros(3, 1);
     ant.coupling_re.ones(1, 1);
     ant.coupling_im.zeros(1, 1);
@@ -268,21 +284,22 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin);
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin, float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin, double res);
 
 // Generate : Antenna model for the 3GPP-NR channel model
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, dtype center_freq,
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, dtype center_freq,
                                                                    unsigned pol, dtype tilt, dtype spacing,
-                                                                   unsigned long long Mg, unsigned long long Ng, dtype dgv, dtype dgh,
-                                                                   const arrayant<dtype> *pattern)
+                                                                   arma::uword Mg, arma::uword Ng, dtype dgv, dtype dgh,
+                                                                   const arrayant<dtype> *pattern, dtype res)
 {
     double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
     double wavelength = 299792458.0 / double(center_freq);
     constexpr dtype zero = dtype(0.0);
 
-    quadriga_lib::arrayant<dtype> ant = pattern == nullptr ? quadriga_lib::generate_arrayant_omni<dtype>() : pattern->copy();
+    // Initialize pattern
+    quadriga_lib::arrayant<dtype> ant = (pattern == nullptr) ? quadriga_lib::generate_arrayant_omni<dtype>(res) : pattern->copy();
 
     if (pattern != nullptr)
     {
@@ -292,7 +309,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     }
 
     ant.center_frequency = center_freq;
-    unsigned long long n_az = ant.n_azimuth(), n_el = ant.n_elevation();
+    arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
     if (pattern == nullptr) // Generate 3GPP default radiation pattern
     {
@@ -302,18 +319,18 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         {
             double y = double(*py) * rad2deg / 65.0;
             y = 12.0 * y * y;
-            *py = y > 30.0 ? dtype(30.0) : dtype(y);
+            *py = (y > 30.0) ? dtype(30.0) : dtype(y);
         }
 
         // Full pattern (normalized to 8 dBi gain using factor 2.51..)
         dtype *ptr = ant.e_theta_re.memptr(), *py = Y.memptr(), *px = ant.azimuth_grid.memptr();
-        for (auto ia = 0ULL; ia < n_az; ++ia)
+        for (arma::uword ia = 0ULL; ia < n_az; ++ia)
         {
             double x = double(*px++) * rad2deg / 65.0;
             x = 12.0 * x * x;
-            x = x > 30.0 ? 30.0 : x;
+            x = (x > 30.0) ? 30.0 : x;
 
-            for (auto ie = 0ULL; ie < n_el; ++ie)
+            for (arma::uword ie = 0ULL; ie < n_el; ++ie)
             {
                 double z = double(py[ie]) + x;
                 z = z > 30.0 ? -30.0 : -z;
@@ -337,12 +354,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     }
 
     // Duplicate the existing elements in z-direction (vertical stacking)
-    unsigned long long n_elements = ant.n_elements();
+    arma::uword n_elements = ant.n_elements();
     if (M > 1ULL)
-        for (unsigned long long source = n_elements; source > 0ULL; source--)
+        for (arma::uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned long long i_start = n_elements + source - 1ULL;
-            unsigned long long i_end = M * n_elements - 1ULL;
+            arma::uword i_start = n_elements + source - 1ULL;
+            arma::uword i_end = M * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -354,8 +371,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         z_position = arma::linspace<arma::Col<dtype>>(zero, dtype(M - 1ULL) * spacing * dtype(wavelength), M);
         z_position = z_position - arma::mean(z_position);
 
-        for (auto m = 0ULL; m < M; ++m)
-            for (auto n = 0ULL; n < n_elements; ++n)
+        for (arma::uword m = 0ULL; m < M; ++m)
+            for (arma::uword n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(2ULL, m * n_elements + n) = z_position.at(m);
     }
 
@@ -371,8 +388,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         ant.coupling_re.zeros(n_elements * M, n_elements);
         ant.coupling_im.zeros(n_elements * M, n_elements);
 
-        for (auto m = 0ULL; m < M; ++m)
-            for (auto n = 0ULL; n < n_elements; ++n)
+        for (arma::uword m = 0ULL; m < M; ++m)
+            for (arma::uword n = 0ULL; n < n_elements; ++n)
             {
                 ant.coupling_re.at(m * n_elements + n, n) = cpl_re.at(m);
                 ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
@@ -386,10 +403,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     n_elements = ant.n_elements();
     if (N > 1ULL)
     {
-        for (unsigned long long source = n_elements; source > 0ULL; source--)
+        for (arma::uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned long long i_start = n_elements + source - 1ULL;
-            unsigned long long i_end = N * n_elements - 1ULL;
+            arma::uword i_start = n_elements + source - 1ULL;
+            arma::uword i_end = N * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -397,8 +414,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         arma::Col<dtype> y_position = arma::linspace<arma::Col<dtype>>(zero, dtype(N - 1ULL) * spacing * dtype(wavelength), N);
         y_position = y_position - arma::mean(y_position);
 
-        for (auto m = 0ULL; m < N; ++m)
-            for (auto n = 0ULL; n < n_elements; ++n)
+        for (arma::uword m = 0ULL; m < N; ++m)
+            for (arma::uword n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(1ULL, m * n_elements + n) = y_position.at(m);
     }
 
@@ -406,10 +423,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     n_elements = ant.n_elements();
     if (Mg > 1ULL)
     {
-        for (unsigned long long source = n_elements; source > 0ULL; source--)
+        for (arma::uword source = n_elements; source > 0ULL; source--)
         {
-            unsigned long long i_start = n_elements + source - 1ULL;
-            unsigned long long i_end = Mg * n_elements - 1ULL;
+            arma::uword i_start = n_elements + source - 1ULL;
+            arma::uword i_end = Mg * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -417,8 +434,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         arma::Col<dtype> zg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Mg - 1ULL) * dgv * dtype(wavelength), Mg);
         zg_position = zg_position - arma::mean(zg_position);
 
-        for (auto mg = 0ULL; mg < Mg; ++mg)
-            for (auto n = 0ULL; n < n_elements; ++n)
+        for (arma::uword mg = 0ULL; mg < Mg; ++mg)
+            for (arma::uword n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(2ULL, mg * n_elements + n) += zg_position.at(mg);
     }
 
@@ -426,10 +443,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     n_elements = ant.n_elements();
     if (Ng > 1)
     {
-        for (unsigned long long source = n_elements; source > 0; source--)
+        for (arma::uword source = n_elements; source > 0; source--)
         {
-            unsigned long long i_start = n_elements + source - 1ULL;
-            unsigned long long i_end = Ng * n_elements - 1ULL;
+            arma::uword i_start = n_elements + source - 1ULL;
+            arma::uword i_end = Ng * n_elements - 1ULL;
             arma::uvec destination = arma::regspace<arma::uvec>(i_start, n_elements, i_end);
             ant.copy_element(source - 1ULL, destination);
         }
@@ -437,8 +454,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
         arma::Col<dtype> yg_position = arma::linspace<arma::Col<dtype>>(zero, dtype(Ng - 1ULL) * dgh * dtype(wavelength), Ng);
         yg_position = yg_position - arma::mean(yg_position);
 
-        for (auto mg = 0ULL; mg < Ng; ++mg)
-            for (auto n = 0ULL; n < n_elements; ++n)
+        for (arma::uword mg = 0ULL; mg < Ng; ++mg)
+            for (arma::uword n = 0ULL; n < n_elements; ++n)
                 ant.element_pos.at(1ULL, mg * n_elements + n) += yg_position.at(mg);
     }
 
@@ -446,12 +463,12 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(unsigned long
     return ant;
 }
 
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, float center_freq,
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, float center_freq,
                                                                             unsigned pol, float tilt, float spacing,
-                                                                            unsigned long long Mg, unsigned long long Ng, float dgv, float dgh,
-                                                                            const quadriga_lib::arrayant<float> *pattern);
+                                                                            arma::uword Mg, arma::uword Ng, float dgv, float dgh,
+                                                                            const quadriga_lib::arrayant<float> *pattern, float res);
 
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(unsigned long long M, unsigned long long N, double center_freq,
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(arma::uword M, arma::uword N, double center_freq,
                                                                              unsigned pol, double tilt, double spacing,
-                                                                             unsigned long long Mg, unsigned long long Ng, double dgv, double dgh,
-                                                                             const quadriga_lib::arrayant<double> *pattern);
+                                                                             arma::uword Mg, arma::uword Ng, double dgv, double dgh,
+                                                                             const quadriga_lib::arrayant<double> *pattern, double res);
