@@ -59,8 +59,9 @@ namespace quadriga_lib
         dtype calc_directivity_dBi(arma::uword i_element) const;
 
         // Calculates a virtual pattern of the given array by applying coupling and element positions
-        // Calling this function without an argument updates the arrayant properties inplace
-        void combine_pattern(arrayant<dtype> *output = nullptr);
+        // If called without arguments, 'azimuth_grid' and 'elevation_grid' from the calling object are used
+        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,
+                                        const arma::Col<dtype> *elevation_grid_new = nullptr) const;
 
         // Creates a copy of the array antenna object
         arrayant<dtype> copy() const;

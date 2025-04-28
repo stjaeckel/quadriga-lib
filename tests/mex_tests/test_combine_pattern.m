@@ -60,21 +60,10 @@ catch ME
 end
 
 try
-    [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, 1);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Can have at most 10 inputs.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-try
     [A,B,C,D,~] = quadriga_lib.arrayant_combine_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Must have exactly 4 outputs.';
+    expectedErrorMessage = 'Can have at most 4 outputs.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

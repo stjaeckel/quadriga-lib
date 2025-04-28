@@ -55,9 +55,10 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td style="padding-bottom: 10px;"><a href="#arrayant ">arrayant </a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
+<tr><td style="padding-bottom: 10px;"><a href="#arrayant">arrayant</a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
 <tr><td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td><td>Calculate the directivity (in dBi) of array antenna elements</td></tr>
 <tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
+<tr><td><a href="#.copy_element">.copy_element</a></td><td>Creates a copy of a single array antenna element</td></tr>
 </tbody>
 </table>
 </ul>
@@ -81,8 +82,8 @@
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant "></a>
-<b>arrayant </b> - Class for storing and manipulating array antenna models
+<a name="arrayant"></a>
+<b>arrayant</b> - Class for storing and manipulating array antenna models
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">An array antenna consists of multiple individual elements. 
@@ -215,21 +216,18 @@ ant.name = "name";
    is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
    from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
    of a hypothetical isotropic radiator is 1, or 0 dBi. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-dtype calc_directivity_dBi(unsigned element) const;
+dtype calc_directivity_dBi(arma::uword i_element) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>unsigned element</code></td>
-  <td>Element index</td>
-</tr>
-</table><br>
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_element</b></code><br> 
+   Element index, 0-based<br> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
@@ -255,14 +253,60 @@ float directivity = ant.calc_directivity_dBi( 0 );
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-void combine_pattern(arrayant&lt;dtype&gt; *output);
+quadriga_lib::arrayant&lt;dtype&gt; combine_pattern(const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
+        const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt; *output</code><br> 
-   Pointer to an arrayant object the the results should be written to. Calling this function without 
-   an argument or passing <code>nullptr</code> updates the arrayant properties of <code>this</code> arrayant inplace. 
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*azimuth_grid_new</b></code> (optional)<br> 
+   Azimuth angle grid of the output array antenna in [rad], between -pi and pi, sorted 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*elevation_grid_new</b></code> (optional)<br> 
+   Elevation angle grid of the output array antenna in [rad], between -pi/2 and pi/2, sorted 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+auto ant = quadriga_lib::generate_arrayant_omni&lt;double&gt;();  // Generate omni antenna
+ant.copy_element(0, 1);                                     // Duplicate the first element
+ant.element_pos.row(1) = {-0.25, 0.25};                     // Set element positions (in lambda)
+ant.coupling_re.ones(2, 1);                                 // Set coupling matrix (real part)
+ant.coupling_im.reset();                                    // Remove imaginary part
+ant = ant.combine_pattern();                                // Calculate the combined pattern
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name=".copy_element"></a>
+<b>.copy_element</b> - Creates a copy of a single array antenna element
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void copy_element(arma::uword source, arma::uvec destination);
+void copy_element(arma::uword source, arma::uword destination);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>source</b></code> (optional)<br> 
+   Index of the source element (0-based) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>destination</b></code> or <code>arma::uword <b>destination</b></code><br> 
+   Index of the destinations element (0-based), either as a vector or as a scalar. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+auto ant = quadriga_lib::generate_arrayant_omni&lt;double&gt;();  // Generate omni antenna
+ant.copy_element(0, 1);                                     // Duplicate the first element
+ant.copy_element(1, {2,3});                                 // Duplicate multiple times
+</pre>
 </li>
 </ul>
 <div class="pagebreak"></div>

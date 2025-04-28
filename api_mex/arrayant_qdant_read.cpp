@@ -87,45 +87,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // 10 - name            Name of the array antenna object, string
     // 11 - layout          Layout of multiple array antennas (optional), uint32            Matrix
 
-    // Number of in and outputs
     if (nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Filename not given.");
 
     if (nlhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:qdant_read:no_input", "Too many output arguments.");
 
-    // Read file name
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Input 'fn' must be a string.");
-
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
-
-    // Read scalar variables
+    std::string fn = qd_mex_get_string(prhs[0]);
     unsigned id = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id");
     bool use_single = nrhs < 3 ? false : qd_mex_get_scalar<bool>(prhs[2], "use_single");
 
-    // Read from file
     quadriga_lib::arrayant<float> arrayant_single;
     quadriga_lib::arrayant<double> arrayant_double;
     arma::Mat<unsigned> layout;
 
-    try
-    {
-        if (use_single)
-            arrayant_single = quadriga_lib::qdant_read<float>(fn, id, &layout);
-        else
-            arrayant_double = quadriga_lib::qdant_read<double>(fn, id, &layout);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    if (use_single)
+        CALL_QD(arrayant_single = quadriga_lib::qdant_read<float>(fn, id, &layout));
+    else
+        CALL_QD(arrayant_double = quadriga_lib::qdant_read<double>(fn, id, &layout));
 
     if (use_single)
     {

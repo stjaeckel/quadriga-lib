@@ -520,7 +520,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
             arma::uword n_links = eRe->n_rows * eRe->n_cols;
             arma::mat mat_tmp(eRe->n_rows, eRe->n_cols, arma::fill::none);
-            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, -100.0, 1.0e-3);
+            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, -100.0, 1.0e-4);
 
             if (valid) // Write magnitude
             {
