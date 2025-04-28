@@ -356,39 +356,44 @@ arguments are then specific to this type.
 <b><i>Usage:</i></b><br><pre>
 % Isotropic radiator, vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni', res);
 
 % Short dipole radiating with vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole', res);
 
 % Half-wave dipole radiating with vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole', res);
 
 % Cross-polarized isotropic radiator, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol', res);
 
 % An antenna with a custom 3dB beam with (in degree)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('custom', az_3dB, el_3db, rear_gain_lin );
+    quadriga_lib.arrayant_generate('custom', az_3dB, el_3db, rear_gain_lin, res );
 
 % Antenna model for the 3GPP-NR channel model
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh );
+    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res );
 
 % Antenna model for the 3GPP-NR channel model with a custom pattern
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, ...
+    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res, ...
     e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c, azimuth_grid_c, elevation_grid_c );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments for type 'custom':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b><br> 
+<b><i>Optional input argument for types 'omni', 'dipole', 'half-wave-dipole', and 'xpol':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b><br> 
+   Pattern resolution in [deg], scalar, Default = 1 deg 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input arguments for type 'custom':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b><br> 
    3dB beam width in azimuth direction in [deg], scalar 
 </li></ul>
  
@@ -399,9 +404,13 @@ arguments are then specific to this type.
 <ul><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b><br> 
    Isotropic gain (linear scale) at the back of the antenna, scalar 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> (optional)<br> 
+   Pattern resolution in [deg], scalar, Default = 1 deg 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments for type '3GPP':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
+<b><i>Input arguments for type '3GPP':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
    Number of vertically stacked elements, scalar, default = 1 
 </li></ul>
  
@@ -450,11 +459,13 @@ arguments are then specific to this type.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b><br> 
    Element spacing in [λ], scalar, default = 0.5 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b><br> 
    Number of nested panels in a column, scalar, default = 1 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b><br> 
    Number of nested panels in a row, scalar, default = 1 
 </li></ul>
  
@@ -466,7 +477,11 @@ arguments are then specific to this type.
    Panel spacing in vertical horizontal in [λ], scalar, default = 0.5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>Antenna data for custom pattern data:</b> (inputs 11-16, double precision, optional) 
+<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b><br> 
+   Pattern resolution in [deg], scalar, Default = 1 deg 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Antenna data for custom pattern data:</b> (inputs 12-17, double precision, optional) 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re_c</code></td>
@@ -499,10 +514,9 @@ arguments are then specific to this type.
   <td>Size: <code>[n_elevation]</code></td>
 </tr>
 </table><br>
-    
-   If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used. 
-    
 </li></ul>
+ 
+  If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data of the generated array antenna:</b> (outputs 1-11, double precision) 

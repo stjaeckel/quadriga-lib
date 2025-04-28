@@ -102,6 +102,14 @@ python:
 	@$(MAKE) dirs
 	@$(MAKE) $(PYTHON_TARGET)
 
+mex_matlab: cpp
+	@$(MAKE) dirs
+	@$(MAKE) $(MATLAB_TARGETS)
+
+mex_octave: cpp
+	@$(MAKE) dirs
+	@$(MAKE) $(OCTAVE_TARGETS)
+
 dirs:
 	mkdir -p build
 	mkdir -p lib

@@ -37,38 +37,42 @@ arguments are then specific to this type.
 ```
 % Isotropic radiator, vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni', res);
 
 % Short dipole radiating with vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole', res);
 
 % Half-wave dipole radiating with vertical polarization, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole', res);
 
 % Cross-polarized isotropic radiator, 1 deg resolution
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol');
+    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol', res);
 
 % An antenna with a custom 3dB beam with (in degree)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('custom', az_3dB, el_3db, rear_gain_lin );
+    quadriga_lib.arrayant_generate('custom', az_3dB, el_3db, rear_gain_lin, res );
 
 % Antenna model for the 3GPP-NR channel model
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh );
+    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res );
 
 % Antenna model for the 3GPP-NR channel model with a custom pattern
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, ...
+    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res, ...
     e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c, azimuth_grid_c, elevation_grid_c );
 ```
 
-## Input Arguments for type 'custom':
+## Optional input argument for types 'omni', 'dipole', 'half-wave-dipole', and 'xpol':
+- **`res`**<br>
+  Pattern resolution in [deg], scalar, Default = 1 deg
+
+## Input arguments for type 'custom':
 - **`az_3dB`**<br>
   3dB beam width in azimuth direction in [deg], scalar
 
@@ -78,7 +82,10 @@ arguments are then specific to this type.
 - **`rear_gain_lin`**<br>
   Isotropic gain (linear scale) at the back of the antenna, scalar
 
-## Input Arguments for type '3GPP':
+- **`res`** (optional)<br>
+  Pattern resolution in [deg], scalar, Default = 1 deg
+
+## Input arguments for type '3GPP':
 - **`M`**<br>
   Number of vertically stacked elements, scalar, default = 1
 
@@ -116,6 +123,11 @@ arguments are then specific to this type.
 - **`dgh`**<br>
   Panel spacing in vertical horizontal in [λ], scalar, default = 0.5
 
+- **`res`** (optional)<br>
+  Pattern resolution in [deg], scalar, Default = 1 deg, Note: In case of a custom pattern, `res` is
+  replaced by `e_theta_re_c` and the generated array antenna inherits the resolutions from the 
+  custom pattern data.
+
 - **Antenna data for custom pattern data:** (inputs 11-16, double precision, optional)
   `e_theta_re_c`     | Real part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements_c]`
   `e_theta_im_c`     | Imaginary part of e-theta field component        | Size: `[n_elevation, n_azimuth, n_elements_c]`
@@ -124,7 +136,7 @@ arguments are then specific to this type.
   `azimuth_grid_c`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
   `elevation_grid_c` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
 
-  If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
+  If custom pattern data is not provided, the default 3GPP element pattern is used.
 
 ## Output Arguments:
 - **Antenna data of the generated array antenna:** (outputs 1-11, double precision)
@@ -145,7 +157,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Inputs:
     //  0 - array_type      Array type (string)
-    //  1-16                Additional parameters
+    //  1-17                Additional parameters
 
     // Outputs:
     //  0 - e_theta_re      Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
@@ -167,32 +179,34 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of output arguments.");
 
-    // Read filename
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Input 'array_type' must be a string");
+    std::string array_type = qd_mex_get_string(prhs[0]);
 
-    auto mx_name = mxArrayToString(prhs[0]);
-    std::string array_type = std::string(mx_name);
-    mxFree(mx_name);
+    // Read resolution
+    double res = 1.0;
+    if (array_type == "omni" || array_type == "dipole" || array_type == "short-dipole" || array_type == "xpol")
+        res = nrhs < 2 ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "res", 1.0);
 
     // Returns double by default
     quadriga_lib::arrayant<double> arrayant_double;
 
     if (array_type == "omni")
-        arrayant_double = quadriga_lib::generate_arrayant_omni<double>();
+        arrayant_double = quadriga_lib::generate_arrayant_omni<double>(res);
     else if (array_type == "dipole" || array_type == "short-dipole")
-        arrayant_double = quadriga_lib::generate_arrayant_dipole<double>();
+        arrayant_double = quadriga_lib::generate_arrayant_dipole<double>(res);
     else if (array_type == "half-wave-dipole")
-        arrayant_double = quadriga_lib::generate_arrayant_half_wave_dipole<double>();
+        arrayant_double = quadriga_lib::generate_arrayant_half_wave_dipole<double>(res);
     else if (array_type == "xpol")
-        arrayant_double = quadriga_lib::generate_arrayant_xpol<double>();
+        arrayant_double = quadriga_lib::generate_arrayant_xpol<double>(res);
     else if (array_type == "custom")
+    {
+        res = nrhs < 5 ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "res", 1.0);
         if (nrhs < 4)
             mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
         else
             arrayant_double = quadriga_lib::generate_arrayant_custom<double>(qd_mex_get_scalar<double>(prhs[1], "az_3dB", 90.0),
                                                                              qd_mex_get_scalar<double>(prhs[2], "el_3db", 90.0),
-                                                                             qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin", 0.0));
+                                                                             qd_mex_get_scalar<double>(prhs[3], "rear_gain_lin", 0.0), res);
+    }
     else if (array_type == "3GPP" || array_type == "3gpp")
     {
         unsigned M = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "M", 1);
@@ -205,26 +219,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         unsigned Ng = nrhs < 9 ? 1 : qd_mex_get_scalar<unsigned>(prhs[8], "Ng", 1);
         double dgv = nrhs < 10 ? 0.5 : qd_mex_get_scalar<double>(prhs[9], "dgv", 0.5);
         double dgh = nrhs < 11 ? 0.5 : qd_mex_get_scalar<double>(prhs[10], "dgh", 0.5);
+        res = nrhs < 12 ? 1.0 : qd_mex_get_scalar<double>(prhs[11], "res", 1.0);
 
-        if (nrhs < 12)
-        {
-            try
-            {
-                arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh);
-            }
-            catch (const std::invalid_argument &ex)
-            {
-                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", ex.what());
-            }
-            catch (...)
-            {
-                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-            }
-        }
+        if (nrhs < 13) // Use default 3GPP pattern
+            CALL_QD(arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res));
         else if (nrhs < 17)
             mexErrMsgIdAndTxt("quadriga_lib:generate:no_input", "Wrong number of input/output arguments.");
-        else if (mxIsDouble(prhs[11]) && mxIsDouble(prhs[12]) && mxIsDouble(prhs[13]) &&
-                 mxIsDouble(prhs[14]) && mxIsDouble(prhs[15]) && mxIsDouble(prhs[16]))
+        else if (mxIsDouble(prhs[11]) && mxIsDouble(prhs[12]) && mxIsDouble(prhs[13]) && mxIsDouble(prhs[14]) && mxIsDouble(prhs[15]) && mxIsDouble(prhs[16]))
         {
             quadriga_lib::arrayant<double> pattern;
             pattern.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[11]);
@@ -233,19 +234,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             pattern.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[14]);
             pattern.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[15]);
             pattern.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[16]);
-
-            try
-            {
-                arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &pattern);
-            }
-            catch (const std::invalid_argument &ex)
-            {
-                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", ex.what());
-            }
-            catch (...)
-            {
-                mexErrMsgIdAndTxt("quadriga_lib:rotate_pattern:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-            }
+            CALL_QD(arrayant_double = quadriga_lib::generate_arrayant_3GPP<double>(M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &pattern));
         }
         else
             mexErrMsgIdAndTxt("quadriga_lib:generate:wrong_type", "Custom antenna pattern must be provided in double precision.");
@@ -286,5 +275,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (nlhs > 10)
         plhs[10] = mxCreateString(arrayant_double.name.c_str());
-
-    }
+}
