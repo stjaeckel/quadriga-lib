@@ -29,6 +29,20 @@
 #include <any>
 #include <string>
 
+// Macro to redirect any exception to stderr
+#define CALL_QD(expr)                                              \
+    do                                                             \
+    {                                                              \
+        try                                                        \
+        {                                                          \
+            expr;                                                  \
+        }                                                          \
+        catch (const std::exception &ex)                           \
+        {                                                          \
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what()); \
+        }                                                          \
+    } while (0)
+
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
 // - Casts to <dtype>
 // - Returns NaN for empty input (0 in case of integer types)
@@ -102,7 +116,7 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
     auto chr = mxArrayToString(input);
     std::string data = std::string(chr);
     mxFree(chr);
-    
+
     return data;
 }
 

@@ -422,6 +422,8 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
     // Elevation grid
     arma::Row<dtype> row_vec_tmp = elevation_grid->t() * rad2deg;
+    for (dtype &val : row_vec_tmp)
+        val = dtype(0.001 * std::round((double)val * 1000.0));
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
@@ -430,6 +432,8 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
 
     // Azimuth grid
     row_vec_tmp = azimuth_grid->t() * rad2deg;
+    for (dtype &val : row_vec_tmp)
+        val = dtype(0.001 * std::round((double)val * 1000.0));
     row_vec_tmp.raw_print(strm);
     str = strm.str();
     str.erase(str.size() - 1);
@@ -471,13 +475,17 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     }
 
     // Lambda to calculate the power and check if the pattern has any entry > -200 dB
-    auto calc_power = [](const dtype *Re, const dtype *Im, dtype *pow, arma::uword n_elem, dtype th = dtype(-200.0)) -> bool
+    auto calc_power = [](const dtype *Re, const dtype *Im, double *pow, arma::uword n_elem, double th = -200.0, double abs_precision = 1.0e-10) -> bool
     {
+        double multiply = std::round(1.0 / abs_precision);
         bool has_power = false;
         for (arma::uword i = 0ULL; i < n_elem; ++i)
         {
-            dtype p = Re[i] * Re[i] + Im[i] * Im[i];
-            p = dtype(10.0) * std::log10(p);
+            double re = (double)Re[i], im = (double)Im[i];
+            double p = re * re + im * im;
+            p = 10.0 * std::log10(p);
+            p = abs_precision * std::round(p * multiply);
+            p = (p < th) ? -INFINITY : p;
             pow[i] = p;
             if (p > th)
                 has_power = true;
@@ -485,12 +493,17 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         return has_power;
     };
 
-    auto calc_phase = [](const dtype *Re, const dtype *Im, dtype *phase, arma::uword n_elem, dtype th = dtype(0.001)) -> bool
+    auto calc_phase = [](const dtype *Re, const dtype *Im, double *phase, arma::uword n_elem, double th = 0.001, double abs_precision = 1.0e-10) -> bool
     {
+        double multiply = std::round(1.0 / abs_precision);
         bool has_phase = false;
         for (arma::uword i = 0ULL; i < n_elem; ++i)
         {
-            dtype p = std::atan2(Im[i], Re[i]) * dtype(57.295779513082323);
+            double re = (double)Re[i], im = (double)Im[i];
+            double p = std::atan2(im, re) * 57.295779513082323;
+            p = (std::abs(p) < th) ? 0.0 : p;
+            p = abs_precision * std::round(p * multiply);
+            p = (p < -180.0 + abs_precision) ? 180.0 : p;
             phase[i] = p;
             if (std::abs(p) > th)
                 has_phase = true;
@@ -506,8 +519,8 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
         {
 
             arma::uword n_links = eRe->n_rows * eRe->n_cols;
-            arma::Mat<dtype> mat_tmp(eRe->n_rows, eRe->n_cols, arma::fill::none);
-            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links);
+            arma::mat mat_tmp(eRe->n_rows, eRe->n_cols, arma::fill::none);
+            bool valid = calc_power(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, -100.0, 1.0e-3);
 
             if (valid) // Write magnitude
             {
@@ -522,7 +535,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
             }
 
             if (valid) // Calculate phase
-                valid = calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links);
+                valid = calc_phase(eRe->slice_memptr(i), eIm->slice_memptr(i), mat_tmp.memptr(), n_links, 1.0e-5, 1.0e-5);
 
             if (valid) // Write phase
             {

@@ -26,6 +26,8 @@ assertElementsAlmostEqual( coupling_im, 0, 'absolute', 1e-13 );
 assertElementsAlmostEqual( center_frequency, 299792458, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'omni') );
 
+e_theta_re = quadriga_lib.arrayant_generate('omni', 10);
+assertElementsAlmostEqual( e_theta_re, ones(19,37), 'absolute', 1e-14 );
 
 end
 

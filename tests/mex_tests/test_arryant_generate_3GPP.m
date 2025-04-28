@@ -1,7 +1,14 @@
 function test_arryant_generate_3GPP
 
+% Generate a custom pattern with custom resolution
+amp = quadriga_lib.arrayant_generate('custom',90,90,0,10);
+assertTrue( size(amp,1) == 19 );
+assertTrue( size(amp,2) == 37 );
+
 % Generate a custom pattern
 [ amp, z, ~, ~, az, el, ~, ~, ~, freq ] = quadriga_lib.arrayant_generate('custom',90,90,0);
+assertTrue( size(amp,1) == 181 );
+assertTrue( size(amp,2) == 361 );
 
 % The single-element 3GPP default pattern
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
