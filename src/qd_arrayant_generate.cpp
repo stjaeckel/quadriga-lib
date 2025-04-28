@@ -395,7 +395,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
                 ant.coupling_im.at(m * n_elements + n, n) = cpl_im.at(m);
             }
 
-        ant.combine_pattern();
+        ant = ant.combine_pattern();
         M = 1ULL;
     }
 

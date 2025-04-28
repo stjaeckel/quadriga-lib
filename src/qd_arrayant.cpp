@@ -24,13 +24,14 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Array antenna class
 SECTION!*/
 
 /*!MD
-# arrayant <++>
+# arrayant<++>
 Class for storing and manipulating array antenna models
 
 ## Description:
@@ -197,14 +198,15 @@ Calculate the directivity (in dBi) of array antenna elements
   is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction
   from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity
   of a hypothetical isotropic radiator is 1, or 0 dBi.
-- Allowed datatypes (`dtype`): `float` and `double`
+- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
-dtype calc_directivity_dBi(unsigned element) const;
+dtype calc_directivity_dBi(arma::uword i_element) const;
 ```
 ## Arguments:
-`unsigned element` | Element index
+- `arma::uword **i_element**`<br>
+  Element index, 0-based<br>
 
 ## Example:
 ```
@@ -297,146 +299,146 @@ Calculate effective radiation patterns for array antennas
 
 ## Declaration:
 ```
-void combine_pattern(arrayant<dtype> *output);
+quadriga_lib::arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,
+        const arma::Col<dtype> *elevation_grid_new = nullptr) const;
 ```
 
 ## Arguments:
-- `arrayant<dtype> *output`<br>
-  Pointer to an arrayant object the the results should be written to. Calling this function without
-  an argument or passing `nullptr` updates the arrayant properties of `this` arrayant inplace.
+- `arma::Col<dtype> ***azimuth_grid_new**` (optional)<br>
+  Azimuth angle grid of the output array antenna in [rad], between -pi and pi, sorted
+
+- `arma::Col<dtype> ***elevation_grid_new**` (optional)<br>
+  Elevation angle grid of the output array antenna in [rad], between -pi/2 and pi/2, sorted
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_omni<double>();  // Generate omni antenna
+ant.copy_element(0, 1);                                     // Duplicate the first element
+ant.element_pos.row(1) = {-0.25, 0.25};                     // Set element positions (in lambda)
+ant.coupling_re.ones(2, 1);                                 // Set coupling matrix (real part)
+ant.coupling_im.reset();                                    // Remove imaginary part
+ant = ant.combine_pattern();                                // Calculate the combined pattern
+```
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::arrayant<dtype>::combine_pattern(quadriga_lib::arrayant<dtype> *output)
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(const arma::Col<dtype> *azimuth_grid_new,
+                                                                             const arma::Col<dtype> *elevation_grid_new) const
 {
-    // Check if arrayant object is valid
-    std::string error_message = validate(); // Deep check
+    // Check if calling arrayant object is valid
+    std::string error_message = this->is_valid(false); // Deep check
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());
 
-    dtype pi = dtype(arma::datum::pi);
-    dtype lambda = dtype(299792448.0) / center_frequency;
-    dtype wave_no = dtype(2.0) * pi / lambda;
+    // Get output angular grid
+    if (azimuth_grid_new != nullptr && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
+        throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in between -pi and pi (equivalent to -180 to 180 degree).");
 
-    unsigned long long n_el = e_theta_re.n_rows;
-    unsigned long long n_az = e_theta_re.n_cols;
-    unsigned long long n_out = e_theta_re.n_slices;
-    unsigned long long n_ang = n_el * n_az;
-    unsigned long long n_prt = coupling_re.n_cols;
-    unsigned n32_out = unsigned(n_out);
+    if (elevation_grid_new != nullptr && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
+        throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
+
+    const dtype *p_azimuth_grid = (azimuth_grid_new == nullptr) ? this->azimuth_grid.memptr() : azimuth_grid_new->memptr();
+    const dtype *p_elevation_grid = (elevation_grid_new == nullptr) ? this->elevation_grid.memptr() : elevation_grid_new->memptr();
+
+    arma::uword n_azimuth_out = (azimuth_grid_new == nullptr) ? this->azimuth_grid.n_elem : azimuth_grid_new->n_elem;
+    arma::uword n_elevation_out = (azimuth_grid_new == nullptr) ? this->elevation_grid.n_elem : elevation_grid_new->n_elem;
+    arma::uword n_ang = n_azimuth_out * n_elevation_out;
 
     // Create list of angles for pattern interpolation
     arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
     arma::Mat<dtype> elevation(1, n_ang, arma::fill::none);
-    dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr(),
-          *p_phi = azimuth_grid.memptr(), *p_theta = elevation_grid.memptr();
+    {
+        dtype *p_azimuth = azimuth.memptr(), *p_elevation = elevation.memptr();
+        for (arma::uword ia = 0ULL; ia < n_azimuth_out; ++ia)
+            for (arma::uword ie = 0ULL; ie < n_elevation_out; ++ie)
+                *p_azimuth++ = p_azimuth_grid[ia], *p_elevation++ = p_elevation_grid[ie];
+    }
 
-    for (auto ia = 0ULL; ia < n_az; ++ia)
-        for (auto ie = 0ULL; ie < n_el; ++ie)
-            *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
+    // Get element positions
+    arma::uword n_elements = this->e_theta_re.n_slices;
+    arma::Mat<dtype> element_pos_empty(3, n_elements, arma::fill::zeros);
+    const auto p_element_pos = this->element_pos.empty() ? &element_pos_empty : &this->element_pos;
 
     // Interpolate the pattern data
+    unsigned n32_out = unsigned(n_elements);
     arma::Col<unsigned> i_element = arma::linspace<arma::Col<unsigned>>(1, n32_out, n32_out);
     arma::Cube<dtype> orientation(3, 1, 1);
-    arma::Mat<dtype> V_re(n_out, n_ang), V_im(n_out, n_ang), H_re(n_out, n_ang), H_im(n_out, n_ang), dist(n_out, n_ang);
+    arma::Mat<dtype> V_re(n_elements, n_ang), V_im(n_elements, n_ang), H_re(n_elements, n_ang), H_im(n_elements, n_ang), dist(n_elements, n_ang);
     arma::Mat<dtype> EMPTY;
 
-    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, &element_pos,
+    qd_arrayant_interpolate(&this->e_theta_re, &this->e_theta_im, &this->e_phi_re, &this->e_phi_im,
+                            &this->azimuth_grid, &this->elevation_grid, &azimuth, &elevation,
+                            &i_element, &orientation, p_element_pos,
                             &V_re, &V_im, &H_re, &H_im, &dist, &EMPTY, &EMPTY, &EMPTY);
 
     // Apply phase shift caused by element positions
+    double lambda = 299792448.0 / (double)this->center_frequency;
+    dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
     arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);
     Vi = Vi % phase, Hi = Hi % phase;
 
     // Apply coupling
-    arma::Mat<std::complex<dtype>> coupling(coupling_re, coupling_im);
-    arma::Mat<std::complex<dtype>> Vo(n_ang, n_prt), Ho(n_ang, n_prt);
-    for (auto i = 0ULL; i < n_out; ++i)
+    arma::uword n_ports_out = this->coupling_re.empty() ? n_elements : this->coupling_re.n_cols;
+    arma::Mat<std::complex<dtype>> Vo(n_ang, n_ports_out), Ho(n_ang, n_ports_out);
+    if (!this->coupling_re.empty())
     {
-        arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col(), hi = Hi.row(i).as_col();
-        for (auto o = 0ULL; o < n_prt; ++o)
+        arma::Mat<dtype> coupling_im_empty(n_elements, n_ports_out, arma::fill::zeros);
+        const auto p_coupling_im = this->coupling_im.empty() ? &coupling_im_empty : &this->coupling_im;
+        arma::Mat<std::complex<dtype>> coupling(this->coupling_re, *p_coupling_im);
+
+        for (arma::uword i = 0ULL; i < n_elements; ++i)
         {
-            std::complex<dtype> cpl = coupling.at(i, o);
-            Vo.col(o) += vi * cpl, Ho.col(o) += hi * cpl;
+            arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col(), hi = Hi.row(i).as_col();
+            for (arma::uword o = 0ULL; o < n_ports_out; ++o)
+            {
+                std::complex<dtype> cpl = coupling.at(i, o);
+                Vo.col(o) += vi * cpl, Ho.col(o) += hi * cpl;
+            }
         }
     }
+    else
+        Vo = Vi, Ho = Hi;
 
-    if (output != nullptr) // Write output data
+    // Write output data
+    quadriga_lib::arrayant<dtype> output;
     {
-        output->set_size(n_el, n_az, n_prt, n_prt);
+        output.set_size(n_elevation_out, n_azimuth_out, n_ports_out, n_ports_out);
 
-        std::memcpy(output->azimuth_grid.memptr(), azimuth_grid.memptr(), n_az * sizeof(dtype));
-        std::memcpy(output->elevation_grid.memptr(), elevation_grid.memptr(), n_el * sizeof(dtype));
+        std::memcpy(output.azimuth_grid.memptr(), p_azimuth_grid, n_azimuth_out * sizeof(dtype));
+        std::memcpy(output.elevation_grid.memptr(), p_elevation_grid, n_elevation_out * sizeof(dtype));
 
         arma::Mat<dtype> cpy = arma::real(Vo);
-        std::memcpy(output->e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        arma::uword n_bytes = n_elevation_out * n_azimuth_out * n_ports_out * sizeof(dtype);
+        std::memcpy(output.e_theta_re.memptr(), cpy.memptr(), n_bytes);
 
         cpy = arma::imag(Vo);
-        std::memcpy(output->e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        std::memcpy(output.e_theta_im.memptr(), cpy.memptr(), n_bytes);
 
         cpy = arma::real(Ho);
-        std::memcpy(output->e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        std::memcpy(output.e_phi_re.memptr(), cpy.memptr(), n_bytes);
 
         cpy = arma::imag(Ho);
-        std::memcpy(output->e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
+        std::memcpy(output.e_phi_im.memptr(), cpy.memptr(), n_bytes);
 
-        output->element_pos.zeros();
-        output->coupling_re.eye();
-        output->coupling_im.zeros();
-        output->center_frequency = center_frequency;
-
-        // Set the data pointers for the quick check.
-        output->check_ptr[0] = output->e_theta_re.memptr();
-        output->check_ptr[1] = output->e_theta_im.memptr();
-        output->check_ptr[2] = output->e_phi_re.memptr();
-        output->check_ptr[3] = output->e_phi_im.memptr();
-        output->check_ptr[4] = output->azimuth_grid.memptr();
-        output->check_ptr[5] = output->elevation_grid.memptr();
-        output->check_ptr[6] = output->element_pos.memptr();
-        output->check_ptr[7] = output->coupling_re.memptr();
-        output->check_ptr[8] = output->coupling_im.memptr();
-    }
-    else if (read_only)
-    {
-        error_message = "Cannot update read-only array antenna object inplace.";
-        throw std::invalid_argument(error_message.c_str());
-    }
-    else // Update the properties of current array antenna object
-    {
-        arma::Mat<dtype> cpy = real(Vo);
-        e_theta_re.set_size(n_el, n_az, n_prt);
-        std::memcpy(e_theta_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
-
-        cpy = imag(Vo);
-        e_theta_im.set_size(n_el, n_az, n_prt);
-        std::memcpy(e_theta_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
-
-        cpy = real(Ho);
-        e_phi_re.set_size(n_el, n_az, n_prt);
-        std::memcpy(e_phi_re.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
-
-        cpy = imag(Ho);
-        e_phi_im.set_size(n_el, n_az, n_prt);
-        std::memcpy(e_phi_im.memptr(), cpy.memptr(), n_el * n_az * n_prt * sizeof(dtype));
-
-        element_pos.zeros(3, n_prt);
-        coupling_re.eye(n_prt, n_prt);
-        coupling_im.zeros(n_prt, n_prt);
+        output.element_pos.zeros();
+        output.coupling_re.eye();
+        output.coupling_im.zeros();
+        output.center_frequency = this->center_frequency;
 
         // Set the data pointers for the quick check.
-        check_ptr[0] = e_theta_re.memptr();
-        check_ptr[1] = e_theta_im.memptr();
-        check_ptr[2] = e_phi_re.memptr();
-        check_ptr[3] = e_phi_im.memptr();
-        check_ptr[4] = azimuth_grid.memptr();
-        check_ptr[5] = elevation_grid.memptr();
-        check_ptr[6] = element_pos.memptr();
-        check_ptr[7] = coupling_re.memptr();
-        check_ptr[8] = coupling_im.memptr();
+        output.check_ptr[0] = output.e_theta_re.memptr();
+        output.check_ptr[1] = output.e_theta_im.memptr();
+        output.check_ptr[2] = output.e_phi_re.memptr();
+        output.check_ptr[3] = output.e_phi_im.memptr();
+        output.check_ptr[4] = output.azimuth_grid.memptr();
+        output.check_ptr[5] = output.elevation_grid.memptr();
+        output.check_ptr[6] = output.element_pos.memptr();
+        output.check_ptr[7] = output.coupling_re.memptr();
+        output.check_ptr[8] = output.coupling_im.memptr();
     }
+
+    return output;
 }
 
 // Creates a copy of the array antenna object
@@ -460,6 +462,35 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
 
     return ant;
 }
+
+/*!MD
+# .copy_element
+Creates a copy of a single array antenna element
+
+## Description:
+- Member function of <a href="#arrayant">arrayant</a>
+- Allowed datatypes (`dtype`): `float` and `double`
+
+## Declaration:
+```
+void copy_element(arma::uword source, arma::uvec destination);
+void copy_element(arma::uword source, arma::uword destination);
+```
+
+## Arguments:
+- `arma::uword **source**` (optional)<br>
+  Index of the source element (0-based)
+
+- `arma::uvec **destination**` or `arma::uword **destination**`<br>
+  Index of the destinations element (0-based), either as a vector or as a scalar.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_omni<double>();  // Generate omni antenna
+ant.copy_element(0, 1);                                     // Duplicate the first element
+ant.copy_element(1, {2,3});                                 // Duplicate multiple times
+```
+MD!*/
 
 // Copy antenna elements, enlarge array size if needed
 template <typename dtype>

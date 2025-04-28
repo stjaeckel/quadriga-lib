@@ -29,7 +29,7 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
     ant.coupling_re.ones(3, 1);
     ant.coupling_im.reset();
 
-    ant.combine_pattern();
+    ant = ant.combine_pattern();
 
     arma::fcube T(181, 361, 1, arma::fill::value(2.0f));
     CHECK(arma::approx_equal(ant.e_theta_re, T, "absdiff", 1e-6));
@@ -47,6 +47,11 @@ TEST_CASE("Arrayant combine pattern - Minimal test")
 
     Q.zeros(1, 1);
     CHECK(arma::approx_equal(ant.coupling_im, Q, "absdiff", 1e-6));
+
+    // Multiple copies
+    ant.copy_element(0, {1,2});
+    CHECK(arma::approx_equal(ant.e_theta_re.slice(0), ant.e_theta_re.slice(1), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.e_theta_re.slice(0), ant.e_theta_re.slice(2), "absdiff", 1e-6));
 }
 
 TEST_CASE("Arrayant rotation - Minimal test")

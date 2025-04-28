@@ -212,21 +212,21 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 <b>arrayant_combine_pattern</b> - Calculate effective radiation patterns for array antennas
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>An array antenna consists of multiple individual elements. Each element occupies a specific position  
-relative to the array's phase-center, its local origin. Elements can also be inter-coupled,  
-represented by a coupling matrix. By integrating the element radiation patterns, their positions,  
-and the coupling weights, one can determine an effective radiation pattern observable by a receiver  
-in the antenna's far field. Leveraging these effective patterns is especially beneficial in antenna  
-design, beamforming applications such as in 5G systems, and in planning wireless communication  
-networks in complex environments like urban areas. This streamlined approach offers a significant  
-boost in computation speed when calculating MIMO channel coefficients, as it reduces the number of  
-necessary operations. The function <code>arrayant_combine_pattern</code> is designed to compute these effective  
+<b><i>Description:</i></b><br>An array antenna consists of multiple individual elements. Each element occupies a specific position 
+relative to the array's phase-center, its local origin. Elements can also be inter-coupled, 
+represented by a coupling matrix. By integrating the element radiation patterns, their positions, 
+and the coupling weights, one can determine an effective radiation pattern observable by a receiver 
+in the antenna's far field. Leveraging these effective patterns is especially beneficial in antenna 
+design, beamforming applications such as in 5G systems, and in planning wireless communication 
+networks in complex environments like urban areas. This streamlined approach offers a significant 
+boost in computation speed when calculating MIMO channel coefficients, as it reduces the number of 
+necessary operations. The function <code>arrayant_combine_pattern</code> is designed to compute these effective 
 radiation patterns.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 [ e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c] = quadriga_lib.arrayant_combine_pattern( ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, 
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos,
     coupling_re, coupling_im, center_freq);
 </pre>
 </li>
@@ -477,11 +477,13 @@ arguments are then specific to this type.
    Panel spacing in vertical horizontal in [λ], scalar, default = 0.5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b><br> 
-   Pattern resolution in [deg], scalar, Default = 1 deg 
+<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> (optional)<br> 
+   Pattern resolution in [deg], scalar, Default = 1 deg, Note: In case of a custom pattern, <code>res</code> is 
+   replaced by <code>e_theta_re_c</code> and the generated array antenna inherits the resolutions from the  
+   custom pattern data. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>Antenna data for custom pattern data:</b> (inputs 12-17, double precision, optional) 
+<ul><li style="margin-bottom: 0.4em;"><b>Antenna data for custom pattern data:</b> (inputs 11-16, double precision, optional) 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re_c</code></td>
@@ -516,7 +518,7 @@ arguments are then specific to this type.
 </table><br>
 </li></ul>
  
-  If custom pattern data is not provided, the default 3GPP element pattern with 1 degree sampling is used.
+  If custom pattern data is not provided, the default 3GPP element pattern is used.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data of the generated array antenna:</b> (outputs 1-11, double precision) 
