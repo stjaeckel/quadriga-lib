@@ -30,16 +30,16 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
 
     arma::vec x = {0.0, 1.5, 2.0}, xo;
     arma::vec y = {10.0, 20.0}, yo;
-    arma::cube O, T;
+    arma::cube T;
 
     // Interpolation at the same sample points should create identical output
-    quadriga_lib::interp(&I, &x, &y, &x, &y, &O);
+    auto O = quadriga_lib::interp_2D(I, x, y, x, y);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-13));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75, 1.875};
     yo = {0.0, 100.0};
-    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
+    quadriga_lib::interp_2D(I, x, y, xo, yo, O);
     T.set_size(2, 2, 2);
     T.slice(0) = {{0.5, -1.5}, {0.5, -1.5}};
     T.slice(1) = {{2.0, 2.0}, {4.0, 4.0}};
@@ -49,44 +49,63 @@ TEST_CASE("Quadriga tools - 2D Interpolation")
     I.set_size(1, 4, 1);
     I.slice(0) = {{0.0, 1.0, 2.0, 3.0}};
     x = {0.0, 1.0, 1.0, 2.0}, y = {0.0}, xo = {0.9, 1.0, 1.1}, yo = {-1.0, 1.0};
-    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
+    O = quadriga_lib::interp_2D(I, x, y, xo, yo);
     T.set_size(2, 3, 1);
     T.slice(0) = {{0.9, 2.0, 2.1}, {0.9, 2.0, 2.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
 
     // Reverse order
     x = {3.0, 2.0, 1.0, 0.0}, y = {0.0}, xo = {2.5, 2.1, 2.0, 1.9}, yo = {0.0};
-    quadriga_lib::interp(&I, &x, &y, &xo, &yo, &O);
+    quadriga_lib::interp_2D(I, x, y, xo, yo, O);
     T.set_size(1, 4, 1);
     T.slice(0) = {{0.5, 0.9, 1.0, 1.1}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-13));
+}
+
+TEST_CASE("Quadriga tools - 2D Interpolation example")
+{
+    arma::cube input(5, 5, 2, arma::fill::randu); // example input data
+    arma::vec xi = arma::linspace(0, 4, 5);
+    arma::vec yi = arma::linspace(0, 4, 5);
+    arma::vec xo = arma::linspace(0, 4, 10);
+    arma::vec yo = arma::linspace(0, 4, 10);
+
+    arma::cube output;
+    quadriga_lib::interp_2D(input, xi, yi, xo, yo, output);
 }
 
 TEST_CASE("Quadriga tools - 1D Interpolation")
 {
     arma::fmat I = {{1.0f, 0.0f, -2.0f}, {2.0f, 3.0f, 4.0f}};
     arma::fvec x = {0.0f, 1.5f, 2.0f}, xo;
-    arma::fmat O, T;
+    arma::fmat T;
     I = I.t();
 
     // Interpolation at the same sample points should create identical output
-    quadriga_lib::interp(&I, &x, &x, &O);
+    auto O = quadriga_lib::interp_1D(I, x, x);
     CHECK(arma::approx_equal(I, O, "absdiff", 1e-6));
 
     // Regular interpolation, y-values out of bound
     xo = {0.75f, 1.875f};
-    quadriga_lib::interp(&I, &x, &xo, &O);
+    O = quadriga_lib::interp_1D(I, x, xo);
     T = {{0.5f, 2.5f}, {-1.5f, 3.75f}};
     CHECK(arma::approx_equal(T, O, "absdiff", 1e-6));
 }
 
+TEST_CASE("Quadriga tools - 1D Interpolation example")
+{
+    arma::vec input = arma::linspace(0, 1, 5);
+    arma::vec xi = arma::linspace(0, 4, 5);
+    arma::vec xo = arma::linspace(0, 4, 10);
+
+    auto output = quadriga_lib::interp_1D(input, xi, xo);
+}
+
 TEST_CASE("Quadriga tools - Icosphere")
 {
-    arma::Mat<float> center;
-    arma::Col<float> length;
-    arma::Mat<float> vert;
-    arma::Mat<float> direction;
-
+    arma::fmat center, vert, direction;
+    arma::fvec length;
+    
     // Number of subdivisions cannot be zero
     REQUIRE_THROWS_AS(quadriga_lib::icosphere<float>(0, 1.0, &center), std::invalid_argument);
 
@@ -303,7 +322,7 @@ TEST_CASE("Quadriga tools - Subdivide Rays")
     arma::Mat<float> tridirN;
 
     // No index given
-    size_t n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN);
+    auto n_rayN = quadriga_lib::subdivide_rays<float>(&orig, &trivec, &tridir, nullptr, &origN, &trivecN, &tridirN);
     CHECK(n_rayN == 4 * orig.n_rows);
 
     // Empty index
@@ -440,4 +459,69 @@ TEST_CASE("Quadriga tools - Coord 2 Path")
 
     M = {{10.0, 8.0, 2.0, 0.0}, {0.0, 2.0, 2.0, 0.0}, {0.0, 2.0, 2.0, 0.0}};
     CHECK(arma::approx_equal(path_coord[0], M, "absdiff", 1e-14));
+}
+
+TEST_CASE("Quadriga tools - Rotation matrix")
+{
+    arma::mat ori(3, 1);
+    ori(0, 0) = 0.0;    // bank
+    ori(1, 0) = 0.0;    // tilt
+    ori(2, 0) = 1.5708; // head
+    auto R = quadriga_lib::calc_rotation_matrix(ori);
+
+    arma::fvec oriv(3);
+    oriv(0) = 0.0;    // bank
+    oriv(1) = 0.0;    // tilt
+    oriv(2) = 1.5708; // head
+    auto Rv = quadriga_lib::calc_rotation_matrix(oriv);
+}
+
+TEST_CASE("Quadriga tools - Cart 2 Geo")
+{
+    arma::vec cart = {1.0, 1.0, 0.0};
+    auto geo = quadriga_lib::cart2geo(cart);
+
+    arma::vec T = {0.7854, 0.0, 1.4142};
+    CHECK(arma::approx_equal(geo, T, "absdiff", 1e-3));
+}
+
+TEST_CASE("Quadriga tools - Geo 2 Cart")
+{
+    arma::mat az(2, 2), el(2, 2), len(2, 2, arma::fill::ones);
+    auto cart = quadriga_lib::geo2cart(az, el, len);
+
+    CHECK(cart.n_rows == 3);
+    CHECK(cart.n_cols == 2);
+    CHECK(cart.n_slices == 2);
+
+    auto cart2 = quadriga_lib::geo2cart(az, el);
+
+    CHECK(cart.n_rows == 3);
+    CHECK(cart.n_cols == 2);
+    CHECK(cart.n_slices == 2);
+
+    CHECK(arma::approx_equal(cart, cart2, "absdiff", 1e-13));
+}
+
+TEST_CASE("Quadriga tools - coord2path example")
+{
+    arma::u32_vec no_int = {0, 1};
+    arma::mat interact(3, 1);
+    interact.col(0) = {5.0, 0.0, 2.0};
+
+    arma::vec lengths;
+    arma::mat fbs, lbs;
+    arma::mat angles;
+    std::vector<arma::mat> coords;
+
+    quadriga_lib::coord2path<double>(
+        0.0, 0.0, 0.0,  // TX at origin
+        10.0, 0.0, 0.0, // RX at x = 10 m
+        &no_int, &interact, &lengths, &fbs, &lbs, &angles, &coords, 1);
+
+    arma::mat T = {{10, 0}, {0, 0}, {0, 0}};
+    CHECK(arma::approx_equal(coords[0], T, "absdiff", 1e-12));
+
+    T = {{10, 5, 0}, {0, 0, 0}, {0, 2, 0}};
+    CHECK(arma::approx_equal(coords[1], T, "absdiff", 1e-12));
 }

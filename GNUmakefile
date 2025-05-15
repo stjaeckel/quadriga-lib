@@ -92,7 +92,7 @@ endif
 .PHONY: dirs
 all:
 	@$(MAKE) dirs
-	@$(MAKE) lib/libquadriga.a   $(PYTHON_TARGET)   $(OCTAVE_TARGETS)   $(MATLAB_TARGETS)
+	@$(MAKE) lib/libquadriga.a   $(PYTHON_TARGET)   $(OCTAVE_TARGETS)   $(MATLAB_TARGETS)   tests/test_bin
 
 cpp:
 	@$(MAKE) dirs
@@ -257,6 +257,7 @@ clean:
 	- rm -rf lib
 	- rm *.obj
 	- rm tests/test_bin
+	- rm tests/test_cmake
 	- rm tests/test_static_bin
 	- rm tests/test.exe
 	- rm -rf build

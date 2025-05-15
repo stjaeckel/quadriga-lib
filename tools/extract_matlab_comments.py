@@ -43,7 +43,7 @@ def extract_matlab_comments(mex_filename, m_filename):
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-% Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+% Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 % All rights reserved.
 %
 % e-mail: info@sjc-wireless.com

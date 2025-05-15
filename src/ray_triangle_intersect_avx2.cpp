@@ -17,7 +17,8 @@
 
 #include <armadillo>
 #include <immintrin.h>
-#include "ray_triangle_intersect_avx2.hpp"
+
+#include "quadriga_lib_avx2_functions.hpp"
 
 // Vector size for AVX2
 #define VEC_SIZE 8

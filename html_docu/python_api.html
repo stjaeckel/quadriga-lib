@@ -858,7 +858,7 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
 <li style="margin-bottom: 1.5em;">
 <b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">If the file exists already, the new data is added to the exisiting file 
 </li><li style="margin-bottom: 0.4em;">If a new file is created, a storage layout is created to store the location of datasets in the file 
-</li><li style="margin-bottom: 0.4em;">For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix > 65536</code>) 
+</li><li style="margin-bottom: 0.4em;">For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix &gt; 65536</code>) 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy]</code> storage layout is <code>[1024,64,1,1]</code> 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy,iz]</code> storage layout is <code>[256,16,16,1]</code> 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy,iz,iw]</code> storage layout is <code>[128,8,8,8]</code> 

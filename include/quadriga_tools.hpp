@@ -21,6 +21,8 @@
 #include <armadillo>
 #include <string>
 #include <vector>
+#include <cmath>
+#include <cstring>
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
@@ -31,58 +33,106 @@ static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned
 namespace quadriga_lib
 {
 
-    // ---- Miscellaneous / Tools ----
+    // ---- Miscellaneous tools ----
 
-    // Calculates a 3x3 rotation matrix from a 3-element orientation vector
+    // Calculates the rotation matrix from Euler angles
+    // - Returns: Coefficients of the rotation matrix in column-major ordering, Size: [9, n_row, n_col]
+    // - Internal calculations are done in double precision, even if the <dtype> is <float>
     template <typename dtype>
-    arma::cube calc_rotation_matrix(const arma::Cube<dtype> orientation,
-                                    bool invert_y_axis = false,
-                                    bool transposeR = false);
+    arma::Cube<dtype> calc_rotation_matrix(const arma::Cube<dtype> &orientation, // Orientation vectors (Euler rotations) in [rad], Size [3, n_row, n_col]
+                                           bool invert_y_axis = false,           // Inverts the y-axis
+                                           bool transposeR = false);             // Returns the transpose of R instead of R
+
+    template <typename dtype>
+    arma::Mat<dtype> calc_rotation_matrix(const arma::Mat<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
+
+    template <typename dtype>
+    arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
 
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+    // - Input: Cartesian coordinates, size [3, n_row, n_col]
+    // - Output: Geographic coordinates, size [n_row, n_col, 3]
     template <typename dtype>
-    arma::cube cart2geo(const arma::Cube<dtype> cart);
+    arma::Cube<dtype> cart2geo(const arma::Cube<dtype> &cart);
+
+    template <typename dtype>
+    arma::Mat<dtype> cart2geo(const arma::Mat<dtype> &cart); // Input: [3, n_row], Output: [n_row, 3]
+
+    template <typename dtype>
+    arma::Col<dtype> cart2geo(const arma::Col<dtype> &cart); // Input / Output: [3]
 
     // Generate colormap
-    // Output is a 64 x 3 matrix of unsigned chars
+    // - Returns a 64 x 3 matrix of unsigned chars
+    // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map);
 
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
+    // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
     template <typename dtype>
-    arma::cube geo2cart(const arma::Mat<dtype> azimuth,
-                        const arma::Mat<dtype> elevation,
-                        const arma::Mat<dtype> length);
+    arma::Cube<dtype> geo2cart(const arma::Mat<dtype> &azimuth,      // Azimuth angles, Size [n_row, n_col]
+                               const arma::Mat<dtype> &elevation,    // Elevation angles, Size [n_row, n_col]
+                               const arma::Mat<dtype> &length = {}); // Radius, Size [n_row, n_col] or [0,0] for unit length
 
-    // 2D linear interpolation (returns error message or empty string in case of no error)
-    template <typename dtype>                          // Supported types: float or double
-    std::string interp(const arma::Cube<dtype> *input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                       const arma::Col<dtype> *xi,     // x sample points of input; vector length nx
-                       const arma::Col<dtype> *yi,     // y sample points of input; vector length ny
-                       const arma::Col<dtype> *xo,     // x sample points of output; vector length mx
-                       const arma::Col<dtype> *yo,     // y sample points of output; vector length my
-                       arma::Cube<dtype> *output);     // Interpolated data; size [ my, mx, ne ]
+    // 2D linear interpolation of multiple data sets
+    // - Output object is passed as a reference (its data will be overwritten)
+    // - If output is not initialized to size [ my, mx, me ], it will be resized, invalidating data pointers
+    template <typename dtype>
+    void interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
+                   const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
+                   const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
+                   const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
+                   const arma::Col<dtype> &yo,     // y sample points of output; vector length my
+                   arma::Cube<dtype> &output);     // Interpolated data, size [ my, mx, me ]
 
-    // 1D linear interpolation (returns error message or empty string)
-    template <typename dtype>                         // Supported types: float or double
-    std::string interp(const arma::Mat<dtype> *input, // Input data; size [ nx, ne ], ne = multiple data sets
-                       const arma::Col<dtype> *xi,    // x sample points of input; vector length nx
-                       const arma::Col<dtype> *xo,    // x sample points of output; vector length mx
-                       arma::Mat<dtype> *output);     // Interpolated data; size [ mx, ne ]
+    // 2D linear interpolation of multiple data sets
+    // - Returns interpolated data, size [ my, mx, me ]
+    template <typename dtype>
+    arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
+                                const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
+                                const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
+                                const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
+                                const arma::Col<dtype> &yo);    // y sample points of output; vector length my
 
-    // ----  Site-Specific Simulation Tools ----
+    // 2D linear interpolation of a single data set
+    // - Returns interpolated data, size [ my, mx ]
+    template <typename dtype>
+    arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input,                           // Input data; size [ ny, nx ]
+                               const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,  // x/y input sample points
+                               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo); // x/y output sample points
+
+    // 1D linear interpolation of multiple data sets
+    // - Returns interpolated data, size [ mx, ne ]
+    template <typename dtype>
+    arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, // Input data; size [ nx, ne ], ne = multiple data sets
+                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
+                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
+
+    // 1D linear interpolation of single data set
+    // - Returns interpolated data, length mx
+    template <typename dtype>
+    arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, // Input data vector, vector length nx
+                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
+                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
+
+    // ----  Computational geometry tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
-    template <typename dtype>                                                        // Supported types: float or double
-    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                         // Origin points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *dest,                         // Destination points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *mesh,                         // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
-                               const arma::Mat<dtype> *mtl_prop,                     // Material properties; Size: [ no_mesh, 5 ]
-                               dtype center_frequency,                               // Center frequency in [Hz]
-                               int lod = 2,                                          // Level of detail, scalar values 0-6
-                               arma::Col<dtype> *gain = nullptr,                     // Diffraction gain; linear scale; Size: [ n_pos ]
-                               arma::Cube<dtype> *coord = nullptr,                   // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
-                               int verbose = 0,                                      // Verbosity level
-                               const arma::Col<unsigned> *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
+    // - For faster processing, the mesh can be split into sub-meshes. In this case, the algorithm can
+    //   efficiently skip entire sub-meshed if no interaction with any of its componenets is possible
+    //   (i.e. the path does not insect its bounding-box).
+    // - The function "quadriga_lib::triangle_mesh_segmentation" can be used to split the mesh and
+    //   calculate the optional "sub_mesh_index".
+    template <typename dtype>                                                  // Supported types: float or double
+    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                   // Origin points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *dest,                   // Destination points, Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *mesh,                   // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
+                               const arma::Mat<dtype> *mtl_prop,               // Material properties; Size: [ no_mesh, 5 ]
+                               dtype center_frequency,                         // Center frequency in [Hz]
+                               int lod = 2,                                    // Level of detail, scalar values 0-6
+                               arma::Col<dtype> *gain = nullptr,               // Diffraction gain; linear scale; Size: [ n_pos ]
+                               arma::Cube<dtype> *coord = nullptr,             // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
+                               int verbose = 0,                                // Verbosity level
+                               const arma::u32_vec *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
@@ -90,7 +140,7 @@ namespace quadriga_lib
     template <typename dtype>                                            // Supported types: float or double
     void coord2path(dtype Tx, dtype Ty, dtype Tz,                        // Transmitter position in Cartesian coordinates
                     dtype Rx, dtype Ry, dtype Rz,                        // Receiver position in Cartesian coordinates
-                    const arma::Col<unsigned> *no_interact,              // Number interaction points of a path with the environment, 0 = LOS, vector of length [n_path]
+                    const arma::u32_vec *no_interact,                    // Number interaction points of a path with the environment, 0 = LOS, vector of length [n_path]
                     const arma::Mat<dtype> *interact_coord,              // Interaction coordinates of paths with the environment, matrix of size [3, sum(no_interact)]
                     arma::Col<dtype> *path_length = nullptr,             // Absolute path length from TX to RX phase center, vector of length [n_path]
                     arma::Mat<dtype> *fbs_pos = nullptr,                 // First-bounce scatterer positions, matrix of size [3, n_path]
@@ -148,14 +198,14 @@ namespace quadriga_lib
     // - The optional output "direction" can have 2 Formats: Spherical or Cartesian
     // - For spherical directions, the values of "direction" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
     // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
-    template <typename dtype>                               // Allowed types: float or double
-    size_t icosphere(arma::uword n_div,                     // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
-                     dtype radius,                          // Radius of the icosphere in meters
-                     arma::Mat<dtype> *center,              // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
-                     arma::Col<dtype> *length = nullptr,    // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
-                     arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-                     arma::Mat<dtype> *direction = nullptr, // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
-                     bool direction_xyz = false);           // Direction format indicator: true = Cartesian, false = Spherical
+    template <typename dtype>                                    // Allowed types: float or double
+    arma::uword icosphere(arma::uword n_div,                     // Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
+                          dtype radius,                          // Radius of the icosphere in meters
+                          arma::Mat<dtype> *center,              // Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
+                          arma::Col<dtype> *length = nullptr,    // Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
+                          arma::Mat<dtype> *vert = nullptr,      // Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
+                          arma::Mat<dtype> *direction = nullptr, // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
+                          bool direction_xyz = false);           // Direction format indicator: true = Cartesian, false = Spherical
 
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
@@ -185,8 +235,7 @@ namespace quadriga_lib
                               std::vector<std::string> *mtl_names = nullptr); // Material names, Size: [ max(mtl_ind) - 1 ]
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
-    // - Returns: list of object indices (1-based) that are overlapping, length [ n_overlap ]
-    // - Overlap reasons (optional output)
+    // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]
     template <typename dtype>                                                  // Supported types: float or double
     arma::u32_vec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
                                    const arma::u32_vec *obj_ind,               // Object index, 1-based, Size: [ n_mesh ]
@@ -194,8 +243,11 @@ namespace quadriga_lib
                                    dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
     // Convert paths to tubes
-    // - Internal computations are done in double precision for accuracy
+    // - Paths are defined by a list of ordered points
+    // - This function adds faced around the paths for rendereing, e.g. in Blender
     // - Faces are provided as quads
+    // - Edges of the faces lie on a circle around the path with a given radius
+    // - Internal computations are done in double precision for accuracy
     template <typename dtype>
     void path_to_tube(const arma::Mat<dtype> *path_coord, // Path coordinates, size [3, n_coord ]
                       arma::Mat<dtype> *vert,             // Output: Vertices of the tube, size [3, n_coord * n_edges ]
@@ -204,12 +256,13 @@ namespace quadriga_lib
                       arma::uword n_edges = 5);           // Number of points in the circle building the tube, must be >= 3
 
     // Calculate the axis-aligned bounding box (AABB) of a point cloud
-    // - The point cloud can be composed of sub-clouds, where each new sub-cloud h is indicated by an index (= starting row number)
-    // - Output is a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-cloud
+    // - The point cloud can be composed of sub-clouds, where each new sub-cloud is indicated by an index (= starting row number in points list)
+    // - Returns a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-cloud
+    // - The number of rows n_sub is a multiple of vec_size, padded with zeros
     template <typename dtype>
-    arma::Mat<dtype> point_cloud_aabb(const arma::Mat<dtype> *points,                       // Points in 3D Space, Size: [ n_points, 3 ]
-                                      const arma::Col<unsigned> *sub_cloud_index = nullptr, // Sub-cloud index, Length: [ n_sub ]
-                                      size_t vec_size = 1);                                 // Vector size for SIMD processing (e.g. 8 for AVX2)
+    arma::Mat<dtype> point_cloud_aabb(const arma::Mat<dtype> *points,                 // Points in 3D Space, Size: [ n_points, 3 ]
+                                      const arma::u32_vec *sub_cloud_index = nullptr, // Sub-cloud index, Length: [ n_sub ]
+                                      arma::uword vec_size = 1);                      // Vector size for SIMD processing (e.g. 8 for AVX2)
 
     // Reorganize a point cloud into smaller sub-clouds for faster processing
     // - Recursively calls "point_cloud_split" until number of elements per sub-cloud is below a target size
@@ -220,26 +273,30 @@ namespace quadriga_lib
     // - "reverse_index" contains the map of elements in "pointsR" to "points" in 0-based notation
     // - Returns number of sub-clouds "n_sub"
     template <typename dtype>
-    size_t point_cloud_segmentation(const arma::Mat<dtype> *points,                // Points in 3D Space (input), Size: [ n_points, 3 ]
-                                    arma::Mat<dtype> *pointsR,                     // Reorganized points (output), Size: [ n_pointsR, 3 ]
-                                    arma::Col<unsigned> *sub_cloud_index,          // Sub-cloud index, 0-based, Length: [ n_sub ]
-                                    size_t target_size = 1024,                     // Target value for the sub-cloud size
-                                    size_t vec_size = 1,                           // Vector size for SIMD processing (e.g. 8 for AVX2)
-                                    arma::Col<unsigned> *forward_index = nullptr,  // Index mapping elements of "points" to "pointsR", 1-based, Length: [ n_pointsR ]
-                                    arma::Col<unsigned> *reverse_index = nullptr); // Index mapping elements of "pointsR" to "points", 0-based, Length: [ n_points ]
+    arma::uword point_cloud_segmentation(const arma::Mat<dtype> *points,          // Points in 3D Space (input), Size: [ n_points, 3 ]
+                                         arma::Mat<dtype> *pointsR,               // Reorganized points (output), Size: [ n_pointsR, 3 ]
+                                         arma::u32_vec *sub_cloud_index,          // Sub-cloud index, 0-based, Length: [ n_sub ]
+                                         arma::uword target_size = 1024,          // Target value for the sub-cloud size
+                                         arma::uword vec_size = 1,                // Vector size for SIMD processing (e.g. 8 for AVX2)
+                                         arma::u32_vec *forward_index = nullptr,  // Index mapping elements of "points" to "pointsR", 1-based, Length: [ n_pointsR ]
+                                         arma::u32_vec *reverse_index = nullptr); // Index mapping elements of "pointsR" to "points", 0-based, Length: [ n_points ]
 
     // Split a point cloud into two sub-clouds along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)
+    // - Updates the output arguments pointsA and pointsB (changes size and values, invalidates data pointers)
     // - If the split failed, i.e. all elements would be in one of the two outputs, the output value is negated (-1 = x, -2 = y, -3 = z)
     //   In this case, the arguments "pointsA" and "pointsB" remain unchanged
+    // - The optional output split_ind indicates into which sub-cloud (A or B) each point was put
     template <typename dtype>
     int point_cloud_split(const arma::Mat<dtype> *points,       // Points in 3D Space, Size: [ n_points, 3 ]
                           arma::Mat<dtype> *pointsA,            // First half, Size: [ n_pointsA, 9 ]
                           arma::Mat<dtype> *pointsB,            // Second half, Size: [ n_pointsB, 9 ]
                           int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
-                          arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
+                          arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = pointsA, 2 = pointsB, 0 = Error, Length: [ n_points ]
 
-    // Calculate the interaction of rays with a triangle mesh
+    // Calculate the interaction of rays (beams) with a triangle mesh
+    // - A ray beam is defined by its origin, destination and a triangular wavefront (trivec and tridir)
+    // - The first and second interaction point of the ray (FBS, SBS) are required (computed by ray_triangle_intersect function)
     // - Number of input rays: n_ray
     // - Only returns rays that interact with the mesh, i.e. n_rayN <= n_ray
     // - Outputs {trivecN, tridirN, orig_lengthN} will be empty if inputs {trivec, tridir, orig_length} are not provided
@@ -257,8 +314,8 @@ namespace quadriga_lib
                            const arma::Mat<dtype> *sbs,                   // Second interaction points in GCS, Size [ n_ray, 3 ]
                            const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
                            const arma::Mat<dtype> *mtl_prop,              // Material properties, Size: [ n_mesh, 5 ]
-                           const arma::Col<unsigned> *fbs_ind,            // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                           const arma::Col<unsigned> *sbs_ind,            // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                           const arma::u32_vec *fbs_ind,                  // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                           const arma::u32_vec *sbs_ind,                  // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                            const arma::Mat<dtype> *trivec = nullptr,      // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [n_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
                            const arma::Mat<dtype> *tridir = nullptr,      // Directions of the vertex-rays; Size Spherical [n_ray, 6], Size Cartesian [n_ray, 9]
                            const arma::Col<dtype> *orig_length = nullptr, // Path length at origin point, Size [ n_ray ]
@@ -273,7 +330,7 @@ namespace quadriga_lib
                            arma::Col<dtype> *thicknessN = nullptr,        // Material thickness in meters calculated from the difference between FBS and SBS, Size [ n_rayN ]
                            arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
                            arma::Mat<dtype> *normal_vecN = nullptr,       // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
-                           arma::Col<int> *out_typeN = nullptr);          // Output type code
+                           arma::s32_vec *out_typeN = nullptr);           // Output type code, Length [ n_rayN ]
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
@@ -281,12 +338,12 @@ namespace quadriga_lib
     // - Returns the indices of the rays that hit the points; 0-based; Length (std::vector) [ n_points ]
     // - All internal computations are done using single precision
     template <typename dtype>
-    std::vector<arma::Col<unsigned>> ray_point_intersect(const arma::Mat<dtype> *points,                       // Points in 3D Space, Size: [ n_points, 3 ]
-                                                         const arma::Mat<dtype> *orig,                         // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                                         const arma::Mat<dtype> *trivec,                       // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
-                                                         const arma::Mat<dtype> *tridir,                       // Directions of the vertex-rays; Cartesian format; Size [ n_ray, 9 ]
-                                                         const arma::Col<unsigned> *sub_cloud_index = nullptr, // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
-                                                         arma::Col<unsigned> *hit_count = nullptr);            // Hit counter; Optional Output; Length [ n_points ]
+    std::vector<arma::u32_vec> ray_point_intersect(const arma::Mat<dtype> *points,                 // Points in 3D Space, Size: [ n_points, 3 ]
+                                                   const arma::Mat<dtype> *orig,                   // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                                   const arma::Mat<dtype> *trivec,                 // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
+                                                   const arma::Mat<dtype> *tridir,                 // Directions of the vertex-rays; Cartesian format; Size [ n_ray, 9 ]
+                                                   const arma::u32_vec *sub_cloud_index = nullptr, // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
+                                                   arma::u32_vec *hit_count = nullptr);            // Hit counter; Optional Output; Length [ n_points ]
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
@@ -295,16 +352,16 @@ namespace quadriga_lib
     // - Instead of 'orig' and 'dest', rays can be provided as a combined object 'orig' with size [ n_ray, 6 ] = {xo, yo, zo, xd, yd, zd}
     //   The input 'dest' must be a nullptr in this case. This can help to optimize memory access patterns.
     template <typename dtype>
-    void ray_triangle_intersect(const arma::Mat<dtype> *orig,                        // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *dest,                        // Ray destination points in GCS, Size [ n_ray, 3 ]
-                                const arma::Mat<dtype> *mesh,                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                arma::Mat<dtype> *fbs = nullptr,                     // First interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Mat<dtype> *sbs = nullptr,                     // Second interaction points in GCS, Size [ n_ray, 3 ]
-                                arma::Col<unsigned> *no_interact = nullptr,          // Number of mesh between orig and dest, Size [ n_ray ]
-                                arma::Col<unsigned> *fbs_ind = nullptr,              // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                arma::Col<unsigned> *sbs_ind = nullptr,              // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                                const arma::Col<unsigned> *sub_mesh_index = nullptr, // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
-                                bool transpose_inputs = false);                      // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
+    void ray_triangle_intersect(const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
+                                const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                arma::Mat<dtype> *fbs = nullptr,               // First interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::Mat<dtype> *sbs = nullptr,               // Second interaction points in GCS, Size [ n_ray, 3 ]
+                                arma::u32_vec *no_interact = nullptr,          // Number of mesh between orig and dest, Size [ n_ray ]
+                                arma::u32_vec *fbs_ind = nullptr,              // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                arma::u32_vec *sbs_ind = nullptr,              // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
+                                const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
+                                bool transpose_inputs = false);                // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
 
     // Subdivide rays
     // - Subdivides ray beams into 4 sub beams
@@ -316,35 +373,35 @@ namespace quadriga_lib
     // - If the input "dest" is not given, the corresponding output "destN" will be empty
     // - Returns the number of rays in the output 'n_rayN'
     template <typename dtype>
-    size_t subdivide_rays(const arma::Mat<dtype> *orig,               // Ray origin points in GCS, Size [ n_ray, 3 ]
-                          const arma::Mat<dtype> *trivec,             // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
-                          const arma::Mat<dtype> *tridir,             // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
-                          const arma::Mat<dtype> *dest = nullptr,     // Ray destination points in GCS, Size [ n_ray, 3 ]
-                          arma::Mat<dtype> *origN = nullptr,          // New ray origin points in GCS, Size [ n_rayN, 3 ]
-                          arma::Mat<dtype> *trivecN = nullptr,        // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
-                          arma::Mat<dtype> *tridirN = nullptr,        // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
-                          arma::Mat<dtype> *destN = nullptr,          // New ray destination points in GCS, Size [ n_rayN, 3 ]
-                          const arma::Col<unsigned> *index = nullptr, // Optional list of indices, 0-based, Length [ n_ind ]
-                          const double ray_offset = 0.0);             // Offset of new ray origin from face plane
+    arma::uword subdivide_rays(const arma::Mat<dtype> *orig,           // Ray origin points in GCS, Size [ n_ray, 3 ]
+                               const arma::Mat<dtype> *trivec,         // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
+                               const arma::Mat<dtype> *tridir,         // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
+                               const arma::Mat<dtype> *dest = nullptr, // Ray destination points in GCS, Size [ n_ray, 3 ]
+                               arma::Mat<dtype> *origN = nullptr,      // New ray origin points in GCS, Size [ n_rayN, 3 ]
+                               arma::Mat<dtype> *trivecN = nullptr,    // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
+                               arma::Mat<dtype> *tridirN = nullptr,    // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
+                               arma::Mat<dtype> *destN = nullptr,      // New ray destination points in GCS, Size [ n_rayN, 3 ]
+                               const arma::u32_vec *index = nullptr,   // Optional list of indices, 0-based, Length [ n_ind ]
+                               const double ray_offset = 0.0);         // Offset of new ray origin from face plane
 
     // Subdivide triangles into smaller triangles
     // - Returns the number of triangles after subdivision
     // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
     // - Optional processing of materials (copy of the original material)
-    template <typename dtype>                                              // Supported types: float or double
-    size_t subdivide_triangles(arma::uword n_div,                          // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
-                               const arma::Mat<dtype> *triangles_in,       // Input, matrix of size [n_triangles_in, 9]
-                               arma::Mat<dtype> *triangles_out,            // Output, matrix of size [n_triangles_out, 9]
-                               const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_triangles_in, 5 ], optional
-                               arma::Mat<dtype> *mtl_prop_out = nullptr);  // Material properties (output), Size: [ n_triangles_out, 5 ], optional
+    template <typename dtype>                                                   // Supported types: float or double
+    arma::uword subdivide_triangles(arma::uword n_div,                          // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
+                                    const arma::Mat<dtype> *triangles_in,       // Input, matrix of size [n_triangles_in, 9]
+                                    arma::Mat<dtype> *triangles_out,            // Output, matrix of size [n_triangles_out, 9]
+                                    const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_triangles_in, 5 ], optional
+                                    arma::Mat<dtype> *mtl_prop_out = nullptr);  // Material properties (output), Size: [ n_triangles_out, 5 ], optional
 
     // Calculate the axis-aligned bounding box (AABB) of a 3D mesh
     // - The mesh can be composed of sub-meshes, where each new sub_mesh is indicated by an index (=row number)
     // - Output is a [ n_sub, 6 ] matrix with rows containing [ x_min, x_max, y_min, y_max, z_min, z_max ] of each sub-mesh
     template <typename dtype>
-    arma::Mat<dtype> triangle_mesh_aabb(const arma::Mat<dtype> *mesh,                        // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                        const arma::Col<unsigned> *sub_mesh_index = nullptr, // Sub-mesh index, Length: [ n_sub ]
-                                        size_t vec_size = 1);                                // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+    arma::Mat<dtype> triangle_mesh_aabb(const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                        const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, Length: [ n_sub ]
+                                        arma::uword vec_size = 1);                     // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
 
     // Reorganize a 3D mesh into smaller sub-meshes for faster processing
     // - Recursively calls "mesh_split" until number of elements per sub-mesh is below a target size
@@ -355,14 +412,14 @@ namespace quadriga_lib
     // - "mesh_index" contains the map of elements in "mesh" to "meshR" in 1-based notation, padded with 0s for vec_size > 1
     // - Returns number of sub-meshes "n_sub"
     template <typename dtype>
-    size_t triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
-                                      arma::Mat<dtype> *meshR,                    // Reorganized mesh (output), Size: [ n_meshR, 9 ]
-                                      arma::Col<unsigned> *sub_mesh_index,        // Sub-mesh index, 0-based, Length: [ n_sub ]
-                                      size_t target_size = 1024,                  // Target value for the sub-mesh size
-                                      size_t vec_size = 1,                        // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
-                                      const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_mesh, 5 ], optional
-                                      arma::Mat<dtype> *mtl_propR = nullptr,      // Material properties (output), Size: [ n_meshR, 5 ], optional
-                                      arma::Col<unsigned> *mesh_index = nullptr); // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
+    arma::uword triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
+                                           arma::Mat<dtype> *meshR,                    // Reorganized mesh (output), Size: [ n_meshR, 9 ]
+                                           arma::u32_vec *sub_mesh_index,              // Sub-mesh index, 0-based, Length: [ n_sub ]
+                                           arma::uword target_size = 1024,             // Target value for the sub-mesh size
+                                           arma::uword vec_size = 1,                   // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+                                           const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_mesh, 5 ], optional
+                                           arma::Mat<dtype> *mtl_propR = nullptr,      // Material properties (output), Size: [ n_meshR, 5 ], optional
+                                           arma::u32_vec *mesh_index = nullptr);       // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
 
     // Split a 3D mesh into two sub-meshes along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)

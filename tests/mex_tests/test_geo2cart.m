@@ -74,48 +74,11 @@ catch ME
     end
 end
 
-% wrong_type
-try
-    [~] = quadriga_lib.geo2cart(single(e),e);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input ''elevation'' must have same type as ''azimuth''.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-try
-    [~] = quadriga_lib.geo2cart(e,single(e));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input ''elevation'' must have same type as ''azimuth''.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-try
-    [~] = quadriga_lib.geo2cart(e,e,single(e));
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input ''length'' must have same type as ''azimuth''.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-try
-    [~] = quadriga_lib.geo2cart(single(e),single(e),e);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Input ''length'' must have same type as ''azimuth''.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
 c = quadriga_lib.geo2cart(single(e),single(e),single(e));
+assertEqual( size(c), [3,2,6] )
+assert( isa(c,'single') );
+
+c = quadriga_lib.geo2cart(single(e),e,e);
 assertEqual( size(c), [3,2,6] )
 assert( isa(c,'single') );
 

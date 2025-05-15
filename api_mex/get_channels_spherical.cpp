@@ -41,7 +41,6 @@ execution of this process, several pieces of input data are required:<br><br>
 - The orientations of the antennas.
 
 ## Usage:
-
 ```
 [ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( ...
     e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, coupling_re_tx, coupling_im_tx, ...

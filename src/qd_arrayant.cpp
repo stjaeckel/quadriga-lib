@@ -93,9 +93,17 @@ ant.name = "name";
 `.is_valid()`    | Returns an empty string if arrayant object is valid or an error message otherwise
 
 ## Complex member fuctions:
-- <a href="#.calc_directivity_dbi">.calc_directivity_dBi</a>
-- <a href="#.combine_pattern">.combine_pattern</a>
-
+[[.append]]                 | Append elements of another antenna array
+[[.calc_directivity_dbi]]   | Calculate the directivity (in dBi) of array antenna elements
+[[.combine_pattern]]        | Calculate effective radiation patterns for array antennas
+[[.copy_element]]           | Creates a copy of a single array antenna element
+[[.export_obj_file]]        | Export antenna pattern geometry to Wavefront OBJ file
+[[.interpolate]]            | Interpolate array antenna field patterns
+[[.qdant_write]]            | Write array antenna object and layout to QDANT file
+[[.remove_zeros]]           | Remove zeros from antenna pattern data
+[[.rotate_pattern]]         | Adjust orientation of antenna patterns
+[[.set_size]]               | Change size of antenna array object
+[[.is_valid]]               | Validate integrity of antenna array object
 MD!*/
 
 template <typename dtype>
@@ -123,6 +131,38 @@ arma::uword quadriga_lib::arrayant<dtype>::n_ports() const
     else
         return coupling_re.n_cols;
 }
+
+/*!MD
+# .append
+Append elements of another antenna array
+
+## Description:
+- Combines elements of another antenna array (`new_arrayant`) with the current antenna array object.
+- Returns a new `arrayant` object containing elements from both antenna arrays.
+- Throws an error if the sampling grids of the two antenna arrays do not match.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const arrayant<dtype> *new_arrayant) const;
+```
+
+## Arguments:
+- `const arrayant<dtype> *new_arrayant` (input)<br>
+  Pointer to an antenna array object whose elements will be added to the current object. Sampling grids must match exactly.
+
+## Returns:
+- `quadriga_lib::arrayant<dtype>`<br>
+  A new antenna array object combining the current and new antenna elements.
+
+## Example:
+```
+quadriga_lib::arrayant<double> ant1 = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+quadriga_lib::arrayant<double> ant2 = quadriga_lib::generate_arrayant_custom<double>(120.0, 60.0, 0.0);
+quadriga_lib::arrayant<double> combined_ant = ant1.append(&ant2);
+```
+MD!*/
 
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadriga_lib::arrayant<dtype> *new_arrayant) const
@@ -193,7 +233,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
 Calculate the directivity (in dBi) of array antenna elements
 
 ## Description:
-- Member function of <a href="#arrayant">arrayant</a>
+- Member function of [[arrayant]]
 - Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted
   is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction
   from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity
@@ -202,7 +242,7 @@ Calculate the directivity (in dBi) of array antenna elements
 
 ## Declaration:
 ```
-dtype calc_directivity_dBi(arma::uword i_element) const;
+dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const;
 ```
 ## Arguments:
 - `arma::uword **i_element**`<br>
@@ -288,7 +328,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 Calculate effective radiation patterns for array antennas
 
 ## Description:
-- Member function of <a href="#arrayant">arrayant</a>
+- Member function of [[arrayant]]
 - By integrating element radiation patterns, element positions, and the coupling weights, one can
   determine an effective radiation pattern observable by a receiver in the antenna's far field.
 - Leveraging these effective patterns is especially beneficial in antenna design, beamforming
@@ -299,8 +339,9 @@ Calculate effective radiation patterns for array antennas
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,
-        const arma::Col<dtype> *elevation_grid_new = nullptr) const;
+quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
+                const arma::Col<dtype> *azimuth_grid_new = nullptr,
+                const arma::Col<dtype> *elevation_grid_new = nullptr) const;
 ```
 
 ## Arguments:
@@ -468,13 +509,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::copy() const
 Creates a copy of a single array antenna element
 
 ## Description:
-- Member function of <a href="#arrayant">arrayant</a>
+- Member function of [[arrayant]]
 - Allowed datatypes (`dtype`): `float` and `double`
 
 ## Declaration:
 ```
-void copy_element(arma::uword source, arma::uvec destination);
-void copy_element(arma::uword source, arma::uword destination);
+void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec destination);
+
+void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword destination);
 ```
 
 ## Arguments:
@@ -558,6 +600,57 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uword
     dest.at(0) = destination;
     copy_element(source, dest);
 }
+
+/*!MD
+# .export_obj_file
+Export antenna pattern geometry to Wavefront OBJ file
+
+## Description:
+- This function exports the antenna pattern geometry to a Wavefront OBJ file, useful for visualization in 3D software such as Blender.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::arrayant<dtype>::export_obj_file(
+                std::string fn,
+                dtype directivity_range = 30.0,
+                std::string colormap = "jet",
+                dtype object_radius = 1.0,
+                arma::uword icosphere_n_div = 4,
+                arma::uvec i_element = {}) const;
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the OBJ file to which the antenna pattern will be exported. Cannot be empty.
+
+- `dtype **directivity_range** = 30.0` (optional input)<br>
+  Directivity range in decibels (dB) for visualizing the antenna pattern. This value defines the
+  dynamic range of the visualized directivity pattern. Default: `30.0`
+
+- `std::string **colormap** = "jet"` (optional input)<br>
+  Colormap used for visualizing the antenna directivity. Supported colormaps are: `jet`,
+  `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`, `autumn`, `summer`.
+  Default: `"jet"`
+
+- `dtype **object_radius** = 1.0` (optional input)<br>
+  Radius of the exported antenna pattern geometry object, specified in meters. Default: `1.0`
+
+- `arma::uword **icosphere_n_div** = 4` (optional input)<br>
+  Number of subdivisions used to map the antenna pattern onto an icosphere. Higher values yield finer
+  mesh resolution. Default: `4`
+
+- `arma::uvec **i_element** = {}` (optional input)<br>
+  Antenna element indices for which the pattern geometry is exported. Indices are 0-based. Providing
+  an empty vector `{}` (default) exports the geometry for all elements of the antenna array.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+ant.export_obj_file("antenna_pattern.obj", 40.0, "turbo", 1.5, 5);
+```
+MD!*/
 
 // ARRAYANT METHOD : OBJ Export
 template <typename dtype>
@@ -903,6 +996,120 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(std::string fn, dtype direct
     }
 }
 
+/*!MD
+# .interpolate
+Interpolate array antenna field patterns
+
+## Description:
+- This function interpolates polarimetric antenna field patterns for a given set of azimuth and
+  elevation angles.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::arrayant<dtype>::interpolate(
+                const arma::Mat<dtype> *azimuth,
+                const arma::Mat<dtype> *elevation,
+                arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                arma::uvec i_element,
+                const arma::Cube<dtype> *orientation,
+                const arma::Mat<dtype> *element_pos_i,
+                arma::Mat<dtype> *dist,
+                arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc,
+                arma::Mat<dtype> *gamma) const;
+```
+
+## Arguments:
+- `const arma::Mat<dtype> ***azimuth**` (input)<br>
+  Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be
+  between -pi and pi, cannot be NULL
+  Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
+             | Size: `[1, n_ang]`
+  Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
+             | Size: `[n_out, n_ang]`
+
+- `const arma::Mat<dtype> ***elevation**` (input)<br>
+  Elevation angles in [rad] for which the field pattern should be interpolated. Values must be
+  between -pi/2 and pi/2, cannot be NULL
+  Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
+             | Size: `[1, n_ang]`
+  Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
+             | Size: `[n_out, n_ang]`
+
+- `arma::Mat<dtype> ***V_re**` (output)<br>
+  Real part of the interpolated e-theta (vertical) field component, Size `[n_out, n_ang]`,
+  will be resized if it does not match the required size (invalidates data pointers), cannot be NULL
+
+- `arma::Mat<dtype> ***V_im**` (output)<br>
+  Imaginary part of the interpolated e-theta (vertical) field component, Size `[n_out, n_ang]`
+  will be resized if it does not match the required size (invalidates data pointers), cannot be NULL
+
+- `arma::Mat<dtype> ***H_re**` (output)<br>
+  Real part of the interpolated e-phi (horizontal) field component, Size `[n_out, n_ang]`
+  will be resized if it does not match the required size (invalidates data pointers), cannot be NULL
+
+- `arma::Mat<dtype> ***H_im**` (output)<br>
+  Imaginary part of the interpolated e-phi (horizontal) field component, Size `[n_out, n_ang]`
+  will be resized if it does not match the required size (invalidates data pointers), cannot be NULL
+
+- `arma::uvec **i_element** = {}` (optional input)<br>
+  The element indices for which the interpolation should be done, optional argument,
+  values must be between 1 and `n_elements`. It is possible to duplicate elements, i.e. by passing
+  `{1,1,2}`. If this parameter is not provided (or an empty array is passed), `i_element` is initialized
+  to include all elements of the array antenna. In this case, `n_out = n_elements`,
+  Length: `n_out` or  empty `{}`
+
+- `const arma::Cube<dtype> ***orientation** = nullptr` (optional input)<br>
+  This (optional) 3-element vector allows for setting orientation of the array antenna or
+  of individual elements using Euler angles (bank, tilt, heading); values must be given in [rad];
+  By default, the orientation is `{0,0,0}`, i.e. the broadside of the antenna points at the horizon
+  towards the East. Sizes: `nullptr` (use default), `[3, 1]` (set orientation for entire array),
+  `[3, n_out]` (set orientation for individual elements), or `[3, 1, n_ang]` (set orientation for
+  individual angles) or `[3, n_out, n_ang]` (set orientation for individual elements and angles)
+
+- `const arma::Mat<dtype> ***element_pos_i** = nullptr` (optional input)<br>
+  Positions of the array antenna elements in local cartesian coordinates (using units
+  of [m]). If this parameter is not given, the element positions from the `arrayant` object are used.
+  Sizes: `nullptr` (use `arrayant.element_pos`), `[3, n_out]` (set alternative positions)
+
+- `arma::Mat<dtype> ***dist** = nullptr` (optional output)<br>
+  The effective distances between the antenna elements when seen from the direction
+  of the incident path. The distance is calculated by an projection of the array positions on the normal
+  plane of the incident path. This is needed for calculating the phase of the antenna response.
+  Size: `nullptr` (do not calculate this) or `[n_out, n_ang]` (argument be resized if it does not already
+  match this size)
+
+- `arma::Mat<dtype> ***azimuth_loc** = nullptr` (optional output)<br>
+  The azimuth angles in [rad] for the local antenna coordinate system, i.e., after
+  applying the `orientation`. If no orientation vector is given, these angles are identical to the input
+  azimuth angles. Size: `nullptr` or `[n_out, n_ang]`
+
+- `arma::Mat<dtype> ***elevation_loc** = nullptr` (optional output)<br>
+  The elevation angles in [rad] for the local antenna coordinate system, i.e., after
+  applying the `orientation`. If no orientation vector is given, these angles are identical to the input
+  elevation angles. Size: `nullptr` or `[n_out, n_ang]`
+
+- `arma::Mat<dtype> ***gamma** = nullptr` (optional output)<br>
+  Polarization rotation angles in [rad]. Size: `nullptr` or `[n_out, n_ang]`
+
+
+## Example:
+```
+double pi = arma::datum::pi;
+
+// Directional antenna, pointing east
+auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+
+arma::mat azimuth = {0.0, 0.5 * pi, -0.5 * pi, pi};     // Azimuth angles: East, North, South, West
+arma::mat elevation(1, azimuth.n_elem);                 // Initialize to 0
+arma::mat V_re, V_im, H_re, H_im;                       // Output variables (uninitialized)
+ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
+V_re.print();
+```
+MD!*/
+
 // ARRAYANT METHOD : Interpolation
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
@@ -1014,9 +1221,56 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
                             V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma);
 }
 
+/*!MD
+# .qdant_write
+Write array antenna object and layout to QDANT file
+
+## Description:
+- This function writes array antenna patterns and their layout into the QuaDRiGa array antenna exchange
+  format (QDANT), an XML-based file format
+- Multiple array antennas can be stored in the same file using the `id` parameter.
+- If writing to an exisiting file without specifying an `id`, the data gests appended at the end.
+  The output `id_in_file` identifies the location inside the file.
+- An optional storage `layout` can be provided to organize data inside the file.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+unsigned quadriga_lib::arrayant<dtype>::qdant_write(
+                std::string fn,
+                unsigned id = 0, 
+                arma::u32_mat layout = {}) const;
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the QDANT file to write the antenna pattern data. Cannot be empty.
+
+- `unsigned **id** = 0` (optional input)<br>
+  ID of the antenna to write into the file. If not provided or set to `0`, the antenna pattern is appended with a new ID equal to the maximum existing ID in the file plus one.
+
+- `arma::u32_mat **layout** = {}` (optional input)<br>
+  Layout specifying the organization of multiple antenna elements inside the file. This matrix must only contain element IDs present within the file. Default: empty matrix `{}`.
+
+## Returns:
+- `unsigned`<br>
+  Returns the ID assigned to the antenna pattern within the file after writing.
+
+## Example:
+```
+quadriga_lib::arrayant<double> ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+unsigned ant_id = ant.qdant_write("antenna_data.qdant");
+```
+
+## See also:
+- [[arrayant]]
+- <a href="#qdant_read">qdant_read</a>
+MD!*/
+
 // ARRAYANT : Write to QDANT file
 template <typename dtype>
-unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::Mat<unsigned> layout) const
+unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id, arma::u32_mat layout) const
 {
     // Check if arrayant object is valid
     std::string error_message = is_valid();
@@ -1034,6 +1288,33 @@ unsigned quadriga_lib::arrayant<dtype>::qdant_write(std::string fn, unsigned id,
 
     return id_in_file;
 }
+
+/*!MD
+# .remove_zeros
+Remove zeros from antenna pattern data
+
+## Description:
+- This function removes zeros from the antenna pattern data, altering its size accordingly.
+- If called without an argument, the function modifies the antenna array properties in place.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::arrayant<dtype>::remove_zeros(arrayant<dtype> *output = nullptr);
+```
+
+## Arguments:
+- `arrayant<dtype> ***output** = nullptr` (optional output)<br>
+  Pointer to an antenna array object where the modified pattern data is should be written to. If set
+  to `nullptr` (default), the modifications are applied directly to the calling antenna object.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+ant.remove_zeros(); // Modifies ant in-place
+```
+MD!*/
 
 // Remove zeros from the pattern
 template <typename dtype>
@@ -1283,6 +1564,57 @@ void quadriga_lib::arrayant<dtype>::reset()
     center_frequency = dtype(299792458.0);
 }
 
+/*!MD
+# .rotate_pattern
+Adjust orientation of antenna patterns
+
+## Description:
+
+* Adjusts the orientation of antenna radiation patterns by performing precise rotations around the
+  three principal axes (x, y, z) of the local Cartesian coordinate system (Euler rotations)
+* Transforms both uniformly and non-uniformly sampled antenna patterns, useful for precise adjustments
+  in antennas like parabolic antennas with small apertures.
+* Member function of [[arrayant]]
+* Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::arrayant<dtype>::rotate_pattern(
+                dtype x_deg = 0.0,
+                dtype y_deg = 0.0, 
+                dtype z_deg = 0.0,
+                unsigned usage = 0, 
+                unsigned element = -1,
+                arrayant<dtype> *output = nullptr);
+```
+
+## Arguments:
+- `dtype **x_deg** = 0.0` (optional input)<br>
+  Rotation angle around the x-axis (bank angle), specified in degrees. Default: `0.0`
+
+- `dtype **y_deg** = 0.0` (optional input)<br>
+  Rotation angle around the y-axis (tilt angle), specified in degrees. Default: `0.0`
+
+- `dtype **z_deg** = 0.0` (optional input)<br>
+  Rotation angle around the z-axis (heading angle), specified in degrees. Default: `0.0`
+
+- `unsigned **usage** = 0` (optional input)<br>
+  Rotation usage model, specifying which components to rotate: (`0`): Rotate both pattern and polarization,
+  (`1`): Rotate only pattern, (`2`): Rotate only polarization, (`3`): Rotate both pattern and polarization without adjusting the grid
+
+- `unsigned **element** = -1` (optional input)<br>
+  Index of the antenna element (0-based) to rotate. Default (`-1`) applies rotation to all elements.
+
+- `arrayant<dtype> **output** = nullptr` (optional output)<br>
+  Pointer to an antenna array object to store the modified pattern data. If `nullptr` (default), modifications are applied directly to the calling antenna object.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+ant.rotate_pattern(0.0, 0.0, 45.0);
+```
+MD!*/
+
 // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
 template <typename dtype>
 void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dtype z_deg,
@@ -1473,7 +1805,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     }
 
     // Initiate output variables
-    arma::Cube<dtype> orientation(3, 1, 1);
+
     arma::Mat<dtype> V_re(n_out, n_ang, arma::fill::none), V_im(n_out, n_ang, arma::fill::none);
     arma::Mat<dtype> H_re(n_out, n_ang, arma::fill::none), H_im(n_out, n_ang, arma::fill::none);
     arma::Mat<dtype> azimuth_loc, elevation_loc, gamma, EMPTY;
@@ -1488,13 +1820,14 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         for (auto ie = 0ULL; ie < n_el; ++ie)
             *p_azimuth++ = p_phi[ia], *p_elevation++ = p_theta[ie];
 
-    // Set antenna orientation
+    // Calculate rotation matrix
+    arma::Cube<dtype> orientation(3, 1, 1);
     orientation.at(0) = x_deg * deg2rad;
     orientation.at(1) = -y_deg * deg2rad;
     orientation.at(2) = z_deg * deg2rad;
 
-    // Calculate rotation matrix (double precision)
-    arma::cube R = quadriga_lib::calc_rotation_matrix(orientation, true);
+    // Set antenna orientation
+    arma::Cube<dtype> R = quadriga_lib::calc_rotation_matrix(orientation, true);
 
     if (usage == 1)
         azimuth_loc.set_size(n_out, n_ang), elevation_loc.set_size(n_out, n_ang);
@@ -1612,14 +1945,14 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         ptrI = element_pos_update.memptr();
         ptrO = use_all_elements ? element_pos.memptr() : element_pos.colptr(element);
         ptrO = output == nullptr ? ptrO : output->element_pos.memptr();
-        double *R_ptr = R.memptr();
+        dtype *R_ptr = R.memptr();
         for (auto i = 0ULL; i < i_element.n_elem; ++i)
         {
             unsigned j = 3 * (i_element.at(i) - 1);
             unsigned k = use_all_elements ? j : 0;
-            dtype a = dtype(R_ptr[0]) * ptrI[j] + dtype(R_ptr[3]) * ptrI[j + 1] + dtype(R_ptr[6]) * ptrI[j + 2];
-            dtype b = dtype(R_ptr[1]) * ptrI[j] + dtype(R_ptr[4]) * ptrI[j + 1] + dtype(R_ptr[7]) * ptrI[j + 2];
-            dtype c = dtype(R_ptr[2]) * ptrI[j] + dtype(R_ptr[5]) * ptrI[j + 1] + dtype(R_ptr[8]) * ptrI[j + 2];
+            dtype a = R_ptr[0] * ptrI[j] + R_ptr[3] * ptrI[j + 1] + R_ptr[6] * ptrI[j + 2];
+            dtype b = R_ptr[1] * ptrI[j] + R_ptr[4] * ptrI[j + 1] + R_ptr[7] * ptrI[j + 2];
+            dtype c = R_ptr[2] * ptrI[j] + R_ptr[5] * ptrI[j + 1] + R_ptr[8] * ptrI[j + 2];
             ptrO[k] = a, ptrO[k + 1] = b, ptrO[k + 2] = c;
         }
 
@@ -1629,6 +1962,48 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
             output->remove_zeros();
     }
 }
+
+/*!MD
+# .set_size
+Change size of antenna array object
+
+## Description:
+- Changes the size of an antenna array (`arrayant`) without explicitly preserving existing data.
+- Resets `element_pos` to zero and sets `coupling_re` and `coupling_im` to identity matrices.
+- Other properties may contain undefined or garbage data after resizing
+- Size update is performed only if the existing size differs from the specified new size
+- Function returns an error if the antenna object is marked as read-only
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::arrayant<dtype>::set_size(
+                arma::uword n_elevation, 
+                arma::uword n_azimuth,
+                arma::uword n_elements, 
+                arma::uword n_ports);
+```
+
+## Arguments:
+- `arma::uword **n_elevation**` (input)<br>
+  Number of elevation angles to resize to.
+
+- `arma::uword **n_azimuth**` (input)<br>
+  Number of azimuth angles to resize to.
+
+- `arma::uword **n_elements**` (input)<br>
+  Number of antenna elements in the array after resizing.
+
+- `arma::uword **n_ports**` (input)<br>
+  Number of ports (after coupling of elements) in the resized antenna array.
+
+## Example:
+```
+quadriga_lib::arrayant<double> ant;
+ant.set_size(180, 360, 4, 2);
+```
+MD!*/
 
 // ARRAYANT METHOD : Change the size of an arrayant, without explicitly preserving data
 template <typename dtype>
@@ -1668,6 +2043,44 @@ void quadriga_lib::arrayant<dtype>::set_size(arma::uword n_elevation, arma::uwor
     if (coupling_im.n_rows != n_elements || coupling_im.n_cols != n_ports)
         coupling_im.zeros(n_elements, n_ports);
 }
+
+/*!MD
+# .is_valid
+Validate integrity of antenna array object
+
+## Description:
+- Checks the integrity of an antenna array (`arrayant`) object.
+- Returns an empty string if the antenna object is valid.
+- Provides an error message describing any issue if the object is invalid.
+- A quick integrity check can be performed for efficiency.
+- Member function of [[arrayant]]
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) const;
+```
+
+## Arguments:
+
+- `bool **quick_check** = true` (optional input)<br>
+  If set to `true` (default), performs a quick validation check. Setting it to `false` performs a more thorough validation.
+
+## Returns:
+- `std::string`<br>
+  Returns an empty string (`""`) if the antenna object passes the integrity check; otherwise, returns an error message detailing the issue.
+
+## Example:
+```
+quadriga_lib::arrayant<double> ant;
+std::string result = ant.is_valid();
+if(result.empty()) {
+    std::cout << "Antenna array is valid." << std::endl;
+} else {
+    std::cout << "Error: " << result << std::endl;
+}
+```
+MD!*/
 
 // ARRAYANT METHOD : Validates correctness of the member functions
 template <typename dtype>
@@ -1784,41 +2197,3 @@ std::string quadriga_lib::arrayant<dtype>::validate()
 // Instantiate templates
 template class quadriga_lib::arrayant<float>;
 template class quadriga_lib::arrayant<double>;
-
-// Read array antenna object and layout from QDANT file
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout)
-{
-    quadriga_lib::arrayant<dtype> ant;
-    std::string error_message;
-
-    if (layout == nullptr)
-    {
-        arma::Mat<unsigned> tmp_layout;
-        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
-                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
-                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
-                                               &tmp_layout);
-        tmp_layout.reset();
-    }
-    else
-        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
-                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
-                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
-                                               layout);
-
-    // Throw parsing errors
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Throw validation errors
-    error_message = ant.validate();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    return ant;
-}
-template quadriga_lib::arrayant<float> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
-template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);

@@ -75,74 +75,46 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:cart2geo:no_output", "Too many output arguments.");
 
-    if (mxGetNumberOfElements(prhs[0]) == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:empty", "Input cannot be empty.");
-
-    arma::cube cart = mxIsDouble(prhs[0]) ? qd_mex_reinterpret_Cube<double>(prhs[0]) : qd_mex_typecast_Cube<double>(prhs[0]);
-    arma::cube geo;
-
-    try
-    {
-        geo = quadriga_lib::cart2geo(cart);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:cart2geo:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
-
-    arma::uword n_elem = geo.n_rows * geo.n_cols;
-
     if (mxIsSingle(prhs[0]))
     {
-        arma::fmat azimuth, elevation, length;
-
+        arma::fcube cart = qd_mex_reinterpret_Cube<float>(prhs[0]);
+        arma::fcube geo;
+        CALL_QD(geo = quadriga_lib::cart2geo(cart));
         if (nlhs > 0)
         {
-            plhs[0] = qd_mex_init_output(&azimuth, geo.n_rows, geo.n_cols);
-            float *ptrO = azimuth.memptr();
-            double *ptrI = geo.slice_memptr(0);
-            for (arma::uword i = 0ULL; i < n_elem; ++i)
-                ptrO[i] = (float)ptrI[i];
+            arma::fmat sub_matrix(geo.slice_memptr(0), geo.n_rows, geo.n_cols, false, true);
+            plhs[0] = qd_mex_copy2matlab(&sub_matrix);
         }
         if (nlhs > 1)
         {
-            plhs[1] = qd_mex_init_output(&elevation, geo.n_rows, geo.n_cols);
-            float *ptrO = elevation.memptr();
-            double *ptrI = geo.slice_memptr(1);
-            for (arma::uword i = 0ULL; i < n_elem; ++i)
-                ptrO[i] = (float)ptrI[i];
+            arma::fmat sub_matrix(geo.slice_memptr(1), geo.n_rows, geo.n_cols, false, true);
+            plhs[1] = qd_mex_copy2matlab(&sub_matrix);
         }
         if (nlhs > 2)
         {
-            plhs[2] = qd_mex_init_output(&length, geo.n_rows, geo.n_cols);
-            float *ptrO = length.memptr();
-            double *ptrI = geo.slice_memptr(2);
-            for (arma::uword i = 0ULL; i < n_elem; ++i)
-                ptrO[i] = (float)ptrI[i];
+            arma::fmat sub_matrix(geo.slice_memptr(2), geo.n_rows, geo.n_cols, false, true);
+            plhs[2] = qd_mex_copy2matlab(&sub_matrix);
         }
     }
-    else // Return double
+    else
     {
-        arma::mat azimuth, elevation, length;
-
+        arma::cube cart = mxIsDouble(prhs[0]) ? qd_mex_reinterpret_Cube<double>(prhs[0]) : qd_mex_typecast_Cube<double>(prhs[0]);
+        arma::cube geo;
+        CALL_QD(geo = quadriga_lib::cart2geo(cart));
         if (nlhs > 0)
         {
-            plhs[0] = qd_mex_init_output(&azimuth, geo.n_rows, geo.n_cols);
-            std::memcpy(azimuth.memptr(), geo.slice_memptr(0), n_elem * sizeof(double));
+            arma::mat sub_matrix(geo.slice_memptr(0), geo.n_rows, geo.n_cols, false, true);
+            plhs[0] = qd_mex_copy2matlab(&sub_matrix);
         }
         if (nlhs > 1)
         {
-            plhs[1] = qd_mex_init_output(&elevation, geo.n_rows, geo.n_cols);
-            std::memcpy(elevation.memptr(), geo.slice_memptr(1), n_elem * sizeof(double));
+            arma::mat sub_matrix(geo.slice_memptr(1), geo.n_rows, geo.n_cols, false, true);
+            plhs[1] = qd_mex_copy2matlab(&sub_matrix);
         }
         if (nlhs > 2)
         {
-            plhs[2] = qd_mex_init_output(&length, geo.n_rows, geo.n_cols);
-            std::memcpy(length.memptr(), geo.slice_memptr(2), n_elem * sizeof(double));
+            arma::mat sub_matrix(geo.slice_memptr(2), geo.n_rows, geo.n_cols, false, true);
+            plhs[2] = qd_mex_copy2matlab(&sub_matrix);
         }
     }
 }

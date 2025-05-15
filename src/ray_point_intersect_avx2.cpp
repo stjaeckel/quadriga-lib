@@ -19,7 +19,8 @@
 #include <stdexcept>
 #include <cstdint>
 #include <immintrin.h>
-#include "ray_point_intersect_avx2.hpp"
+
+#include "quadriga_lib_avx2_functions.hpp"
 
 #if defined(_MSC_VER) // Windows
 #include <intrin.h>

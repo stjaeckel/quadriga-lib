@@ -34,8 +34,8 @@ TEST_CASE("Tools - Path 2 Tube")
 TEST_CASE("Tools - Path 2 Tube Short segments")
 {
     arma::fmat path = {{1.0, 1.0, 1.0, 10.0, 10.0, 12.0, 12.001},
-                      {0.0, 0.0, 0.001, 5.0, 5.0, 0.0, 0.0},
-                      {0.0, 0.0, 0.0, 1.0, 1.001, 0.0, 0.0}};
+                       {0.0, 0.0, 0.001, 5.0, 5.0, 0.0, 0.0},
+                       {0.0, 0.0, 0.0, 1.0, 1.001, 0.0, 0.0}};
 
     arma::fmat vert;
     arma::umat faces;
@@ -48,7 +48,7 @@ TEST_CASE("Channel - OBJ Export")
 {
     quadriga_lib::channel<double> c;
 
-    REQUIRE_THROWS_AS(quadriga_lib::export_obj_file(&c, "test_chan.obj"), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj"), std::invalid_argument);
 
     // Single transmitter
     c.tx_pos = {0.0, 0.0, 1.0};
@@ -59,7 +59,7 @@ TEST_CASE("Channel - OBJ Export")
                 {0.0, 1.0},
                 {1.0, 1.0}};
 
-    REQUIRE_THROWS_AS(quadriga_lib::export_obj_file(&c, "test_chan.obj"), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj"), std::invalid_argument);
 
     // 2 Paths: LOS and 1 single-bounce
     arma::u32_vec no_interact = {0, 1};
@@ -70,7 +70,7 @@ TEST_CASE("Channel - OBJ Export")
     c.interact_coord.push_back(interact_coord.t());
     c.interact_coord.push_back(interact_coord.t());
 
-    REQUIRE_THROWS_AS(quadriga_lib::export_obj_file(&c, "test_chan.obj"), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj"), std::invalid_argument);
 
     arma::mat M(8, 2);
     M(0, 0) = 1.0;
@@ -84,15 +84,15 @@ TEST_CASE("Channel - OBJ Export")
 
     // This is the minimum data required from the RT simulation:
     // - TX and RX positions, Polarization Matrix and Path interaction coordinates
-    quadriga_lib::export_obj_file(&c, "test_chan.obj");
-    quadriga_lib::export_obj_file(&c, "test_chan.obj", 1);
-    quadriga_lib::export_obj_file(&c, "test_chan.obj", 0, -50.0);
-    quadriga_lib::export_obj_file(&c, "test_chan.obj", 0, -50.0, -82.6);
+    c.write_paths_to_obj_file("test_chan.obj");
+    c.write_paths_to_obj_file("test_chan.obj", 1);
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0);
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6);
 
-    REQUIRE_THROWS_AS(quadriga_lib::export_obj_file(&c, "test_chan.obj", 0, -50.0, -82.6, "bla"), std::invalid_argument);
+    REQUIRE_THROWS_AS(c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "bla"), std::invalid_argument);
 
-    quadriga_lib::export_obj_file(&c, "test_chan.obj", 0, -50.0, -82.6, "turbo");
-    quadriga_lib::export_obj_file(&c, "test_chan.obj", 0, -50.0, -82.6, "jet", {1,0,0,1}, 0.5, 0.2, 12);
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "turbo");
+    c.write_paths_to_obj_file("test_chan.obj", 0, -50.0, -82.6, "jet", {1, 0, 0, 1}, 0.5, 0.2, 12);
 
     std::remove("test_chan.obj");
     std::remove("test_chan.mtl");

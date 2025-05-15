@@ -64,6 +64,7 @@
 <tr><td><a href="#arrayant_qdant_read">arrayant_qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
 <tr><td><a href="#arrayant_qdant_write">arrayant_qdant_write</a></td><td>Writes array antenna data to QDANT files</td></tr>
 <tr><td><a href="#arrayant_rotate_pattern">arrayant_rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
+<tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients from path data and antenna patterns</td></tr>
 </tbody>
 </table>
@@ -93,7 +94,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#calc_rotation_matrix ">calc_rotation_matrix </a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
+<tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
@@ -1100,6 +1101,225 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_planar"></a>
+<b>get_channels_planar</b> - Calculate channel coefficients for planar waves
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>In this function, the wireless propagation channel between a transmitter and a receiver is calculated, 
+based on a single transmit and receive position. Additionally, interaction points with the environment, 
+which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are 
+considered. The calculation is performed under the assumption of planar wave propagation. For accurate 
+execution of this process, several pieces of input data are required:<br><br> 
+ 
+<ul><li style="margin-bottom: 0.4em;">The 3D Cartesian (local) coordinates of both the transmitter and the receiver. 
+</li><li style="margin-bottom: 0.4em;">The azimuth/elevation departure and arrval angles. 
+</li><li style="margin-bottom: 0.4em;">The polarization transfer matrix for each propagation path. 
+</li><li style="margin-bottom: 0.4em;">Antenna models for both the transmitter and the receiver. 
+</li><li style="margin-bottom: 0.4em;">The orientations of the antennas. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ coeff_re, coeff_im, delays, rx_Doppler ] = quadriga_lib.get_channels_planar( ...
+    e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, coupling_re_tx, coupling_im_tx, ...
+    e_theta_re_rx, e_theta_im_rx, e_phi_re_rx, e_phi_im_rx, azimuth_grid_rx, elevation_grid_rx, element_pos_rx, coupling_re_rx, coupling_im_rx, ...
+    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, center_freq, use_absolute_delays, add_fake_los_path );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>TX Antenna data:</b> (inputs 1-9, single or double) 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re_tx</code></td>
+  <td>Real part of e-theta field component</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im_tx</code></td>
+  <td>Imaginary part of e-theta field component</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re_tx</code></td>
+  <td>Real part of e-phi field component</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im_tx</code></td>
+  <td>Imaginary part of e-phi field component</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid_tx</code></td>
+  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth_tx]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid_tx</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation_tx]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos_tx</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_tx_elements]</code> or <code>[]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re_tx</code></td>
+  <td>Real part of coupling matrix, optional</td>
+  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im_tx</code></td>
+  <td>Imaginary part of coupling matrix, optional</td>
+  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>RX Antenna data:</b> (inputs 10-18, single or double) 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re_rx</code></td>
+  <td>Real part of e-theta field component</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im_rx</code></td>
+  <td>Imaginary part of e-theta field component</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re_rx</code></td>
+  <td>Real part of e-phi field component</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im_rx</code></td>
+  <td>Imaginary part of e-phi field component</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid_rx</code></td>
+  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth_rx]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid_rx</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation_rx]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos_rx</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_rx_elements]</code> or <code>[]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re_rx</code></td>
+  <td>Real part of coupling matrix, optional</td>
+  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im_rx</code></td>
+  <td>Imaginary part of coupling matrix, optional</td>
+  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b><br> 
+   Departure azimuth angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b><br> 
+   Departure elevation angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b><br> 
+   Arrival azimuth angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b><br> 
+   Arrival elevation angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b><br> 
+   Path gain (linear scale); Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b><br> 
+   Total path length in meters; If <code>path_length</code> is shorter than the shortest possible path from TX to 
+   FBS to LBS to RX, it is replaced by the shortest path length. <br>Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
+   Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); 
+   Size: <code>[ 8, n_path ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
+   Transmitter position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b><br> 
+   3-element vector describing the orientation of the transmit antenna. The The first value describes 
+   the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards), 
+   the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given 
+   in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south 
+   is -pi/2, and west is equal to pi. Single or double precision, Size: <code>[3,1]</code> or <code>[1,3]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b><br> 
+   Receiver position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b><br> 
+   3-element vector describing the orientation of the receive antenna. Size: <code>[3,1]</code> or <code>[1,3]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
+   Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation 
+   in coefficients is disabled, i.e. that path length has not influence on the results. This can be 
+   used to calculate the antenna response for a specific angle and polarization. Scalar value 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>use_absolute_delays</code></b> (optional)<br> 
+   If true, the LOS delay is included for all paths; Default is <code>false</code>, i.e. delays are normalized 
+   to the LOS delay. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>add_fake_los_path</code></b> (optional)<br> 
+   If true, adds a zero-power LOS path as the first path in case where no LOS path was present. 
+   Default: <code>false</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b><br> 
+   Channel coefficients, real part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b><br> 
+   Channel coefficients, imaginary part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>delays</code></b><br> 
+   Propagation delay in seconds, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_Doppler</code></b><br> 
+   Doppler weights for moving RX, Size: <code>[ 1, n_path ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Antenna patterns, <code>aod</code>, <code>eod</code>, <code>aoa</code>, <code>eoa</code>, <code>path_gain</code>, <code>path_length</code>, and <code>M</code> can be provided in 
+   single or double precision, but types must match. Outputs are returned in the same type. 
+</li><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance 
+   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
+   computation. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="get_channels_spherical"></a>
 <b>get_channels_spherical</b> - Calculate channel coefficients from path data and antenna patterns
 <ul>
@@ -1912,7 +2132,7 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, location, rx_position, tx_po
 <li style="margin-bottom: 1.5em;">
 <b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">If the file exists already, the new data is added to the exisiting file 
 </li><li style="margin-bottom: 0.4em;">If a new file is created, a storage layout is created to store the location of datasets in the file 
-</li><li style="margin-bottom: 0.4em;">For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix > 65536</code>) 
+</li><li style="margin-bottom: 0.4em;">For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix &gt; 65536</code>) 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy]</code> storage layout is <code>[1024,64,1,1]</code> 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy,iz]</code> storage layout is <code>[256,16,16,1]</code> 
 </li><li style="margin-bottom: 0.4em;">For <code>location = [ix,iy,iz,iw]</code> storage layout is <code>[128,8,8,8]</code> 
@@ -1983,20 +2203,16 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="calc_rotation_matrix "></a>
-<b>calc_rotation_matrix </b> - Calculates a 3x3 rotation matrix from a 3-element orientation vector
+<a name="calc_rotation_matrix"></a>
+<b>calc_rotation_matrix</b> - Calculates a 3x3 rotation matrix from a 3-element orientation vector
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>In linear algebra, a rotation matrix is a transformation matrix that is used to perform a rotation  
-in Euclidean space. The rotation of a rigid body (or three-dimensional coordinate system with a  
-fixed origin) is described by a single rotation about some axis. Such a rotation may be uniquely  
-described by three real-valued parameters. The idea behind Euler rotations is to split the complete  
-rotation of the coordinate system into three simpler constitutive rotations, called precession,  
-nutation, and intrinsic rotation, being each one of them an increment on one of the Euler angles. In  
-aviation orientation of the aircraft is usually expressed as intrinsic Tait-Bryan angles following  
-the z-y-x convention, which are called heading, tilt, and bank (or synonymously, yaw, pitch,  
-and roll). This function calculates the 3x3 rotation matrix <b>R</b> from the intrinsic Tait-Bryan  
-(orientation) angles.
+<b><i>Description:</i></b><br>In linear algebra, a rotation matrix is a transformation matrix that is used to perform a rotation 
+in Euclidean space. The rotation of a rigid body (or three-dimensional coordinate system with a 
+fixed origin) is described by a single rotation about some axis. Such a rotation may be uniquely 
+described by three real-valued parameters. The idea behind Euler rotations is to split the complete 
+rotation of the coordinate system into three simpler constitutive rotation. This function calculates  
+the 3x3 rotation matrix <b>R</b> from the intrinsic Euler angles.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
@@ -2005,12 +2221,10 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transp
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br>The following example obtains the 3x3 matrix R for a 45 degree rotation around the z-axis: 
- 
 <pre>
 bank    = 0;
 tilt    = 0;
 heading = 45 * pi/180;
-
 orientation = [ bank; tilt; heading ];
 rotation = quadriga_lib.calc_rotation_matrix( orientation );
 R = reshape( rotation, 3, 3 );
@@ -2018,12 +2232,7 @@ R = reshape( rotation, 3, 3 );
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b><br> 
-   This 3-element vector describes the orientation of the array antenna or of individual array elements. 
-   The The first value describes the ”bank angle”, the second value describes the  ”tilt angle”,  
-   (positive values point upwards), the third value describes the bearing or ”heading angle”, in  
-   mathematic sense. Values must be given in [rad]. East corresponds to 0, and the angles increase  
-   counter-clockwise, so north is pi/2, south is -pi/2, and west is equal to pi. <br> 
-   Single or double precision, Size: <code>[3, n_row, n_col]</code> 
+   Euler angles (bank, tilt, head) in [rad]; Single or double precision, Size: <code>[3, n_row, n_col]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>invert_y_axis</code></b><br> 
@@ -2036,11 +2245,8 @@ R = reshape( rotation, 3, 3 );
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>rotation</code></b><br> 
-   The rotation matrix, i.e. a transformation matrix that is used to perform a rotation in 3D  
-   Euclidean space. The matrix produces the desired effect only if it is used to premultiply column  
-   vectors. The rotations are applies in the order: heading (around z axis), tilt (around y axis)  
-   and bank (around x axis). The 9 elements of the rotation matrix are returned in column-major  
-   order. Single or double precision (same as input), Size: <code>[9, n_row, n_col]</code> 
+   The rotation matrix, i.e. a transformation matrix that is used to perform a rotation in 3D 
+   Euclidean space; Size: <code>[9, n_row, n_col]</code> 
 </li></ul>
 </li>
 </ul>
@@ -2774,7 +2980,7 @@ each cluster.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>forward_index</code></b><br> 
    Indices for mapping elements of "points_in" to "points_out"; 1-based; 
-   Length: <code>[ n_points_out ]</code>; For <code>vec_size > 1</code>, the added elements not contained in the input 
+   Length: <code>[ n_points_out ]</code>; For <code>vec_size &gt; 1</code>, the added elements not contained in the input 
    are indicated by zeros. 
 </li></ul>
  
@@ -3508,13 +3714,13 @@ and complex simulation environments.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mesh_index</code></b><br> 
    Indices for mapping elements of "triangles_in" to "triangles_out"; 1-based;  
-   Length: <code>[ n_triangles_out ]</code>; For <code>vec_size > 1</code>, the added elements not contained in the input 
+   Length: <code>[ n_triangles_out ]</code>; For <code>vec_size &gt; 1</code>, the added elements not contained in the input 
    are indicated by zeros. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop_out</code></b><br> 
    Material properties for the sub-divided triangle mesh elements. The values for the new faces are  
-   copied from <code>mtl_prop_in</code>; Size: <code>[ n_triangles_out, 5 ]</code>; For <code>vec_size > 1</code>, the added elements 
+   copied from <code>mtl_prop_in</code>; Size: <code>[ n_triangles_out, 5 ]</code>; For <code>vec_size &gt; 1</code>, the added elements 
    will contain the vacuum / air material. 
 </li></ul>
 </li>

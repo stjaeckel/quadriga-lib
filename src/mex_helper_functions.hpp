@@ -515,6 +515,37 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
     return output;
 }
 
+// Quick input converters
+inline arma::vec qd_mex_get_double_Col(const mxArray *input)
+{
+    return mxIsDouble(input) ? qd_mex_reinterpret_Col<double>(input) : qd_mex_typecast_Col<double>(input);
+}
+
+inline arma::fvec qd_mex_get_single_Col(const mxArray *input)
+{
+    return mxIsSingle(input) ? qd_mex_reinterpret_Col<float>(input) : qd_mex_typecast_Col<float>(input);
+}
+
+inline arma::mat qd_mex_get_double_Mat(const mxArray *input)
+{
+    return mxIsDouble(input) ? qd_mex_reinterpret_Mat<double>(input) : qd_mex_typecast_Mat<double>(input);
+}
+
+inline arma::fmat qd_mex_get_single_Mat(const mxArray *input)
+{
+    return mxIsSingle(input) ? qd_mex_reinterpret_Mat<float>(input) : qd_mex_typecast_Mat<float>(input);
+}
+
+inline arma::cube qd_mex_get_double_Cube(const mxArray *input)
+{
+    return mxIsDouble(input) ? qd_mex_reinterpret_Cube<double>(input) : qd_mex_typecast_Cube<double>(input);
+}
+
+inline arma::fcube qd_mex_get_single_Cube(const mxArray *input)
+{
+    return mxIsSingle(input) ? qd_mex_reinterpret_Cube<float>(input) : qd_mex_typecast_Cube<float>(input);
+}
+
 // Creates an mxArray based on the armadillo input type, copies content
 template <typename dtype>
 inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar

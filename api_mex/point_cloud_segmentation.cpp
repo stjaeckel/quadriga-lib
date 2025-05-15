@@ -93,53 +93,30 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:point_cloud_segmentation:IO_error", "Too many output arguments.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:point_cloud_segmentation:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
+    arma::uword target_size = (nrhs < 2) ? 1024 : qd_mex_get_scalar<arma::uword>(prhs[1], "target_size", 1024);
+    arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    // Read inputs
-    arma::fmat points_in_single;
-    arma::mat points_in_double;
-
-    if (use_single)
-        points_in_single = qd_mex_reinterpret_Mat<float>(prhs[0]);
-    else
-        points_in_double = qd_mex_reinterpret_Mat<double>(prhs[0]);
-
-    size_t target_size = (nrhs < 2) ? 1024 : qd_mex_get_scalar<size_t>(prhs[1], "target_size", 1024);
-    size_t vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<size_t>(prhs[2], "vec_size", 1);
-
-    // Reserve memory for the output
     arma::fmat points_out_single;
     arma::mat points_out_double;
     arma::u32_vec sub_cloud_index, forward_index, reverse_index;
 
-    // Call the quadriga-lib function
-    try
+    if (mxIsSingle(prhs[0]))
     {
-        if (use_single)
-            quadriga_lib::point_cloud_segmentation(&points_in_single, &points_out_single,
-                                                   &sub_cloud_index, target_size, vec_size,
-                                                   &forward_index, &reverse_index);
-        else
-            quadriga_lib::point_cloud_segmentation(&points_in_double, &points_out_double,
-                                                   &sub_cloud_index, target_size, vec_size,
-                                                   &forward_index, &reverse_index);
+        const arma::fmat points_in = qd_mex_get_single_Mat(prhs[0]);
+        CALL_QD(quadriga_lib::point_cloud_segmentation<float>(&points_in, &points_out_single,
+                                                              &sub_cloud_index, target_size, vec_size,
+                                                              &forward_index, &reverse_index));
     }
-    catch (const std::invalid_argument &ex)
+    else
     {
-        mexErrMsgIdAndTxt("quadriga_lib:point_cloud_segmentation:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:point_cloud_segmentation:unknown_error", "Unknown failure occurred. Possible memory corruption!");
+        const arma::mat points_in = qd_mex_get_double_Mat(prhs[0]);
+        CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points_in, &points_out_double,
+                                                              &sub_cloud_index, target_size, vec_size,
+                                                              &forward_index, &reverse_index));
     }
 
     // Copy data to MATLAB / Octave
-    if (nlhs > 0 && use_single)
+    if (nlhs > 0 && mxIsSingle(prhs[0]))
         plhs[0] = qd_mex_copy2matlab(&points_out_single);
     else if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&points_out_double);

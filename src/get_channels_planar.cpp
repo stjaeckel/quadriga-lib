@@ -23,134 +23,111 @@
 
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
-// Helper function "quick_multiply_3_mat"
-// Calculates the matrix product X = A^T * B * C
-// A, C can be NULL
-template <typename dtype>
-static inline void quick_multiply_3_mat(const dtype *A, // n rows, m columns
-                                        const dtype *B, // n rows, o columns
-                                        const dtype *C, // o rows, p columns
-                                        dtype *X,       // m rows, p columns
-                                        size_t n, size_t m, size_t o, size_t p)
-{
-    // Avoid expensive typecasts
-    constexpr dtype zero = dtype(0.0), one = dtype(1.0);
+/*!SECTION
+Array antenna functions
+SECTION!*/
 
-    // Calculate the output row by row
-    for (size_t im = 0; im < m; ++im)
-    {
-        for (size_t ip = 0; ip < p; ip++) // Initialize output to zero
-            X[ip * m + im] = zero;
+/*!MD
+# get_channels_planar
+Calculate channel coefficients for planar waves
 
-        // Process temporary matrix T = A^H * B column-wise
-        for (size_t io = 0; io < o; ++io)
-        {
-            // Calculate one value of the temporary matrix T
-            dtype t = zero;
-            for (size_t in = 0; in < n; ++in)
-            {
-                dtype a = (A == nullptr) ? (im == in ? one : zero) : A[im * n + in];
-                t += a * B[io * n + in];
-            }
+## Description:
+- Calculates MIMO channel coefficients and delays for a set of planar wave paths between two antenna arrays.
+- Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays.
+- Supports LOS path identification based on distance (angles are ignored).
+- Polarization transfer matrix models polarization coupling and must be normalized.
+- Doppler weights can optionally be calculated from receiver motion relative to path direction.
+- Element positions and antenna orientation are fully considered for delay and phase.
+- Allowed datatypes (`dtype`): `float` or `double`
 
-            // Update all values of an entire row of the output matrix X = T * C
-            for (size_t ip = 0; ip < p; ++ip)
-            {
-                dtype c = (C == nullptr) ? (io == ip ? one : zero) : C[ip * o + io];
-                X[ip * m + im] += t * c;
-            }
-        }
-    }
-}
+## Declaration:
+```
+void quadriga_lib::get_channels_planar(
+                const arrayant<dtype> *tx_array,
+                const arrayant<dtype> *rx_array,
+                dtype Tx, dtype Ty, dtype Tz,
+                dtype Tb, dtype Tt, dtype Th,
+                dtype Rx, dtype Ry, dtype Rz,
+                dtype Rb, dtype Rt, dtype Rh,
+                const arma::Col<dtype> *aod,
+                const arma::Col<dtype> *eod,
+                const arma::Col<dtype> *aoa,
+                const arma::Col<dtype> *eoa,
+                const arma::Col<dtype> *path_gain,
+                const arma::Col<dtype> *path_length,
+                const arma::Mat<dtype> *M,
+                arma::Cube<dtype> *coeff_re,
+                arma::Cube<dtype> *coeff_im,
+                arma::Cube<dtype> *delay,
+                dtype center_frequency = dtype(0.0),
+                bool use_absolute_delays = false,
+                bool add_fake_los_path = false,
+                arma::Col<dtype> *rx_Doppler = nullptr);
+```
 
-// Helper function "quick_multiply_3_complex_mat"
-// Calculates the matrix product X = A^T * B * C
-// Ar, Ai, Cr, Ci can be NULL
-template <typename dtype>
-static inline void quick_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, // n rows, m columns
-                                                const dtype *Br, const dtype *Bi, // n rows, o columns
-                                                const dtype *Cr, const dtype *Ci, // o rows, p columns
-                                                dtype *Xr, dtype *Xi,             // m rows, p columns
-                                                size_t n, size_t m, size_t o, size_t p)
-{
-    // Avoid expensive typecasts
-    constexpr dtype zero = (dtype)0.0, one = (dtype)1.0;
+## Arguments:
+- `const arrayant<dtype> ***tx_array**` (input)<br>
+  Pointer to the transmit antenna array object (with `n_tx` elements).
 
-    // Calculate the output row by row
-    for (size_t im = 0; im < m; ++im)
-    {
-        // Initialize output to zero
-        for (size_t ip = 0; ip < p; ++ip)
-            Xr[ip * m + im] = zero, Xi[ip * m + im] = zero;
+- `const arrayant<dtype> ***rx_array**` (input)<br>
+  Pointer to the receive antenna array object (with `n_rx` elements).
 
-        // Process temporary matrix T = A^H * B column-wise
-        for (size_t io = 0; io < o; ++io)
-        {
-            // Calculate one value of the temporary matrix T
-            dtype tR = zero, tI = zero;
-            for (size_t in = 0; in < n; ++in)
-            {
-                dtype a_real = (Ar == nullptr) ? (im == in ? one : zero) : Ar[im * n + in];
-                dtype a_imag = (Ai == nullptr) ? zero : Ai[im * n + in];
-                tR += a_real * Br[io * n + in] - a_imag * Bi[io * n + in];
-                tI += a_real * Bi[io * n + in] + a_imag * Br[io * n + in];
-            }
+- `dtype **Tx**, **Ty**, **Tz**` (input)<br>
+  Transmitter position in Cartesian coordinates [m].
 
-            // Update all values of an entire row of the output matrix X = T * C
-            for (size_t ip = 0; ip < p; ++ip)
-            {
-                dtype c_real = (Cr == nullptr) ? (io == ip ? one : zero) : Cr[ip * o + io];
-                dtype c_imag = (Ci == nullptr) ? zero : Ci[ip * o + io];
-                Xr[ip * m + im] += tR * c_real - tI * c_imag;
-                Xi[ip * m + im] += tR * c_imag + tI * c_real;
-            }
-        }
-    }
-}
+- `dtype **Tb**, **Tt**, **Th**` (input)<br>
+  Transmitter orientation (Euler) angles (bank, tilt, head) in [rad].
 
-// Helper function "quick_power_mat"
-// - Calculates X = abs( A ).^2 + abs ( B ).^2
-// - Optional normalization of the columns by their sum-power
-// - Returns identity matrix normalization is true and inputs A/B are NULL
-template <typename dtype>
-static inline void quick_power_mat(size_t n, size_t m,                                   // Matrix dimensions (n=rows, m=columns)
-                                   dtype *X,                                             // Output X with n rows, m columns
-                                   bool normalize_columns = false,                       // Optional normalization
-                                   const dtype *Ar = nullptr, const dtype *Ai = nullptr, // Input A with n rows, m columns
-                                   const dtype *Br = nullptr, const dtype *Bi = nullptr) // Input B with n rows, m columns
-{
-    constexpr dtype zero = (dtype)0.0, one = (dtype)1.0, limit = (dtype)1.0e-10;
-    dtype avg = one / (dtype)n;
+- `dtype **Rx**, **Ry**, **Rz**` (input)<br>
+  Receiver position in Cartesian coordinates [m].
 
-    for (size_t im = 0; im < n * m; im += n)
-    {
-        dtype sum = zero;
-        for (size_t in = im; in < im + n; ++in)
-        {
-            X[in] = zero;
-            X[in] += (Ar == nullptr) ? zero : Ar[in] * Ar[in];
-            X[in] += (Ai == nullptr) ? zero : Ai[in] * Ai[in];
-            X[in] += (Br == nullptr) ? zero : Br[in] * Br[in];
-            X[in] += (Bi == nullptr) ? zero : Bi[in] * Bi[in];
-            sum += X[in];
-        }
-        if (normalize_columns)
-        {
-            if (Ar == nullptr && Ai == nullptr && Br == nullptr && Bi == nullptr) // Return identity matrix
-                X[im + im / n] = one;
-            else if (sum > limit) // Scale values by sum
-            {
-                sum = one / sum;
-                for (size_t in = im; in < im + n; ++in)
-                    X[in] *= sum;
-            }
-            else
-                for (size_t in = im; in < im + n; ++in)
-                    X[in] = avg;
-        }
-    }
-}
+- `dtype **Rb**, **Rt**, **Rh**` (input)<br>
+  Receiver orientation (Euler) angles (bank, tilt, head) in [rad].
+
+- `const arma::Col<dtype> ***aod**` (input)<br>
+  Departure azimuth angles in radians, Length `n_path`.
+
+- `const arma::Col<dtype> ***eod**` (input)<br>
+  Departure elevation angles in radians, Length `n_path`.
+
+- `const arma::Col<dtype> ***aoa**` (input)<br>
+  Arrival azimuth angles in radians, Length `n_path`.
+
+- `const arma::Col<dtype> ***eoa**` (input)<br>
+  Arrival elevation angles in radians, Length `n_path`.
+
+- `const arma::Col<dtype> ***path_gain**` (input)<br>
+  Path gains in linear scale, Length `n_path`.
+
+- `const arma::Col<dtype> ***path_length**` (input)<br>
+  Path lengths from TX to RX phase center, Length `n_path`.
+
+- `const arma::Mat<dtype> ***M**` (input)<br>
+  Polarization transfer matrix of size `[8, n_path]`, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH).
+
+- `arma::Cube<dtype> ***coeff_re**` (output)<br>
+  Real part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
+
+- `arma::Cube<dtype> ***coeff_im**` (output)<br>
+  Imaginary part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
+
+- `arma::Cube<dtype> ***delay**` (output)<br>
+  Propagation delays in seconds, Size `[n_rx, n_tx, n_path(+1)]`.
+
+- `dtype **center_frequency** = 0.0` (optional input)<br>
+  Center frequency in Hz; set to 0 to disable phase calculation. Default: `0.0`
+
+- `bool **use_absolute_delays** = false` (optional input)<br>
+  If true, includes LOS delay in all paths. Default: `false`
+
+- `bool **add_fake_los_path** = false` (optional input)<br>
+  Adds a zero-power LOS path if no LOS is present. Default: `false`
+
+- `arma::Col<dtype> ***rx_Doppler** = nullptr` (optional output)<br>
+  Doppler weights for moving RX, Length `n_path(+1)`. Positive = towards path, Negative = away.
+MD!*/
 
 // Calculate channel coefficients for planar waves
 template <typename dtype>
@@ -388,8 +365,8 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         // Calculate abs( cpl )^2 and normalize the row-sum to 1
         dtype *p_rx_cpl = new dtype[n_rx * n_rx_ports];
         dtype *p_tx_cpl = new dtype[n_tx * n_tx_ports];
-        quick_power_mat(n_rx, n_rx_ports, p_rx_cpl, true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
-        quick_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
+        qd_power_mat(n_rx, n_rx_ports, p_rx_cpl, true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
+        qd_power_mat(n_tx, n_tx_ports, p_tx_cpl, true, tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr());
 
         // Process coefficients and delays
         if (different_output_size) // Data is stored in internal memory, we can write directly to the output
@@ -399,14 +376,14 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
                 arma::uword o = j * n_links; // Slice offset
 
                 // Apply coupling to coefficients
-                quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
                                              &p_coeff_re[o], &p_coeff_im[o],
                                              tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
                                              coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
                                              n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                 // Apply coupling to delays
-                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
+                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
             }
         }
         else // Data has been written to external memory
@@ -418,7 +395,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             for (arma::uword o = 0ULL; o < n_links * n_out; o += n_links) // Loop over paths
             {
                 // Apply coupling to coefficients
-                quick_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
+                qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
                                              &p_coeff_re[o], &p_coeff_im[o],
                                              tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
                                              tempX, tempY,
@@ -428,7 +405,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
                 std::memcpy(&p_coeff_im[o], tempY, n_ports * sizeof(dtype));
 
                 // Apply coupling to delays
-                quick_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
+                qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, tempX, n_rx, n_rx_ports, n_tx, n_tx_ports);
                 std::memcpy(&p_delays[o], tempX, n_ports * sizeof(dtype));
             }
             delete[] tempX;

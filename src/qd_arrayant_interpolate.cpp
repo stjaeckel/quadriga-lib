@@ -81,10 +81,8 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     dtype *p_elevation_loc = (elevation_loc == nullptr || elevation_loc->is_empty()) ? nullptr : elevation_loc->memptr();
     dtype *p_gamma = (gamma == nullptr || gamma->is_empty()) ? nullptr : gamma->memptr();
 
-    // Rotation matrix [3,3,n_out] or [3,3,1], always double output
-    arma::cube R = quadriga_lib::calc_rotation_matrix(*orientation, true, true);
-    const arma::Cube<dtype> R_typed = arma::conv_to<arma::Cube<dtype>>::from(R);
-    R.reset();
+    // Rotation matrix [3,3,n_out] or [3,3,1]
+    arma::Cube<dtype> R_typed = quadriga_lib::calc_rotation_matrix(*orientation, true, true);
 
     // Obtain pointers for direct memory access
     const unsigned *p_i_element = i_element->memptr();                                  // Elements
