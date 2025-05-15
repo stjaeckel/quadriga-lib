@@ -18,6 +18,35 @@
 #include "quadriga_channel.hpp"
 #include <hdf5.h>
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# get_HDF5_version
+Get the version of the linked HDF5 library
+
+## Description:
+- Returns the version string of the HDF5 library used during linking.
+- This function is useful for diagnostics, compatibility checks, or logging.
+- The function reflects the version of the compiled HDF5 library, not necessarily the version of the header used at compile time.
+
+## Declaration:
+```
+std::string quadriga_lib::get_HDF5_version();
+```
+
+## Returns:
+- `std::string`<br>
+  HDF5 version string in the format `"x.y.z"`, e.g., `"1.12.2"`
+
+## Example:
+```
+std::string hdf5_ver = quadriga_lib::get_HDF5_version();
+std::cout << "Using HDF5 version: " << hdf5_ver << std::endl;
+```
+MD!*/
+
 // Return HDF5 version info
 #define AUX(x) #x
 #define STRINGIFY(x) AUX(x)
@@ -783,7 +812,53 @@ static inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, 
     return std::any();
 }
 
-// Create a new HDF file and set the index to to given storage layout
+/*!MD
+# hdf5_create
+Create a new HDF5 channel file with a defined storage layout
+
+## Description:
+- Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this
+  library is its ability to organize multiple channels within a single HDF5 file while enabling access
+  to individual data sets without the need to read the entire file.
+- This function initializes a new HDF5 file for storing wireless channel data.
+- Defines a multi-dimensional array layout for organizing channels (up to 4 dimensions).
+- Typical usage: map base stations (BS), user equipment (UE), and frequencies to dimensions.
+- The layout can later be reshaped using `hdf5_reshape_layout`, provided the total number of entries remains constant.
+- Each combination of indices corresponds to a storage slot that can hold a channel object.
+
+## Declaration:
+```
+void quadriga_lib::hdf5_create(
+                std::string fn,
+                unsigned nx = 65536,
+                unsigned ny = 1,
+                unsigned nz = 1,
+                unsigned nw = 1);
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename (including path) of the HDF5 file to be created. If the file exists, it will be overwritten.
+
+- `unsigned **nx** = 65536` (input)<br>
+  Number of entries in the **x-dimension**, e.g., for base stations (BSs). Default: `65536`.
+
+- `unsigned **ny** = 1` (input)<br>
+  Number of entries in the **y-dimension**, e.g., for user equipment (UEs). Default: `1`.
+
+- `unsigned **nz** = 1` (input)<br>
+  Number of entries in the **z-dimension**, e.g., for frequency points. Default: `1`.
+
+- `unsigned **nw** = 1` (input)<br>
+  Number of entries in the **w-dimension**, e.g., for repetitions, scenarios, or configurations. Default: `1`.
+
+## Example:
+```
+// Create a file with layout: [10 BSs, 4 UEs, 2 frequencies]
+quadriga_lib::hdf5_create("channels.hdf5", 10, 4, 2);
+```
+MD!*/
+
 void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
     hid_t file_id, dspace_id, dset_id;
@@ -837,11 +912,42 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
     return;
 }
 
+/*!MD
+# hdf5_read_layout
+Read the HDF5 channel storage layout
+
+## Description:
+- Reads the structure of the storage layout in an HDF5 file created for channel data.
+- Returns the size of each of the four dimensions: `{nx, ny, nz, nw}`.
+- Can optionally return a serialized list of channel IDs to indicate which entries contain data.
+- If the file does not exist or is not a valid channel HDF5 file, the returned layout is `{0, 0, 0, 0}`.
+- Entries in `channelID` are set to `0` if no data is present at that index.
+
+## Declaration:
+```
+arma::u32_vec quadriga_lib::hdf5_read_layout(
+                std::string fn,
+                arma::u32_vec *channelID = nullptr);
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Path to the HDF5 file.
+
+- `arma::u32_vec ***channelID** = nullptr` (optional output)<br>
+  Pointer to a vector receiving the serialized channel index contents.<br>
+  Length: `nx × ny × nz × nw`, where `channelID[i] == 0` indicates an empty slot.
+
+## Returns:
+- `arma::u32_vec`<br>
+  Containing four elements: `{nx, ny, nz, nw}`, the layout of the storage grid.
+MD!*/
+
 // Read storage layout from HDF file
-arma::Col<unsigned> quadriga_lib::hdf5_read_layout(std::string fn, arma::Col<unsigned> *channelID)
+arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *channelID)
 {
     if (!qHDF_file_exists(fn))
-        return arma::Col<unsigned>(4);
+        return arma::u32_vec(4);
 
     // Initialize HDF5 library
     H5open();
@@ -854,7 +960,7 @@ arma::Col<unsigned> quadriga_lib::hdf5_read_layout(std::string fn, arma::Col<uns
     if (file_id == H5I_INVALID_HID)
         throw std::invalid_argument("Error opening file.");
 
-    arma::Col<unsigned> ChannelDims(4, arma::fill::none);
+    arma::u32_vec ChannelDims(4, arma::fill::none);
 
     // Read channel dims from file
     hsize_t dims[4];
@@ -902,6 +1008,66 @@ arma::Col<unsigned> quadriga_lib::hdf5_read_layout(std::string fn, arma::Col<uns
 
     return ChannelDims;
 }
+
+/*!MD
+# hdf5_write
+Write channel data to HDF5 file
+
+## Description:
+- Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data.
+- This function rites a `channel` object to a specified HDF5 file at the given 4D index location.
+- If the file does not exist, a new file is created with default layout `(65535 × 1 × 1 × 1)`.
+
+
+## Declaration:
+```
+int quadriga_lib::hdf5_write(
+                const quadriga_lib::channel<dtype> *ch,
+                std::string fn,
+                unsigned ix = 0,
+                unsigned iy = 0,
+                unsigned iz = 0,
+                unsigned iw = 0,
+                bool assume_valid = false);
+```
+
+## Arguments:
+- `const channel<dtype> ***ch**` (input)<br>
+  Pointer to the channel object to be stored.
+
+- `std::string **fn**` (input)<br>
+  Path to the HDF5 file.
+
+- `unsigned **ix** = 0` (input)<br>
+  Index in the x-dimension (e.g., Base Station ID). Default: `0`.
+
+- `unsigned **iy** = 0` (input)<br>
+  Index in the y-dimension (e.g., User Equipment ID). Default: `0`.
+
+- `unsigned **iz** = 0` (input)<br>
+  Index in the z-dimension (e.g., Frequency point). Default: `0`.
+
+- `unsigned **iw** = 0` (input)<br>
+  Index in the w-dimension (e.g., Repetition/Scenario). Default: `0`.
+
+- `bool **assume_valid** = false` (input)<br>
+  If `true`, skips channel integrity validation before writing. Default: `false`.
+
+## Returns:
+- `0` if a new dataset was created.
+- `1` if an existing dataset was overwritten or extended.
+
+## Caveat:
+- If the file exists already, the new data is added to the exisiting file
+- If the index already contains data, it will be overwritten
+- Use `assume_valid = true` to skip internal validation (faster, but unsafe if data may be corrupted).
+- Throws an error if the index was not reserved during `hdf5_create`.
+- All structured data is written in single precision (but can can be provided as float or double)
+- Unstructured datatypes are maintained in the HDF file
+- Supported unstructured types: string, double, float, (u)int32, (u)int64
+- Supported unstructured size: up to 3 dimensions
+- Storage order of the unstructured data is maintained
+MD!*/
 
 // Save data to HDF file (stand alone function)
 template <typename dtype>
@@ -1427,6 +1593,49 @@ template int quadriga_lib::hdf5_write(const quadriga_lib::channel<float> *ch, st
 template int quadriga_lib::hdf5_write(const quadriga_lib::channel<double> *ch, std::string fn,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw, bool assume_valid);
 
+/*!MD
+# hdf5_read_channel
+Read a channel object from an HDF5 file
+
+## Description:
+- Loads a `quadriga_lib::channel<dtype>` object from the specified index in a previously created HDF5 file.
+- If the selected index does not contain a valid channel, an empty channel object is returned (with `no_snapshots == 0`).
+- Allowed datatypes (`dtype`): `float` or `double`
+- All structured data (e.g., channel coefficients, delays, positions) is stored in **single precision** in the
+  file but will be **converted** to the appropriate precision (`float` or `double`) depending on the provided template parameter.
+- Unstructured or user-defined fields stored in `std::any` containers are not converted and retain their original type
+
+## Declaration:
+```
+quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
+                std::string fn,
+                unsigned ix = 0,
+                unsigned iy = 0,
+                unsigned iz = 0,
+                unsigned iw = 0);
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the HDF5 file containing the channel data.
+
+- `unsigned **ix** = 0` (input)<br>
+  x-Index in the file's 4D storage layout. Default: `0`.
+
+- `unsigned **iy** = 0` (input)<br>
+  y-Index in the file's 4D storage layout. Default: `0`.
+
+- `unsigned **iz** = 0` (input)<br>
+  z-Index in the file's 4D storage layout. Default: `0`.
+
+- `unsigned **iw** = 0` (input)<br>
+  w-Index in the file's 4D storage layout. Default: `0`.
+
+## Returns:
+- `quadriga_lib::channel<dtype>`
+  A channel object containing the channel data at the specified index. If no data is found, an empty channel object is returned.
+MD!*/
+
 // Read channel object from HDF5 file
 template <typename dtype>
 quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw)
@@ -1893,11 +2102,11 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
         if (H5Lexists(snap_id, "no_interact", H5P_DEFAULT))
         {
             for (unsigned j = j_no_interact; j < i; ++j)
-                c.no_interact.push_back(arma::Col<unsigned>()), c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
+                c.no_interact.push_back(arma::u32_vec()), c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
             j_no_interact = i + 1;
 
             dset_id = H5Dopen(snap_id, "no_interact", H5P_DEFAULT);
-            arma::Col<unsigned> val1 = arma::Col<unsigned>(n_path_arma, arma::fill::none);
+            arma::u32_vec val1 = arma::u32_vec(n_path_arma, arma::fill::none);
             H5Dread(dset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT, val1.memptr());
             H5Dclose(dset_id);
 
@@ -1958,7 +2167,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
             c.path_lbs_pos.push_back(arma::Mat<dtype>(3, 0));
     if (j_no_interact != 0)
         for (unsigned j = j_no_interact; j < n_snapshots; ++j)
-            c.no_interact.push_back(arma::Col<unsigned>()), c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
+            c.no_interact.push_back(arma::u32_vec()), c.interact_coord.push_back(arma::Mat<dtype>(3ULL, 0ULL));
 
     return c;
 }
@@ -1966,6 +2175,44 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(std::string fn, uns
 template quadriga_lib::channel<float> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
 
 template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(std::string fn, unsigned ix, unsigned iy, unsigned iz, unsigned iw);
+
+/*!MD
+# hdf5_reshape_layout
+Reshape the storage layout of an HDF5 channel file
+
+## Description:
+- Updates the multi-dimensional storage layout of an existing HDF5 file that contains channel data.
+- The layout consists of up to four dimensions: `{nx, ny, nz, nw}`.
+- This is useful for reorganizing data after initial creation (e.g., grouping entries by BS/UE/frequency).
+- The total number of entries must remain unchanged, i.e., `nx × ny × nz × nw` must equal the original layout.
+- Throws an error if the reshaped layout violates this constraint.
+
+## Declaration:
+```
+void quadriga_lib::hdf5_reshape_layout(
+                std::string fn,
+                unsigned nx,
+                unsigned ny = 1,
+                unsigned nz = 1,
+                unsigned nw = 1);
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the HDF5 file to reshape.
+
+- `unsigned **nx**` (input)<br>
+  Number of entries in the first dimension (e.g., base stations).
+
+- `unsigned **ny** = 1` (input)<br>
+  Number of entries in the second dimension (e.g., user equipment). Default: `1`.
+
+- `unsigned **nz** = 1` (input)<br>
+  Number of entries in the third dimension (e.g., carrier frequency). Default: `1`.
+
+- `unsigned **nw** = 1` (input)<br>
+  Number of entries in the fourth dimension. Default: `1`.
+MD!*/
 
 // Reshape storage layout
 void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
@@ -2014,6 +2261,55 @@ void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny,
     qHDF_close_file(file_id);
 }
 
+/*!MD
+# hdf5_read_dset
+Read an unstructured dataset from an HDF5 file
+
+## Description:
+- Reads a user-defined, unstructured dataset stored in an HDF5 file at the specified index.
+- Unstructured datasets are typically used to store additional parameters or metadata and are stored under a **name prefix** (e.g. `"par_"`) followed by the dataset name.
+- Returns the dataset as a `std::any` object, which can hold any supported type (e.g., scalar values, vectors, matrices, cubes).
+- Use `quadriga_lib::any_type_id` to determine the contained type and obtain a raw pointer for direct access.
+- If the dataset does not exist at the specified index or name, an empty `std::any` object is returned.
+
+## Declaration:
+```
+std::any quadriga_lib::hdf5_read_dset(
+                std::string fn,
+                std::string par_name,
+                unsigned ix = 0,
+                unsigned iy = 0,
+                unsigned iz = 0,
+                unsigned iw = 0,
+                std::string prefix = "par_");
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the HDF5 file containing the dataset.
+
+- `std::string **par_name**` (input)<br>
+  Name of the dataset, **without** the prefix (e.g., `"carrier_frequency"`).
+
+- `unsigned **ix** = 0` (input)<br>
+  x-Index in the HDF5 file’s 4D storage layout. Default: `0`.
+
+- `unsigned **iy** = 0` (input)<br>
+  y-Index in the HDF5 file’s 4D storage layout. Default: `0`.
+
+- `unsigned **iz** = 0` (input)<br>
+  z-Index in the HDF5 file’s 4D storage layout. Default: `0`.
+
+- `unsigned **iw** = 0` (input)<br>
+  w-Index in the HDF5 file’s 4D storage layout. Default: `0`.
+
+- `std::string **prefix** = "par_"` (input)<br>
+  Optional dataset name prefix. Default is `"par_"`.
+
+## Returns:
+- A `std::any` object containing the dataset. If the dataset is not present, the return value is an empty `std::any`.
+MD!*/
+
 // Read unstructured data from HDF5 file
 std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
                                       unsigned ix, unsigned iy, unsigned iz, unsigned iw,
@@ -2057,10 +2353,58 @@ std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
     return data;
 }
 
+/*!MD
+# hdf5_read_dset_names
+Read names of unstructured datasets from an HDF5 file
+
+## Description:
+- Retrieves the names of all unstructured datasets stored at a specified 4D index in an HDF5 file.
+- Dataset names are identified by a common prefix (default: `"par_"`) and the actual parameter name follows the prefix.
+- The returned names in `par_names` exclude the prefix for convenience.
+- Returns the number of datasets found at the given index.
+
+## Declaration:
+```
+arma::uword quadriga_lib::hdf5_read_dset_names(
+                std::string fn,
+                std::vector<std::string> *par_names,
+                unsigned ix = 0,
+                unsigned iy = 0,
+                unsigned iz = 0,
+                unsigned iw = 0,
+                std::string prefix = "par_");
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the HDF5 file containing the datasets.
+
+- `std::vector<std::string> ***par_names**` (output)<br>
+  Pointer to a vector that will be filled with all dataset names found at the specified index (excluding the prefix).
+
+- `unsigned **ix** = 0` (input)<br>
+  x-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iy** = 0` (input)<br>
+  y-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iz** = 0` (input)<br>
+  z-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iw** = 0` (input)<br>
+  w-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `std::string **prefix** = "par_"` (input)<br>
+  Optional prefix string used to identify unstructured datasets. Default: `"par_"`.
+
+## Returns:
+- The number of unstructured datasets found at the specified location with the given prefix.
+MD!*/
+
 // Read names of the unstructured data fields from the HDF file
-unsigned long long quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
-                                                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                                      std::string prefix)
+arma::uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::string> *par_names,
+                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                               std::string prefix)
 {
     if (!qHDF_file_exists(fn))
         throw std::invalid_argument("File does not exist.");
@@ -2100,6 +2444,58 @@ unsigned long long quadriga_lib::hdf5_read_dset_names(std::string fn, std::vecto
 
     return (unsigned long long)no_par_names;
 }
+
+/*!MD
+# hdf5_write_dset
+Write a single unstructured dataset to an HDF5 file
+
+## Description:
+- Writes a single unstructured data field to an HDF5 file at the specified 4D index.
+- Supported scalar types: `std::string`, `unsigned`, `int`, `long long`, `unsigned long long`, `float`, `double`
+- Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, and `arma::Cube` with `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
+- `arma::Row` vectors are converted to column vectors (`arma::Col`) before writing.
+- The dataset name is prefixed with `"par_"` (default) unless another prefix is specified.
+- Throws an error for unsupported types.
+- Dataset names may only include alphanumeric characters and underscores.
+
+## Declaration:
+```
+void quadriga_lib::hdf5_write_dset(
+                std::string fn,
+                std::string par_name,
+                const std::any \*par_data,
+                unsigned ix = 0,
+                unsigned iy = 0,
+                unsigned iz = 0,
+                unsigned iw = 0,
+                std::string prefix = "par_");
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the HDF5 file to which the dataset will be written.
+
+- `std::string **par_name**` (input)<br>
+  Name of the parameter to store (without prefix). Must contain only letters, digits, and underscores.
+
+- `const std::any ***par_data**` (input)<br>
+  Pointer to the data to be written. Type must be supported (see above).
+
+- `unsigned **ix** = 0` (input)<br>
+  x-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iy** = 0` (input)<br>
+  y-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iz** = 0` (input)<br>
+  z-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `unsigned **iw** = 0` (input)<br>
+  w-Index in the HDF5 file’s 4D layout. Default: `0`.
+
+- `std::string **prefix** = "par_"` (input)<br>
+  Optional prefix for the dataset name. Default: `"par_"`.
+MD!*/
 
 // Writes unstructured data to a hdf5 file
 void quadriga_lib::hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,

@@ -16,9 +16,10 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Site-Specific Simulation Tools
 SECTION!*/
 
 /*!MD
@@ -26,26 +27,8 @@ SECTION!*/
 Generate propagation paths for estimating the diffraction gain
 
 ## Description:
-Diffraction refers to the phenomenon where waves bend or interfere around the edges of an obstacle,
-extending into the region that would otherwise be in the obstacle's geometrical shadow. The object
-causing the diffraction acts as a secondary source for the wave's propagation. A specific example of
-this is the knife-edge effect, or knife-edge diffraction, where a sharp, well-defined obstacle—like
-a mountain range or a building wall—partially truncates the incident radiation.<br><br>
-
-To estimate the diffraction gain in a three-dimensional space, one can assess the extent to which the
-Fresnel ellipsoid is obstructed by objects, and then evaluate the impact of this obstruction on the
-received power. This method presupposes that diffracted waves travel along slightly varied paths
-before arriving at a receiver. These waves may reach the receiver out of phase with the primary wave
-due to their different travel lengths, leading to either constructive or destructive interference.<br><br>
-
-The process of estimating the gain involves dividing the wave propagation from a transmitter to a
-receiver into `n_path` paths. These paths are represented by elliptic arcs, which are further
-approximated using `n_seg` line segments. Each segment can be individually blocked or attenuated
-by environmental objects. To determine the overall diffraction gain, a weighted sum of these
-individual path contributions is calculated. The weighting is adjusted to align with the uniform
-theory of diffraction (UTD) coefficients in two dimensions, but the methodology is adapted for
-any 3D object shape. This function generates the elliptic propagation paths and corresponding weights
-necessary for this calculation.
+This function generates the elliptic propagation paths and corresponding weights necessary for the
+calculation of the diffraction gain in <a href="#calc_diffraction_gain">calc_diffraction_gain</a>.
 
 ## Caveat:
 - Each ellipsoid consists of `n_path` diffraction paths. The number of paths is determined by the
@@ -61,25 +44,30 @@ necessary for this calculation.
 
 ## Declaration:
 ```
-void generate_diffraction_paths(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
-                                dtype center_frequency, int lod,
-                                arma::Cube<dtype> *ray_x, arma::Cube<dtype> *ray_y,
-                                arma::Cube<dtype> *ray_z, arma::Cube<dtype> *weight);
+void generate_diffraction_paths(
+                const arma::Mat<dtype> *orig, 
+                const arma::Mat<dtype> *dest,
+                dtype center_frequency, 
+                int lod,
+                arma::Cube<dtype> *ray_x, 
+                arma::Cube<dtype> *ray_y, 
+                arma::Cube<dtype> *ray_z,
+                arma::Cube<dtype> *weight);
 ```
 
 ## Arguments:
-- **`const arma::Mat<dtype> *orig`**<br>
+- `const arma::Mat<dtype> ***orig**` (input)<br>
   Pointer to Armadillo matrix containing the origin points of the propagation ellipsoid (e.g.
   transmitter positions). Size: `[ n_pos, 3 ]`
 
-- **`const arma::Mat<dtype> *dest`**<br>
+- `const arma::Mat<dtype> ***dest**` (input)<br>
   Pointer to Armadillo matrix containing the destination point of the propagation ellipsoid (e.g.
   receiver positions). Size: `[ n_pos, 3 ]`
 
-- **`dtype center_frequency`**<br>
+- `dtype **center_frequency**` (input)<br>
   The center frequency in [Hz], scalar, default = 299792458 Hz
 
-- **`int lod`**<br>
+- `int **lod**` (input)<br>
   Level of detail, scalar value
   `lod = 1` | results in `n_path = 7` and `n_seg = 3`
   `lod = 2` | results in `n_path = 19` and `n_seg = 3`
@@ -88,36 +76,25 @@ void generate_diffraction_paths(const arma::Mat<dtype> *orig, const arma::Mat<dt
   `lod = 5` | results in `n_path = 1` and `n_seg = 2` (for debugging)
   `lod = 6` | results in `n_path = 2` and `n_seg = 2` (for debugging)
 
-- **`arma::Cube<dtype> *ray_x`**<br>
+- `arma::Cube<dtype> ***ray_x**` (output)<br>
   Pointer to an Armadillo cube for the x-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
   Size will be adjusted if not set correctly.
 
-- **`arma::Cube<dtype> *ray_y`**<br>
+- `arma::Cube<dtype> ***ray_y**` (output)<br>
   Pointer to an Armadillo cube for the y-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
   Size will be adjusted if not set correctly.
 
-- **`arma::Cube<dtype> *ray_z`**<br>
+- `arma::Cube<dtype> ***ray_z**` (output)<br>
   Pointer to an Armadillo cube for the z-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
   Size will be adjusted if not set correctly.
 
-- **`arma::Cube<dtype> *weight`**<br>
+- `arma::Cube<dtype> ***weight**` (output)<br>
   Pointer to an Armadillo cube for the  weights; Size: `[ n_pos, n_path, n_seg ]`
   Size will be adjusted if not set correctly.
-MD!*/
 
-// Helper function : repeat sequence of values
-template <typename dtypeIn, typename dtypeOut>
-static void qd_repeat_sequence(const dtypeIn *sequence, arma::uword sequence_length, arma::uword repeat_value, arma::uword repeat_sequence, dtypeOut *output)
-{
-    arma::uword pos = 0;                                  // Position in output
-    for (arma::uword rs = 0; rs < repeat_sequence; ++rs)  // Repeat sequence of values
-        for (arma::uword v = 0; v < sequence_length; ++v) // Iterate through all values of the sequence
-        {
-            dtypeOut val = (dtypeOut)sequence[v];             // Type conversion
-            for (arma::uword rv = 0; rv < repeat_value; ++rv) // Repeat each value
-                output[pos++] = val;
-        }
-}
+## See also:
+- <a href="#calc_diffraction_gain">calc_diffraction_gain</a>
+MD!*/
 
 template <typename dtype>
 void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, dtype center_frequency, int lod,

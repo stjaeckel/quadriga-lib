@@ -35,7 +35,6 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
 θ = 90◦ points to the zenith and θ = 0◦ points to the horizon.
 
 ## Usage:
-
 ```
 cart = arrayant_lib.geo2cart( azimuth, elevation, length )
 ```
@@ -62,91 +61,30 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:          azimuth         Azimuth angles in [rad],                Size [n_row, n_col]
-    //                  elevation       Elevation angles in [rad],              Size [n_row, n_col]
-    //                  length          Length of the vector, optional,         Size [n_row, n_col]
-    // Output:          cart            Cartesian coordinates,                  Size [3, n_row, n_col]
-
     if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:no_input", "Need at least one input argument.");
-
-    if (nrhs > 3)
-        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:no_input", "Too many input arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Need at least one input argument.");
 
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:no_output", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:geo2cart:IO_error", "Inputs must be provided in 'single' or 'double' precision.");
-
-    if (use_single && nlhs > 0)
+    if (mxIsSingle(prhs[0]) && nlhs > 0)
     {
-        arma::fmat azimuth = qd_mex_reinterpret_Mat<float>(prhs[0]);
-        arma::fmat elevation, length;
+        const arma::fmat azimuth = qd_mex_get_single_Mat(prhs[0]);
+        const arma::fmat elevation = (nrhs > 1) ? qd_mex_get_single_Mat(prhs[1]) : arma::fmat(azimuth.n_rows, azimuth.n_cols);
+        const arma::fmat length = (nrhs > 2) ? qd_mex_get_single_Mat(prhs[2]) : arma::fmat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
 
-        if (nrhs > 1 && mxIsSingle(prhs[1]))
-            elevation = qd_mex_reinterpret_Mat<float>(prhs[1]);
-        else if (nrhs > 1)
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:IO_error", "Input 'elevation' must have same type as 'azimuth'.");
-        else
-            elevation = arma::fmat(azimuth.n_rows, azimuth.n_cols);
-
-        if (nrhs > 2 && mxIsSingle(prhs[2]))
-            length = qd_mex_reinterpret_Mat<float>(prhs[2]);
-        else if (nrhs > 2)
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:IO_error", "Input 'length' must have same type as 'azimuth'.");
-        else
-            length = arma::fmat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
-
-        try
-        {
-            auto tmp = quadriga_lib::geo2cart(azimuth, elevation, length);
-            auto cart = arma::conv_to<arma::fcube>::from(tmp);
-            plhs[0] = qd_mex_copy2matlab(&cart);
-        }
-        catch (const std::invalid_argument &ex)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:unknown_error", ex.what());
-        }
-        catch (...)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-        }
+        arma::fcube cart;
+        CALL_QD(cart = quadriga_lib::geo2cart(azimuth, elevation, length));
+        plhs[0] = qd_mex_copy2matlab(&cart);
     }
-    else if (nlhs > 0) // double
+    else if (nlhs > 0)
     {
-        arma::mat azimuth = qd_mex_reinterpret_Mat<double>(prhs[0]);
-        arma::mat elevation, length;
+        const arma::mat azimuth = qd_mex_get_double_Mat(prhs[0]);
+        const arma::mat elevation = (nrhs > 1) ? qd_mex_get_double_Mat(prhs[1]) : arma::mat(azimuth.n_rows, azimuth.n_cols);
+        const arma::mat length = (nrhs > 2) ? qd_mex_get_double_Mat(prhs[2]) : arma::mat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
 
-        if (nrhs > 1 && mxIsDouble(prhs[1]))
-            elevation = qd_mex_reinterpret_Mat<double>(prhs[1]);
-        else if (nrhs > 1)
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:IO_error", "Input 'elevation' must have same type as 'azimuth'.");
-        else
-            elevation = arma::mat(azimuth.n_rows, azimuth.n_cols);
-
-        if (nrhs > 2 && mxIsDouble(prhs[2]))
-            length = qd_mex_reinterpret_Mat<double>(prhs[2]);
-        else if (nrhs > 2)
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:IO_error", "Input 'length' must have same type as 'azimuth'.");
-        else
-            length = arma::mat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
-        try
-        {
-            auto cart = quadriga_lib::geo2cart(azimuth, elevation, length);
-            plhs[0] = qd_mex_copy2matlab(&cart);
-        }
-        catch (const std::invalid_argument &ex)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:unknown_error", ex.what());
-        }
-        catch (...)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:geo2cart:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-        }
+        arma::cube cart;
+        CALL_QD(cart = quadriga_lib::geo2cart(azimuth, elevation, length));
+        plhs[0] = qd_mex_copy2matlab(&cart);
     }
 }

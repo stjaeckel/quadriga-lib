@@ -15,10 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <cstring> // For std::memcopy
-#include <cmath>   // For std::isnan
 #include "quadriga_channel.hpp"
-#include "baseband_freq_response_avx2.hpp"
+#include "quadriga_lib_avx2_functions.hpp"
 
 // Vector size for AVX2
 #define VEC_SIZE 8
@@ -77,6 +75,58 @@ static inline void qd_DFT_GENERIC(const dtype *CFr,       // Channel coefficient
             }
         }
 }
+
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# baseband_freq_response
+Compute the baseband frequency response of a MIMO channel
+
+## Description:
+- Computes the frequency-domain response of a time-domain MIMO channel using a discrete Fourier transform (DFT).
+- Input consists of real and imaginary channel coefficients and corresponding delays for each MIMO sub-link.
+- Outputs the complex channel response matrix `H` at given sub-carrier frequency positions.
+- Internally uses AVX2 instructions for fast parallel computation of 8 carriers at once.
+- Can be efficiently called in a loop (e.g., over snapshots) and parallelized with OpenMP.
+- Internal arithmetic is performed in single precision for speed.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::baseband_freq_response(
+                const arma::Cube<dtype> *coeff_re,
+                const arma::Cube<dtype> *coeff_im,
+                const arma::Cube<dtype> *delay,
+                const arma::Col<dtype> *pilot_grid,
+                const double bandwidth,
+                arma::Cube<dtype> *hmat_re,
+                arma::Cube<dtype> *hmat_im);
+```
+
+## Arguments:
+- `const arma::Cube<dtype> ***coeff_re**` (input)<br>
+  Real part of channel coefficients in time domain, Size `[n_rx, n_tx, n_path]`.
+
+- `const arma::Cube<dtype> ***coeff_im**` (input)<br>
+  Imaginary part of channel coefficients in time domain, Size `[n_rx, n_tx, n_path]`.
+
+- `const arma::Cube<dtype> ***delay**` (input)<br>
+  Path delays in seconds. Size `[n_rx, n_tx, n_path]` or broadcastable shape `[1, 1, n_path]`.
+
+- `const arma::Col<dtype> ***pilot_grid**` (input)<br>
+  Normalized sub-carrier positions relative to bandwidth. Range: `0.0` (center freq) to `1.0` (center + bandwidth). Length: `n_carriers`.
+
+- `const double **bandwidth**` (input)<br>
+  Total baseband bandwidth in Hz (defines absolute frequency spacing of the pilot grid).
+
+- `arma::Cube<dtype> ***hmat_re**` (output)<br>
+  Output: Real part of the frequency-domain channel matrix, Size `[n_rx, n_tx, n_carriers]`.
+
+- `arma::Cube<dtype> ***hmat_im**` (output)<br>
+  Output: Imaginary part of the frequency-domain channel matrix, Size `[n_rx, n_tx, n_carriers]`.
+MD!*/
 
 template <typename dtype>
 void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
@@ -163,7 +213,7 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
     for (size_t i = 0; i < n_carrier_s * n_ant_t; ++i)
         Hr[i] = 0.0f, Hi[i] = 0.0f;
 
-        // Call DFT function
+    // Call DFT function
 #if defined(_MSC_VER) // Windows
     qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                    n_ant_t, (size_t)n_path, planar_wave,
@@ -216,6 +266,61 @@ template void quadriga_lib::baseband_freq_response(const arma::Cube<float> *coef
 template void quadriga_lib::baseband_freq_response(const arma::Cube<double> *coeff_re, const arma::Cube<double> *coeff_im, const arma::Cube<double> *delay,
                                                    const arma::Col<double> *pilot_grid, const double bandwidth,
                                                    arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im);
+
+/*!MD
+# baseband_freq_response_vec
+Compute the baseband frequency response of multiple MIMO channels
+
+## Description:
+- Computes the frequency-domain response of a batch of time-domain MIMO channels using a discrete Fourier transform (DFT).
+- This function wraps `quadriga_lib::baseband_freq_response` and applies it across multiple snapshots in parallel using OpenMP.
+- Input consists of vectors of real/imaginary coefficients and delay Cubes for each snapshot.
+- Output is a vector of frequency-domain channel matrices `H` (one per snapshot).
+- Can optionally compute a selected subset of snapshots using `i_snap`.
+- Internal arithmetic is performed in single precision for performance.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::baseband_freq_response_vec(
+                const std::vector<arma::Cube<dtype>> *coeff_re,
+                const std::vector<arma::Cube<dtype>> *coeff_im,
+                const std::vector<arma::Cube<dtype>> *delay,
+                const arma::Col<dtype> *pilot_grid,
+                const double bandwidth,
+                std::vector<arma::Cube<dtype>> *hmat_re,
+                std::vector<arma::Cube<dtype>> *hmat_im,
+                const arma::u32_vec *i_snap = nullptr);
+```
+
+## Arguments:
+- `const std::vector<arma::Cube<dtype>> ***coeff_re**` (input)<br>
+  Real part of channel coefficients, vector of length `n_snap`. Each cube has shape `[n_rx, n_tx, n_path]`.
+
+- `const std::vector<arma::Cube<dtype>> ***coeff_im**` (input)<br>
+  Imaginary part of channel coefficients, same structure as `coeff_re`.
+
+- `const std::vector<arma::Cube<dtype>> ***delay**` (input)<br>
+  Path delays in seconds, same structure as `coeff_re`, shape can be broadcasted `[1, 1, n_path]`.
+
+- `const arma::Col<dtype> ***pilot_grid**` (input)<br>
+  Normalized sub-carrier positions relative to bandwidth. Range: `0.0` (center freq) to `1.0` (center + bandwidth). Length: `n_carriers`.
+
+- `const double **bandwidth**` (input)<br>
+  Total baseband bandwidth in Hz, used to compute sub-carrier frequencies.
+
+- `std::vector<arma::Cube<dtype>> ***hmat_re**` (output)<br>
+  Output: Real part of the frequency-domain channel matrices. Vector of length `n_out`. Each cube is `[n_rx, n_tx, n_carriers]`.
+
+- `std::vector<arma::Cube<dtype>> ***hmat_im**` (output)<br>
+  Output: Imaginary part of the frequency-domain channel matrices. Same structure as `hmat_re`.
+
+- `const arma::u32_vec ***i_snap** = nullptr` (optional input)<br>
+  Optional subset of snapshot indices to process. If omitted, all `n_snap` snapshots are processed. Length: `n_out`.
+
+## See also:
+- [[baseband_freq_response]] (for processing a single snapshot)
+MD!*/
 
 // Compute the baseband frequency response of multiple MIMO channels
 template <typename dtype>

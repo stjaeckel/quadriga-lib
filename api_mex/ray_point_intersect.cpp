@@ -77,7 +77,6 @@ the vertices.
   Target value for the sub-cloud size, only evaluated if 'sub_cloud_index' is not given.
 
 ## Output Arguments:
-
 - **`hit_count`**<br>
   Number of rays that hit a point, unit32, Length: `[ n_points ]`
 

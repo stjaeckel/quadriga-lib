@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_lib.hpp"
-#include "quadriga_lib_test_avx2.hpp"
+#include "quadriga_lib_avx2_functions.hpp"
 
 // Template for time measuring:
 // #include <chrono>
@@ -96,7 +96,7 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
 
     if (isAVX2Supported()) // CPU support for AVX2
     {
-        quadriga_lib::avx2_test(X, Z);
+        qd_TEST_AVX2(X, Z);
     }
 
     // Free aligned memory

@@ -17,6 +17,84 @@
 
 #include "quadriga_tools.hpp"
 
+/*!SECTION
+Site-Specific Simulation Tools
+SECTION!*/
+
+/*!MD
+# combine_irs_coord
+Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS)
+
+## Description:
+- Merges two propagation segments — (1) TX → IRS and (2) IRS → RX — into complete TX → RX paths via an IRS.
+- Interaction coordinates of both segments are stored in a compressed format where `no_interact` is a vector of
+  length `n_path` storing the number of interactions per path and `interact_coord` stores all
+  interaction coordinates in path order.
+- Each combined path includes interaction points from both segments, optionally reversed for each segment.
+- The number of output paths `n_path_irs` is at most `n_path_1 × n_path_2`, but can be reduced by specifying `active_path`.
+- Output includes the number and coordinates of interaction points per IRS-reflected path.
+- Allowed datatypes (`dtype`): `float` or `double`.
+
+## Declaration:
+```
+void quadriga_lib::combine_irs_coord(
+                dtype Ix, dtype Iy, dtype Iz,
+                const arma::u32_vec *no_interact_1,
+                const arma::Mat<dtype> *interact_coord_1,
+                const arma::u32_vec *no_interact_2,
+                const arma::Mat<dtype> *interact_coord_2,
+                arma::u32_vec *no_interact,
+                arma::Mat<dtype> *interact_coord,
+                bool reverse_segment_1 = false,
+                bool reverse_segment_2 = false,
+                const std::vector<bool> *active_path = nullptr);
+```
+
+## Arguments:
+- `dtype **Ix**, **Iy**, **Iz**` (input)<br>
+  IRS position in Cartesian coordinates `[m]`.
+
+- `const arma::u32_vec ***no_interact_1**` (input)<br>
+  Number of interaction points in segment 1 (TX → IRS), vector of length `[n_path_1]`
+
+- `const arma::Mat<dtype> ***interact_coord_1**` (input)<br>
+  Interaction coordinates for segment 1, matrix of size `[3, sum(no_interact_1)]`.
+
+- `const arma::u32_vec ***no_interact_2**` (input)<br>
+  Number of interaction points in segment 2 (IRS → RX), vector of length `[n_path_2]`
+
+- `const arma::Mat<dtype> ***interact_coord_2**` (input)<br>
+  Interaction coordinates for segment 2, matrix of size `[3, sum(no_interact_2)]`.
+
+- `arma::u32_vec ***no_interact**` (output)<br>
+  Combined number of interaction points per IRS-based path, vector of length `[n_path_irs]`.
+
+- `arma::Mat<dtype> ***interact_coord**` (output)<br>
+  Combined interaction coordinates, matrix of size `[3, sum(no_interact)]`.
+
+- `bool **reverse_segment_1** = false` (optional input)<br>
+  If `true`, reverses the interaction coordinates of segment 1. TX and IRS positions are not swapped. Default: `false`.
+
+- `bool **reverse_segment_2** = false` (optional input)<br>
+  If `true`, reverses the interaction coordinates of segment 2. IRS and RX positions are not swapped. Default: `false`.
+
+- `const std::vector<bool> ***active_path** = nullptr` (optional input)<br>
+  Optional mask vector of length `[n_path_1 × n_path_2]`. If provided, only paths with `true` are combined. 
+  This is generated as the output of [[get_channels_irs]]
+
+## Technical Notes:
+- Paths are created by appending interaction coordinates from both segments. Reversing only affects the order of these coordinates.
+- Output matrix `interact_coord` is built sequentially and should be preallocated only if the total number of interaction points is known in advance.
+- The function supports sparsely activated paths via `active_path`, this is generated as a return value of [[get_channels_irs]]
+  and filters out paths that have very little power after being reflected by the IRS. 
+- This function is typically used as a complementary step to delay or coefficient calculations involving IRS-based channels. 
+  It calculated the required data for visualizing paths, e.g. in Blender or other visualization tools.
+
+## See also:
+- [[get_channels_irs]] (for computing IRS channels)
+- [[coord2path]] (for processing coordinates, calculating departure and arrival angels, etc.)
+MD!*/
+
 // Combine path interaction coordinates for Intelligent Reflective Surfaces (IRS)
 template <typename dtype>
 void quadriga_lib::combine_irs_coord(dtype Ix, dtype Iy, dtype Iz,

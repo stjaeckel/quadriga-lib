@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <cstring> // For std::memcopy
-
-#include <cmath> // For std::isnan
 #include "quadriga_tools.hpp"
-#include "ray_triangle_intersect_avx2.hpp"
+#include "quadriga_lib_avx2_functions.hpp"
 
 // Vector size for AVX2
 #define VEC_SIZE 8ULL
@@ -247,11 +244,86 @@ static inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float 
     }
 }
 
+/*!SECTION
+Site-Specific Simulation Tools
+SECTION!*/
+
+/*!MD
+# ray_triangle_intersect
+Calculates the intersection of rays and triangles in three dimensions
+
+## Description:
+- Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
+- Efficient SIMD acceleration using AVX2 intrinsics to process 8 mesh triangles in parallel.
+- Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
+- Supports a compact input format where origin and destination coordinates are stored together.
+- Allowed datatypes (`dtype`): `float` or `double`
+- Internal computations are carried out in **single precision** regardless of `dtype`.
+
+## Declaration:
+```
+void quadriga_lib::ray_triangle_intersect(
+                const arma::Mat<dtype> *orig,
+                const arma::Mat<dtype> *dest,
+                const arma::Mat<dtype> *mesh,
+                arma::Mat<dtype> *fbs = nullptr,
+                arma::Mat<dtype> *sbs = nullptr,
+                arma::u32_vec *no_interact = nullptr,
+                arma::u32_vec *fbs_ind = nullptr,
+                arma::u32_vec *sbs_ind = nullptr,
+                const arma::u32_vec *sub_mesh_index = nullptr,
+                bool transpose_inputs = false);
+```
+
+## Arguments:
+- `const arma::Mat<dtype> ***orig**` (input)<br>
+  Ray origins in global coordinate system (GCS). Size: `[n_ray, 3]`, or `[n_ray, 6]` if `dest == nullptr`. 
+  In the latter case, columns must be ordered as `{xo, yo, zo, xd, yd, zd}`.
+
+- `const arma::Mat<dtype> ***dest**` (input)<br>
+  Ray destinations in GCS. Size: `[n_ray, 3]`. Set to `nullptr` if `orig` has 6 columns and contains 
+  both origin and destination.
+
+- `const arma::Mat<dtype> ***mesh**` (input)<br>
+  Triangular surface mesh. Size: `[n_mesh, 9]`, where each row contains the 3 vertices 
+  `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`.
+
+- `arma::Mat<dtype> ***fbs**` (optional output)<br>
+  First-bounce surface intersection points (FBS). Size: `[n_ray, 3]`.
+
+- `arma::Mat<dtype> ***sbs**` (optional output)<br>
+  Second-bounce surface intersection points (SBS). Size: `[n_ray, 3]`.
+
+- `arma::u32_vec ***no_interact**` (optional output)<br>
+  Number of intersections per ray (0, 1, or 2). Size: `[n_ray]`.
+
+- `arma::u32_vec ***fbs_ind**` (optional output)<br>
+  1-based index of the first intersected mesh element, 0 = no intersection. Size: `[n_ray]`.
+
+- `arma::u32_vec ***sbs_ind**` (optional output)<br>
+  1-based index of the second intersected mesh element, 0 = no second intersection. Size: `[n_ray]`.
+
+- `const arma::u32_vec ***sub_mesh_index**` (optional input)<br>
+  Indexes indicating start of sub-meshes in `mesh`. Size: `[n_sub]`. Enables faster processing via segmentation.
+
+- `bool **transpose_inputs** = false` (optional input)<br>
+  If `true`, treats `orig`/`dest` as `[3, n_ray]` and `mesh` as `[9, n_mesh]`.
+
+## See also:
+- <a href="#obj_file_read">obj_file_read</a> (for loading `mesh` from an OBJ file)
+- <a href="#icosphere">icosphere</a> (for generating beams)
+- <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
+- <a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
+- <a href="#subdivide_rays">subdivide_rays</a> (for subdivides ray beams into sub beams)
+MD!*/
+
+
+
 template <typename dtype>
 void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, const arma::Mat<dtype> *mesh,
-                                          arma::Mat<dtype> *fbs, arma::Mat<dtype> *sbs, arma::Col<unsigned> *no_interact,
-                                          arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                          const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs)
+                                          arma::Mat<dtype> *fbs, arma::Mat<dtype> *sbs, arma::u32_vec *no_interact,
+                                          arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
+                                          const arma::u32_vec *sub_mesh_index, bool transpose_inputs)
 {
     // Input validation
     if (orig == nullptr)
@@ -368,7 +440,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
     // Check if the sub-mesh indices are valid
     arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
-    arma::Col<unsigned> smi(1);                                   // Sub-mesh-index (local copy)
+    arma::u32_vec smi(1);                                   // Sub-mesh-index (local copy)
     if (sub_mesh_index != nullptr && sub_mesh_index->n_elem != 0) // Input is available
     {
         n_sub = sub_mesh_index->n_elem;
@@ -663,11 +735,11 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 }
 
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<float> *orig, const arma::Mat<float> *dest, const arma::Mat<float> *mesh,
-                                                   arma::Mat<float> *fbs, arma::Mat<float> *sbs, arma::Col<unsigned> *no_interact,
-                                                   arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                                   const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs);
+                                                   arma::Mat<float> *fbs, arma::Mat<float> *sbs, arma::u32_vec *no_interact,
+                                                   arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
+                                                   const arma::u32_vec *sub_mesh_index, bool transpose_inputs);
 
 template void quadriga_lib::ray_triangle_intersect(const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *mesh,
-                                                   arma::Mat<double> *fbs, arma::Mat<double> *sbs, arma::Col<unsigned> *no_interact,
-                                                   arma::Col<unsigned> *fbs_ind, arma::Col<unsigned> *sbs_ind,
-                                                   const arma::Col<unsigned> *sub_mesh_index, bool transpose_inputs);
+                                                   arma::Mat<double> *fbs, arma::Mat<double> *sbs, arma::u32_vec *no_interact,
+                                                   arma::u32_vec *fbs_ind, arma::u32_vec *sbs_ind,
+                                                   const arma::u32_vec *sub_mesh_index, bool transpose_inputs);

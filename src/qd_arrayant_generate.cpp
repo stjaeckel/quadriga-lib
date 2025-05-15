@@ -23,6 +23,117 @@
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
+#include "qd_arrayant_functions.hpp"
+
+/*!SECTION
+Array antenna functions
+SECTION!*/
+
+/*!MD
+# qdant_read
+Reads array antenna data from QDANT files
+
+## Description:
+- Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file, which stores antenna pattern data in XML format.
+- Returns an antenna array (`arrayant`) object constructed from the specified data in the QDANT file.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id = 1, arma::u32_mat *layout = nullptr);
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Filename of the QDANT file from which antenna pattern data will be read. Cannot be empty.
+
+- `unsigned **id** = 1` (optional input)<br>
+  ID of the antenna within the QDANT file to read. Default is `1`.
+
+- `arma::u32_mat **layout** = nullptr` (optional output)<br>
+  Pointer to a matrix that will store the layout information of multiple antenna elements from the file. The layout contains element IDs present in the QDANT file.
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object containing data from the specified antenna ID within the QDANT file.
+
+## Example:
+```
+arma::u32_mat layout;
+auto ant = quadriga_lib::qdant_read<double>("antenna_data.qdant", 2, &layout);
+```
+
+## See also:
+- <a href="#arrayant">arrayant</a>
+- <a href="#.qdant_write">arrayant.qdant_write</a>
+
+MD!*/
+
+// Read array antenna object and layout from QDANT file
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::u32_mat *layout)
+{
+    quadriga_lib::arrayant<dtype> ant;
+    std::string error_message;
+
+    if (layout == nullptr)
+    {
+        arma::Mat<unsigned> tmp_layout;
+        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
+                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
+                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
+                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
+                                               &tmp_layout);
+        tmp_layout.reset();
+    }
+    else
+        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
+                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
+                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
+                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
+                                               layout);
+
+    // Throw parsing errors
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Throw validation errors
+    error_message = ant.validate();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    return ant;
+}
+template quadriga_lib::arrayant<float> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
+template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
+
+/*!MD
+# generate_arrayant_omni
+Generate isotropic radiator with vertical polarization
+
+## Description:
+- Generates an isotropic antenna radiator pattern with vertical polarization.
+- Allows specification of the resolution of the antenna pattern sampling grid.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0)
+```
+
+## Arguments:
+- `dtype **res** = 1.0` (optional input)<br>
+  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object representing an isotropic radiator with vertical polarization.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_omni<float>(10.0f);
+```
+MD!*/
 
 // Generate : Isotropic radiator, vertical polarization
 template <typename dtype>
@@ -60,6 +171,34 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
 }
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_omni(float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni(double res);
+
+/*!MD
+# generate_arrayant_xpol
+Generate cross-polarized isotropic radiator
+
+## Description:
+- Generates a cross-polarized isotropic antenna radiator pattern.
+- Allows specification of the resolution of the antenna pattern sampling grid.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0)
+```
+
+## Arguments:
+- `dtype **res** = 1.0` (optional input)<br>
+  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object representing a cross-polarized isotropic radiator.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_xpol<float>(10.0f);
+```
+MD!*/
 
 // Generate : Cross-polarized isotropic radiator
 template <typename dtype>
@@ -108,6 +247,34 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_xpol(float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol(double res);
 
+/*!MD
+# generate_arrayant_dipole
+Generate short dipole with vertical polarization
+
+## Description:
+- Generates a short dipole antenna pattern with vertical polarization.
+- Allows specification of the resolution of the antenna pattern sampling grid.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0)
+```
+
+## Arguments:
+- `dtype **res** = 1.0` (optional input)<br>
+  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object representing a vertically polarized short dipole.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_dipole<float>();
+```
+MD!*/
+
 // Generate : Short dipole radiating with vertical polarization
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
@@ -149,6 +316,34 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
 }
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_dipole(float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole(double res);
+
+/*!MD
+# generate_arrayant_half_wave_dipole
+Generate half-wave dipole with vertical polarization
+
+## Description:
+- Generates a vertically polarized half-wave dipole antenna pattern.
+- Allows specification of the resolution of the antenna pattern sampling grid.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0)
+```
+
+## Arguments:
+- `dtype **res** = 1.0` (optional input)<br>
+  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object representing a vertically polarized half-wave dipole.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
+```
+MD!*/
 
 // Generate : Half-wave dipole radiating with vertical polarization
 template <typename dtype>
@@ -193,6 +388,45 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(d
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_half_wave_dipole(float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wave_dipole(double res);
 
+/*!MD
+# generate_arrayant_custom
+Generate antenna with custom 3dB beamwidth
+
+## Description:
+- Generates an antenna array object with a custom-defined 3dB beamwidth (FWHM) in azimuth and elevation.
+- Allows control over the rear-side attenuation using a front-to-back gain ratio.
+- Supports specification of the pattern sampling resolution.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
+                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0)
+```
+
+## Arguments:
+- `dtype **az_3dB** = 90.0` (optional input)<br>
+  3dB beamwidth in azimuth, specified in degrees. Default: `90.0`
+
+- `dtype **el_3db** = 90.0` (optional input)<br>
+  3dB beamwidth in elevation, specified in degrees. Default: `90.0`
+
+- `dtype **rear_gain_lin** = 0.0` (optional input)<br>
+  Front-to-back gain ratio as a linear value. Default: `0.0` (no rear gain)
+
+- `dtype **res** = 1.0` (optional input)<br>
+  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Antenna array object with the specified 3dB beamwidth and rear gain.
+
+## Example:
+```
+auto ant = quadriga_lib::generate_arrayant_custom<double>(60.0, 45.0, 0.01, 1.0);
+```
+MD!*/
+
 // Generate : An antenna with a custom gain in elevation and azimuth
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin, dtype res)
@@ -216,13 +450,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     // Calculate azimuth pattern cut
     dtype a = one, d = half, x = limit_inf, delta = limit_inf;
-    arma::Col<dtype> xn(1), C(no_az), D(no_el);
+    arma::Col<dtype> C(no_az), D(no_el);
     for (unsigned lp = 0; lp < 5000; ++lp)
     {
         dtype an = (lp == 0) ? a : a + d;
         delta = (lp == 0) ? limit_inf : std::abs(a - an);
         C = rear_gain_lin + (one - rear_gain_lin) * arma::exp(-an * phi_sq);
-        quadriga_lib::interp(&C, &ant.azimuth_grid, &az_3dB_rad, &xn);
+        auto xn = quadriga_lib::interp_1D(C, ant.azimuth_grid, az_3dB_rad);
         dtype xm = std::abs(xn.at(0) - half);
         a = xm < x ? an : a;
         d = xm < x ? d : step * d;
@@ -239,7 +473,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
         dtype an = (lp == 0) ? a : a + d;
         delta = (lp == 0) ? limit_inf : std::abs(a - an);
         D = arma::pow(cos_theta, an);
-        quadriga_lib::interp(&D, &ant.elevation_grid, &el_3db_rad, &xn);
+        auto xn = quadriga_lib::interp_1D(D, ant.elevation_grid, el_3db_rad);
         dtype xm = std::abs(xn.at(0) - half);
         a = xm < x ? an : a;
         d = xm < x ? d : step * d;
@@ -286,6 +520,78 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 }
 template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin, float res);
 template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin, double res);
+
+/*!MD
+# generate_arrayant_3GPP
+Generate 3GPP-NR compliant antenna model
+
+## Description:
+- Generates an antenna array based on the 3GPP-NR channel model specification.
+- Supports vertical and horizontal stacking of elements and panels with a range of polarization configurations.
+- Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored).
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
+                arma::uword M = 1, arma::uword N = 1, dtype center_freq = 299792458.0,
+                unsigned pol = 1, dtype tilt = 0.0, dtype spacing = 0.5, arma::uword Mg = 1,
+                arma::uword Ng = 1, dtype dgv = 0.5, dtype dgh = 0.5,
+                const arrayant<dtype> *pattern = nullptr, dtype res = 1.0)
+```
+## Arguments:
+- `arma::uword **M** = 1` (optional input)<br>
+  Number of vertical elements in the array. Default: `1`
+
+- `arma::uword **N** = 1` (optional input)<br>
+  Number of horizontal elements in the array. Default: `1`
+
+- `dtype **center_freq** = 299792458.0` (optional input)<br>
+  Center frequency of the antenna array in Hz. Default: `299792458.0`
+
+- `unsigned **pol** = 1` (optional input)<br>
+  Polarization configuration:
+  `pol = 1` | vertical polarization (default value)
+  `pol = 2` | H/V polarized elements, results in 2NM elements
+  `pol = 3` | +/-45° polarized elements, results in 2NM elements
+  `pol = 4` | vertical polarization, combines elements in vertical direction, results in N elements
+  `pol = 5` | H/V polarization, combines elements in vertical direction, results in 2N elements
+  `pol = 6` | +/-45° polarization, combines elements in vertical direction, results in 2N elements
+
+- `dtype **tilt** = 0.0` (optional input)<br>
+  Electrical downtilt angle in degrees. Used for `pol` values 4, 5, and 6. Default: `0.0`
+
+- `dtype **spacing** = 0.5` (optional input)<br>
+  Spacing between elements in wavelengths (λ). Default: `0.5`
+
+- `arma::uword **Mg** = 1` (optional input)<br>
+  Number of vertically stacked panels (columns). Default: `1`
+
+- `arma::uword **Ng** = 1` (optional input)<br>
+  Number of horizontally stacked panels (rows). Default: `1`
+
+- `dtype **dgv** = 0.5` (optional input)<br>
+  Panel spacing in vertical direction in wavelengths (λ). Default: `0.5`
+
+- `dtype **dgh** = 0.5` (optional input)<br>
+  Panel spacing in horizontal direction in wavelengths (λ). Default: `0.5`
+
+- `const arrayant<dtype> **pattern** = nullptr` (optional input)<br>
+  Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored.
+
+- `dtype **res** = 1.0` (optional input)<br>
+  Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: `1.0`
+
+## Returns:
+- `arrayant<dtype>`<br>
+  Generated antenna array object according to 3GPP-NR specifications.
+
+## Example:
+```
+// Generate 3GPP antenna array with 4x4 elements, H/V polarization
+auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 4, 3e9, 2);
+```
+MD!*/
 
 // Generate : Antenna model for the 3GPP-NR channel model
 template <typename dtype>

@@ -134,5 +134,6 @@ void channel_export_obj_file(const std::string fn,
 
     arma::uvec i_snap_a = qd_python_NPArray_to_Col(&i_snap);
 
-    quadriga_lib::export_obj_file(&c, fn, max_no_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
+    // Call Quadriga-Lib function
+    c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
 }

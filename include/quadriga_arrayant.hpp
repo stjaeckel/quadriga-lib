@@ -51,8 +51,8 @@ namespace quadriga_lib
         arma::uword n_ports() const;     // Number of ports (after coupling of elements)
 
         // Adds elements of "new_arrayant" to the current one
-        // - Returns a new arrayant that is a combination of the two
-        // - Throws an error if grids don't match
+        // - Returns an arrayant object that is a combination of the calling object and the "new_arrayant"
+        // - Throws an error if sampling grids don't match
         arrayant<dtype> append(const arrayant<dtype> *new_arrayant) const;
 
         // Calculate the directivity of an antenna element in dBi
@@ -97,8 +97,17 @@ namespace quadriga_lib
                          arma::Mat<dtype> *elevation_loc = nullptr,       // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
                          arma::Mat<dtype> *gamma = nullptr) const;        // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
 
-        // Write array antenna object and layout to QDANT file, returns id in file
-        unsigned qdant_write(std::string fn, unsigned id = 0, arma::Mat<unsigned> layout = arma::Mat<unsigned>()) const;
+        // Write array antenna object and layout to QDANT file
+        // - The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern
+        //   data in XML. This function writes pattern data to the specified file.
+        // - Multiple array antennas can be stored in the same file using the `id` parameter.
+        // - If writing to an exisiting file without specifying an `id`, the data gests appended at the end.
+        //   The output `id_in_file` identifies the location inside the file.
+        // - An optional storage `layout` can be provided to organize data inside the file.
+        // - Returns id in file after writing
+        unsigned qdant_write(std::string fn,                   // Filename of the QDANT file, string
+                             unsigned id = 0,                  // ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1
+                             arma::u32_mat layout = {}) const; // Layout of multiple array antennas. Must only contain element ids that are present in the file. optional
 
         // Remove zeros from the pattern data. Changes that size of the pattern.
         // Calling this function without an argument updates the arrayant properties inplace
@@ -107,18 +116,29 @@ namespace quadriga_lib
         // Reset the size to zero (the arrayant object will contain no data)
         void reset();
 
-        // Rotating antenna patterns (adjusts sampling grid if needed, e.g. for parabolic antennas)
-        // Usage: 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
-        // Calling this function without the argument "output" updates the arrayant properties inplace
-        void rotate_pattern(dtype x_deg = 0.0, dtype y_deg = 0.0, dtype z_deg = 0.0,
-                            unsigned usage = 0, unsigned element = -1, arrayant<dtype> *output = nullptr);
+        // Adjusts the orientation of antenna patterns
+        // - Transforms the radiation patterns of array antenna elements, allowing for precise
+        //   rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system
+        // - Also adjusts the sampling grid for non-uniformly sampled antennas, such as parabolic antennas with small apertures
+        // - Uses Euler rotations
+        // - Usage models : 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
+        // - Calling this function without the argument "output" updates the arrayant properties inplace
+        void rotate_pattern(dtype x_deg = 0.0,                  // The rotation angle around x-axis (bank angle) in [degrees]
+                            dtype y_deg = 0.0,                  // The rotation angle around y-axis (tilt angle) in [degrees]
+                            dtype z_deg = 0.0,                  // The rotation angle around z-axis (heading angle) in [degrees]
+                            unsigned usage = 0,                 // The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization
+                            unsigned element = -1,              // Element index, 0-bases, default (-1) =  update all elements
+                            arrayant<dtype> *output = nullptr); // Pointer to an antenna array object where the modified pattern data is should be written
 
         // Change the size of an arrayant, without explicitly preserving data
         // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
         // - Data in other properties may contain garbage
         // - Only performs a size update if exisiting size is different from new size
         // - Returns error when read-only
-        void set_size(arma::uword n_elevation, arma::uword n_azimuth, arma::uword n_elements, arma::uword n_ports);
+        void set_size(arma::uword n_elevation, // Number of elevation angles
+                      arma::uword n_azimuth,   // Number of azimuth angles
+                      arma::uword n_elements,  // Number of antenna elements
+                      arma::uword n_ports);    // Number of ports (after coupling of elements)
 
         // Validate integrity
         std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
@@ -126,29 +146,39 @@ namespace quadriga_lib
     };
 
     // Read array antenna object and layout from QDANT file
+    // - The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern data in XML
     template <typename dtype>
-    arrayant<dtype> qdant_read(std::string fn, unsigned id = 1, arma::Mat<unsigned> *layout = nullptr);
+    arrayant<dtype> qdant_read(std::string fn,                   // Filename of the QDANT file, string
+                               unsigned id = 1,                  // ID of the antenna to be read from the file
+                               arma::u32_mat *layout = nullptr); // Layout of multiple array antennas. Contain element ids that are present in the file
 
-    // Generate : Isotropic radiator, vertical polarization, 1 deg resolution
-    // Usage example: auto ant = quadriga_lib::generate_omni<float>();
+    // Generate isotropic radiator with vertical polarization
+    // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
+    // - Usage example: auto ant = quadriga_lib::generate_omni<float>();
     template <typename dtype>
     arrayant<dtype> generate_arrayant_omni(dtype res = 1.0);
 
-    // Generate : Cross-polarized isotropic radiator, 1 deg resolution
+    // Generate cross-polarized isotropic radiator
+    // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype>
     arrayant<dtype> generate_arrayant_xpol(dtype res = 1.0);
 
-    // Generate : Short dipole radiating with vertical polarization, 1 deg resolution
+    // Generate short dipole radiating with vertical polarization
+    // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype>
     arrayant<dtype> generate_arrayant_dipole(dtype res = 1.0);
 
-    // Generate : Half-wave dipole radiating with vertical polarization, 1 deg resolution
+    // Generate half-wave dipole radiating with vertical polarization
+    // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
     template <typename dtype>
     arrayant<dtype> generate_arrayant_half_wave_dipole(dtype res = 1.0);
 
-    // Generate : An antenna with a custom 3dB beam with (in degree)
+    // Generate an antenna with a custom 3dB beam with (FWHM)
     template <typename dtype>
-    arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0, dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0);
+    arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0,       // Azimuth 3dB beam with in degree
+                                             dtype el_3db = 90.0,       // Elevation 3dB beam with in degree
+                                             dtype rear_gain_lin = 0.0, // Front-back ration, linear value
+                                             dtype res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
 
     // Generate : Antenna model for the 3GPP-NR channel model
     // Polarization indicator:
@@ -172,7 +202,7 @@ namespace quadriga_lib
                                            dtype dgv = 0.5,                          // Panel spacing in vertical direction (dg,V) in [λ]
                                            dtype dgh = 0.5,                          // Panel spacing in horizontal direction (dg,H) in [λ]
                                            const arrayant<dtype> *pattern = nullptr, // Optional custom per-element pattern
-                                           dtype res = 1.0);                         // Resolution in degree, ignored if pattern is given
+                                           dtype res = 1.0);                         // Resolution in degree, ignored if custom pattern is given
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -183,7 +213,7 @@ namespace quadriga_lib
     // - LOS-Path delays and amplitudes are calculated including the individual element positions
     // - If path length is shorter than the shortest possible path (TX > FBS > LBS > RX), shortest possible path is used for delay calculation
     // - Polarization transfer matrix must be given by 8 interleaved complex values, (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
-    // - Polarization transfer matrix must be normalized (i.e., not include the path gain)
+    // - Polarization transfer matrix must be normalized (i.e., not include the free-space equivalent path gain)
     template <typename dtype>
     void get_channels_spherical(const arrayant<dtype> *tx_array,     // Transmit array antenna with 'n_tx' elements (= ports after element coupling)
                                 const arrayant<dtype> *rx_array,     // Receive array antenna with 'n_rx' elements (= ports after element coupling)

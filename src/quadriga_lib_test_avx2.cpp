@@ -16,11 +16,11 @@
 // ------------------------------------------------------------------------
 
 #include <immintrin.h>
-#include "quadriga_lib_test_avx2.hpp"
+#include "quadriga_lib_avx2_functions.hpp"
 
 // Perform a simple test calculation
-void quadriga_lib::avx2_test(const float *X, // Aligned memory, 16 floats
-                             float *Z)       // 8 floats
+void qd_TEST_AVX2(const float *X, // Aligned memory, 16 floats
+                  float *Z)       // 8 floats
 {
     __m256 tx = _mm256_load_ps(X);
     __m256 ty = _mm256_load_ps(&X[8]);

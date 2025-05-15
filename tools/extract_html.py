@@ -10,19 +10,29 @@ def extract_md_sections(file_content):
     md_sections = re.findall(r'\/\*!MD\n(.*?)\nMD!\*\/', file_content, re.DOTALL)
     return md_sections
 
+def escape_code(match):
+    code = match.group(1)
+    code = re.sub(r'&', '&amp;', code)
+    code = re.sub(r'<', '&lt;', code)
+    code = re.sub(r'>', '&gt;', code)
+    return f'<code>{code}</code>'
+
 def format_text(text):
+     # Replace `code` with <code>code</code>
+    text = re.sub(r'`(.*?)`', escape_code, text)
+
+    # Pointers
+    text = re.sub(r'\*\*\*\*(.*?)\*\*', r'**&#42;&#42;\1**', text)
+
     # Replace **bold** with <b>bold</b>
     text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
     
     # Replace *italic* with <i>italic</i>
     text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
-    
-    # Replace `code` with <code>code</code>
-    text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)
+      
+    # Encode [[]] as internal links
+    text = re.sub(r'\[\[(.*?)\]\]', r'<a href="#\1">\1</a>', text)
 
-    # Replace `code` with <code>code</code>
-    text = text.replace('<dtype>','&lt;dtype&gt;');
-    
     return text
 
 def format_nested_lists(text):
@@ -209,6 +219,7 @@ def generate_html(folder_name, html_output_file, html_preamble):
                                 i += 1
                                 while i < len(lines) and lines[i].strip() != "```":  # End of code block
                                     ln = lines[i]
+                                    ln = ln.replace('&','&amp;')
                                     ln = ln.replace("<","&lt;")
                                     ln = ln.replace(">","&gt;")
                                     section_content += ln + "\n"

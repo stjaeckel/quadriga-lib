@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 #include <any>
+#include <cstring>
+#include <cmath>
 
 namespace quadriga_lib
 {
@@ -84,6 +86,18 @@ namespace quadriga_lib
         // - throws an error if neither coeff_re/im nor path_polarization is available
         // - returns one value for each snapshot (vector with n_snap elements)
         arma::Col<dtype> calc_effective_path_gain(bool assume_valid = false) const;
+
+        // Write propagation paths to a Wavefront OBJ file
+        // - e.g. for visualization in Blender
+        void write_paths_to_obj_file(std::string fn,                 // Filename of the OBJ file
+                                     arma::uword max_no_paths = 0,   // Maximum number of paths to be shown, Default: all
+                                     dtype gain_max = -60.0,         // Maximum path gain in dB (only for color-coding)
+                                     dtype gain_min = -140.0,        // Minimum path gain in dB (only for color-coding and path selection)
+                                     std::string colormap = "jet",   // Colormap for the visualization
+                                     arma::uvec i_snap = {},         // Snapshot indices, 0-based, empty = export all
+                                     dtype radius_max = 0.05,        // Maximum tube radius in meters
+                                     dtype radius_min = 0.01,        // Minimum tube radius in meters
+                                     arma::uword n_edges = 5) const; // Number of vertices in the circle building the tube, must be >= 3
     };
 
     // Function to obtain the HDF5 library version
@@ -108,22 +122,18 @@ namespace quadriga_lib
     //      53  arma::Row<arma::sword>,   54  arma::Row<unsigned>,      55  arma::Row<int>
     int any_type_id(const std::any *data, unsigned long long *dims = nullptr, void **dataptr = nullptr);
 
-    // Export the path data to a Wavefront OBJ file, e.g. for visualization in Blender
-    // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-    template <typename dtype>                                    // Float or double
-    void export_obj_file(const quadriga_lib::channel<dtype> *ch, // Channel object
-                         std::string fn,                         // Filename of the OBJ file
-                         arma::uword max_no_paths = 0,           // Maximum number of paths to be shown, Default: all
-                         dtype gain_max = -60.0,                 // Maximum path gain in dB (only for color-coding)
-                         dtype gain_min = -140.0,                // Minimum path gain in dB (only for color-coding and path selection)
-                         std::string colormap = "jet",           // Colormap for the visualization
-                         arma::uvec i_snap = {},                 // Snapshot indices, 0-based, empty = export all
-                         dtype radius_max = 0.05,                // Maximum tube radius in meters
-                         dtype radius_min = 0.01,                // Minimum tube radius in meters
-                         arma::uword n_edges = 5);               // Number of vertices in the circle building the tube, must be >= 3
-
     // Create a new channel HDF file and set the index to given storage layout
-    void hdf5_create(std::string fn, unsigned nx = 65536, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
+    // - Channels can be structured in a multi-dimensional array (up to 4D)
+    //   For instance, the first dimension might represent the Base Station (BS), the second the
+    //   User Equipment (UE), and the third the frequency.
+    // - Dimensions of the storage layout must be defined when the file is initially created
+    // - It is possible to reshape the layout using 'hdf5_reshape_layout', but the total number of
+    //   entries must not change
+    void hdf5_create(std::string fn,      // Filename of the HDF5 file
+                     unsigned nx = 65536, // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
+                     unsigned ny = 1,     // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
+                     unsigned nz = 1,     // Number of z-entries in the storage layout (second dimension, e.g. for carrier frequency)
+                     unsigned nw = 1);    // Number of w-entries in the storage layout (fourth dimension)
 
     // Save data to HDF file (stand alone function)
     // - All data is stored in single precision
@@ -132,39 +142,66 @@ namespace quadriga_lib
     // - If file does not exist, a new file will be created with (nx = 65535, ny = 1, nz = 1, nw = 1)
     // - Returns 0 if new dataset was created, 1 if dataset was overwritten or modified
     // - The switch "assume_valid" can be used to skip the data integrity check (for better performance)
-    template <typename dtype> // Float or double
-    int hdf5_write(const quadriga_lib::channel<dtype> *ch, std::string fn,
-                   unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
-                   bool assume_valid = false);
+    // - Throws and error if the requested index in the file has not been reserved during hdf5_create
+    template <typename dtype>                              // Float or double
+    int hdf5_write(const quadriga_lib::channel<dtype> *ch, // Channel object to write
+                   std::string fn,                         // Filename of the HDF5 file
+                   unsigned ix = 0,                        // x-Index in the HDF file
+                   unsigned iy = 0,                        // y-Index in the HDF file
+                   unsigned iz = 0,                        // z-Index in the HDF file
+                   unsigned iw = 0,                        // w-Index in the HDF file
+                   bool assume_valid = false);             // Swith to skip the data integrity check
 
-    // Read storage layout from HDF file
-    // - Output will be a 4-element vector
-    // - If file does not exist, output will be [0,0,0,0], no error-message
-    // - Optional output: has_value = vector containing the ChannelID in the file
+    // Read the storage layout of channel data inside an HDF5 file
+    // - Returns 4-element vector with storage layout in form: {nx, ny, nz, nw}
+    // - If file does not exist, output will be {0,0,0,0}, no error-message
+    // - Optional output: ChannelID = vector containing the ChannelID in the file, serialized, length nx × ny × nz × nw
     // - channelIDs with value 0 indicate that there is no data stored at this index
-    arma::Col<unsigned> hdf5_read_layout(std::string fn, arma::Col<unsigned> *channelID = nullptr);
+    arma::u32_vec hdf5_read_layout(std::string fn, arma::u32_vec *channelID = nullptr);
 
-    // Reshape storage layout
-    void hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny = 1, unsigned nz = 1, unsigned nw = 1);
+    // Reshapes the storage layout inside an existing HDF5 file
+    // - Total number of elements in the HDF5 file is fixed when calling `hdf5_create`
+    // - Reshaping is possible only when the total number does not change
+    void hdf5_reshape_layout(std::string fn,   // Filename of the HDF5 file
+                             unsigned nx,      // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
+                             unsigned ny = 1,  // Number of y-entries in the storage layout (second dimension, e.g. for UEs)
+                             unsigned nz = 1,  // Number of z-entries in the storage layout (second dimension, e.g. for carrier frequency)
+                             unsigned nw = 1); // Number of w-entries in the storage layout (fourth dimension)
 
     // Read channel object from HDF5 file
-    // - Returns empty channel object if channel ID dies not exist
+    // - Returns empty channel object if channel ID does not exist
+    // - All structured data is stored in single precision, but is converted to double in case if dtype = double
     // - Conversion to float or double is not done for unstructured data
-    template <typename dtype> // Read as float or double
-    channel<dtype> hdf5_read_channel(std::string fn, unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0);
+    template <typename dtype>                          // Read as float or double
+    channel<dtype> hdf5_read_channel(std::string fn,   // Filename of the HDF5 file
+                                     unsigned ix = 0,  // x-Index in the HDF file
+                                     unsigned iy = 0,  // y-Index in the HDF file
+                                     unsigned iz = 0,  // z-Index in the HDF file
+                                     unsigned iw = 0); // w-Index in the HDF file
 
     // Read single unstructured dataset from HDF5 file
+    // - Besides structured channel data, extra datasets of various types can be added
+    // - They are identified by a prefix (usually "par_") followed by a dataset name (par_name)
+    // - Returns a std::any object, that can be further analyzed using the function quadriga_lib::any_type_id
     // - Returns empty std::any if there is no dataset at this location or under this name
-    std::any hdf5_read_dset(std::string fn, std::string par_name,
-                            unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
-                            std::string prefix = "par_");
+    std::any hdf5_read_dset(std::string fn,               // Filename of the HDF5 file
+                            std::string par_name,         // Dataset name without the prefix (typically "par_")
+                            unsigned ix = 0,              // x-Index in the HDF file
+                            unsigned iy = 0,              // y-Index in the HDF file
+                            unsigned iz = 0,              // z-Index in the HDF file
+                            unsigned iw = 0,              // w-Index in the HDF file
+                            std::string prefix = "par_"); // Option to set a different prefix
 
     // Read names of the unstructured datasets from the HDF file
     // - Returns number of the unstructured datasets at the given location
-    unsigned long long hdf5_read_dset_names(std::string fn,                                                     // File name
-                                            std::vector<std::string> *par_names,                                // Output
-                                            unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0, // Location in file
-                                            std::string prefix = "par_");                                       // Default prefix
+    // - par_names will contain all dataset name without the prefix
+    arma::uword hdf5_read_dset_names(std::string fn,                      // Filename of the HDF5 file
+                                     std::vector<std::string> *par_names, // Output data
+                                     unsigned ix = 0,                     // x-Index in the HDF file
+                                     unsigned iy = 0,                     // y-Index in the HDF file
+                                     unsigned iz = 0,                     // z-Index in the HDF file
+                                     unsigned iw = 0,                     // w-Index in the HDF file
+                                     std::string prefix = "par_");        // Option to set a different prefix
 
     // Write single unstructured data field to HDF5 file
     // - Scalar types: string, unsigned, int, long long, unsigned long long, float, double
@@ -174,15 +211,20 @@ namespace quadriga_lib
     // - Parameter name may only contain letters and numbers and the underscore "_"
     // - An additional prefix "par_" will be added to the name before writing to the HDF file
     // - Unsupported data types will cause an error
-    void hdf5_write_dset(std::string fn, std::string par_name, const std::any *par_data,
-                         unsigned ix = 0, unsigned iy = 0, unsigned iz = 0, unsigned iw = 0,
-                         std::string prefix = "par_");
+    void hdf5_write_dset(std::string fn,               // Filename of the HDF5 file
+                         std::string par_name,         // Dataset name without the prefix (typically "par_")
+                         const std::any *par_data,     // Data to be written
+                         unsigned ix = 0,              // x-Index in the HDF file
+                         unsigned iy = 0,              // y-Index in the HDF file
+                         unsigned iz = 0,              // z-Index in the HDF file
+                         unsigned iw = 0,              // w-Index in the HDF file
+                         std::string prefix = "par_"); // Option to set a different prefix
 
-    // Compute the baseband frequency response of a single MIMO channel
+    // Compute the baseband frequency response of a MIMO channel
     // - Inputs are given in the time domain
     // - Calculates the discrete Fourier transform of the coefficients
     // - Outputs are returned in the frequency domain at the given sample positions
-    // - Uses AVX2 to accelerate the computations (calculate 2 carriers in parallel)
+    // - Uses AVX2 to accelerate the computations (calculate 8 carriers in parallel)
     // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
     // - Internal calculations are done in single precision
     template <typename dtype>
@@ -195,6 +237,8 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *hmat_im);        // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
 
     // Compute the baseband frequency response of multiple MIMO channels
+    // - Wrapper function for "quadriga_lib::baseband_freq_response" to process multiple snapshot at once
+    // - Optional input i_snap can be used to select a subset of the given coeff_re, coeff_im, delay
     // - Uses OpenMP to process snapshots in parallel
     template <typename dtype>
     void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
@@ -204,7 +248,7 @@ namespace quadriga_lib
                                     const double bandwidth,                         // The baseband bandwidth in [Hz]
                                     std::vector<arma::Cube<dtype>> *hmat_re,        // Output: Channel matrices (H), real part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
                                     std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
-                                    const arma::Col<unsigned> *i_snap = nullptr);   // Snapshot indices, 0-based, optional, vector of length "n_out"
+                                    const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
 
 }
 

@@ -17,10 +17,80 @@
 
 #include "quadriga_tools.hpp"
 
+/*!SECTION
+Site-Specific Simulation Tools
+SECTION!*/
+
+/*!MD
+# icosphere
+Construct a geodesic polyhedron (icosphere) from triangles
+
+## Description:
+- Generates a convex polyhedral surface (icosphere) made entirely of triangles, based on recursive subdivision of an icosahedron.
+- Useful for sampling directions uniformly on a sphere, for applications like ray tracing, antenna pattern evaluation, or spatial grids.
+- Each triangular face points outward from the center and has an associated normal.
+- Optionally returns vertex directions and vector lengths in either Cartesian or spherical coordinates.
+- Allowed datatypes (`dtype`): `float` or `double`.
+
+## Declaration:
+```
+arma::uword quadriga_lib::icosphere(
+                arma::uword n_div,
+                dtype radius,
+                arma::Mat<dtype> *center,
+                arma::Col<dtype> *length = nullptr,
+                arma::Mat<dtype> *vert = nullptr,
+                arma::Mat<dtype> *direction = nullptr,
+                bool direction_xyz = false);
+```
+
+## Arguments:
+- `arma::uword **n_div**` (input)<br>
+  Number of subdivisions per triangle edge. The total number of faces will be `n_faces = 20 × n_div²`.
+
+- `dtype **radius**` (input)<br>
+  Radius of the icosphere in meters. All triangle vertices lie on this sphere.
+
+- `arma::Mat<dtype> ***center**` (output)<br>
+  Unit vectors pointing from the origin to the center of each triangle face. Usually a bit shorter than `radius`, Size `[n_faces, 3]`.
+
+- `arma::Col<dtype> ***length** = nullptr` (optional output)<br>
+  Vector magnitudes of each `center` vector (usually slightly less than `radius`). Vector size `[n_faces]`.
+
+- `arma::Mat<dtype> ***vert** = nullptr` (optional output)<br>
+  Vertex vectors from each triangle’s center to its three vertices, flattened as `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`. Size `[n_faces, 9]`.
+
+- `arma::Mat<dtype> ***direction** = nullptr` (optional output)<br>
+  Direction vectors of the three triangle edges. Format depends on `direction_xyz`: If `false` 
+  (spherical): `[v1az, v1el, v2az, v2el, v3az, v3el]`, If `true` (Cartesian): `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`,
+  Size `[n_faces, 6]` or `[n_faces, 9]`.
+
+- `bool **direction_xyz** = false` (optional input)<br>
+  If `true`, output directions in Cartesian coordinates. If `false`, output in spherical azimuth/elevation. Default: `false`.
+
+## Returns:
+- `arma::uword`<br>
+  The number of triangular faces generated: `n_faces = 20 × n_div²`.
+
+## Technical Notes:
+- The generated mesh is well-suited for uniform angular sampling on a sphere.
+- Triangle vertices are calculated relative to the center to ensure they lie on the desired sphere.
+- The radius parameter scales the final structure without changing angular spacing.
+
+## Example:
+```
+arma::fmat center, vert, direction;
+arma::fvec length;
+
+// 4 subdivisions → 320 faces, map to unit sphere, output Cartesian directions
+auto n = quadriga_lib::icosphere<float>(4, 1.0, &center, &length, &vert, &direction, true);
+```
+MD!*/
+
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 template <typename dtype>
-size_t quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length,
-                               arma::Mat<dtype> *vert, arma::Mat<dtype> *direction, bool direction_xyz)
+arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype> *center, arma::Col<dtype> *length,
+                                    arma::Mat<dtype> *vert, arma::Mat<dtype> *direction, bool direction_xyz)
 {
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
@@ -29,7 +99,6 @@ size_t quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype>
         throw std::invalid_argument("Input 'radius' cannot be negative.");
 
     arma::uword n_faces = n_div * n_div * 20;
-    size_t n_faces_t = (size_t)n_faces;
 
     // Set sizes
     if (center == nullptr)
@@ -94,81 +163,81 @@ size_t quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype>
 
     // Process all faces
     double ri = 1.0 / r;
-    for (size_t n = 0; n < n_faces_t; ++n)
+    for (arma::uword n = 0; n < n_faces; ++n)
     {
         // Project triangles onto the unit sphere
         // First vertex
         double tmp = r / std::sqrt(p_icosphere[n] * p_icosphere[n] +
-                                   p_icosphere[n + n_faces_t] * p_icosphere[n + n_faces_t] +
-                                   p_icosphere[n + 2 * n_faces_t] * p_icosphere[n + 2 * n_faces_t]);
+                                   p_icosphere[n + n_faces] * p_icosphere[n + n_faces] +
+                                   p_icosphere[n + 2 * n_faces] * p_icosphere[n + 2 * n_faces]);
 
         p_icosphere[n] *= tmp;
-        p_icosphere[n + n_faces_t] *= tmp;
-        p_icosphere[n + 2 * n_faces_t] *= tmp;
+        p_icosphere[n + n_faces] *= tmp;
+        p_icosphere[n + 2 * n_faces] *= tmp;
 
         // Second vertex
-        tmp = r / std::sqrt(p_icosphere[n + 3 * n_faces_t] * p_icosphere[n + 3 * n_faces_t] +
-                            p_icosphere[n + 4 * n_faces_t] * p_icosphere[n + 4 * n_faces_t] +
-                            p_icosphere[n + 5 * n_faces_t] * p_icosphere[n + 5 * n_faces_t]);
+        tmp = r / std::sqrt(p_icosphere[n + 3 * n_faces] * p_icosphere[n + 3 * n_faces] +
+                            p_icosphere[n + 4 * n_faces] * p_icosphere[n + 4 * n_faces] +
+                            p_icosphere[n + 5 * n_faces] * p_icosphere[n + 5 * n_faces]);
 
-        p_icosphere[n + 3 * n_faces_t] *= tmp;
-        p_icosphere[n + 4 * n_faces_t] *= tmp;
-        p_icosphere[n + 5 * n_faces_t] *= tmp;
+        p_icosphere[n + 3 * n_faces] *= tmp;
+        p_icosphere[n + 4 * n_faces] *= tmp;
+        p_icosphere[n + 5 * n_faces] *= tmp;
 
         // Third vertex
-        tmp = r / std::sqrt(p_icosphere[n + 6 * n_faces_t] * p_icosphere[n + 6 * n_faces_t] +
-                            p_icosphere[n + 7 * n_faces_t] * p_icosphere[n + 7 * n_faces_t] +
-                            p_icosphere[n + 8 * n_faces_t] * p_icosphere[n + 8 * n_faces_t]);
+        tmp = r / std::sqrt(p_icosphere[n + 6 * n_faces] * p_icosphere[n + 6 * n_faces] +
+                            p_icosphere[n + 7 * n_faces] * p_icosphere[n + 7 * n_faces] +
+                            p_icosphere[n + 8 * n_faces] * p_icosphere[n + 8 * n_faces]);
 
-        p_icosphere[n + 6 * n_faces_t] *= tmp;
-        p_icosphere[n + 7 * n_faces_t] *= tmp;
-        p_icosphere[n + 8 * n_faces_t] *= tmp;
+        p_icosphere[n + 6 * n_faces] *= tmp;
+        p_icosphere[n + 7 * n_faces] *= tmp;
+        p_icosphere[n + 8 * n_faces] *= tmp;
 
         if (calc_directions == 1) // Spherical
         {
             // First vertex
-            tmp = p_icosphere[n + 2 * n_faces_t] * ri;
+            tmp = p_icosphere[n + 2 * n_faces] * ri;
             tmp = (tmp > 1.0) ? 1.0 : (tmp < -1.0 ? -1.0 : tmp);
-            p_direction[n] = (dtype)std::atan2(p_icosphere[n + n_faces_t], p_icosphere[n]);
-            p_direction[n + n_faces_t] = (dtype)std::asin(tmp);
+            p_direction[n] = (dtype)std::atan2(p_icosphere[n + n_faces], p_icosphere[n]);
+            p_direction[n + n_faces] = (dtype)std::asin(tmp);
 
             // Second vertex
-            tmp = p_icosphere[n + 5 * n_faces_t] * ri;
+            tmp = p_icosphere[n + 5 * n_faces] * ri;
             tmp = (tmp > 1.0) ? 1.0 : (tmp < -1.0 ? -1.0 : tmp);
-            p_direction[n + 2 * n_faces_t] = (dtype)std::atan2(p_icosphere[n + 4 * n_faces_t], p_icosphere[n + 3 * n_faces_t]);
-            p_direction[n + 3 * n_faces_t] = (dtype)std::asin(tmp);
+            p_direction[n + 2 * n_faces] = (dtype)std::atan2(p_icosphere[n + 4 * n_faces], p_icosphere[n + 3 * n_faces]);
+            p_direction[n + 3 * n_faces] = (dtype)std::asin(tmp);
 
             // Third vertex
-            tmp = p_icosphere[n + 8 * n_faces_t] * ri;
+            tmp = p_icosphere[n + 8 * n_faces] * ri;
             tmp = (tmp > 1.0) ? 1.0 : (tmp < -1.0 ? -1.0 : tmp);
-            p_direction[n + 4 * n_faces_t] = (dtype)std::atan2(p_icosphere[n + 7 * n_faces_t], p_icosphere[n + 6 * n_faces_t]);
-            p_direction[n + 5 * n_faces_t] = (dtype)std::asin(tmp);
+            p_direction[n + 4 * n_faces] = (dtype)std::atan2(p_icosphere[n + 7 * n_faces], p_icosphere[n + 6 * n_faces]);
+            p_direction[n + 5 * n_faces] = (dtype)std::asin(tmp);
         }
         else if (calc_directions == 2) // Cartesian
         {
-            for (size_t m = 0; m < 9; ++m)
-                p_direction[n + m * n_faces_t] = dtype(p_icosphere[n + m * n_faces_t] * ri);
+            for (arma::uword m = 0; m < 9; ++m)
+                p_direction[n + m * n_faces] = dtype(p_icosphere[n + m * n_faces] * ri);
         }
 
         // Calculate normal vector of the plane that is formed by the 3 vertices
-        double Ux = p_icosphere[n + 3 * n_faces_t] - p_icosphere[n],
-               Uy = p_icosphere[n + 4 * n_faces_t] - p_icosphere[n + n_faces_t],
-               Uz = p_icosphere[n + 5 * n_faces_t] - p_icosphere[n + 2 * n_faces_t];
+        double Ux = p_icosphere[n + 3 * n_faces] - p_icosphere[n],
+               Uy = p_icosphere[n + 4 * n_faces] - p_icosphere[n + n_faces],
+               Uz = p_icosphere[n + 5 * n_faces] - p_icosphere[n + 2 * n_faces];
 
-        double Vx = p_icosphere[n + 6 * n_faces_t] - p_icosphere[n],
-               Vy = p_icosphere[n + 7 * n_faces_t] - p_icosphere[n + n_faces_t],
-               Vz = p_icosphere[n + 8 * n_faces_t] - p_icosphere[n + 2 * n_faces_t];
+        double Vx = p_icosphere[n + 6 * n_faces] - p_icosphere[n],
+               Vy = p_icosphere[n + 7 * n_faces] - p_icosphere[n + n_faces],
+               Vz = p_icosphere[n + 8 * n_faces] - p_icosphere[n + 2 * n_faces];
 
         double Nx = Uy * Vz - Uz * Vy, Ny = Uz * Vx - Ux * Vz, Nz = Ux * Vy - Uy * Vx;       // Cross Product
         tmp = 1.0 / std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz), Nx *= tmp, Ny *= tmp, Nz *= tmp; // Normalize
 
         // Distance from origin to plane
-        tmp = (p_icosphere[n] * Nx + p_icosphere[n + n_faces_t] * Ny + p_icosphere[n + 2 * n_faces_t] * Nz);
+        tmp = (p_icosphere[n] * Nx + p_icosphere[n + n_faces] * Ny + p_icosphere[n + 2 * n_faces] * Nz);
 
         // Calculate intersect coordinate
         p_dest[n] = dtype(tmp * Nx);
-        p_dest[n + n_faces_t] = dtype(tmp * Ny);
-        p_dest[n + 2 * n_faces_t] = dtype(tmp * Nz);
+        p_dest[n + n_faces] = dtype(tmp * Ny);
+        p_dest[n + 2 * n_faces] = dtype(tmp * Nz);
 
         if (p_length != nullptr)
             p_length[n] = (dtype)std::abs(tmp);
@@ -177,22 +246,22 @@ size_t quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<dtype>
         if (p_vert != nullptr)
         {
             p_vert[n] = dtype(p_icosphere[n] - (double)p_dest[n]);
-            p_vert[n + n_faces_t] = dtype(p_icosphere[n + n_faces_t] - (double)p_dest[n + n_faces_t]);
-            p_vert[n + 2 * n_faces_t] = dtype(p_icosphere[n + 2 * n_faces_t] - (double)p_dest[n + 2 * n_faces_t]);
-            p_vert[n + 3 * n_faces_t] = dtype(p_icosphere[n + 3 * n_faces_t] - (double)p_dest[n]);
-            p_vert[n + 4 * n_faces_t] = dtype(p_icosphere[n + 4 * n_faces_t] - (double)p_dest[n + n_faces_t]);
-            p_vert[n + 5 * n_faces_t] = dtype(p_icosphere[n + 5 * n_faces_t] - (double)p_dest[n + 2 * n_faces_t]);
-            p_vert[n + 6 * n_faces_t] = dtype(p_icosphere[n + 6 * n_faces_t] - (double)p_dest[n]);
-            p_vert[n + 7 * n_faces_t] = dtype(p_icosphere[n + 7 * n_faces_t] - (double)p_dest[n + n_faces_t]);
-            p_vert[n + 8 * n_faces_t] = dtype(p_icosphere[n + 8 * n_faces_t] - (double)p_dest[n + 2 * n_faces_t]);
+            p_vert[n + n_faces] = dtype(p_icosphere[n + n_faces] - (double)p_dest[n + n_faces]);
+            p_vert[n + 2 * n_faces] = dtype(p_icosphere[n + 2 * n_faces] - (double)p_dest[n + 2 * n_faces]);
+            p_vert[n + 3 * n_faces] = dtype(p_icosphere[n + 3 * n_faces] - (double)p_dest[n]);
+            p_vert[n + 4 * n_faces] = dtype(p_icosphere[n + 4 * n_faces] - (double)p_dest[n + n_faces]);
+            p_vert[n + 5 * n_faces] = dtype(p_icosphere[n + 5 * n_faces] - (double)p_dest[n + 2 * n_faces]);
+            p_vert[n + 6 * n_faces] = dtype(p_icosphere[n + 6 * n_faces] - (double)p_dest[n]);
+            p_vert[n + 7 * n_faces] = dtype(p_icosphere[n + 7 * n_faces] - (double)p_dest[n + n_faces]);
+            p_vert[n + 8 * n_faces] = dtype(p_icosphere[n + 8 * n_faces] - (double)p_dest[n + 2 * n_faces]);
         }
     }
 
-    return n_faces_t;
+    return n_faces;
 }
 
-template size_t quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length,
-                                        arma::Mat<float> *vert, arma::Mat<float> *direction, bool direction_as_spheric);
+template arma::uword quadriga_lib::icosphere(arma::uword n_div, float radius, arma::Mat<float> *center, arma::Col<float> *length,
+                                             arma::Mat<float> *vert, arma::Mat<float> *direction, bool direction_as_spheric);
 
-template size_t quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length,
-                                        arma::Mat<double> *vert, arma::Mat<double> *direction, bool direction_as_spheric);
+template arma::uword quadriga_lib::icosphere(arma::uword n_div, double radius, arma::Mat<double> *center, arma::Col<double> *length,
+                                             arma::Mat<double> *vert, arma::Mat<double> *direction, bool direction_as_spheric);

@@ -37,7 +37,7 @@ TEST_CASE("Arrayant interpolation - Minimal test")
     arma::mat elevation = {-0.5, 0.0, 0.0, 0.5};
     arma::uvec i_element = {0};
     arma::Cube<double> orientation(3, 1, 1);
-    arma::mat element_pos_i(3, 1); 
+    arma::mat element_pos_i(3, 1);
 
     arma::mat V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma;
     ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im,
@@ -350,4 +350,16 @@ TEST_CASE("Arrayant interpolation - Test projected distance")
     ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im, i_element, &orientation, &element_pos_i,
                     &dist, &azimuth_loc, &elevation_loc, &gamma);
     CHECK(arma::approx_equal(dist, element_pos_i, "absdiff", 1e-14));
+}
+
+TEST_CASE("Arrayant interpolation - Example")
+{
+    double pi = arma::datum::pi;
+
+    auto ant = quadriga_lib::generate_arrayant_custom<double>(90.0, 90.0, 0.0);
+    arma::mat azimuth = {0.0, 0.5 * pi, -0.5 * pi, pi}; // Azimuth angles: East, North, South, West
+    arma::mat elevation(1, azimuth.n_elem);             // Initialize to 0
+
+    arma::mat V_re, V_im, H_re, H_im;
+    ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
 }

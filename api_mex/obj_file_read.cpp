@@ -37,7 +37,6 @@ material name exists in the material database, the function loads the correspond
 Otherwise, it defaults to using standard properties.
 
 ## Usage:
-
 ```
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
     quadriga_lib.obj_file_read( fn, use_single );

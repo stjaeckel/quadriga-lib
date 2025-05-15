@@ -16,6 +16,60 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_channel.hpp"
+#include "quadriga_tools.hpp"
+
+#include <iomanip> // std::setprecision
+
+/*!SECTION
+Channel class
+SECTION!*/
+
+/*!MD
+# channel<++>
+Class for storing and managing MIMO channel data and associated metadata
+
+## Description:
+- A channel object represents MIMO path-level channel data between antenna arrays over multiple time snapshots.
+- Each snapshot may have a different number of propagation paths.
+- Contains structured fields for positions, delays, gains, angles, coefficients, and more.
+- Supports optional metadata via `par_names` and `par_data`.
+- Allowed datatypes (`dtype`): `float` and `double`
+
+## Attributes:
+`std::string name`                                | Name of the channel object
+`arma::Col<dtype> center_frequency`               | Center frequency in [Hz], size `[1]` or `[n_snap]` or `[]`
+`arma::Mat<dtype> tx_pos`                         | Transmitter positions, size `[3, n_snap]` or `[3, 1]`
+`arma::Mat<dtype> rx_pos`                         | Receiver positions, size `[3, n_snap]` or `[3, 1]`
+`arma::Mat<dtype> tx_orientation`                 | Transmitter orientation (Euler), size `[3, n_snap]`, `[3, 1]`, or `[]`
+`arma::Mat<dtype> rx_orientation`                 | Receiver orientation (Euler), size `[3, n_snap]`, `[3, 1]`, or `[]`
+`std::vector<arma::Cube<dtype>> coeff_re`         | Channel coefficients, real part, size `[n_rx, n_tx, n_path]` per snapshot
+`std::vector<arma::Cube<dtype>> coeff_im`         | Channel coefficients, imaginary part, same size as `coeff_re`
+`std::vector<arma::Cube<dtype>> delay`            | Path delays [s], size `[n_rx, n_tx, n_path]` or `[1,1,n_path]` per snapshot
+`std::vector<arma::Col<dtype>> path_gain`         | Path gains (pre-pattern), length `[n_path]` per snapshot
+`std::vector<arma::Col<dtype>> path_length`       | Path lengths TX→RX [m], length `[n_path]` per snapshot
+`std::vector<arma::Mat<dtype>> path_polarization` | Polarization matrix, size `[8, n_path]` per snapshot
+`std::vector<arma::Mat<dtype>> path_angles`       | Departure/arrival angles, size `[n_path, 4]`, columns: AOD, EOD, AOA, EOA
+`std::vector<arma::Mat<dtype>> path_fbs_pos`      | First-bounce scatterer positions, size `[3, n_path]`
+`std::vector<arma::Mat<dtype>> path_lbs_pos`      | Last-bounce scatterer positions, size `[3, n_path]`
+`std::vector<arma::Col<unsigned>> no_interact`    | Number of interactions per path, length `[n_path]` per snapshot
+`std::vector<arma::Mat<dtype>> interact_coord`    | Coordinates of all interactions, size `[3, sum(no_interact)]` per snapshot
+`std::vector<std::string> par_names`              | Names of unstructured parameters
+`std::vector<std::any> par_data`                  | Unstructured metadata fields (e.g., string, scalar, matrix)
+`int initial_position`                            | Index of reference snapshot (0-based)
+
+## Simple member functions:
+`.n_snap()`     | Returns the number of snapshots
+`.n_rx()`       | Returns the number of receive antennas (0 if coeffs not present)
+`.n_tx()`       | Returns the number of transmit antennas (0 if coeffs not present)
+`.n_path()`     | Returns the number of paths per snapshot as vector
+`.empty()`      | Returns true if the object has no channel data
+`.is_valid()`   | Returns an empty string if object is valid, else an error message
+
+## Complex member functions:
+- <a href="#.add_paths">.add_paths</a>
+- <a href="#.calc_effective_path_gain">.calc_effective_path_gain</a>
+- <a href="#.write_paths_to_obj_file">.write_paths_to_obj_file</a>
+MD!*/
 
 // CHANNEL METHODS : Return object dimensions
 template <typename dtype>
@@ -340,7 +394,76 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
     return std::string("");
 }
 
-// Add paths to an exisiting channel
+/*!MD
+# .add_paths
+Append new propagation paths to an existing channel snapshot
+
+## Description:
+- Adds path-level channel data to a specific snapshot (`i_snap`) in a `channel` object.
+- All fields provided must be consistent in length (`n_path_add`) and structure.
+- The number of antennas must match existing entries for the snapshot.
+- Existing fields in the channel object must also be provided to this method if relevant.
+- Member function of <a href="#channel">channel</a>
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::channel<dtype>::add_paths(
+                arma::uword i_snap,
+                const arma::Cube<dtype> *coeff_re_add = nullptr,
+                const arma::Cube<dtype> *coeff_im_add = nullptr,
+                const arma::Cube<dtype> *delay_add = nullptr,
+                const arma::u32_vec *no_interact_add = nullptr,
+                const arma::Mat<dtype> *interact_coord_add = nullptr,
+                const arma::Col<dtype> *path_gain_add = nullptr,
+                const arma::Col<dtype> *path_length_add = nullptr,
+                const arma::Mat<dtype> *path_polarization_add = nullptr,
+                const arma::Mat<dtype> *path_angles_add = nullptr,
+                const arma::Mat<dtype> *path_fbs_pos_add = nullptr,
+                const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
+```
+## Arguments:
+- `arma::uword **i_snap**` (input)<br>
+  Index of the snapshot to which the new paths should be added (0-based).
+
+- `const arma::Cube<dtype> ***coeff_re_add**` (optional input)<br>
+  Real part of channel coefficients. Size: `[n_rx, n_tx, n_path_add]`.
+
+- `const arma::Cube<dtype> ***coeff_im_add**` (optional input)<br>
+  Imaginary part of channel coefficients. Size: `[n_rx, n_tx, n_path_add]`.
+
+- `const arma::Cube<dtype> ***delay_add**` (optional input)<br>
+  Propagation delay in seconds. Size: `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`.
+
+- `const arma::u32_vec ***no_interact_add**` (optional input)<br>
+  Number of interaction points per path. Length: `[n_path_add]`.
+
+- `const arma::Mat<dtype> ***interact_coord_add**` (optional input)<br>
+  Coordinates of interaction points. Size: `[3, sum(no_interact)]`.
+
+- `const arma::Col<dtype> ***path_gain_add**` (optional input)<br>
+  Path gains before antenna effects. Length: `[n_path_add]`.
+
+- `const arma::Col<dtype> ***path_length_add**` (optional input)<br>
+  Path lengths from TX to RX phase center. Length: `[n_path_add]`.
+
+- `const arma::Mat<dtype> ***path_polarization_add**` (optional input)<br>
+  Polarization transfer matrices (interleaved). Size: `[8, n_path_add]`.
+
+- `const arma::Mat<dtype> ***path_angles_add**` (optional input)<br>
+  Departure and arrival angles. Size: `[n_path_add, 4]`, format: `{AOD, EOD, AOA, EOA}`.
+
+- `const arma::Mat<dtype> ***path_fbs_pos_add**` (optional input)<br>
+  First-bounce scatterer positions. Size: `[3, n_path_add]`.
+
+- `const arma::Mat<dtype> ***path_lbs_pos_add**` (optional input)<br>
+  Last-bounce scatterer positions. Size: `[3, n_path_add]`.
+
+## Notes:
+- Any provided input must match the snapshot structure and existing fields of the `channel` object.
+- This method does not update `tx_pos`, `rx_pos`, or orientation fields.
+MD!*/
+
 template <typename dtype>
 void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
                                              const arma::Cube<dtype> *coeff_re_add, const arma::Cube<dtype> *coeff_im_add, const arma::Cube<dtype> *delay_add,
@@ -534,7 +657,33 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
         this->path_lbs_pos[i_snap] = arma::join_rows(this->path_lbs_pos[i_snap], *path_lbs_pos_add);
 }
 
-// Calculate the the effective path gain (linear scale)
+/*!MD
+# .calc_effective_path_gain
+Calculate the effective path gain for each snapshot (in linear scale)
+
+## Description:
+- Computes the effective channel gain by summing the power of all paths and averaging over all transmit and receive antennas.
+- If channel coefficients (`coeff_re`, `coeff_im`) are available, the result is based on the actual MIMO channel.
+- If channel coefficients are unavailable but `path_polarization` exists, the gain is estimated assuming ideal dual-polarized (XPOL) antennas.
+- Throws an exception if neither of these datasets is available.
+- Returns one gain value per snapshot.
+- Member function of <a href="#channel">channel</a>
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
+```
+
+## Arguments:
+- `bool **assume_valid*- = false` (optional input)<br>
+  Skip internal consistency checks if set to `true` (for performance in trusted contexts). Default: `false`.
+
+## Returns:
+- `arma::Col<dtype>`<br>
+  Column vector of effective path gains (linear scale), one entry per snapshot (length `n_snap`).
+MD!*/
+
 template <typename dtype>
 arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid) const
 {
@@ -610,6 +759,344 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool ass
         }
 
     return PG;
+}
+
+/*!MD
+# .write_paths_to_obj_file
+Export propagation paths to a Wavefront OBJ file
+
+## Description:
+- Writes ray-traced propagation paths to a `.obj` file for 3D visualization (e.g., in Blender).
+- Each path is represented as a tube, optionally colored by path gain using a selected colormap.
+- The function supports filtering by path gain, maximum number of paths, and snapshot index.
+- Tube radius and detail can be customized.
+- Member function of <a href="#channel">channel</a>
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
+                std::string fn,
+                arma::uword max_no_paths = 0,
+                dtype gain_max = -60.0,
+                dtype gain_min = -140.0,
+                std::string colormap = "jet",
+                arma::uvec i_snap = {},
+                dtype radius_max = 0.05,
+                dtype radius_min = 0.01,
+                arma::uword n_edges = 5) const;
+```
+
+## Arguments:
+- `std::string **fn**` (input)<br>
+  Path to the output `.obj` file.
+
+- `arma::uword **max_no_paths** = 0` (optional input)<br>
+  Maximum number of paths to be visualized. A value of `0` includes all available paths above `gain_min`. 
+  Default: `0`.
+
+- `dtype **gain_max** = -60.0` (optional input)<br>
+  Maximum path gain (in dB) used for color-coding. Paths with higher gain are clipped. Default: `-60.0`.
+
+- `dtype **gain_min** = -140.0` (optional input)<br>
+  Minimum path gain (in dB) for color-coding and optional path filtering. Default: `-140.0`.
+
+- `std::string **colormap** = "jet"` (optional input)<br>
+  Name of the colormap to be used for path coloring. 
+  Supported maps: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`, 
+  `autumn`, `summer`. Default: `"jet"`.
+
+- `arma::uvec **i_snap** = {}` (optional input)<br>
+  Indices of the snapshots to be included (0-based). Empty vector exports all snapshots. Default: `{}`.
+
+- `dtype **radius_max** = 0.05` (optional input)<br>
+  Maximum radius (in meters) of the visualized tube geometry. Default: `0.05`.
+
+- `dtype **radius_min** = 0.01` (optional input)<br>
+  Minimum radius (in meters) of the visualized tube geometry. Default: `0.01`.
+
+- `arma::uword **n_edges** = 5` (optional input)<br>
+  Number of vertices used to create each tube cross-section. Must be ≥ 3. Default: `5`.
+
+## See also:
+- <a href="#path_to_tube">path_to_tube</a>
+- <a href="#colormap">colormap</a>
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::channel<dtype>::write_paths_to_obj_file(std::string fn,
+                                                           arma::uword max_no_paths,
+                                                           dtype gain_max, dtype gain_min,
+                                                           std::string colormap,
+                                                           arma::uvec i_snap,
+                                                           dtype radius_max, dtype radius_min,
+                                                           arma::uword n_edges) const
+{
+
+    // Check validity
+    std::string error_message = this->is_valid();
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    if (this->empty())
+        throw std::invalid_argument("Channel contains no data.");
+
+    if (this->center_frequency.empty())
+        throw std::invalid_argument("Center frequency is missing.");
+
+    if (this->no_interact.empty() || this->interact_coord.empty())
+        throw std::invalid_argument("Ray tracing data (no_interact, interact_coord) is missing.");
+
+    if (this->path_polarization.empty() && this->coeff_re.empty())
+        throw std::invalid_argument("MIMO coefficients or path-metadata is missing.");
+
+    // Input validation
+    std::string fn_suffix = ".obj";
+    std::string fn_mtl;
+
+    if (fn.size() >= fn_suffix.size() &&
+        fn.compare(fn.size() - fn_suffix.size(), fn_suffix.size(), fn_suffix) == 0)
+    {
+        fn_mtl = fn.substr(0, fn.size() - fn_suffix.size()) + ".mtl";
+    }
+    else
+        throw std::invalid_argument("OBJ-File name must end with .obj");
+
+    // Extract the file name from the path
+    std::string fn_mtl_base;
+    arma::uword pos = fn_mtl.find_last_of("/");
+    if (pos != std::string::npos)
+        fn_mtl_base = fn_mtl.substr(pos + 1ULL);
+    else
+        fn_mtl_base = fn_mtl;
+
+    if (max_no_paths == 0ULL)
+        max_no_paths = 10000ULL;
+
+    arma::uword n_snap_in = this->n_snap();
+    arma::uword n_rx = this->n_rx();
+    arma::uword n_tx = this->n_tx();
+
+    if (i_snap.n_elem == 0ULL)
+        i_snap = arma::regspace<arma::uvec>(0ULL, n_snap_in - 1ULL);
+
+    if (arma::any(i_snap >= n_snap_in))
+        throw std::invalid_argument("Snapshot indices 'i_snap' cannot exceed the number of snapshots in the channel.");
+
+    arma::uword n_snap_out = i_snap.n_elem;
+
+    if (radius_min < (dtype)0.0 || radius_max < (dtype)0.0)
+        throw std::invalid_argument("Radius cannot be negative.");
+
+    // Make sure that the minimum radius is smaller than the maximum
+    radius_min = (radius_min < radius_max) ? radius_min : radius_max;
+
+    // Colormap
+    arma::uchar_mat cmap = quadriga_lib::colormap(colormap);
+    arma::uword n_cmap = (arma::uword)cmap.n_rows;
+
+    // Export colormap to material file
+    std::ofstream outFile(fn_mtl);
+    if (outFile.is_open())
+    {
+        // Write some text to the file
+        outFile << "# QuaDRiGa " << "path data colormap\n\n";
+        for (arma::uword i = 0ULL; i < n_cmap; ++i)
+        {
+            double R = (double)cmap(i, 0ULL) / 255.0;
+            double G = (double)cmap(i, 1ULL) / 255.0;
+            double B = (double)cmap(i, 2ULL) / 255.0;
+            outFile << "newmtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << i << "\n";
+            outFile << std::fixed << std::setprecision(6) << "Kd " << R << " " << G << " " << B << "\n\n";
+        }
+        outFile.close();
+    }
+    else
+        throw std::invalid_argument("Could not write material file.");
+
+    // Export paths to OBJ file
+    outFile = std::ofstream(fn);
+    if (outFile.is_open())
+    {
+        // Write some text to the file
+        outFile << "# QuaDRiGa Path OBJ File\n";
+        outFile << "mtllib " << fn_mtl_base << "\n";
+    }
+    else
+        throw std::invalid_argument("Could not write OBJ file.");
+
+    bool moving_tx = this->tx_pos.n_cols != 1ULL;
+    bool moving_rx = this->rx_pos.n_cols != 1ULL;
+
+    // Export each snapshot
+    arma::uword vert_counter = 0ULL;
+    for (arma::uword i_snap_out = 0ULL; i_snap_out < n_snap_out; ++i_snap_out)
+    {
+        arma::uword i_snap_in = i_snap(i_snap_out);
+
+        // Extract path coordinates
+        dtype tx = moving_tx ? this->tx_pos(0ULL, i_snap_in) : this->tx_pos(0ULL, 0ULL);
+        dtype ty = moving_tx ? this->tx_pos(1ULL, i_snap_in) : this->tx_pos(1ULL, 0ULL);
+        dtype tz = moving_tx ? this->tx_pos(2ULL, i_snap_in) : this->tx_pos(2ULL, 0ULL);
+
+        dtype gainF = (this->center_frequency.n_elem > 1ULL) ? this->center_frequency(i_snap_in) : this->center_frequency(0ULL);
+        gainF = (dtype)-32.45 - (dtype)20.0 * std::log10(gainF * (dtype)1.0e-9);
+
+        dtype rx = moving_rx ? this->rx_pos(0ULL, i_snap_in) : this->rx_pos(0ULL, 0ULL);
+        dtype ry = moving_rx ? this->rx_pos(1ULL, i_snap_in) : this->rx_pos(1ULL, 0ULL);
+        dtype rz = moving_rx ? this->rx_pos(2ULL, i_snap_in) : this->rx_pos(2ULL, 0ULL);
+
+        // Calculate path coordinates
+        arma::Col<dtype> path_length;
+        std::vector<arma::Mat<dtype>> path_coord;
+        quadriga_lib::coord2path<dtype>(tx, ty, tz, rx, ry, rz, &this->no_interact[i_snap_in], &this->interact_coord[i_snap_in],
+                                        &path_length, nullptr, nullptr, nullptr, &path_coord);
+
+        // Calculate path power
+        arma::uword n_path = path_coord.size();
+        arma::Col<dtype> path_power_dB(n_path);
+        arma::s32_vec color_index(n_path);
+
+        dtype scl = (dtype)63.0 / (gain_max - gain_min);
+        for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            // Lambda to calculate the power and check if the pattern has any entry > -200 dB
+            auto calc_power = [](const dtype *Re, const dtype *Im, arma::uword n_elem) -> dtype
+            {
+                dtype p = dtype(0.0);
+                for (arma::uword i = 0ULL; i < n_elem; ++i)
+                    p += Re[i] * Re[i] + Im[i] * Im[i];
+                return (dtype)10.0 * std::log10(p);
+                ;
+            };
+
+            dtype p = (dtype)0.0;
+            if (!this->coeff_re.empty()) // Use MIMO coefficients
+                p = calc_power(this->coeff_re[i_snap_in].slice_memptr(i_path), this->coeff_im[i_snap_in].slice_memptr(i_path), n_rx * n_tx);
+            else if (!this->path_polarization.empty()) // Use XPR
+            {
+                const dtype *p_xpr = this->path_polarization[i_snap_in].colptr(i_path);
+                for (arma::uword m = 0ULL; m < 8ULL; ++m) // sum( xprmat(:,n).^2 )
+                    p += *p_xpr * *p_xpr, ++p_xpr;
+                p = (dtype)10.0 * std::log10(p);
+                p += gainF - (dtype)20.0 * std::log10(path_length(i_path));
+            }
+            path_power_dB(i_path) = p;
+
+            dtype x = p;
+            x = (x < gain_min) ? gain_min : x;
+            x = (x > gain_max) ? gain_max : x;
+            x = x - gain_min;
+            x = x * scl;
+            x = (x > (dtype)63.0) ? (dtype)63.0 : x;
+            x = std::round(x);
+
+            color_index(i_path) = (p < gain_min) ? -1 : (int)x;
+        }
+
+        // Sort the path power in decreasing order and return the indices
+        arma::uvec pow_indices = arma::sort_index(path_power_dB, "descend");
+        arma::uword *i_pow_sorted = pow_indices.memptr();
+
+        // Limit the number of paths that should be shown
+        for (arma::uword i = max_no_paths; i < n_path; ++i)
+            color_index(i_pow_sorted[i]) = -1;
+
+        // Write some descriptive information
+        outFile << "\n# Snapshot " << i_snap_in << "\n";
+        outFile << "#  No.   Lenght[m]     Gain[dB]   ID" << "\n";
+
+        for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            arma::uword i_path_sorted = i_pow_sorted[i_path];
+            dtype l = path_length(i_path_sorted);
+            dtype p = path_power_dB(i_path_sorted);
+
+            if (p > (dtype)-200.0)
+            {
+                outFile << "# " << std::setfill('0') << std::setw(4) << i_path << " ";
+                if (l < 1000.0f)
+                    outFile << " ";
+                if (l < 100.0f)
+                    outFile << " ";
+                if (l < 10.0f)
+                    outFile << " ";
+                outFile << std::fixed << std::setprecision(6) << l << "  ";
+                if (p > -100.0f)
+                    outFile << " ";
+                if (p > -10.0f)
+                    outFile << " ";
+                if (p > 10.0f)
+                    outFile << " ";
+                else if (p > 0.0f)
+                    outFile << "  ";
+
+                outFile << std::fixed << std::setprecision(6) << p;
+
+                if (color_index(i_path_sorted) >= 10)
+                    outFile << "   " << color_index(i_path_sorted);
+                else if (color_index(i_path_sorted) >= 0)
+                    outFile << "    " << color_index(i_path_sorted);
+
+                outFile << "\n";
+            }
+        }
+
+        // Write OBJ elements
+        scl = radius_max / (gain_max - gain_min);
+        for (arma::uword i_path = 0ULL; i_path < n_path; ++i_path)
+        {
+            arma::uword i_path_sorted = i_pow_sorted[i_path];
+            if (color_index(i_path_sorted) >= 0)
+            {
+                // Calculate radius
+                dtype p = path_power_dB(i_path_sorted);
+                dtype radius = p - gain_min;
+                radius = radius * scl;
+                radius = (radius > radius_max) ? radius_max : radius;
+                radius = (radius < radius_min) ? radius_min : radius;
+
+                // Write object name to OBJ file
+                outFile << "\no QuaDRiGa_path_s" << std::setfill('0') << std::setw(4) << i_snap_in << "_p" << std::setfill('0') << std::setw(4) << i_path << "\n";
+
+                ++vert_counter;
+                if (std::abs(radius) > (dtype)1.0e-4)
+                {
+                    // Calculate vertices and faces
+                    arma::Mat<dtype> vert;
+                    arma::umat faces;
+                    quadriga_lib::path_to_tube(&path_coord[i_path_sorted], &vert, &faces, radius, (arma::uword)n_edges);
+
+                    // Write vertices to file
+                    arma::uword n_vert = vert.n_cols;
+                    for (arma::uword iV = 0ULL; iV < n_vert; ++iV)
+                        outFile << std::defaultfloat << "v " << vert(0ULL, iV) << " " << vert(1ULL, iV) << " " << vert(2ULL, iV) << "\n";
+
+                    outFile << "usemtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << color_index(i_path_sorted) << "\n";
+
+                    // Write faces to file
+                    arma::uword n_faces = faces.n_cols;
+                    for (arma::uword iF = 0ULL; iF < n_faces; ++iF)
+                        outFile << "f " << faces(0ULL, iF) + vert_counter << " " << faces(1ULL, iF) + vert_counter << " " << faces(2ULL, iF) + vert_counter << " " << faces(3ULL, iF) + vert_counter << "\n";
+
+                    vert_counter += vert.n_cols - 1ULL;
+                }
+                else
+                {
+                    // Write vertices to file
+                    arma::uword n_vert = path_coord[i_path_sorted].n_cols;
+                    for (arma::uword iV = 0ULL; iV < n_vert; ++iV)
+                        outFile << std::defaultfloat << "v " << path_coord[i_path_sorted](0ULL, iV) << " " << path_coord[i_path_sorted](1ULL, iV) << " " << path_coord[i_path_sorted](2ULL, iV) << "\n";
+
+                    outFile << "usemtl QuaDRiGa_PATH_" << colormap << "_" << std::setfill('0') << std::setw(2) << color_index(i_path_sorted) << "\n";
+
+                    for (arma::uword iV = 0ULL; iV < n_vert - 1ULL; ++iV)
+                        outFile << "l " << vert_counter << " " << vert_counter + 1ULL << "\n", ++vert_counter;
+                }
+            }
+        }
+    }
+    outFile.close();
 }
 
 // Instantiate templates
