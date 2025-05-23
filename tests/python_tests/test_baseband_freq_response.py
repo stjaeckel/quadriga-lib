@@ -28,9 +28,8 @@ class test_baseband_freq_response(unittest.TestCase):
         # Fill in the values for the second slice of the third dimension
         coeff[:, :, 1] = -coeff[:, :, 0]
 
-        # Create additional dimensions for the array and fill in the values
-        coeff = np.expand_dims(coeff, axis=-1)
-        coeff = np.concatenate((coeff, 2 * coeff, 3 * coeff), axis=-1)
+        # Create list of 3 snapshots
+        coeff_list = [coeff, 2 * coeff, 3 * coeff]
 
         # Speed of light
         fc = 299792458.0
@@ -43,13 +42,12 @@ class test_baseband_freq_response(unittest.TestCase):
         delay[0, 0, 1] = 1.5 / fc
 
         # Create additional dimensions for the array and fill in the values
-        delay = np.expand_dims(delay, axis=-1)
-        delay = np.concatenate((delay, delay, delay), axis=-1)
+        delay_list = [delay, delay, delay]
 
         # Pilots array
         pilots = np.arange(0, 2.1, 0.1)
 
-        hmat = quadriga_lib.baseband_freq_response( coeff, delay, fc, carriers=11 )
+        hmat = quadriga_lib.baseband_freq_response( coeff_list, delay_list, fc, carriers=11 )
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -65,7 +63,7 @@ class test_baseband_freq_response(unittest.TestCase):
         npt.assert_almost_equal( hmat_re[:, :, :, 0]*2.0, hmat_re[:, :, :, 1], decimal=6 )
         npt.assert_almost_equal( hmat_re[:, :, :, 0]*3.0, hmat_re[:, :, :, 2], decimal=5 )
 
-        hmat = quadriga_lib.baseband_freq_response( coeff, delay, fc, pilot_grid=pilots, snap=[1,2,1,0] )
+        hmat = quadriga_lib.baseband_freq_response( coeff_list, delay_list, fc, pilot_grid=pilots, snap=[1,2,1,0] )
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 

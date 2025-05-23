@@ -166,9 +166,9 @@ class test_hdf_rw(unittest.TestCase):
         # This should be OK, but useless
         quadriga_lib.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos)
         
-        coeff_re = np.random.random((2, 3, 5, 4))
-        coeff = np.random.random((2, 3, 5, 4)) + 1j*np.random.random((2, 3, 5, 4))
-        delay_4d = np.random.random((2, 3, 5, 4))
+        coeff_re = [np.random.random((2, 3, 5)) for _ in range(4)] 
+        coeff = [np.random.random((2, 3, 5)) + 1j*np.random.random((2, 3, 5)) for _ in range(4)] 
+        delay_4d = [np.random.random((2, 3, 5)) for _ in range(4)] 
 
         # Passing only coeff should cause error
         with self.assertRaises(ValueError) as context:
@@ -181,7 +181,6 @@ class test_hdf_rw(unittest.TestCase):
 
         # Test if we can restore the data
         res = quadriga_lib.hdf5_read_channel(fn, 5)
-
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
         npt.assert_almost_equal( res["coeff"], coeff )
@@ -192,8 +191,12 @@ class test_hdf_rw(unittest.TestCase):
 
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
-        npt.assert_almost_equal( res["coeff"], coeff[:, :, :, [2, 1, 0]] )
-        npt.assert_almost_equal( res["delay"], delay_4d[:, :, :, [2, 1, 0]] )
+        npt.assert_almost_equal( res["coeff"][0], coeff[2] )
+        npt.assert_almost_equal( res["coeff"][1], coeff[1] )
+        npt.assert_almost_equal( res["coeff"][2], coeff[0] )
+        npt.assert_almost_equal( res["delay"][0], delay_4d[2] )
+        npt.assert_almost_equal( res["delay"][1], delay_4d[1] )
+        npt.assert_almost_equal( res["delay"][2], delay_4d[0] )
 
         # Test out-of-bound error
         with self.assertRaises(ValueError) as context:
@@ -201,30 +204,32 @@ class test_hdf_rw(unittest.TestCase):
         self.assertEqual(str(context.exception), "Snapshot index out of bound.")
         
         # Test alternative delays
-        delay_2d = np.random.random((5, 4))
+        delay_2d = [np.random.random((1, 1, 5)) for _ in range(4)] 
         quadriga_lib.hdf5_write_channel(fn,7,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff, delay=delay_2d)
         res = quadriga_lib.hdf5_read_channel(fn, 7)
 
-        npt.assert_almost_equal( res["delay"][0,0,:,:], delay_2d )
+        npt.assert_almost_equal( res["delay"], delay_2d )
 
         # Add optional parameters
         center_frequency = 21e9
         name = 'buy_more_bitcoin'
-        path_gain = np.random.random((5,4))
-        path_length = np.random.random((5,4))
-        path_polarization = np.random.random((4,5,4)) + 1j * np.random.random((4,5,4))
-        path_angles = np.random.random((5,4,4))
-        fbs_pos = np.random.random((3,5,4))
-        lbs_pos = np.random.random((3,5,4))
-        no_interact = np.array([
-            [1, 2, 3, 4, 5],
-            [5, 4, 3, 2, 1],
-            [1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1]
-        ])
-        interact_coord = np.random.random((3,15,4))
-        interact_coord[:, 5:, 2] = 0.0
-        interact_coord[:, 5:, 3] = 0.0
+        path_gain = [np.random.random((5)) for _ in range(4)]
+        path_length = [np.random.random((5)) for _ in range(4)]
+        path_polarization = [np.random.random((4,5)) + 1j * np.random.random((4,5)) for _ in range(4)]
+        path_angles = [np.random.random((5,4)) for _ in range(4)]
+        fbs_pos = [np.random.random((3,5)) for _ in range(4)]
+        lbs_pos = [np.random.random((3,5)) for _ in range(4)]
+
+        no_interact = [  
+            np.array([1, 2, 3, 4, 5]),
+            np.array([5, 4, 3, 2, 1]),
+            np.array([1, 1, 1, 1, 1]),
+            np.array([1, 1, 1, 2, 0])
+        ]
+        interact_coord = []
+        for v in no_interact:
+            interact_coord.append(np.random.random((3, np.sum(v))))
+
         rx_orientation = np.random.random((3,4))
         tx_orientation = np.random.random((3,4))
 
@@ -232,7 +237,7 @@ class test_hdf_rw(unittest.TestCase):
                                         center_frequency = center_frequency, name = name, path_gain = path_gain,
                                         path_length = path_length, path_polarization = path_polarization, 
                                         path_angles = path_angles, path_fbs_pos = fbs_pos, path_lbs_pos = lbs_pos,
-                                        no_interact = no_interact.T, interact_coord = interact_coord,
+                                        no_interact = no_interact, interact_coord = interact_coord,
                                         rx_orientation = rx_orientation, tx_orientation = tx_orientation )
 
         # Test if we can restore the data
@@ -251,8 +256,11 @@ class test_hdf_rw(unittest.TestCase):
         npt.assert_almost_equal( res["path_angles"], path_angles )
         npt.assert_almost_equal( res["path_fbs_pos"], fbs_pos )
         npt.assert_almost_equal( res["path_lbs_pos"], lbs_pos )
-        npt.assert_equal( res["no_interact"], no_interact.T )
-        npt.assert_almost_equal( res["interact_coord"], interact_coord )
+        npt.assert_equal( res["no_interact"], no_interact )
+        npt.assert_almost_equal( res["interact_coord"][0], interact_coord[0] )
+        npt.assert_almost_equal( res["interact_coord"][1], interact_coord[1] )
+        npt.assert_almost_equal( res["interact_coord"][2], interact_coord[2] )
+        npt.assert_almost_equal( res["interact_coord"][3], interact_coord[3] )
         npt.assert_almost_equal( res["tx_orientation"], tx_orientation )
         npt.assert_almost_equal( res["rx_orientation"], rx_orientation )
 
@@ -261,19 +269,19 @@ class test_hdf_rw(unittest.TestCase):
 
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
-        npt.assert_almost_equal( res["coeff"][:,:,:,0], coeff[:,:,:,2] )
-        npt.assert_almost_equal( res["delay"][:,:,:,0], delay_4d[:,:,:,2] )
+        npt.assert_almost_equal( res["coeff"][0], coeff[2] )
+        npt.assert_almost_equal( res["delay"][0], delay_4d[2] )
         npt.assert_allclose( res["center_freq"], center_frequency)
         self.assertEqual(res["name"], name)
         npt.assert_equal( res["initial_pos"], 0 )
-        npt.assert_almost_equal( res["path_gain"][:,0], path_gain[:,2] )
-        npt.assert_almost_equal( res["path_length"][:,0], path_length[:,2] )
-        npt.assert_almost_equal( res["polarization"][:,:,0], path_polarization[:,:,2] )
-        npt.assert_almost_equal( res["path_angles"][:,:,0], path_angles[:,:,2] )
-        npt.assert_almost_equal( res["path_fbs_pos"][:,:,0], fbs_pos[:,:,2] )
-        npt.assert_almost_equal( res["path_lbs_pos"][:,:,0], lbs_pos[:,:,2] )
-        npt.assert_equal( res["no_interact"][:,0], no_interact[2,:].T )
-        npt.assert_almost_equal( res["interact_coord"][:,:,0], interact_coord[:,:,2] )
+        npt.assert_almost_equal( res["path_gain"][0], path_gain[2] )
+        npt.assert_almost_equal( res["path_length"][0], path_length[2] )
+        npt.assert_almost_equal( res["polarization"][0], path_polarization[2] )
+        npt.assert_almost_equal( res["path_angles"][0], path_angles[2] )
+        npt.assert_almost_equal( res["path_fbs_pos"][0], fbs_pos[2] )
+        npt.assert_almost_equal( res["path_lbs_pos"][0], lbs_pos[2] )
+        npt.assert_equal( res["no_interact"][0], no_interact[2])
+        npt.assert_almost_equal( res["interact_coord"][0], interact_coord[2] )
         npt.assert_almost_equal( res["tx_orientation"][:,0], tx_orientation[:,2] )
         npt.assert_almost_equal( res["rx_orientation"][:,0], rx_orientation[:,2] )
 

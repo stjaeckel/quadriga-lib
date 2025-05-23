@@ -718,7 +718,7 @@ V_re.print();
 <b><i>Declaration:</i></b><br><pre>
 unsigned quadriga_lib::arrayant&lt;dtype&gt;::qdant_write(
                 std::string fn,
-                unsigned id = 0, 
+                unsigned id = 0,
                 arma::u32_mat layout = {}) const;
 </pre>
 </li>
@@ -797,9 +797,9 @@ ant.remove_zeros(); // Modifies ant in-place
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
                 dtype x_deg = 0.0,
-                dtype y_deg = 0.0, 
+                dtype y_deg = 0.0,
                 dtype z_deg = 0.0,
-                unsigned usage = 0, 
+                unsigned usage = 0,
                 unsigned element = -1,
                 arrayant&lt;dtype&gt; *output = nullptr);
 </pre>
@@ -854,9 +854,9 @@ ant.rotate_pattern(0.0, 0.0, 45.0);
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::set_size(
-                arma::uword n_elevation, 
+                arma::uword n_elevation,
                 arma::uword n_azimuth,
-                arma::uword n_elements, 
+                arma::uword n_elements,
                 arma::uword n_ports);
 </pre>
 </li>

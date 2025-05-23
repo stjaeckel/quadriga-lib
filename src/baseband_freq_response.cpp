@@ -129,17 +129,18 @@ void quadriga_lib::baseband_freq_response(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
-                                          const arma::Cube<dtype> *coeff_im,  // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
-                                          const arma::Cube<dtype> *delay,     // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                          const arma::Col<dtype> *pilot_grid, // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
-                                          const double bandwidth,             // The baseband bandwidth in [Hz]
-                                          arma::Cube<dtype> *hmat_re,         // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
-                                          arma::Cube<dtype> *hmat_im)         // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
+void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,     // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
+                                          const arma::Cube<dtype> *coeff_im,     // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
+                                          const arma::Cube<dtype> *delay,        // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                          const arma::Col<dtype> *pilot_grid,    // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+                                          const double bandwidth,                // The baseband bandwidth in [Hz]
+                                          arma::Cube<dtype> *hmat_re,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
+                                          arma::Cube<dtype> *hmat_im,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
+                                          arma::Cube<std::complex<dtype>> *hmat) // Output: Channel matrix (H), Size [n_rx, n_tx, n_carriers]
 {
 
     // Input validation
-    if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr || pilot_grid == nullptr || hmat_re == nullptr || hmat_im == nullptr)
+    if (coeff_re == nullptr || coeff_im == nullptr || delay == nullptr || pilot_grid == nullptr)
         throw std::invalid_argument("Arguments cannot be NULL.");
 
     if (pilot_grid->n_elem == 0)
@@ -147,12 +148,10 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 
     arma::uword n_rx = coeff_re->n_rows;
     arma::uword n_tx = coeff_re->n_cols;
+    arma::uword n_ant = n_rx * n_tx;
     arma::uword n_path = coeff_re->n_slices;
     arma::uword n_carrier = pilot_grid->n_elem;
-
-    size_t n_ant_t = size_t(n_rx * n_tx);
-    size_t n_carrier_t = (size_t)n_carrier;
-    size_t n_carrier_s = (n_carrier_t % VEC_SIZE == 0) ? n_carrier_t : VEC_SIZE * (n_carrier_t / VEC_SIZE + 1);
+    arma::uword n_carrier_s = (n_carrier % VEC_SIZE == 0) ? n_carrier : VEC_SIZE * (n_carrier / VEC_SIZE + 1);
 
     if (coeff_im->n_rows != n_rx || coeff_im->n_cols != n_tx || coeff_im->n_slices != n_path)
         throw std::invalid_argument("Input 'coeff_im' must have same size as 'coeff_re'");
@@ -165,24 +164,29 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
         throw std::invalid_argument("Bandwidth cannot be negative");
 
     // Set output size
-    if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != n_carrier)
-        hmat_re->set_size(n_rx, n_tx, n_carrier);
-
-    if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != n_carrier)
-        hmat_im->set_size(n_rx, n_tx, n_carrier);
-
-    dtype *p_hmat_re = hmat_re->memptr();
-    dtype *p_hmat_im = hmat_im->memptr();
-
-    // Special case: Channel has no paths
-    if (n_path == 0)
+    if (hmat_re != nullptr)
     {
-        size_t n_elem_t = (size_t)hmat_re->n_elem;
-        for (size_t i = 0; i < n_elem_t; ++i)
-            p_hmat_re[i] = (dtype)0.0, p_hmat_im[i] = (dtype)0.0;
-
-        return;
+        if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != n_carrier)
+            hmat_re->set_size(n_rx, n_tx, n_carrier);
+        if (n_path == 0)
+            hmat_re->zeros();
     }
+    if (hmat_im != nullptr)
+    {
+        if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != n_carrier)
+            hmat_im->set_size(n_rx, n_tx, n_carrier);
+        if (n_path == 0)
+            hmat_im->zeros();
+    }
+    if (hmat != nullptr)
+    {
+        if (hmat->n_rows != n_rx || hmat->n_cols != n_tx || hmat->n_slices != n_carrier)
+            hmat->set_size(n_rx, n_tx, n_carrier);
+        if (n_path == 0)
+            hmat->zeros();
+    }
+    if (n_path == 0)
+        return;
 
     // Declare constants
     const double scale = -6.283185307179586 * bandwidth;
@@ -191,45 +195,42 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 // Allocate aligned memory
 #if defined(_MSC_VER) // Windows
     float *phasor = (float *)_aligned_malloc(n_carrier_s * sizeof(float), 32);
-    float *Hr = (float *)_aligned_malloc(n_carrier_s * n_ant_t * sizeof(float), 32);
-    float *Hi = (float *)_aligned_malloc(n_carrier_s * n_ant_t * sizeof(float), 32);
+    float *Hr = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
+    float *Hi = (float *)_aligned_malloc(n_carrier_s * n_ant * sizeof(float), 32);
 #else // Linux
     float *phasor = (float *)aligned_alloc(32, n_carrier_s * sizeof(float));
-    float *Hr = (float *)aligned_alloc(32, n_carrier_s * n_ant_t * sizeof(float));
-    float *Hi = (float *)aligned_alloc(32, n_carrier_s * n_ant_t * sizeof(float));
+    float *Hr = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
+    float *Hi = (float *)aligned_alloc(32, n_carrier_s * n_ant * sizeof(float));
 #endif
 
     // Convert pilot grid to phasor
     const dtype *p_carrier = pilot_grid->memptr();
-    for (size_t i_carrier = 0; i_carrier < n_carrier_t; ++i_carrier)
+    for (arma::uword i_carrier = 0; i_carrier < n_carrier; ++i_carrier)
     {
         double tmp = scale * (double)p_carrier[i_carrier];
         phasor[i_carrier] = (float)tmp;
     }
-    for (size_t i_carrier = n_carrier_t; i_carrier < n_carrier_s; ++i_carrier)
+    for (arma::uword i_carrier = n_carrier; i_carrier < n_carrier_s; ++i_carrier)
         phasor[i_carrier] = 0.0f;
 
     // Initialize output memory
-    for (size_t i = 0; i < n_carrier_s * n_ant_t; ++i)
+    for (arma::uword i = 0; i < n_carrier_s * n_ant; ++i)
         Hr[i] = 0.0f, Hi[i] = 0.0f;
 
     // Call DFT function
 #if defined(_MSC_VER) // Windows
     qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                   n_ant_t, (size_t)n_path, planar_wave,
-                   phasor, n_carrier_s, Hr, Hi);
+                   n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
 #else // Linux
     if (isAVX2Supported()) // CPU support for AVX2
     {
         qd_DFT_AVX2(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                    n_ant_t, (size_t)n_path, planar_wave,
-                    phasor, n_carrier_s, Hr, Hi);
+                    n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
     }
     else
     {
         qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                       n_ant_t, (size_t)n_path, planar_wave,
-                       phasor, n_carrier_s, Hr, Hi);
+                       n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
     }
 #endif
 
@@ -240,13 +241,23 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 #endif
 
     // Copy data to output
-    for (size_t i_carrier = 0; i_carrier < n_carrier_t; ++i_carrier)
-        for (size_t i_ant = 0; i_ant < n_ant_t; ++i_ant)
+    bool use_re = hmat_re != nullptr, use_im = hmat_im != nullptr, use_cplx = hmat != nullptr;
+    dtype *p_hmat_re = use_re ? hmat_re->memptr() : nullptr;
+    dtype *p_hmat_im = use_im ? hmat_im->memptr() : nullptr;
+    std::complex<dtype> *p_hmat = use_cplx ? hmat->memptr() : nullptr;
+
+    for (arma::uword i_carrier = 0; i_carrier < n_carrier; ++i_carrier)
+        for (arma::uword i_ant = 0; i_ant < n_ant; ++i_ant)
         {
-            size_t i = i_ant * n_carrier_s + i_carrier;
-            size_t o = i_carrier * n_ant_t + i_ant;
-            p_hmat_re[o] = (dtype)Hr[i];
-            p_hmat_im[o] = (dtype)Hi[i];
+            arma::uword i = i_ant * n_carrier_s + i_carrier;
+            arma::uword o = i_carrier * n_ant + i_ant;
+
+            if (use_re)
+                p_hmat_re[o] = (dtype)Hr[i];
+            if (use_im)
+                p_hmat_im[o] = (dtype)Hi[i];
+            if (use_cplx)
+                p_hmat[o] = {(dtype)Hr[i], (dtype)Hi[i]};
         }
 
 // Free aligned memory
@@ -261,11 +272,11 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,  //
 
 template void quadriga_lib::baseband_freq_response(const arma::Cube<float> *coeff_re, const arma::Cube<float> *coeff_im, const arma::Cube<float> *delay,
                                                    const arma::Col<float> *pilot_grid, const double bandwidth,
-                                                   arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im);
+                                                   arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im, arma::Cube<std::complex<float>> *hmat);
 
 template void quadriga_lib::baseband_freq_response(const arma::Cube<double> *coeff_re, const arma::Cube<double> *coeff_im, const arma::Cube<double> *delay,
                                                    const arma::Col<double> *pilot_grid, const double bandwidth,
-                                                   arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im);
+                                                   arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im, arma::Cube<std::complex<double>> *hmat);
 
 /*!MD
 # baseband_freq_response_vec

@@ -355,19 +355,19 @@ arguments are then specific to this type.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-% Isotropic radiator, vertical polarization, 1 deg resolution
+% Isotropic radiator, vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni', res);
 
-% Short dipole radiating with vertical polarization, 1 deg resolution
+% Short dipole radiating with vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole', res);
 
-% Half-wave dipole radiating with vertical polarization, 1 deg resolution
+% Half-wave dipole radiating with vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole', res);
 
-% Cross-polarized isotropic radiator, 1 deg resolution
+% Cross-polarized isotropic radiator
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol', res);
 
@@ -424,7 +424,7 @@ arguments are then specific to this type.
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>pol</code></b><br> 
-   Polarization indicator to be applied for each of the NM elements:<br> 
+   Polarization indicator to be applied for each of the M elements:<br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>pol = 1</code></td>
@@ -475,7 +475,7 @@ arguments are then specific to this type.
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dgh</code></b><br> 
-   Panel spacing in vertical horizontal in [λ], scalar, default = 0.5 
+   Panel spacing in horizontal direction in [λ], scalar, default = 0.5 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> (optional)<br> 
@@ -2221,6 +2221,7 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transp
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br>The following example obtains the 3x3 matrix R for a 45 degree rotation around the z-axis: 
+ 
 <pre>
 bank    = 0;
 tilt    = 0;

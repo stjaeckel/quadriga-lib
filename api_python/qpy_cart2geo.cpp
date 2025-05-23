@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
@@ -52,13 +51,23 @@ geo_coords = quadriga_lib.cart2geo(cart_coords)
   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.
 MD!*/
 
-pybind11::array_t<double> cart2geo(pybind11::array_t<double> cart)
-{
-    pybind11::buffer_info buf = cart.request();
-    if (buf.ndim != 3)
-        throw std::invalid_argument("Number of dimensions must be 3"); 
+// #include <chrono>
 
-    arma::cube cart_arma(reinterpret_cast<double *>(buf.ptr), buf.shape[0], buf.shape[1], buf.shape[2], false, true);
-    arma::cube result = quadriga_lib::cart2geo(cart_arma);
-    return pybind11::array_t<double>({result.n_rows, result.n_cols, result.n_slices}, result.memptr());
+// std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now(); // Start time
+// std::cout << "Start CPP" << std::endl;
+
+// std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now(); // Current time
+// double ms = (double)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+// std::cout << "Input data converted, t = " << std::round(ms/100.0)/10.0 << std::endl;
+
+py::array_t<double> cart2geo(py::array_t<double> cart)
+{
+    const auto cart_arma = qd_python_numpy2arma_Cube(cart, true);
+
+    arma::cube geo_arma;
+    auto geo = qd_python_init_output(cart_arma.n_cols, cart_arma.n_slices, cart_arma.n_rows, &geo_arma);
+
+    quadriga_lib::cart2geo(cart_arma, geo_arma);
+
+    return geo;
 }

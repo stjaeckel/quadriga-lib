@@ -35,19 +35,19 @@ arguments are then specific to this type.
 ## Usage:
 
 ```
-% Isotropic radiator, vertical polarization, 1 deg resolution
+% Isotropic radiator, vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni', res);
 
-% Short dipole radiating with vertical polarization, 1 deg resolution
+% Short dipole radiating with vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole', res);
 
-% Half-wave dipole radiating with vertical polarization, 1 deg resolution
+% Half-wave dipole radiating with vertical polarization
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole', res);
 
-% Cross-polarized isotropic radiator, 1 deg resolution
+% Cross-polarized isotropic radiator
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol', res);
 
@@ -96,7 +96,7 @@ arguments are then specific to this type.
   The center frequency in [Hz], scalar, default = 299792458 Hz
 
 - **`pol`**<br>
-  Polarization indicator to be applied for each of the NM elements:<br>
+  Polarization indicator to be applied for each of the M elements:<br>
   `pol = 1` | vertical polarization (default value)
   `pol = 2` | H/V polarized elements, results in 2NM elements
   `pol = 3` | +/-45° polarized elements, results in 2NM elements
@@ -121,7 +121,7 @@ arguments are then specific to this type.
   Panel spacing in vertical direction in [λ], scalar, default = 0.5
 
 - **`dgh`**<br>
-  Panel spacing in vertical horizontal in [λ], scalar, default = 0.5
+  Panel spacing in horizontal direction in [λ], scalar, default = 0.5
 
 - **`res`** (optional)<br>
   Pattern resolution in [deg], scalar, Default = 1 deg, Note: In case of a custom pattern, `res` is

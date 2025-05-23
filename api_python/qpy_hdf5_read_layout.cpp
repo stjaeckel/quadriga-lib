@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Channel functions
@@ -57,19 +54,19 @@ storage_dims, has_data = quadriga_lib.hdf5_read_layout( fn )
   Array indicating if data exists (value 1) or not (value 0); uint32; Size: `[nx,ny,nz,nw]`
 MD!*/
 
-pybind11::tuple hdf5_read_layout(std::string fn)
+py::tuple hdf5_read_layout(std::string fn)
 {
-  arma::Col<unsigned> channelID;
-  arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
+    arma::Col<unsigned> channelID;
+    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
 
-  auto nx = (unsigned long long)storage_space.at(0);
-  auto ny = (unsigned long long)storage_space.at(1);
-  auto nz = (unsigned long long)storage_space.at(2);
-  auto nw = (unsigned long long)storage_space.at(3);
+    auto nx = (ssize_t)storage_space.at(0);
+    auto ny = (ssize_t)storage_space.at(1);
+    auto nz = (ssize_t)storage_space.at(2);
+    auto nw = (ssize_t)storage_space.at(3);
 
-  auto sz = (unsigned long long)sizeof(unsigned);
-  size_t strides[4] = {sz, ny * sz, nx * ny * sz, nx * ny * nz * sz};
-  auto has_data = pybind11::array_t<unsigned>({nx, ny, nz, nw}, strides, channelID.memptr());
+    auto n_bytes = (ssize_t)sizeof(unsigned);
+    ssize_t strides[4] = {n_bytes, ny * n_bytes, nx * ny * n_bytes, nx * ny * nz * n_bytes};
+    auto has_data = py::array_t<unsigned>({nx, ny, nz, nw}, strides, channelID.memptr());
 
-  return pybind11::make_tuple(pybind11::array_t<unsigned>(4ULL, storage_space.memptr()), has_data);
+    return py::make_tuple(py::array_t<unsigned>(4ULL, storage_space.memptr()), has_data);
 }

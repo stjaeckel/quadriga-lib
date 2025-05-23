@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Channel functions
@@ -64,13 +61,13 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw );
   List of names of all these at the given location in the files; Cell array of strings
 MD!*/
 
-pybind11::list hdf5_read_dset_names(const std::string fn,
-                                    unsigned ix, unsigned iy, unsigned iz, unsigned iw)
+py::list hdf5_read_dset_names(const std::string fn,
+                              unsigned ix, unsigned iy, unsigned iz, unsigned iw)
 {
     std::vector<std::string> par_names;
     quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw);
 
-    pybind11::list list;
+    py::list list;
     for (const auto &item : par_names)
         list.append(item);
 

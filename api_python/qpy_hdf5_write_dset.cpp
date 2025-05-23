@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Channel functions
@@ -74,7 +71,7 @@ MD!*/
 void hdf5_write_dset(const std::string fn,
                      unsigned ix, unsigned iy, unsigned iz, unsigned iw,
                      const std::string name = "",
-                     const pybind11::handle data = pybind11::none())
+                     const py::handle data = py::none())
 {
 
     // Check if data is None

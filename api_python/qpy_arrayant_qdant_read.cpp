@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Array antenna functions
@@ -49,35 +46,41 @@ data = quadriga_lib.arrayant_qdant_read( fn, id )
 ## Output Arguments:
 - **`data`**<br>
   Dictionary containing the data in the QDANT file with the following keys:
-  `e_theta`        | e-theta field component, complex-valued               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi`          | e-phi field component, complex-valued                 | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
   `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
   `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
   `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  `coupling`       | Coupling matrix, complex valued                       | Size: `[n_elements, n_ports]`
+  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
+  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
   `name`           | Name of the array antenna object                      | String
   `layout`         | Layout of multiple array antennas.                    | Matrix
 MD!*/
 
-pybind11::dict arrayant_qdant_read(const std::string fn, unsigned id)
+py::dict arrayant_qdant_read(const std::string fn, unsigned id)
 {
     // Read data from file
     arma::Mat<unsigned> layout;
     const auto arrayant = quadriga_lib::qdant_read<double>(fn, id, &layout);
 
     // Initialize output
-    pybind11::dict output;
+    py::dict output;
 
-    output["e_theta"] = qd_python_2Cubes_to_complexNPArray(&arrayant.e_theta_re, &arrayant.e_theta_im);
-    output["e_phi"] = qd_python_2Cubes_to_complexNPArray(&arrayant.e_phi_re, &arrayant.e_phi_im);
-    output["azimuth_grid"] = qd_python_Col_to_NPArray(&arrayant.azimuth_grid);
-    output["elevation_grid"] = qd_python_Col_to_NPArray(&arrayant.elevation_grid);
-    output["element_pos"] = qd_python_Mat_to_NPArray(&arrayant.element_pos);
-    output["coupling"] = qd_python_2Mat_to_complexNPArray(&arrayant.coupling_re, &arrayant.coupling_im);
+    output["e_theta_re"] = qd_python_copy2numpy(arrayant.e_theta_re);
+    output["e_theta_im"] = qd_python_copy2numpy(arrayant.e_theta_im);
+    output["e_phi_re"] = qd_python_copy2numpy(arrayant.e_phi_re);
+    output["e_phi_im"] = qd_python_copy2numpy(arrayant.e_phi_im);
+    output["azimuth_grid"] = qd_python_copy2numpy(arrayant.azimuth_grid);
+    output["elevation_grid"] = qd_python_copy2numpy(arrayant.elevation_grid);
+    output["element_pos"] = qd_python_copy2numpy(arrayant.element_pos);
+    output["coupling_re"] = qd_python_copy2numpy(arrayant.coupling_re);
+    output["coupling_im"] = qd_python_copy2numpy(arrayant.coupling_im);
     output["center_freq"] = arrayant.center_frequency;
     output["name"] = arrayant.name;
-    output["layout"] = qd_python_Mat_to_NPArray(&layout);
+    output["layout"] = qd_python_copy2numpy(layout);
 
     return output;
 }

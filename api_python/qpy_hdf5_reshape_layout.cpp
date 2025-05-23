@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
@@ -28,11 +27,11 @@ SECTION!*/
 Reshapes the storage layout inside an existing HDF5 file
 
 ## Description:
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A
+notable feature of this library is its capacity to manage multiple channels within a single HDF5
 file. In this framework, channels can be arranged in a multi-dimensional array format.
-Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
-However, it is possible to reshape the layout using `quadriga_lib.hdf5_reshape_layout`. 
+Once an HDF5 file has been created, the number of channels in the storage layout is fixed.
+However, it is possible to reshape the layout using `quadriga_lib.hdf5_reshape_layout`.
 
 ## Usage:
 
@@ -59,5 +58,5 @@ MD!*/
 
 void hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)
 {
-  quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw);
+    quadriga_lib::hdf5_reshape_layout(fn, nx, ny, nz, nw);
 }

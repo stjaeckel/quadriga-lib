@@ -34,6 +34,7 @@ from the antenna to the radiation intensity averaged over all directions. Theref
 of a hypothetical isotropic radiator is 1, or 0 dBi.<br>
 
 ## Usage:
+
 ```
 directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
     e_phi_im, azimuth_grid, elevation_grid);

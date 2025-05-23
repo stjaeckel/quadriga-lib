@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp" // qd_python_anycast
 
 /*!SECTION
 Channel functions
@@ -101,26 +98,26 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
 - Storage order of the unstructured data is maintained
 MD!*/
 
-pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
-                                               unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                               const pybind11::dict par,
-                                               const pybind11::array_t<double> rx_pos,
-                                               const pybind11::array_t<double> tx_pos,
-                                               const pybind11::array_t<std::complex<double>> coeff,
-                                               const pybind11::array_t<double> delay,
-                                               const pybind11::array_t<double> center_frequency,
-                                               const std::string name,
-                                               const int initial_position,
-                                               const pybind11::array_t<double> path_gain,
-                                               const pybind11::array_t<double> path_length,
-                                               const pybind11::array_t<std::complex<double>> path_polarization,
-                                               const pybind11::array_t<double> path_angles,
-                                               const pybind11::array_t<double> path_fbs_pos,
-                                               const pybind11::array_t<double> path_lbs_pos,
-                                               const pybind11::array_t<unsigned> no_interact,
-                                               const pybind11::array_t<double> interact_coord,
-                                               const pybind11::array_t<double> rx_orientation,
-                                               const pybind11::array_t<double> tx_orientation)
+py::array_t<unsigned> hdf5_write_channel(const std::string fn,
+                                         unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                                         const py::dict par,
+                                         const py::array_t<double> rx_pos,
+                                         const py::array_t<double> tx_pos,
+                                         const py::list coeff,
+                                         const py::list delay,
+                                         const py::array_t<double> center_frequency,
+                                         const std::string name,
+                                         const int initial_position,
+                                         const py::list path_gain,
+                                         const py::list path_length,
+                                         const py::list path_polarization,
+                                         const py::list path_angles,
+                                         const py::list path_fbs_pos,
+                                         const py::list path_lbs_pos,
+                                         const py::list no_interact,
+                                         const py::list interact_coord,
+                                         const py::array_t<double> rx_orientation,
+                                         const py::array_t<double> tx_orientation)
 {
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
@@ -130,82 +127,56 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
     // Process the unstructured data
     for (auto item : par)
     {
-        std::string fieldName = pybind11::str(item.first);
+        std::string fieldName = py::str(item.first);
         std::string fieldString = "par." + fieldName;
         c.par_names.push_back(std::string(fieldName));
         c.par_data.push_back(qd_python_anycast(item.second, fieldName));
     }
 
     if (rx_pos.size() != 0)
-        c.rx_pos = qd_python_NPArray_to_Mat(&rx_pos);
+        c.rx_pos = qd_python_numpy2arma_Mat(rx_pos, true);
 
     if (tx_pos.size() != 0)
-        c.tx_pos = qd_python_NPArray_to_Mat(&tx_pos);
+        c.tx_pos = qd_python_numpy2arma_Mat(tx_pos, true);
 
     if (coeff.size() != 0)
-        qd_python_complexNPArray_to_2vectorCube(&coeff, 3, &c.coeff_re, &c.coeff_im);
+        qd_python_list2vector_Cube_Cplx(coeff, c.coeff_re, c.coeff_im);
+
+    if (delay.size() != 0)
+        c.delay = qd_python_list2vector_Cube<double>(delay);
 
     if (center_frequency.size() != 0)
-        c.center_frequency = qd_python_NPArray_to_Col(&center_frequency);
+        c.center_frequency = qd_python_numpy2arma_Col(center_frequency, true, true);
 
     if (path_gain.size() != 0)
-        c.path_gain = qd_python_NPArray_to_vectorCol(&path_gain, 1);
+        c.path_gain = qd_python_list2vector_Col<double>(path_gain);
 
     if (path_length.size() != 0)
-        c.path_length = qd_python_NPArray_to_vectorCol(&path_length, 1);
+        c.path_length = qd_python_list2vector_Col<double>(path_length);
 
     if (path_polarization.size() != 0)
-        c.path_polarization = qd_python_complexNPArray_to_vectorMat(&path_polarization, 2);
+        c.path_polarization = qd_python_Complex2Interleaved(qd_python_list2vector_Mat<std::complex<double>>(path_polarization));
 
     if (path_angles.size() != 0)
-        c.path_angles = qd_python_NPArray_to_vectorMat(&path_angles, 2);
+        c.path_angles = qd_python_list2vector_Mat<double>(path_angles);
 
     if (path_fbs_pos.size() != 0)
-        c.path_fbs_pos = qd_python_NPArray_to_vectorMat(&path_fbs_pos, 2);
+        c.path_fbs_pos = qd_python_list2vector_Mat<double>(path_fbs_pos);
 
     if (path_lbs_pos.size() != 0)
-        c.path_lbs_pos = qd_python_NPArray_to_vectorMat(&path_lbs_pos, 2);
+        c.path_lbs_pos = qd_python_list2vector_Mat<double>(path_lbs_pos);
 
     if (no_interact.size() != 0)
-        c.no_interact = qd_python_NPArray_to_vectorCol(&no_interact, 1);
+        c.no_interact = qd_python_list2vector_Col<unsigned>(no_interact);
 
     if (interact_coord.size() != 0)
-        c.interact_coord = qd_python_NPArray_to_vectorMat(&interact_coord, 2);
+        c.interact_coord = qd_python_list2vector_Mat<double>(interact_coord);
 
     if (rx_orientation.size() != 0)
-        c.rx_orientation = qd_python_NPArray_to_Mat(&rx_orientation);
+        c.rx_orientation = qd_python_numpy2arma_Mat(rx_orientation, true);
 
     if (tx_orientation.size() != 0)
-        c.tx_orientation = qd_python_NPArray_to_Mat(&tx_orientation);
-
-    arma::uword n_snap = c.n_snap();
-    if (delay.size() != 0)
-    {
-        pybind11::buffer_info buf = delay.request();
-        size_t n_dim = (size_t)buf.ndim;
-        size_t n_cols = (n_dim < 2) ? 1 : (size_t)buf.shape[1];
-
-        if (n_dim == 2 && n_cols == n_snap) // Compact mode
-        {
-            auto tmp = qd_python_NPArray_to_vectorCube(&delay, 1);
-            for (auto &d : tmp)
-                c.delay.push_back(arma::cube(d.memptr(), 1, 1, d.n_elem, true));
-        }
-        else
-            c.delay = qd_python_NPArray_to_vectorCube(&delay, 3);
-    }
-
-    // Prune the size of 'interact_coord'
-    if (c.no_interact.size() == (size_t)n_snap && c.no_interact.size() == c.interact_coord.size())
-        for (arma::uword s = 0; s < n_snap; ++s)
-        {
-            unsigned cnt = 0;
-            for (auto &d : c.no_interact[s])
-                cnt += d;
-
-            if (c.interact_coord[s].n_cols > (arma::uword)cnt)
-                c.interact_coord[s].resize(c.interact_coord[s].n_rows, (arma::uword)cnt);
-        }
+        c.tx_orientation = qd_python_numpy2arma_Mat(tx_orientation, true);
 
     // Create HDF File if it dies not already exist
     auto storage_space = quadriga_lib::hdf5_read_layout(fn);
@@ -241,5 +212,5 @@ pybind11::array_t<unsigned> hdf5_write_channel(const std::string fn,
     // Write data to file
     quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw);
 
-    return pybind11::array_t<unsigned>(4ULL, storage_space.memptr());
+    return py::array_t<unsigned>(4ULL, storage_space.memptr());
 }

@@ -141,6 +141,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
     arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
@@ -205,6 +207,8 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
+
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
 
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
@@ -281,6 +285,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
 
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
     arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
@@ -350,6 +356,9 @@ template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res)
 {
     quadriga_lib::arrayant<dtype> ant;
+
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+
     dtype pi = dtype(arma::datum::pi), pih = dtype(arma::datum::pi / 2.0);
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
     arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
@@ -431,9 +440,16 @@ MD!*/
 template <typename dtype>
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin, dtype res)
 {
+    // Fix input ranges
+    az_3dB = (az_3dB <= (dtype)0.0) ? (dtype)90.0 : az_3dB;
+    el_3db = (el_3db <= (dtype)0.0) ? (dtype)90.0 : el_3db;
+    rear_gain_lin = (rear_gain_lin <= (dtype)0.0) ? (dtype)0.0 : rear_gain_lin;
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+
     constexpr dtype zero = dtype(0.0), one = dtype(1.0), half = dtype(0.5),
                     limit = dtype(1e-7), step = dtype(-0.382), limit_inf = dtype(1e38);
     const dtype pi = dtype(arma::datum::pi), deg2rad = dtype(arma::datum::pi / 360.0);
+
     arma::uword no_az = arma::uword(360.0 / (double)res) + 1ULL;
     arma::uword no_el = arma::uword(180.0 / (double)res) + 1ULL;
 
@@ -600,6 +616,18 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(arma::uword M
                                                                    arma::uword Mg, arma::uword Ng, dtype dgv, dtype dgh,
                                                                    const arrayant<dtype> *pattern, dtype res)
 {
+    // Fix input ranges
+    M = (M == 0ULL) ? 1ULL : M;
+    N = (N == 0ULL) ? 1ULL : N;
+    center_freq = (center_freq <= (dtype)0.0) ? (dtype)299792458.0 : center_freq;
+    pol = (pol == 0 || pol > 6) ? 1 : pol;
+    spacing = (spacing < (dtype)0.0) ? (dtype)0.5 : spacing;
+    Mg = (Mg == 0ULL) ? 1ULL : Mg;
+    Ng = (Ng == 0ULL) ? 1ULL : Ng;
+    dgv = (dgv < (dtype)0.0) ? (dtype)0.5 : dgv;
+    dgh = (dgh < (dtype)0.0) ? (dtype)0.5 : dgh;
+    res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
+
     double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
     double wavelength = 299792458.0 / double(center_freq);
     constexpr dtype zero = dtype(0.0);
