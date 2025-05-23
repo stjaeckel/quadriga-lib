@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
@@ -28,7 +28,7 @@ Returns the quadriga-lib version number
 
 ## Usage:
 ```
-version = quadriga_lib.version;
+version = quadriga_lib.version();
 ```
 
 ## Caveat:

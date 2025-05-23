@@ -53,18 +53,42 @@ namespace quadriga_lib
     // - Input: Cartesian coordinates, size [3, n_row, n_col]
     // - Output: Geographic coordinates, size [n_row, n_col, 3]
     template <typename dtype>
-    arma::Cube<dtype> cart2geo(const arma::Cube<dtype> &cart);
+    void cart2geo(const arma::Cube<dtype> &cart, arma::Cube<dtype> &geo);
 
     template <typename dtype>
-    arma::Mat<dtype> cart2geo(const arma::Mat<dtype> &cart); // Input: [3, n_row], Output: [n_row, 3]
+    void cart2geo(const arma::Mat<dtype> &cart, arma::Mat<dtype> &geo); // Input: [3, n_row], Output: [n_row, 3]
 
     template <typename dtype>
-    arma::Col<dtype> cart2geo(const arma::Col<dtype> &cart); // Input / Output: [3]
+    void cart2geo(const arma::Col<dtype> &cart, arma::Col<dtype> &geo); // Input / Output: [3]
+
+    template <typename arma_type>
+    arma_type cart2geo(const arma_type &cart);
 
     // Generate colormap
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map);
+
+    // Combine real and imaginary parts to complex types, cast to double
+    template <typename dtype>
+    void complex_cast(const arma::Mat<dtype> &real, // Matrix (real part, float or double)
+                      const arma::Mat<dtype> &imag, // Matrix (imaginary part, float or double)
+                      arma::cx_mat &complex);       // Output: Complex matrix, double
+
+    template <typename dtype>
+    void complex_cast(const arma::Cube<dtype> &real, // Cube (real part, float or double)
+                      const arma::Cube<dtype> &imag, // Cube (imaginary part, float or double)
+                      arma::cx_cube &complex);       // Output: Complex cube, double
+
+    template <typename dtype>
+    void complex_cast(const arma::cx_mat &complex, // Complex matrix, double
+                      arma::Mat<dtype> &real,      // Output: Matrix (real part, float or double)
+                      arma::Mat<dtype> &imag);     // Output: Matrix (imaginary part, float or double)
+
+    template <typename dtype>
+    void complex_cast(const arma::cx_cube &complex, // Complex cube, double
+                      arma::Cube<dtype> &real,      // Output: Cube (real part, float or double)
+                      arma::Cube<dtype> &imag);     // Output: Cube (imaginary part, float or double)
 
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     // - Returns: Cartesian coordinates, Size [3, n_row, n_col]

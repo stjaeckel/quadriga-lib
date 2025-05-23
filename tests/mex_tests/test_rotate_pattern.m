@@ -143,7 +143,7 @@ try
     [~, ~, ~, ~, ~, ~, ~] = quadriga_lib.arrayant_rotate_pattern( e_theta_re_q(:), e_theta_im_q, e_phi_re_q, e_phi_im_q, azimuth_grid_q, elevation_grid_q, element_pos_q, 0, 0, 0, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sizes of ''e_theta_re'', ''e_theta_im'', ''e_phi_re'', ''e_phi_im'' do not match.';
+    expectedErrorMessage = 'Sizes of ''e_theta_re'' and ''e_theta_im'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

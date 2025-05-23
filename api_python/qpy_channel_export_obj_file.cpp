@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Channel functions
@@ -100,40 +97,31 @@ void channel_export_obj_file(const std::string fn,
                              double radius_max,
                              double radius_min,
                              size_t n_edges,
-                             const pybind11::array_t<double> rx_pos,
-                             const pybind11::array_t<double> tx_pos,
-                             const pybind11::array_t<unsigned> no_interact,
-                             const pybind11::array_t<double> interact_coord,
-                             const pybind11::array_t<double> center_freq,
-                             const pybind11::array_t<std::complex<double>> coeff,
-                             const pybind11::array_t<arma::uword> i_snap)
+                             const py::array_t<double> rx_pos,
+                             const py::array_t<double> tx_pos,
+                             const py::list no_interact,
+                             const py::list interact_coord,
+                             const py::array_t<double> center_freq,
+                             const py::list coeff,
+                             const py::array_t<arma::uword> snap)
 {
     // Construct channel object from input data
     auto c = quadriga_lib::channel<double>();
 
-    c.rx_pos = qd_python_NPArray_to_Mat(&rx_pos);
-    c.tx_pos = qd_python_NPArray_to_Mat(&tx_pos);
-    c.no_interact = qd_python_NPArray_to_vectorCol(&no_interact, 1);
-    c.interact_coord = qd_python_NPArray_to_vectorMat(&interact_coord, 2);
-    c.center_frequency = qd_python_NPArray_to_Col(&center_freq);
-    qd_python_complexNPArray_to_2vectorCube(&coeff, 3, &c.coeff_re, &c.coeff_im);
+    c.rx_pos = qd_python_numpy2arma_Mat(rx_pos, true);
+    c.tx_pos = qd_python_numpy2arma_Mat(tx_pos, true);
+    c.no_interact = qd_python_list2vector_Col<unsigned>(no_interact);
+    c.interact_coord = qd_python_list2vector_Mat<double>(interact_coord);
+    c.center_frequency = qd_python_numpy2arma_Col(center_freq, true, true);
+    qd_python_list2vector_Cube_Cplx(coeff, c.coeff_re, c.coeff_im);
 
-    if (c.coeff_re.size() > c.interact_coord.size())
-        throw std::invalid_argument("Number of snapshots in 'interact_coord' must match number of snapshots in coefficients.");
-
-    for (size_t i_snap_a = 0; i_snap_a < c.coeff_re.size(); ++i_snap_a)
+    // Add a zero-power delay matrix
+    for (size_t i = 0; i < c.coeff_re.size(); ++i)
     {
-        // Add a zero-power delay matrix
-        arma::cube delays(c.coeff_re[i_snap_a].n_rows, c.coeff_re[i_snap_a].n_cols, c.coeff_re[i_snap_a].n_slices);
+        arma::cube delays(c.coeff_re[i].n_rows, c.coeff_re[i].n_cols, c.coeff_re[i].n_slices);
         c.delay.push_back(delays);
-
-        // Remove tailing zeros from interact_coord
-        unsigned sum_no_int = arma::sum(c.no_interact[i_snap_a]);
-        c.interact_coord[i_snap_a] = arma::resize(c.interact_coord[i_snap_a], 3, sum_no_int);
     }
 
-    arma::uvec i_snap_a = qd_python_NPArray_to_Col(&i_snap);
-
-    // Call Quadriga-Lib function
-    c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, i_snap_a, radius_max, radius_min, n_edges);
+    arma::uvec snap_arma = qd_python_numpy2arma_Col(snap, true);
+    c.write_paths_to_obj_file(fn, max_no_paths, gain_max, gain_min, colormap, snap_arma, radius_max, radius_min, n_edges);
 }

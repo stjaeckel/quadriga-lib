@@ -73,7 +73,7 @@ try
     [A,B,C,D] = quadriga_lib.arrayant_combine_pattern( 1, e_theta_im, e_phi_re, e_phi_im, azimuth_grid,elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Sizes of ''e_theta_re'', ''e_theta_im'', ''e_phi_re'', ''e_phi_im'' do not match.';
+    expectedErrorMessage = 'Sizes of ''e_theta_re'' and ''e_theta_im'' do not match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

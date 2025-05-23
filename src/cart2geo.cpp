@@ -60,7 +60,7 @@ MD!*/
 
 // FUNCTION: Transform from Cartesian coordinates to geographic coordinates
 template <typename dtype>
-arma::Cube<dtype> quadriga_lib::cart2geo(const arma::Cube<dtype> &cart)
+void quadriga_lib::cart2geo(const arma::Cube<dtype> &cart, arma::Cube<dtype> &geo)
 {
     if (cart.n_elem == 0)
         throw std::invalid_argument("Input cannot be empty.");
@@ -68,13 +68,14 @@ arma::Cube<dtype> quadriga_lib::cart2geo(const arma::Cube<dtype> &cart)
         throw std::invalid_argument("Input must have 3 rows.");
 
     arma::uword n_row = cart.n_cols, n_col = cart.n_slices;
-    arma::Cube<dtype> geo(n_row, n_col, 3, arma::fill::none);
+    if (geo.n_rows != n_row || geo.n_cols != n_col || geo.n_slices != 3)
+        geo.set_size(n_row, n_col, 3);
+
     qd_cart2geo_interleaved(n_row * n_col, cart.memptr(), geo.slice_memptr(0), geo.slice_memptr(1), geo.slice_memptr(2));
-    return geo;
 }
 
 template <typename dtype>
-arma::Mat<dtype> quadriga_lib::cart2geo(const arma::Mat<dtype> &cart)
+void quadriga_lib::cart2geo(const arma::Mat<dtype> &cart, arma::Mat<dtype> &geo)
 {
     if (cart.n_elem == 0)
         throw std::invalid_argument("Input cannot be empty.");
@@ -82,23 +83,44 @@ arma::Mat<dtype> quadriga_lib::cart2geo(const arma::Mat<dtype> &cart)
         throw std::invalid_argument("Input must have 3 rows.");
 
     arma::uword n_row = cart.n_cols;
-    arma::Mat<dtype> geo(n_row, 3, arma::fill::none);
+    if (geo.n_rows != n_row || geo.n_cols != 3)
+        geo.set_size(n_row, 3);
+
     qd_cart2geo_interleaved(n_row, cart.memptr(), geo.colptr(0), geo.colptr(1), geo.colptr(2));
-    return geo;
 }
 
 template <typename dtype>
-arma::Col<dtype> quadriga_lib::cart2geo(const arma::Col<dtype> &cart)
+void quadriga_lib::cart2geo(const arma::Col<dtype> &cart, arma::Col<dtype> &geo)
 {
     if (cart.n_elem != 3)
         throw std::invalid_argument("Input must have 3 elements.");
 
-    arma::Col<dtype> geo(3, arma::fill::none);
-    dtype *p = geo.memptr();
+    if (geo.n_elem != 3)
+        geo.set_size(3);
 
+    dtype *p = geo.memptr();
     qd_cart2geo_interleaved(1, cart.memptr(), &p[0], &p[1], &p[2]);
+}
+
+template <typename arma_type>
+arma_type quadriga_lib::cart2geo(const arma_type &cart)
+{
+    arma_type geo;
+    quadriga_lib::cart2geo(cart, geo);
     return geo;
 }
+
+template void quadriga_lib::cart2geo(const arma::Cube<float> &cart, arma::Cube<float> &geo);
+
+template void quadriga_lib::cart2geo(const arma::Cube<double> &cart, arma::Cube<double> &geo);
+
+template void quadriga_lib::cart2geo(const arma::Mat<float> &cart, arma::Mat<float> &geo);
+
+template void quadriga_lib::cart2geo(const arma::Mat<double> &cart, arma::Mat<double> &geo);
+
+template void quadriga_lib::cart2geo(const arma::Col<float> &cart, arma::Col<float> &geo);
+
+template void quadriga_lib::cart2geo(const arma::Col<double> &cart, arma::Col<double> &geo);
 
 template arma::Cube<float> quadriga_lib::cart2geo(const arma::Cube<float> &cart);
 

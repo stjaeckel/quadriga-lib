@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
@@ -71,14 +70,14 @@ center, length, vert, direction = quadriga_lib.icosphere( no_div, radius, direct
   order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`; Size: `[ no_face, 9 ]`
 MD!*/
 
-pybind11::tuple icosphere(unsigned long long n_div, double radius, bool direction_xyz)
+py::tuple icosphere(unsigned long long n_div, double radius, bool direction_xyz)
 {
     arma::mat center, vert, direction;
     arma::vec length;
     unsigned long long n_faces = quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
 
-    return pybind11::make_tuple(pybind11::array_t<double>({n_faces, 3ULL}, center.memptr()),
-                                pybind11::array_t<double>(n_faces, length.memptr()),
-                                pybind11::array_t<double>({n_faces, 9ULL}, vert.memptr()),
-                                pybind11::array_t<double>({n_faces, (unsigned long long)direction.n_cols}, direction.memptr()));
+    return py::make_tuple(py::array_t<double>({n_faces, 3ULL}, center.memptr()),
+                          py::array_t<double>(n_faces, length.memptr()),
+                          py::array_t<double>({n_faces, 9ULL}, vert.memptr()),
+                          py::array_t<double>({n_faces, (unsigned long long)direction.n_cols}, direction.memptr()));
 }

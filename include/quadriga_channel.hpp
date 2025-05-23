@@ -24,6 +24,7 @@
 #include <any>
 #include <cstring>
 #include <cmath>
+#include <complex>
 
 namespace quadriga_lib
 {
@@ -228,13 +229,14 @@ namespace quadriga_lib
     // - It is possible to call this function in a loop for multiple snapshots and parallelize this loop using OpenMP
     // - Internal calculations are done in single precision
     template <typename dtype>
-    void baseband_freq_response(const arma::Cube<dtype> *coeff_re,  // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
-                                const arma::Cube<dtype> *coeff_im,  // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
-                                const arma::Cube<dtype> *delay,     // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                const arma::Col<dtype> *pilot_grid, // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
-                                const double bandwidth,             // The baseband bandwidth in [Hz]
-                                arma::Cube<dtype> *hmat_re,         // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
-                                arma::Cube<dtype> *hmat_im);        // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
+    void baseband_freq_response(const arma::Cube<dtype> *coeff_re,                // Channel coefficients, real part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> *coeff_im,                // Channel coefficients, imaginary part, cube of size [n_rx, n_tx, n_path]
+                                const arma::Cube<dtype> *delay,                   // Path delays in seconds, cube of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                const arma::Col<dtype> *pilot_grid,               // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
+                                const double bandwidth,                           // The baseband bandwidth in [Hz]
+                                arma::Cube<dtype> *hmat_re = nullptr,             // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carriers]
+                                arma::Cube<dtype> *hmat_im = nullptr,             // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
+                                arma::Cube<std::complex<dtype>> *hmat = nullptr); // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carriers]
 
     // Compute the baseband frequency response of multiple MIMO channels
     // - Wrapper function for "quadriga_lib::baseband_freq_response" to process multiple snapshot at once

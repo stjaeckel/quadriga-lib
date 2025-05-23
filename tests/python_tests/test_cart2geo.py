@@ -21,10 +21,10 @@ class test_cart2geo(unittest.TestCase):
         x = quadriga_lib.cart2geo(e)
 
         # We need 3 dimensions
-        e = np.random.rand(3, 6)
+        e = np.random.rand(3, 6, 5, 2)
         with self.assertRaises(ValueError) as context:
             x = quadriga_lib.cart2geo(e)
-        self.assertEqual(str(context.exception), "Number of dimensions must be 3")
+        self.assertEqual(str(context.exception), "Expected 1D, 2D or 3D array, got 4D")
 
 if __name__ == '__main__':
     unittest.main()

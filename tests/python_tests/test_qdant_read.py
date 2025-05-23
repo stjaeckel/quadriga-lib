@@ -31,16 +31,16 @@ class test_version(unittest.TestCase):
 
         data = quadriga_lib.arrayant_qdant_read( 'test.qdant' )
 
-        A = 20 * np.log10(data["e_theta"].real)
+        A = 20 * np.log10(data["e_theta_re"])
         B = np.reshape(np.arange(1, 16), (5, 3, 1))
         npt.assert_almost_equal(A, B, decimal=14)
 
-        npt.assert_almost_equal(data["e_theta"].imag, np.zeros((5, 3, 1)), decimal=14)
-        npt.assert_almost_equal(data["e_phi"].imag, np.zeros((5, 3,1)), decimal=14)
+        npt.assert_almost_equal(data["e_theta_im"], np.zeros((5, 3, 1)), decimal=14)
+        npt.assert_almost_equal(data["e_phi_im"], np.zeros((5, 3,1)), decimal=14)
         npt.assert_almost_equal(data["azimuth_grid"], np.array([-np.pi, 0, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["elevation_grid"], np.array([-np.pi / 2, -np.pi / 4, 0, np.pi / 4, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["element_pos"][:,0], np.array([0, 0, 0]), decimal=13)
-        npt.assert_almost_equal(data["coupling"], np.array([[1]]), decimal=13)
+        npt.assert_almost_equal(data["coupling_re"], np.array([[1]]), decimal=13)
         npt.assert_almost_equal(data["center_freq"], 299792448, decimal=13)
         assert data["name"] == 'bla'
         assert data["layout"] == np.uint32(1)
@@ -66,13 +66,13 @@ class test_version(unittest.TestCase):
 
         npt.assert_almost_equal(data["azimuth_grid"], np.array([-np.pi / 2, -np.pi / 4, 0, np.pi / 4, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["elevation_grid"], np.array([-np.pi / 2, 0, np.pi / 2]), decimal=13)
-        npt.assert_almost_equal(data["e_theta"].real, np.zeros((3, 5, 1)), decimal=13)
-        npt.assert_almost_equal(data["e_theta"].imag, -np.sqrt(10 ** 0.3 * np.ones((3, 5, 1))), decimal=13)
-        npt.assert_almost_equal(data["e_phi"].real, np.zeros((3, 5, 1)), decimal=13)
-        npt.assert_almost_equal(data["e_phi"].imag, np.ones((3, 5, 1)), decimal=13)
+        npt.assert_almost_equal(data["e_theta_re"], np.zeros((3, 5, 1)), decimal=13)
+        npt.assert_almost_equal(data["e_theta_im"], -np.sqrt(10 ** 0.3 * np.ones((3, 5, 1))), decimal=13)
+        npt.assert_almost_equal(data["e_phi_re"], np.zeros((3, 5, 1)), decimal=13)
+        npt.assert_almost_equal(data["e_phi_im"], np.ones((3, 5, 1)), decimal=13)
         npt.assert_almost_equal(data["element_pos"][:,0], np.array([1, 2, 3]), decimal=13)
-        npt.assert_almost_equal(data["coupling"].real, 1 / np.sqrt(2), decimal=13)
-        npt.assert_almost_equal(data["coupling"].imag, 1 / np.sqrt(2), decimal=13)
+        npt.assert_almost_equal(data["coupling_re"], 1 / np.sqrt(2), decimal=13)
+        npt.assert_almost_equal(data["coupling_im"], 1 / np.sqrt(2), decimal=13)
         npt.assert_almost_equal(data["center_freq"], 3e9, decimal=13)
         assert data["name"] == 'unknown'
         assert np.array_equal(data["layout"], np.ones((2, 3), dtype=np.uint32))
@@ -98,16 +98,16 @@ class test_version(unittest.TestCase):
 
         B = np.sqrt(np.array([[1.26, 1.26, 1.26], [1.58, 1.58, 2]]))
         assert np.array_equal(data["layout"], np.array([[1, 3]], dtype=np.uint32))
-        npt.assert_almost_equal(data["e_theta"].real[:,:,0], B, decimal=2)
+        npt.assert_almost_equal(data["e_theta_re"][:,:,0], B, decimal=2)
 
         data = quadriga_lib.arrayant_qdant_read( 'test.qdant', 3 )
 
         B = np.array([[1], [-1]]) * np.sqrt(10 ** (np.array([[1, 2, 3], [-1, -2, -3]]) / 10))
-        npt.assert_almost_equal(data["e_theta"].real, np.zeros((2, 3, 2)), decimal=13)
-        npt.assert_almost_equal(data["e_phi"].real, np.zeros((2, 3, 2)), decimal=13)
-        npt.assert_almost_equal(data["e_phi"].imag[:, :, 1], B, decimal=13)
-        npt.assert_almost_equal(data["coupling"].real, np.array([[1 / np.sqrt(2), 3],[0,4]]), decimal=13)
-        npt.assert_almost_equal(data["coupling"].imag, np.array([[1 / np.sqrt(2), 0],[-2,0]]), decimal=13)
+        npt.assert_almost_equal(data["e_theta_re"], np.zeros((2, 3, 2)), decimal=13)
+        npt.assert_almost_equal(data["e_phi_re"], np.zeros((2, 3, 2)), decimal=13)
+        npt.assert_almost_equal(data["e_phi_im"][:,:,1], B, decimal=13)
+        npt.assert_almost_equal(data["coupling_re"], np.array([[1 / np.sqrt(2), 3],[0,4]]), decimal=13)
+        npt.assert_almost_equal(data["coupling_im"], np.array([[1 / np.sqrt(2), 0],[-2,0]]), decimal=13)
 
         os.remove('test.qdant')
             

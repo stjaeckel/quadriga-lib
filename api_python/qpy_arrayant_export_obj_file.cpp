@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
+#include "quadriga_python_adapter.hpp"
 #include "quadriga_lib.hpp"
-
-#include "python_helpers.cpp"
 
 /*!SECTION
 Array antenna functions
@@ -32,13 +29,24 @@ Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
 ## Usage:
 
 ```
-quadriga_lib.arrayant_export_obj_file( fn, directivity_range, colormap, object_radius, icosphere_n_div,
-    e_theta, e_phi, azimuth_grid, elevation_grid, element_pos, name, i_element )
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,
+                object_radius, icosphere_n_div, i_element )
 ```
 
 ## Input Arguments:
 - **`fn`**<br>
   Filename of the OBJ file, string
+
+- **`arrayant`**<br>
+  Dictionary containing array antenna data with at least the following keys:
+  `e_theta_re`     | Real part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_theta_im`     | Imaginary part of e-theta field component        | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_phi_re`       | Real part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `e_phi_im`       | Imaginary part of e-phi field component          | Size: `[n_elevation, n_azimuth, n_elements_c]`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
+  `element_pos`    | Antenna element (x,y,z) positions, optional      | Size: `[3, n_elements]`
+  `name`           | Name of the array antenna object                 | String
 
 - **`directivity_range`**<br>
   Directivity range of the antenna pattern visualization in dB
@@ -53,52 +61,31 @@ quadriga_lib.arrayant_export_obj_file( fn, directivity_range, colormap, object_r
 - **`icosphere_n_div`**<br>
   Map pattern to an Icosphere with given number of subdivisions
 
-- **`e_theta`**<br>
-  e-theta field component, complex-valued, Size: `[n_elevation, n_azimuth, n_elements]`
-
-- **`e_phi`**<br>
-  e-phi field component, complex-valued, Size: `[n_elevation, n_azimuth, n_elements]`
-
-- **`azimuth_grid`**<br>
-  Azimuth angles in [rad] -pi to pi, sorted, Size: `[n_azimuth]`
-
-- **`elevation_grid`**<br>
-  Elevation angles in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation]`
-
-- **`element_pos`**<br>
-  Antenna element (x,y,z) positions, Size: `[3, n_elements]`
-
-- **`name`**<br>
-  Name of the array antenna object
-
 - **`i_element`**<br>
   Antenna element indices, 0-based, empty = export all
 MD!*/
 
 void arrayant_export_obj_file(const std::string fn,
+                              const py::dict arrayant,
                               double directivity_range,
                               const std::string colormap,
                               double object_radius,
                               unsigned icosphere_n_div,
-                              const pybind11::array_t<std::complex<double>> e_theta,
-                              const pybind11::array_t<std::complex<double>> e_phi,
-                              const pybind11::array_t<double> azimuth_grid,
-                              const pybind11::array_t<double> elevation_grid,
-                              const pybind11::array_t<double> element_pos,
-                              const std::string name,
-                              const pybind11::array_t<arma::uword> i_element)
+                              const py::array_t<arma::uword> element)
 {
     auto ant = quadriga_lib::arrayant<double>();
-    ant.name = name;
 
-    qd_python_complexNPArray_to_2Cubes(&e_theta, &ant.e_theta_re, &ant.e_theta_im);
-    qd_python_complexNPArray_to_2Cubes(&e_phi, &ant.e_phi_re, &ant.e_phi_im);
+    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], true);
+    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], true);
+    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], true);
+    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], true);
+    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], true);
+    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], true);
+    ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], true);
 
-    ant.azimuth_grid = qd_python_NPArray_to_Col(&azimuth_grid);
-    ant.elevation_grid = qd_python_NPArray_to_Col(&elevation_grid);
-    ant.element_pos = qd_python_NPArray_to_Mat(&element_pos);
+    if (arrayant.contains("name"))
+        ant.name = arrayant["name"].cast<std::string>();
 
-    arma::uvec i_element_a = qd_python_NPArray_to_Col(&i_element);
-
+    arma::uvec i_element_a = qd_python_numpy2arma_Col(element);
     ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, i_element_a);
 }

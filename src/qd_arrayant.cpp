@@ -372,17 +372,20 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
         throw std::invalid_argument(error_message.c_str());
 
     // Get output angular grid
-    if (azimuth_grid_new != nullptr && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
+    bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
+    bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
+
+    if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
         throw std::invalid_argument("Values of 'azimuth_grid_new' must be sorted and in between -pi and pi (equivalent to -180 to 180 degree).");
 
-    if (elevation_grid_new != nullptr && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
+    if (new_elgrid && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
         throw std::invalid_argument("Values of 'elevation_grid_new' must be sorted and in between -pi/2 and pi/2 (equivalent to -90 to 90 degree).");
 
-    const dtype *p_azimuth_grid = (azimuth_grid_new == nullptr) ? this->azimuth_grid.memptr() : azimuth_grid_new->memptr();
-    const dtype *p_elevation_grid = (elevation_grid_new == nullptr) ? this->elevation_grid.memptr() : elevation_grid_new->memptr();
+    const dtype *p_azimuth_grid = (new_azgrid) ? azimuth_grid_new->memptr() : this->azimuth_grid.memptr();
+    const dtype *p_elevation_grid = (new_elgrid) ? elevation_grid_new->memptr() : this->elevation_grid.memptr();
 
-    arma::uword n_azimuth_out = (azimuth_grid_new == nullptr) ? this->azimuth_grid.n_elem : azimuth_grid_new->n_elem;
-    arma::uword n_elevation_out = (azimuth_grid_new == nullptr) ? this->elevation_grid.n_elem : elevation_grid_new->n_elem;
+    arma::uword n_azimuth_out = (new_azgrid) ? azimuth_grid_new->n_elem : this->azimuth_grid.n_elem;
+    arma::uword n_elevation_out = (new_elgrid) ? elevation_grid_new->n_elem : this->elevation_grid.n_elem;
     arma::uword n_ang = n_azimuth_out * n_elevation_out;
 
     // Create list of angles for pattern interpolation
@@ -466,6 +469,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
         output.coupling_re.eye();
         output.coupling_im.zeros();
         output.center_frequency = this->center_frequency;
+        output.name = name;
 
         // Set the data pointers for the quick check.
         output.check_ptr[0] = output.e_theta_re.memptr();
@@ -1149,6 +1153,9 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
     else if (arma::any(i_element >= n_elements))
         throw std::invalid_argument("Element indices 'i_element' cannot exceed the array antenna size.");
 
+    if (n_out != 1 && n_out != i_element.n_elem)
+        throw std::invalid_argument("Number of requested outputs does not match the number of elements.");
+
     // Process orientation
     n_out = i_element.n_elem;
     arma::Cube<dtype> orientation_empty = arma::Cube<dtype>(3, 1, 1);
@@ -1239,7 +1246,7 @@ Write array antenna object and layout to QDANT file
 ```
 unsigned quadriga_lib::arrayant<dtype>::qdant_write(
                 std::string fn,
-                unsigned id = 0, 
+                unsigned id = 0,
                 arma::u32_mat layout = {}) const;
 ```
 
@@ -1581,9 +1588,9 @@ Adjust orientation of antenna patterns
 ```
 void quadriga_lib::arrayant<dtype>::rotate_pattern(
                 dtype x_deg = 0.0,
-                dtype y_deg = 0.0, 
+                dtype y_deg = 0.0,
                 dtype z_deg = 0.0,
-                unsigned usage = 0, 
+                unsigned usage = 0,
                 unsigned element = -1,
                 arrayant<dtype> *output = nullptr);
 ```
@@ -1979,9 +1986,9 @@ Change size of antenna array object
 ## Declaration:
 ```
 void quadriga_lib::arrayant<dtype>::set_size(
-                arma::uword n_elevation, 
+                arma::uword n_elevation,
                 arma::uword n_azimuth,
-                arma::uword n_elements, 
+                arma::uword n_elements,
                 arma::uword n_ports);
 ```
 
@@ -2114,13 +2121,13 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check) const
     arma::uword n_elements = e_theta_re.n_slices;
 
     if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements)
-        return std::string("Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.");
+        return std::string("Sizes of 'e_theta_re' and 'e_theta_im' do not match.");
 
     if (e_phi_re.n_rows != n_elevation || e_phi_re.n_cols != n_azimuth || e_phi_re.n_slices != n_elements)
-        return std::string("Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.");
+        return std::string("Sizes of 'e_theta_re' and 'e_phi_re' do not match.");
 
     if (e_phi_im.n_rows != n_elevation || e_phi_im.n_cols != n_azimuth || e_phi_im.n_slices != n_elements)
-        return std::string("Sizes of 'e_theta_re', 'e_theta_im', 'e_phi_re', 'e_phi_im' do not match.");
+        return std::string("Sizes of 'e_theta_re' and 'e_phi_im' do not match.");
 
     if (azimuth_grid.n_elem != n_azimuth)
         return std::string("Number of elements in 'azimuth_grid' does not match number of columns in pattern data.");
