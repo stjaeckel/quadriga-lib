@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "mex.h"  
-#include "quadriga_arrayant.hpp" 
+#include "mex.h"
+#include "quadriga_arrayant.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
@@ -28,14 +28,19 @@ SECTION!*/
 Calculates the directivity (in dBi) of array antenna elements
 
 ## Description:
-Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
-is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
-from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
+Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted
+is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction
+from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity
 of a hypothetical isotropic radiator is 1, or 0 dBi.<br>
 
 ## Usage:
 
 ```
+% Input as struct
+directivity = quadriga_lib.arrayant_calc_directivity(arrayant);
+directivity = quadriga_lib.arrayant_calc_directivity(arrayant, i_element);
+
+% Separate inputs
 directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
     e_phi_im, azimuth_grid, elevation_grid);
 
@@ -46,16 +51,15 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ## Examples:
 ```
 % Generate dipole antenna
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid] = ...
-    quadriga_lib.arrayant_generate('dipole');
+ant = quadriga_lib.arrayant_generate('dipole');
 
-% Calculate directivity 
-directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid);
+% Calculate directivity
+directivity = quadriga_lib.arrayant_calc_directivity(ant);
 ```
 
-## Input Arguments:
-- **Antenna data:** (inputs 1-6, single or double precision)
+## Input arguments for struct mode:
+- **`arrayant`** [1]<br>
+  Struct containing a array antenna pattern with at least the following fields:
   `e_theta_re`     | Real part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_theta_im`     | Imaginary part of e-theta field component        | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_phi_re`       | Real part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
@@ -63,8 +67,31 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
   `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
   `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
 
-- **`i_element`** (optional)<br> 
-  Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the 
+- **`i_element`** [2] (optional)<br>
+  Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the
+  array antenna. <br>Size: `[n_out]` or empty<br>
+
+## Input arguments for separate inputs:
+- **`e_theta_re`** [1]<br>
+  Real part of e-theta field component, Size: `[n_elevation, n_azimuth, n_elements]`
+
+- **`e_theta_im`** [2]<br>
+  Imaginary part of e-theta field component, Size: `[n_elevation, n_azimuth, n_elements]`
+
+- **`e_phi_re`** [3]<br>
+  Real part of e-phi field component, Size: `[n_elevation, n_azimuth, n_elements]`
+
+- **`e_phi_im`** [4]<br>
+  Imaginary part of e-phi field component, Size: `[n_elevation, n_azimuth, n_elements]`
+
+- **`azimuth_grid`** [5]<br>
+  Azimuth angles in [rad] -pi to pi, sorted, Size: `[n_azimuth]`
+
+- **`elevation_grid`** [6]<br>
+  Elevation angles in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation]`
+
+- **`i_element`** [7] (optional)<br>
+  Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the
   array antenna. <br>Size: `[n_out]` or empty<br>
 
 ## Output Argument:
@@ -74,100 +101,48 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - e_theta_re      Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
-    //  1 - e_theta_im      Vertical component of the electric field, imaginary part,       Size [n_elevation, n_azimuth, n_elements]
-    //  2 - e_phi_re        Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_elements]
-    //  3 - e_phi_im        Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_elements]
-    //  4 - azimuth_grid    Azimuth angles in pattern (theta) in [rad], sorted,             Vector of length "n_azimuth"
-    //  5 - elevation_grid  Elevation angles in pattern (phi) in [rad], sorted,             Vector of length "n_elevation"
-    //  6 - i_element       Element index, scalar, 1-based (optional, default: 1)
-
-    // Output:
-    //  0 - directivity     Directivity of the antenna pattern in dBi
-
-    if (nrhs < 6) 
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Need at least 6 inputs.");
-
-    if (nrhs > 7)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Can have at most 7 inputs.");
+    if (!(nrhs == 1 || nrhs == 2 || nrhs == 6 || nrhs == 7))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Wrong number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
+    if (nlhs == 0)
+        return;
 
-    for (int i = 1; i < 6; ++i)
-        if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
-            mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:wrong_type", "All floating-point inputs must have the same type: 'single' or 'double' precision");
-
-    // Create arrayant object and validate the input
-    quadriga_lib::arrayant<float> arrayant_single;
-    quadriga_lib::arrayant<double> arrayant_double;
-    if (use_single)
-        arrayant_single.e_theta_re = qd_mex_reinterpret_Cube<float>(prhs[0]),
-        arrayant_single.e_theta_im = qd_mex_reinterpret_Cube<float>(prhs[1]),
-        arrayant_single.e_phi_re = qd_mex_reinterpret_Cube<float>(prhs[2]),
-        arrayant_single.e_phi_im = qd_mex_reinterpret_Cube<float>(prhs[3]),
-        arrayant_single.azimuth_grid = qd_mex_reinterpret_Col<float>(prhs[4]),
-        arrayant_single.elevation_grid = qd_mex_reinterpret_Col<float>(prhs[5]);
-    else
-        arrayant_double.e_theta_re = qd_mex_reinterpret_Cube<double>(prhs[0]),
-        arrayant_double.e_theta_im = qd_mex_reinterpret_Cube<double>(prhs[1]),
-        arrayant_double.e_phi_re = qd_mex_reinterpret_Cube<double>(prhs[2]),
-        arrayant_double.e_phi_im = qd_mex_reinterpret_Cube<double>(prhs[3]),
-        arrayant_double.azimuth_grid = qd_mex_reinterpret_Col<double>(prhs[4]),
-        arrayant_double.elevation_grid = qd_mex_reinterpret_Col<double>(prhs[5]);
-
-    unsigned long long n_element = (use_single) ? arrayant_single.n_elements() : arrayant_double.n_elements();
-
-    // Validate the data integrity
-    std::string error_message = use_single ? arrayant_single.validate() : arrayant_double.validate();
-    if (!error_message.empty())
-        mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:IO_error", error_message.c_str());
-
-    // Read i_element
-    arma::u32_vec i_element;
-    if (nrhs < 7)
+    // Assemble array antenna object
+    auto ant = quadriga_lib::arrayant<double>();
+    if (nrhs <= 2) // Struct
     {
-        i_element.set_size(n_element);
-        auto p_element = i_element.memptr();
-        for (unsigned i = 0; i < (unsigned)n_element; ++i)
-            p_element[i] = i + 1; // 1-based
+        ant.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
+        ant.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
+        ant.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
+        ant.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
+        ant.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
+        ant.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
     }
-    else
-        i_element = qd_mex_typecast_Col<unsigned>(prhs[6], "i_element");
-
-    // Generate output
-    if (nlhs > 0)
+    else // Separate
     {
-        arma::vec directivity;
-        plhs[0] = qd_mex_init_output(&directivity, i_element.n_elem);
-
-        // Call library function
-        try
-        {
-            auto p_directivity = directivity.memptr();
-            for (auto &el : i_element)
-            {
-                if (use_single)
-                    *p_directivity++ = (double)arrayant_single.calc_directivity_dBi(el - 1);
-                else
-                    *p_directivity++ = arrayant_double.calc_directivity_dBi(el - 1);
-            }
-        }
-        catch (const std::invalid_argument &ex)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:unknown_error", ex.what());
-        }
-        catch (...)
-        {
-            mexErrMsgIdAndTxt("quadriga_lib:calc_directivity:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-        }
+        ant.e_theta_re = qd_mex_get_double_Cube(prhs[0]);
+        ant.e_theta_im = qd_mex_get_double_Cube(prhs[1]);
+        ant.e_phi_re = qd_mex_get_double_Cube(prhs[2]);
+        ant.e_phi_im = qd_mex_get_double_Cube(prhs[3]);
+        ant.azimuth_grid = qd_mex_get_double_Col(prhs[4]);
+        ant.elevation_grid = qd_mex_get_double_Col(prhs[5]);
     }
+
+    arma::uvec element_ind;
+    if (nrhs == 2)
+        element_ind = qd_mex_typecast_Col<arma::uword>(prhs[1], "i_element") - 1;
+    else if (nrhs == 7)
+        element_ind = qd_mex_typecast_Col<arma::uword>(prhs[6], "i_element") - 1;
+    else
+        element_ind = arma::regspace<arma::uvec>(0, ant.e_theta_re.n_slices - 1);
+
+    arma::vec directivity;
+    plhs[0] = qd_mex_init_output(&directivity, element_ind.n_elem);
+
+    auto *p_directivity = directivity.memptr();
+    for (auto el : element_ind)
+        CALL_QD(*p_directivity++ = ant.calc_directivity_dBi(el));
 }

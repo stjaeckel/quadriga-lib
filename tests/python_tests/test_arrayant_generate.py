@@ -69,7 +69,7 @@ class test_version(unittest.TestCase):
         npt.assert_almost_equal(data["e_phi_re"][90,180,1], -1.776172, decimal=5)
 
         # Use custom pattern
-        pat = quadriga_lib.arrayant_generate("custom", 10, 90, 90, 0)
+        pat = quadriga_lib.arrayant_generate("custom", 10)
 
         data = quadriga_lib.arrayant_generate("3gpp", az_3dB=90, el_3dB=90, res=10, N=2)
         npt.assert_almost_equal(data["e_theta_re"][:,:,0], pat["e_theta_re"][:,:,0], decimal=14)
@@ -81,6 +81,7 @@ class test_version(unittest.TestCase):
         npt.assert_almost_equal(data["e_theta_re"][:,:,1], pat["e_theta_re"][:,:,0], decimal=14)
         npt.assert_almost_equal(data["element_pos"], [[0.0,0.0],[0.0,0.0],[-0.25,0.25]], decimal=14)
 
+        # Errors
         trash = {"e_theta_re":0.0}
         with self.assertRaises(KeyError) as context:
             quadriga_lib.arrayant_generate("3gpp", pattern=trash)
@@ -90,6 +91,10 @@ class test_version(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             quadriga_lib.arrayant_generate("3gpp", pattern=trash)
         self.assertEqual(str(context.exception), "could not convert string to float: 'Bla'")
+
+        with self.assertRaises(ValueError) as context:
+            quadriga_lib.arrayant_generate("bla")
+        self.assertEqual(str(context.exception), "Array type not supported!")
             
 if __name__ == '__main__':
     unittest.main()

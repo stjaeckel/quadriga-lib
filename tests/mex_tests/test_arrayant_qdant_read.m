@@ -1,4 +1,4 @@
-function test_qdant_read
+function test_arrayant_qdant_read
 
 %% Minimal test
 f = fopen( 'test.qdant','w' );
@@ -57,30 +57,33 @@ fprintf(f,'%s\n','</xx:arrayant></qdant>');
 fclose(f);
 
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1,1);
+    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
 
-assertTrue( isa(e_theta_re,'single') );
-assertTrue( isa(e_theta_im,'single') );
-assertTrue( isa(e_phi_re,'single') );
-assertTrue( isa(e_phi_im,'single') );
-assertTrue( isa(azimuth_grid,'single') );
-assertTrue( isa(elevation_grid,'single') );
-assertTrue( isa(element_pos,'single') );
-assertTrue( isa(coupling_re,'single') );
-assertTrue( isa(coupling_im,'single') );
-assertTrue( isa(center_frequency,'single') );
-
-assertElementsAlmostEqual( azimuth_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-7 );
-assertElementsAlmostEqual( elevation_grid, [-pi/2,0,pi/2], 'absolute', 1e-7 );
-assertElementsAlmostEqual( e_theta_re, zeros(3,5), 'absolute', 1e-7 );
-assertElementsAlmostEqual( e_theta_im, -sqrt(10^(0.3)*ones(3,5)), 'absolute', 1e-6 );
-assertElementsAlmostEqual( e_phi_re, zeros(3,5), 'absolute', 1e-7 );
-assertElementsAlmostEqual( e_phi_im, ones(3,5), 'absolute', 1e-7 );
-assertElementsAlmostEqual( element_pos, [1;2;3], 'absolute', 1e-7 );
-assertElementsAlmostEqual( coupling_re, 1/sqrt(2), 'absolute', 1e-7 );
-assertElementsAlmostEqual( coupling_im, 1/sqrt(2), 'absolute', 1e-7 );
-assertElementsAlmostEqual( center_frequency, 3e9, 'absolute', 1e-13 );
+assertElementsAlmostEqual( azimuth_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute', 1e-12 );
+assertElementsAlmostEqual( elevation_grid, [-pi/2,0,pi/2], 'absolute', 1e-12 );
+assertElementsAlmostEqual( e_theta_re, zeros(3,5), 'absolute', 1e-12 );
+assertElementsAlmostEqual( e_theta_im, -sqrt(10^(0.3)*ones(3,5)), 'absolute', 1e-12 );
+assertElementsAlmostEqual( e_phi_re, zeros(3,5), 'absolute', 1e-12 );
+assertElementsAlmostEqual( e_phi_im, ones(3,5), 'absolute', 1e-12 );
+assertElementsAlmostEqual( element_pos, [1;2;3], 'absolute', 1e-12 );
+assertElementsAlmostEqual( coupling_re, 1/sqrt(2), 'absolute', 1e-12 );
+assertElementsAlmostEqual( coupling_im, 1/sqrt(2), 'absolute', 1e-12 );
+assertElementsAlmostEqual( center_frequency, 3e9, 'absolute', 1e-12 );
 assertTrue( strcmp(name,'unknown') );
+assertEqual( layout, ones(2,3,'uint32') );
+
+[data, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
+assertElementsAlmostEqual( data.e_theta_re, e_theta_re, 'absolute', 1e-14 );
+assertElementsAlmostEqual( data.e_theta_im, e_theta_im, 'absolute', 1e-14 );
+assertElementsAlmostEqual( data.e_phi_re, e_phi_re, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.e_phi_im, e_phi_im, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.azimuth_grid, azimuth_grid, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.elevation_grid, elevation_grid, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.element_pos, element_pos, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.coupling_re, coupling_re, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.coupling_im, coupling_im, 'absolute', 1e-14)
+assertElementsAlmostEqual( data.center_freq, center_frequency, 'absolute', 1e-14)
+assertTrue( strcmp(data.name,'unknown') );
 assertEqual( layout, ones(2,3,'uint32') );
 
 %% Two array antennas with uncommon formats
@@ -101,30 +104,29 @@ fprintf(f,'<name>xxx</name>\n');
 fprintf(f,'</arrayant></qdant>\n');
 fclose(f);
 
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
+[data, layout] = quadriga_lib.arrayant_qdant_read('test.qdant',1);
 
 assertEqual( layout, uint32([1 3]) );
 
-assertElementsAlmostEqual( e_theta_re, sqrt([1.26 1.26 1.26 ; 1.58 1.58 2]), 'absolute', 1e-2 );
+assertElementsAlmostEqual( data.e_theta_re, sqrt([1.26 1.26 1.26 ; 1.58 1.58 2]), 'absolute', 1e-2 );
 
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
+data = quadriga_lib.arrayant_qdant_read('test.qdant',3);
 
-assertElementsAlmostEqual( e_theta_re, zeros(2,3,2), 'absolute', 1e-13 );
-assertElementsAlmostEqual( e_phi_re, zeros(2,3,2), 'absolute', 1e-13 );
-assertElementsAlmostEqual( e_phi_im(:,:,2), [1;-1].*sqrt(10.^([1 2 3 ; -1 -2 -3]/10)), 'absolute', 1e-13 );
-assertElementsAlmostEqual( coupling_re, [1/sqrt(2);0], 'absolute', 1e-13 );
-assertElementsAlmostEqual( coupling_im, [1/sqrt(2);-2], 'absolute', 1e-13 );
-assertTrue( strcmp(name,'xxx') );
+assertElementsAlmostEqual( data.e_theta_re, zeros(2,3,2), 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.e_phi_re, zeros(2,3,2), 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.e_phi_im(:,:,2), [1;-1].*sqrt(10.^([1 2 3 ; -1 -2 -3]/10)), 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.coupling_re, [1/sqrt(2);0], 'absolute', 1e-13 );
+assertElementsAlmostEqual( data.coupling_im, [1/sqrt(2);-2], 'absolute', 1e-13 );
+assertTrue( strcmp(data.name,'xxx') );
 
 %% Check error parsing
 try
     [~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant',3);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Wrong number of output arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -139,8 +141,9 @@ try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Array antenna object must have an ''AzimuthGrid''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -156,8 +159,9 @@ try
     [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Start-end tags mismatch';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -171,11 +175,12 @@ fprintf(f,'</arrayant></qdant>');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    [~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Number of entries in antenna field pattern does not match the number of azimuth * elevation angles.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -190,11 +195,12 @@ fprintf(f,'</arrayant></qdant>');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    [~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = '''CouplingAbs'' must be a matrix with number of rows equal to number of elements';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -208,11 +214,12 @@ fprintf(f,'</arrayant></qdant>');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    [~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'Number of entries in ''CouplingPhase'' must match number of entries in ''CouplingAbs''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -222,11 +229,12 @@ fprintf(f,'bla bla bla\n');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    [~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'No document element found';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
@@ -244,14 +252,15 @@ fprintf(f,'</kml>\n');
 fclose(f);
 
 try
-    [~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_qdant_read('test.qdant');
+    [~] = quadriga_lib.arrayant_qdant_read('test.qdant');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    if (strcmp(ME.identifier, 'moxunit:exceptionNotRaised'))
-        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    expectedErrorMessage = 'File format is invalid. Requires ''QuaDRiGa Array Antenna Exchange Format (QDANT)''.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 delete('test.qdant');
 
-
+end

@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -60,6 +59,9 @@ arrayant = quadriga_lib.arrayant_generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, s
 - **`res`**<br>
   Pattern resolution in [deg], scalar, default = 1 deg
 
+- **`freq`**<br>
+  The center frequency in [Hz], scalar, default = 299792458 Hz
+
 ## Input arguments for type 'custom' and '3gpp':
 - **`az_3dB`**<br>
   3dB beam width in azimuth direction in [deg], scalar,
@@ -78,9 +80,6 @@ arrayant = quadriga_lib.arrayant_generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, s
 
 - **`N`**<br>
   Number of horizontally stacked elements, scalar, default = 1
-
-- **`freq`**<br>
-  The center frequency in [Hz], scalar, default = 299792458 Hz
 
 - **`pol`**<br>
   Polarization indicator to be applied for each of the M elements:<br>
@@ -137,12 +136,12 @@ MD!*/
 
 py::dict arrayant_generate(const std::string type,  // Array type
                            double res,              // Pattern resolution in [deg]
+                           double freq,             // The center frequency in [Hz]
                            double az_3dB,           // 3dB beam width in azimuth direction in [deg]
                            double el_3dB,           // 3dB beam width in elevation direction in [deg]
                            double rear_gain_lin,    // Isotropic gain (linear scale) at the back of the antenna
                            arma::uword M,           // Number of vertically stacked elements
                            arma::uword N,           // Number of horizontally stacked elements
-                           double freq,             // The center frequency in [Hz]
                            unsigned pol,            // Polarization indicator to be applied for each of the M elements
                            double tilt,             // The electric downtilt angle in [deg]
                            double spacing,          // Element spacing in [λ]
@@ -196,18 +195,9 @@ py::dict arrayant_generate(const std::string type,  // Array type
         else // Use 3GPP default pattern
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res);
     }
+    else
+        throw std::invalid_argument("Array type not supported!");
 
-    py::dict output;
-    output["e_theta_re"] = qd_python_copy2numpy(arrayant.e_theta_re);
-    output["e_theta_im"] = qd_python_copy2numpy(arrayant.e_theta_im);
-    output["e_phi_re"] = qd_python_copy2numpy(arrayant.e_phi_re);
-    output["e_phi_im"] = qd_python_copy2numpy(arrayant.e_phi_im);
-    output["azimuth_grid"] = qd_python_copy2numpy(arrayant.azimuth_grid);
-    output["elevation_grid"] = qd_python_copy2numpy(arrayant.elevation_grid);
-    output["element_pos"] = qd_python_copy2numpy(arrayant.element_pos);
-    output["coupling_re"] = qd_python_copy2numpy(arrayant.coupling_re);
-    output["coupling_im"] = qd_python_copy2numpy(arrayant.coupling_im);
-    output["center_freq"] = freq;
-    output["name"] = arrayant.name;
-    return output;
+    arrayant.center_frequency = freq;
+    return qd_python_arrayant2dict(arrayant);
 }

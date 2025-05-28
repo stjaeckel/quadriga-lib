@@ -516,34 +516,34 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
 }
 
 // Quick input converters
-inline arma::vec qd_mex_get_double_Col(const mxArray *input)
+inline arma::vec qd_mex_get_double_Col(const mxArray *input, bool copy = false)
 {
-    return mxIsDouble(input) ? qd_mex_reinterpret_Col<double>(input) : qd_mex_typecast_Col<double>(input);
+    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Col<double>(input) : qd_mex_typecast_Col<double>(input);
 }
 
-inline arma::fvec qd_mex_get_single_Col(const mxArray *input)
+inline arma::fvec qd_mex_get_single_Col(const mxArray *input, bool copy = false)
 {
-    return mxIsSingle(input) ? qd_mex_reinterpret_Col<float>(input) : qd_mex_typecast_Col<float>(input);
+    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Col<float>(input) : qd_mex_typecast_Col<float>(input);
 }
 
-inline arma::mat qd_mex_get_double_Mat(const mxArray *input)
+inline arma::mat qd_mex_get_double_Mat(const mxArray *input, bool copy = false)
 {
-    return mxIsDouble(input) ? qd_mex_reinterpret_Mat<double>(input) : qd_mex_typecast_Mat<double>(input);
+    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Mat<double>(input) : qd_mex_typecast_Mat<double>(input);
 }
 
-inline arma::fmat qd_mex_get_single_Mat(const mxArray *input)
+inline arma::fmat qd_mex_get_single_Mat(const mxArray *input, bool copy = false)
 {
-    return mxIsSingle(input) ? qd_mex_reinterpret_Mat<float>(input) : qd_mex_typecast_Mat<float>(input);
+    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Mat<float>(input) : qd_mex_typecast_Mat<float>(input);
 }
 
-inline arma::cube qd_mex_get_double_Cube(const mxArray *input)
+inline arma::cube qd_mex_get_double_Cube(const mxArray *input, bool copy = false)
 {
-    return mxIsDouble(input) ? qd_mex_reinterpret_Cube<double>(input) : qd_mex_typecast_Cube<double>(input);
+    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Cube<double>(input) : qd_mex_typecast_Cube<double>(input);
 }
 
-inline arma::fcube qd_mex_get_single_Cube(const mxArray *input)
+inline arma::fcube qd_mex_get_single_Cube(const mxArray *input, bool copy = false)
 {
-    return mxIsSingle(input) ? qd_mex_reinterpret_Cube<float>(input) : qd_mex_typecast_Cube<float>(input);
+    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Cube<float>(input) : qd_mex_typecast_Cube<float>(input);
 }
 
 // Creates an mxArray based on the armadillo input type, copies content
@@ -1507,6 +1507,54 @@ inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, unsigned long lo
     mxArray *output = mxCreateNumericArray(3, dims, mxUINT32_CLASS, mxREAL);
     *input = arma::Cube<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
+}
+
+// Make an empty struct
+inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields)
+{
+    mxArray *output;
+    if (fields.empty())
+    {
+        mwSize dims[2] = {0, 0};
+        output = mxCreateStructArray(2, dims, 0, NULL);
+    }
+    else
+    {
+        std::vector<const char *> field_names;
+        for (const auto &str : fields)
+            field_names.push_back(str.c_str());
+
+        mwSize dims[2] = {1, 1}; // Creates a 1x1 struct array
+        output = mxCreateStructArray(2, dims, (int)field_names.size(), field_names.data());
+    }
+    return output;
+}
+
+void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data)
+{
+    mxSetField(strct, 0, field.c_str(), data);
+}
+
+bool qd_mex_has_field(const mxArray *strct, const std::string &field)
+{
+    if (!mxIsStruct(strct))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+    mxArray *data = mxGetField(strct, 0, field.c_str());
+    if (data == nullptr)
+        return false;
+    return true;
+}
+
+inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field)
+{
+    if (!mxIsStruct(strct))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+
+    mxArray *data = mxGetField(strct, 0, field.c_str());
+    if (data == nullptr)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + field + "' not found!").c_str());
+
+    return data;
 }
 
 #endif

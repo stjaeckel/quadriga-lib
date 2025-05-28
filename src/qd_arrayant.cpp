@@ -1638,7 +1638,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
         error_message = "Input parameter 'usage' must be 0, 1, 2 or 3.";
     if (element == unsigned(-1) || e_theta_re.n_slices == 1)
         use_all_elements = true;
-    else if (element >= e_theta_re.n_slices)
+    if (element != unsigned(-1) && element >= e_theta_re.n_slices)
         error_message = "Input parameter 'element' out of bound.";
     if (error_message.length() != 0)
         throw std::invalid_argument(error_message.c_str());

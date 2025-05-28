@@ -15,8 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#ifndef quadriga_python_adapter_H
-#define quadriga_python_adapter_H
+#ifndef quadriga_python_arma_adapter_H
+#define quadriga_python_arma_adapter_H
 
 #include <any>
 #include <armadillo>
@@ -527,9 +527,18 @@ void qd_python_copy2arma(const py::array_t<std::complex<dtype>> &input, arma::Cu
 // -------------------------------- qd_python_numpy2arma --------------------------------
 
 template <typename dtype>
-arma::Col<dtype> qd_python_numpy2arma_Col(const py::array_t<dtype> &input, bool view = false, bool strict = false)
+arma::Col<dtype> qd_python_numpy2arma_Col(const py::array_t<dtype> &input,
+                                          bool view = false, bool strict = false,
+                                          std::string var_name = "", arma::uword n_elem = 0)
 {
     auto shape = qd_python_get_shape(input, !view);
+    if (n_elem != 0 && shape[0] != n_elem)
+    {
+        if (var_name.empty())
+            throw std::invalid_argument("Incorrect number of elements.");
+        else
+            throw std::invalid_argument("Input '" + var_name + "' has incorrect number of elements.");
+    }
     if (view && shape[6])
         return arma::Col<dtype>(const_cast<dtype *>(input.data()), shape[0] * shape[1] * shape[2], true, false);
     if (view && strict)

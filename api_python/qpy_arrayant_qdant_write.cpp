@@ -22,49 +22,60 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_QDANT_READ
-Reads array antenna data from QDANT files
+# ARRAYANT_QDANT_WRITE
+Writes array antenna data to QDANT files
 
 ## Description:
 The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern
-data in XML. This function reads pattern data from the specified file.
+data in XML. This function writes pattern data to the specified file.
 
 ## Usage:
 
 ```
-data = quadriga_lib.arrayant_qdant_read( fn, id )
+id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout);
 ```
 
+## Caveat:
+- Multiple array antennas can be stored in the same file using the `id` parameter.
+- If writing to an exisiting file without specifying an `id`, the data gests appended at the end.
+  The output `id_in_file` identifies the location inside the file.
+- An optional storage `layout` can be provided to organize data inside the file.
+
 ## Input Arguments:
-- **`fn`**<br>
+- **`fn`** [1]<br>
   Filename of the QDANT file, string
 
-- **`id`** (optional)<br>
-  ID of the antenna to be read from the file, optional, Default: Read first
-
-## Output Arguments:
-- **`data`**<br>
-  Dictionary containing the data in the QDANT file with the following keys:
+- **`arrayant`** [2] (optional)<br>
+  Dictionary containing the arrayant data with the following keys:
   `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
   `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
   `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
+  `coupling_re`    | Coupling matrix, real part, optional                  | Size: `[n_elements, n_ports]`
+  `coupling_im`    | Coupling matrix, imaginary part, optional             | Size: `[n_elements, n_ports]`
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
-  `name`           | Name of the array antenna object                      | String
-  `layout`         | Layout of multiple array antennas.                    | Matrix
+  `name`           | Name of the array antenna object, optional            | String
+
+- **`id`** [3] (optional)<br>
+  ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1
+
+- **`layout`** [4] (optional)<br>
+  Layout of multiple array antennas. Must only contain element ids that are present in the file. optional
+
+## Output Argument:
+- **`id_in_file`**<br>
+  ID of the antenna in the file after writing
 MD!*/
 
-py::dict arrayant_qdant_read(const std::string fn, unsigned id)
+ssize_t arrayant_qdant_write(const std::string &fn,
+                             const py::dict &arrayant,
+                             const unsigned id,
+                             const py::array_t<unsigned> &layout)
 {
-    arma::Mat<unsigned> layout;
-    auto arrayant = quadriga_lib::qdant_read<double>(fn, id, &layout);
-
-    auto output = qd_python_arrayant2dict(arrayant);
-    output["layout"] = qd_python_copy2numpy(layout);
-    return output;
+    const auto ant = qd_python_dict2arrayant(arrayant, true);
+    const auto layout_a = qd_python_numpy2arma_Mat(layout, true);
+    return (ssize_t)ant.qdant_write(fn, id, layout_a);
 }

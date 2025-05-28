@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -60,14 +59,7 @@ MD!*/
 py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,                // Input data
                                               const py::array_t<arma::uword> &element) // Antenna element indices, 0-based
 {
-    // Assemble array antenna object
-    auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], true);
-    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], true);
-    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], true);
-    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], true);
-    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], true);
-    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], true);
+    const auto ant = qd_python_dict2arrayant(arrayant, true);
 
     arma::uvec element_ind = (element.size() == 0) ? arma::regspace<arma::uvec>(0, ant.e_theta_re.n_slices - 1)
                                                    : qd_python_numpy2arma_Col(element);

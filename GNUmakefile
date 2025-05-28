@@ -116,7 +116,7 @@ dirs:
 	mkdir -p +quadriga_lib
 	mkdir -p release
 
-lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/libquadriga.a   $(api_python)   api_python/quadriga_python_adapter.hpp
+lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/libquadriga.a   $(api_python)   api_python/python_arma_adapter.hpp
 	$(CC) -shared $(CCFLAGS) $< lib/libquadriga.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
 
 # Use cmake to compile

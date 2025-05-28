@@ -59,6 +59,8 @@
 <tbody>
 <tr><td><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a></td><td>Calculates the directivity (in dBi) of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
+<tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
+<tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
 <tr><td><a href="#arrayant_generate">arrayant_generate</a></td><td>Generates predefined array antenna models</td></tr>
 <tr><td><a href="#arrayant_interpolate">arrayant_interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
 <tr><td><a href="#arrayant_qdant_read">arrayant_qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
@@ -136,13 +138,18 @@
 <b>arrayant_calc_directivity</b> - Calculates the directivity (in dBi) of array antenna elements
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted  
-is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction  
-from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity  
+<b><i>Description:</i></b><br>Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
+is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
+from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
 of a hypothetical isotropic radiator is 1, or 0 dBi.<br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+% Input as struct
+directivity = quadriga_lib.arrayant_calc_directivity(arrayant);
+directivity = quadriga_lib.arrayant_calc_directivity(arrayant, i_element);
+
+% Separate inputs
 directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
     e_phi_im, azimuth_grid, elevation_grid);
 
@@ -153,16 +160,15 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 <li style="margin-bottom: 1.5em;">
 <b><i>Examples:</i></b><br><pre>
 % Generate dipole antenna
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid] = ...
-    quadriga_lib.arrayant_generate('dipole');
+ant = quadriga_lib.arrayant_generate('dipole');
 
-% Calculate directivity 
-directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_phi_re, ...
-    e_phi_im, azimuth_grid, elevation_grid);
+% Calculate directivity
+directivity = quadriga_lib.arrayant_calc_directivity(ant);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (inputs 1-6, single or double precision) 
+<b><i>Input arguments for struct mode:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [1]<br> 
+   Struct containing a array antenna pattern with at least the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
@@ -197,8 +203,38 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> (optional)<br>  
-   Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the  
+<ul><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> [2] (optional)<br> 
+   Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the 
+   array antenna. <br>Size: <code>[n_out]</code> or empty<br> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input arguments for separate inputs:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>e_theta_re</code></b> [1]<br> 
+   Real part of e-theta field component, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>e_theta_im</code></b> [2]<br> 
+   Imaginary part of e-theta field component, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>e_phi_re</code></b> [3]<br> 
+   Real part of e-phi field component, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>e_phi_im</code></b> [4]<br> 
+   Imaginary part of e-phi field component, Size: <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_grid</code></b> [5]<br> 
+   Azimuth angles in [rad] -pi to pi, sorted, Size: <code>[n_azimuth]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation_grid</code></b> [6]<br> 
+   Elevation angles in [rad], -pi/2 to pi/2, sorted, Size: <code>[n_elevation]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> [7] (optional)<br> 
+   Element index, 1-based. If not provided or empty, the directivity is calculated for all elements in the 
    array antenna. <br>Size: <code>[n_out]</code> or empty<br> 
 </li></ul>
 </li>
@@ -226,9 +262,20 @@ radiation patterns.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c] = quadriga_lib.arrayant_combine_pattern( ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos,
-    coupling_re, coupling_im, center_freq);
+% Minimal example (input/output = struct)
+arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in);
+
+% Optional inputs: freq, azimuth_grid, elevation_grid
+arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid, elevation_grid);
+
+% Separate outputs, struct input
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern(arrayant_in);
+
+% Separate inputs
+arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid, elevation_grid, ...
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, freq, name);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -238,51 +285,128 @@ is calculated using <code>arrayant_combine_pattern</code>.
  
 <pre>
 % Generate dipole pattern
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos] = ...
-    &lt;a href="#arrayant_generate"&gt;quadriga_lib.arrayant_generate&lt;/a&gt;('dipole');
+ant = quadriga_lib.arrayant_generate('dipole');
 
 % Duplicate 4 times
-e_theta_re  = repmat(e_theta_re, [1,1,4]);
-e_theta_im  = repmat(e_theta_im, [1,1,4]);
-e_phi_re    = repmat(e_phi_re, [1,1,4]);
-e_phi_im    = repmat(e_phi_im, [1,1,4]);
-element_pos = repmat(element_pos, [1,4]);
+ant.e_theta_re  = repmat(ant.e_theta_re, [1,1,4]);
+ant.e_theta_im  = repmat(ant.e_theta_im, [1,1,4]);
+ant.e_phi_re    = repmat(ant.e_phi_re, [1,1,4]);
+ant.e_phi_im    = repmat(ant.e_phi_im, [1,1,4]);
+ant.element_pos = repmat(ant.element_pos, [1,4]);
 
 % Set element positions and coupling matrix
-element_pos(2,:) = [ -0.75, -0.25, 0.25, 0.75];  % lambda, along y-axis
-coupling_re = [ 1 ; 1 ; 1 ; 1 ]/sqrt(4);
+ant.element_pos(2,:) = [ -0.75, -0.25, 0.25, 0.75];  % lambda, along y-axis
+ant.coupling_re = [ 1 ; 1 ; 1 ; 1 ]/sqrt(4);
+ant.coupling_im = [ 0 ; 0 ; 0 ; 0 ];
 
 % Calculate effective pattern
-[ e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c] = quadriga_lib.arrayant_combine_pattern( ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re);
+ant_c = quadriga_lib.arrayant_combine_pattern( ant );
 
 % Plot gain
-plot( azimuth_grid*180/pi, [ 10*log10( e_theta_re(91,:,1).^2 ); 10*log10( e_theta_re_c(91,:).^2 ) ]);
+plot( ant.azimuth_grid*180/pi, [ 10*log10( ant.e_theta_re(91,:,1).^2 ); 10*log10( ant_c.e_theta_re(91,:).^2 ) ]);
 axis([-180 180 -20 15]); ylabel('Gain (dBi)'); xlabel('Azimth angle (deg)'); legend('Dipole','Array')
-
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (inputs 1-10, single or double) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_in</code></b> [1]<br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
+</tr>
+</table><br>
+   If an empty array is passed, array antenna data is provided as separate inputs (Inputs 5-15)<br><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>freq</code></b> [2] (optional)<br> 
+   An alternative value for the center frequency. Overwrites the value given in <code>arrayant_in</code>. If 
+   neither <code>freq</code> not <code>arrayant_in["center_freq"]</code> are given, an error is thrown. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_grid</code></b> [3] (optional)<br> 
+   Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: <code>[n_azimuth_out]</code>, 
+   If not given, <code>arrayant_in.azimuth_grid</code> is used instead. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation_grid</code></b> [4] (optional)<br> 
+   Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: <code>[n_elevation_out]</code>, 
+   If not given, <code>arrayant_in.elevation_grid</code> is used instead. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
+   Struct containing the arrayant data with the following fields: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
@@ -297,51 +421,258 @@ axis([-180 180 -20 15]); ylabel('Gain (dBi)'); xlabel('Azimth angle (deg)'); leg
 </tr>
 <tr>
   <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code> or <code>[]</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Size: <code>[3, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], optional, default = 0.3 GHz</td>
+  <td>Center frequency in [Hz], default = 0.3 GHz</td>
   <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
+</tr>
+</table><br>
+   Can be returned as separate outputs. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_copy_element"></a>
+<b>arrayant_copy_element</b> - Create copies of array antenna elements
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+arrayant_out = quadriga_lib.arrayant_copy_element(arrayant_in, source_element, dest_element);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_in</code></b> [1] (required)<br> 
+   Struct containing the arrayant data with the following fields: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>source_element</code></b> [2] (required)<br> 
+   Index of the source elements (1-based), scalar or vector 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dest_element</code></b> [3] (optional)<br> 
+   Index of the destination elements (1-based), either as a vector or as a scalar. If <code>source_element</code> 
+   is also a vector, <code>dest_element</code> must have the same length. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
+   Struct containing the arrayant data with the following fields: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], default = 0.3 GHz</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
 </tr>
 </table><br>
 </li></ul>
 </li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_export_obj_file"></a>
+<b>arrayant_export_obj_file</b> - Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
+<ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>e_theta_re_c</code></b><br> 
-   Real part of the e-theta component (vertical component) of the effective array antenna.<br> 
-   Size: <code>[n_elevation, n_azimuth, n_ports]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>e_theta_im_c</code></b><br> 
-   Imaginary part of the e-theta component (vertical component) of the effective array antenna.<br> 
-   Size: <code>[n_elevation, n_azimuth, n_ports]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>e_phi_re_c</code></b><br> 
-   Real part of the e-phi component (horizontal component) of the effective array antenna.<br> 
-   Size: <code>[n_elevation, n_azimuth, n_ports]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>e_phi_im_c</code></b><br> 
-   Imaginary part of the e-phi component (horizontal component) of the effective array antenna.<br> 
-   Size: <code>[n_elevation, n_azimuth, n_ports]</code> 
-</li></ul>
+<b><i>Usage:</i></b><br><pre>
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap, ...
+                object_radius, icosphere_n_div, i_element );
+</pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br>The effective antenna has all elements at the phase center <code>[0,0,0]'</code> and has perfect isolation 
-between its elements. Hence, no outputs for the effective <code>element_pos</code> and <code>coupling</code> are needed.
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> [1]<br> 
+   Filename of the OBJ file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [2]<br> 
+   Struct containing the arrayant data with the following fields: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Size: <code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Size: <code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>directivity_range</code></b> [3]<br> 
+   Directivity range of the antenna pattern visualization in dB 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>colormap</code></b> [4]<br> 
+   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo', 
+   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', Optional, default = 'jet' 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>object_radius</code></b> [5]<br> 
+   Radius in meters of the exported object 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>icosphere_n_div</code></b> [6]<br> 
+   Map pattern to an Icosphere with given number of subdivisions 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> [7]<br> 
+   Antenna element indices, 1-based, empty = export all 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -355,75 +686,70 @@ arguments are then specific to this type.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-% Isotropic radiator, vertical polarization
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('omni', res);
-
-% Short dipole radiating with vertical polarization
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('dipole', res);
-
-% Half-wave dipole radiating with vertical polarization
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('half-wave-dipole', res);
-
-% Cross-polarized isotropic radiator
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = quadriga_lib.arrayant_generate('xpol', res);
+% Simple antenna models, output as struct
+ant = quadriga_lib.arrayant_generate('omni', res);               % Isotropic radiator, v-pol
+ant = quadriga_lib.arrayant_generate('dipole', res);             % Short dipole, v-pol
+ant = quadriga_lib.arrayant_generate('half-wave-dipole', res);   % Half-wave dipole, v-pol
+ant = quadriga_lib.arrayant_generate('xpol', res);               % Cross-polarized isotropic radiator
 
 % An antenna with a custom 3dB beam with (in degree)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('custom', az_3dB, el_3db, rear_gain_lin, res );
+ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3db, rear_gain_lin);
 
-% Antenna model for the 3GPP-NR channel model
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res );
+% Antenna model for the 3GPP-NR channel model with 3GPP default pattern
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
 
-% Antenna model for the 3GPP-NR channel model with a custom pattern
+% Antenna model for the 3GPP-NR channel model with a custom beam width
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3db, rear_gain_lin,
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+
+% Antenna model for the 3GPP-NR channel model with a custom antenna pattern
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
+
+% Optional for all types: output as separate variables, (must have exactly 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_frequency, name] = ...
-    quadriga_lib.arrayant_generate('3GPP', M, N, center_freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, res, ...
-    e_theta_re_c, e_theta_im_c, e_phi_re_c, e_phi_im_c, azimuth_grid_c, elevation_grid_c );
+    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_generate( ... );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Optional input argument for types 'omni', 'dipole', 'half-wave-dipole', and 'xpol':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b><br> 
-   Pattern resolution in [deg], scalar, Default = 1 deg 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>type</code></b> [1]<br> 
+   Antenna model type, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> [2]<br> 
+   Pattern resolution in [deg], scalar, default = 1 deg 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>freq</code></b> [3]<br> 
+   The center frequency in [Hz], scalar, default = 299792458 Hz 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input arguments for type 'custom':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b><br> 
-   3dB beam width in azimuth direction in [deg], scalar 
+<b><i>Input arguments for type 'custom' and '3GPP' (custom beam width):</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b> [4]<br> 
+   3dB beam width in azimuth direction in [deg], scalar, 
+   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>el_3db</code></b><br> 
-   3dB beam width in elevation direction in [deg], scalar 
+<ul><li style="margin-bottom: 0.4em;"><b><code>el_3db</code></b> [5]<br> 
+   3dB beam width in elevation direction in [deg], scalar, 
+   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b><br> 
-   Isotropic gain (linear scale) at the back of the antenna, scalar 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> (optional)<br> 
-   Pattern resolution in [deg], scalar, Default = 1 deg 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b> [6]<br> 
+   Isotropic gain (linear scale) at the back of the antenna, scalar, default = 0.0 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input arguments for type '3GPP':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
+<b><i>Input arguments for type '3GPP':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> [7]<br> 
    Number of vertically stacked elements, scalar, default = 1 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>N</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>N</code></b> [8]<br> 
    Number of horizontally stacked elements, scalar, default = 1 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
-   The center frequency in [Hz], scalar, default = 299792458 Hz 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>pol</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>pol</code></b> [9]<br> 
    Polarization indicator to be applied for each of the M elements:<br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -454,37 +780,32 @@ arguments are then specific to this type.
    Polarization indicator is ignored when a custom pattern is provided. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tilt</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tilt</code></b> [10]<br> 
    The electric downtilt angle in [deg], Only relevant for <code>pol = 4/5/6</code>, scalar, default = 0 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b> [11]<br> 
    Element spacing in [λ], scalar, default = 0.5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b> [12]<br> 
    Number of nested panels in a column, scalar, default = 1 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b> [13]<br> 
    Number of nested panels in a row, scalar, default = 1 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>dgv</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dgv</code></b> [14]<br> 
    Panel spacing in vertical direction in [λ], scalar, default = 0.5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>dgh</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dgh</code></b> [15]<br> 
    Panel spacing in horizontal direction in [λ], scalar, default = 0.5 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> (optional)<br> 
-   Pattern resolution in [deg], scalar, Default = 1 deg, Note: In case of a custom pattern, <code>res</code> is 
-   replaced by <code>e_theta_re_c</code> and the generated array antenna inherits the resolutions from the  
-   custom pattern data. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b>Antenna data for custom pattern data:</b> (inputs 11-16, double precision, optional) 
+<ul><li style="margin-bottom: 0.4em;"><b><code>pattern</code></b> [16]<br> 
+   Struct containing a custom pattern (default = empty) with at least the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re_c</code></td>
@@ -519,29 +840,31 @@ arguments are then specific to this type.
 </table><br>
 </li></ul>
  
-  If custom pattern data is not provided, the default 3GPP element pattern is used.
+  If custom pattern data is not provided, the pattern is generated internally (either with a custom 
+  beam width if <code>az_3dB</code> and <code>el_3db</code> are given or using the default 3GPP pattern).
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data of the generated array antenna:</b> (outputs 1-11, double precision) 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ant</code></b><br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
@@ -556,18 +879,18 @@ arguments are then specific to this type.
 </tr>
 <tr>
   <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code> or <code>[]</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Size: <code>[3, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -593,37 +916,43 @@ elevation angles.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+% Arrayant as struct
 [V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
-    quadriga_lib.arrayant_interpolate( e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, azimuth, elevation, i_element, orientation, element_pos )
+    quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, element, orientation, element_pos );
+
+% Arrayant as separate inputs
+[V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
+    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos,
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (inputs 1-6, single or double precision) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [1] (optional)<br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth]</code></td>
 </tr>
 <tr>
@@ -631,9 +960,16 @@ elevation angles.
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
   <td>Size: <code>[n_elevation]</code></td>
 </tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
 </table><br>
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b><br> 
+   If an empty array is passed, array antenna data is provided as separate inputs (Inputs 7-12)<br><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b> [2] (required)<br> 
    Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be 
    between -pi and pi, single or double precision. 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -654,8 +990,9 @@ elevation angles.
   <td>Size: <code>[n_out, n_ang]</code></td>
 </tr>
 </table><br>
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>elevation</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation</code></b> [3] (required)<br> 
    Elevation angles in [rad] for which the field pattern should be interpolated. Values must be 
    between -pi/2 and pi/2, single or double precision. 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -676,15 +1013,17 @@ elevation angles.
   <td>Size: <code>[n_out, n_ang]</code></td>
 </tr>
 </table><br>
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> [4] (optional)<br> 
    The element indices for which the interpolation should be done. Optional parameter. Values must 
    be between 1 and n_elements. It is possible to duplicate elements, i.e. by passing <code>[1,1,2]</code>. 
    If this parameter is not provided (or an empty array is passed), <code>i_element</code> is initialized 
    to <code>[1:n_elements]</code>. In this case, <code>n_out = n_elements</code>. Allowed types: uint32 or double.<br> 
    Size: <code>[1, n_out]</code> or <code>[n_out, 1]</code> or empty <code>[]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b> [5] (optional)<br> 
    This (optional) 3-element vector describes the orientation of the array antenna or of individual 
    array elements. The The first value describes the ”bank angle”, the second value describes the 
    ”tilt angle”, (positive values point upwards), the third value describes the bearing or ”heading 
@@ -693,15 +1032,14 @@ elevation angles.
    default, the orientation is <code>[0,0,0]</code>', i.e. the broadside of the antenna points at the horizon 
    towards the East. Single or double precision<br> 
    Size: <code>[3, 1]</code> or <code>[3, n_out]</code> or <code>[3, 1, n_ang]</code> or <code>[3, n_out, n_ang]</code> or empty <code>[]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>element_pos</code></b><br> 
-   Positions of the array antenna elements in local cartesian coordinates (using units of [m]). 
-   Optional parameter. If this parameter is not given, all elements are placed at the phase center 
-   of the array at coordinates <code>[0,0,0]'</code>. Otherwise, positions are given for the elements in the 
-   output of the interpolation function. For example, when duplicating the fist element by setting 
-   <code>i_element = [1,1]</code>, different element positions can be set for the two elements in the output. 
-   Single or double precision, <br>Size: <code>[3, n_out]</code> or empty <code>[]</code> 
-    
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element_pos</code></b> [6] (optional)<br> 
+   Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]). 
+   If this parameter is not given, element positions <code>arrayant</code> are used. If the <code>arrayant</code> has no 
+   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting 
+   <code>element = [1,1]</code>, different element positions can be set for the  two elements in the output. 
+   Size: <code>[3, n_out]</code> or empty <code>[]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -729,43 +1067,43 @@ elevation angles.
 </table><br>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>V_re</code></b><br> 
-   Real part of the interpolated e-theta (vertical) field component.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>V_im</code></b><br> 
-   Imaginary part of the interpolated e-theta (vertical) field component.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>H_re</code></b><br> 
-   Real part of the interpolated e-phi (horizontal) field component.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>H_im</code></b><br> 
-   Imaginary part of the interpolated e-phi (horizontal) field component.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>dist</code></b><br> 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>vr</code></b><br> 
+   Real part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vi</code></b><br> 
+   Imaginary part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>hr</code></b><br> 
+   Real part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>hi</code></b><br> 
+   Imaginary part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dist</code></b> (optional)<br> 
    The effective distances between the antenna elements when seen from the direction of the 
    incident path. The distance is calculated by an projection of the array positions on the normal 
-   plane of the incident path. This is needed for calculating the phase of the antenna response.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b><br> 
+   plane of the incident path. This is needed for calculating the phase of the antenna response. 
+   Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b> (optional)<br> 
    The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
-   azimuth angles. Optional output.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b><br> 
+   azimuth angles. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b> (optional)<br> 
    The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
-   elevation angles. Optional output.<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b><br> 
-   Polarization rotation angles in [rad]<br> 
-   Single or double precision (same as input), Size <code>[n_out, n_ang]</code> 
+   elevation angles. Size <code>[n_out, n_ang]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b> (optional)<br> 
+   Polarization rotation angles in [rad], Size <code>[n_out, n_ang]</code> 
 </li></ul>
 </li>
 </ul>
@@ -779,8 +1117,12 @@ data in XML. This function reads pattern data from the specified file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+% Read as struct
+[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
+
+% Read as separate fields
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re,
-   coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id, use_single );
+   coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -791,32 +1133,29 @@ data in XML. This function reads pattern data from the specified file.
 <ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> (optional)<br> 
    ID of the antenna to be read from the file, optional, Default: Read first 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>use_single</code></b> (optional)<br> 
-   Indicator if results should be returned in single precision, default = 0, returned in double precision 
-</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (outputs 1-11, single or double) 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ant</code></b><br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
@@ -831,18 +1170,18 @@ data in XML. This function reads pattern data from the specified file.
 </tr>
 <tr>
   <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code> or <code>[]</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Size: <code>[3, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -867,53 +1206,57 @@ data in XML. This function reads pattern data from the specified file.
 <b>arrayant_qdant_write</b> - Writes array antenna data to QDANT files
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern  
+<b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
 data in XML. This function writes pattern data to the specified file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name, id, layout);
+% Arrayant as struct
+id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout);
+
+% Arrayant as separate inputs
+id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re,
+    e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Inputs can be single or double precision, but type must match for all inputs 
-</li><li style="margin-bottom: 0.4em;">Multiple array antennas can be stored in the same file using the <code>id</code> parameter. 
-</li><li style="margin-bottom: 0.4em;">If writing to an exisiting file without specifying an <code>id</code>, the data gests appended at the end.   
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Multiple array antennas can be stored in the same file using the <code>id</code> parameter. 
+</li><li style="margin-bottom: 0.4em;">If writing to an exisiting file without specifying an <code>id</code>, the data gests appended at the end. 
    The output <code>id_in_file</code> identifies the location inside the file. 
 </li><li style="margin-bottom: 0.4em;">An optional storage <code>layout</code> can be provided to organize data inside the file. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> [1]<br> 
    Filename of the QDANT file, string 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (inputs 2-12, single or double) 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [2] (optional)<br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth]</code></td>
 </tr>
 <tr>
@@ -924,17 +1267,17 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, e_theta_re, e_theta_im, e_ph
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code> or <code>[]</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -943,17 +1286,18 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, e_theta_re, e_theta_im, e_ph
 </tr>
 <tr>
   <td><code>name</code></td>
-  <td>Name of the array antenna object</td>
+  <td>Name of the array antenna object, optional</td>
   <td>String</td>
 </tr>
 </table><br>
+   If an empty array is passed, array antenna data is provided as separate inputs (Inputs 5-15)<br><br> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> [3] (optional)<br> 
    ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>layout</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>layout</code></b> [4] (optional)<br> 
    Layout of multiple array antennas. Must only contain element ids that are present in the file. optional 
 </li></ul>
 </li>
@@ -978,37 +1322,47 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ e_theta_re_r, e_theta_im_r, e_phi_re_r, e_phi_im_r, azimuth_grid_r, elevation_grid_r, element_pos_r ] = ...
-    quadriga_lib.arrayant_rotate_pattern( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, ...
-    elevation_grid, element_pos, x_deg, y_deg, z_deg, usage )
+% Minimal example (input/output = struct)
+arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, bank, tilt, head, usage, element);
+
+% Separate outputs, struct input
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_rotate_pattern(arrayant_in, ...
+    bank, tilt, head, usage, element);
+
+% Separate inputs
+arrayant_out = quadriga_lib.arrayant_rotate_pattern([], bank, tilt, head, usage, element, ...
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, freq, name);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data:</b> (inputs 1-7, single or double) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_in</code></b> [1]<br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
-  <td>Real part of e-theta field component</td>
+  <td>e-theta field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
-  <td>Imaginary part of e-theta field component</td>
+  <td>e-theta field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
-  <td>Real part of e-phi field component</td>
+  <td>e-phi field component, real part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
-  <td>Imaginary part of e-phi field component</td>
+  <td>e-phi field component, imaginary part</td>
   <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth]</code></td>
 </tr>
 <tr>
@@ -1019,24 +1373,45 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
 </tr>
 </table><br>
+   If an empty array is passed, array antenna data is provided as separate inputs (Inputs 7-17)<br><br> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>x_deg</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>x_deg</code></b> [2] (optional)<br> 
    The rotation angle around x-axis (bank angle) in [degrees] 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>y_deg</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>y_deg</code></b> [3] (optional)<br> 
    The rotation angle around y-axis (tilt angle) in [degrees] 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>z_deg</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>z_deg</code></b> [4] (optional)<br> 
    The rotation angle around z-axis (heading angle) in [degrees] 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>usage</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>usage</code></b> [5] (optional)<br> 
    The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization. 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -1057,46 +1432,74 @@ computations. The 3 rotations are applies in the order: 1. rotation around the x
 </tr>
 </table><br>
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> [6] (optional)<br> 
+   The element indices for which the pattern should be transformed. Optional parameter. Values must 
+   be between 1 and n_elements. If this parameter is not provided (or an empty array is passed), 
+   all elements will be rotated by the same angles. Size: <code>[1, n_elements]</code> or empty <code>[]</code> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>Antenna data of the rotated antenna:</b> (outputs 1-7, single or double) 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
+   Struct containing the arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>e_theta_re_r</code></td>
-  <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_r, n_azimuth_r, n_elements]</code></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
-  <td><code>e_theta_im_r</code></td>
-  <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_r, n_azimuth_r, n_elements]</code></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_re_r</code></td>
-  <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_r, n_azimuth_r, n_elements]</code></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_im_r</code></td>
-  <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_r, n_azimuth_r, n_elements]</code></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
 </tr>
 <tr>
-  <td><code>azimuth_grid_r</code></td>
+  <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_r]</code></td>
+  <td>Size: <code>[n_azimuth]</code></td>
 </tr>
 <tr>
-  <td><code>elevation_grid_r</code></td>
+  <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation_r]</code></td>
+  <td>Size: <code>[n_elevation]</code></td>
 </tr>
 <tr>
-  <td><code>element_pos_r</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions</td>
   <td>Size: <code>[3, n_elements]</code></td>
 </tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Size: <code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], default = 0.3 GHz</td>
+  <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
+</tr>
 </table><br>
+   Can be returned as separate outputs. 
 </li></ul>
 </li>
 </ul>
@@ -1120,190 +1523,228 @@ execution of this process, several pieces of input data are required:<br><br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ coeff_re, coeff_im, delays, rx_Doppler ] = quadriga_lib.get_channels_planar( ...
-    e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, coupling_re_tx, coupling_im_tx, ...
-    e_theta_re_rx, e_theta_im_rx, e_phi_re_rx, e_phi_im_rx, azimuth_grid_rx, elevation_grid_rx, element_pos_rx, coupling_re_rx, coupling_im_rx, ...
-    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, center_freq, use_absolute_delays, add_fake_los_path );
+[ coeff_re, coeff_im, delays, rx_Doppler ] = quadriga_lib.get_channels_planar( ant_tx, ant_rx, ...
+    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
+    center_freq, use_absolute_delays, add_fake_los_path );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>TX Antenna data:</b> (inputs 1-9, single or double) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ant_tx</code></b> [1] (required)<br> 
+   Struct containing the transmit (TX) arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>e_theta_re_tx</code></td>
-  <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_theta_im_tx</code></td>
-  <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_re_tx</code></td>
-  <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_im_tx</code></td>
-  <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>azimuth_grid_tx</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth_tx]</code></td>
 </tr>
 <tr>
-  <td><code>elevation_grid_tx</code></td>
+  <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
   <td>Size: <code>[n_elevation_tx]</code></td>
 </tr>
 <tr>
-  <td><code>element_pos_tx</code></td>
+  <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_tx_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_re_tx</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_im_tx</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
 </tr>
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>RX Antenna data:</b> (inputs 10-18, single or double) 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ant_rx</code></b> [2] (required)<br> 
+   Struct containing the receive (RX) arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>e_theta_re_rx</code></td>
-  <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_theta_im_rx</code></td>
-  <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_re_rx</code></td>
-  <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_im_rx</code></td>
-  <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>azimuth_grid_rx</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth_rx]</code></td>
 </tr>
 <tr>
-  <td><code>elevation_grid_rx</code></td>
+  <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
   <td>Size: <code>[n_elevation_rx]</code></td>
 </tr>
 <tr>
-  <td><code>element_pos_rx</code></td>
+  <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_rx_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_re_rx</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_im_rx</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
 </tr>
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b><br> 
-   Departure azimuth angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b> [3] (required)<br> 
+   Departure azimuth angles in [rad], Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b><br> 
-   Departure elevation angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b> [4] (required)<br> 
+   Departure elevation angles in [rad], Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b><br> 
-   Arrival azimuth angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b> [5] (required)<br> 
+   Arrival azimuth angles in [rad], Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b><br> 
-   Arrival elevation angles in radians, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b> [6] (required)<br> 
+   Arrival elevation angles in [rad], Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b><br> 
-   Path gain (linear scale); Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b> [7] (required)<br> 
+   Path gain (linear scale), Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b><br> 
-   Total path length in meters; If <code>path_length</code> is shorter than the shortest possible path from TX to 
-   FBS to LBS to RX, it is replaced by the shortest path length. <br>Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b> [8] (required)<br> 
+   Total path length in meters, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
-   Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); 
+<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> [9] (required)<br> 
+   Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), 
    Size: <code>[ 8, n_path ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b> [10] (required)<br> 
    Transmitter position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b><br> 
-   3-element vector describing the orientation of the transmit antenna. The The first value describes 
-   the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards), 
-   the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given 
-   in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south 
-   is -pi/2, and west is equal to pi. Single or double precision, Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b> [11] (required)<br> 
+   3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading), 
+   Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b><br> 
-   Receiver position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b> [12] (required)<br> 
+   Receiver position in 3D Cartesian coordinates, Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b><br> 
-   3-element vector describing the orientation of the receive antenna. Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b> [13 (required)]<br> 
+   3-element vector describing the orientation of the receive antenna in Euler angles, 
+   Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> [14] (optional)<br> 
    Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation 
    in coefficients is disabled, i.e. that path length has not influence on the results. This can be 
    used to calculate the antenna response for a specific angle and polarization. Scalar value 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>use_absolute_delays</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>use_absolute_delays</code></b> [15] (optional)<br> 
    If true, the LOS delay is included for all paths; Default is <code>false</code>, i.e. delays are normalized 
    to the LOS delay. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>add_fake_los_path</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>add_fake_los_path</code></b> [16] (optional)<br> 
    If true, adds a zero-power LOS path as the first path in case where no LOS path was present. 
    Default: <code>false</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
+<b><i>Derived inputs:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>n_azimuth_tx</code></td>
+  <td>Number of azimuth angles in the TX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elevation_tx</code></td>
+  <td>Number of elevation angles in the TX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elements_tx</code></td>
+  <td>Number of physical antenna elements in the TX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_ports_tx</code></td>
+  <td>Number of ports (after coupling) in the TX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_azimuth_rx</code></td>
+  <td>Number of azimuth angles in the RX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elevation_rx</code></td>
+  <td>Number of elevation angles in the RX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elements_rx</code></td>
+  <td>Number of physical antenna elements in the RX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_ports_rx</code></td>
+  <td>Number of ports (after coupling) in the RX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_path</code></td>
+  <td>Number of propagation paths</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b><br> 
-   Channel coefficients, real part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Channel coefficients, real part, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b><br> 
-   Channel coefficients, imaginary part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Channel coefficients, imaginary part, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delays</code></b><br> 
-   Propagation delay in seconds, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Propagation delay in seconds, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_Doppler</code></b><br> 
@@ -1311,11 +1752,12 @@ execution of this process, several pieces of input data are required:<br><br>
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Antenna patterns, <code>aod</code>, <code>eod</code>, <code>aoa</code>, <code>eoa</code>, <code>path_gain</code>, <code>path_length</code>, and <code>M</code> can be provided in 
-   single or double precision, but types must match. Outputs are returned in the same type. 
-</li><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance 
-   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
-   computation. 
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying if it is provided in 
+   <b>double</b> precision. 
+</li><li style="margin-bottom: 0.4em;">Other formats (e.g. single precision inputs) will be converted to double automatically, causing 
+   additional computation steps. 
+</li><li style="margin-bottom: 0.4em;">To improve performance of repeated computations (e.g. in loops), consider preparing the data 
+   accordingly to avoid unecessary computations. 
 </li></ul>
 </li>
 </ul>
@@ -1339,207 +1781,246 @@ execution of this process, several pieces of input data are required:<br><br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( ...
-    e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, coupling_re_tx, coupling_im_tx, ...
-    e_theta_re_rx, e_theta_im_rx, e_phi_re_rx, e_phi_im_rx, azimuth_grid_rx, elevation_grid_rx, element_pos_rx, coupling_re_rx, coupling_im_rx, ...
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, center_freq, use_absolute_delays, add_fake_los_path );
+[ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, ...
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
+    center_freq, use_absolute_delays, add_fake_los_path );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b>TX Antenna data:</b> (inputs 1-9, single or double) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ant_tx</code></b> [1] (required)<br> 
+   Struct containing the transmit (TX) arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>e_theta_re_tx</code></td>
-  <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_theta_im_tx</code></td>
-  <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_re_tx</code></td>
-  <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_im_tx</code></td>
-  <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_tx_elements]</code></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>azimuth_grid_tx</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth_tx]</code></td>
 </tr>
 <tr>
-  <td><code>elevation_grid_tx</code></td>
+  <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
   <td>Size: <code>[n_elevation_tx]</code></td>
 </tr>
 <tr>
-  <td><code>element_pos_tx</code></td>
+  <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_tx_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements_tx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_re_tx</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_im_tx</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_tx_elements, n_tx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
 </tr>
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>RX Antenna data:</b> (inputs 10-18, single or double) 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ant_rx</code></b> [2] (required)<br> 
+   Struct containing the receive (RX) arrayant data with the following fields: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>e_theta_re_rx</code></td>
-  <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_theta_im_rx</code></td>
-  <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_re_rx</code></td>
-  <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>e_phi_im_rx</code></td>
-  <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_rx_elements]</code></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>azimuth_grid_rx</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
   <td>Size: <code>[n_azimuth_rx]</code></td>
 </tr>
 <tr>
-  <td><code>elevation_grid_rx</code></td>
+  <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
   <td>Size: <code>[n_elevation_rx]</code></td>
 </tr>
 <tr>
-  <td><code>element_pos_rx</code></td>
+  <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_rx_elements]</code> or <code>[]</code></td>
+  <td>Size: <code>[3, n_elements_rx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_re_rx</code></td>
-  <td>Real part of coupling matrix, optional</td>
-  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
 </tr>
 <tr>
-  <td><code>coupling_im_rx</code></td>
-  <td>Imaginary part of coupling matrix, optional</td>
-  <td>Size: <code>[n_rx_elements, n_rx_ports]</code> or <code>[]</code></td>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
 </tr>
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>fbs_pos</code></b><br> 
-   First interaction point of the rays and the environment; Size: <code>[ 3, n_path ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fbs_pos</code></b> [3] (required)<br> 
+   First interaction point of the rays and the environment, Size: <code>[ 3, n_path ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>lbs_pos</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>lbs_pos</code></b> [4] (required)<br> 
    Last interaction point of the rays and the environment; For single-bounce models, this must be 
-   identical to <code>fbs_pos</code>. Size: <code>[ 3, n_path ]</code> 
+   identical to <code>fbs_pos</code>, Size: <code>[ 3, n_path ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b><br> 
-   Path gain (linear scale); Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b> [5] (required)<br> 
+   Path gain (linear scale), Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b> [6] (required)<br> 
    Total path length in meters; If <code>path_length</code> is shorter than the shortest possible path from TX to 
-   FBS to LBS to RX, it is replaced by the shortest path length. <br>Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
+   FBS to LBS to RX, it is replaced by the shortest path length, Size: <code>[ 1, n_path ]</code> or <code>[ n_path, 1 ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
-   Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); 
+<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> [7] (required)<br> 
+   Polarization transfer matrix; interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), 
    Size: <code>[ 8, n_path ]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
-   Transmitter position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b> [8] (required)<br> 
+   Transmitter position in 3D Cartesian coordinates, Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b><br> 
-   3-element vector describing the orientation of the transmit antenna. The The first value describes 
-   the ”bank angle”, the second value describes the  ”tilt angle”, (positive values point upwards), 
-   the third value describes the bearing or ”heading angle”, in mathematic sense. Values must be given 
-   in [rad]. East corresponds to 0, and the angles increase counter-clockwise, so north is pi/2, south 
-   is -pi/2, and west is equal to pi. Single or double precision, Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b> [9] (required)<br> 
+   3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading), 
+   Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b><br> 
-   Receiver position in 3D Cartesian coordinates; Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b> [10] (required)<br> 
+   Receiver position in 3D Cartesian coordinates, Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b><br> 
-   3-element vector describing the orientation of the receive antenna. Size: <code>[3,1]</code> or <code>[1,3]</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b> [11] (required)<br> 
+   3-element vector describing the orientation of the receive antenna, Size: <code>[3,1]</code> or <code>[1,3]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> [12] (optional)<br> 
    Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation 
    in coefficients is disabled, i.e. that path length has not influence on the results. This can be 
    used to calculate the antenna response for a specific angle and polarization. Scalar value 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>use_absolute_delays</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>use_absolute_delays</code></b> [13] (optional)<br> 
    If true, the LOS delay is included for all paths; Default is <code>false</code>, i.e. delays are normalized 
    to the LOS delay. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>add_fake_los_path</code></b> (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>add_fake_los_path</code></b> [14] (optional)<br> 
    If true, adds a zero-power LOS path as the first path in case where no LOS path was present. 
    Default: <code>false</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
+<b><i>Derived inputs:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>n_azimuth_tx</code></td>
+  <td>Number of azimuth angles in the TX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elevation_tx</code></td>
+  <td>Number of elevation angles in the TX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elements_tx</code></td>
+  <td>Number of physical antenna elements in the TX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_ports_tx</code></td>
+  <td>Number of ports (after coupling) in the TX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_azimuth_rx</code></td>
+  <td>Number of azimuth angles in the RX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elevation_rx</code></td>
+  <td>Number of elevation angles in the RX antenna pattern</td>
+</tr>
+<tr>
+  <td><code>n_elements_rx</code></td>
+  <td>Number of physical antenna elements in the RX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_ports_rx</code></td>
+  <td>Number of ports (after coupling) in the RX array antenna</td>
+</tr>
+<tr>
+  <td><code>n_path</code></td>
+  <td>Number of propagation paths</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b><br> 
-   Channel coefficients, real part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Channel coefficients, real part, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b><br> 
-   Channel coefficients, imaginary part, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Channel coefficients, imaginary part, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delays</code></b><br> 
-   Propagation delay in seconds, Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Propagation delay in seconds, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b> (optional)<br> 
-   Azimuth of Departure angles in [rad], Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Azimuth of Departure angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b> (optional)<br> 
-   Elevation of Departure angles in [rad], Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Elevation of Departure angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b> (optional)<br> 
-   Azimuth of Arrival angles in [rad], Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Azimuth of Arrival angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b> (optional)<br> 
-   Elevation of Arrival angles in [rad], Size: <code>[ n_rx_ports, n_tx_ports, n_path ]</code> 
+   Elevation of Arrival angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Antenna patterns, <code>fbs_pos</code>, <code>lbs_pos</code>, <code>path_gain</code>, <code>path_length</code>, and <code>M</code> can be provided in 
-   single or double precision, but types must match. Outputs are returned in the same type. 
-</li><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying. To improve performance 
-   of repeated computations (e.g. in loops), consider preparing the data accordingly to avoid unecessary 
-   computation. 
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Input data is directly accessed from MATLAB / Octave memory, without copying if it is provided in 
+   <b>double</b> precision. 
+</li><li style="margin-bottom: 0.4em;">Other formats (e.g. single precision inputs) will be converted to double automatically, causing 
+   additional computation steps. 
+</li><li style="margin-bottom: 0.4em;">To improve performance of repeated computations (e.g. in loops), consider preparing the data 
+   accordingly to avoid unecessary computations. 
 </li></ul>
 </li>
 </ul>
