@@ -34,7 +34,7 @@ class test_version(unittest.TestCase):
         assert out["center_freq"] == 3.0e9
 
         el_grid = np.linspace(-np.pi/2, np.pi/2, 37)
-        out = quadriga_lib.arrayant_combine_pattern(ant, elevation_grid=el_grid, fast_access=1)
+        out = quadriga_lib.arrayant_combine_pattern(ant, elevation_grid=el_grid)
         npt.assert_almost_equal(out["e_theta_re"][::2,:,0], 3*ant["e_theta_re"][:,:,0], decimal=14)
         assert out["name"] == "buy_bitcoin"
 

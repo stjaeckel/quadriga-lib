@@ -1,4 +1,4 @@
-function test_qdant_write
+function test_arrayant_qdant_write
 
 %% Simple test
 if exist( 'testm.qdant','file' )
@@ -17,7 +17,7 @@ coupling_im     = 0.1;
 center_freq     = 2e9;
 name            = 'name';
 
-id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
     azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 
 assert( id_file == 1 );
@@ -51,20 +51,20 @@ fprintf(f,'%s\n',['<EthetaMag>',num2str(1:15),'</EthetaMag>']);
 fprintf(f,'%s\n','</arrayant></qdant>');
 fclose(f);
 
-azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
-elevation_grid  = [-0.9,0,0.9] * pi/2;
-e_theta_re      = reshape(1:12,3,[])/2;
-e_theta_im      = -reshape(1:12,3,[])*0.002;
-e_phi_re        = -reshape(1:12,3,[]);
-e_phi_im        = -reshape(1:12,3,[])*0.001;
-element_pos     = [1;2;4];
-coupling_re     = 1;
-coupling_im     = 0.1;
-center_freq     = 2e9;
-name            = 'name';
+ant = struct;
+ant.azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
+ant.elevation_grid  = [-0.9,0,0.9] * pi/2;
+ant.e_theta_re      = reshape(1:12,3,[])/2;
+ant.e_theta_im      = -reshape(1:12,3,[])*0.002;
+ant.e_phi_re        = -reshape(1:12,3,[]);
+ant.e_phi_im        = -reshape(1:12,3,[])*0.001;
+ant.element_pos     = [1;2;4];
+ant.coupling_re     = 1;
+ant.coupling_im     = 0.1;
+ant.center_freq     = 2e9;
+ant.name            = 'name';
 
-id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
+id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', ant );
 
 assertEqual( id_file, uint32(2) );
 
@@ -75,8 +75,7 @@ assertEqual(layout, uint32([1,2]));
 [~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.arrayant_qdant_read('testm.qdant',2);
 assertTrue( strcmp(nameI,'name') );
 
-id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name, 112);
+id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 112);
 
 assertEqual( id_file, uint32(112) );
 
@@ -84,8 +83,7 @@ layout = uint32([1,2,112 ; 112, 112, 6]);
 
 % Try setting a layout that contains an ID that is not in the file
 try
-    id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name, 5, layout);
+    id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 5, layout);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Layout contains reference to non-existing array antenna!';
@@ -94,8 +92,7 @@ catch ME
     end
 end
 
-quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-    azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name, 6, layout);
+quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 6, layout);
 
 % Check if the layout can be restored
 [~,~,~,~,~,~,~,~,~,~, ~, layoutI] = quadriga_lib.arrayant_qdant_read('testm.qdant');
@@ -103,23 +100,36 @@ assertEqual(layout,layoutI);
 
 % Test error: multiple outputs
 try
-    [~, ~] = quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name, 999);
+    [~, ~] = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 999);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Cannot have more than 1 output.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 % Test error: too few inputs
+ant = struct;
+ant.azimuth_grid    = [-1.5,0,1.5,2] * pi/2;
+ant.elevation_grid  = [-0.9,0,0.9] * pi/2;
+ant.e_theta_re      = reshape(1:12,3,[])/2;
+ant.e_theta_im      = -reshape(1:12,3,[])*0.002;
 try
-    quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
-        azimuth_grid);
+    quadriga_lib.arrayant_qdant_write('testm.qdant', ant);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Need at least 7 inputs.';
+    expectedErrorMessage = 'Field ''e_phi_re'' not found!';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+try
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -127,7 +137,7 @@ end
 
 % Test error: elevation_grid mismatch
 try
-    quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
         azimuth_grid, elevation_grid(1:end-1));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -139,7 +149,7 @@ end
 
 % Test error: azimuth_grid mismatch
 try
-    quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
         azimuth_grid(1:end-1), elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -151,7 +161,7 @@ end
 
 % Test error: pattern mismatch
 try
-    quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
         azimuth_grid, elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -161,16 +171,6 @@ catch ME
     end
 end
 
-% Test error: type mismatch
-try
-    quadriga_lib.arrayant_qdant_write('testm.qdant', e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, ...
-        azimuth_grid, elevation_grid);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'All floating-point inputs must have the same type: ''single'' or ''double'' precision.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
+quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
 
 delete('testm.qdant');

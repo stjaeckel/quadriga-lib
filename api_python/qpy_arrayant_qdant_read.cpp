@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -62,25 +61,10 @@ MD!*/
 
 py::dict arrayant_qdant_read(const std::string fn, unsigned id)
 {
-    // Read data from file
     arma::Mat<unsigned> layout;
-    const auto arrayant = quadriga_lib::qdant_read<double>(fn, id, &layout);
+    auto arrayant = quadriga_lib::qdant_read<double>(fn, id, &layout);
 
-    // Initialize output
-    py::dict output;
-
-    output["e_theta_re"] = qd_python_copy2numpy(arrayant.e_theta_re);
-    output["e_theta_im"] = qd_python_copy2numpy(arrayant.e_theta_im);
-    output["e_phi_re"] = qd_python_copy2numpy(arrayant.e_phi_re);
-    output["e_phi_im"] = qd_python_copy2numpy(arrayant.e_phi_im);
-    output["azimuth_grid"] = qd_python_copy2numpy(arrayant.azimuth_grid);
-    output["elevation_grid"] = qd_python_copy2numpy(arrayant.elevation_grid);
-    output["element_pos"] = qd_python_copy2numpy(arrayant.element_pos);
-    output["coupling_re"] = qd_python_copy2numpy(arrayant.coupling_re);
-    output["coupling_im"] = qd_python_copy2numpy(arrayant.coupling_im);
-    output["center_freq"] = arrayant.center_frequency;
-    output["name"] = arrayant.name;
+    auto output = qd_python_arrayant2dict(arrayant);
     output["layout"] = qd_python_copy2numpy(layout);
-
     return output;
 }

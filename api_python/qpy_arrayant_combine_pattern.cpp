@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -41,14 +40,14 @@ radiation patterns.
 ## Usage:
 ```
 # Minimal example
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in)
+arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant)
 
 # Optional inputs: freq, azimuth_grid, elevation_grid
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid, elevation_grid)
+arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
 ```
 
 ## Input Arguments:
-- **`arrayant_in`**<br>
+- **`arrayant`**<br>
   Dictionary containing the arrayant data with the following keys:
   `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
   `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
@@ -63,15 +62,15 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_
   `name`           | Name of the array antenna object, optional            | String
 
 - **`freq`** (optional)<br>
-  An alternative value for the center frequency. Overwrites the value given in `arrayant_in`. If 
-  neither `freq` not `arrayant_in["center_freq"]` are given, an error is thrown.alignas
+  An alternative value for the center frequency. Overwrites the value given in `arrayant_in`. If
+  neither `freq` not `arrayant_in["center_freq"]` are given, an error is thrown.
 
 - **`azimuth_grid`** (optional)<br>
-  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: `[n_azimuth_out]`, 
+  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: `[n_azimuth_out]`,
   If not given, `arrayant_in["azimuth_grid"]` is used instead.
 
 - **`elevation_grid`** (optional)<br>
-  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation_out]`, 
+  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation_out]`,
   If not given, `arrayant_in["elevation_grid"]` is used instead.
 
 ## Output Arguments:
@@ -92,51 +91,19 @@ MD!*/
 
 py::dict arrayant_combine_pattern(const py::dict &arrayant,                  // Input data
                                   double freq,                               // The center frequency in [Hz]
-                                  const py::array_t<double> &azimuth_grid,   // Optional new azimuth_grid
-                                  const py::array_t<double> &elevation_grid, // Optional new elevation_grid
-                                  bool fast_access)                          // Enforces fast memory access
+                                  const py::array_t<double> &azimuth_grid,   // Optional alternative azimuth_grid
+                                  const py::array_t<double> &elevation_grid) // Optional alternative elevation_grid)
 {
-    // Assemble array antenna object
-    auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], true, fast_access);
-    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], true, fast_access);
-    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], true, fast_access);
-    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], true, fast_access);
-    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], true, fast_access);
-    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], true, fast_access);
-    ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], true, fast_access);
-    ant.coupling_re = qd_python_numpy2arma_Cube<double>(arrayant["coupling_re"], true);
-    ant.coupling_im = qd_python_numpy2arma_Cube<double>(arrayant["coupling_im"], true);
+    auto ant = qd_python_dict2arrayant(arrayant, true);
 
     if (freq > 0.0)
         ant.center_frequency = freq;
-    else if (arrayant.contains("center_freq"))
-        ant.center_frequency = arrayant["center_freq"].cast<double>();
-    else
-        throw std::invalid_argument("Center frequency is missing.");
 
-    if (arrayant.contains("name"))
-        ant.name = arrayant["name"].cast<std::string>();
-
-    // Parse grid
     const auto az = qd_python_numpy2arma_Col(azimuth_grid, true);
     const auto el = qd_python_numpy2arma_Col(elevation_grid, true);
 
-    // Call member function
     auto arrayant_out = ant.combine_pattern(&az, &el);
+    arrayant_out.center_frequency = freq;
 
-    // Return to python
-    py::dict output;
-    output["e_theta_re"] = qd_python_copy2numpy(arrayant_out.e_theta_re);
-    output["e_theta_im"] = qd_python_copy2numpy(arrayant_out.e_theta_im);
-    output["e_phi_re"] = qd_python_copy2numpy(arrayant_out.e_phi_re);
-    output["e_phi_im"] = qd_python_copy2numpy(arrayant_out.e_phi_im);
-    output["azimuth_grid"] = qd_python_copy2numpy(arrayant_out.azimuth_grid);
-    output["elevation_grid"] = qd_python_copy2numpy(arrayant_out.elevation_grid);
-    output["element_pos"] = qd_python_copy2numpy(arrayant_out.element_pos);
-    output["coupling_re"] = qd_python_copy2numpy(arrayant_out.coupling_re);
-    output["coupling_im"] = qd_python_copy2numpy(arrayant_out.coupling_im);
-    output["center_freq"] = freq;
-    output["name"] = arrayant_out.name;
-    return output;
+    return qd_python_arrayant2dict(arrayant_out);
 }

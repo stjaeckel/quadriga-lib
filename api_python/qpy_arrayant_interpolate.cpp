@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -91,7 +90,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = quadriga_lib.arrayant_interpolate(arrayant
   Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]).
   If this parameter is not given, element positions `arrayant` are used. If the `arrayant` has no
   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting 
-  `i_element = [1,1]`, different element positions can be set for the  two elements in the output.
+  `element = [1,1]`, different element positions can be set for the  two elements in the output.
   Size: `[3, n_out]` or empty `[]`
 
 - **`complex`** (optional flag)<br>
@@ -164,19 +163,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,                // Array
                                bool local_angles,                       // Switch to calculate the antenna-local angles (az, el, gamma)
                                bool fast_access)                        // Enforces fast memory access
 {
-    // Assemble array antenna object
-    auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], true, fast_access);
-    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], true, fast_access);
-    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], true, fast_access);
-    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], true, fast_access);
-    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], true, fast_access);
-    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], true, fast_access);
-
-    if (arrayant.contains("element_pos"))
-        ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], true, fast_access);
-
-    // Parse other inputs
+    const auto ant = qd_python_dict2arrayant(arrayant, true, fast_access);
     const auto az = qd_python_numpy2arma_Mat(azimuth, true);
     const auto el = qd_python_numpy2arma_Mat(elevation, true);
     const arma::uvec element_ind = qd_python_numpy2arma_Col(element, true);

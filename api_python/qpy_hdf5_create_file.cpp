@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
+#include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION

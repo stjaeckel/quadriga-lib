@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,8 +34,12 @@ data in XML. This function reads pattern data from the specified file.
 ## Usage:
 
 ```
+% Read as struct
+[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
+
+% Read as separate fields
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re,
-   coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id, use_single );
+   coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
 ```
 
 ## Input Arguments:
@@ -45,20 +49,18 @@ data in XML. This function reads pattern data from the specified file.
 - **`id`** (optional)<br>
   ID of the antenna to be read from the file, optional, Default: Read first
 
-- **`use_single`** (optional)<br>
-  Indicator if results should be returned in single precision, default = 0, returned in double precision
-
 ## Output Arguments:
-- **Antenna data:** (outputs 1-11, single or double)
-  `e_theta_re`     | Real part of e-theta field component                  | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | Imaginary part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | Real part of e-phi field component                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | Imaginary part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
+- **`ant`**<br>
+  Struct containing the arrayant data with the following fields:
+  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
   `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
   `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]` or `[]`
-  `coupling_re`    | Real part of coupling matrix, optional                | Size: `[n_elements, n_ports]` or `[]`
-  `coupling_im`    | Imaginary part of coupling matrix, optional           | Size: `[n_elements, n_ports]` or `[]`
+  `element_pos`    | Antenna element (x,y,z) positions                     | Size: `[3, n_elements]`
+  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
+  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
   `name`           | Name of the array antenna object                      | String
 
@@ -68,94 +70,59 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the QDANT file
-    //  1 - id              ID of the antenna to be read from the file (optional, default: 1)
-    //  2 - use_single      Indicator if results should be returned in single precision (optional, default: 0, double)
+    if (nrhs < 1 || nrhs > 2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    // Outputs:
-    //  0 - e_theta_re      Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
-    //  1 - e_theta_im      Vertical component of the electric field, imaginary part,       Size [n_elevation, n_azimuth, n_elements]
-    //  2 - e_phi_re        Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_elements]
-    //  3 - e_phi_im        Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_elements]
-    //  4 - azimuth_grid    Azimuth angles in pattern (theta) in [rad], sorted,             Vector of length "n_azimuth"
-    //  5 - elevation_grid  Elevation angles in pattern (phi) in [rad], sorted,             Vector of length "n_elevation"
-    //  6 - element_pos     Element positions                                               Size [3, n_elements]
-    //  7 - coupling_re     Coupling matrix, real part                                      Size [n_elements, n_ports]
-    //  8 - coupling_im     Coupling matrix, imaginary part                                 Size [n_elements, n_ports]
-    //  9 - center_frequency   Center frequency in [Hz]                                     Scalar
-    // 10 - name            Name of the array antenna object, string
-    // 11 - layout          Layout of multiple array antennas (optional), uint32            Matrix
-
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Filename not given.");
-
-    if (nlhs > 12)
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_read:no_input", "Too many output arguments.");
+    if (nlhs == 0)
+        return;
 
     std::string fn = qd_mex_get_string(prhs[0]);
-    unsigned id = nrhs < 2 ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id");
-    bool use_single = nrhs < 3 ? false : qd_mex_get_scalar<bool>(prhs[2], "use_single");
+    unsigned id = (nrhs < 2) ? 1 : qd_mex_get_scalar<unsigned>(prhs[1], "id");
 
-    quadriga_lib::arrayant<float> arrayant_single;
-    quadriga_lib::arrayant<double> arrayant_double;
+    // Read data from file
+    quadriga_lib::arrayant<double> arrayant;
     arma::Mat<unsigned> layout;
+    CALL_QD(arrayant = quadriga_lib::qdant_read<double>(fn, id, &layout));
 
-    if (use_single)
-        CALL_QD(arrayant_single = quadriga_lib::qdant_read<float>(fn, id, &layout));
-    else
-        CALL_QD(arrayant_double = quadriga_lib::qdant_read<double>(fn, id, &layout));
-
-    if (use_single)
+    if (nlhs == 1 || nlhs == 2) // Output as struct
     {
-        if (nlhs > 0)
-            plhs[0] = qd_mex_copy2matlab(&arrayant_single.e_theta_re);
-        if (nlhs > 1)
-            plhs[1] = qd_mex_copy2matlab(&arrayant_single.e_theta_im);
-        if (nlhs > 2)
-            plhs[2] = qd_mex_copy2matlab(&arrayant_single.e_phi_re);
-        if (nlhs > 3)
-            plhs[3] = qd_mex_copy2matlab(&arrayant_single.e_phi_im);
-        if (nlhs > 4)
-            plhs[4] = qd_mex_copy2matlab(&arrayant_single.azimuth_grid, true);
-        if (nlhs > 5)
-            plhs[5] = qd_mex_copy2matlab(&arrayant_single.elevation_grid, true);
-        if (nlhs > 6)
-            plhs[6] = qd_mex_copy2matlab(&arrayant_single.element_pos);
-        if (nlhs > 7)
-            plhs[7] = qd_mex_copy2matlab(&arrayant_single.coupling_re);
-        if (nlhs > 8)
-            plhs[8] = qd_mex_copy2matlab(&arrayant_single.coupling_im);
-        if (nlhs > 9)
-            plhs[9] = qd_mex_copy2matlab(&arrayant_single.center_frequency);
+        std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
+                                           "azimuth_grid", "elevation_grid", "element_pos",
+                                           "coupling_re", "coupling_im", "center_freq", "name"};
+
+        plhs[0] = qd_mex_make_struct(fields);
+        qd_mex_set_field(plhs[0], fields[0], qd_mex_copy2matlab(&arrayant.e_theta_re));
+        qd_mex_set_field(plhs[0], fields[1], qd_mex_copy2matlab(&arrayant.e_theta_im));
+        qd_mex_set_field(plhs[0], fields[2], qd_mex_copy2matlab(&arrayant.e_phi_re));
+        qd_mex_set_field(plhs[0], fields[3], qd_mex_copy2matlab(&arrayant.e_phi_im));
+        qd_mex_set_field(plhs[0], fields[4], qd_mex_copy2matlab(&arrayant.azimuth_grid, true));
+        qd_mex_set_field(plhs[0], fields[5], qd_mex_copy2matlab(&arrayant.elevation_grid, true));
+        qd_mex_set_field(plhs[0], fields[6], qd_mex_copy2matlab(&arrayant.element_pos));
+        qd_mex_set_field(plhs[0], fields[7], qd_mex_copy2matlab(&arrayant.coupling_re));
+        qd_mex_set_field(plhs[0], fields[8], qd_mex_copy2matlab(&arrayant.coupling_im));
+        qd_mex_set_field(plhs[0], fields[9], qd_mex_copy2matlab(&arrayant.center_frequency));
+        qd_mex_set_field(plhs[0], fields[10], mxCreateString(arrayant.name.c_str()));
+
+        if (nlhs == 2)
+            plhs[1] = qd_mex_copy2matlab(&layout);
+    }
+    else if (nlhs == 11 || nlhs == 12) // Separate outputs
+    {
+        plhs[0] = qd_mex_copy2matlab(&arrayant.e_theta_re);
+        plhs[1] = qd_mex_copy2matlab(&arrayant.e_theta_im);
+        plhs[2] = qd_mex_copy2matlab(&arrayant.e_phi_re);
+        plhs[3] = qd_mex_copy2matlab(&arrayant.e_phi_im);
+        plhs[4] = qd_mex_copy2matlab(&arrayant.azimuth_grid, true);
+        plhs[5] = qd_mex_copy2matlab(&arrayant.elevation_grid, true);
+        plhs[6] = qd_mex_copy2matlab(&arrayant.element_pos);
+        plhs[7] = qd_mex_copy2matlab(&arrayant.coupling_re);
+        plhs[8] = qd_mex_copy2matlab(&arrayant.coupling_im);
+        plhs[9] = qd_mex_copy2matlab(&arrayant.center_frequency);
+        plhs[10] = mxCreateString(arrayant.name.c_str());
+
+        if (nlhs == 12)
+            plhs[11] = qd_mex_copy2matlab(&layout);
     }
     else
-    {
-        if (nlhs > 0)
-            plhs[0] = qd_mex_copy2matlab(&arrayant_double.e_theta_re);
-        if (nlhs > 1)
-            plhs[1] = qd_mex_copy2matlab(&arrayant_double.e_theta_im);
-        if (nlhs > 2)
-            plhs[2] = qd_mex_copy2matlab(&arrayant_double.e_phi_re);
-        if (nlhs > 3)
-            plhs[3] = qd_mex_copy2matlab(&arrayant_double.e_phi_im);
-        if (nlhs > 4)
-            plhs[4] = qd_mex_copy2matlab(&arrayant_double.azimuth_grid, true);
-        if (nlhs > 5)
-            plhs[5] = qd_mex_copy2matlab(&arrayant_double.elevation_grid, true);
-        if (nlhs > 6)
-            plhs[6] = qd_mex_copy2matlab(&arrayant_double.element_pos);
-        if (nlhs > 7)
-            plhs[7] = qd_mex_copy2matlab(&arrayant_double.coupling_re);
-        if (nlhs > 8)
-            plhs[8] = qd_mex_copy2matlab(&arrayant_double.coupling_im);
-        if (nlhs > 9)
-            plhs[9] = qd_mex_copy2matlab(&arrayant_double.center_frequency);
-    }
-
-    if (nlhs > 10)
-        plhs[10] = use_single ? mxCreateString(arrayant_single.name.c_str()) : mxCreateString(arrayant_double.name.c_str());
-
-    if (nlhs == 12)
-        plhs[11] = qd_mex_copy2matlab(&layout);
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 }

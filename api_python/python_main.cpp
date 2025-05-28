@@ -23,14 +23,19 @@ namespace py = pybind11;
 // Include parts
 #include "qpy_arrayant_calc_directivity.cpp"
 #include "qpy_arrayant_combine_pattern.cpp"
+#include "qpy_arrayant_copy_element.cpp"
 #include "qpy_arrayant_export_obj_file.cpp"
 #include "qpy_arrayant_generate.cpp"
 #include "qpy_arrayant_interpolate.cpp"
 #include "qpy_arrayant_qdant_read.cpp"
+#include "qpy_arrayant_qdant_write.cpp"
+#include "qpy_arrayant_rotate_pattern.cpp"
 #include "qpy_baseband_freq_response.cpp"
 #include "qpy_cart2geo.cpp"
 #include "qpy_channel_export_obj_file.cpp"
 #include "qpy_components.cpp"
+#include "qpy_get_channels_planar.cpp"
+#include "qpy_get_channels_spherical.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_hdf5_create_file.cpp"
 #include "qpy_hdf5_read_channel.cpp"
@@ -40,7 +45,6 @@ namespace py = pybind11;
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
 #include "qpy_version.cpp"
-
 
 PYBIND11_MODULE(quadriga_lib, m)
 {
@@ -52,8 +56,12 @@ PYBIND11_MODULE(quadriga_lib, m)
           py::arg("arrayant") = py::dict(),
           py::arg("freq") = 0.0,
           py::arg("azimuth_grid") = py::array_t<double>(),
-          py::arg("elevation_grid") = py::array_t<double>(),
-          py::arg("fast_access") = false);
+          py::arg("elevation_grid") = py::array_t<double>());
+
+    m.def("arrayant_copy_element", &arrayant_copy_element,
+          py::arg("arrayant") = py::dict(),
+          py::arg("source_element") = py::array_t<arma::uword>(),
+          py::arg("dest_element") = py::array_t<arma::uword>());
 
     m.def("arrayant_export_obj_file", &arrayant_export_obj_file,
           py::arg("fn"),
@@ -67,12 +75,12 @@ PYBIND11_MODULE(quadriga_lib, m)
     m.def("arrayant_generate", &arrayant_generate,
           py::arg("type"),
           py::arg("res") = 1.0,
+          py::arg("freq") = 299792458.0,
           py::arg("az_3dB") = 0.0,
           py::arg("el_3dB") = 0.0,
           py::arg("rear_gain_lin") = 0.0,
           py::arg("M") = 1,
           py::arg("N") = 1,
-          py::arg("freq") = 299792458.0,
           py::arg("pol") = 1,
           py::arg("tilt") = 0.0,
           py::arg("spacing") = 0.5,
@@ -95,6 +103,20 @@ PYBIND11_MODULE(quadriga_lib, m)
           py::arg("fast_access") = false);
 
     m.def("arrayant_qdant_read", &arrayant_qdant_read, py::arg("fn"), py::arg("id") = 1);
+
+    m.def("arrayant_qdant_write", &arrayant_qdant_write,
+          py::arg("fn"),
+          py::arg("arrayant") = py::dict(),
+          py::arg("id") = 1,
+          py::arg("layout") = py::array_t<unsigned>());
+
+    m.def("arrayant_rotate_pattern", &arrayant_rotate_pattern,
+          py::arg("arrayant") = py::dict(),
+          py::arg("x_deg") = 0.0,
+          py::arg("y_deg") = 0.0,
+          py::arg("z_deg") = 0.0,
+          py::arg("usage") = 0,
+          py::arg("element") = py::array_t<unsigned>());
 
     m.def("baseband_freq_response", &baseband_freq_response,
           py::arg("coeff") = py::list(),
@@ -124,6 +146,41 @@ PYBIND11_MODULE(quadriga_lib, m)
           py::arg("i_snap") = py::array_t<arma::uword>());
 
     m.def("components", &components);
+
+    m.def("get_channels_planar", &get_channels_planar,
+          py::arg("ant_tx") = py::dict(),
+          py::arg("ant_rx") = py::dict(),
+          py::arg("aod") = py::array_t<double>(),
+          py::arg("eod") = py::array_t<double>(),
+          py::arg("aoa") = py::array_t<double>(),
+          py::arg("eoa") = py::array_t<double>(),
+          py::arg("path_gain") = py::array_t<double>(),
+          py::arg("path_length") = py::array_t<double>(),
+          py::arg("M") = py::array_t<double>(),
+          py::arg("tx_pos") = py::array_t<double>(),
+          py::arg("tx_orientation") = py::array_t<double>(),
+          py::arg("rx_pos") = py::array_t<double>(),
+          py::arg("rx_orientation") = py::array_t<double>(),
+          py::arg("center_freq") = 0.0,
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false);
+
+    m.def("get_channels_spherical", &get_channels_spherical,
+          py::arg("ant_tx") = py::dict(),
+          py::arg("ant_rx") = py::dict(),
+          py::arg("fbs_pos") = py::array_t<double>(),
+          py::arg("lbs_pos") = py::array_t<double>(),
+          py::arg("path_gain") = py::array_t<double>(),
+          py::arg("path_length") = py::array_t<double>(),
+          py::arg("M") = py::array_t<double>(),
+          py::arg("tx_pos") = py::array_t<double>(),
+          py::arg("tx_orientation") = py::array_t<double>(),
+          py::arg("rx_pos") = py::array_t<double>(),
+          py::arg("rx_orientation") = py::array_t<double>(),
+          py::arg("center_freq") = 0.0,
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("angles") = false);
 
     m.def("icosphere", &icosphere, py::arg("n_div") = 1,
           py::arg("radius") = 1.0, py::arg("direction_xyz") = false);

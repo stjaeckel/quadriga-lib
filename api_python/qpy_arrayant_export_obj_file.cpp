@@ -15,8 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_python_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -61,7 +60,7 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 - **`icosphere_n_div`**<br>
   Map pattern to an Icosphere with given number of subdivisions
 
-- **`i_element`**<br>
+- **`element`**<br>
   Antenna element indices, 0-based, empty = export all
 MD!*/
 
@@ -73,19 +72,8 @@ void arrayant_export_obj_file(const std::string fn,
                               unsigned icosphere_n_div,
                               const py::array_t<arma::uword> element)
 {
-    auto ant = quadriga_lib::arrayant<double>();
-
-    ant.e_theta_re = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_re"], true);
-    ant.e_theta_im = qd_python_numpy2arma_Cube<double>(arrayant["e_theta_im"], true);
-    ant.e_phi_re = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_re"], true);
-    ant.e_phi_im = qd_python_numpy2arma_Cube<double>(arrayant["e_phi_im"], true);
-    ant.azimuth_grid = qd_python_numpy2arma_Col<double>(arrayant["azimuth_grid"], true);
-    ant.elevation_grid = qd_python_numpy2arma_Col<double>(arrayant["elevation_grid"], true);
-    ant.element_pos = qd_python_numpy2arma_Mat<double>(arrayant["element_pos"], true);
-
-    if (arrayant.contains("name"))
-        ant.name = arrayant["name"].cast<std::string>();
-
+    const auto ant = qd_python_dict2arrayant(arrayant, true);
     arma::uvec i_element_a = qd_python_numpy2arma_Col(element);
+
     ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, i_element_a);
 }
