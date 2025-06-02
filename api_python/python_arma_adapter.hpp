@@ -36,14 +36,19 @@ Cheat sheet:
 auto pyarray = qd_python_copy2numpy(Col, transpose, i_elem);        // Copy column vector
 auto pyarray = qd_python_copy2numpy(Mat, i_col);                    // Copy matrix
 auto pyarray = qd_python_copy2numpy(Cube, i_slice);                 // Copy cube
+
 auto pyarray = qd_python_copy2numpy(MatRe, MatIm, i_col);           // Copy Re/Im matrices to complex
 auto pyarray = qd_python_copy2numpy(CubeRe, CubeIm, i_slice);       // Copy Re/Im cubes to complex
+
+auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Col);        // Cast column vector from u32 to int
+auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Mat);        // Cast matrix from u32 to int
 
 - Copy std::vector of Armadillo types to py::list of Numpy arrays
 
 auto pylist = qd_python_copy2numpy(vecCol/Mat/Cube, i_vec);         // Copy vector of Col, Mat or Cubes
 auto pylist = qd_python_copy2numpy(vecMatRe, vecMatIm, i_vec);      // Copy vector of Re/Im matrices to list of complex
 auto pylist = qd_python_copy2numpy(vecCubeRe, vecCubeIm, i_vec);    // Copy vector of Re/Im cubes to list of complex
+auto pylist = qd_python_copy2python(vecStrings, i_vec);             // Copy vector of strings
 
 - Reserve memory in Python and map to Armadillo (Arma can write directly to Python, no copy needed)
 
@@ -128,6 +133,38 @@ py::array_t<dtype> qd_python_copy2numpy(const arma::Col<dtype> &input,  // Colum
     return output;
 }
 
+template <typename dtype_arma, typename dtype_numpy>
+py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtype_arma> &input, // Column Vector
+                                              bool transpose = false,             // Transpose output
+                                              const arma::uvec &indices = {})     // Optional indices to copy
+{
+    const ssize_t n_bytes = sizeof(dtype_numpy);
+    const ssize_t n_elements = indices.empty() ? (ssize_t)input.n_elem : (ssize_t)indices.n_elem;
+
+    std::vector<ssize_t> shape, strides;
+    if (transpose)
+        shape = {1, n_elements}, strides = {n_elements * n_bytes, n_bytes};
+    else
+        shape = {n_elements}, strides = {n_bytes};
+
+    py::array_t<dtype_numpy> output(shape, strides);
+    dtype_numpy *p_out = output.mutable_data();
+    const dtype_arma *p_in = input.memptr();
+
+    if (indices.empty())
+        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+            p_out[i_el] = (dtype_numpy)p_in[i_el];
+    else
+        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+        {
+            if (indices[i_el] >= input.n_elem)
+                throw std::out_of_range("Index out of bound.");
+            p_out[i_el] = (dtype_numpy)p_in[indices[i_el]];
+        }
+
+    return output;
+}
+
 template <typename dtype>
 py::array_t<dtype> qd_python_copy2numpy(const arma::Mat<dtype> &input,  // Matrix
                                         const arma::uvec &indices = {}) // Optional columns to copy
@@ -148,6 +185,35 @@ py::array_t<dtype> qd_python_copy2numpy(const arma::Mat<dtype> &input,  // Matri
             if (indices[i_col] >= input.n_cols)
                 throw std::out_of_range("Index out of bound.");
             std::memcpy(&p_out[i_col * n_rows], input.colptr(indices[i_col]), n_rows * n_bytes);
+        }
+
+    return output;
+}
+
+template <typename dtype_arma, typename dtype_numpy>
+py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Mat<dtype_arma> &input, // Matrix
+                                              const arma::uvec &indices = {})     // Optional columns to copy
+{
+    const ssize_t n_bytes = sizeof(dtype_numpy);
+    const ssize_t n_rows = (ssize_t)input.n_rows;
+    const ssize_t n_cols = indices.empty() ? (ssize_t)input.n_cols : (ssize_t)indices.n_elem;
+    const ssize_t n_elements = n_rows * n_cols;
+
+    std::vector<ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
+    py::array_t<dtype_numpy> output(shape, strides);
+    dtype_numpy *p_out = output.mutable_data();
+    const dtype_arma *p_in = input.memptr();
+
+    if (indices.empty())
+        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+            p_out[i_el] = (dtype_numpy)p_in[i_el];
+    else
+        for (ssize_t i_col = 0; i_col < n_cols; ++i_col)
+        {
+            if (indices[i_col] >= input.n_cols)
+                throw std::out_of_range("Index out of bound.");
+            for (ssize_t i_row = 0; i_row < n_rows; ++i_row)
+                p_out[i_col * n_rows + i_row] = (dtype_numpy)p_in[indices[i_col] * n_rows + i_row];
         }
 
     return output;
@@ -293,6 +359,23 @@ py::list qd_python_copy2numpy(const std::vector<dtype> &real, // Vector of Real 
             if (ind >= real.size())
                 throw std::out_of_range("Index out of bound.");
             output.append(qd_python_copy2numpy(real.at(ind), imag.at(ind)));
+        }
+    return output;
+}
+
+py::list qd_python_copy2python(const std::vector<std::string> &input, // Vector of strings
+                               const arma::uvec &indices = {})        // Optional elements to copy
+{
+    py::list output;
+    if (indices.empty())
+        for (const auto &element : input)
+            output.append(element);
+    else
+        for (auto ind : indices)
+        {
+            if (ind >= input.size())
+                throw std::out_of_range("Index out of bound.");
+            output.append(input.at(ind));
         }
     return output;
 }

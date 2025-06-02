@@ -719,6 +719,18 @@ inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,               // Cu
     return output;
 }
 
+inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
+{
+    size_t n_obj = strings->size();
+    auto *cellArray = mxCreateCellMatrix((mwSize)n_obj, 1);
+    for (size_t i = 0; i < n_obj; ++i)
+    {
+        auto *mxStr = mxCreateString(strings->at(i).c_str());
+        mxSetCell(cellArray, i, mxStr);
+    }
+    return cellArray;
+}
+
 // Creates an mxArray based on a vector of armadillo input types
 // - adds one additional dimension, e.g. arma::Cube --> MATLAB 4D
 // - optional input: reading order of vector elements

@@ -29,25 +29,23 @@ Reads a triangulated 3D polygon mesh from a Wavefront OBJ file
 
 ## Description:
 The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data
-format, exclusively representing 3D geometry. It details the position of each vertex and defines
-polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order,
-eliminating the need for explicit declaration of face normals. When exporting the mesh from software
-like Blender, it's essential to triangulate the mesh and include material definitions. If the
-material name exists in the material database, the function loads the corresponding properties.
+format, representing 3D geometry. It details the position of each vertex and defines polygons as lists
+of these vertices. By default, vertices are arranged in a counter-clockwise order, eliminating the
+need for explicit declaration of face normals. When exporting the mesh from software like Blender,
+it's essential to triangulate the mesh and include material definitions. If the material name
+exists in the material database, the function loads the corresponding properties.
 Otherwise, it defaults to using standard properties.
 
 ## Usage:
+
 ```
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
-    quadriga_lib.obj_file_read( fn, use_single );
+    quadriga_lib.obj_file_read( fn );
 ```
 
 ## Input Arguments:
 - **`fn`**<br>
   Filename of the OBJ file, string
-
-- **`use_single`** (optional)<br>
-  Indicator if results should be returned in single precision, default = 0, returned in double precision
 
 ## Output Arguments:
 - **`mesh`**<br>
@@ -56,7 +54,7 @@ Otherwise, it defaults to using standard properties.
   Size: `[ no_mesh, 9 ]`
 
 - **`mtl_prop`**<br>
-  Material properties of each mesh element; If no material is defined for an object, the properties 
+  Material properties of each mesh element; If no material is defined for an object, the properties
   for vacuum are used. Size: `[ no_mesh, 5 ]`
 
 - **`vert_list`**<br>
@@ -64,17 +62,17 @@ Otherwise, it defaults to using standard properties.
 
 - **`face_ind`**<br>
   Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
-  of the previously defined `vert_list` (1-based indexing). <br>
+  of the previously defined `vert_list` (1-based). <br>
   uint32; Size: `[ no_mesh, 3 ]`
 
 - **`obj_id`**<br>
   Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
-  cube). Each object is identified by a unique ID (1-based index). <br>
+  cube). Each object is identified by a unique ID (1-based). <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
 - **`mtl_id`**<br>
   Each mesh element gets assigned a material and each unique material gets assigned an ID. Different
-  faces of an object can have different materials. If no material is defined in the OBJ file, the 
+  faces of an object can have different materials. If no material is defined in the OBJ file, the
   id is set to `0` and no entry is made in `mtl_names`. <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
@@ -141,121 +139,38 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the OBJ file (including path); string
-    //  1 - use_single      Switch for single precision, default = 0 (double precision)
-
-    // Output:
-    //  0 - mesh            Vertices of the triangular mesh, Size [ no_mesh, 9 ]
-    //  1 - mtl_prop        Material properties of each mesh element; Size [ no_mesh, 5 ]
-    //  2 - vert_list       List of vertices found in the OBJ file; Size [ no_vert, 3 ]
-    //  3 - face_ind        Face indices (=entries in vert_list); uint32; 1-based; Size [ no_mesh, 3 ]
-    //  4 - obj_id          Object index; uint32; Size [ no_mesh, 1 ]
-    //  5 - mtl_id          Material index; uint32; Size [ no_mesh, 1 ]
-    //  6 - obj_names       Names of the objects in the OBJ file; Cell array of strings
-    //  7 - mtl_names       Names of the materials in the OBJ file; Cell array of strings
-
-    // Notes:
-    // Material values are:
-    //     * Real part of relative permittivity at f = 1 GHz (a)
-    //     * Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b
-    //     * Conductivity at f = 1 GHz (c)
-    //     * Frequency dependence of conductivity (d) such that σ = c· f^d
-    //     * Fixed attenuation in dB
-
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:io_error", "Filename is missing.");
-
-    if (nrhs > 2)
-        mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:io_error", "Too many input arguments.");
+    if (nrhs != 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 8)
-        mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:io_error", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:qdant_write:IO_error", "Input 'fn' must be a string.");
+    std::string fn = qd_mex_get_string(prhs[0]);
 
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
-
-    // Read "use_single"
-    bool use_single = nrhs < 2 ? false : qd_mex_get_scalar<bool>(prhs[1], "use_single", false);
-
-    // Declare Armadillo variables
-    arma::Mat<double> mesh_double, mtl_prop_double, vert_list_double;
-    arma::Mat<float> mesh_single, mtl_prop_single, vert_list_single;
-    arma::Mat<unsigned> face_ind;
-    arma::Col<unsigned> obj_ind, mtl_ind;
+    arma::mat mesh, mtl_prop, vert_list;
+    arma::u32_mat face_ind;
+    arma::u32_vec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    // Read data from file
-    try
-    {
-        if (use_single)
-            quadriga_lib::obj_file_read<float>(fn, &mesh_single, &mtl_prop_single, &vert_list_single, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
-        else
-            quadriga_lib::obj_file_read<double>(fn, &mesh_double, &mtl_prop_double, &vert_list_double, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:obj_file_read:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names));
 
-    // Convert 0-based indexing to 1-based indexing
-    face_ind = face_ind + 1;
-
-    // Write to MATLAB / Octave
-    if (nlhs > 0 && use_single)
-        plhs[0] = qd_mex_copy2matlab(&mesh_single);
-    else if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&mesh_double);
-
-    if (nlhs > 1 && use_single)
-        plhs[1] = qd_mex_copy2matlab(&mtl_prop_single);
-    else if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&mtl_prop_double);
-
-    if (nlhs > 2 && use_single)
-        plhs[2] = qd_mex_copy2matlab(&vert_list_single);
-    else if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&vert_list_double);
-
+    if (nlhs > 0)
+        plhs[0] = qd_mex_copy2matlab(&mesh);
+    if (nlhs > 1)
+        plhs[1] = qd_mex_copy2matlab(&mtl_prop);
+    if (nlhs > 2)
+        plhs[2] = qd_mex_copy2matlab(&vert_list);
     if (nlhs > 3)
+    {
+        face_ind += 1;
         plhs[3] = qd_mex_copy2matlab(&face_ind);
-
+    }
     if (nlhs > 4)
         plhs[4] = qd_mex_copy2matlab(&obj_ind);
-
     if (nlhs > 5)
         plhs[5] = qd_mex_copy2matlab(&mtl_ind);
-
     if (nlhs > 6)
-    {
-        size_t n_obj = obj_names.size();
-        auto *cellArray = mxCreateCellMatrix((mwSize)n_obj, 1);
-        for (size_t i = 0; i < n_obj; ++i)
-        {
-            auto *mxStr = mxCreateString(obj_names[i].c_str());
-            mxSetCell(cellArray, i, mxStr);
-        }
-        plhs[6] = cellArray;
-    }
-
+        plhs[6] = qd_mex_copy2matlab(&obj_names);
     if (nlhs > 7)
-    {
-        size_t n_mtl = mtl_names.size();
-        auto *cellArray = mxCreateCellMatrix((mwSize)n_mtl, 1);
-        for (size_t i = 0; i < n_mtl; ++i)
-        {
-            auto *mxStr = mxCreateString(mtl_names[i].c_str());
-            mxSetCell(cellArray, i, mxStr);
-        }
-        plhs[7] = cellArray;
-    }
+        plhs[7] = qd_mex_copy2matlab(&mtl_names);
 }

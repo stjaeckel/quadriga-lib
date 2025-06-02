@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.7.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.7.2</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -3034,26 +3034,22 @@ The approximate equilateral triangles have roughly the same edge length and surf
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data 
-format, exclusively representing 3D geometry. It details the position of each vertex and defines 
-polygons as lists of these vertices. By default, vertices are arranged in a counter-clockwise order, 
-eliminating the need for explicit declaration of face normals. When exporting the mesh from software 
-like Blender, it's essential to triangulate the mesh and include material definitions. If the 
-material name exists in the material database, the function loads the corresponding properties. 
+format, representing 3D geometry. It details the position of each vertex and defines polygons as lists 
+of these vertices. By default, vertices are arranged in a counter-clockwise order, eliminating the 
+need for explicit declaration of face normals. When exporting the mesh from software like Blender, 
+it's essential to triangulate the mesh and include material definitions. If the material name 
+exists in the material database, the function loads the corresponding properties. 
 Otherwise, it defaults to using standard properties.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
-    quadriga_lib.obj_file_read( fn, use_single );
+    quadriga_lib.obj_file_read( fn );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
    Filename of the OBJ file, string 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>use_single</code></b> (optional)<br> 
-   Indicator if results should be returned in single precision, default = 0, returned in double precision 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3064,7 +3060,7 @@ Otherwise, it defaults to using standard properties.
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop</code></b><br> 
-   Material properties of each mesh element; If no material is defined for an object, the properties  
+   Material properties of each mesh element; If no material is defined for an object, the properties 
    for vacuum are used. Size: <code>[ no_mesh, 5 ]</code> 
 </li></ul>
  
@@ -3074,19 +3070,19 @@ Otherwise, it defaults to using standard properties.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>face_ind</code></b><br> 
    Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements 
-   of the previously defined <code>vert_list</code> (1-based indexing). <br> 
+   of the previously defined <code>vert_list</code> (1-based). <br> 
    uint32; Size: <code>[ no_mesh, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>obj_id</code></b><br> 
    Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a 
-   cube). Each object is identified by a unique ID (1-based index). <br> 
+   cube). Each object is identified by a unique ID (1-based). <br> 
    uint32; Size: <code>[ no_mesh, 1 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_id</code></b><br> 
    Each mesh element gets assigned a material and each unique material gets assigned an ID. Different 
-   faces of an object can have different materials. If no material is defined in the OBJ file, the  
+   faces of an object can have different materials. If no material is defined in the OBJ file, the 
    id is set to <code>0</code> and no entry is made in <code>mtl_names</code>. <br> 
    uint32; Size: <code>[ no_mesh, 1 ]</code> 
 </li></ul>
