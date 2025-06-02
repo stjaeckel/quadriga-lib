@@ -194,8 +194,13 @@ mex_docu:   $(api_mex:api_mex/%.cpp=+quadriga_lib/%.m)
 	rm -f $@
 	python3 tools/extract_matlab_comments.py $< $@
 
-documentation:   dirs   mex_docu
+documentation:   dirs   mex_docu   build/quadriga-lib-version
 	mkdir -p +quadriga_lib
+
+	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib"
+	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
+	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
+
 	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
 	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part api_mex/ 
 	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
