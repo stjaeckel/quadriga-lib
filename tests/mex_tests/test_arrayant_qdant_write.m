@@ -68,12 +68,23 @@ id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', ant );
 
 assertEqual( id_file, uint32(2) );
 
-[~,~,~,~,~,~,~,~,~,~, nameI, layout] = quadriga_lib.arrayant_qdant_read('testm.qdant');
-assertTrue( strcmp(nameI,'bla') );
+[A,B,C,D,E,F,G,H,I,J, nameI, layout] = quadriga_lib.arrayant_qdant_read('testm.qdant',2);
+
+assertElementsAlmostEqual( A, ant.e_theta_re, 'absolute', 1e-4 );
+assertElementsAlmostEqual( B, ant.e_theta_im, 'absolute', 1e-4 );
+assertElementsAlmostEqual( C, ant.e_phi_re, 'absolute', 1e-4 );
+assertElementsAlmostEqual( D, ant.e_phi_im, 'absolute', 1e-4 );
+assertElementsAlmostEqual( E, ant.azimuth_grid, 'absolute', 1e-6 );
+assertElementsAlmostEqual( F, ant.elevation_grid, 'absolute', 1e-6 );
+assertElementsAlmostEqual( G, ant.element_pos, 'absolute', 1e-4 );
+assertElementsAlmostEqual( H, ant.coupling_re, 'absolute', 1e-4 );
+assertElementsAlmostEqual( I, ant.coupling_im, 'absolute', 1e-4 );
+assertElementsAlmostEqual( J, ant.center_freq, 'absolute', 1e-4 );
+assertTrue( strcmp(nameI,ant.name) );
 assertEqual(layout, uint32([1,2]));
 
-[~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.arrayant_qdant_read('testm.qdant',2);
-assertTrue( strcmp(nameI,'name') );
+[~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.arrayant_qdant_read('testm.qdant');
+assertTrue( strcmp(nameI,'bla') );
 
 id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 112);
 
