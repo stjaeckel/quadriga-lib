@@ -146,6 +146,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Write to file
     CALL_QD(id = ant.qdant_write(fn, id, layout));
 
-    if (nlhs > 0)
+    if (nlhs == 1)
         plhs[0] = qd_mex_copy2matlab(&id);
 }

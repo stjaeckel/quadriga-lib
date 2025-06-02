@@ -70,6 +70,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+        
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Parse inputs
     std::string fn = qd_mex_get_string(prhs[0]);
@@ -97,6 +100,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CALL_QD(ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, element_ind));
 
     double out = 1.0;
-    if (nlhs > 0)
+    if (nlhs == 1)
         plhs[0] = qd_mex_copy2matlab(&out);
 }

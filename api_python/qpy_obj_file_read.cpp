@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "mex.h"
-#include "quadriga_tools.hpp"
-#include "mex_helper_functions.hpp"
+#include "python_arma_adapter.hpp"
+#include "quadriga_lib.hpp"
 
 /*!SECTION
 Site-Specific Simulation Tools
@@ -39,8 +38,11 @@ Otherwise, it defaults to using standard properties.
 ## Usage:
 
 ```
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
-    quadriga_lib.obj_file_read( fn );
+# Return as separate variables
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn );
+
+# Return as tuple with 8 elements
+data = quadriga_lib.obj_file_read( fn );
 ```
 
 ## Input Arguments:
@@ -48,39 +50,39 @@ Otherwise, it defaults to using standard properties.
   Filename of the OBJ file, string
 
 ## Output Arguments:
-- **`mesh`**<br>
+- **`mesh`**, `data[0]`<br>
   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br>
   Size: `[ no_mesh, 9 ]`
 
-- **`mtl_prop`**<br>
+- **`mtl_prop`**, `data[1]`<br>
   Material properties of each mesh element; If no material is defined for an object, the properties
   for vacuum are used. Size: `[ no_mesh, 5 ]`
 
-- **`vert_list`**<br>
+- **`vert_list`**, `data[2]`<br>
   List of vertices found in the OBJ file; Size: `[ no_vert, 3 ]`
 
-- **`face_ind`**<br>
+- **`face_ind`**, `data[3]`<br>
   Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
   of the previously defined `vert_list` (1-based). <br>
   uint32; Size: `[ no_mesh, 3 ]`
 
-- **`obj_id`**<br>
+- **`obj_id`**, `data[4]`<br>
   Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
   cube). Each object is identified by a unique ID (1-based). <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
-- **`mtl_id`**<br>
+- **`mtl_id`**, `data[5]`<br>
   Each mesh element gets assigned a material and each unique material gets assigned an ID. Different
   faces of an object can have different materials. If no material is defined in the OBJ file, the
   id is set to `0` and no entry is made in `mtl_names`. <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
-- **`obj_names`**<br>
-  Names of the objects in the OBJ file; Cell array of strings
+- **`obj_names`**, `data[6]`<br>
+  Names of the objects in the OBJ file; List of strings
 
-- **`mtl_names`**<br>
-  Names of the materials in the OBJ file; Cell array of strings
+- **`mtl_names`**, `data[7]`<br>
+  Names of the materials in the OBJ file; List of strings
 
 ## Material properties:
 Each material is defined by its electrical properties. Radio waves that interact with a building will
@@ -134,43 +136,25 @@ itu_medium_dry_ground |      15.0 |      -0.1 |     0.035 |      1.63 |       0.
 itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.0 |        10 |
 itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
 irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
-
 MD!*/
 
-void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
+py::tuple obj_file_read(const std::string &fn)
 {
-    if (nrhs != 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-
-    if (nlhs > 8)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-
-    std::string fn = qd_mex_get_string(prhs[0]);
-
     arma::mat mesh, mtl_prop, vert_list;
     arma::u32_mat face_ind;
     arma::u32_vec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names));
+    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
 
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&mesh);
-    if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&mtl_prop);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&vert_list);
-    if (nlhs > 3)
-    {
-        face_ind += 1;
-        plhs[3] = qd_mex_copy2matlab(&face_ind);
-    }
-    if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab(&obj_ind);
-    if (nlhs > 5)
-        plhs[5] = qd_mex_copy2matlab(&mtl_ind);
-    if (nlhs > 6)
-        plhs[6] = qd_mex_copy2matlab(&obj_names);
-    if (nlhs > 7)
-        plhs[7] = qd_mex_copy2matlab(&mtl_names);
+    auto mesh_p = qd_python_copy2numpy(mesh);
+    auto mtl_prop_p = qd_python_copy2numpy(mtl_prop);
+    auto vert_list_p = qd_python_copy2numpy(vert_list);
+    auto face_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(face_ind);
+    auto obj_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(obj_ind);
+    auto mtl_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(mtl_ind);
+    auto obj_names_p = qd_python_copy2python(obj_names);
+    auto mtl_names_p = qd_python_copy2python(mtl_names);
+
+    return py::make_tuple(mesh_p, mtl_prop_p, vert_list_p, face_ind_p, obj_ind_p, mtl_ind_p, obj_names_p, mtl_names_p);
 }

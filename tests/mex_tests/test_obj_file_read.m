@@ -98,14 +98,14 @@ fprintf(f,'%s\n','f 6/5 8/8 7/6');
 fclose(f);
 
 % Read all
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn,1);
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn);
 
 assertEqual( size(obj_names), [2,1] );
 assertEqual( size(mtl_names), [1,1] );
 
-assertTrue( isa(mesh, "single") );
-assertTrue( isa(mtl_prop, "single") );
-assertTrue( isa(vert_list, "single") );
+assertTrue( isa(mesh, "double") );
+assertTrue( isa(mtl_prop, "double") );
+assertTrue( isa(vert_list, "double") );
 
 assertTrue( all( mtl_prop([1,2],1) == 1 ) );
 assertTrue( all( mtl_prop([3,4],1) > 1.5 ) );
@@ -135,8 +135,7 @@ fprintf(f,'%s\n','usemtl Cst::2.1:2.2:2.3:2.4:20');
 fprintf(f,'%s\n','f 2/1/1 4/4/1 3/2/1');
 fclose(f);
 
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn,0);
-assertTrue( isa(mesh, "double") );
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn);
 
 assertElementsAlmostEqual( mtl_prop(1,:), [1.1, 1.2, 1.3, 1.4, 10], 'absolute', 1e-14 );
 assertElementsAlmostEqual( mtl_prop(2,:), [2.1, 2.2, 2.3, 2.4, 20], 'absolute', 1e-14 );
@@ -147,10 +146,10 @@ assertEqual( mtl_ind, uint32([1;2]) );
 
 % Too many inputs
 try
-    quadriga_lib.obj_file_read(fn,0,1);
+    quadriga_lib.obj_file_read(fn,0);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many input arguments.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -158,10 +157,10 @@ end
 
 % Too many outputs
 try
-    [~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn,0);
+    [~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -172,7 +171,7 @@ try
     quadriga_lib.obj_file_read;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Filename is missing.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

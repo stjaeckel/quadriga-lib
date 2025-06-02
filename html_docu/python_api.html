@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.2</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -137,6 +137,7 @@ import quadriga_lib
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
+<tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2720,6 +2721,357 @@ center, length, vert, direction = quadriga_lib.icosphere( no_div, radius, direct
    <code>direction_xyz</code> is set to <code>1</code>, the output is in Cartesian coordinates and the values are in the 
    order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Size: <code>[ no_face, 9 ]</code> 
 </li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="obj_file_read"></a>
+<b>obj_file_read</b> - Reads a triangulated 3D polygon mesh from a Wavefront OBJ file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data 
+format, representing 3D geometry. It details the position of each vertex and defines polygons as lists 
+of these vertices. By default, vertices are arranged in a counter-clockwise order, eliminating the 
+need for explicit declaration of face normals. When exporting the mesh from software like Blender, 
+it's essential to triangulate the mesh and include material definitions. If the material name 
+exists in the material database, the function loads the corresponding properties. 
+Otherwise, it defaults to using standard properties.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+# Return as separate variables
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn );
+
+# Return as tuple with 8 elements
+data = quadriga_lib.obj_file_read( fn );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the OBJ file, string 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>mesh</code></b>, <code>data[0]</code><br> 
+   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
+   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br> 
+   Size: <code>[ no_mesh, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop</code></b>, <code>data[1]</code><br> 
+   Material properties of each mesh element; If no material is defined for an object, the properties 
+   for vacuum are used. Size: <code>[ no_mesh, 5 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vert_list</code></b>, <code>data[2]</code><br> 
+   List of vertices found in the OBJ file; Size: <code>[ no_vert, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>face_ind</code></b>, <code>data[3]</code><br> 
+   Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements 
+   of the previously defined <code>vert_list</code> (1-based). <br> 
+   uint32; Size: <code>[ no_mesh, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>obj_id</code></b>, <code>data[4]</code><br> 
+   Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a 
+   cube). Each object is identified by a unique ID (1-based). <br> 
+   uint32; Size: <code>[ no_mesh, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mtl_id</code></b>, <code>data[5]</code><br> 
+   Each mesh element gets assigned a material and each unique material gets assigned an ID. Different 
+   faces of an object can have different materials. If no material is defined in the OBJ file, the 
+   id is set to <code>0</code> and no entry is made in <code>mtl_names</code>. <br> 
+   uint32; Size: <code>[ no_mesh, 1 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>obj_names</code></b>, <code>data[6]</code><br> 
+   Names of the objects in the OBJ file; List of strings 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mtl_names</code></b>, <code>data[7]</code><br> 
+   Names of the materials in the OBJ file; List of strings 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Material properties:</i></b><br>Each material is defined by its electrical properties. Radio waves that interact with a building will 
+produce losses that depend on the electrical properties of the building materials, the material 
+structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical 
+permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is 
+obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies. 
+The five parameters returned in <code>mtl_prop</code> then are: 
+ 
+<ul><li style="margin-bottom: 0.4em;">Real part of relative permittivity at f = 1 GHz (a) 
+</li><li style="margin-bottom: 0.4em;">Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b 
+</li><li style="margin-bottom: 0.4em;">Conductivity at f = 1 GHz (c) 
+</li><li style="margin-bottom: 0.4em;">Frequency dependence of conductivity (d) such that σ = c· f^d 
+</li><li style="margin-bottom: 0.4em;">Fixed attenuation in dB applied to each transition 
+</li></ul>
+ 
+A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following 
+list of material is currently supported and the material can be selected by using the <code>usemtl</code> tag 
+in the OBJ file. When using Blender, the simply assign a material with that name to an object or face. 
+In addition, custom properties can be set by assigning adding the 5 properties after the material 
+name, separated by <code>:</code>, e.g.: 
+ 
+<pre>
+usemtl custom::2.1:0.1:0.1:0.5:20
+</pre>
+ 
+The following materials are defined by default: 
+ 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th>Name</th>
+  <th>a</th>
+  <th>b</th>
+  <th>c</th>
+  <th>d</th>
+  <th>Att</th>
+  <th>max fGHz</th>
+  <th></th>
+</tr>
+<tr>
+  <td>vacuum / air</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>textiles</td>
+  <td>1.5</td>
+  <td>0.0</td>
+  <td>5e-5</td>
+  <td>0.62</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>plastic</td>
+  <td>2.44</td>
+  <td>0.0</td>
+  <td>2.33e-5</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>ceramic</td>
+  <td>6.5</td>
+  <td>0.0</td>
+  <td>0.0023</td>
+  <td>1.32</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>sea_water</td>
+  <td>80.0</td>
+  <td>-0.25</td>
+  <td>4.0</td>
+  <td>0.58</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>sea_ice</td>
+  <td>3.2</td>
+  <td>-0.022</td>
+  <td>1.1</td>
+  <td>1.5</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>water</td>
+  <td>80.0</td>
+  <td>-0.18</td>
+  <td>0.6</td>
+  <td>1.52</td>
+  <td>0.0</td>
+  <td>20</td>
+  <td></td>
+</tr>
+<tr>
+  <td>water_ice</td>
+  <td>3.17</td>
+  <td>-0.005</td>
+  <td>5.6e-5</td>
+  <td>1.7</td>
+  <td>0.0</td>
+  <td>20</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_concrete</td>
+  <td>5.24</td>
+  <td>0.0</td>
+  <td>0.0462</td>
+  <td>0.7822</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_brick</td>
+  <td>3.91</td>
+  <td>0.0</td>
+  <td>0.0238</td>
+  <td>0.16</td>
+  <td>0.0</td>
+  <td>40</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_plasterboard</td>
+  <td>2.73</td>
+  <td>0.0</td>
+  <td>0.0085</td>
+  <td>0.9395</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_wood</td>
+  <td>1.99</td>
+  <td>0.0</td>
+  <td>0.0047</td>
+  <td>1.0718</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_glass</td>
+  <td>6.31</td>
+  <td>0.0</td>
+  <td>0.0036</td>
+  <td>1.3394</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_ceiling_board</td>
+  <td>1.48</td>
+  <td>0.0</td>
+  <td>0.0011</td>
+  <td>1.075</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_chipboard</td>
+  <td>2.58</td>
+  <td>0.0</td>
+  <td>0.0217</td>
+  <td>0.78</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_plywood</td>
+  <td>2.71</td>
+  <td>0.0</td>
+  <td>0.33</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>40</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_marble</td>
+  <td>7.074</td>
+  <td>0.0</td>
+  <td>0.0055</td>
+  <td>0.9262</td>
+  <td>0.0</td>
+  <td>60</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_floorboard</td>
+  <td>3.66</td>
+  <td>0.0</td>
+  <td>0.0044</td>
+  <td>1.3515</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_metal</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>1.0e7</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_very_dry_ground</td>
+  <td>3.0</td>
+  <td>0.0</td>
+  <td>0.00015</td>
+  <td>2.52</td>
+  <td>0.0</td>
+  <td>10</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_medium_dry_ground</td>
+  <td>15.0</td>
+  <td>-0.1</td>
+  <td>0.035</td>
+  <td>1.63</td>
+  <td>0.0</td>
+  <td>10</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_wet_ground</td>
+  <td>30.0</td>
+  <td>-0.4</td>
+  <td>0.15</td>
+  <td>1.3</td>
+  <td>0.0</td>
+  <td>10</td>
+  <td></td>
+</tr>
+<tr>
+  <td>itu_vegetation</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>1.0e-4</td>
+  <td>1.1</td>
+  <td>0.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+<tr>
+  <td>irr_glass</td>
+  <td>6.27</td>
+  <td>0.0</td>
+  <td>0.0043</td>
+  <td>1.1925</td>
+  <td>23.0</td>
+  <td>100</td>
+  <td></td>
+</tr>
+</table><br>
 </li>
 </ul>
     <!-- CONTENT END -->
