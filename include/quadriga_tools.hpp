@@ -138,7 +138,7 @@ namespace quadriga_lib
                                const arma::Col<dtype> &xi,    // Input sample points, vector length nx
                                const arma::Col<dtype> &xo);   // Output sample points, vector length mx
 
-    // ----  Computational geometry tools ----
+    // ---- Site-Specific Simulation Tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
     // - For faster processing, the mesh can be split into sub-meshes. In this case, the algorithm can
@@ -317,6 +317,17 @@ namespace quadriga_lib
                           arma::Mat<dtype> *pointsB,            // Second half, Size: [ n_pointsB, 9 ]
                           int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
                           arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = pointsA, 2 = pointsB, 0 = Error, Length: [ n_points ]
+
+    // Tests whether points are inside a triangle mesh using raycasting
+    // - Casts 20 rays from each point in multiple directions. If any ray intersects the mesh with a negative incidence angle,
+    //   the point is classified as "inside".
+    // - Returns a vector of length n_points with values: 0 for "outside", 1 for "inside".
+    // - If obj_ind is provided, the return vector contains the 1-based index of the object that the point is inside.
+    template <typename dtype>
+    arma::u32_vec point_inside_mesh(const arma::Mat<dtype> *points,         // Points in 3D space, size: [n_points, 3]
+                                    const arma::Mat<dtype> *mesh,           // Triangular mesh faces, size: [n_mesh, 9]
+                                    const arma::u32_vec *obj_ind = nullptr, // Optional object indices, 1-based, size: [n_mesh]
+                                    dtype distance = 0.0);                  // Optional minimum distance from objects in [m]
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     // - A ray beam is defined by its origin, destination and a triangular wavefront (trivec and tridir)

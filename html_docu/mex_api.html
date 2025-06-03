@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.7.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.7.3</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -115,6 +115,7 @@
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of set of points in 3D-sapce</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
+<tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates interactions (reflection, transmission, refraction) of radio waves with objects</td></tr>
 <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates the intersection of ray beams with points in three dimensions</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
@@ -3464,6 +3465,51 @@ each cluster.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>reverse_index</code></b><br> 
    Indices for mapping elements of "points_out" to "points_in"; 1-based; Length: <code>[ n_points_in ]</code> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_inside_mesh"></a>
+<b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Uses raycasting to determine whether each 3D point lies inside a triangle mesh. 
+</li><li style="margin-bottom: 0.4em;">Requires that the mesh is watertight and all normals are pointing outwards. 
+</li><li style="margin-bottom: 0.4em;">For each point, multiple rays are cast in various directions. 
+</li><li style="margin-bottom: 0.4em;">If any ray intersects a mesh element with a negative incidence angle, the point is classified as <b>inside</b>. 
+</li><li style="margin-bottom: 0.4em;">Output can be binary (0 = outside, 1 = inside) or labeled with object indices. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>points</b></code> (input)<br> 
+   3D point coordinates to test, size <code>[n_points, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>mesh</b></code> (input)<br> 
+   Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format 
+   (x1,y1,z1,x2,y2,z2,x3,y3,z3), size <code>[n_mesh, 9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>obj_ind</b></code> (optional input)<br> 
+   Optional object index for each mesh element (1-based), size <code>[n_mesh]</code>. If provided, the return 
+   vector will contain the index of the enclosing object instead of binary values. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>distance</b></code> (optional input)<br> 
+   Optional distance in meters from objects that should be considered as <i>inside</i> the object. 
+   Possible range: 0 - 20 m. Using this parameter significantly increases computation time. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>result</b></code><br> 
+   For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside 
+   (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b> 
+   if <code>obj_ind</code> is provided. Size: <code>[n_points]</code> 
 </li></ul>
 </li>
 </ul>

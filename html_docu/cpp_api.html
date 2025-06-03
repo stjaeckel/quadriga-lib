@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.7.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.7.3</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -158,6 +158,7 @@
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the Axis-Aligned Bounding Boxes (AABB) of a 3D point cloud</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
 <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
+<tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates interactions (reflection, transmission, refraction) of radio waves with objects</td></tr>
 <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates the intersection of ray beams with points in three dimensions</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
@@ -4142,6 +4143,53 @@ int quadriga_lib::point_cloud_split(
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_inside_mesh"></a>
+<b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Uses raycasting to determine whether each 3D point lies inside a triangle mesh. 
+</li><li style="margin-bottom: 0.4em;">Requires that the mesh is watertight and all normals are pointing outwards. 
+</li><li style="margin-bottom: 0.4em;">For each point, multiple rays are cast in various directions. 
+</li><li style="margin-bottom: 0.4em;">If any ray intersects a mesh element with a negative incidence angle, the point is classified as <b>inside</b>. 
+</li><li style="margin-bottom: 0.4em;">Output can be binary (0 = outside, 1 = inside) or labeled with object indices. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+arma::u32_vec quadriga_lib::point_inside_mesh(
+                const arma::Mat&lt;dtype&gt; *points,
+                const arma::Mat&lt;dtype&gt; *mesh,
+                const arma::u32_vec *obj_ind = nullptr,
+                dtype distance = 0.0);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*points</b></code> (input)<br> 
+   3D point coordinates to test, size <code>[n_points, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mesh</b></code> (input)<br> 
+   Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format (x1,y1,z1,x2,y2,z2,x3,y3,z3), size <code>[n_mesh, 9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*obj_ind</b> = nullptr</code> (optional input)<br> 
+   Optional object index for each mesh element (1-based), size <code>[n_mesh]</code>. If provided, the return vector will contain the index of the enclosing object instead of binary values. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>distance</b> = 0.0</code> (optional input)<br> 
+   Optional distance in meters from objects that should be considered as <i>inside</i> the object. 
+   Possible range: 0 - 20 m. Using this parameter significantly increases computation time. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec</code>, size <code>[n_points]</code><br> 
+   For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside (or close to) any mesh object 
+   (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b> if <code>obj_ind</code> is provided. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="ray_mesh_interact"></a>
 <b>ray_mesh_interact</b> - Calculates interactions (reflection, transmission, refraction) of radio waves with objects
 <ul>
@@ -4226,13 +4274,13 @@ void quadriga_lib::ray_mesh_interact(
    Mesh indices of interaction points (1-based). Size: <code>[n_ray]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;">`const arma::Mat<dtype> <b>*trivec</b> (optional input)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*trivec</b></code> (optional input)<br> 
    The 3 vectors pointing from the center point of the ray at the <code>origin</code> to the vertices of a triangular 
    propagation tube (=beam wavefront), the values are in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; 
    Size: <code>[no_ray, 9]</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;">`const arma::Mat<dtype> <b>*tridir</b> (optional input)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*tridir</b></code> (optional input)<br> 
    The directions of the vertex-rays. Size: <code>[ n_ray, 6 ]</code> or <code>[ n_ray, 9 ]</code>, 
    For 6 columns, values are in geographic coordinates (azimuth and elevation angle in rad); the  
    values are in the order <code>[ v1az, v1el, v2az, v2el, v3az, v3el ]</code>; 

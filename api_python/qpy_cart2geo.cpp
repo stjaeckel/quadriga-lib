@@ -60,7 +60,7 @@ MD!*/
 // double ms = (double)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
 // std::cout << "Input data converted, t = " << std::round(ms/100.0)/10.0 << std::endl;
 
-py::array_t<double> cart2geo(py::array_t<double> cart)
+py::array_t<double> cart2geo(const py::array_t<double> &cart)
 {
     const auto cart_arma = qd_python_numpy2arma_Cube(cart, true);
 

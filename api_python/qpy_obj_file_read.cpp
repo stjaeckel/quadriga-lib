@@ -39,10 +39,10 @@ Otherwise, it defaults to using standard properties.
 
 ```
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn );
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn )
 
 # Return as tuple with 8 elements
-data = quadriga_lib.obj_file_read( fn );
+data = quadriga_lib.obj_file_read( fn )
 ```
 
 ## Input Arguments:
@@ -64,18 +64,18 @@ data = quadriga_lib.obj_file_read( fn );
 
 - **`face_ind`**, `data[3]`<br>
   Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
-  of the previously defined `vert_list` (1-based). <br>
+  of the previously defined `vert_list` (**0-based**). <br>
   uint32; Size: `[ no_mesh, 3 ]`
 
 - **`obj_id`**, `data[4]`<br>
   Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
-  cube). Each object is identified by a unique ID (1-based). <br>
+  cube). Each object is identified by a unique ID (**1-based** index of `obj_names`). <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
 - **`mtl_id`**, `data[5]`<br>
-  Each mesh element gets assigned a material and each unique material gets assigned an ID. Different
-  faces of an object can have different materials. If no material is defined in the OBJ file, the
-  id is set to `0` and no entry is made in `mtl_names`. <br>
+  Each mesh element gets assigned a material and each unique material gets assigned an ID (**1-based** 
+  index of `mtl_names`). Different faces of an object can have different materials. If no material is 
+  defined in the OBJ file, the id is set to `0` and no entry is made in `mtl_names`. <br>
   uint32; Size: `[ no_mesh, 1 ]`
 
 - **`obj_names`**, `data[6]`<br>

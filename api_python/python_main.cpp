@@ -45,6 +45,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
 #include "qpy_obj_file_read.cpp"
+#include "qpy_point_inside_mesh.cpp"
 #include "qpy_version.cpp"
 
 PYBIND11_MODULE(quadriga_lib, m)
@@ -228,6 +229,12 @@ PYBIND11_MODULE(quadriga_lib, m)
           py::arg("data") = py::none());
 
     m.def("obj_file_read", &obj_file_read, py::arg("fn"));
+
+    m.def("point_inside_mesh", &point_inside_mesh,
+          py::arg("points") = py::array_t<double>(),
+          py::arg("mesh") = py::array_t<double>(),
+          py::arg("obj_ind") = py::array_t<unsigned>(),
+          py::arg("distance") = 0.0);
 
     m.def("version", &version);
 }

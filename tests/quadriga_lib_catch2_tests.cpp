@@ -39,6 +39,7 @@
 #include "catch2_tests/test_obj_overlap.cpp"
 #include "catch2_tests/test_obj_file_read.cpp"
 #include "catch2_tests/test_get_channels_irs.cpp"
+#include "catch2_tests/test_point_inside_mesh.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
