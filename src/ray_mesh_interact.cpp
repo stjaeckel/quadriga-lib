@@ -100,12 +100,12 @@ void quadriga_lib::ray_mesh_interact(
 - `const arma::u32_vec ***fbs_ind**, ***sbs_ind**` (input)<br>
   Mesh indices of interaction points (1-based). Size: `[n_ray]`.
 
-- `const arma::Mat<dtype> ***trivec** (optional input)<br>
+- `const arma::Mat<dtype> ***trivec**` (optional input)<br>
   The 3 vectors pointing from the center point of the ray at the `origin` to the vertices of a triangular
   propagation tube (=beam wavefront), the values are in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`;
   Size: `[no_ray, 9]`
 
-- `const arma::Mat<dtype> ***tridir** (optional input)<br>
+- `const arma::Mat<dtype> ***tridir**` (optional input)<br>
   The directions of the vertex-rays. Size: `[ n_ray, 6 ]` or `[ n_ray, 9 ]`,
   For 6 columns, values are in geographic coordinates (azimuth and elevation angle in rad); the 
   values are in the order `[ v1az, v1el, v2az, v2el, v3az, v3el ]`;

@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.3</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -138,6 +138,7 @@ import quadriga_lib
 <tbody>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
+<tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2739,10 +2740,10 @@ Otherwise, it defaults to using standard properties.
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn );
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn )
 
 # Return as tuple with 8 elements
-data = quadriga_lib.obj_file_read( fn );
+data = quadriga_lib.obj_file_read( fn )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2768,20 +2769,20 @@ data = quadriga_lib.obj_file_read( fn );
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>face_ind</code></b>, <code>data[3]</code><br> 
    Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements 
-   of the previously defined <code>vert_list</code> (1-based). <br> 
+   of the previously defined <code>vert_list</code> (<b>0-based</b>). <br> 
    uint32; Size: <code>[ no_mesh, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>obj_id</code></b>, <code>data[4]</code><br> 
    Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a 
-   cube). Each object is identified by a unique ID (1-based). <br> 
+   cube). Each object is identified by a unique ID (<b>1-based</b> index of <code>obj_names</code>). <br> 
    uint32; Size: <code>[ no_mesh, 1 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_id</code></b>, <code>data[5]</code><br> 
-   Each mesh element gets assigned a material and each unique material gets assigned an ID. Different 
-   faces of an object can have different materials. If no material is defined in the OBJ file, the 
-   id is set to <code>0</code> and no entry is made in <code>mtl_names</code>. <br> 
+   Each mesh element gets assigned a material and each unique material gets assigned an ID (<b>1-based</b>  
+   index of <code>mtl_names</code>). Different faces of an object can have different materials. If no material is  
+   defined in the OBJ file, the id is set to <code>0</code> and no entry is made in <code>mtl_names</code>. <br> 
    uint32; Size: <code>[ no_mesh, 1 ]</code> 
 </li></ul>
  
@@ -3072,6 +3073,51 @@ The following materials are defined by default:
   <td></td>
 </tr>
 </table><br>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_inside_mesh"></a>
+<b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Uses raycasting to determine whether each 3D point lies inside a triangle mesh. 
+</li><li style="margin-bottom: 0.4em;">Requires that the mesh is watertight and all normals are pointing outwards. 
+</li><li style="margin-bottom: 0.4em;">For each point, multiple rays are cast in various directions. 
+</li><li style="margin-bottom: 0.4em;">If any ray intersects a mesh element with a negative incidence angle, the point is classified as <b>inside</b>. 
+</li><li style="margin-bottom: 0.4em;">Output can be binary (0 = outside, 1 = inside) or labeled with object indices. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>points</b></code> (input)<br> 
+   3D point coordinates to test, size <code>[n_points, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>mesh</b></code> (input)<br> 
+   Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format 
+   (x1,y1,z1,x2,y2,z2,x3,y3,z3), size <code>[n_mesh, 9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>obj_ind</b></code> (optional input)<br> 
+   Optional object index for each mesh element (1-based), size <code>[n_mesh]</code>. If provided, the return 
+   vector will contain the index of the enclosing object instead of binary values. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>distance</b></code> (optional input)<br> 
+   Optional distance in meters from objects that should be considered as <i>inside</i> the object. 
+   Possible range: 0 - 20 m. Using this parameter significantly increases computation time. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>result</b></code><br> 
+   For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside 
+   (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b> 
+   if <code>obj_ind</code> is provided. Size: <code>[n_points]</code> 
+</li></ul>
 </li>
 </ul>
     <!-- CONTENT END -->

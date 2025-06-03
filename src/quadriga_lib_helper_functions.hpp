@@ -99,7 +99,7 @@ static void qd_repeat_sequence(const dtypeIn *sequence, size_t sequence_length, 
 template <typename dtype>
 static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientation vectors (Euler rotations)
                                       dtype *rotation_matrix_9xN,    // Rotation matrix in column-major ordering
-                                      size_t N = 1,               // Number of elements
+                                      size_t N = 1,                  // Number of elements
                                       bool invert_y_axis = false,    // Inverts the y-axis
                                       bool transposeR = false)       // Returns the transpose of R
 {
@@ -397,18 +397,28 @@ static inline void qd_multiply_3_complex_mat(const dtype *Ar, const dtype *Ai, /
     }
 }
 
+// Multiply with scalar
+template <typename dtype>
+static inline void qd_multiply_scalar(dtype scalar, dtype *data, size_t N)
+{
+    for (size_t i = 0; i < N; ++i)
+        data[i] *= scalar;
+}
+
 // Apply Euler rotations inplace
 template <typename dtype>
-static inline void qd_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, size_t N)
+static inline void qd_rotate_inplace(dtype bank, dtype tilt, dtype heading, dtype *data3xN, size_t N, bool transpose = false)
 {
 
     double O[3] = {bank, tilt, heading};
     double R[9];
     qd_rotation_matrix(O, R);
 
-    for (size_t ix = 0; ix < 3 * N; ix += 3)
+    for (size_t i = 0; i < N; ++i)
     {
-        size_t iy = ix + 1, iz = ix + 2;
+        size_t ix = transpose ? i : 3 * i;
+        size_t iy = transpose ? N + i : 3 * i + 1;
+        size_t iz = transpose ? 2 * N + i : 3 * i + 2;
 
         double xx = (double)data3xN[ix];
         double yy = (double)data3xN[iy];
