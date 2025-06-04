@@ -81,6 +81,8 @@ endif
 api_python = $(wildcard api_python/*.cpp)
 
 PYTHON_H = $(shell python3 -c "from sysconfig import get_paths as gp; print(gp()['include'])")
+PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 ifeq ($(wildcard $(PYTHON_H)/Python.h),)
     PYTHON_H =
 else
@@ -89,7 +91,7 @@ else
 endif
 
 # Compilation targets
-.PHONY: dirs
+.PHONY: dirs all cpp python mex_matlab mex_octave python_install
 all:
 	@$(MAKE) dirs
 	@$(MAKE) lib/libquadriga.a   $(PYTHON_TARGET)   $(OCTAVE_TARGETS)   $(MATLAB_TARGETS)   tests/test_bin
@@ -118,6 +120,14 @@ dirs:
 
 lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/libquadriga.a   $(api_python)   api_python/python_arma_adapter.hpp
 	$(CC) -shared $(CCFLAGS) $< lib/libquadriga.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
+
+python_install:
+	@if [ -z "$(PYTHON_SHARED_OBJ)" ]; then \
+		echo "Error: quadriga_lib python package not found in lib/"; \
+		exit 1; \
+	fi
+	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
+	cp $(PYTHON_SHARED_OBJ) $(PYTHON_SITE_PACKAGES)/
 
 # Use cmake to compile
 cmake:
