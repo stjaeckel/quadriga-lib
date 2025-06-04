@@ -126,7 +126,7 @@ if (NOT HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
     if(HDF5_FOUND)
         get_filename_component(HDF5_LIB_DIR "${HDF5_LIBRARIES}" DIRECTORY)
         message(STATUS "HDF5 Include dir: ${HDF5_INCLUDE_DIRS}")
-        message(STATUS "HDF5 Library dir: ${HDF5_LIB_DIR}")
+        message(STATUS "HDF5 Libraries: ${HDF5_LIBRARIES}")
     else()
         set(BUILD_HDF5 ON)
     endif()
@@ -274,8 +274,9 @@ if(BUILD_MATLAB)
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
 
     if (HDF5_FOUND)
-        set(HDF_L "-L${HDF5_LIB_DIR}")
-        set(HDF_l "-lhdf5")
+        set(HDF5_MEX_LINK_LIBS ${HDF5_LIBRARIES})
+    else()
+        set(HDF5_MEX_LINK_LIBS "")
     endif()
 
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
@@ -302,9 +303,9 @@ if(BUILD_MATLAB)
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND env CXXFLAGS="${MEX_CXXFLAGS}" ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A}
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A} ${HDF5_MEX_LINK_LIBS}
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                        -lgomp ${HDF_L} ${HDF_l}
+                        -lgomp
                 DEPENDS ${mex_src} quadriga_static
                 COMMENT "Building MATLAB MEX file ${mex_output}"
                 VERBATIM
