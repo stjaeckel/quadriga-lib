@@ -79,7 +79,6 @@ endif
 
 # Autodetect the Python include path
 api_python = $(wildcard api_python/*.cpp)
-
 PYTHON_H = $(shell python3 -c "from sysconfig import get_paths as gp; print(gp()['include'])")
 PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
 PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
@@ -120,6 +119,11 @@ dirs:
 
 lib/quadriga_lib$(PYTHON_EXTENSION_SUFFIX):  api_python/python_main.cpp   lib/libquadriga.a   $(api_python)   api_python/python_arma_adapter.hpp
 	$(CC) -shared $(CCFLAGS) $< lib/libquadriga.a -o $@ -I include -I $(PYBIND11_H) -I $(PYTHON_H) -I $(ARMA_H) -lgomp -ldl $(HDF5_DYN)
+
+python_cmake:
+	cmake -B build_linux -D ENABLE_MATLAB=OFF -D ENABLE_OCTAVE=OFF -D ENABLE_MEX_DOC=OFF -D CMAKE_INSTALL_PREFIX=. $(ARMA_CM) 
+	cmake --build build_linux -j32 
+	cmake --install build_linux
 
 python_install:
 	@if [ -z "$(PYTHON_SHARED_OBJ)" ]; then \
