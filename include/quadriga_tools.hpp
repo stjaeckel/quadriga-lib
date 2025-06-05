@@ -23,6 +23,7 @@
 #include <vector>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "uword", "size_t" and "unsigned long long" interchangeably
@@ -247,16 +248,17 @@ namespace quadriga_lib
     // - Unknown materials are treated as Vacuum
     // - Returns number of mesh elements "n_mesh"
     // - Attempts to change the size of the output if it does not have correct size already
-    template <typename dtype>                                                 // Supported types: float or double
-    arma::uword obj_file_read(std::string fn,                                 // File name
-                              arma::Mat<dtype> *mesh = nullptr,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                              arma::Mat<dtype> *mtl_prop = nullptr,           // Material properties, Size: [ n_mesh, 5 ]
-                              arma::Mat<dtype> *vert_list = nullptr,          // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
-                              arma::u32_mat *face_ind = nullptr,              // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
-                              arma::u32_vec *obj_ind = nullptr,               // Object index, 1-based, Size: [ n_mesh ]
-                              arma::u32_vec *mtl_ind = nullptr,               // Material index, 1-based, Size: [ n_mesh ]
-                              std::vector<std::string> *obj_names = nullptr,  // Object names, Size: [ max(obj_ind) - 1 ]
-                              std::vector<std::string> *mtl_names = nullptr); // Material names, Size: [ max(mtl_ind) - 1 ]
+    template <typename dtype>                                                // Supported types: float or double
+    arma::uword obj_file_read(std::string fn,                                // File name
+                              arma::Mat<dtype> *mesh = nullptr,              // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                              arma::Mat<dtype> *mtl_prop = nullptr,          // Material properties, Size: [ n_mesh, 5 ]
+                              arma::Mat<dtype> *vert_list = nullptr,         // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
+                              arma::u32_mat *face_ind = nullptr,             // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
+                              arma::u32_vec *obj_ind = nullptr,              // Object index, 1-based, Size: [ n_mesh ]
+                              arma::u32_vec *mtl_ind = nullptr,              // Material index, 1-based, Size: [ n_mesh ]
+                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) - 1 ]
+                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) - 1 ]
+                              arma::Mat<dtype> *bsdf = nullptr);             // BSDF data from .MTL File, size [mtl_names.size, 15]
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
     // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]
