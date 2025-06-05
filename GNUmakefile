@@ -125,6 +125,9 @@ python_cmake:
 	cmake --build build_linux -j32 
 	cmake --install build_linux
 
+python_test:  python_cmake
+	pytest tests/python_tests -x -s
+
 python_install:
 	@if [ -z "$(PYTHON_SHARED_OBJ)" ]; then \
 		echo "Error: quadriga_lib python package not found in lib/"; \

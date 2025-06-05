@@ -3502,7 +3502,8 @@ arma::uword quadriga_lib::obj_file_read(
                 arma::u32_vec *obj_ind = nullptr,
                 arma::u32_vec *mtl_ind = nullptr,
                 std::vector&lt;std::string&gt; *obj_names = nullptr,
-                std::vector&lt;std::string&gt; *mtl_names = nullptr);
+                std::vector&lt;std::string&gt; *mtl_names = nullptr,
+                arma::Mat&lt;dtype&gt; *bsdf = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3510,40 +3511,113 @@ arma::uword quadriga_lib::obj_file_read(
    Path to the <code>.obj</code> file to be read. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*mesh</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*mesh</b> = nullptr</code> (optional output)<br> 
    Flattened triangle mesh data. Each row holds <code>[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]</code>. Size: <code>[n_mesh, 9]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*mtl_prop</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*mtl_prop</b> = nullptr</code> (optional output)<br> 
    Material properties for each triangle. Size: <code>[n_mesh, 5]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*vert_list</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*vert_list</b> = nullptr</code> (optional output)<br> 
    List of all vertex positions found in the <code>.obj</code> file. Size: <code>[n_vert, 3]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>*face_ind</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>*face_ind</b> = nullptr</code> (optional output)<br> 
    Indices into <code>vert_list</code> for each triangle (0-based). Size: <code>[n_mesh, 3]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*obj_ind</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*obj_ind</b> = nullptr</code> (optional output)<br> 
    Object index (1-based) for each triangle. Size: <code>[n_mesh]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*mtl_ind</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*mtl_ind</b> = nullptr</code> (optional output)<br> 
    Material index (1-based) for each triangle. Size: <code>[n_mesh]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*obj_names</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*obj_names</b> = nullptr</code> (optional output)<br> 
    Names of objects found in the file. Length: <code>max(obj_ind)</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*mtl_names</b> = nullptr</code> (output, optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*mtl_names</b> = nullptr</code> (optional output)<br> 
    Names of materials found in the file. Length: <code>max(mtl_ind)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*bsdf</b> = nullptr</code> (optional output)<br> 
+   Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the 
+   .MTL file. Size <code>[mtl_names.size(), 10]</code>. Values are: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>0</td>
+  <td>Base Color Red</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td>Base Color Green</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>Base Color Blue</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>Transparency (alpha)</td>
+  <td>Range 0-1</td>
+  <td>Default = 1.0 (fully opaque)</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>Roughness</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.5</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>Metallic</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>Index of refraction (IOR)</td>
+  <td>Range 0-4</td>
+  <td>Default = 1.45</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>Specular Adjustment to the IOR</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.5 (no adjustment)</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td>Emission Color Red</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td>Emission Color Green</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td>Emission Color Blue</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+</table><br>
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword</code><br>  
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword</code><br> 
    Number of mesh triangles found in the file (<code>n_mesh</code>). 
 </li></ul>
 </li>
@@ -3557,7 +3631,7 @@ arma::uword quadriga_lib::obj_file_read(
 <li style="margin-bottom: 1.5em;">
 <b><i>Material Tag Format:</i></b><br><ul><li style="margin-bottom: 0.4em;">Default materials (ITU-R P.2040-3 Table 3): <code>"usemtl itu_concrete"</code>, <code>"itu_brick"</code>, <code>"itu_wood"</code>, <code>"itu_water"</code>, etc. 
 </li><li style="margin-bottom: 0.4em;">Frequency range: 1–40 GHz (limited to 1–10 GHz for ground materials) 
-</li><li style="margin-bottom: 0.4em;">Custom materials syntax: <code>"usemtl Name::A:B:C:D:att"</code> with <code>A, B</code>: Real permittivity ε_r = <code>A * fGHz^B</code>,  
+</li><li style="margin-bottom: 0.4em;">Custom materials syntax: <code>"usemtl Name::A:B:C:D:att"</code> with <code>A, B</code>: Real permittivity ε_r = <code>A * fGHz^B</code>, 
    <code>C, D</code>: Conductivity σ = <code>C * fGHz^D</code>, <code>att</code>: Penetration loss in dB (fixed, per interaction) 
 </li></ul>
 </li>
