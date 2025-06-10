@@ -232,6 +232,23 @@ namespace quadriga_lib
                           arma::Mat<dtype> *direction = nullptr, // Directions of the vertex-rays; matrix of size [no_ray, 6] or [no_ray, 9]
                           bool direction_xyz = false);           // Direction format indicator: true = Cartesian, false = Spherical
 
+    // Write a 3D model to a Mitsuba 3 XML file
+    // - Mitsuba 3 is a research-oriented, retargetable rendering system: https://www.mitsuba-renderer.org
+    // - NVIDIA Sionna RT is an open-source, hardware-accelerated differentiable ray tracer for radio propagation
+    //   modeling, built on top of Mitsuba 3: https://developer.nvidia.com/sionna
+    // - Mitsuba 3 XML files can be used to import 3D geometry into Sionna RT.
+    // - This function converts a 3D mesh from quadriga-lib into the Mitsuba XML format.
+    template <typename dtype>
+    void mitsuba_xml_file_write(const std::string &fn,                     // Output file name
+                                const arma::Mat<dtype> &vert_list,         // Vertex list, size [n_vert, 3]
+                                const arma::umat &face_ind,                // Face indices (0-based), size [n_mesh, 3]
+                                const arma::uvec &obj_ind,                 // Object indices (1-based), size [n_mesh]
+                                const arma::uvec &mtl_ind,                 // Material indices (1-based), size [n_mesh]
+                                const std::vector<std::string> &obj_names, // Object names, length = max(obj_ind)-1
+                                const std::vector<std::string> &mtl_names, // Material names, length = max(mtl_ind)-1
+                                const arma::Mat<dtype> &bsdf = {},         // BSDF data, size [mtl_names.size(), 17]
+                                bool map_to_itu_materials = false);        // Optional mapping to ITU default materials used by Sionna
+
     // Read Wavefront .obj file
     // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
     // - 3D model must be triangularized
@@ -253,9 +270,9 @@ namespace quadriga_lib
                               arma::Mat<dtype> *mesh = nullptr,              // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
                               arma::Mat<dtype> *mtl_prop = nullptr,          // Material properties, Size: [ n_mesh, 5 ]
                               arma::Mat<dtype> *vert_list = nullptr,         // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
-                              arma::u32_mat *face_ind = nullptr,             // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
-                              arma::u32_vec *obj_ind = nullptr,              // Object index, 1-based, Size: [ n_mesh ]
-                              arma::u32_vec *mtl_ind = nullptr,              // Material index, 1-based, Size: [ n_mesh ]
+                              arma::umat *face_ind = nullptr,                // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
+                              arma::uvec *obj_ind = nullptr,                 // Object index, 1-based, Size: [ n_mesh ]
+                              arma::uvec *mtl_ind = nullptr,                 // Material index, 1-based, Size: [ n_mesh ]
                               std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) - 1 ]
                               std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) - 1 ]
                               arma::Mat<dtype> *bsdf = nullptr);             // BSDF data from .MTL File, size [mtl_names.size, 15]

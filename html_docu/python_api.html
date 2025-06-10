@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.3</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.4</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -2740,7 +2740,7 @@ Otherwise, it defaults to using standard properties.
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn )
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read( fn )
 
 # Return as tuple with 8 elements
 data = quadriga_lib.obj_file_read( fn )
@@ -2792,6 +2792,115 @@ data = quadriga_lib.obj_file_read( fn )
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_names</code></b>, <code>data[7]</code><br> 
    Names of the materials in the OBJ file; List of strings 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>bsdf</code></b>, <code>data[8]</code><br> 
+   Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the 
+   .MTL file. Size <code>[mtl_names.size(), 17]</code>. Values are: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>0</td>
+  <td>Base Color Red</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td>Base Color Green</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>Base Color Blue</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.8</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>Transparency (alpha)</td>
+  <td>Range 0-1</td>
+  <td>Default = 1.0 (fully opaque)</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>Roughness</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.5</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>Metallic</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>Index of refraction (IOR)</td>
+  <td>Range 0-4</td>
+  <td>Default = 1.45</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>Specular Adjustment to the IOR</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.5 (no adjustment)</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td>Emission Color Red</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td>Emission Color Green</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td>Emission Color Blue</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td>Sheen</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td>Clearcoat</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td>Clearcoat roughness</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td>Anisotropic</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td>Anisotropic rotation</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td>Transmission</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+</table><br>
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

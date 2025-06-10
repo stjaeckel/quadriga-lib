@@ -39,7 +39,7 @@ Otherwise, it defaults to using standard properties.
 
 ```
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read( fn )
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read( fn )
 
 # Return as tuple with 8 elements
 data = quadriga_lib.obj_file_read( fn )
@@ -83,6 +83,27 @@ data = quadriga_lib.obj_file_read( fn )
 
 - **`mtl_names`**, `data[7]`<br>
   Names of the materials in the OBJ file; List of strings
+
+- **`bsdf`**, `data[8]`<br>
+  Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
+  .MTL file. Size `[mtl_names.size(), 17]`. Values are:
+  0  | Base Color Red       | Range 0-1     | Default = 0.8
+  1  | Base Color Green     | Range 0-1     | Default = 0.8
+  2  | Base Color Blue      | Range 0-1     | Default = 0.8
+  3  | Transparency (alpha) | Range 0-1     | Default = 1.0 (fully opaque)
+  4  | Roughness            | Range 0-1     | Default = 0.5
+  5  | Metallic             | Range 0-1     | Default = 0.0
+  6  | Index of refraction (IOR)  | Range 0-4     | Default = 1.45
+  7  | Specular Adjustment to the IOR | Range 0-1 | Default = 0.5 (no adjustment)
+  8  | Emission Color Red    | Range 0-1     | Default = 0.0
+  9  | Emission Color Green  | Range 0-1     | Default = 0.0
+  10 | Emission Color Blue   | Range 0-1     | Default = 0.0
+  11 | Sheen                 | Range 0-1     | Default = 0.0
+  12 | Clearcoat             | Range 0-1     | Default = 0.0
+  13 | Clearcoat roughness   | Range 0-1     | Default = 0.0
+  14 | Anisotropic           | Range 0-1     | Default = 0.0
+  15 | Anisotropic rotation  | Range 0-1     | Default = 0.0
+  16 | Transmission          | Range 0-1     | Default = 0.0
 
 ## Material properties:
 Each material is defined by its electrical properties. Radio waves that interact with a building will
@@ -140,21 +161,22 @@ MD!*/
 
 py::tuple obj_file_read(const std::string &fn)
 {
-    arma::mat mesh, mtl_prop, vert_list;
-    arma::u32_mat face_ind;
-    arma::u32_vec obj_ind, mtl_ind;
+    arma::mat mesh, mtl_prop, vert_list, bsdf;
+    arma::umat face_ind;
+    arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
+    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf);
 
     auto mesh_p = qd_python_copy2numpy(mesh);
     auto mtl_prop_p = qd_python_copy2numpy(mtl_prop);
     auto vert_list_p = qd_python_copy2numpy(vert_list);
-    auto face_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(face_ind);
-    auto obj_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(obj_ind);
-    auto mtl_ind_p = qd_python_copy2numpy<unsigned, ssize_t>(mtl_ind);
+    auto face_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(face_ind);
+    auto obj_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(obj_ind);
+    auto mtl_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(mtl_ind);
     auto obj_names_p = qd_python_copy2python(obj_names);
     auto mtl_names_p = qd_python_copy2python(mtl_names);
+    auto bsdf_p = qd_python_copy2numpy(bsdf);
 
-    return py::make_tuple(mesh_p, mtl_prop_p, vert_list_p, face_ind_p, obj_ind_p, mtl_ind_p, obj_names_p, mtl_names_p);
+    return py::make_tuple(mesh_p, mtl_prop_p, vert_list_p, face_ind_p, obj_ind_p, mtl_ind_p, obj_names_p, mtl_names_p, bsdf_p);
 }

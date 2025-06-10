@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.7.3</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.7.4</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -152,6 +152,7 @@
 <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length and angles</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere) from triangles</td></tr>
+<tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read Wavefront `.obj` file and extract geometry and material information</td></tr>
 <tr><td><a href="#obj_overlap_test">obj_overlap_test</a></td><td>Detect overlapping 3D objects in a triangular mesh</td></tr>
 <tr><td><a href="#path_to_tube">path_to_tube</a></td><td>Convert a 3D path into a tube surface for visualization</td></tr>
@@ -3476,6 +3477,84 @@ auto n = quadriga_lib::icosphere&lt;float&gt;(4, 1.0, &amp;center, &amp;length, 
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="mitsuba_xml_file_write"></a>
+<b>mitsuba_xml_file_write</b> - Write geometry and material data to a Mitsuba 3 XML scene file.
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This routine converts a triangular surface mesh stored in <i>quadriga-lib</i> data structures into the 
+XML format understood by <b>Mitsuba 3</b> <a href="https://www.mitsuba-renderer.org">www.mitsuba-renderer.org</a>. 
+The generated file can be loaded directly by <b>NVIDIA Sionna RT</b> for differentiable radio-propagation  
+simulations.<br><br> 
+ 
+<ul><li style="margin-bottom: 0.4em;">Converts a 3D geometry mesh into Mitsuba 3 XML format for use with rendering tools. 
+</li><li style="margin-bottom: 0.4em;">Enables exporting models from <code>quadriga-lib</code> to be used with <b>Mitsuba 3</b> or <b>Sionna RT</b>: 
+</li><li style="margin-bottom: 0.4em;"><a href="https://www.mitsuba-renderer.org">Mitsuba 3</a>: Research-oriented retargetable rendering system. 
+</li><li style="margin-bottom: 0.4em;"><a href="https://developer.nvidia.com/sionna">NVIDIA Sionna</a>: Hardware-accelerated differentiable ray tracer for wireless propagation, built on Mitsuba 3. 
+</li><li style="margin-bottom: 0.4em;">Supports grouping faces into named objects and assigning materials by name. 
+</li><li style="margin-bottom: 0.4em;">Optionally maps materials to ITU default presets used by Sionna RT. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::mitsuba_xml_file_write(
+                const std::string &amp;fn,
+                const arma::Mat&lt;dtype&gt; &amp;vert_list,
+                const arma::umat &amp;face_ind,
+                const arma::uvec &amp;obj_ind,
+                const arma::uvec &amp;mtl_ind,
+                const std::vector&lt;std::string&gt; &amp;obj_names,
+                const std::vector&lt;std::string&gt; &amp;mtl_names,
+                const arma::Mat&lt;dtype&gt; &amp;bsdf = {},
+                bool map_to_itu_materials = false);
+
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string <b>fn</b></code> (input)<br> 
+   Output file name (including path and <code>.xml</code> extension). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>vert_list</b></code> (input)<br> 
+   Vertex list, size <code>[n_vert, 3]</code>, each row is a vertex (x, y, z) in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::umat <b>face_ind</b></code> (input)<br> 
+   Face indices (0-based), size <code>[n_mesh, 3]</code>, each row defines a triangle via vertex indices. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::uvec <b>obj_ind</b></code> (input)<br> 
+   Object indices (1-based), size <code>[n_mesh]</code>. Assigns each triangle to an object. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::uvec <b>mtl_ind</b></code> (input)<br> 
+   Material indices (1-based), size <code>[n_mesh]</code>. Assigns each triangle to a material. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;std::string&gt; <b>obj_names</b></code> (input)<br> 
+   Names of objects. Length must be equal to <code>max(obj_ind)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;std::string&gt; <b>mtl_names</b></code> (input)<br> 
+   Names of materials. Length must be equal to <code>max(mtl_ind)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>bsdf</b> = {}</code> (optional input)<br> 
+   Material reflectivity data (BSDF parameters), size <code>[mtl_names.size(), 17]</code>. If omitted, the <code>null</code> BSDF is used. 
+   Note that Sionna RT all BSDF parameters. They are only used by the Mitsuma rendering system. 
+   See <a href="#obj_file_read">obj_file_read</a> for a definition of the data fields. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>map_to_itu_materials</b> = false</code> (optional input)<br> 
+   If true, maps material names to ITU-defined presets used by Sionna RT. Default: <code>false</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="obj_file_read"></a>
 <b>obj_file_read</b> - Read Wavefront `.obj` file and extract geometry and material information
 <ul>
@@ -3498,9 +3577,9 @@ arma::uword quadriga_lib::obj_file_read(
                 arma::Mat&lt;dtype&gt; *mesh = nullptr,
                 arma::Mat&lt;dtype&gt; *mtl_prop = nullptr,
                 arma::Mat&lt;dtype&gt; *vert_list = nullptr,
-                arma::u32_mat *face_ind = nullptr,
-                arma::u32_vec *obj_ind = nullptr,
-                arma::u32_vec *mtl_ind = nullptr,
+                arma::umat *face_ind = nullptr,
+                arma::uvec *obj_ind = nullptr,
+                arma::uvec *mtl_ind = nullptr,
                 std::vector&lt;std::string&gt; *obj_names = nullptr,
                 std::vector&lt;std::string&gt; *mtl_names = nullptr,
                 arma::Mat&lt;dtype&gt; *bsdf = nullptr);
@@ -3523,15 +3602,15 @@ arma::uword quadriga_lib::obj_file_read(
    List of all vertex positions found in the <code>.obj</code> file. Size: <code>[n_vert, 3]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>*face_ind</b> = nullptr</code> (optional output)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::umat <b>*face_ind</b> = nullptr</code> (optional output)<br> 
    Indices into <code>vert_list</code> for each triangle (0-based). Size: <code>[n_mesh, 3]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*obj_ind</b> = nullptr</code> (optional output)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>*obj_ind</b> = nullptr</code> (optional output)<br> 
    Object index (1-based) for each triangle. Size: <code>[n_mesh]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*mtl_ind</b> = nullptr</code> (optional output)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>*mtl_ind</b> = nullptr</code> (optional output)<br> 
    Material index (1-based) for each triangle. Size: <code>[n_mesh]</code>. 
 </li></ul>
  
@@ -3545,7 +3624,7 @@ arma::uword quadriga_lib::obj_file_read(
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*bsdf</b> = nullptr</code> (optional output)<br> 
    Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the 
-   .MTL file. Size <code>[mtl_names.size(), 10]</code>. Values are: 
+   .MTL file. Size <code>[mtl_names.size(), 17]</code>. Values are: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td>0</td>
@@ -3610,6 +3689,42 @@ arma::uword quadriga_lib::obj_file_read(
 <tr>
   <td>10</td>
   <td>Emission Color Blue</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td>Sheen</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td>Clearcoat</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>13</td>
+  <td>Clearcoat roughness</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>14</td>
+  <td>Anisotropic</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>15</td>
+  <td>Anisotropic rotation</td>
+  <td>Range 0-1</td>
+  <td>Default = 0.0</td>
+</tr>
+<tr>
+  <td>16</td>
+  <td>Transmission</td>
   <td>Range 0-1</td>
   <td>Default = 0.0</td>
 </tr>
@@ -3911,8 +4026,8 @@ The following materials are defined by default:<br><br>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
 arma::mat mesh, mtl_prop, vert_list;
-arma::u32_mat face_ind;
-arma::u32_vec obj_ind, mtl_ind;
+arma::umat face_ind;
+arma::uvec obj_ind, mtl_ind;
 std::vector&lt;std::string&gt; obj_names, mtl_names;
 
 quadriga_lib::obj_file_read&lt;double&gt;("cube.obj", &amp;mesh, &amp;mtl_prop, &amp;vert_list, &amp;face_ind, &amp;obj_ind, &amp;mtl_ind, &amp;obj_names, &amp;mtl_names);
