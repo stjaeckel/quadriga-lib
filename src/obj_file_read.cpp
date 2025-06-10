@@ -42,9 +42,9 @@ arma::uword quadriga_lib::obj_file_read(
                 arma::Mat<dtype> *mesh = nullptr,
                 arma::Mat<dtype> *mtl_prop = nullptr,
                 arma::Mat<dtype> *vert_list = nullptr,
-                arma::u32_mat *face_ind = nullptr,
-                arma::u32_vec *obj_ind = nullptr,
-                arma::u32_vec *mtl_ind = nullptr,
+                arma::umat *face_ind = nullptr,
+                arma::uvec *obj_ind = nullptr,
+                arma::uvec *mtl_ind = nullptr,
                 std::vector<std::string> *obj_names = nullptr,
                 std::vector<std::string> *mtl_names = nullptr,
                 arma::Mat<dtype> *bsdf = nullptr);
@@ -63,13 +63,13 @@ arma::uword quadriga_lib::obj_file_read(
 - `arma::Mat<dtype> ***vert_list** = nullptr` (optional output)<br>
   List of all vertex positions found in the `.obj` file. Size: `[n_vert, 3]`.
 
-- `arma::u32_mat ***face_ind** = nullptr` (optional output)<br>
+- `arma::umat ***face_ind** = nullptr` (optional output)<br>
   Indices into `vert_list` for each triangle (0-based). Size: `[n_mesh, 3]`.
 
-- `arma::u32_vec ***obj_ind** = nullptr` (optional output)<br>
+- `arma::uvec ***obj_ind** = nullptr` (optional output)<br>
   Object index (1-based) for each triangle. Size: `[n_mesh]`.
 
-- `arma::u32_vec ***mtl_ind** = nullptr` (optional output)<br>
+- `arma::uvec ***mtl_ind** = nullptr` (optional output)<br>
   Material index (1-based) for each triangle. Size: `[n_mesh]`.
 
 - `std::vector<std::string> ***obj_names** = nullptr` (optional output)<br>
@@ -80,7 +80,7 @@ arma::uword quadriga_lib::obj_file_read(
 
 - `arma::Mat<dtype> ***bsdf** = nullptr` (optional output)<br>
   Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
-  .MTL file. Size `[mtl_names.size(), 10]`. Values are:
+  .MTL file. Size `[mtl_names.size(), 17]`. Values are:
   0  | Base Color Red       | Range 0-1     | Default = 0.8
   1  | Base Color Green     | Range 0-1     | Default = 0.8
   2  | Base Color Blue      | Range 0-1     | Default = 0.8
@@ -92,6 +92,12 @@ arma::uword quadriga_lib::obj_file_read(
   8  | Emission Color Red    | Range 0-1     | Default = 0.0
   9  | Emission Color Green  | Range 0-1     | Default = 0.0
   10 | Emission Color Blue   | Range 0-1     | Default = 0.0
+  11 | Sheen                 | Range 0-1     | Default = 0.0
+  12 | Clearcoat             | Range 0-1     | Default = 0.0
+  13 | Clearcoat roughness   | Range 0-1     | Default = 0.0
+  14 | Anisotropic           | Range 0-1     | Default = 0.0
+  15 | Anisotropic rotation  | Range 0-1     | Default = 0.0
+  16 | Transmission          | Range 0-1     | Default = 0.0
 
 ## Returns:
 - `arma::uword`<br>
@@ -159,8 +165,8 @@ irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.
 ## Example:
 ```
 arma::mat mesh, mtl_prop, vert_list;
-arma::u32_mat face_ind;
-arma::u32_vec obj_ind, mtl_ind;
+arma::umat face_ind;
+arma::uvec obj_ind, mtl_ind;
 std::vector<std::string> obj_names, mtl_names;
 
 quadriga_lib::obj_file_read<double>("cube.obj", &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
@@ -170,7 +176,7 @@ MD!*/
 // Read Wavefront .obj file
 template <typename dtype>
 arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
-                                        arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                        arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                         std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
                                         arma::Mat<dtype> *bsdf)
 {
@@ -189,19 +195,19 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         throw std::invalid_argument("Error opening file: failed to open '" + fn + "'.");
 
     // Obtain the number of faces and vertices from the file
-    arma::uword n_vert = 0ULL, n_faces = 0ULL;
+    arma::uword n_vert = 0, n_faces = 0;
     std::string line;
     while (std::getline(fileR, line))
-        if (line.length() > 2ULL && line.at(0ULL) == 118 && line.at(1ULL) == 32) // Line starts with "v "
+        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
             ++n_vert;
-        else if (line.length() > 2ULL && line.at(0ULL) == 102) // Line starts with "f "
+        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
             ++n_faces;
 
     // Stop here if no other outputs are needed
-    if (n_vert == 0ULL || n_faces == 0ULL)
+    if (n_vert == 0 || n_faces == 0)
     {
         fileR.close();
-        return 0ULL;
+        return 0;
     }
 
     if (mesh == nullptr && mtl_prop == nullptr && vert_list == nullptr && face_ind == nullptr && obj_ind == nullptr && mtl_ind == nullptr)
@@ -255,52 +261,52 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 
     // Reset the file pointer to the beginning of the file
     fileR.clear(); // Clear any flags
-    fileR.seekg(0ULL, std::ios::beg);
+    fileR.seekg(0, std::ios::beg);
 
     // Local data
-    arma::uword i_vert = 0ULL, i_face = 0ULL, j_face = 0ULL, i_object = 0ULL, i_mtl = 0ULL; // Counters for vertices, faces, objects, materials
-    arma::uword iM = 0ULL;                                                                  // Material index
-    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;                              // Default material properties
-    bool simple_face_format = true;                                                         // Selector for face format
+    arma::uword i_vert = 0, i_face = 0, j_face = 0, i_object = 0, i_mtl = 0; // Counters for vertices, faces, objects, materials
+    arma::uword iM = 0;                                                      // Material index
+    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;               // Default material properties
+    bool simple_face_format = true;                                          // Selector for face format
 
     // Obtain memory for the vertex list
     dtype *p_vert;
     if (vert_list == nullptr)
-        p_vert = new dtype[n_vert * 3ULL];
-    else if (vert_list->n_rows != n_vert || vert_list->n_cols != 3ULL)
+        p_vert = new dtype[n_vert * 3];
+    else if (vert_list->n_rows != n_vert || vert_list->n_cols != 3)
     {
-        vert_list->set_size(n_vert, 3ULL);
+        vert_list->set_size(n_vert, 3);
         p_vert = vert_list->memptr();
     }
     else
         p_vert = vert_list->memptr();
 
     // Obtain memory for face indices
-    unsigned *p_face_ind;
+    arma::uword *p_face_ind;
     if (face_ind == nullptr)
-        p_face_ind = new unsigned[n_faces * 3ULL];
-    else if (face_ind->n_rows != n_faces || face_ind->n_cols != 3ULL)
+        p_face_ind = new arma::uword[n_faces * 3];
+    else if (face_ind->n_rows != n_faces || face_ind->n_cols != 3)
     {
-        face_ind->set_size(n_faces, 3ULL);
+        face_ind->set_size(n_faces, 3);
         p_face_ind = face_ind->memptr();
     }
     else
         p_face_ind = face_ind->memptr();
 
     // Set size of "mtl_prop"
-    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 5ULL))
-        mtl_prop->set_size(n_faces, 5ULL);
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 5))
+        mtl_prop->set_size(n_faces, 5);
     dtype *p_mtl_prop = (mtl_prop == nullptr) ? nullptr : mtl_prop->memptr();
 
     // Set size of "mtl_ind"
     if (mtl_ind != nullptr && mtl_ind->n_elem != n_faces)
         mtl_ind->set_size(n_faces);
-    unsigned *p_mtl_ind = (mtl_ind == nullptr) ? nullptr : mtl_ind->memptr();
+    arma::uword *p_mtl_ind = (mtl_ind == nullptr) ? nullptr : mtl_ind->memptr();
 
     // Set size of "obj_ind"
     if (obj_ind != nullptr && obj_ind->n_elem != n_faces)
         obj_ind->set_size(n_faces);
-    unsigned *p_obj_ind = (obj_ind == nullptr) ? nullptr : obj_ind->memptr();
+    arma::uword *p_obj_ind = (obj_ind == nullptr) ? nullptr : obj_ind->memptr();
 
     // Process file
     std::string mtllib_fn;
@@ -311,7 +317,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             mtllib_fn = line.substr(7);
 
         // Read vertex
-        if (line.length() > 2ULL && line.at(0ULL) == 118 && line.at(1ULL) == 32) // Line starts with "v "
+        if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
         {
             if (i_vert >= n_vert)
                 throw std::invalid_argument("Error reading vertex data.");
@@ -320,24 +326,24 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             std::sscanf(line.c_str(), "v %lf %lf %lf", &x, &y, &z);
             p_vert[i_vert] = (dtype)x;
             p_vert[i_vert + n_vert] = (dtype)y;
-            p_vert[i_vert++ + 2ULL * n_vert] = (dtype)z;
+            p_vert[i_vert++ + 2 * n_vert] = (dtype)z;
         }
 
         // Read face
-        else if (line.length() > 2ULL && line.at(0ULL) == 102) // Line starts with "f "
+        else if (line.length() > 2 && line.at(0) == 102) // Line starts with "f "
         {
             if (i_face >= n_faces)
                 throw std::invalid_argument("Error reading face data.");
 
             // Read face indices from file (1-based)
-            int a = 0, b = 0, c = 0, d = 0;
+            arma::uword a = 0, b = 0, c = 0, d = 0;
             if (simple_face_format)
             {
-                sscanf(line.c_str(), "f %d %d %d %d", &a, &b, &c, &d);
+                sscanf(line.c_str(), "f %llu %llu %llu %llu", &a, &b, &c, &d);
                 simple_face_format = b != 0;
             }
             if (!simple_face_format)
-                sscanf(line.c_str(), "f %d%*[/0-9] %d%*[/0-9] %d%*[/0-9] %d", &a, &b, &c, &d);
+                sscanf(line.c_str(), "f %llu%*[/0-9] %llu%*[/0-9] %llu%*[/0-9] %llu", &a, &b, &c, &d);
 
             if (a == 0 || b == 0 || c == 0)
                 throw std::invalid_argument("Error reading face data.");
@@ -349,46 +355,46 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             if (p_mtl_prop != nullptr)
                 p_mtl_prop[i_face] = (dtype)aM,
                 p_mtl_prop[i_face + n_faces] = (dtype)bM,
-                p_mtl_prop[i_face + 2ULL * n_faces] = (dtype)cM,
-                p_mtl_prop[i_face + 3ULL * n_faces] = (dtype)dM,
-                p_mtl_prop[i_face + 4ULL * n_faces] = (dtype)attM;
+                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM,
+                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM,
+                p_mtl_prop[i_face + 4 * n_faces] = (dtype)attM;
 
             if (p_mtl_ind != nullptr)
-                p_mtl_ind[i_face] = (unsigned)iM;
+                p_mtl_ind[i_face] = iM;
 
             // Store face indices (0-based)
-            p_face_ind[i_face] = (unsigned)a - 1;
-            p_face_ind[i_face + n_faces] = (unsigned)b - 1;
-            p_face_ind[i_face++ + 2ULL * n_faces] = (unsigned)c - 1;
+            p_face_ind[i_face] = a - 1;
+            p_face_ind[i_face + n_faces] = b - 1;
+            p_face_ind[i_face++ + 2 * n_faces] = c - 1;
         }
 
         // Read objects ids (= connected faces)
         // - Object name is written to the OBJ file before vertices, materials and faces
-        else if (line.length() > 2ULL && line.at(0ULL) == 111) // Line starts with "o "
+        else if (line.length() > 2 && line.at(0) == 111) // Line starts with "o "
         {
             if (p_obj_ind != nullptr)
                 for (arma::uword i = j_face; i < i_face; ++i)
-                    p_obj_ind[i] = (unsigned)i_object;
+                    p_obj_ind[i] = i_object;
 
             // Add object name to list of object names
             if (obj_names != nullptr)
             {
-                std::string obj_name = line.substr(2ULL, 255ULL); // Name in OBJ File
+                std::string obj_name = line.substr(2, 255); // Name in OBJ File
                 obj_names->push_back(obj_name);
             }
 
             // Reset current material
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0ULL;
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0;
             j_face = i_face;
             ++i_object;
         }
 
         // Read and set material properties
         // - Material names are written before face indices
-        else if (line.length() > 7ULL && line.substr(0ULL, 6ULL).compare("usemtl") == 0) // Line contains material definition
+        else if (line.length() > 7 && line.substr(0, 6).compare("usemtl") == 0) // Line contains material definition
         {
-            std::string mtl_name = line.substr(7ULL, 255ULL);              // Name in OBJ File
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0ULL; // Reset current material
+            std::string mtl_name = line.substr(7, 255);                 // Name in OBJ File
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0; // Reset current material
             int found = -1;
 
             // If "mtl_name" does not contain a "::", remove everything after the dot
@@ -400,7 +406,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             }
 
             // Try to find the material name in the material library
-            for (size_t n = 0ULL; n < mtl_lib.size(); ++n)
+            for (size_t n = 0; n < mtl_lib.size(); ++n)
                 if (mtl_lib[n].name.compare(mtl_name) == 0)
                 {
                     aM = mtl_lib[n].a;
@@ -422,7 +428,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                 found = (int)mtl_lib.size() - 1;
             }
 
-            if (iM == 0ULL) // Increase material counter
+            if (iM == 0) // Increase material counter
             {
                 iM = ++i_mtl;
                 mtl_lib[found].index = i_mtl;
@@ -434,36 +440,36 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     }
 
     // Set the object ID of the last object
-    i_object = (i_object == 0ULL) ? 1ULL : i_object; // Single unnamed object
+    i_object = (i_object == 0) ? 1 : i_object; // Single unnamed object
     if (p_obj_ind != nullptr)
         for (arma::uword i = j_face; i < i_face; ++i)
-            p_obj_ind[i] = (unsigned)i_object;
+            p_obj_ind[i] = i_object;
 
     // Calculate the triangle mesh from vertices and faces
     if (mesh != nullptr)
     {
-        if (mesh->n_rows != n_faces || mesh->n_cols != 9ULL)
-            mesh->set_size(n_faces, 9ULL);
+        if (mesh->n_rows != n_faces || mesh->n_cols != 9)
+            mesh->set_size(n_faces, 9);
         dtype *p_mesh = mesh->memptr();
 
-        for (arma::uword n = 0ULL; n < n_faces; ++n)
+        for (arma::uword n = 0; n < n_faces; ++n)
         {
             arma::uword a = p_face_ind[n],
                         b = p_face_ind[n + n_faces],
-                        c = p_face_ind[n + 2ULL * n_faces];
+                        c = p_face_ind[n + 2 * n_faces];
 
             if (a > n_vert || b > n_vert || c > n_vert)
                 throw std::invalid_argument("Error assembling triangle mesh.");
 
             p_mesh[n] = p_vert[a];
             p_mesh[n + n_faces] = p_vert[a + n_vert];
-            p_mesh[n + 2ULL * n_faces] = p_vert[a + 2ULL * n_vert];
-            p_mesh[n + 3ULL * n_faces] = p_vert[b];
-            p_mesh[n + 4ULL * n_faces] = p_vert[b + n_vert];
-            p_mesh[n + 5ULL * n_faces] = p_vert[b + 2ULL * n_vert];
-            p_mesh[n + 6ULL * n_faces] = p_vert[c];
-            p_mesh[n + 7ULL * n_faces] = p_vert[c + n_vert];
-            p_mesh[n + 8ULL * n_faces] = p_vert[c + 2ULL * n_vert];
+            p_mesh[n + 2 * n_faces] = p_vert[a + 2 * n_vert];
+            p_mesh[n + 3 * n_faces] = p_vert[b];
+            p_mesh[n + 4 * n_faces] = p_vert[b + n_vert];
+            p_mesh[n + 5 * n_faces] = p_vert[b + 2 * n_vert];
+            p_mesh[n + 6 * n_faces] = p_vert[c];
+            p_mesh[n + 7 * n_faces] = p_vert[c + n_vert];
+            p_mesh[n + 8 * n_faces] = p_vert[c + 2 * n_vert];
         }
     }
 
@@ -491,129 +497,200 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             mtl_file.replace_filename(mtllib_fn);
 
         if (!std::filesystem::exists(mtl_file))
-            throw std::invalid_argument("Error opening file: '" + mtl_file.filename().string() + "' does not exist.");
-
-        std::ifstream fileR{mtl_file, std::ios::in};
-        if (!fileR.is_open())
-            throw std::invalid_argument("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
-
-        size_t n_mtl = mtl_names->size();
-        if (bsdf->n_rows != n_mtl || bsdf->n_cols != 11)
-            bsdf->set_size(n_mtl, 11);
-
-        size_t i_mtl = 0;
-        for (const auto &mtl : *mtl_names)
         {
-            // Rewind to start
-            fileR.clear();
-            fileR.seekg(0);
+            bsdf->reset();
+        }
+        else
+        {
 
-            // Default values
-            double R = 0.8, G = 0.8, B = 0.8;    // Base color
-            double Re = 0.0, Ge = 0.0, Be = 0.0; // Emission color
-            double alpha = 1.0;                  // Transparency
-            double ior = 1.45;                   // Index of refraction
-            double roughness = 0.5;
-            double metallic = 0.0;
-            double specular = 0.5;
+            std::ifstream fileR{mtl_file, std::ios::in};
+            if (!fileR.is_open())
+                throw std::invalid_argument("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
 
-            std::string line;
-            bool foundMaterial = false;
+            size_t n_mtl = mtl_names->size();
+            if (bsdf->n_rows != n_mtl || bsdf->n_cols != 17)
+                bsdf->set_size(n_mtl, 17);
 
-            // Find the "newmtl <mtl>" line
-            while (std::getline(fileR, line))
-                if (line.rfind("newmtl ", 0) == 0) // starts with "newmtl "
-                {
-                    // extract everything after "newmtl "
-                    std::string name = line.substr(7);
-                    if (name == mtl)
+            size_t i_mtl = 0;
+            for (const auto &mtl : *mtl_names)
+            {
+                // Rewind to start
+                fileR.clear();
+                fileR.seekg(0);
+
+                // Default values
+                double R = 0.8, G = 0.8, B = 0.8;    // Base color
+                double Re = 0.0, Ge = 0.0, Be = 0.0; // Emission color
+                double alpha = 1.0;                  // Transparency
+                double ior = 1.45;                   // Index of refraction
+                double roughness = 0.5;
+                double metallic = 0.0;
+                double specular = 0.5;
+                double sheen = 0.0;
+                double clearcoat = 0.0;
+                double clearcoat_roughness = 0.0;
+                double anisotropic = 0.0;
+                double anisotropic_rotation = 0.0;
+                double transmission = 0.0;
+
+                std::string line;
+                bool foundMaterial = false;
+
+                // Find the "newmtl <mtl>" line
+                while (std::getline(fileR, line))
+                    if (line.rfind("newmtl ", 0) == 0) // starts with "newmtl "
                     {
-                        foundMaterial = true;
+                        // extract everything after "newmtl "
+                        std::string name = line.substr(7);
+                        if (name == mtl)
+                        {
+                            foundMaterial = true;
+                            break;
+                        }
+                    }
+                if (!foundMaterial)
+                {
+                    throw std::invalid_argument(
+                        "Error: material '" + mtl + "' not found in '" + fn + "'.");
+                }
+
+                // From here, scan until the next "newmtl " or EOF to look for Kd and Ns
+                while (std::getline(fileR, line))
+                {
+                    if (line.rfind("newmtl ", 0) == 0)
                         break;
+
+                    if (line.rfind("Kd ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> R >> G >> B;
+                    }
+
+                    if (line.rfind("Ke ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> Re >> Ge >> Be;
+                    }
+
+                    if (line.rfind("Ka ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> metallic;
+                    }
+
+                    if (line.rfind("Pm ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> metallic;
+                    }
+
+                    if (line.rfind("Ks ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> specular;
+                    }
+
+                    if (line.rfind("d ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(2));
+                        iss >> alpha;
+                    }
+
+                    if (line.rfind("Ni ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> ior;
+                    }
+
+                    if (line.rfind("Ns ", 0) == 0)
+                    {
+                        double tmp;
+                        std::istringstream iss(line.substr(3));
+                        iss >> tmp;
+                        roughness = 1.0 - std::sqrt(tmp * 0.001);
+                    }
+
+                    if (line.rfind("Pr ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> roughness;
+                    }
+
+                    if (line.rfind("Ps ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> sheen;
+                    }
+
+                    if (line.rfind("Pc ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> clearcoat;
+                    }
+
+                    if (line.rfind("Pcr ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(4));
+                        iss >> clearcoat_roughness;
+                    }
+
+                    if (line.rfind("aniso ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(6));
+                        iss >> anisotropic;
+                    }
+
+                    if (line.rfind("anisor ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(7));
+                        iss >> anisotropic_rotation;
+                    }
+
+                    if (line.rfind("Tf ", 0) == 0)
+                    {
+                        std::istringstream iss(line.substr(3));
+                        iss >> transmission;
                     }
                 }
-            if (!foundMaterial)
-            {
-                throw std::invalid_argument(
-                    "Error: material '" + mtl + "' not found in '" + fn + "'.");
+
+                // Fix ranges
+                R = (R < 0.0) ? 0.0 : (R > 1.0 ? 1.0 : R);
+                G = (G < 0.0) ? 0.0 : (G > 1.0 ? 1.0 : G);
+                B = (B < 0.0) ? 0.0 : (B > 1.0 ? 1.0 : B);
+                alpha = (alpha < 0.0) ? 0.0 : (alpha > 1.0 ? 1.0 : alpha);
+                specular = (specular < 0.0) ? 0.0 : (specular > 1.0 ? 1.0 : specular);
+                roughness = (roughness < 0.0) ? 0.0 : (roughness > 1.0 ? 1.0 : roughness);
+                metallic = (metallic < 0.0) ? 0.0 : (metallic > 1.0 ? 1.0 : metallic);
+                Re = (Re < 0.0) ? 0.0 : (Re > 1.0 ? 1.0 : Re);
+                Ge = (Ge < 0.0) ? 0.0 : (Ge > 1.0 ? 1.0 : Ge);
+                Be = (Be < 0.0) ? 0.0 : (Be > 1.0 ? 1.0 : Be);
+                sheen = (sheen < 0.0) ? 0.0 : (sheen > 1.0 ? 1.0 : sheen);
+                clearcoat = (clearcoat < 0.0) ? 0.0 : (clearcoat > 1.0 ? 1.0 : clearcoat);
+                clearcoat_roughness = (clearcoat_roughness < 0.0) ? 0.0 : (clearcoat_roughness > 1.0 ? 1.0 : clearcoat_roughness);
+                anisotropic = (anisotropic < 0.0) ? 0.0 : (anisotropic > 1.0 ? 1.0 : anisotropic);
+                anisotropic_rotation = (anisotropic_rotation < 0.0) ? 0.0 : (anisotropic_rotation > 1.0 ? 1.0 : anisotropic_rotation);
+                transmission = (transmission < 0.0) ? 0.0 : (transmission > 1.0 ? 1.0 : transmission);
+
+                // Write to output
+                bsdf->at(i_mtl, 0) = (dtype)R;
+                bsdf->at(i_mtl, 1) = (dtype)G;
+                bsdf->at(i_mtl, 2) = (dtype)B;
+                bsdf->at(i_mtl, 3) = (dtype)alpha;
+                bsdf->at(i_mtl, 4) = (dtype)roughness;
+                bsdf->at(i_mtl, 5) = (dtype)metallic;
+                bsdf->at(i_mtl, 6) = (dtype)ior;
+                bsdf->at(i_mtl, 7) = (dtype)specular;
+                bsdf->at(i_mtl, 8) = (dtype)Re;
+                bsdf->at(i_mtl, 9) = (dtype)Ge;
+                bsdf->at(i_mtl, 10) = (dtype)Be;
+                bsdf->at(i_mtl, 11) = (dtype)sheen;
+                bsdf->at(i_mtl, 12) = (dtype)clearcoat;
+                bsdf->at(i_mtl, 13) = (dtype)clearcoat_roughness;
+                bsdf->at(i_mtl, 14) = (dtype)anisotropic;
+                bsdf->at(i_mtl, 15) = (dtype)anisotropic_rotation;
+                bsdf->at(i_mtl, 16) = (dtype)transmission;
+                ++i_mtl;
             }
-
-            // From here, scan until the next "newmtl " or EOF to look for Kd and Ns
-            while (std::getline(fileR, line))
-            {
-                if (line.rfind("newmtl ", 0) == 0)
-                    break;
-
-                if (line.rfind("Kd ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(3));
-                    iss >> R >> G >> B;
-                }
-
-                if (line.rfind("Ke ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(3));
-                    iss >> Re >> Ge >> Be;
-                }
-
-                if (line.rfind("Ka ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(3));
-                    iss >> metallic;
-                }
-
-                if (line.rfind("Ks ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(3));
-                    iss >> specular;
-                }
-
-                if (line.rfind("d ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(2));
-                    iss >> alpha;
-                }
-
-                if (line.rfind("Ni ", 0) == 0)
-                {
-                    std::istringstream iss(line.substr(3));
-                    iss >> ior;
-                }
-
-                if (line.rfind("Ns ", 0) == 0)
-                {
-                    double tmp;
-                    std::istringstream iss(line.substr(3));
-                    iss >> tmp;
-                    roughness = 1.0 - std::sqrt(tmp * 0.001);
-                }
-            }
-
-            // Fix ranges
-            R = (R < 0.0) ? 0.0 : (R > 1.0 ? 1.0 : R);
-            G = (G < 0.0) ? 0.0 : (G > 1.0 ? 1.0 : G);
-            B = (B < 0.0) ? 0.0 : (B > 1.0 ? 1.0 : B);
-            alpha = (alpha < 0.0) ? 0.0 : (alpha > 1.0 ? 1.0 : alpha);
-            specular = (specular < 0.0) ? 0.0 : (specular > 1.0 ? 1.0 : specular);
-            roughness = (roughness < 0.0) ? 0.0 : (roughness > 1.0 ? 1.0 : roughness);
-            metallic = (metallic < 0.0) ? 0.0 : (metallic > 1.0 ? 1.0 : metallic);
-            Re = (Re < 0.0) ? 0.0 : (Re > 1.0 ? 1.0 : Re);
-            Ge = (Ge < 0.0) ? 0.0 : (Ge > 1.0 ? 1.0 : Ge);
-            Be = (Be < 0.0) ? 0.0 : (Be > 1.0 ? 1.0 : Be);
-
-            // Write to output
-            bsdf->at(i_mtl, 0) = (dtype)R;
-            bsdf->at(i_mtl, 1) = (dtype)G;
-            bsdf->at(i_mtl, 2) = (dtype)B;
-            bsdf->at(i_mtl, 3) = (dtype)alpha;
-            bsdf->at(i_mtl, 4) = (dtype)roughness;
-            bsdf->at(i_mtl, 5) = (dtype)metallic;
-            bsdf->at(i_mtl, 6) = (dtype)ior;
-            bsdf->at(i_mtl, 7) = (dtype)specular;
-            bsdf->at(i_mtl, 8) = (dtype)Re;
-            bsdf->at(i_mtl, 9) = (dtype)Ge;
-            bsdf->at(i_mtl, 10) = (dtype)Be;
-            ++i_mtl;
         }
 
         fileR.close();
@@ -623,11 +700,11 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 }
 
 template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
-                                                 arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                                 arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                                  std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
                                                  arma::Mat<float> *bsdf);
 
 template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
-                                                 arma::u32_mat *face_ind, arma::u32_vec *obj_ind, arma::u32_vec *mtl_ind,
+                                                 arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                                  std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
                                                  arma::Mat<double> *bsdf);

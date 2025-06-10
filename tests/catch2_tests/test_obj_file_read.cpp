@@ -72,8 +72,8 @@ TEST_CASE("Test OBJ File Read - Simple test")
 
     // Containers for data
     arma::mat mesh, mtl_prop, vert_list;
-    arma::u32_mat face_ind;
-    arma::u32_vec obj_ind, mtl_ind;
+    arma::umat face_ind;
+    arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
     // Read file
@@ -105,7 +105,7 @@ TEST_CASE("Test OBJ File Read - Simple test")
         {5, 1, 2}};
 
     face_ind_correct -= 1;
-    auto face_ind_correct_u32 = arma::conv_to<arma::u32_mat>::from(face_ind_correct);
+    auto face_ind_correct_u32 = arma::conv_to<arma::umat>::from(face_ind_correct);
 
     arma::mat mesh_correct = arma::join_rows(
         vert_list_correct.rows(face_ind_correct.col(0)),
@@ -148,7 +148,7 @@ TEST_CASE("Test OBJ File Read - Simple test")
 TEST_CASE("Test OBJ File Read - Materials")
 {
     arma::mat mtl_prop, mtl_correct;
-    arma::u32_vec obj_ind, mtl_ind;
+    arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> mtl_names;
 
     // Check "air"

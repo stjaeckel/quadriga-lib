@@ -81,7 +81,7 @@ class test_version(unittest.TestCase):
         quadriga_lib.obj_file_read(fn)
 
         # Read all
-        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read(fn)
+        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read(fn)
 
         assert mesh.shape == (12,9)
         assert mtl_prop.shape == (12,5)
@@ -91,6 +91,7 @@ class test_version(unittest.TestCase):
         assert mtl_ind.shape == (12,)
         assert len(obj_names) == 1
         assert len(mtl_names) == 0
+        assert bsdf.shape == (0,0)
 
         npt.assert_(mesh.dtype == np.float64)
         npt.assert_(mtl_prop.dtype == np.float64)
@@ -172,7 +173,7 @@ class test_version(unittest.TestCase):
             f.write('usemtl Cst::2.1:2.2:2.3:2.4:20\n')
             f.write('f 2/1/1 4/4/1 3/2/1\n')
 
-        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names = quadriga_lib.obj_file_read(fn)
+        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read(fn)
 
         npt.assert_almost_equal(mtl_prop[0, :], [1.1, 1.2, 1.3, 1.4, 10], decimal=14)
         npt.assert_almost_equal(mtl_prop[1, :], [2.1, 2.2, 2.3, 2.4, 20], decimal=14)
@@ -186,6 +187,6 @@ class test_version(unittest.TestCase):
 
         with self.assertRaises(ValueError) as context:
             quadriga_lib.obj_file_read('bla.obj')
-        self.assertEqual(str(context.exception), "Error opening file.")
+        self.assertEqual(str(context.exception), "Error opening file: 'bla.obj' does not exist.")
 
         os.remove(fn)

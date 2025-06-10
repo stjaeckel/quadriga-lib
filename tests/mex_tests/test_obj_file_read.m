@@ -53,15 +53,15 @@ assertTrue( isempty(mtl_names) );
 assertTrue( isa(mesh, "double") );
 assertTrue( isa(mtl_prop, "double") );
 assertTrue( isa(vert_list, "double") );
-assertTrue( isa(face_ind, "uint32") );
-assertTrue( isa(obj_ind, "uint32") );
-assertTrue( isa(mtl_ind, "uint32") );
+assertTrue( isa(face_ind, "uint64") );
+assertTrue( isa(obj_ind, "uint64") );
+assertTrue( isa(mtl_ind, "uint64") );
 
 assertTrue( all( mtl_prop(:,1) == 1 ) );
 assertTrue( all(all( mtl_prop(:,[2,3,4,5]) == 0 )) );
 
 assertElementsAlmostEqual( vert_list, vert_list_correct, 'absolute', 1e-14 );
-assertEqual( face_ind, uint32(face_ind_correct) );
+assertEqual( face_ind, uint64(face_ind_correct) );
 assertElementsAlmostEqual( mesh, mesh_correct, 'absolute', 1e-14 );
 
 assertTrue( all( obj_ind == 1 ) );
@@ -109,9 +109,9 @@ assertTrue( isa(vert_list, "double") );
 
 assertTrue( all( mtl_prop([1,2],1) == 1 ) );
 assertTrue( all( mtl_prop([3,4],1) > 1.5 ) );
-assertEqual( face_ind, uint32([2,3,1;2,4,3;6,7,5;6,8,7]) );
-assertEqual( obj_ind, uint32([1;1;2;2]) );
-assertEqual( mtl_ind, uint32([0;0;1;1]) );
+assertEqual( face_ind, uint64([2,3,1;2,4,3;6,7,5;6,8,7]) );
+assertEqual( obj_ind, uint64([1;1;2;2]) );
+assertEqual( mtl_ind, uint64([0;0;1;1]) );
 
 assertEqual( mtl_names{1,1}, 'itu_wood' );
 
@@ -135,14 +135,15 @@ fprintf(f,'%s\n','usemtl Cst::2.1:2.2:2.3:2.4:20');
 fprintf(f,'%s\n','f 2/1/1 4/4/1 3/2/1');
 fclose(f);
 
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = quadriga_lib.obj_file_read(fn);
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = quadriga_lib.obj_file_read(fn);
 
 assertElementsAlmostEqual( mtl_prop(1,:), [1.1, 1.2, 1.3, 1.4, 10], 'absolute', 1e-14 );
 assertElementsAlmostEqual( mtl_prop(2,:), [2.1, 2.2, 2.3, 2.4, 20], 'absolute', 1e-14 );
 assertEqual( mtl_names{1,1}, 'Cst::1.1:1.2:1.3:1.4:10' );
 assertEqual( mtl_names{2,1}, 'Cst::2.1:2.2:2.3:2.4:20' );
-assertEqual( obj_ind, uint32([1;1]) );
-assertEqual( mtl_ind, uint32([1;2]) );
+assertEqual( obj_ind, uint64([1;1]) );
+assertEqual( mtl_ind, uint64([1;2]) );
+assertEqual( size(bsdf), [0,0] );
 
 % Too many inputs
 try
@@ -157,7 +158,7 @@ end
 
 % Too many outputs
 try
-    [~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn);
+    [~,~,~,~,~,~,~,~,~,~] = quadriga_lib.obj_file_read(fn);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -182,7 +183,7 @@ try
     quadriga_lib.obj_file_read('bla.obj');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Error opening file.';
+    expectedErrorMessage = 'Error opening file: ''bla.obj'' does not exist.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

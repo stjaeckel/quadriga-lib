@@ -39,7 +39,7 @@ Otherwise, it defaults to using standard properties.
 ## Usage:
 
 ```
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names ] = ...
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
     quadriga_lib.obj_file_read( fn );
 ```
 
@@ -81,6 +81,27 @@ Otherwise, it defaults to using standard properties.
 
 - **`mtl_names`**<br>
   Names of the materials in the OBJ file; Cell array of strings
+
+- **`bsdf`**<br>
+  Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
+  .MTL file. Size `[mtl_names.size(), 17]`. Columns are:
+  1  | Base Color Red       | Range 0-1     | Default = 0.8
+  2  | Base Color Green     | Range 0-1     | Default = 0.8
+  3  | Base Color Blue      | Range 0-1     | Default = 0.8
+  4  | Transparency (alpha) | Range 0-1     | Default = 1.0 (fully opaque)
+  5  | Roughness            | Range 0-1     | Default = 0.5
+  6  | Metallic             | Range 0-1     | Default = 0.0
+  7  | Index of refraction (IOR)  | Range 0-4     | Default = 1.45
+  8  | Specular Adjustment to the IOR | Range 0-1 | Default = 0.5 (no adjustment)
+  9  | Emission Color Red    | Range 0-1     | Default = 0.0
+  10  | Emission Color Green  | Range 0-1     | Default = 0.0
+  11 | Emission Color Blue   | Range 0-1     | Default = 0.0
+  12 | Sheen                 | Range 0-1     | Default = 0.0
+  13 | Clearcoat             | Range 0-1     | Default = 0.0
+  14 | Clearcoat roughness   | Range 0-1     | Default = 0.0
+  15 | Anisotropic           | Range 0-1     | Default = 0.0
+  16 | Anisotropic rotation  | Range 0-1     | Default = 0.0
+  17 | Transmission          | Range 0-1     | Default = 0.0
 
 ## Material properties:
 Each material is defined by its electrical properties. Radio waves that interact with a building will
@@ -142,17 +163,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs != 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 8)
+    if (nlhs > 9)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string fn = qd_mex_get_string(prhs[0]);
 
-    arma::mat mesh, mtl_prop, vert_list;
-    arma::u32_mat face_ind;
-    arma::u32_vec obj_ind, mtl_ind;
+    arma::mat mesh, mtl_prop, vert_list, bsdf;
+    arma::umat face_ind;
+    arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names));
+    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf));
 
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&mesh);
@@ -173,4 +194,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = qd_mex_copy2matlab(&obj_names);
     if (nlhs > 7)
         plhs[7] = qd_mex_copy2matlab(&mtl_names);
+    if (nlhs > 8)
+        plhs[8] = qd_mex_copy2matlab(&bsdf);
 }
