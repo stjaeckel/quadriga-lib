@@ -204,6 +204,26 @@ namespace quadriga_lib
                                            const arrayant<dtype> *pattern = nullptr, // Optional custom per-element pattern
                                            dtype res = 1.0);                         // Resolution in degree, ignored if custom pattern is given
 
+    // Generate multi-beam antenna
+    // - Generates a planar M x N array that forms mutiple beams pointing in different directions
+    // - Beamforming weights are phasors only
+    // - Polarization indicator: (1) Vertical polarization only, (2) H/V polarized elements, (3) +/-45 degree polarized elements
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_multibeam(arma::uword M = 2,               // Number of vertical elements
+                                                arma::uword N = 2,               // Number of horizontal elements
+                                                arma::Col<dtype> az = {0.0},     // Azimuth beam angles in degree
+                                                arma::Col<dtype> el = {0.0},     // Elevation beam angles in degree
+                                                arma::Col<dtype> weight = {1.0}, // Scaling factor for the beams
+                                                dtype center_freq = 299792458.0, // The center frequency in [Hz]
+                                                unsigned pol = 1,                // Polarization indicator
+                                                dtype spacing = 0.5,             // Element spacing in [λ]
+                                                dtype az_3dB = 120.0,            // Azimuth per-element 3dB beam with in degree
+                                                dtype el_3dB = 120.0,            // Elevation per-element 3dB beam with in degree
+                                                dtype rear_gain_lin = 0.0,       // Front-back ration, linear value
+                                                dtype res = 1.0,                 // Resolution of the antenna pattern sampling grid in degree
+                                                bool separate_beams = false,     // If true, create a separate beam for each angle pair (ignores weights)
+                                                bool apply_weights = false);     // Switch to apply the beamforming weights
+
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
     // - Interpolates the receive antenna pattern (including orientation and polarization)

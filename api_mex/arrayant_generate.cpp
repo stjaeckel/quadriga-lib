@@ -56,6 +56,14 @@ ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3db, rear_gai
 ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
 
+% Multi-beam antenna (single beam serving multiple directions)
+ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3db, rear_gain_lin,
+                                     M, N, pol, beam_angles, spacing);
+
+% Multi-beam antenna (one beam per direction)
+ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3db, rear_gain_lin,
+                                     M, N, pol, beam_angles, spacing);
+
 % Optional for all types: output as separate variables, (must have exactly 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_generate( ... );
@@ -130,6 +138,11 @@ ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
   If custom pattern data is not provided, the pattern is generated internally (either with a custom
   beam width if `az_3dB` and `el_3db` are given or using the default 3GPP pattern).
 
+## Input arguments for type 'multibeam' and 'multibeam_sep':
+- **`beam_angles`** [9]<br>
+  Matrix containing the beam steering angles in [deg] for the multi-beam antenna, size = `[3, n_beams]`,
+  Rows are: [azimuth_deg, elevation_deg, weight].
+
 ## Output Arguments:
 - **`ant`**<br>
   Struct containing the arrayant data with the following fields:
@@ -173,15 +186,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     quadriga_lib::arrayant<double> arrayant;
 
     if (array_type == "omni")
-        arrayant = quadriga_lib::generate_arrayant_omni<double>(res);
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_omni<double>(res));
     else if (array_type == "dipole" || array_type == "short-dipole")
-        arrayant = quadriga_lib::generate_arrayant_dipole<double>(res);
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_dipole<double>(res));
     else if (array_type == "half-wave-dipole")
-        arrayant = quadriga_lib::generate_arrayant_half_wave_dipole<double>(res);
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_half_wave_dipole<double>(res));
     else if (array_type == "xpol")
-        arrayant = quadriga_lib::generate_arrayant_xpol<double>(res);
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_xpol<double>(res));
     else if (array_type == "custom")
-        arrayant = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res);
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res));
     else if (array_type == "3GPP" || array_type == "3gpp")
     {
         if (nrhs > 15)
@@ -209,10 +222,29 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
                 custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
             }
-            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array);
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
         }
         else // Use 3GPP default pattern
-            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res);
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res));
+    }
+    else if (array_type == "multibeam" || array_type == "multibeam_sep")
+    {
+        arma::mat beam_angles(3, 1);
+        if (nrhs > 9)
+            beam_angles = qd_mex_get_double_Mat(prhs[9]);
+        else
+            beam_angles(2, 0) = 1.0;
+
+        if (beam_angles.n_rows < 2)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'tilt' must have at lest 2 rows for a multi-beam antennas.");
+
+        arma::vec az = beam_angles.row(0).as_col();
+        arma::vec el = beam_angles.row(1).as_col();
+        arma::vec weight = (beam_angles.n_rows > 2) ? beam_angles.row(2).as_col() : arma::vec(beam_angles.n_cols, arma::fill::ones);
+
+        bool separate_beams = array_type == "multibeam_sep";
+        CALL_QD(arrayant = quadriga_lib::generate_arrayant_multibeam<double>(M, N, az, el, weight, freq, pol, spacing,
+                                                                             az_3dB, el_3dB, rear_gain_lin, res, separate_beams));
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Array type not supported!");

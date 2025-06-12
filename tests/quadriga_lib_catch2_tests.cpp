@@ -26,7 +26,6 @@
 #include "catch2_tests/test_arrayant.cpp"
 #include "catch2_tests/test_arrayant_obj_export.cpp"
 #include "catch2_tests/test_baseband_freq_response.cpp"
-#include "catch2_tests/test_arrayant_generate.cpp"
 #include "catch2_tests/test_get_channels_spherical.cpp"
 #include "catch2_tests/test_get_channels_planar.cpp"
 #include "catch2_tests/test_hdf_functions.cpp"
@@ -41,6 +40,7 @@
 #include "catch2_tests/test_get_channels_irs.cpp"
 #include "catch2_tests/test_point_inside_mesh.cpp"
 #include "catch2_tests/test_mitsuba_xml_file_write.cpp"
+ #include "catch2_tests/test_arrayant_generate.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
