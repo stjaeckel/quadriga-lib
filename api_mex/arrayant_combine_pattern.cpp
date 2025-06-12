@@ -157,8 +157,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             ant.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_re"));
         if (qd_mex_has_field(prhs[0], "coupling_im"))
             ant.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_im"));
-        if (qd_mex_has_field(prhs[0], "center_frequency"))
-            ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(prhs[0], "center_frequency"));
+        if (qd_mex_has_field(prhs[0], "center_freq"))
+            ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(prhs[0], "center_freq"));
         if (qd_mex_has_field(prhs[0], "name"))
             ant.name = qd_mex_get_string(qd_mex_get_field(prhs[0], "name"));
     }

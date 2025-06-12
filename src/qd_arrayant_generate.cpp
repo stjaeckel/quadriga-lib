@@ -21,9 +21,9 @@
 #include <algorithm> // std::replace
 #include <iostream>
 
-#include "quadriga_arrayant.hpp"
-#include "quadriga_tools.hpp"
+#include "quadriga_lib.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -806,3 +806,285 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(arm
                                                                              unsigned pol, double tilt, double spacing,
                                                                              arma::uword Mg, arma::uword Ng, double dgv, double dgh,
                                                                              const quadriga_lib::arrayant<double> *pattern, double res);
+
+// Generate multi-beam antenna
+template <typename dtype>
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<dtype> az, arma::Col<dtype> el, arma::Col<dtype> weight,
+                                                                        dtype center_freq, unsigned pol, dtype spacing, dtype az_3dB, dtype el_3dB,
+                                                                        dtype rear_gain_lin, dtype res, bool separate_beams, bool apply_weights)
+{
+    dtype zero = (dtype)0.0;
+
+    if (az.n_elem == 0)
+        throw std::invalid_argument("Must have at least one beam direction.");
+
+    arma::uword n_beams = az.n_elem;
+
+    if (el.n_elem != n_beams)
+        throw std::invalid_argument("Azimuth and elevation must have the same number of elements.");
+
+    if (weight.n_elem != 0 && weight.n_elem != n_beams)
+        throw std::invalid_argument("BEam weights must be empty or match the number of beams.");
+
+    if (weight.n_elem == 0)
+        weight.ones(n_beams);
+
+    // Fix input ranges
+    M = (M == 0) ? 1 : M;
+    N = (N == 0) ? 1 : N;
+    center_freq = (center_freq <= zero) ? (dtype)299792458.0 : center_freq;
+    pol = (pol == 0 || pol > 3) ? 1 : pol;
+    spacing = (spacing < zero) ? (dtype)0.5 : spacing;
+    az_3dB = (az_3dB <= zero) ? (dtype)90.0 : az_3dB;
+    el_3dB = (el_3dB <= zero) ? (dtype)90.0 : el_3dB;
+    rear_gain_lin = (rear_gain_lin < zero) ? zero : rear_gain_lin;
+
+    // Normalized distance = 5000 wavelengths
+    dtype dist = dtype(5000.0 * 299792458.0) / center_freq;
+
+    // Convert from DEG to RAD
+    qd_multiply_scalar((dtype)0.017453292519943, az.memptr(), n_beams);
+    qd_multiply_scalar((dtype)0.017453292519943, el.memptr(), n_beams);
+
+    // Convert angles to cartesian
+    arma::Mat<dtype> cart(3, n_beams, arma::fill::none);
+    qd_geo2cart_interleaved<dtype>(n_beams, cart.memptr(), az.memptr(), el.memptr(), nullptr);
+
+    // Build pattern
+    auto pattern = quadriga_lib::generate_arrayant_custom<dtype>(az_3dB, el_3dB, rear_gain_lin, res);
+
+    // Assemble array antenna
+    quadriga_lib::arrayant<dtype> ant = quadriga_lib::generate_arrayant_3GPP<dtype>(M, N, center_freq, pol, zero, spacing, 1, 1, 0.5, 0.5, &pattern);
+
+    arma::uword n_elements = ant.n_elements();
+    arma::Mat<dtype> cpl_eye = ant.coupling_re;
+    arma::Mat<dtype> cpl_zero = ant.coupling_im;
+
+    // Probe array
+    auto probe = quadriga_lib::generate_arrayant_omni<dtype>(30.0);
+
+    // Phase shifters
+    arma::Mat<dtype> cpl_re, cpl_im;
+
+    // Get MRT weights
+    const arma::Col<dtype> path_gain = {1.0};
+    const arma::Col<dtype> path_length = {1000.0};
+    const arma::Col<dtype> path_angle = {0.0};
+    const arma::Col<dtype> pilot_grid = {0.0};
+    arma::Mat<dtype> path_pol = {1.0, zero, zero, zero, zero, zero, -1.0, zero};
+    path_pol = path_pol.t();
+
+    // Storage for the coefficients
+    arma::Cube<dtype> coeff_re(1, n_elements, n_beams);
+    arma::Cube<dtype> coeff_im(1, n_elements, n_beams);
+    arma::Cube<dtype> delay(1, n_elements, n_beams);
+
+    // Variables for the optimization loop
+    arma::Col<dtype> gain(n_beams);                                                // zeros
+    arma::Mat<dtype> search_direction(2, n_beams, arma::fill::value((dtype)0.05)); // rad
+    arma::Mat<dtype> angles(2, n_beams);
+    for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+        angles(0, i_beam) = az[i_beam], angles(1, i_beam) = el[i_beam];
+
+    // Beam pointing optimization loop
+    arma::uword lp_max = separate_beams ? 7 : 25;
+    for (arma::uword lp = 0; lp < lp_max; ++lp)
+    {
+        // Set the angles for testing
+        arma::Mat<dtype> test_angles = angles;
+        if (lp % 2 == 1) // Test azimuth
+            for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+                test_angles(0, i_beam) += search_direction(0, i_beam);
+        else if (lp != 0) // Test elevation
+            for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+                test_angles(1, i_beam) += search_direction(1, i_beam);
+
+        // Calculate the coefficients for each beam
+        ant.coupling_re = cpl_eye;
+        ant.coupling_im = cpl_zero;
+        for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+        {
+            arma::Col<dtype> aod = {test_angles(0, i_beam)};
+            arma::Col<dtype> eod = {test_angles(1, i_beam)};
+
+            // Temporary storage for the coefficients
+            arma::Cube<dtype> coeff_re_tmp, coeff_im_tmp, delay_tmp;
+
+            // Receiver positions
+            dtype R[3];
+            qd_geo2cart_interleaved<dtype>(1, R, aod.memptr(), eod.memptr(), nullptr);
+            qd_multiply_scalar(dist, R, 3);
+
+            quadriga_lib::get_channels_planar(&ant, &probe, zero, zero, zero, zero, zero, zero,
+                                              R[0], R[1], R[2], zero, zero, zero, &aod, &eod,
+                                              &path_angle, &path_angle, &path_gain, &path_length, &path_pol,
+                                              &coeff_re_tmp, &coeff_im_tmp, &delay_tmp, center_freq);
+
+            for (arma::uword i_elem = 0; i_elem < n_elements; ++i_elem)
+            {
+                coeff_re(0, i_elem, i_beam) = coeff_re_tmp[i_elem] * weight[i_beam];
+                coeff_im(0, i_elem, i_beam) = coeff_im_tmp[i_elem] * weight[i_beam];
+            }
+        }
+
+        // Calculate phase shifts
+        if (separate_beams)
+        {
+            ant.coupling_re.set_size(n_elements, n_beams);
+            ant.coupling_im.set_size(n_elements, n_beams);
+            for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+                for (arma::uword i_elem = 0; i_elem < n_elements; ++i_elem)
+                {
+                    std::complex<dtype> w(coeff_re(0, i_elem, i_beam), coeff_im(0, i_elem, i_beam));
+                    w /= std::abs(w);
+                    ant.coupling_re(i_elem, i_beam) = w.real();
+                    ant.coupling_im(i_elem, i_beam) = -w.imag(); // Use conjugate
+                }
+        }
+        else // Combine the coefficients into a single beam
+        {
+            arma::Cube<std::complex<dtype>> hmat;
+            quadriga_lib::baseband_freq_response<dtype>(&coeff_re, &coeff_im, &delay, &pilot_grid, 1.0, nullptr, nullptr, &hmat);
+
+            ant.coupling_re.set_size(n_elements, 1);
+            ant.coupling_im.set_size(n_elements, 1);
+            for (arma::uword i_elem = 0; i_elem < n_elements; ++i_elem)
+            {
+                std::complex<dtype> w = hmat[i_elem];
+                w /= std::abs(w);
+                ant.coupling_re[i_elem] = w.real();
+                ant.coupling_im[i_elem] = -w.imag(); // Use conjugate
+            }
+        }
+
+        // Calculate gain per beam
+        for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+        {
+            arma::Col<dtype> aod = {az[i_beam]};
+            arma::Col<dtype> eod = {el[i_beam]};
+            arma::Cube<dtype> coeff_re_tmp, coeff_im_tmp, delay_tmp;
+
+            dtype Rx = cart.at(0, i_beam) * dist;
+            dtype Ry = cart.at(1, i_beam) * dist;
+            dtype Rz = cart.at(2, i_beam) * dist;
+
+            quadriga_lib::get_channels_planar(&ant, &probe, zero, zero, zero, zero, zero, zero,
+                                              Rx, Ry, Rz, zero, zero, zero, &aod, &eod,
+                                              &path_angle, &path_angle, &path_gain, &path_length, &path_pol,
+                                              &coeff_re_tmp, &coeff_im_tmp, &delay_tmp, center_freq);
+
+            dtype a = separate_beams ? coeff_re_tmp[i_beam] : coeff_re_tmp[0];
+            dtype b = separate_beams ? coeff_im_tmp[i_beam] : coeff_im_tmp[0];
+            dtype gain_new = a * a + b * b;
+
+            // auto tmp = test_angles * 57.29577951308232;
+            // tmp.print("test angles");
+            // std::cout << "IT = " << lp << ", B = " << i_beam << ", Gain = " << 10.0*std::log10( gain[i_beam]) << " > " << 10.0*std::log10(gain_new) << std::endl;
+
+            // Update search direction for next iteration
+            if (gain_new > gain[i_beam]) // Update gain and angles, keep search direction
+            {
+                gain[i_beam] = gain_new;
+                angles(0, i_beam) = test_angles(0, i_beam);
+                angles(1, i_beam) = test_angles(1, i_beam);
+                cpl_re = ant.coupling_re;
+                cpl_im = ant.coupling_im;
+            }
+            else // Discard new angles, change search direction and step size
+            {
+                if (lp % 2 == 1) // azimuth
+                    search_direction(0, i_beam) *= (dtype)-0.382;
+                else // elevation
+                    search_direction(1, i_beam) *= (dtype)-0.382;
+            }
+        }
+    }
+
+    // auto tmp = angles * 57.29577951308232;
+    // tmp.print("final angles");
+
+    // arma::Col<dtype> tmp2 = arma::log10(gain);
+    // tmp2 *= 10.0;
+    // tmp2.print("final gain");
+
+    // Apply polarization
+    if (pol > 1)
+    {
+        auto element_pos = ant.element_pos;
+
+        // Extend array for second polarization
+        arma::uvec dest = arma::regspace<arma::uvec>(n_elements, 2 * n_elements - 1);
+        ant.copy_element(0, dest);
+
+        // Update polarization
+        if (pol == 2)
+        {
+            ant.rotate_pattern(90.0, 0.0, 0.0, 2, (unsigned)n_elements);
+            dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
+            ant.copy_element(n_elements, dest);
+        }
+        else if (pol == 3)
+        {
+            ant.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
+            dest = arma::regspace<arma::uvec>(1, n_elements - 1);
+            ant.copy_element(0, dest);
+
+            ant.rotate_pattern(-45.0, 0.0, 0.0, 2, (unsigned)n_elements);
+            dest = arma::regspace<arma::uvec>(n_elements + 1, 2 * n_elements - 1);
+            ant.copy_element(n_elements, dest);
+
+            std::memcpy(ant.element_pos.memptr(), element_pos.memptr(), 3 * n_elements * sizeof(dtype));
+        }
+
+        // Update element positions
+        std::memcpy(ant.element_pos.colptr(n_elements), element_pos.memptr(), 3 * n_elements * sizeof(dtype));
+
+        // Set coupling weights
+        if (separate_beams)
+        {
+            ant.coupling_re.zeros(2 * n_elements, 2 * n_beams);
+            ant.coupling_im.zeros(2 * n_elements, 2 * n_beams);
+
+            for (arma::uword i_beam = 0; i_beam < n_beams; ++i_beam)
+            {
+                std::memcpy(ant.coupling_re.colptr(2 * i_beam), cpl_re.colptr(i_beam), n_elements * sizeof(dtype));
+                std::memcpy(ant.coupling_im.colptr(2 * i_beam), cpl_im.colptr(i_beam), n_elements * sizeof(dtype));
+                std::memcpy(ant.coupling_re.colptr(2 * i_beam + 1) + n_elements, cpl_re.colptr(i_beam), n_elements * sizeof(dtype));
+                std::memcpy(ant.coupling_im.colptr(2 * i_beam + 1) + n_elements, cpl_im.colptr(i_beam), n_elements * sizeof(dtype));
+            }
+        }
+        else
+        {
+            ant.coupling_re.zeros(2 * n_elements, 2);
+            ant.coupling_im.zeros(2 * n_elements, 2);
+
+            std::memcpy(ant.coupling_re.memptr(), cpl_re.memptr(), n_elements * sizeof(dtype));
+            std::memcpy(ant.coupling_im.memptr(), cpl_im.memptr(), n_elements * sizeof(dtype));
+            std::memcpy(ant.coupling_re.colptr(1) + n_elements, cpl_re.memptr(), n_elements * sizeof(dtype));
+            std::memcpy(ant.coupling_im.colptr(1) + n_elements, cpl_im.memptr(), n_elements * sizeof(dtype));
+        }
+    }
+    else // V-Pol only
+    {
+        ant.coupling_re = cpl_re;
+        ant.coupling_im = cpl_im;
+    }
+
+    // Make sure the generated antenna is valid
+    auto err = ant.is_valid(false);
+    if (!err.empty())
+        throw std::invalid_argument(err);
+
+    if (apply_weights)
+        ant = ant.combine_pattern();
+
+    return ant;
+}
+
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<float> az, arma::Col<float> el, arma::Col<float> weight,
+                                                                                 float center_freq, unsigned pol, float spacing, float az_3dB, float el_3dB,
+                                                                                 float rear_gain_lin, float res, bool separate_beams, bool apply_weights);
+
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_multibeam(arma::uword M, arma::uword N, arma::Col<double> az, arma::Col<double> el, arma::Col<double> weight,
+                                                                                  double center_freq, unsigned pol, double spacing, double az_3dB, double el_3dB,
+                                                                                  double rear_gain_lin, double res, bool separate_beams, bool apply_weights);

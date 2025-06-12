@@ -708,6 +708,10 @@ ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3db, rear_gai
 ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
 
+% Multi-beam antenna
+ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3db, rear_gain_lin,
+                                     M, N, pol, [], spacing, [], [], [], [], [], beam_angles);
+
 % Optional for all types: output as separate variables, (must have exactly 11 outputs)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_generate( ... );
@@ -843,6 +847,12 @@ ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
  
   If custom pattern data is not provided, the pattern is generated internally (either with a custom 
   beam width if <code>az_3dB</code> and <code>el_3db</code> are given or using the default 3GPP pattern).
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input arguments for type 'multibeam':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>beam_angles</code></b> [17]<br> 
+   Matrix containing the beam steering angles in [deg] for the multi-beam antenna, size = <code>[3, n_beams]</code>, 
+   Rows are: [azimuth_deg, elevation_deg, weight]. 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ant</code></b><br> 

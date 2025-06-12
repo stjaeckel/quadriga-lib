@@ -163,3 +163,93 @@ TEST_CASE("Generate Arrayant - 3GPP")
     CHECK(std::abs(ant.element_pos.at(1, 4) - 0.25) < 1.0e-5);
     CHECK(std::abs(ant.element_pos.at(1, 5) - 0.25) < 1.0e-5);
 }
+
+TEST_CASE("Generate Arrayant - Multi-Beam")
+{
+    arma::vec az, el, weight;
+    double freq = 3.75e9;
+
+    // Generate a pattern with 2 weighted beams
+    az = {20.0, 0.0};
+    el = {-7.0, 30.0};
+    weight = {2.0, 1.0};
+    auto ant = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, weight, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0);
+
+    CHECK(ant.n_elements() == 36);
+    CHECK(ant.n_elevation() == 13);
+    CHECK(ant.n_azimuth() == 25);
+    CHECK(ant.n_ports() == 1);
+
+    arma::vec azg = arma::regspace<arma::vec>(-180.0, 1.0, 180.0) * 0.017453292519943;
+    arma::vec elg = arma::regspace<arma::vec>(-90.0, 1.0, 90.0) * 0.017453292519943;
+
+    auto comb = ant.combine_pattern(&azg, &elg);
+
+    CHECK(comb.n_elements() == 1);
+    CHECK(comb.n_elevation() == 181);
+    CHECK(comb.n_azimuth() == 361);
+
+    double a = comb.e_theta_re(83, 199, 0), b = comb.e_theta_im(83, 199, 0);
+    double gain = 10.0 * std::log10(a * a + b * b);
+
+    CHECK(std::abs(gain - 35.6992) < 0.0001);
+    CHECK(std::abs(a + 34.7096) < 0.01);
+    CHECK(std::abs(b + 50.0993) < 0.01);
+
+    // Generate the same pattern from 3 unweighted beams
+    az = {20.0, 0.0, 20.0};
+    el = {-7.0, 30.0, -7.0};
+    auto ant2 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0);
+    auto comb2 = ant2.combine_pattern(&azg, &elg);
+
+    CHECK(arma::approx_equal(ant.coupling_re, ant2.coupling_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(ant.coupling_im, ant2.coupling_im, "absdiff", 1e-6));
+
+    CHECK(arma::approx_equal(comb.e_theta_re, comb2.e_theta_re, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(comb.e_theta_im, comb2.e_theta_im, "absdiff", 1e-6));
+
+    // Test if generating the patterns at 1 de resolution generates similar results as at 10 degree
+    auto comb3 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 1.0, false, true);
+
+    CHECK(comb3.n_elements() == 1);
+    CHECK(comb3.n_elevation() == 181);
+    CHECK(comb3.n_azimuth() == 361);
+
+    a = comb3.e_theta_re(83, 199, 0), b = comb3.e_theta_im(83, 199, 0);
+    gain = 10.0 * std::log10(a * a + b * b);
+
+    CHECK(std::abs(gain - 35.6992) < 0.1);
+    CHECK(std::abs(a + 34.7096) < 0.5);
+    CHECK(std::abs(b + 50.0993) < 0.5);
+
+    // Test generation of separate beams
+    auto ant4 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 1, 0.4, 120.0, 120.0, 0.0, 15.0, true);
+
+    CHECK(ant4.n_elements() == 36);
+    CHECK(ant4.n_elevation() == 13);
+    CHECK(ant4.n_azimuth() == 25);
+    CHECK(ant4.n_ports() == 3);
+
+    // H/V Polarization
+    auto ant5 = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, {}, freq, 2, 0.4, 120.0, 120.0, 0.0, 10.0);
+
+    CHECK(ant5.n_elements() == 72);
+    CHECK(ant5.n_elevation() == 19);
+    CHECK(ant5.n_azimuth() == 37);
+    CHECK(ant5.n_ports() == 2);
+
+    arma::mat x = ant5.element_pos.submat(0, 0, 2, 35);
+    arma::mat y = ant5.element_pos.submat(0, 36, 2, 71);
+    CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
+
+    x = ant5.coupling_re.submat(0, 0, 35, 0);
+    y = ant5.coupling_re.submat(36, 1, 71, 1);
+    CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
+
+    x.zeros();
+    y = ant5.coupling_re.submat(0, 1, 35, 1);
+    CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
+
+    y = ant5.coupling_re.submat(36, 0, 71, 0);
+    CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
+}
