@@ -178,16 +178,17 @@ else # Static linking
 	$(CC) -std=c++17 $< lib/libquadriga.a lib/libhdf5.a -o $@ -I include -I $(ARMA_H) -I $(CATCH2)/include -L $(CATCH2)/lib -lCatch2 -lgomp -ldl
 endif
 
+# Archive file for static linking
+src_cpp = $(wildcard src/*.cpp)
+include_hpp = $(wildcard include/*.hpp)
+
 # C++ object files
-build/%.o:   src/%.cpp
+build/%.o:   src/%.cpp   $(include_hpp)
 	$(CC) $(CCFLAGS) -c $< -o $@ -I include -I src -I $(PUGIXML_H) -I $(HDF5_H) -I $(ARMA_H) 
 
 # C++ object files with AVX acceleration
-build/%_avx2.o:   src/%_avx2.cpp
+build/%_avx2.o:   src/%_avx2.cpp   $(include_hpp)
 	$(CC) -mavx2 -mfma $(CCFLAGS) -c $< -o $@ -I src -I $(ARMA_H)
-
-# Archive file for static linking
-src_cpp = $(wildcard src/*.cpp)
 
 build/libhdf5.a:
 	cp external/hdf5-$(hdf5_version)-Linux/lib/libhdf5.a build/

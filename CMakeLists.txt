@@ -7,6 +7,7 @@ option(ENABLE_MATLAB "Enable MATLAB MEX API" ON)
 option(ENABLE_OCTAVE "Enable Octave MEX API" ON)
 option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
+option(ENABLE_SHARED_LIB "Enable build of shared library" OFF)
 
 # Option to specify MATLAB path manually (leave empty for auto-detect)
 option(MATLAB_PATH "Path to MATLAB" "")
@@ -109,6 +110,7 @@ set(BUILD_MATLAB ${ENABLE_MATLAB})
 set(BUILD_OCTAVE ${ENABLE_OCTAVE})
 set(BUILD_MEX_DOC ${ENABLE_MEX_DOC})
 set(BUILD_PYTHON ${ENABLE_PYTHON})
+set(BUILD_SHARED_LIB ${ENABLE_SHARED_LIB})
 
 if (NOT ENABLE_PYTHON)
     set(BUILD_MEX_DOC OFF)
@@ -118,6 +120,10 @@ if (MSVC)
     set(BUILD_PYTHON OFF)
     set(BUILD_MEX_DOC OFF)
     set(BUILD_OCTAVE OFF)
+endif()
+
+if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
+    set(BUILD_SHARED_LIB OFF)
 endif()
 
 # Build instructions for HDF5 library
@@ -260,7 +266,7 @@ if (NOT ARMADILLO_FOUND)
 endif()
 
 # Shared library
-if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
+if (BUILD_SHARED_LIB)
     add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2})
     set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
     add_dependencies(quadriga_shared pugixml_lib pybind11_lib)
@@ -409,7 +415,7 @@ install(TARGETS quadriga_static
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin)
 
-if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
+if (BUILD_SHARED_LIB)
     install(TARGETS quadriga_shared
             ARCHIVE DESTINATION lib
             LIBRARY DESTINATION lib
