@@ -43,15 +43,15 @@ TEST_CASE("Test OBJ Overlap - Identical objects")
     arma::mat mesh = arma::join_cols(cube, tmp);
 
     // Object indices (1,4)
-    arma::u32_vec cube_ind(12);
+    arma::uvec cube_ind(12);
     cube_ind.ones();
-    arma::u32_vec tmp_ind = cube_ind + 3;
-    arma::u32_vec obj_ind = arma::join_cols(cube_ind, tmp_ind);
+    arma::uvec tmp_ind = cube_ind + 3;
+    arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     std::vector<std::string> reason;
     auto overlap = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
 
-    arma::u32_vec test = {1, 4};
+    arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
     CHECK(reason[0] == "Identical with OBJ-ID 4");
@@ -80,10 +80,10 @@ TEST_CASE("Test OBJ Overlap - Touching cubes")
     arma::mat mesh = arma::join_cols(cube, tmp);
 
     // Object indices (1,4)
-    arma::u32_vec cube_ind(12);
+    arma::uvec cube_ind(12);
     cube_ind.ones();
-    arma::u32_vec tmp_ind = cube_ind + 3;
-    arma::u32_vec obj_ind = arma::join_cols(cube_ind, tmp_ind);
+    arma::uvec tmp_ind = cube_ind + 3;
+    arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     auto overlap = quadriga_lib::obj_overlap_test(&mesh, &obj_ind);
     CHECK(overlap.n_elem == 0ULL);
@@ -117,15 +117,15 @@ TEST_CASE("Test OBJ Overlap - 3D overlap")
     arma::mat mesh = arma::join_cols(cube, tmp);
 
     // Object indices (1,4)
-    arma::u32_vec cube_ind(12);
+    arma::uvec cube_ind(12);
     cube_ind.ones();
-    arma::u32_vec tmp_ind = cube_ind + 3;
-    arma::u32_vec obj_ind = arma::join_cols(cube_ind, tmp_ind);
+    arma::uvec tmp_ind = cube_ind + 3;
+    arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     std::vector<std::string> reason;
     auto overlap = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
 
-    arma::u32_vec test = {1, 4};
+    arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
     CHECK(reason[0].substr(0, 21) == "3D Intersect: OBJ-IDs");
@@ -154,15 +154,15 @@ TEST_CASE("Test OBJ Overlap - Overlapping Edges")
     arma::mat mesh = arma::join_cols(cube, tmp);
 
     // Object indices (1,4)
-    arma::u32_vec cube_ind(12);
+    arma::uvec cube_ind(12);
     cube_ind.ones();
-    arma::u32_vec tmp_ind = cube_ind + 3;
-    arma::u32_vec obj_ind = arma::join_cols(cube_ind, tmp_ind);
+    arma::uvec tmp_ind = cube_ind + 3;
+    arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     std::vector<std::string> reason;
     auto overlap = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
 
-    arma::u32_vec test = {1, 4};
+    arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
     CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
@@ -196,15 +196,15 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
     arma::mat mesh = arma::join_cols(cube, tmp);
 
     // Object indices (1,4)
-    arma::u32_vec cube_ind(12);
+    arma::uvec cube_ind(12);
     cube_ind.ones();
-    arma::u32_vec tmp_ind = cube_ind + 3;
-    arma::u32_vec obj_ind = arma::join_cols(cube_ind, tmp_ind);
+    arma::uvec tmp_ind = cube_ind + 3;
+    arma::uvec obj_ind = arma::join_cols(cube_ind, tmp_ind);
 
     std::vector<std::string> reason;
     auto overlap = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
 
-    arma::u32_vec test = {1, 4};
+    arma::uvec test = {1, 4};
     CHECK(arma::all(overlap == test));
 
     CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
@@ -215,12 +215,12 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
 
 //     std::string fn_obj = "/tmp/qrt_overlap_test.obj";
 //     arma::fmat mesh;
-//     arma::u32_vec obj_ind;
+//     arma::uvec obj_ind;
 //     std::vector<std::string> obj_names;
 //     quadriga_lib::obj_file_read<float>(fn_obj, &mesh, nullptr, nullptr, nullptr, &obj_ind, nullptr, &obj_names);
 
 //     std::vector<std::string> reason;
-//     arma::u32_vec intersecting = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
+//     arma::uvec intersecting = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
 
 //     intersecting.print();
 

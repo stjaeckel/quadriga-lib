@@ -279,11 +279,11 @@ namespace quadriga_lib
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
     // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]
-    template <typename dtype>                                                  // Supported types: float or double
-    arma::u32_vec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                                   const arma::u32_vec *obj_ind,               // Object index, 1-based, Size: [ n_mesh ]
-                                   std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
-                                   dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
+    template <typename dtype>                                               // Supported types: float or double
+    arma::uvec obj_overlap_test(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                                const arma::uvec *obj_ind,                  // Object index, 1-based, Size: [ n_mesh ]
+                                std::vector<std::string> *reason = nullptr, // Optional output: Overlap reason, Length [ n_overlap ]
+                                dtype tolerance = 0.0005);                  // Optional input: Detection tolerance in meters
 
     // Convert paths to tubes
     // - Paths are defined by a list of ordered points
