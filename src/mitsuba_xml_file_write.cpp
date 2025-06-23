@@ -134,7 +134,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 
 - `const arma::Mat<dtype> **bsdf** = {}` (optional input)<br>
   Material reflectivity data (BSDF parameters), size `[mtl_names.size(), 17]`. If omitted, the `null` BSDF is used.
-  Note that Sionna RT all BSDF parameters. They are only used by the Mitsuma rendering system.
+  Note that Sionna RT ignores all BSDF parameters. They are only used by the Mitsuma rendering system.
   See [[obj_file_read]] for a definition of the data fields.
 
 - `bool **map_to_itu_materials** = false` (optional input)<br>

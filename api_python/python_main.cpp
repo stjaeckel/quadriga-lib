@@ -44,6 +44,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_reshape_layout.cpp"
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
+#include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
 #include "qpy_point_inside_mesh.cpp"
 #include "qpy_version.cpp"
@@ -227,6 +228,17 @@ PYBIND11_MODULE(quadriga_lib, m)
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("name"),
           py::arg("data") = py::none());
+
+    m.def("mitsuba_xml_file_write", &mitsuba_xml_file_write,
+          py::arg("fn"),
+          py::arg("vert_list") = py::array_t<double>(),
+          py::arg("face_ind") = py::array_t<arma::uword>(),
+          py::arg("obj_ind") = py::array_t<arma::uword>(),
+          py::arg("mtl_ind") = py::array_t<arma::uword>(),
+          py::arg("obj_names") = py::list(),
+          py::arg("mtl_names") = py::list(),
+          py::arg("bsdf") = py::array_t<double>(),
+          py::arg("map_to_itu") = false);
 
     m.def("obj_file_read", &obj_file_read, py::arg("fn"));
 

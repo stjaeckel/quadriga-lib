@@ -73,7 +73,7 @@ void arrayant_export_obj_file(const std::string fn,
                               const py::array_t<arma::uword> element)
 {
     const auto ant = qd_python_dict2arrayant(arrayant, true);
-    arma::uvec i_element_a = qd_python_numpy2arma_Col(element);
+    const arma::uvec i_element_a = qd_python_numpy2arma_Col(element);
 
     ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, i_element_a);
 }
