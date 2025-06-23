@@ -27,7 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_7_6
+#define QUADRIGA_LIB_VERSION v0_7_7
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably

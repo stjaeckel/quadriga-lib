@@ -253,3 +253,4 @@ TEST_CASE("Generate Arrayant - Multi-Beam")
     y = ant5.coupling_re.submat(36, 0, 71, 0);
     CHECK(arma::approx_equal(x, y, "absdiff", 1e-14));
 }
+

@@ -88,6 +88,7 @@ auto Cube = qd_python_numpy2arma_Cube(pyarray, view, strict);       // Map to Ma
 auto vecCol = qd_python_list2vector_Col<dtype>(pylist);             // Copy py::list to std::vector<arma::Col<dtype>>
 auto vecMat = qd_python_list2vector_Mat<dtype>(pylist);             // Copy py::list to std::vector<arma::Mat<dtype>>
 auto vecCube = qd_python_list2vector_Cube<dtype>(pylist);           // Copy py::list to std::vector<arma::Cube<dtype>>
+auto vecStrings = qd_python_list2vector_Strings(pylist);            // Copy py::list to std::vector<std::string>
 
 qd_python_list2vector_Cube_Cplx<dtype>(pylistComplex, vecCubeRe, vecCubeIm);      // For Complex -> Re/Im conversion
 
@@ -547,7 +548,6 @@ static inline void qd_python_copy2arma(const dtype *src, const std::array<size_t
     if (shape[6] == 1)
         std::memcpy(dst, src, shape[8]);
     else
-#pragma omp parallel for collapse(2)
         for (size_t is = 0; is < ns; ++is)
             for (size_t ic = 0; ic < nc; ++ic)
             {
@@ -584,7 +584,6 @@ static inline void qd_python_copy2arma(const std::complex<dtype> *src, const std
     dtype *dst_re = real.memptr();
     dtype *dst_im = imag.memptr();
 
-#pragma omp parallel for collapse(2)
     for (size_t is = 0; is < ns; ++is)
         for (size_t ic = 0; ic < nc; ++ic)
         {
@@ -722,7 +721,6 @@ std::vector<arma::Col<dtype>> qd_python_list2vector_Col(const py::list &input)
     std::vector<py::array_t<dtype>> arrays;
     auto shape = qd_python_get_list_shape(input, pointers, arrays);
 
-#pragma omp parallel for
     for (size_t i = 0; i < n_input; ++i)
     {
         output[i].set_size(shape[i][7]);
@@ -742,7 +740,6 @@ std::vector<arma::Mat<dtype>> qd_python_list2vector_Mat(const py::list &input)
     std::vector<py::array_t<dtype>> arrays;
     auto shape = qd_python_get_list_shape(input, pointers, arrays);
 
-#pragma omp parallel for
     for (size_t i = 0; i < n_input; ++i)
     {
         output[i].set_size(shape[i][0], shape[i][1] * shape[i][2]);
@@ -762,7 +759,6 @@ std::vector<arma::Cube<dtype>> qd_python_list2vector_Cube(const py::list &input)
     std::vector<py::array_t<dtype>> arrays;
     auto shape = qd_python_get_list_shape(input, pointers, arrays);
 
-#pragma omp parallel for
     for (size_t i = 0; i < n_input; ++i)
         qd_python_copy2arma(pointers[i], shape[i], output[i]);
 
@@ -785,9 +781,21 @@ void qd_python_list2vector_Cube_Cplx(const py::list &input,
     imag.clear();
     imag.resize(n_input);
 
-#pragma omp parallel for
     for (size_t i = 0; i < n_input; ++i)
         qd_python_copy2arma(pointers[i], shape[i], real[i], imag[i]);
+}
+
+std::vector<std::string> qd_python_list2vector_Strings(const py::list &input)
+{
+    std::vector<std::string> output;
+    output.reserve(py::len(input));
+
+    for (py::handle obj : input)
+    {
+        output.emplace_back(py::cast<std::string>(obj));
+    }
+
+    return output;
 }
 
 // -------------------------------- Imterleave complex --------------------------------
