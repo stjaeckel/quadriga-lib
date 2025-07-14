@@ -8,6 +8,8 @@ option(ENABLE_OCTAVE "Enable Octave MEX API" ON)
 option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
 option(ENABLE_SHARED_LIB "Enable build of shared library" OFF)
+option(ENABLE_TESTS "Build tests" OFF)
+option(ENABLE_BIN "Build supporting binary files" OFF)
 
 # Option to specify MATLAB path manually (leave empty for auto-detect)
 option(MATLAB_PATH "Path to MATLAB" "")
@@ -26,9 +28,10 @@ option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
 
 # Versions for external libraries (adjust as needed)
 set(armadillo_version "14.2.2")
-set(pugixml_version "1.13")
-set(pybind11_version "2.12.0")
-set(hdf5_version "1.14.2")
+set(pugixml_version "1.15")
+set(pybind11_version "3.0.0")
+set(hdf5_version "1.14.6")
+set(catch2_version "3.8.1")
 
 # Set the C++ standard and basic compile flags
 set(CMAKE_CXX_STANDARD 17)
@@ -52,6 +55,7 @@ set(ARMADILLO_ZIP "${CMAKE_SOURCE_DIR}/external/armadillo-${armadillo_version}.z
 set(PUGIXML_ZIP "${CMAKE_SOURCE_DIR}/external/pugixml-${pugixml_version}.zip")
 set(PYBIND11_ZIP "${CMAKE_SOURCE_DIR}/external/pybind11-${pybind11_version}.zip")
 set(HDF5_ZIP "${CMAKE_SOURCE_DIR}/external/hdf5-${hdf5_version}.zip")
+set(CATCH2_ZIP "${CMAKE_SOURCE_DIR}/external/Catch2-${catch2_version}.zip")
 
 # External packages
 set(ARMADILLO_SRC_DIR "${CMAKE_BINARY_DIR}/armadillo-${armadillo_version}")
@@ -111,6 +115,7 @@ set(BUILD_OCTAVE ${ENABLE_OCTAVE})
 set(BUILD_MEX_DOC ${ENABLE_MEX_DOC})
 set(BUILD_PYTHON ${ENABLE_PYTHON})
 set(BUILD_SHARED_LIB ${ENABLE_SHARED_LIB})
+set(BUILD_CATCH2 ${ENABLE_TESTS})
 
 if (NOT ENABLE_PYTHON)
     set(BUILD_MEX_DOC OFF)
@@ -156,9 +161,9 @@ if (HDF5_PATH) # Use given HDF5 location before building it
     get_filename_component(HDF5_PATH_ABSOLUTE "${HDF5_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
     set(HDF5_INCLUDE_DIRS "${HDF5_PATH}/include")
     if (MSVC)
-        set(HDF5_A "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.lib")
+        set(HDF5_LIB "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.lib")
     else()
-        set(HDF5_A "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.a")
+        set(HDF5_LIB "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.a")
     endif()
 endif()
 
@@ -176,16 +181,41 @@ if (BUILD_HDF5)
             -DHDF5_BUILD_EXAMPLES=OFF
             -DHDF5_BUILD_HL_LIB=OFF
     )
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+        list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    endif()
 
     if (MSVC)
-        list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-        set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
+        set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
     else()
-        set(HDF5_A "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
+        set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
     endif()
     set(HDF5_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/include")
 
     ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS})
+endif()
+
+# Build instructions for CATCH2 library
+if (BUILD_CATCH2)
+    set(CATCH2_EP_ARGS
+        URL ${CATCH2_ZIP}
+        BINARY_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_build"
+        INSTALL_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin"
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+    )
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+        list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    endif()
+
+    if (MSVC) 
+        set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/Catch2.lib")
+    else()
+        set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/libCatch2.a")
+    endif()
+    set(CATCH2_INCLUDE_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/include")
+
+    ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS})
 endif()
 
 # Detect MATLAB
@@ -194,7 +224,7 @@ if(BUILD_MATLAB AND MATLAB_PATH)
     set(MEX_EXECUTABLE "${MATLAB_PATH}/bin/mex")
     message(STATUS "Using MEX compiler at: ${MEX_EXECUTABLE}")
 elseif(BUILD_MATLAB)
-    find_package(Matlab REQUIRED COMPONENTS MEX_COMPILER)
+    find_package(Matlab COMPONENTS MEX_COMPILER)
     if(Matlab_FOUND)
         message(STATUS "Found MEX compiler at: ${Matlab_MEX_COMPILER}")
         set(MEX_EXECUTABLE "${Matlab_MEX_COMPILER}")
@@ -297,7 +327,7 @@ if(BUILD_MATLAB)
                 OUTPUT ${mex_output}
                 COMMAND ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
                         COMPFLAGS="${MEX_CXXFLAGS}"
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A} shlwapi.lib 
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} shlwapi.lib 
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                 DEPENDS ${mex_src} quadriga_static
                 COMMENT "Building MATLAB MEX file ${mex_output}"
@@ -309,7 +339,7 @@ if(BUILD_MATLAB)
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND env CXXFLAGS="${MEX_CXXFLAGS}" ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_A} ${HDF5_MEX_LINK_LIBS}
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS}
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         -lgomp
                 DEPENDS ${mex_src} quadriga_static
@@ -395,6 +425,52 @@ if (BUILD_PYTHON)
     message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")
 endif()
 
+# --- Catch2 Tests ---
+if (ENABLE_TESTS)
+    set(CATCH2_MAIN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tests/quadriga_lib_catch2_tests.cpp")
+
+    # Watch test files (but don't compile them)
+    file(GLOB TEST_HEADERS CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/*.cpp
+    )
+    
+    add_executable(test_bin ${CATCH2_MAIN_SRC})
+    add_dependencies(test_bin catch2_dep)
+    target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
+
+    if (BUILD_HDF5)
+        target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} ${HDF5_LIB})
+    else()
+        target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} HDF5::HDF5)
+    endif()
+    
+    if(MSVC)
+        target_link_libraries(test_bin PRIVATE shlwapi.lib)
+        target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /openmp /MP)
+    else()
+        target_compile_options(test_bin PRIVATE -O3 -fPIC -fopenmp -w)
+    endif()
+
+    
+endif()
+
+# --- Binaries ---
+if (ENABLE_BIN)
+    file(GLOB SRC_BIN "${CMAKE_SOURCE_DIR}/src/bin/*.cpp")
+    foreach(source IN LISTS SRC_BIN)
+        get_filename_component(exeName ${source} NAME_WE)
+
+        add_executable(${exeName} ${source})
+        add_dependencies(${exeName} quadriga_static)
+        
+        if (BUILD_HDF5)
+            target_link_libraries(${exeName} PRIVATE quadriga_static ${HDF5_LIB})
+        else()
+            target_link_libraries(${exeName} PRIVATE quadriga_static HDF5::HDF5)
+        endif()
+    endforeach()
+endif()
+
 # Install options
 if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     message(STATUS "Using source dir as install dir")
@@ -440,5 +516,5 @@ if (BUILD_PYTHON)
 endif()
 
 if (BUILD_HDF5 OR HDF5_PATH)
-    install(FILES ${HDF5_A} DESTINATION lib)
+    install(FILES ${HDF5_LIB} DESTINATION lib)
 endif()

@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.7</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.8</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -2435,32 +2435,33 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
    Dictionary of unstructured data, can be empty if no unstructured data should be written 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b>Structured data:</b> (double precision) 
+<ul><li style="margin-bottom: 0.4em;"><b>Structured data:</b> (double precision)<br> 
+   Each snapshot may have a different number of paths <code>n_path_s</code>. Variable-length data is provided as lists. 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>rx_position</code></td>
+  <td><code>rx_pos</code></td>
   <td>Receiver positions</td>
   <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
 </tr>
 <tr>
-  <td><code>tx_position</code></td>
+  <td><code>tx_pos</code></td>
   <td>Transmitter positions</td>
   <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
 </tr>
 <tr>
   <td><code>coeff</code></td>
   <td>Channel coefficients, complex valued</td>
-  <td><code>[n_rx, n_tx, n_path, n_snap]</code></td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>delay</code></td>
   <td>Propagation delays in seconds</td>
-  <td><code>[n_rx, n_tx, n_path, n_snap]</code> or <code>[1, 1, n_path, n_snap]</code></td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
   <td>Center frequency in [Hz]</td>
-  <td><code>[n_snap, 1]</code> or scalar</td>
+  <td><code>[n_snap]</code> or scalar</td>
 </tr>
 <tr>
   <td><code>name</code></td>
@@ -2475,52 +2476,52 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
 <tr>
   <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
-  <td><code>[n_path, n_snap]</code></td>
+  <td>list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_length</code></td>
   <td>Path length from TX to RX phase center in m</td>
-  <td><code>[n_path, n_snap]</code></td>
+  <td>list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>polarization</code></td>
   <td>Polarization transfer function, complex valued</td>
-  <td><code>[4, n_path, n_snap]</code></td>
+  <td>list of <code>[4, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_angles</code></td>
   <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
-  <td><code>[n_path, 4, n_snap]</code></td>
+  <td>list of <code>[n_path, 4_s]</code></td>
 </tr>
 <tr>
   <td><code>path_fbs_pos</code></td>
   <td>First-bounce scatterer positions</td>
-  <td><code>[3, n_path, n_snap]</code></td>
+  <td>list of <code>[3, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_lbs_pos</code></td>
   <td>Last-bounce scatterer positions</td>
-  <td><code>[3, n_path, n_snap]</code></td>
+  <td>list of <code>[3, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>no_interact</code></td>
   <td>Number interaction points of paths with the environment</td>
-  <td>uint32, <code>[n_path, n_snap]</code></td>
+  <td>uint32, list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>interact_coord</code></td>
   <td>Interaction coordinates</td>
-  <td><code>[3, max(sum(no_interact)), n_snap]</code></td>
+  <td>list of <code>[3, max(sum(no_interact))]</code></td>
 </tr>
 <tr>
   <td><code>rx_orientation</code></td>
   <td>Transmitter orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 <tr>
   <td><code>tx_orientation</code></td>
   <td>Receiver orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 </table><br>
 </li></ul>

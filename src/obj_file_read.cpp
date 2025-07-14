@@ -394,6 +394,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         else if (line.length() > 7 && line.substr(0, 6).compare("usemtl") == 0) // Line contains material definition
         {
             std::string mtl_name = line.substr(7, 255);                 // Name in OBJ File
+            std::string mtl_name_raw = mtl_name;
+
             aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0; // Reset current material
             int found = -1;
 
@@ -434,7 +436,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                 mtl_lib[found].index = i_mtl;
 
                 if (mtl_names != nullptr)
-                    mtl_names->push_back(mtl_name);
+                    mtl_names->push_back(mtl_name_raw);
             }
         }
     }
@@ -502,7 +504,6 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         }
         else
         {
-
             std::ifstream fileR{mtl_file, std::ios::in};
             if (!fileR.is_open())
                 throw std::invalid_argument("Error opening file: failed to open '" + mtl_file.filename().string() + "'.");
@@ -551,7 +552,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                 if (!foundMaterial)
                 {
                     throw std::invalid_argument(
-                        "Error: material '" + mtl + "' not found in '" + fn + "'.");
+                        "Error: material '" + mtl + "' not found in material file.");
                 }
 
                 // From here, scan until the next "newmtl " or EOF to look for Kd and Ns

@@ -195,10 +195,10 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
 
 template arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<float> *points,
                                                        const arma::Mat<float> *mesh,
-                                                       const arma::u32_vec *obj_ind = nullptr,
+                                                       const arma::u32_vec *obj_ind,
                                                        float distance);
 
 template arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<double> *points,
                                                        const arma::Mat<double> *mesh,
-                                                       const arma::u32_vec *obj_ind = nullptr,
+                                                       const arma::u32_vec *obj_ind,
                                                        double distance);
