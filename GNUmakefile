@@ -7,9 +7,11 @@ arma_internal = ON
 
 CMAKE_BUILD_DIR = build_linux
 
-# Autodetect Python
-PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
+# Location where pip-installable packages live
+PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig, pathlib, json; print(sysconfig.get_paths()['purelib'])")
+
+# The compiled extension that CMake puts into ./lib
+PYTHON_SHARED_OBJ    := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 
 # Autodetect Octave
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
@@ -25,7 +27,7 @@ cpp:
 	cmake --install $(CMAKE_BUILD_DIR)
 
 bin:
-	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_BIN=ON
+	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_BIN=ON -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal)
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 
 python:
@@ -33,13 +35,13 @@ python:
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
-python_install:   python
+python_install: python
 	@if [ -z "$(PYTHON_SHARED_OBJ)" ]; then \
 		echo "Error: quadriga_lib python package not found in lib/"; \
 		exit 1; \
 	fi
 	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
-	cp $(PYTHON_SHARED_OBJ) $(PYTHON_SITE_PACKAGES)/
+	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
 
 # Tests
 test:   all   moxunit-lib
@@ -58,7 +60,7 @@ cpp_test:   cpp
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	$(CMAKE_BUILD_DIR)/test_bin
 
-python_test:  python_install   
+python_test: 
 	pytest tests/python_tests -x -s
 
 # Documentation

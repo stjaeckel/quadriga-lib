@@ -41,11 +41,15 @@ execution of this process, several pieces of input data are required:<br><br>
 ## Usage:
 
 ```
-coeff_re, coeff_im, delays = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, 
+from quadriga_lib import arrayant
+
+# Return only coefficients and delays
+coeff_re, coeff_im, delays = arrayant.get_channels_spherical( ant_tx, ant_rx, 
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path );
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, 
+# Return additional departure and arrival angles
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant_tx, ant_rx, 
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path, angles=1 );
 ```

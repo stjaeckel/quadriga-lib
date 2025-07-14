@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,13 +31,13 @@ Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel 
 to structured datasets, the library facilitates the inclusion of extra datasets of various types
 and shapes. This feature is particularly beneficial for integrating descriptive data or analysis
 results. Users can add any number of such unstructured datasets, each identified by a unique
-dataset name. The function `quadriga_lib.hdf5_read_dset_names` retrieves the names of all these
-datasets, returning them as a list of strings.
+dataset name. The function `quadriga_lib.channel.hdf5_read_dset_names` retrieves the names of all 
+these datasets, returning them as a list of strings.
 
 ## Usage:
-
 ```
-names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw );
+from quadriga_lib import channel
+names = channel.hdf5_read_dset_names( fn, ix, iy, iz, iw );
 ```
 
 ## Input Arguments:

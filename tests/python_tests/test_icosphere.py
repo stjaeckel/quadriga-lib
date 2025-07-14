@@ -10,13 +10,13 @@ if package_path not in sys.path:
     sys.path.append(package_path)
 
 # Now you can import your package
-import quadriga_lib
+from quadriga_lib import RTtools
 
 class test_icosphere(unittest.TestCase):
 
     def test(self):
 
-        center, length, vert, direction = quadriga_lib.icosphere()
+        center, length, vert, direction = RTtools.icosphere()
 
         self.assertEqual(center.shape, (20,3))
         self.assertEqual(length.shape, (20,))

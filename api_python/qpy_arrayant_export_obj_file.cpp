@@ -22,13 +22,14 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_EXPORT_OBJ_FILE
+# EXPORT_OBJ_FILE
 Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
 
 ## Usage:
 
 ```
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,
+from quadriga_lib import arrayant
+arrayant.export_obj_file( fn, arrayant, directivity_range, colormap,
                 object_radius, icosphere_n_div, i_element )
 ```
 

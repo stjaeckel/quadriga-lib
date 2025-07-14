@@ -38,11 +38,13 @@ Otherwise, it defaults to using standard properties.
 ## Usage:
 
 ```
+from quadriga_lib import RTtools
+
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read( fn )
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = RTtools.obj_file_read( fn )
 
 # Return as tuple with 8 elements
-data = quadriga_lib.obj_file_read( fn )
+data = RTtools.obj_file_read( fn )
 ```
 
 ## Input Arguments:

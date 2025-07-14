@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_CALC_DIRECTIVITY
+# CALC_DIRECTIVITY
 Calculates the directivity (in dBi) of array antenna elements
 
 ## Description:
@@ -34,7 +34,8 @@ of a hypothetical isotropic radiator is 1, or 0 dBi.
 ## Usage:
 
 ```
-directivity = quadriga_lib.arrayant_calc_directivity(arrayant, element);
+from quadriga_lib import arrayant
+directivity = arrayant.calc_directivity(arrayant, element)
 ```
 
 ## Input Arguments:

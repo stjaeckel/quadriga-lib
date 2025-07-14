@@ -19,7 +19,7 @@
 #include "quadriga_lib.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Site-Specific Simulation Tools
 SECTION!*/
 
 /*!MD
@@ -34,9 +34,9 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
 θ = 90° points to the zenith and θ = 0° points to the horizon.
 
 ## Usage:
-
 ```
-geo_coords = quadriga_lib.cart2geo(cart_coords)
+from quadriga_lib import RTtools
+geo_coords = RTtools.cart2geo(cart_coords)
 ```
 
 ## Input Argument:

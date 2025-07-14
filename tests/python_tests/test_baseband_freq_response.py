@@ -10,8 +10,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-# Now you can import your package
-import quadriga_lib
+from quadriga_lib import channel
 
 class test_baseband_freq_response(unittest.TestCase):
 
@@ -47,7 +46,7 @@ class test_baseband_freq_response(unittest.TestCase):
         # Pilots array
         pilots = np.arange(0, 2.1, 0.1)
 
-        hmat = quadriga_lib.baseband_freq_response( coeff_list, delay_list, fc, carriers=11 )
+        hmat = channel.baseband_freq_response( coeff_list, delay_list, fc, carriers=11 )
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 
@@ -63,7 +62,7 @@ class test_baseband_freq_response(unittest.TestCase):
         npt.assert_almost_equal( hmat_re[:, :, :, 0]*2.0, hmat_re[:, :, :, 1], decimal=6 )
         npt.assert_almost_equal( hmat_re[:, :, :, 0]*3.0, hmat_re[:, :, :, 2], decimal=5 )
 
-        hmat = quadriga_lib.baseband_freq_response( coeff_list, delay_list, fc, pilot_grid=pilots, snap=[1,2,1,0] )
+        hmat = channel.baseband_freq_response( coeff_list, delay_list, fc, pilot_grid=pilots, snap=[1,2,1,0] )
         hmat_re = np.real(hmat)
         hmat_im = np.imag(hmat)
 

@@ -10,7 +10,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-import quadriga_lib
+from quadriga_lib import arrayant
 
 class test_version(unittest.TestCase):
 
@@ -26,10 +26,10 @@ class test_version(unittest.TestCase):
             f.write('</arrayant></qdant>\n')
 
         with self.assertRaises(ValueError) as context:
-            data = quadriga_lib.arrayant_qdant_read( 'testx.qdant' )
+            data = arrayant.qdant_read( 'testx.qdant' )
         self.assertEqual(str(context.exception), "File was not found")
 
-        data = quadriga_lib.arrayant_qdant_read( 'test.qdant' )
+        data = arrayant.qdant_read( 'test.qdant' )
 
         A = 20 * np.log10(data["e_theta_re"])
         B = np.reshape(np.arange(1, 16), (5, 3, 1))
@@ -62,7 +62,7 @@ class test_version(unittest.TestCase):
             f.write('<xx:CenterFrequency>3e9</xx:CenterFrequency>\n')
             f.write('</xx:arrayant></qdant>\n')
 
-        data = quadriga_lib.arrayant_qdant_read( 'test.qdant' )
+        data = arrayant.qdant_read( 'test.qdant' )
 
         npt.assert_almost_equal(data["azimuth_grid"], np.array([-np.pi / 2, -np.pi / 4, 0, np.pi / 4, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["elevation_grid"], np.array([-np.pi / 2, 0, np.pi / 2]), decimal=13)
@@ -94,13 +94,13 @@ class test_version(unittest.TestCase):
             f.write('<name>xxx</name>\n')
             f.write('</arrayant></qdant>\n')
 
-        data = quadriga_lib.arrayant_qdant_read( 'test.qdant', 1 )
+        data = arrayant.qdant_read( 'test.qdant', 1 )
 
         B = np.sqrt(np.array([[1.26, 1.26, 1.26], [1.58, 1.58, 2]]))
         assert np.array_equal(data["layout"], np.array([[1, 3]], dtype=np.uint32))
         npt.assert_almost_equal(data["e_theta_re"][:,:,0], B, decimal=2)
 
-        data = quadriga_lib.arrayant_qdant_read( 'test.qdant', 3 )
+        data = arrayant.qdant_read( 'test.qdant', 3 )
 
         B = np.array([[1], [-1]]) * np.sqrt(10 ** (np.array([[1, 2, 3], [-1, -2, -3]]) / 10))
         npt.assert_almost_equal(data["e_theta_re"], np.zeros((2, 3, 2)), decimal=13)

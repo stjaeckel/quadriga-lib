@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_QDANT_WRITE
+# QDANT_WRITE
 Writes array antenna data to QDANT files
 
 ## Description:
@@ -32,7 +32,8 @@ data in XML. This function writes pattern data to the specified file.
 ## Usage:
 
 ```
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout);
+from quadriga_lib import arrayant
+id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
 ```
 
 ## Caveat:

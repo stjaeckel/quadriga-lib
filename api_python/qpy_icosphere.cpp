@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,9 +33,9 @@ resulting mesh has 6 triangles at each vertex, except for 12 vertices which have
 The approximate equilateral triangles have roughly the same edge length and surface area.
 
 ## Usage:
-
 ```
-center, length, vert, direction = quadriga_lib.icosphere( no_div, radius, direction_xyz )
+from quadriga_lib import RTtools
+center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_xyz )
 ```
 
 ## Input Arguments:

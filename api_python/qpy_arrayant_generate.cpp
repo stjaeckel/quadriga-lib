@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_GENERATE
+# GENERATE
 Generates predefined array antenna models
 
 ## Description:
@@ -33,23 +33,25 @@ arguments are then specific to this type.
 ## Usage:
 
 ```
+from quadriga_lib import arrayant
+
 # Isotropic radiator, vertical polarization
-arrayant = quadriga_lib.arrayant_generate('omni', res)
+arrayant = arrayant.generate('omni', res)
 
 # Short dipole radiating with vertical polarization
-arrayant = quadriga_lib.arrayant_generate('dipole', res)
+arrayant = arrayant.generate('dipole', res)
 
 # Half-wave dipole radiating with vertical polarization
-arrayant = quadriga_lib.arrayant_generate('half-wave-dipole', res)
+arrayant = arrayant.generate('half-wave-dipole', res)
 
 # Cross-polarized isotropic radiator
-arrayant = quadriga_lib.arrayant_generate('xpol', res)
+arrayant = arrayant.generate('xpol', res)
 
 # An antenna with a custom 3dB beam with (in degree)
-arrayant = quadriga_lib.arrayant_generate('custom', res, az_3dB, el_3db, rear_gain_lin)
+arrayant = arrayant.generate('custom', res, az_3dB, el_3db, rear_gain_lin)
 
 # 3GPP-NR antenna model (example for 2x2, V-polarized, 0.7λ spacing)
-arrayant = quadriga_lib.arrayant_generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
+arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 ```
 
 ## Input Arguments:

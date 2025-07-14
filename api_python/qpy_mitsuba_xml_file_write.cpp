@@ -40,9 +40,9 @@ simulations.<br><br>
 - Optionally maps materials to ITU default presets used by Sionna RT.
 
 ## Usage:
-
 ```
-quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+from quadriga_lib import RTtools
+RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
 ```
 
 ## Input Arguments:
