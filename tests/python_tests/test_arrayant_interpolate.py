@@ -10,7 +10,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-import quadriga_lib
+from quadriga_lib import arrayant
 
 class test_version(unittest.TestCase):
 
@@ -24,21 +24,21 @@ class test_version(unittest.TestCase):
         az = [[0, np.pi/4, np.pi/2, 3*np.pi/4]]
         el = [[-0.5,0,0,0.5]]
 
-        vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(ant, az, el)
+        vr,vi,hr,hi = arrayant.interpolate(ant, az, el)
 
         npt.assert_almost_equal(vr, [[-2, -1, 0, 1]], decimal=14)
         npt.assert_almost_equal(vi, [[-1, -0.5, 0, 0.5]], decimal=14)
         npt.assert_almost_equal(hr, [[3, 2.5, 2, 1.5]], decimal=14)
         npt.assert_almost_equal(hi, [[6, 5, 4, 3]], decimal=14)
 
-        v,h = quadriga_lib.arrayant_interpolate(ant, az, el, complex=1)
+        v,h = arrayant.interpolate(ant, az, el, complex=1)
 
         npt.assert_almost_equal(v.real, [[-2, -1, 0, 1]], decimal=14)
         npt.assert_almost_equal(v.imag, [[-1, -0.5, 0, 0.5]], decimal=14)
         npt.assert_almost_equal(h.real, [[3, 2.5, 2, 1.5]], decimal=14)
         npt.assert_almost_equal(h.imag, [[6, 5, 4, 3]], decimal=14)
 
-        res = quadriga_lib.arrayant_interpolate(ant, az, el, dist=1, local_angles=1)
+        res = arrayant.interpolate(ant, az, el, dist=1, local_angles=1)
 
         npt.assert_almost_equal(res[4], [[0, 0, 0, 0]], decimal=14)
         npt.assert_almost_equal(res[5], az, decimal=14)
@@ -52,7 +52,7 @@ class test_version(unittest.TestCase):
         az = [[-0.5,0,0,0.5]]
         el = [[0, np.pi/8, np.pi/4, 3*np.pi/8]]
 
-        res = quadriga_lib.arrayant_interpolate(ant, az, el, dist=1, local_angles=1)
+        res = arrayant.interpolate(ant, az, el, dist=1, local_angles=1)
 
         npt.assert_almost_equal(res[0], [[-2, -1, 0, 1]], decimal=14)
         npt.assert_almost_equal(res[1], [[-1, -0.5, 0, 0.5]], decimal=14)
@@ -71,7 +71,7 @@ class test_version(unittest.TestCase):
         el = [[0,0,0,0]]
         ori = [[0,0],[0,0],[-np.pi/8,np.pi/8]]
 
-        res = quadriga_lib.arrayant_interpolate(ant, az, el, [0,0], ori, dist=1, local_angles=1)
+        res = arrayant.interpolate(ant, az, el, [0,0], ori, dist=1, local_angles=1)
         
         npt.assert_almost_equal(res[0][0,:], np.cos(np.array([0,1,2,3]) * np.pi/8 + np.pi/16), decimal=14)
         npt.assert_almost_equal(res[1][0,:], np.sin(np.array([0,1,2,3]) * np.pi/8 + np.pi/16), decimal=14)
@@ -86,7 +86,7 @@ class test_version(unittest.TestCase):
                 "azimuth_grid" : [0,np.pi], "elevation_grid" : 0 }
         
         ori = [[np.pi/4,-np.pi/4],[0,0],[0,0]]
-        vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(ant, 0, 0, [0,0], ori)
+        vr,vi,hr,hi = arrayant.interpolate(ant, 0, 0, [0,0], ori)
         
         npt.assert_almost_equal(vr[:,0], [1/np.sqrt(2),1/np.sqrt(2)], decimal=14)
         npt.assert_almost_equal(vi[:,0], [1/np.sqrt(2),1/np.sqrt(2)], decimal=14)
@@ -98,16 +98,16 @@ class test_version(unittest.TestCase):
                 "e_phi_re" : 0, "e_phi_im" : 0,
                 "azimuth_grid" : 0, "elevation_grid" : 0 }
         
-        vr,vi,hr,hi,ds = quadriga_lib.arrayant_interpolate(ant, 0, 0, [0,0,0], element_pos=np.eye(3), dist=1)
+        vr,vi,hr,hi,ds = arrayant.interpolate(ant, 0, 0, [0,0,0], element_pos=np.eye(3), dist=1)
         npt.assert_almost_equal(ds[:,0], [-1,0,0], decimal=14)
         
-        vr,vi,hr,hi,ds = quadriga_lib.arrayant_interpolate(ant, 3*np.pi/4, 0, [0,0,0], element_pos=np.eye(3), dist=1)
+        vr,vi,hr,hi,ds = arrayant.interpolate(ant, 3*np.pi/4, 0, [0,0,0], element_pos=np.eye(3), dist=1)
         npt.assert_almost_equal(ds[:,0], [1/np.sqrt(2),-1/np.sqrt(2),0], decimal=14)
 
-        vr,vi,hr,hi,ds = quadriga_lib.arrayant_interpolate(ant, 0, -np.pi/4, [0,0,0], element_pos=np.eye(3), dist=1)
+        vr,vi,hr,hi,ds = arrayant.interpolate(ant, 0, -np.pi/4, [0,0,0], element_pos=np.eye(3), dist=1)
         npt.assert_almost_equal(ds[:,0], [-1/np.sqrt(2),0,1/np.sqrt(2)], decimal=14)
 
-        vr,vi,hr,hi,ds = quadriga_lib.arrayant_interpolate(ant, [[-np.pi,-np.pi/2,0]], [[0,0,-np.pi/2]], [0,0,0], element_pos=-np.eye(3), dist=1)
+        vr,vi,hr,hi,ds = arrayant.interpolate(ant, [[-np.pi,-np.pi/2,0]], [[0,0,-np.pi/2]], [0,0,0], element_pos=-np.eye(3), dist=1)
         npt.assert_almost_equal(ds, -np.eye(3), decimal=14)
 
         # Error handling
@@ -119,51 +119,51 @@ class test_version(unittest.TestCase):
                 "elevation_grid" : np.linspace(-np.pi/2, np.pi/2, 5) }
 
         # Minimal working example
-        quadriga_lib.arrayant_interpolate(ant, 0, 0)
+        arrayant.interpolate(ant, 0, 0)
 
         with self.assertRaises(KeyError) as context: # No arrayant data
-            quadriga_lib.arrayant_interpolate()
+            arrayant.interpolate()
 
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant)
+            arrayant.interpolate(ant)
         self.assertEqual(str(context.exception), "Azimuth angles cannot be empty.")
 
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant,0)
+            arrayant.interpolate(ant,0)
         self.assertEqual(str(context.exception), "Sizes of 'azimuth' and 'elevation' do not match.")
 
         ant["e_theta_re"] = np.random.random((2,10,3))
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0)
+            arrayant.interpolate(ant, 0, 0)
         self.assertEqual(str(context.exception), "Sizes of 'e_theta_re' and 'e_theta_im' do not match.")
 
         ant["e_theta_im"] = np.random.random((2,10,3))
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0)
+            arrayant.interpolate(ant, 0, 0)
         self.assertEqual(str(context.exception), "Sizes of 'e_theta_re' and 'e_phi_re' do not match.")
 
         ant["e_phi_re"] = np.random.random((2,10,3))
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0)
+            arrayant.interpolate(ant, 0, 0)
         self.assertEqual(str(context.exception), "Sizes of 'e_theta_re' and 'e_phi_im' do not match.")
 
         ant["e_phi_im"] = np.random.random((2,10,3))
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0)
+            arrayant.interpolate(ant, 0, 0)
         self.assertEqual(str(context.exception), "Number of elements in 'elevation_grid' does not match number of rows in pattern data.")
 
         ant["elevation_grid"] = [-np.pi/4, np.pi/4]
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0, element=3)
+            arrayant.interpolate(ant, 0, 0, element=3)
         self.assertEqual(str(context.exception), "Element indices 'i_element' cannot exceed the array antenna size.")
 
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.arrayant_interpolate(ant, 0, 0, fast_access=1)
+            arrayant.interpolate(ant, 0, 0, fast_access=1)
         self.assertEqual(str(context.exception), "Could not obtain memory view, possibly due to mismatching strides.")
 
         # Interpolate real data (fast access OK)
-        ant = quadriga_lib.arrayant_generate("3gpp", az_3dB=90, el_3dB=90, res=10, N=2)
-        quadriga_lib.arrayant_interpolate(ant, 0, 0, fast_access=1)
+        ant = arrayant.generate("3gpp", az_3dB=90, el_3dB=90, res=10, N=2)
+        arrayant.interpolate(ant, 0, 0, fast_access=1)
             
 if __name__ == '__main__':
     unittest.main()

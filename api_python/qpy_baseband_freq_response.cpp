@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,8 @@ Transforms the channel into frequency domain and returns the frequency response
 ## Usage:
 
 ```
-hmat = quadriga_lib.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
+from quadriga_lib import channel
+hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
 ```
 
 ## Input Arguments:

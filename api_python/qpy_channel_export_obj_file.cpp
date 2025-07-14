@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,7 +35,9 @@ set gain thresholds for color-coding and selection.
 ## Usage:
 
 ```
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
+from quadriga_lib import channel
+
+channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
     radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
     coeff, i_snap )
 ```

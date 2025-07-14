@@ -10,7 +10,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-import quadriga_lib
+from quadriga_lib import arrayant
 
 class test_version(unittest.TestCase):
 
@@ -31,10 +31,10 @@ class test_version(unittest.TestCase):
                 'center_freq': 2e9,
                 'name': 'name' }
         
-        id_file = quadriga_lib.arrayant_qdant_write("test_py.qdant", ant)
+        id_file = arrayant.qdant_write("test_py.qdant", ant)
         assert id_file == 1
 
-        data = quadriga_lib.arrayant_qdant_read('test_py.qdant')
+        data = arrayant.qdant_read('test_py.qdant')
         npt.assert_almost_equal(data["azimuth_grid"], ant["azimuth_grid"], decimal=6)
         npt.assert_almost_equal(data["elevation_grid"], ant["elevation_grid"], decimal=6)
         npt.assert_almost_equal(data["e_theta_re"][:,:,0], ant["e_theta_re"], decimal=4)

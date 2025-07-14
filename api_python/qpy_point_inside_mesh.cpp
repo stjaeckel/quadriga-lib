@@ -35,7 +35,8 @@ Test whether 3D points are inside a triangle mesh using raycasting
 
 ## Usage:
 ```
-result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
+from quadriga_lib import RTtools
+result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
 ```
 
 ## Input Arguments:

@@ -78,10 +78,10 @@ class test_version(unittest.TestCase):
         ])
 
         # No output should be fine
-        quadriga_lib.obj_file_read(fn)
+        quadriga_lib.RTtools.obj_file_read(fn)
 
         # Read all
-        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read(fn)
+        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.RTtools.obj_file_read(fn)
 
         assert mesh.shape == (12,9)
         assert mtl_prop.shape == (12,5)
@@ -138,7 +138,7 @@ class test_version(unittest.TestCase):
             f.write('f 6/5 7/6 5/7\n')
             f.write('f 6/5 8/8 7/6\n')
 
-        data = quadriga_lib.obj_file_read(fn)
+        data = quadriga_lib.RTtools.obj_file_read(fn)
 
         assert len(data[6]) == 2
         assert len(data[7]) == 1
@@ -173,7 +173,7 @@ class test_version(unittest.TestCase):
             f.write('usemtl Cst::2.1:2.2:2.3:2.4:20\n')
             f.write('f 2/1/1 4/4/1 3/2/1\n')
 
-        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read(fn)
+        mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.RTtools.obj_file_read(fn)
 
         npt.assert_almost_equal(mtl_prop[0, :], [1.1, 1.2, 1.3, 1.4, 10], decimal=14)
         npt.assert_almost_equal(mtl_prop[1, :], [2.1, 2.2, 2.3, 2.4, 20], decimal=14)
@@ -183,10 +183,10 @@ class test_version(unittest.TestCase):
         npt.assert_array_equal(mtl_ind, [1,2])
 
         with self.assertRaises(TypeError) as context:
-            quadriga_lib.obj_file_read()
+            quadriga_lib.RTtools.obj_file_read()
 
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.obj_file_read('bla.obj')
+            quadriga_lib.RTtools.obj_file_read('bla.obj')
         self.assertEqual(str(context.exception), "Error opening file: 'bla.obj' does not exist.")
 
         os.remove(fn)

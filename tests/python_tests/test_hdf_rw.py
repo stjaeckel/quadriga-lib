@@ -10,7 +10,7 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-import quadriga_lib
+from quadriga_lib import channel
 
 class test_hdf_rw(unittest.TestCase):
 
@@ -23,10 +23,10 @@ class test_hdf_rw(unittest.TestCase):
             os.remove(fn)
 
         # Try creating the file
-        quadriga_lib.hdf5_create_file(fn)
+        channel.hdf5_create_file(fn)
 
         # Read Layout
-        storage_space, has_data = quadriga_lib.hdf5_read_layout(fn)
+        storage_space, has_data = channel.hdf5_read_layout(fn)
 
         tst = np.array([65536, 1, 1, 1], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
@@ -35,34 +35,34 @@ class test_hdf_rw(unittest.TestCase):
 
         # Trying this again should fail because file exists
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_create_file(fn)
+            channel.hdf5_create_file(fn)
         self.assertEqual(str(context.exception), "File already exists.")
 
         # Try creating a file with a custom storage layout
         os.remove(fn)
-        quadriga_lib.hdf5_create_file(fn, 12, 12)
-        storage_space, has_data = quadriga_lib.hdf5_read_layout(fn)
+        channel.hdf5_create_file(fn, 12, 12)
+        storage_space, has_data = channel.hdf5_read_layout(fn)
         tst = np.array([12, 12, 1, 1], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
         self.assertEqual(has_data.shape, (12, 12, 1, 1))
 
         # Reshape the storage layout
-        quadriga_lib.hdf5_reshape_layout(fn, 1, 1, 18, 8);
-        storage_space, has_data = quadriga_lib.hdf5_read_layout(fn)
+        channel.hdf5_reshape_layout(fn, 1, 1, 18, 8);
+        storage_space, has_data = channel.hdf5_read_layout(fn)
         tst = np.array([1, 1, 18, 8], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
         self.assertEqual(has_data.shape, (1, 1, 18, 8))
 
         # There should be an error if number of elements dont match
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_reshape_layout(fn, 145)
+            channel.hdf5_reshape_layout(fn, 145)
         self.assertEqual(str(context.exception), "Mismatch in number of elements in storage index.")
 
         os.remove(fn)
 
         # Calling the reshape function on a non-exisitng file should cause error
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_reshape_layout(fn, 145)
+            channel.hdf5_reshape_layout(fn, 145)
         self.assertEqual(str(context.exception), "File does not exist.")
 
         # Test writing unstructured data
@@ -98,19 +98,19 @@ class test_hdf_rw(unittest.TestCase):
         }
 
         # Write dataset to file
-        storage_space = quadriga_lib.hdf5_write_channel(fn,1,1,1,1,par)
+        storage_space = channel.hdf5_write_channel(fn,1,1,1,1,par)
         tst = np.array([128,8,8,8], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
 
         # Try writing empty par - should be OK
-        storage_space = quadriga_lib.hdf5_write_channel(fn,2,1,1,1,{})
+        storage_space = channel.hdf5_write_channel(fn,2,1,1,1,{})
         npt.assert_array_equal(storage_space, tst)
 
         # Read the names of the par
-        par_names = quadriga_lib.hdf5_read_dset_names(fn,1,1,1,1)
+        par_names = channel.hdf5_read_dset_names(fn,1,1,1,1)
 
         # Read the data again and compare the results
-        res = quadriga_lib.hdf5_read_channel(fn,1,1,1,1)
+        res = channel.hdf5_read_channel(fn,1,1,1,1)
         npt.assert_equal(len(res), 1)
         npt.assert_("par" in res, f"No unstructured data found in file!")
 
@@ -126,33 +126,33 @@ class test_hdf_rw(unittest.TestCase):
             npt.assert_equal(value, value_read)
 
             # Add a copy of the data to a new storage location
-            quadriga_lib.hdf5_write_dset(fn, iy = 1, name=key, data=value)
+            channel.hdf5_write_dset(fn, iy = 1, name=key, data=value)
 
         # Check if number of datasets matches
-        par_names = quadriga_lib.hdf5_read_dset_names(fn,0,1)
+        par_names = channel.hdf5_read_dset_names(fn,0,1)
         for key, value in par.items():
             npt.assert_(key in par_names, f"Key '{key}' not found in list of dataset names!")
 
         # Overwriting an exisiting dataset should cause error
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_write_dset(fn, 0,1,0,0, 'string', 'Oh no, I bought Ethereum.')
+            channel.hdf5_write_dset(fn, 0,1,0,0, 'string', 'Oh no, I bought Ethereum.')
         self.assertEqual(str(context.exception), "Dataset 'par_string' already exists.")
 
         # Missing dataset name should cause error
         with self.assertRaises(TypeError) as context:
-            quadriga_lib.hdf5_write_dset(fn, 12, value=5)
+            channel.hdf5_write_dset(fn, 12, value=5)
 
         # Reading from an empty location
-        par_names = quadriga_lib.hdf5_read_dset_names(fn,12)
+        par_names = channel.hdf5_read_dset_names(fn,12)
         npt.assert_equal(len(par_names), 0)
 
         # Passing a snapshot range should work fine since there is no structured data
-        quadriga_lib.hdf5_read_channel(fn,1,1,1,1,[1,2])
+        channel.hdf5_read_channel(fn,1,1,1,1,[1,2])
 
         # Trying to write a complex number should generate an error
         with self.assertRaises(ValueError) as context:
             parC = { "complex": 1+2j }
-            quadriga_lib.hdf5_write_channel(fn,3, par=parC)
+            channel.hdf5_write_channel(fn,3, par=parC)
         self.assertEqual(str(context.exception), "Input 'complex' has an unsupported type.")
 
         rx_pos = np.random.rand(3, 1)
@@ -160,11 +160,11 @@ class test_hdf_rw(unittest.TestCase):
 
         # Only providing rx_pos should lead to an error
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_write_channel(fn,5,rx_pos=rx_pos)
+            channel.hdf5_write_channel(fn,5,rx_pos=rx_pos)
         self.assertEqual(str(context.exception), "'tx_pos' is missing or ill-formatted (must have 3 rows).")
 
         # This should be OK, but useless
-        quadriga_lib.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos)
+        channel.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos)
         
         coeff_re = [np.random.random((2, 3, 5)) for _ in range(4)] 
         coeff = [np.random.random((2, 3, 5)) + 1j*np.random.random((2, 3, 5)) for _ in range(4)] 
@@ -172,22 +172,22 @@ class test_hdf_rw(unittest.TestCase):
 
         # Passing only coeff should cause error
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff)
+            channel.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff)
         self.assertEqual(str(context.exception), "Delays are missing or incomplete.")
 
         # This should work fine
-        quadriga_lib.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff, delay=delay_4d)
-        quadriga_lib.hdf5_write_channel(fn,6,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff_re, delay=delay_4d)
+        channel.hdf5_write_channel(fn,5,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff, delay=delay_4d)
+        channel.hdf5_write_channel(fn,6,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff_re, delay=delay_4d)
 
         # Test if we can restore the data
-        res = quadriga_lib.hdf5_read_channel(fn, 5)
+        res = channel.hdf5_read_channel(fn, 5)
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
         npt.assert_almost_equal( res["coeff"], coeff )
         npt.assert_almost_equal( res["delay"], delay_4d )
 
         # Test if we can restore the data in reverse order
-        res = quadriga_lib.hdf5_read_channel(fn, 5, snap=(2,1,0))
+        res = channel.hdf5_read_channel(fn, 5, snap=(2,1,0))
 
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
@@ -200,13 +200,13 @@ class test_hdf_rw(unittest.TestCase):
 
         # Test out-of-bound error
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.hdf5_read_channel(fn, 5, snap=4)
+            channel.hdf5_read_channel(fn, 5, snap=4)
         self.assertEqual(str(context.exception), "Snapshot index out of bound.")
         
         # Test alternative delays
         delay_2d = [np.random.random((1, 1, 5)) for _ in range(4)] 
-        quadriga_lib.hdf5_write_channel(fn,7,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff, delay=delay_2d)
-        res = quadriga_lib.hdf5_read_channel(fn, 7)
+        channel.hdf5_write_channel(fn,7,rx_pos=rx_pos, tx_pos=tx_pos,coeff=coeff, delay=delay_2d)
+        res = channel.hdf5_read_channel(fn, 7)
 
         npt.assert_almost_equal( res["delay"], delay_2d )
 
@@ -233,7 +233,7 @@ class test_hdf_rw(unittest.TestCase):
         rx_orientation = np.random.random((3,4))
         tx_orientation = np.random.random((3,4))
 
-        quadriga_lib.hdf5_write_channel(fn, 8, rx_pos = rx_pos, tx_pos = tx_pos, coeff = coeff, delay = delay_4d,
+        channel.hdf5_write_channel(fn, 8, rx_pos = rx_pos, tx_pos = tx_pos, coeff = coeff, delay = delay_4d,
                                         center_frequency = center_frequency, name = name, path_gain = path_gain,
                                         path_length = path_length, path_polarization = path_polarization, 
                                         path_angles = path_angles, path_fbs_pos = fbs_pos, path_lbs_pos = lbs_pos,
@@ -241,7 +241,7 @@ class test_hdf_rw(unittest.TestCase):
                                         rx_orientation = rx_orientation, tx_orientation = tx_orientation )
 
         # Test if we can restore the data
-        res = quadriga_lib.hdf5_read_channel(fn, 8)
+        res = channel.hdf5_read_channel(fn, 8)
 
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )
@@ -265,7 +265,7 @@ class test_hdf_rw(unittest.TestCase):
         npt.assert_almost_equal( res["rx_orientation"], rx_orientation )
 
         # Test if we can restore a single snapsot
-        res = quadriga_lib.hdf5_read_channel(fn, 8, snap = 2)
+        res = channel.hdf5_read_channel(fn, 8, snap = 2)
 
         npt.assert_almost_equal( res["tx_position"], tx_pos )
         npt.assert_almost_equal( res["rx_position"], rx_pos )

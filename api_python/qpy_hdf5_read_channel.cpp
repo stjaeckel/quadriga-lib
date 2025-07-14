@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,13 +37,13 @@ various frequencies. It is important to note that not all datasets include all t
 
 The library also supports the addition of extra datasets of any type or shape, which can be useful
 for incorporating descriptive data or analysis results. To facilitate data access, the function
-`quadriga_lib.hdf5_read_channel` is designed to read both structured and unstructured data from the
+`quadriga_lib.channel.hdf5_read_channel` is designed to read both structured and unstructured data from the
 file.
 
 ## Usage:
-
 ```
-data = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+from quadriga_lib import channel
+data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 ```
 
 ## Input Arguments:

@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_INTERPOLATE
+# INTERPOLATE
 Interpolate array antenna field patterns
 
 ## Description:
@@ -32,21 +32,23 @@ elevation angles.
 ## Usage:
 
 ```
+from quadriga_lib import arrayant
+
 # Minimal example
-vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation)
+vr,vi,hr,hi = arrayant.interpolate(arrayant, azimuth, elevation)
 
 # Output as complex type
-v,h = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, complex=1)
+v,h = arrayant.interpolate(arrayant, azimuth, elevation, complex=1)
 
 # Generate projected distance
-vr,vi,hr,hi,dist = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, dist=1)
-v,h,dist = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, complex=1, dist=1)
+vr,vi,hr,hi,dist = arrayant.interpolate(arrayant, azimuth, elevation, dist=1)
+v,h,dist = arrayant.interpolate(arrayant, azimuth, elevation, complex=1, dist=1)
 
 # Additional inputs
-vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, element, orientation, element_pos)
+vr,vi,hr,hi = arrayant.interpolate(arrayant, azimuth, elevation, element, orientation, element_pos)
 
 # Output angles in antenna-local coordinates
-vr,vi,hr,hi,az_local,el_local,gamma = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, orientation=ori, local_angles=1)
+vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, elevation, orientation=ori, local_angles=1)
 ```
 
 ## Input Arguments:

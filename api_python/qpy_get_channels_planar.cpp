@@ -41,7 +41,9 @@ execution of this process, several pieces of input data are required:<br><br>
 ## Usage:
 
 ```
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.get_channels_planar( ant_tx, ant_rx, 
+from quadriga_lib import arrayant
+
+coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, ant_rx, 
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path );
 ```

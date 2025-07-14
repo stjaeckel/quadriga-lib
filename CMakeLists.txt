@@ -408,18 +408,25 @@ if (BUILD_PYTHON)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 
-    set(PYTHON_MAIN_SRC "api_python/python_main.cpp")
-    add_library(quadriga_py MODULE ${PYTHON_MAIN_SRC})
+    set(PYTHON_SOURCES 
+        api_python/python_main.cpp
+        api_python/python_arrayant.cpp
+        api_python/python_channel.cpp
+        api_python/python_RTtools.cpp
+    )
+    add_library(quadriga_py MODULE ${PYTHON_SOURCES})
     set_target_properties(quadriga_py PROPERTIES
         PREFIX ""
         OUTPUT_NAME "quadriga_lib"
         SUFFIX "${PYTHON_EXTENSION_SUFFIX}"
+        POSITION_INDEPENDENT_CODE ON
     )
     target_include_directories(quadriga_py PRIVATE ${Python3_INCLUDE_DIRS})
     target_link_libraries(quadriga_py PRIVATE quadriga_static ${Python3_LIBRARIES} HDF5::HDF5)
+    target_compile_options(quadriga_py PRIVATE -Wno-unused-function)
 
     file(GLOB PYTHON_INCLUDED_FILES "api_python/*.hpp" "api_python/*.cpp")
-    set_source_files_properties(${PYTHON_MAIN_SRC} PROPERTIES
+    set_source_files_properties(${PYTHON_SOURCES} PROPERTIES
         OBJECT_DEPENDS "${PYTHON_INCLUDED_FILES}"
     )
     message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")

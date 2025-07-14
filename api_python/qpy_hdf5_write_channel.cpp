@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,9 @@ can be used to write structured and unstructured data to an HDF5 file.
 ## Usage:
 
 ```
-storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position, tx_position, ...
+from quadriga_lib import channel
+
+storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position, tx_position, ...
    coeff_re, coeff_im, delay, center_freq, name, initial_pos, path_gain, path_length, ...
    path_polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
    rx_orientation, tx_orientation )

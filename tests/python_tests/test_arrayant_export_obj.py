@@ -17,9 +17,9 @@ class test_version(unittest.TestCase):
     def test(self):
 
         # Omni antenna, 10 deg
-        data = quadriga_lib.arrayant_generate("3gpp", 10, M=2)
+        data = quadriga_lib.arrayant.generate("3gpp", 10, M=2)
 
-        quadriga_lib.arrayant_export_obj_file("test_py.obj", data)
+        quadriga_lib.arrayant.export_obj_file("test_py.obj", data)
 
         assert os.path.exists("test_py.obj")
         assert os.path.exists("test_py.mtl")

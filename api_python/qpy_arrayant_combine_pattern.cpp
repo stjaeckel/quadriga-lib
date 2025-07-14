@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_COMBINE_PATTERN
+# COMBINE_PATTERN
 Calculate effective radiation patterns for array antennas
 
 ## Description:
@@ -39,11 +39,13 @@ radiation patterns.
 
 ## Usage:
 ```
+from quadriga_lib import arrayant
+
 # Minimal example
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant)
+arrayant_out = arrayant.combine_pattern(arrayant)
 
 # Optional inputs: freq, azimuth_grid, elevation_grid
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
+arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
 ```
 
 ## Input Arguments:

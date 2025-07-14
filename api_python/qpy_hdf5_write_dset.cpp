@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,12 +30,13 @@ Writes unstructured data to a HDF5 file
 Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition
 to structured datasets, the library facilitates the inclusion of extra datasets of various types
 and shapes. This feature is particularly beneficial for integrating descriptive data or analysis
-results. The function `quadriga_lib.hdf5_write_dset` writes a single unstructured dataset.
+results. The function `quadriga_lib.channel.hdf5_write_dset` writes a single unstructured dataset.
 
 ## Usage:
 
 ```
-quadriga_lib.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+from quadriga_lib import channel
+channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 ```
 
 ## Input Arguments:

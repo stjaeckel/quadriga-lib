@@ -22,13 +22,14 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_COPY_ELEMENT
+# COPY_ELEMENT
 Create copies of array antenna elements
 
 ## Usage:
 
 ```
-arrayant_out = quadriga_lib.arrayant_copy_element(arrayant, source_element, dest_element);
+from quadriga_lib import arrayant
+arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 ```
 
 ## Input Arguments:

@@ -23,7 +23,7 @@
 
 namespace py = pybind11;
 
-inline quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
+static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &arrayant,
                                                                bool view = false, bool strict = false)
 {
     auto ant = quadriga_lib::arrayant<double>();
@@ -46,7 +46,7 @@ inline quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
     return ant;
 }
 
-inline py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
+static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
 {
     py::dict output;
     output["e_theta_re"] = qd_python_copy2numpy(ant.e_theta_re);

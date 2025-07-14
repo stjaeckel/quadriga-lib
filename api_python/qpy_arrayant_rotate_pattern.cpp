@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_ROTATE_PATTERN
+# ROTATE_PATTERN
 Rotates antenna patterns
 
 ## Description:
@@ -34,7 +34,8 @@ The 3 rotations are applies in the order: 1. rotation around the x-axis (bank an
 ## Usage:
 
 ```
-arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant, bank, tilt, head, usage, element);
+from quadriga_lib import arrayant
+arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, element);
 ```
 
 ## Input Arguments:

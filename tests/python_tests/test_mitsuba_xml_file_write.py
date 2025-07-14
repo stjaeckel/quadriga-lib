@@ -30,7 +30,7 @@ class test_version(unittest.TestCase):
             obj_names,
             mtl_names,
             bsdf,
-        ) = quadriga_lib.obj_file_read(obj_file)
+        ) = quadriga_lib.RTtools.obj_file_read(obj_file)
 
         # Minimal sanity check
         self.assertTrue(vert_list.size, "No vertices loaded from OBJ")
@@ -40,7 +40,7 @@ class test_version(unittest.TestCase):
         # -----------------------------------------------------------------
         xml_file = os.path.join(current_dir, 'test_scene_x.xml')
 
-        quadriga_lib.mitsuba_xml_file_write(
+        quadriga_lib.RTtools.mitsuba_xml_file_write(
             xml_file,
             vert_list,
             face_ind,

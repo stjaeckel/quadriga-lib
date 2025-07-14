@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.7.8</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.0</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -86,15 +86,15 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a></td><td>Calculates the directivity (in dBi) of array antenna elements</td></tr>
-<tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
-<tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
-<tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
-<tr><td><a href="#arrayant_generate">arrayant_generate</a></td><td>Generates predefined array antenna models</td></tr>
-<tr><td><a href="#arrayant_interpolate">arrayant_interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
-<tr><td><a href="#arrayant_qdant_read">arrayant_qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
-<tr><td><a href="#arrayant_qdant_write">arrayant_qdant_write</a></td><td>Writes array antenna data to QDANT files</td></tr>
-<tr><td><a href="#arrayant_rotate_pattern">arrayant_rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
+<tr><td><a href="#calc_directivity">calc_directivity</a></td><td>Calculates the directivity (in dBi) of array antenna elements</td></tr>
+<tr><td><a href="#combine_pattern">combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
+<tr><td><a href="#copy_element">copy_element</a></td><td>Create copies of array antenna elements</td></tr>
+<tr><td><a href="#export_obj_file">export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
+<tr><td><a href="#generate">generate</a></td><td>Generates predefined array antenna models</td></tr>
+<tr><td><a href="#interpolate">interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
+<tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
+<tr><td><a href="#qdant_write">qdant_write</a></td><td>Writes array antenna data to QDANT files</td></tr>
+<tr><td><a href="#rotate_pattern">rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients from path data and antenna patterns</td></tr>
 </tbody>
@@ -124,7 +124,6 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 </tbody>
@@ -136,6 +135,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
@@ -153,8 +153,8 @@ import quadriga_lib
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_calc_directivity"></a>
-<b>arrayant_calc_directivity</b> - Calculates the directivity (in dBi) of array antenna elements
+<a name="calc_directivity"></a>
+<b>calc_directivity</b> - Calculates the directivity (in dBi) of array antenna elements
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
@@ -164,7 +164,8 @@ of a hypothetical isotropic radiator is 1, or 0 dBi.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-directivity = quadriga_lib.arrayant_calc_directivity(arrayant, element);
+from quadriga_lib import arrayant
+directivity = arrayant.calc_directivity(arrayant, element)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -216,8 +217,8 @@ directivity = quadriga_lib.arrayant_calc_directivity(arrayant, element);
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_combine_pattern"></a>
-<b>arrayant_combine_pattern</b> - Calculate effective radiation patterns for array antennas
+<a name="combine_pattern"></a>
+<b>combine_pattern</b> - Calculate effective radiation patterns for array antennas
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>An array antenna consists of multiple individual elements. Each element occupies a specific position 
@@ -233,11 +234,13 @@ radiation patterns.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
 # Minimal example
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant)
+arrayant_out = arrayant.combine_pattern(arrayant)
 
 # Optional inputs: freq, azimuth_grid, elevation_grid
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
+arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -381,12 +384,13 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant, freq, azimuth_gri
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_copy_element"></a>
-<b>arrayant_copy_element</b> - Create copies of array antenna elements
+<a name="copy_element"></a>
+<b>copy_element</b> - Create copies of array antenna elements
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-arrayant_out = quadriga_lib.arrayant_copy_element(arrayant, source_element, dest_element);
+from quadriga_lib import arrayant
+arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -524,12 +528,13 @@ arrayant_out = quadriga_lib.arrayant_copy_element(arrayant, source_element, dest
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_export_obj_file"></a>
-<b>arrayant_export_obj_file</b> - Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
+<a name="export_obj_file"></a>
+<b>export_obj_file</b> - Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,
+from quadriga_lib import arrayant
+arrayant.export_obj_file( fn, arrayant, directivity_range, colormap,
                 object_radius, icosphere_n_div, i_element )
 </pre>
 </li>
@@ -607,8 +612,8 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_generate"></a>
-<b>arrayant_generate</b> - Generates predefined array antenna models
+<a name="generate"></a>
+<b>generate</b> - Generates predefined array antenna models
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>This functions can be used to generate a variety of pre-defined array antenna models, including 3GPP 
@@ -617,23 +622,25 @@ arguments are then specific to this type.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
 # Isotropic radiator, vertical polarization
-arrayant = quadriga_lib.arrayant_generate('omni', res)
+arrayant = arrayant.generate('omni', res)
 
 # Short dipole radiating with vertical polarization
-arrayant = quadriga_lib.arrayant_generate('dipole', res)
+arrayant = arrayant.generate('dipole', res)
 
 # Half-wave dipole radiating with vertical polarization
-arrayant = quadriga_lib.arrayant_generate('half-wave-dipole', res)
+arrayant = arrayant.generate('half-wave-dipole', res)
 
 # Cross-polarized isotropic radiator
-arrayant = quadriga_lib.arrayant_generate('xpol', res)
+arrayant = arrayant.generate('xpol', res)
 
 # An antenna with a custom 3dB beam with (in degree)
-arrayant = quadriga_lib.arrayant_generate('custom', res, az_3dB, el_3db, rear_gain_lin)
+arrayant = arrayant.generate('custom', res, az_3dB, el_3db, rear_gain_lin)
 
 # 3GPP-NR antenna model (example for 2x2, V-polarized, 0.7λ spacing)
-arrayant = quadriga_lib.arrayant_generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
+arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -828,8 +835,8 @@ arrayant = quadriga_lib.arrayant_generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, s
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_interpolate"></a>
-<b>arrayant_interpolate</b> - Interpolate array antenna field patterns
+<a name="interpolate"></a>
+<b>interpolate</b> - Interpolate array antenna field patterns
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>This function interpolates polarimetric antenna field patterns for a given set of azimuth and 
@@ -837,21 +844,23 @@ elevation angles.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
 # Minimal example
-vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation)
+vr,vi,hr,hi = arrayant.interpolate(arrayant, azimuth, elevation)
 
 # Output as complex type
-v,h = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, complex=1)
+v,h = arrayant.interpolate(arrayant, azimuth, elevation, complex=1)
 
 # Generate projected distance
-vr,vi,hr,hi,dist = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, dist=1)
-v,h,dist = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, complex=1, dist=1)
+vr,vi,hr,hi,dist = arrayant.interpolate(arrayant, azimuth, elevation, dist=1)
+v,h,dist = arrayant.interpolate(arrayant, azimuth, elevation, complex=1, dist=1)
 
 # Additional inputs
-vr,vi,hr,hi = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, element, orientation, element_pos)
+vr,vi,hr,hi = arrayant.interpolate(arrayant, azimuth, elevation, element, orientation, element_pos)
 
 # Output angles in antenna-local coordinates
-vr,vi,hr,hi,az_local,el_local,gamma = quadriga_lib.arrayant_interpolate(arrayant, azimuth, elevation, orientation=ori, local_angles=1)
+vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, elevation, orientation=ori, local_angles=1)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1044,8 +1053,8 @@ vr,vi,hr,hi,az_local,el_local,gamma = quadriga_lib.arrayant_interpolate(arrayant
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_qdant_read"></a>
-<b>arrayant_qdant_read</b> - Reads array antenna data from QDANT files
+<a name="qdant_read"></a>
+<b>qdant_read</b> - Reads array antenna data from QDANT files
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
@@ -1053,7 +1062,8 @@ data in XML. This function reads pattern data from the specified file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-data = quadriga_lib.arrayant_qdant_read( fn, id )
+from quadriga_lib import arrayant
+data = arrayant.qdant_read( fn, id )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1134,8 +1144,8 @@ data = quadriga_lib.arrayant_qdant_read( fn, id )
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_qdant_write"></a>
-<b>arrayant_qdant_write</b> - Writes array antenna data to QDANT files
+<a name="qdant_write"></a>
+<b>qdant_write</b> - Writes array antenna data to QDANT files
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
@@ -1143,7 +1153,8 @@ data in XML. This function writes pattern data to the specified file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout);
+from quadriga_lib import arrayant
+id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1234,8 +1245,8 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout);
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_rotate_pattern"></a>
-<b>arrayant_rotate_pattern</b> - Rotates antenna patterns
+<a name="rotate_pattern"></a>
+<b>rotate_pattern</b> - Rotates antenna patterns
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>This function transforms the radiation patterns of array antenna elements, allowing for 
@@ -1245,7 +1256,8 @@ The 3 rotations are applies in the order: 1. rotation around the x-axis (bank an
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant, bank, tilt, head, usage, element);
+from quadriga_lib import arrayant
+arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, element);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1433,7 +1445,9 @@ execution of this process, several pieces of input data are required:<br><br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.get_channels_planar( ant_tx, ant_rx, 
+from quadriga_lib import arrayant
+
+coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, ant_rx, 
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path );
 </pre>
@@ -1691,11 +1705,15 @@ execution of this process, several pieces of input data are required:<br><br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-coeff_re, coeff_im, delays = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, 
+from quadriga_lib import arrayant
+
+# Return only coefficients and delays
+coeff_re, coeff_im, delays = arrayant.get_channels_spherical( ant_tx, ant_rx, 
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path );
 
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, 
+# Return additional departure and arrival angles
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant_tx, ant_rx, 
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
     center_freq, use_absolute_delays, add_fake_los_path, angles=1 );
 </pre>
@@ -1960,7 +1978,8 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.get_channels_spher
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-hmat = quadriga_lib.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
+from quadriga_lib import channel
+hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2017,7 +2036,9 @@ set gain thresholds for color-coding and selection.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
+from quadriga_lib import channel
+
+channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
     radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
     coeff, i_snap )
 </pre>
@@ -2097,12 +2118,13 @@ to individual data sets without the need to read the entire file. In this system
 structured in a multi-dimensional array. For instance, the first dimension might represent the Base 
 Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important 
 to note that the dimensions of the storage layout must be defined when the file is initially created 
-and cannot be altered thereafter. The function <code>quadriga_lib.hdf5_create_file</code> is used to create an 
+and cannot be altered thereafter. The function <code>quadriga_lib.channel.hdf5_create_file</code> is used to create an 
 empty file with a predetermined custom storage layout.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw )
+from quadriga_lib import channel
+channel.hdf5_create_file( fn, nx, ny, nz, nw )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2142,12 +2164,13 @@ various frequencies. It is important to note that not all datasets include all t
  
 The library also supports the addition of extra datasets of any type or shape, which can be useful 
 for incorporating descriptive data or analysis results. To facilitate data access, the function 
-<code>quadriga_lib.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
+<code>quadriga_lib.channel.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
 file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-data = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+from quadriga_lib import channel
+data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2287,12 +2310,13 @@ data = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 to structured datasets, the library facilitates the inclusion of extra datasets of various types 
 and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
 results. Users can add any number of such unstructured datasets, each identified by a unique 
-dataset name. The function <code>quadriga_lib.hdf5_read_dset_names</code> retrieves the names of all these 
-datasets, returning them as a list of strings.
+dataset name. The function <code>quadriga_lib.channel.hdf5_read_dset_names</code> retrieves the names of all  
+these datasets, returning them as a list of strings.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw );
+from quadriga_lib import channel
+names = channel.hdf5_read_dset_names( fn, ix, iy, iz, iw );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2331,14 +2355,15 @@ names = quadriga_lib.hdf5_read_dset_names( fn, ix, iy, iz, iw );
 notable feature of this library is its capacity to manage multiple channels within a single HDF5 
 file. In this framework, channels can be arranged in a multi-dimensional array format. 
  
-The function <code>quadriga_lib.hdf5_read_layout</code> is designed to read the storage layout from an 
+The function <code>quadriga_lib.channel.hdf5_read_layout</code> is designed to read the storage layout from an 
 existing file. Furthermore, it also generates an array that marks the locations within the layout 
 where data already exists. This functionality aids in efficiently managing and accessing channel 
 data within the HDF5 file structure.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-storage_dims, has_data = quadriga_lib.hdf5_read_layout( fn )
+from quadriga_lib import channel
+storage_dims, has_data = channel.hdf5_read_layout( fn )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2365,11 +2390,12 @@ storage_dims, has_data = quadriga_lib.hdf5_read_layout( fn )
 notable feature of this library is its capacity to manage multiple channels within a single HDF5 
 file. In this framework, channels can be arranged in a multi-dimensional array format. 
 Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
-However, it is possible to reshape the layout using <code>quadriga_lib.hdf5_reshape_layout</code>.
+However, it is possible to reshape the layout using <code>quadriga_lib.channel.hdf5_reshape_layout</code>.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+from quadriga_lib import channel
+channel.hdf5_reshape_layout( fn, storage_dims );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2404,7 +2430,9 @@ can be used to write structured and unstructured data to an HDF5 file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position, tx_position, ...
+from quadriga_lib import channel
+
+storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position, tx_position, ...
    coeff_re, coeff_im, delay, center_freq, name, initial_pos, path_gain, path_length, ...
    path_polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
    rx_orientation, tx_orientation )
@@ -2557,11 +2585,12 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, ix, iy, iz, iw, rx_position,
 <b><i>Description:</i></b><br>Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
 to structured datasets, the library facilitates the inclusion of extra datasets of various types 
 and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function <code>quadriga_lib.hdf5_write_dset</code> writes a single unstructured dataset.
+results. The function <code>quadriga_lib.channel.hdf5_write_dset</code> writes a single unstructured dataset.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+from quadriga_lib import channel
+channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2611,36 +2640,6 @@ quadriga_lib.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="cart2geo"></a>
-<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90° points to the zenith and θ = 0° points to the horizon.
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Usage:</i></b><br><pre>
-geo_coords = quadriga_lib.cart2geo(cart_coords)
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
-   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
-   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
-   First row: Azimuth angles in [rad], values between -pi and pi.<br> 
-   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
-   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="components"></a>
 <b>components</b> - Returns the version numbers of all quadriga-lib sub-components
 <ul>
@@ -2674,6 +2673,37 @@ version = quadriga_lib.version();
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="cart2geo"></a>
+<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
+coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
+points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
+where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
+θ = 90° points to the zenith and θ = 0° points to the horizon.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+geo_coords = RTtools.cart2geo(cart_coords)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
+   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
+   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
+   First row: Azimuth angles in [rad], values between -pi and pi.<br> 
+   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
+   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="icosphere"></a>
 <b>icosphere</b> - Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
 <ul>
@@ -2685,7 +2715,8 @@ The approximate equilateral triangles have roughly the same edge length and surf
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-center, length, vert, direction = quadriga_lib.icosphere( no_div, radius, direction_xyz )
+from quadriga_lib import RTtools
+center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_xyz )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2746,7 +2777,8 @@ simulations.<br><br>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-quadriga_lib.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+from quadriga_lib import RTtools
+RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2808,11 +2840,13 @@ Otherwise, it defaults to using standard properties.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = quadriga_lib.obj_file_read( fn )
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = RTtools.obj_file_read( fn )
 
 # Return as tuple with 8 elements
-data = quadriga_lib.obj_file_read( fn )
+data = RTtools.obj_file_read( fn )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3267,7 +3301,8 @@ The following materials are defined by default:
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
+from quadriga_lib import RTtools
+result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">

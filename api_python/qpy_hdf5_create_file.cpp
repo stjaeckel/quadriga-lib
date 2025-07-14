@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,13 +33,13 @@ to individual data sets without the need to read the entire file. In this system
 structured in a multi-dimensional array. For instance, the first dimension might represent the Base
 Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important
 to note that the dimensions of the storage layout must be defined when the file is initially created
-and cannot be altered thereafter. The function `quadriga_lib.hdf5_create_file` is used to create an
+and cannot be altered thereafter. The function `quadriga_lib.channel.hdf5_create_file` is used to create an
 empty file with a predetermined custom storage layout.
 
 ## Usage:
-
 ```
-quadriga_lib.hdf5_create_file( fn, nx, ny, nz, nw )
+from quadriga_lib import channel
+channel.hdf5_create_file( fn, nx, ny, nz, nw )
 ```
 
 ## Input Arguments:

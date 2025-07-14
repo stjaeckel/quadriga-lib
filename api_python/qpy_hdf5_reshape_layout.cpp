@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,12 +31,12 @@ Quadriga-Lib provides an HDF5-based solution for the storage and organization of
 notable feature of this library is its capacity to manage multiple channels within a single HDF5
 file. In this framework, channels can be arranged in a multi-dimensional array format.
 Once an HDF5 file has been created, the number of channels in the storage layout is fixed.
-However, it is possible to reshape the layout using `quadriga_lib.hdf5_reshape_layout`.
+However, it is possible to reshape the layout using `quadriga_lib.channel.hdf5_reshape_layout`.
 
 ## Usage:
-
 ```
-quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
+from quadriga_lib import channel
+channel.hdf5_reshape_layout( fn, storage_dims );
 ```
 
 ## Input Arguments:

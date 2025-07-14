@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_QDANT_READ
+# QDANT_READ
 Reads array antenna data from QDANT files
 
 ## Description:
@@ -32,7 +32,8 @@ data in XML. This function reads pattern data from the specified file.
 ## Usage:
 
 ```
-data = quadriga_lib.arrayant_qdant_read( fn, id )
+from quadriga_lib import arrayant
+data = arrayant.qdant_read( fn, id )
 ```
 
 ## Input Arguments:

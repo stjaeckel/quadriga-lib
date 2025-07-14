@@ -10,14 +10,14 @@ package_path = os.path.join(current_dir, '../../lib')
 if package_path not in sys.path:
     sys.path.append(package_path)
 
-import quadriga_lib
+from quadriga_lib import arrayant
 
 class test_version(unittest.TestCase):
 
     def test(self):
 
-        ant = quadriga_lib.arrayant_generate('omni')  
-        ant = quadriga_lib.arrayant_copy_element(ant,0,1)
+        ant = arrayant.generate('omni')  
+        ant = arrayant.copy_element(ant,0,1)
         ant['e_theta_re'][:, :, 1] = 2
         ant['e_theta_im'][:, :, 1] = 0
         ant['e_phi_re'][:, :, 1] = 0
@@ -31,7 +31,7 @@ class test_version(unittest.TestCase):
         path_length = np.zeros(2)
         M = np.array([[1,1],[0,0],[0,0],[0,0],[0,0],[0,0],[-1,-1],[0,0]])
 
-        coeff_re, coeff_im, delay, aod, eod, aoa, eoa = quadriga_lib.get_channels_spherical( ant, ant, 
+        coeff_re, coeff_im, delay, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant, ant, 
             fbs_pos, fbs_pos, path_gain, path_length, M, [0,0,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1, 0, angles=1 )
 
         # Convert to degrees
@@ -88,27 +88,27 @@ class test_version(unittest.TestCase):
 
         # Exception handling
         ant.pop('element_pos', None)
-        A, B, C = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
+        A, B, C = arrayant.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
                                                  M, [0,0,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1)
         
         ant.pop('coupling_re', None)
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
+            arrayant.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
                                               M, [0,0,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1)
         self.assertEqual(str(context.exception), "Transmit antenna: Imaginary part of coupling matrix (phase component) defined without real part (absolute component)")
 
         ant.pop('coupling_im', None)
-        data = quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
+        data = arrayant.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
                                                  M, [0,0,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1)
 
         # Mismatching n_path
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain[[0, 1, 1]], path_length, 
+            arrayant.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain[[0, 1, 1]], path_length, 
                                                  M, [0,0,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1)
         self.assertEqual(str(context.exception), "Inputs 'fbs_pos', 'lbs_pos', 'path_gain', 'path_length', and 'M' must have the same number of columns (n_paths).")
 
         # Wrong size of TX position
         with self.assertRaises(ValueError) as context:
-            quadriga_lib.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
+            arrayant.get_channels_spherical( ant, ant, fbs_pos, fbs_pos, path_gain, path_length, 
                                               M, [0,0,1,1], [0,0,0], [20,0,1], [0,0,0], 2997924580.0, 1)
         self.assertEqual(str(context.exception), "Input 'tx_pos' has incorrect number of elements.")
