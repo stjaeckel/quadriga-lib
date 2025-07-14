@@ -16,7 +16,7 @@
         {
             "type": "shell",
             "label": "Build and run tests",
-            "command": "make test_catch2 -j32",
+            "command": "make cpp_test",
             "group": {
                 "kind": "build",
                 "isDefault": true

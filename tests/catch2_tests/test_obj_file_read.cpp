@@ -179,11 +179,11 @@ TEST_CASE("Test OBJ File Read - Materials")
     
     mtl_correct = {{3.91, 0.0, 0.0238, 0.16, 0.0}};
     CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
-    CHECK(mtl_names[0] == "itu_brick");
+    CHECK(mtl_names[0] == "itu_brick.001");
 
     mtl_correct = {{1.0, 0.0, 1.0e7, 0.0, 0.0}};
     CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
-    CHECK(mtl_names[1] == "itu_metal");
+    CHECK(mtl_names[1] == "itu_metal.shiny.001");
 
     // Custom materials
     REQUIRE(my_fancy_cube("cube.obj", "itu_brick.001::1.1:0.1:0.2:-3:20", "something_new::5"));

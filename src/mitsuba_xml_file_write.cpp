@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <string_view>
 
+#define PUGIXML_HEADER_ONLY
 #include "pugixml.hpp"
 
 // ----------------------------------------------------------------------------
@@ -392,10 +393,10 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         }
 
         // Write faces
-        u_int8_t const_3 = (u_int8_t)3;
+        unsigned char const_3 = (unsigned char)3;
         for (arma::uword i_face = 0; i_face < n_faces; ++i_face)
         {
-            fileW.write((char *)&const_3, sizeof(u_int8_t));
+            fileW.write((char *)&const_3, sizeof(unsigned char));
             for (arma::uword i = 0; i < 3; ++i)
             {
                 unsigned e = ply_vert_idx.at(i_face, i);

@@ -9,7 +9,7 @@ def get_quadriga_lib_version():
     """
     try:
         # Run the command and capture its output
-        output = subprocess.check_output(['build/quadriga-lib-version'], stderr=subprocess.STDOUT)
+        output = subprocess.check_output(['build_linux/version'], stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         print(f"Error: failed to run 'quadriga-lib-version': {e.output.decode().strip()}", file=sys.stderr)
         sys.exit(1)

@@ -40,7 +40,7 @@ TEST_CASE("Test Mitsuba XML File Write")
     // ---------------------------------------------------------------------
     const std::filesystem::path xml_file = "test_scene_x.xml";
     quadriga_lib::mitsuba_xml_file_write<double>(
-        xml_file,
+        xml_file.string(),
         vert_list, face_ind, obj_ind, mtl_ind,
         obj_names, mtl_names,
         /*bsdf names*/ {}, /*map_to_itu_materials=*/true);
