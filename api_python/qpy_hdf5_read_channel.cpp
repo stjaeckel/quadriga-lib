@@ -43,7 +43,7 @@ file.
 ## Usage:
 ```
 from quadriga_lib import channel
-data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
 ```
 
 ## Input Arguments:
@@ -71,22 +71,21 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
   `par`            | Dictionary of unstructured data                          | Variable
   `rx_position`    | Receiver positions                                       | `[3, n_snap]` or `[3, 1]`
   `tx_position`    | Transmitter positions                                    | `[3, n_snap]` or `[3, 1]`
-  `coeff`          | Channel coefficients, complex valued                     | `[n_rx, n_tx, n_path, n_snap]`
-  `delay`          | Propagation delays in seconds                            | `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`
-  `center_freq`    | Center frequency in [Hz]                                 | `[n_snap, 1]` or scalar
+  `coeff`          | Channel coefficients, complex valued                     | list of `[n_rx, n_tx, n_path_s]`
+  `delay`          | Propagation delays in seconds                            | list of `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
+  `center_freq`    | Center frequency in [Hz]                                 | `[n_snap]` or scalar
   `name`           | Name of the channel                                      | String
-  `initial_pos`    | Index of reference position, 0-based                     | uint32, scalar
-  `path_gain`      | Path gain before antenna, linear scale                   | `[n_path, n_snap]`
-  `path_length`    | Path length from TX to RX phase center in m              | `[n_path, n_snap]`
-  `polarization`   | Polarization transfer function, complex valued           | `[4, n_path, n_snap]`
-  `path_angles`    | Departure and arrival angles {AOD, EOD, AOA, EOA} in rad | `[n_path, 4, n_snap]`
-  `path_fbs_pos`   | First-bounce scatterer positions                         | `[3, n_path, n_snap]`
-  `path_lbs_pos`   | Last-bounce scatterer positions                          | `[3, n_path, n_snap]`
-  `no_interact`    | Number interaction points of paths with the environment  | uint32, `[n_path, n_snap]`
-  `interact_coord` | Interaction coordinates                                  | `[3, max(sum(no_interact)), n_snap]`
-  `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3, 1]`
-  `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3, 1]`
-
+  `initial_pos`    | Index of reference position, 1-based                     | uint32, scalar
+  `path_gain`      | Path gain before antenna, linear scale                   | list of `[n_path_s]`
+  `path_length`    | Path length from TX to RX phase center in m              | list of `[n_path_s]`
+  `polarization`   | Polarization transfer function, complex valued           | list of `[4, n_path_s]`
+  `path_angles`    | Departure and arrival angles {AOD, EOD, AOA, EOA} in rad | list of `[n_path, 4_s]`
+  `path_fbs_pos`   | First-bounce scatterer positions                         | list of `[3, n_path_s]`
+  `path_lbs_pos`   | Last-bounce scatterer positions                          | list of `[3, n_path_s]`
+  `no_interact`    | Number interaction points of paths with the environment  | uint32, list of `[n_path_s]`
+  `interact_coord` | Interaction coordinates                                  | list of `[3, max(sum(no_interact))]`
+  `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3]`
+  `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3]`
 ## Caveat:
 - Only datasets that are present in the HDF file are returned in the dictionary.
 - Although the data is stored in single precision, it is converted to double precision by default.

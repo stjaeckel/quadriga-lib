@@ -24,6 +24,7 @@ namespace py = pybind11;
 void quadriga_lib_arrayant(py::module_ &m);
 void quadriga_lib_channel(py::module_ &m);
 void quadriga_lib_RTtools(py::module_ &m);
+void quadriga_lib_tools(py::module_ &m);
 
 // Include parts
 #include "qpy_components.cpp"
@@ -36,6 +37,9 @@ PYBIND11_MODULE(quadriga_lib, m)
 
     py::module_ channel = m.def_submodule("channel", "Channel functions");
     quadriga_lib_channel(channel);
+
+    py::module_ tools = m.def_submodule("tools", "Miscellaneous / Tools");
+    quadriga_lib_tools(tools);
 
     py::module_ RTtools = m.def_submodule("RTtools", "Site-Specific Simulation Tools");
     quadriga_lib_RTtools(RTtools);

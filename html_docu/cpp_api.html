@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.8.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.8.3</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -138,6 +138,7 @@
 <tr><td><a href="#colormap">colormap</a></td><td>Generate colormap</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform geographic (azimuth, elevation, length) to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp_1d / interp_2d">interp_1d / interp_2d</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
+<tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2846,7 +2847,7 @@ auto geo = quadriga_lib::cart2geo(cart);
 <b>colormap</b> - Generate colormap
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a 64x3 colormap matrix with RGB values in unsigned char format. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a 64x3 or 256x3 colormap matrix with RGB values in unsigned char format. 
 </li><li style="margin-bottom: 0.4em;">Each row corresponds to an RGB color entry of the selected colormap. 
 </li><li style="margin-bottom: 0.4em;">Useful for visualization purposes (e.g., heatmaps or 3D rendering). 
 </li><li style="margin-bottom: 0.4em;">Available color maps include: <code>jet</code>, <code>parula</code>, <code>winter</code>, <code>hot</code>, <code>turbo</code>, <code>copper</code>, <code>spring</code>, <code>cool</code>, <code>gray</code>, <code>autumn</code>, <code>summer</code>. 
@@ -2854,7 +2855,7 @@ auto geo = quadriga_lib::cart2geo(cart);
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arma::uchar_mat quadriga_lib::colormap(std::string map)
+arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2862,10 +2863,14 @@ arma::uchar_mat quadriga_lib::colormap(std::string map)
    Name of the desired colormap. Must be one of: 
    <code>"jet"</code>, <code>"parula"</code>, <code>"winter"</code>, <code>"hot"</code>, <code>"turbo"</code>, <code>"copper"</code>, <code>"spring"</code>, <code>"cool"</code>, <code>"gray"</code>, <code>"autumn"</code>, <code>"summer"</code>. 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>high_res</b></code> (input)<br> 
+   Enables 256 color steps 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uchar_mat</code><br> 
-   A matrix of size <code>[64 x 3]</code> containing RGB color values as unsigned chars in the range <code>[0, 255]</code>. 
+   A matrix of size <code>[64 x 3]</code> or <code>[256 x 3]</code> containing RGB color values as unsigned chars in the range <code>[0, 255]</code>. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2993,6 +2998,61 @@ arma::vec xo = arma::linspace(0, 4, 10);
 
 auto output = quadriga_lib::interp_1D(input, xi, xo);
 </pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="write_png"></a>
+<b>write_png</b> - Write data to a PNG file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Converts input data into a color-coded PNG file for visualization 
+</li><li style="margin-bottom: 0.4em;">Support optional selection of a colormap, as well a minimum and maximum value limits 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li><li style="margin-bottom: 0.4em;">Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void write_png( const arma::Mat&lt;dtype&gt; &amp;data, 
+                std::string fn,              
+                std::string colormap = "jet", 
+                dtype min_val = NAN, 
+                dtype max_val = NAN, 
+                bool log_transform = false);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>&amp;data</b></code><br> 
+   Data matrix 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code><br> 
+   Path to the <code>.png</code> file to be written 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>colormap</b></code><br> 
+   Name of the desired colormap. Must be one of: 
+   <code>"jet"</code>, <code>"parula"</code>, <code>"winter"</code>, <code>"hot"</code>, <code>"turbo"</code>, <code>"copper"</code>, <code>"spring"</code>, <code>"cool"</code>, <code>"gray"</code>, <code>"autumn"</code>, <code>"summer"</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>min_val</b></code><br> 
+   Minimum value. Values below this value will have be encoded with the color of the smallest value. 
+   If <code>NAN</code> is provided (default), the lowest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>max_val</b></code><br> 
+   Maximum value. Values above this value will have be encoded with the color of the largest value. 
+   If <code>NAN</code> is provided (default), the largest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>log_transform</b></code><br> 
+   If enabled, the <code>data</code> values are transformed to the log-domain (<code>10*log10(data)</code>) before processing. 
+   Default: false (disabled) 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#colormap">colormap</a> 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div>

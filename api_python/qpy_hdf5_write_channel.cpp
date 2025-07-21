@@ -108,7 +108,7 @@ py::array_t<unsigned> hdf5_write_channel(const std::string fn,
                                          const py::array_t<double> tx_pos,
                                          const py::list coeff,
                                          const py::list delay,
-                                         const py::array_t<double> center_frequency,
+                                         const py::array_t<double> center_freq,
                                          const std::string name,
                                          const int initial_position,
                                          const py::list path_gain,
@@ -148,8 +148,8 @@ py::array_t<unsigned> hdf5_write_channel(const std::string fn,
     if (delay.size() != 0)
         c.delay = qd_python_list2vector_Cube<double>(delay);
 
-    if (center_frequency.size() != 0)
-        c.center_frequency = qd_python_numpy2arma_Col(center_frequency, true, true);
+    if (center_freq.size() != 0)
+        c.center_frequency = qd_python_numpy2arma_Col(center_freq, true, true);
 
     if (path_gain.size() != 0)
         c.path_gain = qd_python_list2vector_Col<double>(path_gain);

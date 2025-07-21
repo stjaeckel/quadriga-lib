@@ -102,6 +102,19 @@ class test_hdf_rw(unittest.TestCase):
         tst = np.array([128,8,8,8], dtype=np.uint32)
         npt.assert_array_equal(storage_space, tst)
 
+        # Read dataset from file
+        dset = channel.hdf5_read_dset(fn,1,1,1,1,'uint64_Mat')
+        npt.assert_array_equal(dset, par["uint64_Mat"])
+
+        dset = channel.hdf5_read_dset(fn,1,1,1,1,'double_Col')
+        npt.assert_array_equal(dset, par["double_Col"][:,0])
+
+        dset = channel.hdf5_read_dset(fn,1,1,1,1,'single_Cube')
+        npt.assert_array_equal(dset, par["single_Cube"])
+
+        dset = channel.hdf5_read_dset(fn,1,1,1,1,'double_default')
+        npt.assert_equal(dset, par["double_default"])
+        
         # Try writing empty par - should be OK
         storage_space = channel.hdf5_write_channel(fn,2,1,1,1,{})
         npt.assert_array_equal(storage_space, tst)
@@ -234,7 +247,7 @@ class test_hdf_rw(unittest.TestCase):
         tx_orientation = np.random.random((3,4))
 
         channel.hdf5_write_channel(fn, 8, rx_pos = rx_pos, tx_pos = tx_pos, coeff = coeff, delay = delay_4d,
-                                        center_frequency = center_frequency, name = name, path_gain = path_gain,
+                                        center_freq = center_frequency, name = name, path_gain = path_gain,
                                         path_length = path_length, path_polarization = path_polarization, 
                                         path_angles = path_angles, path_fbs_pos = fbs_pos, path_lbs_pos = lbs_pos,
                                         no_interact = no_interact, interact_coord = interact_coord,

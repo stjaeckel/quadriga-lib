@@ -26,6 +26,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_create_file.cpp"
 #include "qpy_hdf5_read_channel.cpp"
 #include "qpy_hdf5_read_dset_names.cpp"
+#include "qpy_hdf5_read_dset.cpp"
 #include "qpy_hdf5_read_layout.cpp"
 #include "qpy_hdf5_reshape_layout.cpp"
 #include "qpy_hdf5_write_channel.cpp"
@@ -33,7 +34,7 @@ namespace py = pybind11;
 
 void quadriga_lib_channel(py::module_ &m)
 {
-     m.def("baseband_freq_response", &baseband_freq_response,
+    m.def("baseband_freq_response", &baseband_freq_response,
           py::arg("coeff") = py::list(),
           py::arg("delay") = py::list(),
           py::arg("bandwidth"),
@@ -68,6 +69,10 @@ void quadriga_lib_channel(py::module_ &m)
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0);
 
+    m.def("hdf5_read_dset", &hdf5_read_dset, py::arg("fn"),
+          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+          py::arg("name"));
+
     m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
 
     m.def("hdf5_reshape_layout", &hdf5_reshape_layout, py::arg("fn"),
@@ -80,7 +85,7 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("tx_pos") = py::array_t<double>(),
           py::arg("coeff") = py::list(),
           py::arg("delay") = py::list(),
-          py::arg("center_frequency") = py::array_t<double>(),
+          py::arg("center_freq") = py::array_t<double>(),
           py::arg("name") = "New channel",
           py::arg("initial_position") = 0,
           py::arg("path_gain") = py::list(),

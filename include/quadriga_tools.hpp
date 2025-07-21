@@ -68,7 +68,7 @@ namespace quadriga_lib
     // Generate colormap
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-    arma::uchar_mat colormap(std::string map);
+    arma::uchar_mat colormap(std::string map, bool high_res = false);
 
     // Combine real and imaginary parts to complex types, cast to double
     template <typename dtype>
@@ -138,6 +138,15 @@ namespace quadriga_lib
     arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, // Input data vector, vector length nx
                                const arma::Col<dtype> &xi,    // Input sample points, vector length nx
                                const arma::Col<dtype> &xo);   // Output sample points, vector length mx
+
+    // Write data to PNG file
+    template <typename dtype>                    // Types: float, double
+    void write_png(const arma::Mat<dtype> &data, // Data matrix
+                   std::string fn,               // Filename of the PNG file, string
+                   std::string colormap = "jet", // Colormap
+                   dtype min_val = NAN,          // Minimum value, when passing NAN, minimum in data is used
+                   dtype max_val = NAN,          // Maximum value, when passing NAN, maximum data is used
+                   bool log_transform = false);  // Transform data to log-domain (10*log10(data))
 
     // ---- Site-Specific Simulation Tools ----
 

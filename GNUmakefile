@@ -82,6 +82,19 @@ moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
 
+catch2_version = 3.8.1
+catch2-lib:
+	- rm -rf external/build
+	- rm -rf external/Catch2-$(catch2_version)
+	- rm -rf external/Catch2-$(catch2_version)-Linux
+	unzip external/Catch2-$(catch2_version).zip -d external/
+	mkdir external/build
+	cmake -S external/Catch2-$(catch2_version) -B external/build
+	( cd external/build && make -j8 && make package )
+	tar -xzf external/build/Catch2-$(catch2_version)-Linux.tar.gz -C external/
+	- rm -rf external/build
+	- rm -rf external/Catch2-$(catch2_version)
+
 clean:
 	- rm -rf external/build
 	- rm -rf +quadriga_lib

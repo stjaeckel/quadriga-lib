@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.3</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -110,6 +110,7 @@ import quadriga_lib
 <tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
+<tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
@@ -126,6 +127,7 @@ import quadriga_lib
 <tbody>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
+<tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2170,7 +2172,7 @@ file.
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 from quadriga_lib import channel
-data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
+data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2220,17 +2222,17 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 <tr>
   <td><code>coeff</code></td>
   <td>Channel coefficients, complex valued</td>
-  <td><code>[n_rx, n_tx, n_path, n_snap]</code></td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>delay</code></td>
   <td>Propagation delays in seconds</td>
-  <td><code>[n_rx, n_tx, n_path, n_snap]</code> or <code>[1, 1, n_path, n_snap]</code></td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
   <td>Center frequency in [Hz]</td>
-  <td><code>[n_snap, 1]</code> or scalar</td>
+  <td><code>[n_snap]</code> or scalar</td>
 </tr>
 <tr>
   <td><code>name</code></td>
@@ -2239,58 +2241,58 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 </tr>
 <tr>
   <td><code>initial_pos</code></td>
-  <td>Index of reference position, 0-based</td>
+  <td>Index of reference position, 1-based</td>
   <td>uint32, scalar</td>
 </tr>
 <tr>
   <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
-  <td><code>[n_path, n_snap]</code></td>
+  <td>list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_length</code></td>
   <td>Path length from TX to RX phase center in m</td>
-  <td><code>[n_path, n_snap]</code></td>
+  <td>list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>polarization</code></td>
   <td>Polarization transfer function, complex valued</td>
-  <td><code>[4, n_path, n_snap]</code></td>
+  <td>list of <code>[4, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_angles</code></td>
   <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
-  <td><code>[n_path, 4, n_snap]</code></td>
+  <td>list of <code>[n_path, 4_s]</code></td>
 </tr>
 <tr>
   <td><code>path_fbs_pos</code></td>
   <td>First-bounce scatterer positions</td>
-  <td><code>[3, n_path, n_snap]</code></td>
+  <td>list of <code>[3, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>path_lbs_pos</code></td>
   <td>Last-bounce scatterer positions</td>
-  <td><code>[3, n_path, n_snap]</code></td>
+  <td>list of <code>[3, n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>no_interact</code></td>
   <td>Number interaction points of paths with the environment</td>
-  <td>uint32, <code>[n_path, n_snap]</code></td>
+  <td>uint32, list of <code>[n_path_s]</code></td>
 </tr>
 <tr>
   <td><code>interact_coord</code></td>
   <td>Interaction coordinates</td>
-  <td><code>[3, max(sum(no_interact)), n_snap]</code></td>
+  <td>list of <code>[3, max(sum(no_interact))]</code></td>
 </tr>
 <tr>
   <td><code>rx_orientation</code></td>
   <td>Transmitter orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 <tr>
   <td><code>tx_orientation</code></td>
   <td>Receiver orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -2298,6 +2300,59 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 <li style="margin-bottom: 1.5em;">
 <b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Only datasets that are present in the HDF file are returned in the dictionary. 
 </li><li style="margin-bottom: 0.4em;">Although the data is stored in single precision, it is converted to double precision by default. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_dset"></a>
+<b>hdf5_read_dset</b> - Read a single unstructured dataset from an HDF5 file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. The function <code>quadriga_lib.channel.hdf5_read_dset</code> retrieves a single unstructured dataset. 
+Theo output type of the function is defined by the datatype in the file. An empty matrix is returned 
+if the dataset does not exist in the file.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import channel
+dset = channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the HDF5 file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ix</code></b><br> 
+   Storage index for x-dimension, Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>iy</code></b><br> 
+   Storage index for y-dimension, Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>iz</code></b><br> 
+   Storage index for z-dimension, Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>iw</code></b><br> 
+   Storage index for w-dimension, Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>name</code></b><br> 
+   Name of the dataset; String 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>dset</code></b><br> 
+   Output data. Type and size is defined by the dataspace in the file 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Only datasets that are present in the HDF file are returned in the dictionary. 
 </li></ul>
 </li>
 </ul>
@@ -2661,6 +2716,53 @@ version = quadriga_lib.version();
 <li style="margin-bottom: 1.5em;">
 <b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions, 
    an suffix <code>_AVX2</code> is added after the version number 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="write_png"></a>
+<b>write_png</b> - Write data to a PNG file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Converts input data into a color-coded PNG file for visualization 
+</li><li style="margin-bottom: 0.4em;">Support optional selection of a colormap, as well a minimum and maximum value limits 
+</li><li style="margin-bottom: 0.4em;">Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+import quadriga_lib
+
+quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transform )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the PNG file, string, required 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
+   Data matrix, required, size <code>[N, M]</code>  
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>colormap</code></b> (optional)<br> 
+   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo', 
+   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet' 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>min_val</code></b> (optional)<br> 
+   Minimum value. Values below this value will have be encoded with the color of the smallest value. 
+   If <code>NAN</code> is provided (default), the lowest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>max_val</code></b> (optional)<br> 
+   Maximum value. Values above this value will have be encoded with the color of the largest value. 
+   If <code>NAN</code> is provided (default), the largest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>log_transform</b></code> (optional)<br> 
+   If enabled, the <code>data</code> values are transformed to the log-domain (<code>10*log10(data)</code>) before processing. 
+   Default: false (disabled) 
 </li></ul>
 </li>
 </ul>
