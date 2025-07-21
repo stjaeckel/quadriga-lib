@@ -44,7 +44,7 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "")
     set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MDd> $<$<CONFIG:Release>:/MD>")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp -Wall -Wconversion -Wpedantic -Wextra")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
     set(MEX_CXXFLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
 endif()
 
@@ -413,6 +413,7 @@ if (BUILD_PYTHON)
         api_python/python_arrayant.cpp
         api_python/python_channel.cpp
         api_python/python_RTtools.cpp
+        api_python/python_tools.cpp
     )
     add_library(quadriga_py MODULE ${PYTHON_SOURCES})
     set_target_properties(quadriga_py PROPERTIES

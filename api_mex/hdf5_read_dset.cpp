@@ -38,7 +38,7 @@ if the dataset does not exist in the file.
 ## Usage:
 
 ```
-dset = quadriga_lib.hdf5_read_dset_names( fn, location, name );
+dset = quadriga_lib.hdf5_read_dset( fn, location, name );
 ```
 
 ## Input Arguments:

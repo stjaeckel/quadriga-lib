@@ -20,31 +20,16 @@
 
 namespace py = pybind11;
 
-// Declare submodules
-void quadriga_lib_arrayant(py::module_ &m);
-void quadriga_lib_channel(py::module_ &m);
-void quadriga_lib_RTtools(py::module_ &m);
-void quadriga_lib_tools(py::module_ &m);
-
 // Include parts
-#include "qpy_components.cpp"
-#include "qpy_version.cpp"
+#include "qpy_write_png.cpp"
 
-PYBIND11_MODULE(quadriga_lib, m)
+void quadriga_lib_tools(py::module_ &m)
 {
-    py::module_ arrayant = m.def_submodule("arrayant", "Array antenna functions");
-    quadriga_lib_arrayant(arrayant);
-
-    py::module_ channel = m.def_submodule("channel", "Channel functions");
-    quadriga_lib_channel(channel);
-
-    py::module_ tools = m.def_submodule("tools", "Miscellaneous / Tools");
-    quadriga_lib_tools(tools);
-
-    py::module_ RTtools = m.def_submodule("RTtools", "Site-Specific Simulation Tools");
-    quadriga_lib_RTtools(RTtools);
-  
-    m.def("components", &components);
-
-    m.def("version", &version);
+    m.def("write_png", &write_png,
+          py::arg("fn"),
+          py::arg("data") = py::array_t<double>(),
+          py::arg("colormap") = "jet",
+          py::arg("min_val") = NAN,
+          py::arg("max_val") = NAN,
+          py::arg("log_transform") = false);
 }
