@@ -10,7 +10,7 @@ if package_path not in sys.path:
     sys.path.append(package_path)
 
 # Now you can import your package
-from quadriga_lib import RTtools
+import quadriga_lib
 
 class test_cart2geo(unittest.TestCase):
 
@@ -18,12 +18,12 @@ class test_cart2geo(unittest.TestCase):
 
         # This should work fine
         e = np.random.rand(3, 6, 2)
-        x = RTtools.cart2geo(e)
+        x = quadriga_lib.tools.cart2geo(e)
 
         # We need 3 dimensions
         e = np.random.rand(3, 6, 5, 2)
         with self.assertRaises(ValueError) as context:
-            x = RTtools.cart2geo(e)
+            x = quadriga_lib.tools.cart2geo(e)
         self.assertEqual(str(context.exception), "Expected 1D, 2D or 3D array, got 4D")
 
 if __name__ == '__main__':

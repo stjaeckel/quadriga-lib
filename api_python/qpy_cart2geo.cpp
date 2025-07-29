@@ -19,7 +19,7 @@
 #include "quadriga_lib.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
@@ -35,8 +35,8 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
 
 ## Usage:
 ```
-from quadriga_lib import RTtools
-geo_coords = RTtools.cart2geo(cart_coords)
+import quadriga_lib
+geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
 ```
 
 ## Input Argument:

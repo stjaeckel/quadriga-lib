@@ -21,7 +21,6 @@
 namespace py = pybind11;
 
 // Include parts
-#include "qpy_cart2geo.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
@@ -29,8 +28,6 @@ namespace py = pybind11;
 
 void quadriga_lib_RTtools(py::module_ &m)
 {
-    m.def("cart2geo", &cart2geo, py::arg("cart"));
-
     m.def("icosphere", &icosphere, py::arg("n_div") = 1,
           py::arg("radius") = 1.0, py::arg("direction_xyz") = false);
 
