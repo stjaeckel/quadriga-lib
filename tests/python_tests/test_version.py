@@ -17,10 +17,6 @@ class test_version(unittest.TestCase):
     def test(self):
 
         v = quadriga_lib.version()
-
-        print(" ")
-        print(" ")
-        print(quadriga_lib.components())
        
 if __name__ == '__main__':
     unittest.main()

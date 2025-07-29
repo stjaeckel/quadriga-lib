@@ -17,7 +17,7 @@ PYTHON_SHARED_OBJ    := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
 all:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal)
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ENABLE_MATLAB=ON -D ENABLE_OCTAVE=ON -D ENABLE_MEX_DOC=ON -D ENABLE_PYTHON=ON -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal)
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
@@ -26,7 +26,7 @@ cpp:
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
-bin:
+bin:   cpp
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_BIN=ON -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal)
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 
@@ -94,6 +94,17 @@ catch2-lib:
 	tar -xzf external/build/Catch2-$(catch2_version)-Linux.tar.gz -C external/
 	- rm -rf external/build
 	- rm -rf external/Catch2-$(catch2_version)
+
+armadillo_version = 14.2.2
+armadillo-lib:
+	- rm -rf external/armadillo-$(armadillo_version)
+	unzip external/armadillo-$(armadillo_version).zip -d external/
+
+pybind11_version = 3.0.0
+pybind11-lib:
+	- rm -rf external/pybind11-$(pybind11_version)
+	unzip external/pybind11-$(pybind11_version).zip -d external/
+
 
 clean:
 	- rm -rf external/build

@@ -91,7 +91,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 - **`element_pos`** (optional)<br>
   Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]).
   If this parameter is not given, element positions `arrayant` are used. If the `arrayant` has no
-  positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting 
+  positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting
   `element = [1,1]`, different element positions can be set for the  two elements in the output.
   Size: `[3, n_out]` or empty `[]`
 
@@ -103,13 +103,13 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
   Switch to calculate the effective distances for phase calculation. Default: 0, false
 
 - **`local_angles`** (optional flag)<br>
-  Switch to return the angles in antenna-local coordinates. These differ from the input when the 
+  Switch to return the angles in antenna-local coordinates. These differ from the input when the
   orientation of the antenna is adjusted. Default: 0, false
 
 - **`fast_access`** (optional flag)<br>
   If arrayant data is provided as munpy.ndarray of type double in Fortran-continguous (column-major)
   order, `arrayant_interpolate` can access the Python memory directly without a conversion of the
-  data. This will increase performance and is done by default. If the data is not in the correct 
+  data. This will increase performance and is done by default. If the data is not in the correct
   format, a conversion is done in the background. Setting `fast_access` to 1 will skip the conversion
   and throw an error if the arrayant data is not correctly formatted. Default: 0, false (convert)
 
@@ -123,34 +123,34 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 ## Output Arguments:
 - **`vr`**<br>
   Real part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
-  
+
 - **`vi`**<br>
   Imaginary part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
-  
+
 - **`hr`**<br>
   Real part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
-  
+
 - **`hi`**<br>
   Imaginary part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
-  
+
 - **`dist`** (optional)<br>
   The effective distances between the antenna elements when seen from the direction of the
   incident path. The distance is calculated by an projection of the array positions on the normal
   plane of the incident path. This is needed for calculating the phase of the antenna response.
   Only returned when `dist` flag is set to 1. Size `[n_out, n_ang]`
-  
+
 - **`azimuth_loc`** (optional)<br>
   The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the
   'orientation'. If no orientation vector is given, these angles are identical to the input
   azimuth angles. Only returned when `local_angles` flag is set to 1. Size `[n_out, n_ang]`
-  
+
 - **`elevation_loc`** (optional)<br>
   The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the
   'orientation'. If no orientation vector is given, these angles are identical to the input
   elevation angles. Only returned when `local_angles` flag is set to 1. Size `[n_out, n_ang]`
-  
+
 - **`gamma`** (optional)<br>
-  Polarization rotation angles in [rad], Only returned when `local_angles` flag is set to 1. 
+  Polarization rotation angles in [rad], Only returned when `local_angles` flag is set to 1.
   Size `[n_out, n_ang]`
 MD!*/
 

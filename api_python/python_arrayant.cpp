@@ -75,6 +75,11 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("Ng") = 1,
           py::arg("dgv") = 0.5,
           py::arg("dgh") = 0.5,
+          py::arg("beam_az") = py::array_t<double>(),
+          py::arg("beam_el") = py::array_t<double>(),
+          py::arg("beam_weight") = py::array_t<double>(),
+          py::arg("separate_beams") = false,
+          py::arg("apply_weights") = false,
           py::arg("pattern") = py::dict());
 
     m.def("interpolate", &arrayant_interpolate,

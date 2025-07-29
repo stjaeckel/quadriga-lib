@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.3</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.4</b></big>
 <br><br><br>
 
 <b>Notes:</b>
@@ -643,6 +643,9 @@ arrayant = arrayant.generate('custom', res, az_3dB, el_3db, rear_gain_lin)
 
 # 3GPP-NR antenna model (example for 2x2, V-polarized, 0.7λ spacing)
 arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
+
+# Planar multi-element antenna with support for multiple beam directions
+arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0.7, az=[-30.0, 30.0], el=[0.0, 0.0])
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -659,14 +662,14 @@ arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input arguments for type 'custom' and '3gpp':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b><br> 
+<b><i>Input arguments for type `custom`, `3gpp` and `multibeam`:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b><br> 
    3dB beam width in azimuth direction in [deg], scalar, 
-   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg 
+   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg, <code>multibeam</code> = 120 deg 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>el_3db</code></b><br> 
    3dB beam width in elevation direction in [deg], scalar, 
-   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg 
+   default for <code>custom</code> = 90 deg, default for <code>3gpp</code> = 67 deg, <code>multibeam</code> = 120 deg 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b><br> 
@@ -674,12 +677,12 @@ arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input arguments for type '3GPP':</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
-   Number of vertically stacked elements, scalar, default = 1 
+<b><i>Input arguments for type `3gpp` and `multibeam`:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
+   Number of vertically stacked elements for <code>3gpp</code> and <code>multibeam</code>, scalar, default = 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>N</code></b><br> 
-   Number of horizontally stacked elements, scalar, default = 1 
+   Number of horizontally stacked elements for <code>3gpp</code> and <code>multibeam</code>, scalar, default = 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>pol</code></b><br> 
@@ -687,54 +690,76 @@ arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>pol = 1</code></td>
-  <td>vertical polarization (default value)</td>
+  <td>vertical polarization (default value), <code>3gpp</code> and <code>multibeam</code></td>
 </tr>
 <tr>
   <td><code>pol = 2</code></td>
-  <td>H/V polarized elements, results in 2NM elements</td>
+  <td>H/V polarized elements, results in 2NM elements, <code>3gpp</code> and <code>multibeam</code></td>
 </tr>
 <tr>
   <td><code>pol = 3</code></td>
-  <td>+/-45° polarized elements, results in 2NM elements</td>
+  <td>+/-45° polarized elements, results in 2NM elements, <code>3gpp</code> and <code>multibeam</code></td>
 </tr>
 <tr>
   <td><code>pol = 4</code></td>
-  <td>vertical polarization, combines elements in vertical direction, results in N elements</td>
+  <td>vertical polarization, combines elements in vertical direction, results in N elements, <code>3gpp</code> only</td>
 </tr>
 <tr>
   <td><code>pol = 5</code></td>
-  <td>H/V polarization, combines elements in vertical direction, results in 2N elements</td>
+  <td>H/V polarization, combines elements in vertical direction, results in 2N elements, <code>3gpp</code> only</td>
 </tr>
 <tr>
   <td><code>pol = 6</code></td>
-  <td>+/-45° polarization, combines elements in vertical direction, results in 2N elements</td>
+  <td>+/-45° polarization, combines elements in vertical direction, results in 2N elements, <code>3gpp</code> only</td>
 </tr>
 </table><br>
    Polarization indicator is ignored when a custom pattern is provided. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tilt</code></b><br> 
-   The electric downtilt angle in [deg], Only relevant for <code>pol = 4/5/6</code>, scalar, default = 0 
+   The electric downtilt angle in [deg], Only relevant for <code>pol = 4/5/6</code>, <code>3gpp</code> only, scalar, default = 0 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b><br> 
-   Element spacing in [λ], scalar, default = 0.5 
+   Element spacing in [λ] for <code>3gpp</code> and <code>multibeam</code>, scalar, default = 0.5 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b><br> 
-   Number of nested panels in a column, scalar, default = 1 
+   Number of nested panels in a column, <code>3gpp</code> only, scalar, default = 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b><br> 
-   Number of nested panels in a row, scalar, default = 1 
+   Number of nested panels in a row, <code>3gpp</code> only, scalar, default = 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dgv</code></b><br> 
-   Panel spacing in vertical direction in [λ], scalar, default = 0.5 
+   Panel spacing in vertical direction in [λ], <code>3gpp</code> only, scalar, default = 0.5 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dgh</code></b><br> 
-   Panel spacing in horizontal direction in [λ], scalar, default = 0.5 
+   Panel spacing in horizontal direction in [λ], <code>3gpp</code> only, scalar, default = 0.5 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>beam_az</code></b><br> 
+   Azimuth beam angles (degrees), <code>multibeam</code> only, Vector of length <code>n_beams</code>. Default: <code>[0.0]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>beam_el</code></b><br> 
+   Elevation beam angles (degrees), <code>multibeam</code> only, Vector of length <code>n_beams</code>. Default: <code>[0.0]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>beam_weight</code></b><br> 
+   Scaling factors for each beam, <code>multibeam</code> only, The vector must have the same length as <code>beam_az</code> and <code>beam_el</code>. 
+   Values are normalized so that their sum equals 1. Can be used to prioritize beams. 
+   Default: <code>{1.0}</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>separate_beams</code></b><br> 
+   If set to true, create a separate beam for each angle pair (ignores weights), <code>multibeam</code> only 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>apply_weights</code></b><br> 
+   Switch to apply the beam-forming weights 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>pattern</code></b> (optional)<br> 
@@ -968,7 +993,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 <ul><li style="margin-bottom: 0.4em;"><b><code>element_pos</code></b> (optional)<br> 
    Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]). 
    If this parameter is not given, element positions <code>arrayant</code> are used. If the <code>arrayant</code> has no 
-   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting  
+   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting 
    <code>element = [1,1]</code>, different element positions can be set for the  two elements in the output. 
    Size: <code>[3, n_out]</code> or empty <code>[]</code> 
 </li></ul>
@@ -983,14 +1008,14 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>local_angles</code></b> (optional flag)<br> 
-   Switch to return the angles in antenna-local coordinates. These differ from the input when the  
+   Switch to return the angles in antenna-local coordinates. These differ from the input when the 
    orientation of the antenna is adjusted. Default: 0, false 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>fast_access</code></b> (optional flag)<br> 
    If arrayant data is provided as munpy.ndarray of type double in Fortran-continguous (column-major) 
    order, <code>arrayant_interpolate</code> can access the Python memory directly without a conversion of the 
-   data. This will increase performance and is done by default. If the data is not in the correct  
+   data. This will increase performance and is done by default. If the data is not in the correct 
    format, a conversion is done in the background. Setting <code>fast_access</code> to 1 will skip the conversion 
    and throw an error if the arrayant data is not correctly formatted. Default: 0, false (convert) 
 </li></ul>
@@ -1022,34 +1047,41 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>vr</code></b><br> 
    Real part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>vi</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vi</code></b><br> 
    Imaginary part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>hr</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>hr</code></b><br> 
    Real part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>hi</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>hi</code></b><br> 
    Imaginary part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>dist</code></b> (optional)<br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dist</code></b> (optional)<br> 
    The effective distances between the antenna elements when seen from the direction of the 
    incident path. The distance is calculated by an projection of the array positions on the normal 
    plane of the incident path. This is needed for calculating the phase of the antenna response. 
    Only returned when <code>dist</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b> (optional)<br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b> (optional)<br> 
    The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
    azimuth angles. Only returned when <code>local_angles</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b> (optional)<br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b> (optional)<br> 
    The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
    elevation angles. Only returned when <code>local_angles</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b> (optional)<br> 
-   Polarization rotation angles in [rad], Only returned when <code>local_angles</code> flag is set to 1.  
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b> (optional)<br> 
+   Polarization rotation angles in [rad], Only returned when <code>local_angles</code> flag is set to 1. 
    Size <code>[n_out, n_ang]</code> 
 </li></ul>
 </li>

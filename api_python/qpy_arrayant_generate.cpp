@@ -52,6 +52,9 @@ arrayant = arrayant.generate('custom', res, az_3dB, el_3db, rear_gain_lin)
 
 # 3GPP-NR antenna model (example for 2x2, V-polarized, 0.7λ spacing)
 arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
+
+# Planar multi-element antenna with support for multiple beam directions
+arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0.7, az=[-30.0, 30.0], el=[0.0, 0.0])
 ```
 
 ## Input Arguments:
@@ -64,52 +67,69 @@ arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
 - **`freq`**<br>
   The center frequency in [Hz], scalar, default = 299792458 Hz
 
-## Input arguments for type 'custom' and '3gpp':
+## Input arguments for type `custom`, `3gpp` and `multibeam`:
 - **`az_3dB`**<br>
   3dB beam width in azimuth direction in [deg], scalar,
-  default for `custom` = 90 deg, default for `3gpp` = 67 deg
+  default for `custom` = 90 deg, default for `3gpp` = 67 deg, `multibeam` = 120 deg
 
 - **`el_3db`**<br>
   3dB beam width in elevation direction in [deg], scalar,
-  default for `custom` = 90 deg, default for `3gpp` = 67 deg
+  default for `custom` = 90 deg, default for `3gpp` = 67 deg, `multibeam` = 120 deg
 
 - **`rear_gain_lin`**<br>
   Isotropic gain (linear scale) at the back of the antenna, scalar, default = 0.0
 
-## Input arguments for type '3GPP':
+## Input arguments for type `3gpp` and `multibeam`:
 - **`M`**<br>
-  Number of vertically stacked elements, scalar, default = 1
+  Number of vertically stacked elements for `3gpp` and `multibeam`, scalar, default = 1
 
 - **`N`**<br>
-  Number of horizontally stacked elements, scalar, default = 1
+  Number of horizontally stacked elements for `3gpp` and `multibeam`, scalar, default = 1
 
 - **`pol`**<br>
   Polarization indicator to be applied for each of the M elements:<br>
-  `pol = 1` | vertical polarization (default value)
-  `pol = 2` | H/V polarized elements, results in 2NM elements
-  `pol = 3` | +/-45° polarized elements, results in 2NM elements
-  `pol = 4` | vertical polarization, combines elements in vertical direction, results in N elements
-  `pol = 5` | H/V polarization, combines elements in vertical direction, results in 2N elements
-  `pol = 6` | +/-45° polarization, combines elements in vertical direction, results in 2N elements
+  `pol = 1` | vertical polarization (default value), `3gpp` and `multibeam`
+  `pol = 2` | H/V polarized elements, results in 2NM elements, `3gpp` and `multibeam`
+  `pol = 3` | +/-45° polarized elements, results in 2NM elements, `3gpp` and `multibeam`
+  `pol = 4` | vertical polarization, combines elements in vertical direction, results in N elements, `3gpp` only
+  `pol = 5` | H/V polarization, combines elements in vertical direction, results in 2N elements, `3gpp` only
+  `pol = 6` | +/-45° polarization, combines elements in vertical direction, results in 2N elements, `3gpp` only
   Polarization indicator is ignored when a custom pattern is provided.
 
 - **`tilt`**<br>
-  The electric downtilt angle in [deg], Only relevant for `pol = 4/5/6`, scalar, default = 0
+  The electric downtilt angle in [deg], Only relevant for `pol = 4/5/6`, `3gpp` only, scalar, default = 0
 
 - **`spacing`**<br>
-  Element spacing in [λ], scalar, default = 0.5
+  Element spacing in [λ] for `3gpp` and `multibeam`, scalar, default = 0.5
 
 - **`Mg`**<br>
-  Number of nested panels in a column, scalar, default = 1
+  Number of nested panels in a column, `3gpp` only, scalar, default = 1
 
 - **`Ng`**<br>
-  Number of nested panels in a row, scalar, default = 1
+  Number of nested panels in a row, `3gpp` only, scalar, default = 1
 
 - **`dgv`**<br>
-  Panel spacing in vertical direction in [λ], scalar, default = 0.5
+  Panel spacing in vertical direction in [λ], `3gpp` only, scalar, default = 0.5
 
 - **`dgh`**<br>
-  Panel spacing in horizontal direction in [λ], scalar, default = 0.5
+  Panel spacing in horizontal direction in [λ], `3gpp` only, scalar, default = 0.5
+
+- **`beam_az`**<br>
+  Azimuth beam angles (degrees), `multibeam` only, Vector of length `n_beams`. Default: `[0.0]`
+
+- **`beam_el`**<br>
+  Elevation beam angles (degrees), `multibeam` only, Vector of length `n_beams`. Default: `[0.0]`
+
+- **`beam_weight`**<br>
+  Scaling factors for each beam, `multibeam` only, The vector must have the same length as `beam_az` and `beam_el`.
+  Values are normalized so that their sum equals 1. Can be used to prioritize beams.
+  Default: `{1.0}`
+
+- **`separate_beams`**<br>
+  If set to true, create a separate beam for each angle pair (ignores weights), `multibeam` only
+
+- **`apply_weights`**<br>
+  Switch to apply the beam-forming weights
 
 - **`pattern`** (optional)<br>
   Dictionary containing a custom pattern (default = empty) with at least the following keys:
@@ -136,22 +156,27 @@ arrayant = arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacing=0.7)
   `name`           | Name of the array antenna object                      | String
 MD!*/
 
-py::dict arrayant_generate(const std::string type,  // Array type
-                           double res,              // Pattern resolution in [deg]
-                           double freq,             // The center frequency in [Hz]
-                           double az_3dB,           // 3dB beam width in azimuth direction in [deg]
-                           double el_3dB,           // 3dB beam width in elevation direction in [deg]
-                           double rear_gain_lin,    // Isotropic gain (linear scale) at the back of the antenna
-                           arma::uword M,           // Number of vertically stacked elements
-                           arma::uword N,           // Number of horizontally stacked elements
-                           unsigned pol,            // Polarization indicator to be applied for each of the M elements
-                           double tilt,             // The electric downtilt angle in [deg]
-                           double spacing,          // Element spacing in [λ]
-                           arma::uword Mg,          // Number of nested panels in a column
-                           arma::uword Ng,          // Number of nested panels in a row
-                           double dgv,              // Panel spacing in vertical horizontal in [λ]
-                           double dgh,              // Panel spacing in horizontal direction in [λ]
-                           const py::dict &pattern) // 3GPP custom pattern
+py::dict arrayant_generate(const std::string type,                 // Array type
+                           double res,                             // Pattern resolution in [deg]
+                           double freq,                            // The center frequency in [Hz]
+                           double az_3dB,                          // 3dB beam width in azimuth direction in [deg]
+                           double el_3dB,                          // 3dB beam width in elevation direction in [deg]
+                           double rear_gain_lin,                   // Isotropic gain (linear scale) at the back of the antenna
+                           arma::uword M,                          // Number of vertically stacked elements
+                           arma::uword N,                          // Number of horizontally stacked elements
+                           unsigned pol,                           // Polarization indicator to be applied for each of the M elements
+                           double tilt,                            // The electric downtilt angle in [deg]
+                           double spacing,                         // Element spacing in [λ]
+                           arma::uword Mg,                         // Number of nested panels in a column
+                           arma::uword Ng,                         // Number of nested panels in a row
+                           double dgv,                             // Panel spacing in vertical horizontal in [λ]
+                           double dgh,                             // Panel spacing in horizontal direction in [λ]
+                           const py::array_t<double> &beam_az,     // Azimuth beam angles in degree
+                           const py::array_t<double> &beam_el,     // Elevation beam angles in degree
+                           const py::array_t<double> &beam_weight, // Scaling factor for the beams
+                           bool separate_beams,                    // If true, create a separate beam for each angle pair (ignores weights)
+                           bool apply_weights,                     // Switch to apply the beamforming weights
+                           const py::dict &pattern)                // 3GPP custom pattern
 {
     quadriga_lib::arrayant<double> arrayant;
 
@@ -196,6 +221,16 @@ py::dict arrayant_generate(const std::string type,  // Array type
         }
         else // Use 3GPP default pattern
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res);
+    }
+    else if (type == "multibeam")
+    {
+        const auto az = qd_python_numpy2arma_Col(beam_az, true);
+        const auto el = qd_python_numpy2arma_Col(beam_el, true);
+        const auto weight = qd_python_numpy2arma_Col(beam_weight, true);
+
+        arrayant = quadriga_lib::generate_arrayant_multibeam(M, N, az, el, weight, freq, pol, spacing,
+                                                             az_3dB, el_3dB, rear_gain_lin, res, 
+                                                             separate_beams, apply_weights);
     }
     else
         throw std::invalid_argument("Array type not supported!");
