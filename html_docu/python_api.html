@@ -142,6 +142,7 @@ import quadriga_lib
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+<tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Rearranges elements of a triangle mesh into smaller sub-meshes</td></tr>
 </tbody>
 </table>
 </ul>
@@ -3464,6 +3465,81 @@ result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
    For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside 
    (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b> 
    if <code>obj_ind</code> is provided. Size: <code>[n_points]</code> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="triangle_mesh_segmentation"></a>
+<b>triangle_mesh_segmentation</b> - Rearranges elements of a triangle mesh into smaller sub-meshes
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function processes the elements of a large triangle mesh by clustering those that are 
+closely spaced. The resulting mesh retains the same elements but rearranges their order. 
+The function aims to minimize the size of the axis-aligned bounding box around each cluster, 
+referred to as a sub-mesh, while striving to maintain a specific number of elements within 
+each cluster.<br><br> 
+ 
+This approach is particularly useful in computer graphics and simulation applications where 
+managing computational resources efficiently is crucial. By organizing the mesh elements into 
+compact clusters, the function enhances rendering performance and accelerates computational 
+tasks, such as collision detection and physics simulations. It allows for quicker processing 
+and reduced memory usage, making it an essential technique in both real-time graphics rendering 
+and complex simulation environments.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+# Output as tuple
+data = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+
+# Unpacked outputs
+triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangles_in</code></b><br> 
+   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 
+   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles_in, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>target_size</code></b> (optional)<br> 
+   The target number of elements of each sub-mesh. Default value = 1024. For best performance, the 
+   value should be around sgrt( n_triangles_in ) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vec_size</code></b> (optional)<br> 
+   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. 
+   For values > 1,the number of rows for each sub-mesh in the output is increased to a multiple 
+   of <code>vec_size</code>. For padding, zero-sized triangles are placed at the center of the AABB of 
+   the corresponding sub-mesh. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop_in</code></b> (optional)<br> 
+   Material properties of each mesh element; Size: <code>[ n_triangles_in, 5 ]</code> 
+   If this is not provided, the corresponding <code>mtl_prop_out</code> will be empty. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangles_out</code></b>, <code>data[0]</code><br> 
+   Vertices of the clustered mesh in global Cartesian coordinates; singe or double precision; 
+   Size: <code>[ n_triangles_out, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b>, <code>data[1]</code><br> 
+   Start indices of the sub-meshes in 0-based notation. Type: int; Vector of length <code>[ n_sub_mesh ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mesh_index</code></b>, <code>data[2]</code><br> 
+   Indices for mapping elements of "triangles_in" to "triangles_out"; 1-based; 
+   Length: <code>[ n_triangles_out ]</code>; For <code>vec_size &gt; 1</code>, the added elements not contained in the input 
+   are indicated by zeros. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop_out</code></b>, <code>data[3]</code><br> 
+   Material properties for the sub-divided triangle mesh elements. The values for the new faces are 
+   copied from <code>mtl_prop_in</code>; Size: <code>[ n_triangles_out, 5 ]</code>; For <code>vec_size &gt; 1</code>, the added elements 
+   will contain the vacuum / air material. 
 </li></ul>
 </li>
 </ul>
