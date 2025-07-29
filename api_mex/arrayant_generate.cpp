@@ -139,7 +139,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3db,
   beam width if `az_3dB` and `el_3db` are given or using the default 3GPP pattern).
 
 ## Input arguments for type 'multibeam' and 'multibeam_sep':
-- **`beam_angles`** [9]<br>
+- **`beam_angles`** [10]<br>
   Matrix containing the beam steering angles in [deg] for the multi-beam antenna, size = `[3, n_beams]`,
   Rows are: [azimuth_deg, elevation_deg, weight].
 

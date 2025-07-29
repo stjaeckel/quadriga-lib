@@ -41,7 +41,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.8.3</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.8.4</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -90,6 +90,7 @@
 <tr><td><a href="#generate_arrayant_half_wave_dipole">generate_arrayant_half_wave_dipole</a></td><td>Generate half-wave dipole with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_custom">generate_arrayant_custom</a></td><td>Generate antenna with custom 3dB beamwidth</td></tr>
 <tr><td><a href="#generate_arrayant_3gpp">generate_arrayant_3gpp</a></td><td>Generate 3GPP-NR compliant antenna model</td></tr>
+<tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna with support for multiple beam directions.</td></tr>
 </tbody>
 </table>
 </ul>
@@ -1692,6 +1693,126 @@ arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_3GPP(
 <b><i>Example:</i></b><br><pre>
 // Generate 3GPP antenna array with 4x4 elements, H/V polarization
 auto ant = quadriga_lib::generate_arrayant_3GPP&lt;double&gt;(4, 4, 3e9, 2);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_arrayant_multibeam"></a>
+<b>generate_arrayant_multibeam</b> - Generate a planar multi-element antenna with support for multiple beam directions.
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function generates a planar array antenna with <b>M</b> rows and <b>N</b> columns.   
+It allows customization of the per-element radiation pattern, polarization, and spacing.   
+Multiple beam directions can be specified via azimuth and elevation angles.   
+Beamforming uses <b>maximum-ratio transmission (MRT)</b>, which is optimal for a single  
+beam and approximate when multiple beams are specified. 
+ 
+Supported data types for <code>dtype</code>: <code>float</code> or <code>double</code>.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
+                arma::uword M = 1, 
+                arma::uword N = 1, 
+                arma::Col&lt;dtype&gt; az = {0.0}, 
+                arma::Col&lt;dtype&gt; el = {0.0}, 
+                arma::Col&lt;dtype&gt; weight = {1.0},
+                dtype center_freq = 299792458.0, 
+                unsigned pol = 1, 
+                dtype spacing = 0.5, 
+                dtype az_3dB = 120.0, 
+                dtype el_3dB = 120.0,
+                dtype rear_gain_lin = 0.0, 
+                dtype res = 1.0, 
+                bool separate_beams = false, 
+                bool apply_weights = false );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>M</b> = 1</code> (optional input)<br> 
+   Number of vertical (rows) elements in the array. Default: <code>1</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>N</b> = 1</code> (optional input)<br> 
+   Number of horizontal (columns) elements in the array. Default: <code>1</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>az</b> = {0.0}</code> (optional input)<br> 
+   Azimuth beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
+    
+</li><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>el</b> = {0.0}</code> (optional input)<br> 
+   Elevation beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>weight</b> = {1.0}</code> (optional input)<br> 
+   Scaling factors for each beam. The vector must have the same length as <code>az</code> and <code>el</code>.   
+   Values are normalized so that their sum equals 1. Can be used to prioritize beams.   
+   Default: <code>{1.0}</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_freq</b> = 299792458.0</code> (optional input)<br> 
+   Center frequency of the antenna array in Hz. Default: <code>299792458.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>pol</b> = 1</code> (optional input)<br> 
+   Polarization configuration: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>pol = 1</code></td>
+  <td>vertical polarization (default value)</td>
+</tr>
+<tr>
+  <td><code>pol = 2</code></td>
+  <td>H/V polarized elements, results in 2NM elements</td>
+</tr>
+<tr>
+  <td><code>pol = 3</code></td>
+  <td>+/-45° polarized elements, results in 2NM elements</td>
+</tr>
+</table><br>
+   
+</li><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
+   Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>az_3dB</b> = 120.0</code> (optional input)<br> 
+   3dB beamwidth in azimuth, specified in degrees. Default: <code>120.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>el_3db</b> = 120.0</code> (optional input)<br> 
+   3dB beamwidth in elevation, specified in degrees. Default: <code>120.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>rear_gain_lin</b> = 0.0</code> (optional input)<br> 
+   Front-to-back gain ratio as a linear value. Default: <code>0.0</code> (no rear gain) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
+   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>separate_beams</b> = false</code> (optional input)<br> 
+   If set to true, create a separate beam for each angle pair (ignores weights) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>apply_weights</b> = false</code> (optional input)<br> 
+   Switch to apply the beam-forming weights 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
+   Array antenna object containing the generated multibeam pattern. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a pattern with 2 weighted beams
+double freq = 3.75e9;
+arma::vec az = {20.0, 0.0};
+arma::vec el = {-7.0, 30.0};
+arma::vec weight = {2.0, 1.0};
+
+auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el, weight, freq);
 </pre>
 </li>
 </ul>

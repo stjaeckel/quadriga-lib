@@ -6,10 +6,10 @@
                 "${workspaceFolder}/**",
                 "include/",
                 "src/",
-                "external/armadillo-14.4.1/include",
-                "external/pybind11-2.12.0/include",
+                "external/armadillo-14.2.2/include",
+                "external/pybind11-3.0.0/include",
                 "external/Catch2-3.8.1-Linux/include",
-                "/usr/include/python3.10/",
+                "/usr/include/python3.12/",
                 "/usr/local/MATLAB/R2021a/extern/include/",
                 "/usr/include/octave-8.3.0/octave",
                 "${default}"
