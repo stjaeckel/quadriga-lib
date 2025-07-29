@@ -21,10 +21,13 @@
 namespace py = pybind11;
 
 // Include parts
+#include "qpy_cart2geo.cpp"
 #include "qpy_write_png.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
+    m.def("cart2geo", &cart2geo, py::arg("cart"));
+
     m.def("write_png", &write_png,
           py::arg("fn"),
           py::arg("data") = py::array_t<double>(),

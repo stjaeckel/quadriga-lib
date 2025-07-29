@@ -125,6 +125,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
@@ -137,7 +138,6 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
@@ -2727,6 +2727,37 @@ channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="cart2geo"></a>
+<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
+coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
+points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
+where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
+θ = 90° points to the zenith and θ = 0° points to the horizon.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+import quadriga_lib
+geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
+   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
+   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
+   First row: Azimuth angles in [rad], values between -pi and pi.<br> 
+   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
+   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="components"></a>
 <b>components</b> - Returns the version numbers of all quadriga-lib sub-components
 <ul>
@@ -2806,37 +2837,6 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 <font size=+1><b>Site-Specific Simulation Tools</b></font>
 <br>
 <br>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="cart2geo"></a>
-<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90° points to the zenith and θ = 0° points to the horizon.
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Usage:</i></b><br><pre>
-from quadriga_lib import RTtools
-geo_coords = RTtools.cart2geo(cart_coords)
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
-   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
-   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
-   First row: Azimuth angles in [rad], values between -pi and pi.<br> 
-   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
-   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
-</li></ul>
-</li>
-</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="icosphere"></a>
 <b>icosphere</b> - Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
