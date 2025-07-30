@@ -61,7 +61,7 @@ aabb = RTtools.triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
   `[ x_min, x_max, y_min, y_max, z_min, z_max ]`; Size: `[ n_sub_mesh, 6 ]`
 
 ## See also:
-- [[triangle_mesh_segmentation]] for calculating sub-meshes
+- [[triangle_mesh_segmentation]] (for calculating sub-meshes)
 MD!*/
 
 py::array_t<double> triangle_mesh_aabb(const py::array_t<double> &triangles,        // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]

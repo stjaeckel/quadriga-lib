@@ -142,6 +142,7 @@ import quadriga_lib
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+<tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
 <tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Rearranges elements of a triangle mesh into smaller sub-meshes</td></tr>
 </tbody>
@@ -3470,6 +3471,95 @@ result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="ray_triangle_intersect"></a>
+<b>ray_triangle_intersect</b> - Calculates the intersection of rays and triangles in three dimensions
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function implements the Möller–Trumbore ray-triangle intersection algorithm, known for its 
+   efficiency in calculating the intersection of a ray and a triangle in three-dimensional space. 
+   This method achieves its speed by eliminating the need for precomputed plane equations of the plane 
+   containing the triangle. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">For further information, refer to [Wikipedia: <a href="https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm">Möller–Trumbore intersection algorithm</a>]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle 
+   is specified by its three vertices. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
+   available, to speed up the computational process. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+# Output as tuple
+data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index )
+
+# Unpacked outputs
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>orig</code></b><br> 
+   Ray origins in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dest</code></b><br> 
+   Ray destinations in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>mesh</code></b><br> 
+   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
+   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ];  
+   Size: <code>[ no_mesh, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b> (optional)<br> 
+   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections 
+   are calculated for each mesh element, leading to poor performance for large meshes. 
+   Vector of length <code>[ n_sub_mesh ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fbs</code></b>, <code>data[0]</code><br> 
+   First interaction point between the rays and the triangular mesh. If no interaction was found, the 
+   FBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sbs</code></b>, <code>data[1]</code><br> 
+   Second interaction point between the rays and the triangular mesh. If no interaction was found, the 
+   SBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_interact</code></b>, <code>data[2]</code><br> 
+   Total number of interactions between the origin point and the destination; uint32; Length: <code>[ no_ray ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fbs_ind</code></b>, <code>data[3]</code><br> 
+   Index of the triangle that was hit by the ray at the FBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sbs_ind</code></b>, <code>data[4]</code><br> 
+   Index of the triangle that was hit by the ray at the SBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">All internal computation are done in single precision to achieve an additional 2x improvement in 
+   speed compared to double precision when using AVX2 intrinsic instructions 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> (for loading mesh from an OBJ file) 
+</li><li style="margin-bottom: 0.4em;"><a href="#icosphere">icosphere</a> (for generating beams) 
+</li><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes) 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="triangle_mesh_aabb"></a>
 <b>triangle_mesh_aabb</b> - Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 <ul>
@@ -3512,7 +3602,7 @@ aabb = RTtools.triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> for calculating sub-meshes 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes) 
 </li></ul>
 </li>
 </ul>
