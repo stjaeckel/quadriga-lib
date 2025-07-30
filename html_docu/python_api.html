@@ -142,6 +142,7 @@ import quadriga_lib
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+<tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
 <tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Rearranges elements of a triangle mesh into smaller sub-meshes</td></tr>
 </tbody>
 </table>
@@ -3469,6 +3470,53 @@ result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="triangle_mesh_aabb"></a>
+<b>triangle_mesh_aabb</b> - Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum 
+bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian) 
+coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of 
+triangles. In order to find intersections with the triangles (e.g. using ray tracing), the 
+initial check is the intersections between the rays and the AABBs. Since it is usually a much 
+less expensive operation than the check of the actual intersection (because it only requires 
+comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+aabb = RTtools.triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangle_mesh</code></b><br> 
+   Vertices of the triangle mesh in global Cartesian coordinates. Each face is described by 3 
+   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles, 9 ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b> (optional)<br> 
+   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of 
+   the entire triangle mesh is returned. Vector of length <code>[ n_sub_mesh ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vec_size</code></b> (optional)<br> 
+   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1, 
+   the number of rows in the output is increased to a multiple of <code>vec_size</code>, padded with zeros. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>aabb</code></b><br> 
+   Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values: 
+   <code>[ x_min, x_max, y_min, y_max, z_min, z_max ]</code>; Size: <code>[ n_sub_mesh, 6 ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> for calculating sub-meshes 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="triangle_mesh_segmentation"></a>
 <b>triangle_mesh_segmentation</b> - Rearranges elements of a triangle mesh into smaller sub-meshes
 <ul>
@@ -3491,21 +3539,21 @@ and complex simulation environments.
 from quadriga_lib import RTtools
 
 # Output as tuple
-data = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+data = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangles_in</code></b><br> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangles</code></b><br> 
    Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 
-   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles_in, 9 ]</code> 
+   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles, 9 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>target_size</code></b> (optional)<br> 
    The target number of elements of each sub-mesh. Default value = 1024. For best performance, the 
-   value should be around sgrt( n_triangles_in ) 
+   value should be around <code>sgrt( n_triangles )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>vec_size</code></b> (optional)<br> 
@@ -3516,14 +3564,13 @@ triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mtl_prop_in</code></b> (optional)<br> 
-   Material properties of each mesh element; Size: <code>[ n_triangles_in, 5 ]</code> 
+   Material properties of each mesh element; Size: <code>[ n_triangles, 5 ]</code> 
    If this is not provided, the corresponding <code>mtl_prop_out</code> will be empty. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>triangles_out</code></b>, <code>data[0]</code><br> 
-   Vertices of the clustered mesh in global Cartesian coordinates; singe or double precision; 
-   Size: <code>[ n_triangles_out, 9 ]</code> 
+   Vertices of the clustered mesh in global Cartesian coordinates; Size: <code>[ n_triangles_out, 9 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b>, <code>data[1]</code><br> 

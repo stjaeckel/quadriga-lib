@@ -25,6 +25,7 @@ namespace py = pybind11;
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
 #include "qpy_point_inside_mesh.cpp"
+#include "qpy_triangle_mesh_aabb.cpp"
 #include "qpy_triangle_mesh_segmentation.cpp"
 
 void quadriga_lib_RTtools(py::module_ &m)
@@ -50,6 +51,11 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mesh") = py::array_t<double>(),
           py::arg("obj_ind") = py::array_t<unsigned>(),
           py::arg("distance") = 0.0);
+
+    m.def("triangle_mesh_aabb", &triangle_mesh_aabb,
+          py::arg("triangles") = py::array_t<double>(),
+          py::arg("sub_mesh_index") = py::array_t<unsigned>(),
+          py::arg("vec_size") = 1);
 
     m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,
           py::arg("triangles") = py::array_t<double>(),
