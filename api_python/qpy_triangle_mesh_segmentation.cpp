@@ -45,20 +45,20 @@ and complex simulation environments.
 from quadriga_lib import RTtools
 
 # Output as tuple
-data = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+data = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles_in, target_size, vec_size, mtl_prop_in )
+triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 ```
 
 ## Input Arguments:
-- **`triangles_in`**<br>
+- **`triangles`**<br>
   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ n_triangles_in, 9 ]`
+  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ n_triangles, 9 ]`
 
 - **`target_size`** (optional)<br>
   The target number of elements of each sub-mesh. Default value = 1024. For best performance, the
-  value should be around sgrt( n_triangles_in )
+  value should be around `sgrt( n_triangles )`
 
 - **`vec_size`** (optional)<br>
   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1.
@@ -67,7 +67,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_
   the corresponding sub-mesh.
 
 - **`mtl_prop_in`** (optional)<br>
-  Material properties of each mesh element; Size: `[ n_triangles_in, 5 ]`
+  Material properties of each mesh element; Size: `[ n_triangles, 5 ]`
   If this is not provided, the corresponding `mtl_prop_out` will be empty.
 
 ## Output Arguments:

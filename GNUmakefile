@@ -31,7 +31,7 @@ bin:   cpp
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 
 python:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ENABLE_MATLAB=OFF -D ENABLE_OCTAVE=OFF -D ENABLE_MEX_DOC=OFF -D ARMA_EXT=$(arma_internal)
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ENABLE_MATLAB=OFF -D ENABLE_OCTAVE=OFF -D ENABLE_MEX_DOC=OFF -D ENABLE_PYTHON=ON -D ARMA_EXT=$(arma_internal)
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
