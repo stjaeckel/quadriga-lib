@@ -4160,7 +4160,7 @@ the vertices.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh );
+[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -4180,7 +4180,7 @@ the vertices.
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b> (optional)<br> 
    Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections 
-   are calculated for each mesh element, leading to poor performance for large meshed.  
+   are calculated for each mesh element, leading to poor performance for large meshes.  
    Type: uint32; Vector of length <code>[ n_sub_mesh ]</code> 
 </li></ul>
 </li>

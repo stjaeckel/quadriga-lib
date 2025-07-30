@@ -44,7 +44,7 @@ Calculates the intersection of rays and triangles in three dimensions
 ## Usage:
 
 ```
-[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh );
+[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index );
 ```
 
 ## Input Arguments:
@@ -61,7 +61,7 @@ Calculates the intersection of rays and triangles in three dimensions
 
 - **`sub_mesh_index`** (optional)<br>
   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections
-  are calculated for each mesh element, leading to poor performance for large meshed. 
+  are calculated for each mesh element, leading to poor performance for large meshes. 
   Type: uint32; Vector of length `[ n_sub_mesh ]`
 
 ## Output Arguments:
