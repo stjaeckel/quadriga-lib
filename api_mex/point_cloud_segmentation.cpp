@@ -28,11 +28,16 @@ SECTION!*/
 Rearranges elements of a point cloud into smaller sub-clouds
 
 ## Description:
-This function processes the elements of a large point cloud by clustering those that are
-closely spaced. The resulting cloud retains the same elements but rearranges their order.
-The function aims to minimize the size of the axis-aligned bounding box around each cluster,
-referred to as a sub-cloud, while striving to maintain a specific number of elements within
-each cluster.
+This function processes a large 3D point cloud by clustering closely spaced points and recursively 
+partitioning it into smaller sub-clouds, each below a specified size threshold. It minimizes the 
+axis-aligned bounding box of each sub-cloud while striving to maintain a target number of points 
+per cluster.<br><br>
+
+Sub-clouds are aligned to a specified SIMD vector size (e.g., for AVX or CUDA), with padding applied 
+as needed. The function outputs a reorganized version of the input points (pointsR), where points 
+are grouped by sub-cloud, and provides forward and reverse index maps to track the reordering. This 
+organization is particularly useful for optimizing spatial processing tasks such as bounding volume 
+hierarchies or GPU batch execution.
 
 ## Usage:
 
@@ -59,7 +64,7 @@ each cluster.
 ## Output Arguments:
 
 - **`points_out`**<br>
-  Points in 3D-Cartesian space; singe or double precision;  Size: `[ n_points_out, 9 ]`
+  Points in 3D-Cartesian space; singe or double precision;  Size: `[ n_points_out, 3 ]`
 
 - **`sub_cloud_index`**<br>
   Start indices of the sub-clouds in 0-based notation. Type: uint32; Vector of length `[ n_sub_cloud ]`

@@ -3542,11 +3542,16 @@ aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, vec_size );
 <b>point_cloud_segmentation</b> - Rearranges elements of a point cloud into smaller sub-clouds
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function processes the elements of a large point cloud by clustering those that are 
-closely spaced. The resulting cloud retains the same elements but rearranges their order. 
-The function aims to minimize the size of the axis-aligned bounding box around each cluster, 
-referred to as a sub-cloud, while striving to maintain a specific number of elements within 
-each cluster.
+<b><i>Description:</i></b><br>This function processes a large 3D point cloud by clustering closely spaced points and recursively  
+partitioning it into smaller sub-clouds, each below a specified size threshold. It minimizes the  
+axis-aligned bounding box of each sub-cloud while striving to maintain a target number of points  
+per cluster.<br><br> 
+ 
+Sub-clouds are aligned to a specified SIMD vector size (e.g., for AVX or CUDA), with padding applied  
+as needed. The function outputs a reorganized version of the input points (pointsR), where points  
+are grouped by sub-cloud, and provides forward and reverse index maps to track the reordering. This  
+organization is particularly useful for optimizing spatial processing tasks such as bounding volume  
+hierarchies or GPU batch execution.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
