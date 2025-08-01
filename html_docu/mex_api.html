@@ -113,7 +113,7 @@
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
-<tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of set of points in 3D-sapce</td></tr>
+<tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates interactions (reflection, transmission, refraction) of radio waves with objects</td></tr>
@@ -3502,7 +3502,7 @@ The following materials are defined by default:
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="point_cloud_aabb"></a>
-<b>point_cloud_aabb</b> - Calculate the axis-aligned bounding box (AABB) of set of points in 3D-sapce
+<b>point_cloud_aabb</b> - Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>The axis-aligned minimum bounding box (or AABB) for a given set points is its minimum bounding  
@@ -3578,7 +3578,7 @@ hierarchies or GPU batch execution.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>points_out</code></b><br> 
-   Points in 3D-Cartesian space; singe or double precision;  Size: <code>[ n_points_out, 9 ]</code> 
+   Points in 3D-Cartesian space; singe or double precision;  Size: <code>[ n_points_out, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_cloud_index</code></b><br> 
