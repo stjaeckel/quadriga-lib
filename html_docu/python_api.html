@@ -141,7 +141,8 @@ import quadriga_lib
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
-<tr><td><a href="# point_cloud_segmentation"> point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
+<tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
+<tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
@@ -3426,8 +3427,63 @@ The following materials are defined by default:
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name=" point_cloud_segmentation"></a>
-<b> point_cloud_segmentation</b> - Rearranges elements of a point cloud into smaller sub-clouds
+<a name="point_cloud_aabb"></a>
+<b>point_cloud_aabb</b> - Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>The axis-aligned bounding box (AABB) of a set of points is the smallest bounding box whose edges 
+are parallel to the Cartesian coordinate axes and that fully contains all points in the set. 
+This function computes the AABB for either: 
+<ul><li style="margin-bottom: 0.4em;">an entire point cloud, or 
+</li><li style="margin-bottom: 0.4em;">multiple sub-clouds defined by their starting indices. 
+</li></ul>
+ 
+For each cloud, the function returns the minimum and maximum extents along the x, y, and z 
+dimensions, producing a matrix where each row corresponds to one sub-cloud’s bounding box. When 
+SIMD-friendly alignment is required, the output is zero-padded to the nearest multiple of vec_size; 
+these padding rows should be ignored if the number of sub-clouds is known externally.<br><br> 
+ 
+If a sub_cloud_index is provided, the last index is assumed to extend to the end of the 
+points matrix. This functionality is particularly useful for preprocessing in geometry analysis, 
+rendering pipelines, and spatial acceleration structures such as BVHs or octrees. Sub-clouds 
+can be conveniently generated using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+aabb = RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>points</code></b><br> 
+   Points in 3D-Cartesian space; Size: [ n_points, 3 ] 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sub_cloud_ind</code></b> (optional)<br> 
+   Start indices of the sub-clouds in 0-based notation. If this parameter is not given, the AABB of 
+   the entire point cloud is returned. Vector of length <code>[ n_sub_cloud ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>vec_size</code></b> (optional)<br> 
+   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1, 
+   the number of rows in the output is increased to a multiple of <code>vec_size</code>, padded with zeros. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>aabb</code></b><br> 
+   Axis-aligned bounding box of each sub-cloud. Each box is described by 6 values: 
+   <code>[ x_min, x_max, y_min, y_max, z_min, z_max ]</code>; Size: <code>[ n_sub_cloud, 6 ]</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for calculating sub clouds) 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_cloud_segmentation"></a>
+<b>point_cloud_segmentation</b> - Rearranges elements of a point cloud into smaller sub-clouds
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br>This function processes a large 3D point cloud by clustering closely spaced points and recursively 
@@ -3471,7 +3527,7 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = RTtools.point_cloud_segmen
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>points_out</code></b>, <code>data[0]</code><br> 
-   Points in 3D-Cartesian space; singe or double precision;  Size: <code>[ n_points_out, 9 ]</code> 
+   Points in 3D-Cartesian space; singe or double precision;  Size: <code>[ n_points_out, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_cloud_ind</code></b>, <code>data[1]</code><br> 
@@ -3485,7 +3541,7 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = RTtools.point_cloud_segmen
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>reverse_ind</code></b>, <code>data[3]</code><br> 
-   Indices for mapping elements of "points_out" to "points_in"; 1-based; Length: <code>[ n_points_in ]</code> 
+   Indices for mapping elements of "points_out" to "points"; 0-based; Length: <code>[ n_points ]</code> 
 </li></ul>
 </li>
 </ul>

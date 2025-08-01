@@ -23,7 +23,7 @@ Site-Specific Simulation Tools
 SECTION!*/
 
 /*!MD
-#  point_cloud_segmentation
+# point_cloud_segmentation
 Rearranges elements of a point cloud into smaller sub-clouds
 
 ## Description:

@@ -25,7 +25,7 @@ SECTION!*/
 
 /*!MD
 POINT_CLOUD_AABB
-Calculate the axis-aligned bounding box (AABB) of set of points in 3D-sapce
+Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds
 
 ## Description:
 The axis-aligned minimum bounding box (or AABB) for a given set points is its minimum bounding 
