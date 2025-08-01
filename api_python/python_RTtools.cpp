@@ -24,6 +24,7 @@ namespace py = pybind11;
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
+#include "qpy_point_cloud_segmentation.cpp"
 #include "qpy_point_inside_mesh.cpp"
 #include "qpy_ray_triangle_intersect.cpp"
 #include "qpy_triangle_mesh_aabb.cpp"
@@ -46,6 +47,11 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("map_to_itu") = false);
 
     m.def("obj_file_read", &obj_file_read, py::arg("fn"));
+
+    m.def("point_cloud_segmentation", &point_cloud_segmentation,
+          py::arg("points") = py::array_t<double>(),
+          py::arg("target_size") = 1024,
+          py::arg("vec_size") = 1);
 
     m.def("point_inside_mesh", &point_inside_mesh,
           py::arg("points") = py::array_t<double>(),
