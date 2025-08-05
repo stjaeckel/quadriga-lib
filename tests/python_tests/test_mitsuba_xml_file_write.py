@@ -12,9 +12,11 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
-class test_version(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
+        # Test
+
         # -----------------------------------------------------------------
         # 1. Read reference OBJ
         # -----------------------------------------------------------------

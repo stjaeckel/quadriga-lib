@@ -12,7 +12,7 @@ if package_path not in sys.path:
 # Now you can import your package
 from quadriga_lib import RTtools
 
-class test_icosphere(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
 

@@ -80,7 +80,7 @@ points_out, sub_cloud_ind, forward_ind, reverse_ind = RTtools.point_cloud_segmen
 MD!*/
 
 py::tuple point_cloud_segmentation(const py::array_t<double> &points, // Points in 3D-Cartesian space; Size: [ n_points, 3 ]
-                                   arma::uword target_size,           // Target value for the sub-mesh size
+                                   arma::uword target_size,           // Target value for the sub-cloud size
                                    arma::uword vec_size)              // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
 {
     const auto points_arma = qd_python_numpy2arma_Mat(points, true);

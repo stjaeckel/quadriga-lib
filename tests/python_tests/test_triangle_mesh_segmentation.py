@@ -40,7 +40,7 @@ def triangles_to_vertices(triangles: np.ndarray):
     return triangles.reshape((-1, 3, 3))
 
 
-class test_version(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
         rng = np.random.default_rng(0)

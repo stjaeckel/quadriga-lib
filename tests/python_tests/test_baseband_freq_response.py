@@ -12,7 +12,7 @@ if package_path not in sys.path:
 
 from quadriga_lib import channel
 
-class test_baseband_freq_response(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
 

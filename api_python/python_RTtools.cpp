@@ -27,6 +27,7 @@ namespace py = pybind11;
 #include "qpy_point_cloud_aabb.cpp"
 #include "qpy_point_cloud_segmentation.cpp"
 #include "qpy_point_inside_mesh.cpp"
+#include "qpy_ray_point_intersect.cpp"
 #include "qpy_ray_triangle_intersect.cpp"
 #include "qpy_triangle_mesh_aabb.cpp"
 #include "qpy_triangle_mesh_segmentation.cpp"
@@ -51,7 +52,7 @@ void quadriga_lib_RTtools(py::module_ &m)
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),
-          py::arg("sub_cloud_index") = py::array_t<unsigned>(),
+          py::arg("sub_cloud_ind") = py::array_t<unsigned>(),
           py::arg("vec_size") = 1);
 
     m.def("point_cloud_segmentation", &point_cloud_segmentation,
@@ -64,6 +65,14 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("mesh") = py::array_t<double>(),
           py::arg("obj_ind") = py::array_t<unsigned>(),
           py::arg("distance") = 0.0);
+
+    m.def("ray_point_intersect", &ray_point_intersect,
+          py::arg("orig") = py::array_t<double>(),
+          py::arg("trivec") = py::array_t<double>(),
+          py::arg("tridir") = py::array_t<double>(),
+          py::arg("points") = py::array_t<double>(),
+          py::arg("sub_cloud_ind") = py::array_t<unsigned>(),
+          py::arg("target_size") = 0);
 
     m.def("ray_triangle_intersect", &ray_triangle_intersect,
           py::arg("orig") = py::array_t<double>(),

@@ -51,7 +51,7 @@ def build_unit_cube_triangles(dtype=np.float32):
     return tris
 
 
-class test_version(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
         atol = 1e-7
