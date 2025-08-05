@@ -52,22 +52,22 @@ center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_x
 
 ## Output Arguments (tuple containing 4 values):
 - **`center`**<br>
-  Position of the center point of each triangle; Size: `[ no_face, 3 ]`
+  Position of the center point of each triangle; Shape: `( no_face, 3 )`
 
 - **`length`**<br>
   Length of the vector pointing from the origin to the center point. This number is smaller than
-  1 since the triangles are located inside the unit sphere; <br>Size: `[ no_face ]`
+  1 since the triangles are located inside the unit sphere; Shape: `( no_face )`
 
 - **`vert`**<br>
   The 3 vectors pointing from the center point to the vertices of each triangle; the values are
-  in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; <br>Size: `[ no_face, 9 ]`
+  in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Shape: `( no_face, 9 )`
 
 - **`direction`**<br>
   The directions of the vertex-rays. If the format indicator `direction_xyz` is set to `0`, the
   output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the
-  order `[ v1az, v1el, v2az, v2el, v3az, v3el ]`;Size: `[ no_face, 6 ]` If the format indicator
+  order `( v1az, v1el, v2az, v2el, v3az, v3el ]`;Shape: `( no_face, 6 )` If the format indicator
   `direction_xyz` is set to `1`, the output is in Cartesian coordinates and the values are in the
-  order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`; Size: `[ no_face, 9 ]`
+  order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`; Shape: `( no_face, 9 )`
 MD!*/
 
 py::tuple icosphere(unsigned long long n_div, double radius, bool direction_xyz)

@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# COMBINE_PATTERN
+# combine_pattern
 Calculate effective radiation patterns for array antennas
 
 ## Description:
@@ -51,42 +51,42 @@ arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_
 ## Input Arguments:
 - **`arrayant`**<br>
   Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions                     | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
+  `element_pos`    | Antenna element (x,y,z) positions                     | Shape: `(3, n_elements)`
+  `coupling_re`    | Coupling matrix, real part                            | Shape: `(n_elements, n_ports)`
+  `coupling_im`    | Coupling matrix, imaginary part                       | Shape: `(n_elements, n_ports)`
   `center_freq`    | Center frequency in [Hz], optional                    | Scalar
   `name`           | Name of the array antenna object, optional            | String
 
 - **`freq`** (optional)<br>
   An alternative value for the center frequency. Overwrites the value given in `arrayant_in`. If
-  neither `freq` not `arrayant_in["center_freq"]` are given, an error is thrown.
+  neither `freq` not `arrayant_in["center_freq")` are given, an error is thrown.
 
 - **`azimuth_grid`** (optional)<br>
-  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: `[n_azimuth_out]`,
-  If not given, `arrayant_in["azimuth_grid"]` is used instead.
+  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Shape: `(n_azimuth_out)`,
+  If not given, `arrayant_in["azimuth_grid")` is used instead.
 
 - **`elevation_grid`** (optional)<br>
-  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation_out]`,
-  If not given, `arrayant_in["elevation_grid"]` is used instead.
+  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Shape: `(n_elevation_out)`,
+  If not given, `arrayant_in["elevation_grid")` is used instead.
 
 ## Output Arguments:
 - **`arrayant_out`**<br>
   Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation_out, n_azimuth_out, n_ports]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_azimuth_out, n_azimuth_out, n_ports]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_azimuth_out, n_azimuth_out, n_ports]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_azimuth_out, n_azimuth_out, n_ports]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth_out]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_azimuth_out]`
-  `element_pos`    | Antenna element (x,y,z) positions, set to 0           | Size: `[3, n_ports]`
-  `coupling_re`    | Coupling matrix, real part, identity matrix           | Size: `[n_ports, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part, zero matrix          | Size: `[n_ports, n_ports]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_out, n_azimuth_out, n_ports)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_out)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_azimuth_out)`
+  `element_pos`    | Antenna element (x,y,z) positions, set to 0           | Shape: `(3, n_ports)`
+  `coupling_re`    | Coupling matrix, real part, identity matrix           | Shape: `(n_ports, n_ports)`
+  `coupling_im`    | Coupling matrix, imaginary part, zero matrix          | Shape: `(n_ports, n_ports)`
   `center_freq`    | Center frequency in [Hz]                              | Scalar
   `name`           | Name of the array antenna object, same as input       | String
 MD!*/

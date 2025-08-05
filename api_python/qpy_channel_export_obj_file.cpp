@@ -23,7 +23,7 @@ Channel functions
 SECTION!*/
 
 /*!MD
-# CHANNEL_EXPORT_OBJ_FILE
+# channel_export_obj_file
 Export path data to a Wavefront OBJ file for visualization in Blender
 
 ## Description:
