@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# EXPORT_OBJ_FILE
+# export_obj_file
 Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
 
 ## Usage:
@@ -39,13 +39,13 @@ arrayant.export_obj_file( fn, arrayant, directivity_range, colormap,
 
 - **`arrayant`**<br>
   Dictionary containing array antenna data with at least the following keys:
-  `e_theta_re`     | Real part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements_c]`
-  `e_theta_im`     | Imaginary part of e-theta field component        | Size: `[n_elevation, n_azimuth, n_elements_c]`
-  `e_phi_re`       | Real part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements_c]`
-  `e_phi_im`       | Imaginary part of e-phi field component          | Size: `[n_elevation, n_azimuth, n_elements_c]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional      | Size: `[3, n_elements]`
+  `e_theta_re`     | Real part of e-theta field component             | Shape: `(n_elevation, n_azimuth, n_elements_c)`
+  `e_theta_im`     | Imaginary part of e-theta field component        | Shape: `(n_elevation, n_azimuth, n_elements_c)`
+  `e_phi_re`       | Real part of e-phi field component               | Shape: `(n_elevation, n_azimuth, n_elements_c)`
+  `e_phi_im`       | Imaginary part of e-phi field component          | Shape: `(n_elevation, n_azimuth, n_elements_c)`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Shape: `(n_azimuth)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Shape: `(n_elevation)`
+  `element_pos`    | Antenna element (x,y,z) positions, optional      | Shape: `(3, n_elements)`
   `name`           | Name of the array antenna object                 | String
 
 - **`directivity_range`**<br>

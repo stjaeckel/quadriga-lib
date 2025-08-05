@@ -183,44 +183,44 @@ directivity = arrayant.calc_directivity(arrayant, element)
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 </table><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> (optional)<br> 
    Element index, 0-based. If not provided or empty, the directivity is calculated for all elements in the 
-   array antenna. Size: <code>[n_out]</code> or empty 
+   array antenna. Shape: <code>(n_out)</code> or empty 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>directivity</code></b><br> 
-   Directivity of the antenna pattern in dBi, Size: <code>[n_out]</code> or <code>[n_elements]</code> 
+   Directivity of the antenna pattern in dBi, Shape: <code>[n_out)</code> or <code>[n_elements)</code> 
 </li></ul>
 </li>
 </ul>
@@ -258,47 +258,47 @@ arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -315,17 +315,17 @@ arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>freq</code></b> (optional)<br> 
    An alternative value for the center frequency. Overwrites the value given in <code>arrayant_in</code>. If 
-   neither <code>freq</code> not <code>arrayant_in["center_freq"]</code> are given, an error is thrown. 
+   neither <code>freq</code> not <code>arrayant_in["center_freq")</code> are given, an error is thrown. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_grid</code></b> (optional)<br> 
-   Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: <code>[n_azimuth_out]</code>, 
-   If not given, <code>arrayant_in["azimuth_grid"]</code> is used instead. 
+   Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Shape: <code>(n_azimuth_out)</code>, 
+   If not given, <code>arrayant_in["azimuth_grid")</code> is used instead. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>elevation_grid</code></b> (optional)<br> 
-   Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: <code>[n_elevation_out]</code>, 
-   If not given, <code>arrayant_in["elevation_grid"]</code> is used instead. 
+   Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Shape: <code>(n_elevation_out)</code>, 
+   If not given, <code>arrayant_in["elevation_grid")</code> is used instead. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -335,47 +335,47 @@ arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation_out, n_azimuth_out, n_ports]</code></td>
+  <td>Shape: <code>(n_elevation_out, n_azimuth_out, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_azimuth_out, n_azimuth_out, n_ports]</code></td>
+  <td>Shape: <code>(n_azimuth_out, n_azimuth_out, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_azimuth_out, n_azimuth_out, n_ports]</code></td>
+  <td>Shape: <code>(n_azimuth_out, n_azimuth_out, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_azimuth_out, n_azimuth_out, n_ports]</code></td>
+  <td>Shape: <code>(n_azimuth_out, n_azimuth_out, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_out]</code></td>
+  <td>Shape: <code>(n_azimuth_out)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_azimuth_out]</code></td>
+  <td>Shape: <code>(n_azimuth_out)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, set to 0</td>
-  <td>Size: <code>[3, n_ports]</code></td>
+  <td>Shape: <code>(3, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, identity matrix</td>
-  <td>Size: <code>[n_ports, n_ports]</code></td>
+  <td>Shape: <code>(n_ports, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, zero matrix</td>
-  <td>Size: <code>[n_ports, n_ports]</code></td>
+  <td>Shape: <code>(n_ports, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -408,47 +408,47 @@ arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -479,47 +479,47 @@ arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -557,37 +557,37 @@ arrayant.export_obj_file( fn, arrayant, directivity_range, colormap,
 <tr>
   <td><code>e_theta_re</code></td>
   <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>name</code></td>
@@ -774,32 +774,32 @@ arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0
 <tr>
   <td><code>e_theta_re</code></td>
   <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements_c]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements_c)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -811,47 +811,47 @@ arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -903,37 +903,37 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 <tr>
   <td><code>e_theta_re</code></td>
   <td>Real part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>Imaginary part of e-theta field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>Real part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>Imaginary part of e-phi field component</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -947,7 +947,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </tr>
 <tr>
   <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
+  <td>Shape: <code>(1, n_ang)</code></td>
 </tr>
 <tr>
   <td>Option 2:</td>
@@ -955,7 +955,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </tr>
 <tr>
   <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
+  <td>Shape: <code>(n_out, n_ang)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -969,7 +969,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </tr>
 <tr>
   <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
+  <td>Shape: <code>(1, n_ang)</code></td>
 </tr>
 <tr>
   <td>Option 2:</td>
@@ -977,7 +977,7 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </tr>
 <tr>
   <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
+  <td>Shape: <code>[n_out, n_ang)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -987,21 +987,21 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
    be between 0 and n_elements-1. It is possible to duplicate elements, i.e. by passing <code>[1,1,2]</code>. 
    If this parameter is not provided (or an empty array is passed), <code>i_element</code> is initialized 
    to <code>[0:n_elements-1]</code>. In this case, <code>n_out = n_elements</code>. 
-   Size: <code>[1, n_out]</code> or <code>[n_out, 1]</code> or empty <code>[]</code> 
+   Shape: <code>(1, n_out)</code> or <code>(n_out, 1)</code> or empty <code>()</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b> (optional)<br> 
    This (optional) 3-element vector describes the orientation of the array antenna or of individual 
    array elements using Euler angles in [rad]. 
-   Size: <code>[3, 1]</code> or <code>[3, n_out]</code> or <code>[3, 1, n_ang]</code> or <code>[3, n_out, n_ang]</code> or empty <code>[]</code> 
+   Shape: <code>(3, 1)</code> or <code>(3, n_out)</code> or <code>(3, 1, n_ang)</code> or <code>(3, n_out, n_ang)</code> or empty <code>()</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>element_pos</code></b> (optional)<br> 
    Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]). 
    If this parameter is not given, element positions <code>arrayant</code> are used. If the <code>arrayant</code> has no 
    positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting 
-   <code>element = [1,1]</code>, different element positions can be set for the  two elements in the output. 
-   Size: <code>[3, n_out]</code> or empty <code>[]</code> 
+   <code>element = [1,1)</code>, different element positions can be set for the  two elements in the output. 
+   Shape: <code>(3, n_out)</code> or empty <code>()</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>complex</code></b> (optional flag)<br> 
@@ -1052,43 +1052,43 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>vr</code></b><br> 
-   Real part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
+   Real part of the interpolated e-theta (vertical) field component. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>vi</code></b><br> 
-   Imaginary part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code> 
+   Imaginary part of the interpolated e-theta (vertical) field component. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>hr</code></b><br> 
-   Real part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
+   Real part of the interpolated e-phi (horizontal) field component. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>hi</code></b><br> 
-   Imaginary part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code> 
+   Imaginary part of the interpolated e-phi (horizontal) field component. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dist</code></b> (optional)<br> 
    The effective distances between the antenna elements when seen from the direction of the 
    incident path. The distance is calculated by an projection of the array positions on the normal 
    plane of the incident path. This is needed for calculating the phase of the antenna response. 
-   Only returned when <code>dist</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
+   Only returned when <code>dist</code> flag is set to 1. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b> (optional)<br> 
    The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
-   azimuth angles. Only returned when <code>local_angles</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
+   azimuth angles. Only returned when <code>local_angles</code> flag is set to 1. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b> (optional)<br> 
    The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the 
    'orientation'. If no orientation vector is given, these angles are identical to the input 
-   elevation angles. Only returned when <code>local_angles</code> flag is set to 1. Size <code>[n_out, n_ang]</code> 
+   elevation angles. Only returned when <code>local_angles</code> flag is set to 1. Shape <code>(n_out, n_ang)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b> (optional)<br> 
    Polarization rotation angles in [rad], Only returned when <code>local_angles</code> flag is set to 1. 
-   Size <code>[n_out, n_ang]</code> 
+   Shape <code>(n_out, n_ang)</code> 
 </li></ul>
 </li>
 </ul>
@@ -1122,47 +1122,47 @@ data = arrayant.qdant_read( fn, id )
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -1215,47 +1215,47 @@ id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -1307,47 +1307,47 @@ arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, elemen
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -1399,7 +1399,7 @@ arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, elemen
 <ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> (optional)<br> 
    The element indices for which the pattern should be transformed. Optional parameter. Values must 
    be between 1 and n_elements. If this parameter is not provided (or an empty array is passed), 
-   all elements will be rotated by the same angles. Size: <code>[1, n_elements]</code> or empty <code>[]</code> 
+   all elements will be rotated by the same angles. Shape: <code>(1, n_elements)</code> or empty <code>()</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1409,47 +1409,47 @@ arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, elemen
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
+  <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
+  <td>Shape: <code>(n_elevation)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions</td>
-  <td>Size: <code>[3, n_elements]</code></td>
+  <td>Shape: <code>(3, n_elements)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part</td>
-  <td>Size: <code>[n_elements, n_ports]</code></td>
+  <td>Shape: <code>(n_elements, n_ports)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
@@ -1499,47 +1499,47 @@ coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, a
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_tx]</code></td>
+  <td>Shape: <code>(n_azimuth_tx)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements_tx]</code></td>
+  <td>Shape: <code>(3, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
+  <td>Shape: <code>(n_elements_tx, n_ports_tx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
+  <td>Shape: <code>(n_elements_tx, n_ports_tx)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -1550,96 +1550,96 @@ coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, a
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_rx]</code></td>
+  <td>Shape: <code>(n_azimuth_rx)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements_rx]</code></td>
+  <td>Shape: <code>(3, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
+  <td>Shape: <code>(n_elements_rx, n_ports_rx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
+  <td>Shape: <code>(n_elements_rx, n_ports_rx)</code></td>
 </tr>
 </table><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b> (required)<br> 
-   Departure azimuth angles in [rad], Size: <code>[ n_path ]</code> 
+   Departure azimuth angles in [rad], Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b> (required)<br> 
-   Departure elevation angles in [rad], Size: <code>[ n_path ]</code> 
+   Departure elevation angles in [rad], Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b> (required)<br> 
-   Arrival azimuth angles in [rad], Size: <code>[ n_path ]</code> 
+   Arrival azimuth angles in [rad], Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b> (required)<br> 
-   Arrival elevation angles in [rad], Size: <code>[ n_path ]</code> 
+   Arrival elevation angles in [rad], Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b> (required)<br> 
-   Path gain (linear scale), Size: <code>[ n_path ]</code> 
+   Path gain (linear scale), Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b> (required)<br> 
-   Total path length in meters, Size: <code>[ n_path ]</code> 
+   Total path length in meters, Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> (required)<br> 
    Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), 
-   Size: <code>[ 8, n_path ]</code> 
+   Shape: <code>( 8, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b> (required)<br> 
-   Transmitter position in 3D Cartesian coordinates; Size: <code>[3]</code> 
+   Transmitter position in 3D Cartesian coordinates; Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b> (required)<br> 
    3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading), 
-   Size: <code>[3,1]</code> or <code>[1,3]</code> 
+   Shape: <code>(3,1)</code> or <code>(1,3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b> (required)<br> 
-   Receiver position in 3D Cartesian coordinates, Size: <code>[3]</code> 
+   Receiver position in 3D Cartesian coordinates, Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b> (required)]<br> 
    3-element vector describing the orientation of the receive antenna in Euler angles, 
-   Size: <code>[3]</code> 
+   Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> (optional)<br> 
@@ -1700,19 +1700,19 @@ coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, a
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b><br> 
-   Channel coefficients, real part, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
+   Channel coefficients, real part, Shape: <code>( n_ports_tx, n_ports_rx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b><br> 
-   Channel coefficients, imaginary part, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
+   Channel coefficients, imaginary part, Shape: <code>( n_ports_tx, n_ports_rx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delays</code></b><br> 
-   Propagation delay in seconds, Size: <code>[ n_ports_tx, n_ports_rx, n_path ]</code> 
+   Propagation delay in seconds, Shape: <code>( n_ports_tx, n_ports_rx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_Doppler</code></b><br> 
-   Doppler weights for moving RX, Size: <code>[ 1, n_path ]</code> 
+   Doppler weights for moving RX, Shape: <code>( 1, n_path )</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1765,47 +1765,47 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_tx, n_azimuth_tx, n_elements_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx, n_azimuth_tx, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_tx]</code></td>
+  <td>Shape: <code>(n_azimuth_tx)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation_tx]</code></td>
+  <td>Shape: <code>(n_elevation_tx)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements_tx]</code></td>
+  <td>Shape: <code>(3, n_elements_tx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
+  <td>Shape: <code>(n_elements_tx, n_ports_tx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements_tx, n_ports_tx]</code></td>
+  <td>Shape: <code>(n_elements_tx, n_ports_tx)</code></td>
 </tr>
 </table><br>
 </li></ul>
@@ -1816,89 +1816,89 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation_rx, n_azimuth_rx, n_elements_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx, n_azimuth_rx, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth_rx]</code></td>
+  <td>Shape: <code>(n_azimuth_rx)</code></td>
 </tr>
 <tr>
   <td><code>elevation_grid</code></td>
   <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation_rx]</code></td>
+  <td>Shape: <code>(n_elevation_rx)</code></td>
 </tr>
 <tr>
   <td><code>element_pos</code></td>
   <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements_rx]</code></td>
+  <td>Shape: <code>(3, n_elements_rx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
+  <td>Shape: <code>(n_elements_rx, n_ports_rx)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Size: <code>[n_elements_rx, n_ports_rx]</code></td>
+  <td>Shape: <code>(n_elements_rx, n_ports_rx)</code></td>
 </tr>
 </table><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>fbs_pos</code></b> (required)<br> 
-   First interaction point of the rays and the environment, Size: <code>[ 3, n_path ]</code> 
+   First interaction point of the rays and the environment, Shape: <code>( 3, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>lbs_pos</code></b> (required)<br> 
    Last interaction point of the rays and the environment; For single-bounce models, this must be 
-   identical to <code>fbs_pos</code>, Size: <code>[ 3, n_path ]</code> 
+   identical to <code>fbs_pos</code>, Shape: <code>( 3, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b> (required)<br> 
-   Path gain (linear scale), Size: <code>[ n_path ]</code> 
+   Path gain (linear scale), Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b> (required)<br> 
-   Total path length in meters, Size: <code>[ n_path ]</code> 
+   Total path length in meters, Shape: <code>( n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> (required)<br> 
    Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), 
-   Size: <code>[ 8, n_path ]</code> 
+   Shape: <code>( 8, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b> (required)<br> 
-   Transmitter position in 3D Cartesian coordinates; Size: <code>[3]</code> 
+   Transmitter position in 3D Cartesian coordinates; Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b> (required)<br> 
    3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading), 
-   Size: <code>[3,1]</code> or <code>[1,3]</code> 
+   Shape: <code>(3,1)</code> or <code>(1,3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b> (required)<br> 
-   Receiver position in 3D Cartesian coordinates, Size: <code>[3]</code> 
+   Receiver position in 3D Cartesian coordinates, Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b> (required)]<br> 
    3-element vector describing the orientation of the receive antenna in Euler angles, 
-   Size: <code>[3]</code> 
+   Shape: <code>(3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> (optional)<br> 
@@ -1963,34 +1963,34 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b><br> 
-   Channel coefficients, real part, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
+   Channel coefficients, real part, Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b><br> 
-   Channel coefficients, imaginary part, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
+   Channel coefficients, imaginary part, Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delays</code></b><br> 
-   Propagation delay in seconds, Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code> 
+   Propagation delay in seconds, Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b> (optional)<br> 
-   Azimuth of Departure angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code>, 
+   Azimuth of Departure angles in [rad], Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code>, 
    Only returned when <code>angles</code> flag is set to 1. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b> (optional)<br> 
-   Elevation of Departure angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code>, 
+   Elevation of Departure angles in [rad], Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code>, 
    Only returned when <code>angles</code> flag is set to 1. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b> (optional)<br> 
-   Azimuth of Arrival angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code>, 
+   Azimuth of Arrival angles in [rad], Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code>, 
    Only returned when <code>angles</code> flag is set to 1. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b> (optional)<br> 
-   Elevation of Arrival angles in [rad], Size: <code>[ n_ports_rx, n_ports_tx, n_path ]</code>, 
+   Elevation of Arrival angles in [rad], Shape: <code>( n_ports_rx, n_ports_tx, n_path )</code>, 
    Only returned when <code>angles</code> flag is set to 1. 
 </li></ul>
 </li>
@@ -2025,13 +2025,13 @@ hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff</code></b><br> 
    Channel coefficients, complex-valued, List of length <code>n_snap</code>,  
-   Each list item is an munpy.ndarray of size <code>[ n_rx, n_tx, n_path ]</code> where <code>n_path</code> can be different  
+   Each list item is an munpy.ndarray of Shape <code>( n_rx, n_tx, n_path )</code> where <code>n_path</code> can be different  
    for each snapshot. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delay</code></b><br> 
    Propagation delay in seconds, List of length <code>n_snap</code>,  
-   Each list item is an munpy.ndarray of size <code>[ n_rx, n_tx, n_path ]</code> or <code>[ 1, 1, n_path ]</code> where  
+   Each list item is an munpy.ndarray of Shape <code>( n_rx, n_tx, n_path )</code> or <code>( 1, 1, n_path )</code> where  
    <code>n_path</code> can be different for each snapshot. 
 </li></ul>
  
@@ -2050,17 +2050,17 @@ hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_
    bandwidth where '0' is the begin of the spectrum (i.e., the center frequency f0) and '1' is 
    equal to f0+bandwidth. To obtain the channel frequency response centered around f0, the 
    input variable 'pilot_grid' must be set to '(-N/2:N/2)/N', where N is the number of sub- 
-   carriers. Vector of length: <code>[ n_carriers ]</code> 
+   carriers. Vector of length: <code>( n_carriers )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>snap</code></b> (optional)<br> 
    Snapshot indices for which the frequency response should be generated (1-based index). If this 
-   variable is not given, all snapshots are processed. Length: <code>[ n_out ]</code> 
+   variable is not given, all snapshots are processed. Length: <code>( n_out )</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat</code></b><br> 
-   Freq. domain channel matrices (H), complex-valued, Size <code>[ n_rx, n_tx, n_carriers, n_out ]</code> 
+   Freq. domain channel matrices (H), complex-valued, Shape <code>( n_rx, n_tx, n_carriers, n_out )</code> 
 </li></ul>
 </li>
 </ul>
@@ -2751,12 +2751,12 @@ geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart_coords</code></b><br> 
-   Cartesian coordinates (x,y,z), Size: <code>[3, n_row, n_col]</code> 
+   Cartesian coordinates (x,y,z), Shape: <code>(3, n_row, n_col)</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>geo_coords</code></b><br> 
-   Geographic coordinates, Size: <code>[3, n_row, n_col]</code><br> 
+   Geographic coordinates, Shape: <code>(3, n_row, n_col)</code><br> 
    First row: Azimuth angles in [rad], values between -pi and pi.<br> 
    Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> 
    Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
@@ -2875,25 +2875,25 @@ center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_x
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments (tuple containing 4 values):</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>center</code></b><br> 
-   Position of the center point of each triangle; Size: <code>[ no_face, 3 ]</code> 
+   Position of the center point of each triangle; Shape: <code>( no_face, 3 )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>length</code></b><br> 
    Length of the vector pointing from the origin to the center point. This number is smaller than 
-   1 since the triangles are located inside the unit sphere; <br>Size: <code>[ no_face ]</code> 
+   1 since the triangles are located inside the unit sphere; Shape: <code>( no_face )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>vert</code></b><br> 
    The 3 vectors pointing from the center point to the vertices of each triangle; the values are 
-   in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; <br>Size: <code>[ no_face, 9 ]</code> 
+   in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Shape: <code>( no_face, 9 )</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>direction</code></b><br> 
    The directions of the vertex-rays. If the format indicator <code>direction_xyz</code> is set to <code>0</code>, the 
    output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the 
-   order <code>[ v1az, v1el, v2az, v2el, v3az, v3el ]</code>;Size: <code>[ no_face, 6 ]</code> If the format indicator 
+   order <code>( v1az, v1el, v2az, v2el, v3az, v3el ]</code>;Shape: <code>( no_face, 6 )</code> If the format indicator 
    <code>direction_xyz</code> is set to <code>1</code>, the output is in Cartesian coordinates and the values are in the 
-   order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Size: <code>[ no_face, 9 ]</code> 
+   order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Shape: <code>( no_face, 9 )</code> 
 </li></ul>
 </li>
 </ul>
@@ -3643,19 +3643,22 @@ hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, 
 <ul><li style="margin-bottom: 0.4em;"><b><code>tridir</code></b><br> 
    Directions of the three vertex rays in Cartesian coordinates. Normalization not required. 
    Order per row: [d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]; Shape: <code>(n_ray, 9)</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><b><code>points</code></b><br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>points</code></b><br> 
    3D Cartesian coordinates of the point cloud to test. Shape: <code>(n_points, 3)</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_cloud_ind</code></b> (optional)<br> 
-   0-based start indices of sub-clouds used to partition points for performance. If not provided  
-   (empty array), sub-clouds may be computed automatically. Passing a scalar 0 disables sub-cloud calculation.  
+   0-based start indices of sub-clouds used to partition points for performance. If not provided 
+   (empty array), sub-clouds may be computed automatically. Passing a scalar 0 disables sub-cloud calculation. 
    Shape: (n_sub_cloud,) (strictly increasing; typically starts with 0) 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>target_size</code></b> (optional)<br> 
    Desired sub-cloud size used only if <code>sub_cloud_ind</code> is not given or empty (guides automatic segmentation). 
+   If it is not given (set to 0) and <code>sub_cloud_ind</code> is empty or also not given, the optimal valued is computed  
+   from the number of points. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3664,7 +3667,7 @@ hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>ray_ind</code></b><br> 
-   List of length n_points; each list entry is a 1-D array of 0-based ray indices that hit that point.  
+   List of length n_points; each list entry is a 1-D array of 0-based ray indices that hit that point. 
    Entries may be empty if no hit was detected. 
 </li></ul>
 </li>

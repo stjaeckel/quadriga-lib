@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# QDANT_READ
+# qdant_read
 Reads array antenna data from QDANT files
 
 ## Description:
@@ -46,15 +46,15 @@ data = arrayant.qdant_read( fn, id )
 ## Output Arguments:
 - **`data`**<br>
   Dictionary containing the data in the QDANT file with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Shape: `(n_azimuth)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements)`
+  `coupling_re`    | Coupling matrix, real part                            | Shape: `(n_elements, n_ports)`
+  `coupling_im`    | Coupling matrix, imaginary part                       | Shape: `(n_elements, n_ports)`
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
   `name`           | Name of the array antenna object                      | String
   `layout`         | Layout of multiple array antennas.                    | Matrix

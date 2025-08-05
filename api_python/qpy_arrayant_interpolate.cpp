@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# INTERPOLATE
+# interpolate
 Interpolate array antenna field patterns
 
 ## Description:
@@ -54,46 +54,46 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 ## Input Arguments:
 - **`arrayant`** (required)<br>
   Dictionary containing array antenna data with at least the following keys:
-  `e_theta_re`     | Real part of e-theta field component             | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | Imaginary part of e-theta field component        | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | Real part of e-phi field component               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | Imaginary part of e-phi field component          | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional      | Size: `[3, n_elements]`
+  `e_theta_re`     | Real part of e-theta field component             | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_theta_im`     | Imaginary part of e-theta field component        | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_re`       | Real part of e-phi field component               | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_im`       | Imaginary part of e-phi field component          | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Shape: `(n_azimuth)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Shape: `(n_elevation)`
+  `element_pos`    | Antenna element (x,y,z) positions, optional      | Shape: `(3, n_elements)`
 
 - **`azimuth`** (required)<br>
   Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be between -pi and pi.
   Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
-             | Size: `[1, n_ang]`
+             | Shape: `(1, n_ang)`
   Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
-             | Size: `[n_out, n_ang]`
+             | Shape: `(n_out, n_ang)`
 
 - **`elevation`** (required)<br>
   Elevation angles in [rad] for which the field pattern should be interpolated. Values must be between -pi/2 and pi/2.
   Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
-             | Size: `[1, n_ang]`
+             | Shape: `(1, n_ang)`
   Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
-             | Size: `[n_out, n_ang]`
+             | Shape: `[n_out, n_ang)`
 
 - **`element`** (optional)<br>
   The element indices for which the interpolation should be done. Optional parameter. Values must
   be between 0 and n_elements-1. It is possible to duplicate elements, i.e. by passing `[1,1,2]`.
   If this parameter is not provided (or an empty array is passed), `i_element` is initialized
   to `[0:n_elements-1]`. In this case, `n_out = n_elements`.
-  Size: `[1, n_out]` or `[n_out, 1]` or empty `[]`
+  Shape: `(1, n_out)` or `(n_out, 1)` or empty `()`
 
 - **`orientation`** (optional)<br>
   This (optional) 3-element vector describes the orientation of the array antenna or of individual
   array elements using Euler angles in [rad].
-  Size: `[3, 1]` or `[3, n_out]` or `[3, 1, n_ang]` or `[3, n_out, n_ang]` or empty `[]`
+  Shape: `(3, 1)` or `(3, n_out)` or `(3, 1, n_ang)` or `(3, n_out, n_ang)` or empty `()`
 
 - **`element_pos`** (optional)<br>
   Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]).
   If this parameter is not given, element positions `arrayant` are used. If the `arrayant` has no
   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting
-  `element = [1,1]`, different element positions can be set for the  two elements in the output.
-  Size: `[3, n_out]` or empty `[]`
+  `element = [1,1)`, different element positions can be set for the  two elements in the output.
+  Shape: `(3, n_out)` or empty `()`
 
 - **`complex`** (optional flag)<br>
   If set to 1, output is returned in complex notation. This reduces performance due to additional
@@ -122,41 +122,41 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 
 ## Output Arguments:
 - **`vr`**<br>
-  Real part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
+  Real part of the interpolated e-theta (vertical) field component. Shape `(n_out, n_ang)`
 
 - **`vi`**<br>
-  Imaginary part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
+  Imaginary part of the interpolated e-theta (vertical) field component. Shape `(n_out, n_ang)`
 
 - **`hr`**<br>
-  Real part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
+  Real part of the interpolated e-phi (horizontal) field component. Shape `(n_out, n_ang)`
 
 - **`hi`**<br>
-  Imaginary part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
+  Imaginary part of the interpolated e-phi (horizontal) field component. Shape `(n_out, n_ang)`
 
 - **`dist`** (optional)<br>
   The effective distances between the antenna elements when seen from the direction of the
   incident path. The distance is calculated by an projection of the array positions on the normal
   plane of the incident path. This is needed for calculating the phase of the antenna response.
-  Only returned when `dist` flag is set to 1. Size `[n_out, n_ang]`
+  Only returned when `dist` flag is set to 1. Shape `(n_out, n_ang)`
 
 - **`azimuth_loc`** (optional)<br>
   The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the
   'orientation'. If no orientation vector is given, these angles are identical to the input
-  azimuth angles. Only returned when `local_angles` flag is set to 1. Size `[n_out, n_ang]`
+  azimuth angles. Only returned when `local_angles` flag is set to 1. Shape `(n_out, n_ang)`
 
 - **`elevation_loc`** (optional)<br>
   The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the
   'orientation'. If no orientation vector is given, these angles are identical to the input
-  elevation angles. Only returned when `local_angles` flag is set to 1. Size `[n_out, n_ang]`
+  elevation angles. Only returned when `local_angles` flag is set to 1. Shape `(n_out, n_ang)`
 
 - **`gamma`** (optional)<br>
   Polarization rotation angles in [rad], Only returned when `local_angles` flag is set to 1.
-  Size `[n_out, n_ang]`
+  Shape `(n_out, n_ang)`
 MD!*/
 
 py::tuple arrayant_interpolate(const py::dict &arrayant,                // Array antenna data
-                               const py::array_t<double> &azimuth,      // Azimuth angles in [rad], Size: `[1, n_ang]` or `[n_out, n_ang]`
-                               const py::array_t<double> &elevation,    // Elevation angles in [rad], Size: `[1, n_ang]` or `[n_out, n_ang]`
+                               const py::array_t<double> &azimuth,      // Azimuth angles in [rad], Shape: `[1, n_ang]` or `[n_out, n_ang]`
+                               const py::array_t<double> &elevation,    // Elevation angles in [rad], Shape: `[1, n_ang]` or `[n_out, n_ang]`
                                const py::array_t<arma::uword> &element, // Antenna element indices, 0-based
                                const py::array_t<double> &orientation,  // Euler angles
                                const py::array_t<double> &element_pos,  // Alternative positions of the array antenna elements

@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# GET_CHANNELS_SPHERICAL
+# get_channels_spherical
 Calculate channel coefficients from path data and antenna patterns
 
 ## Description:
@@ -57,58 +57,58 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 ## Input Arguments:
 - **`ant_tx`** (required)<br>
   Dictionary containing the transmit (TX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation_tx, n_azimuth_tx, n_elements_tx]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation_tx, n_azimuth_tx, n_elements_tx]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation_tx, n_azimuth_tx, n_elements_tx]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation_tx, n_azimuth_tx, n_elements_tx]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth_tx]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation_tx]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements_tx]`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Size: `[n_elements_tx, n_ports_tx]`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Size: `[n_elements_tx, n_ports_tx]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_tx)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_tx)`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_tx)`
+  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_tx, n_ports_tx)`
+  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_tx, n_ports_tx)`
 
 - **`ant_rx`** (required)<br>
   Dictionary containing the receive (RX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation_rx, n_azimuth_rx, n_elements_rx]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation_rx, n_azimuth_rx, n_elements_rx]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation_rx, n_azimuth_rx, n_elements_rx]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation_rx, n_azimuth_rx, n_elements_rx]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth_rx]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation_rx]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements_rx]`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Size: `[n_elements_rx, n_ports_rx]`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Size: `[n_elements_rx, n_ports_rx]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_rx)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_rx)`
+  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_rx)`
+  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_rx, n_ports_rx)`
+  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_rx, n_ports_rx)`
 
 - **`fbs_pos`** (required)<br>
-  First interaction point of the rays and the environment, Size: `[ 3, n_path ]`
+  First interaction point of the rays and the environment, Shape: `( 3, n_path )`
 
 - **`lbs_pos`** (required)<br>
   Last interaction point of the rays and the environment; For single-bounce models, this must be
-  identical to `fbs_pos`, Size: `[ 3, n_path ]`
+  identical to `fbs_pos`, Shape: `( 3, n_path )`
 
 - **`path_gain`** (required)<br>
-  Path gain (linear scale), Size: `[ n_path ]`
+  Path gain (linear scale), Shape: `( n_path )`
 
 - **`path_length`** (required)<br>
-  Total path length in meters, Size: `[ n_path ]`
+  Total path length in meters, Shape: `( n_path )`
 
 - **`M`** (required)<br>
   Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH),
-  Size: `[ 8, n_path ]`
+  Shape: `( 8, n_path )`
 
 - **`tx_pos`** (required)<br>
-  Transmitter position in 3D Cartesian coordinates; Size: `[3]`
+  Transmitter position in 3D Cartesian coordinates; Shape: `(3)`
 
 - **`tx_orientation`** (required)<br>
   3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading),
-  Size: `[3,1]` or `[1,3]`
+  Shape: `(3,1)` or `(1,3)`
 
 - **`rx_pos`** (required)<br>
-  Receiver position in 3D Cartesian coordinates, Size: `[3]`
+  Receiver position in 3D Cartesian coordinates, Shape: `(3)`
 
 - **`rx_orientation`** (required)]<br>
   3-element vector describing the orientation of the receive antenna in Euler angles,
-  Size: `[3]`
+  Shape: `(3)`
 
 - **`center_freq`** (optional)<br>
   Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation
@@ -139,28 +139,28 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 
 ## Output Arguments:
 - **`coeff_re`**<br>
-  Channel coefficients, real part, Size: `[ n_ports_rx, n_ports_tx, n_path ]`
+  Channel coefficients, real part, Shape: `( n_ports_rx, n_ports_tx, n_path )`
 
 - **`coeff_im`**<br>
-  Channel coefficients, imaginary part, Size: `[ n_ports_rx, n_ports_tx, n_path ]`
+  Channel coefficients, imaginary part, Shape: `( n_ports_rx, n_ports_tx, n_path )`
 
 - **`delays`**<br>
-  Propagation delay in seconds, Size: `[ n_ports_rx, n_ports_tx, n_path ]`
+  Propagation delay in seconds, Shape: `( n_ports_rx, n_ports_tx, n_path )`
 
 - **`aod`** (optional)<br>
-  Azimuth of Departure angles in [rad], Size: `[ n_ports_rx, n_ports_tx, n_path ]`,
+  Azimuth of Departure angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
   Only returned when `angles` flag is set to 1.
 
 - **`eod`** (optional)<br>
-  Elevation of Departure angles in [rad], Size: `[ n_ports_rx, n_ports_tx, n_path ]`,
+  Elevation of Departure angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
   Only returned when `angles` flag is set to 1.
 
 - **`aoa`** (optional)<br>
-  Azimuth of Arrival angles in [rad], Size: `[ n_ports_rx, n_ports_tx, n_path ]`,
+  Azimuth of Arrival angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
   Only returned when `angles` flag is set to 1.
 
 - **`eoa`** (optional)<br>
-  Elevation of Arrival angles in [rad], Size: `[ n_ports_rx, n_ports_tx, n_path ]`,
+  Elevation of Arrival angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
   Only returned when `angles` flag is set to 1.
 
 ## Caveat:

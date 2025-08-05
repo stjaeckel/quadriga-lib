@@ -22,7 +22,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# CALC_DIRECTIVITY
+# calc_directivity
 Calculates the directivity (in dBi) of array antenna elements
 
 ## Description:
@@ -41,20 +41,20 @@ directivity = arrayant.calc_directivity(arrayant, element)
 ## Input Arguments:
 - **`arrayant_in`**<br>
   Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
+  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation, n_azimuth, n_elements)`
+  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth)`
+  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
 
 - **`element`** (optional)<br>
   Element index, 0-based. If not provided or empty, the directivity is calculated for all elements in the
-  array antenna. Size: `[n_out]` or empty
+  array antenna. Shape: `(n_out)` or empty
 
 ## Output Argument:
 - **`directivity`**<br>
-  Directivity of the antenna pattern in dBi, Size: `[n_out]` or `[n_elements]`
+  Directivity of the antenna pattern in dBi, Shape: `[n_out)` or `[n_elements)`
 MD!*/
 
 py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,                // Input data

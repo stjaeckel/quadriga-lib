@@ -23,7 +23,7 @@ Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
-# COMPONENTS
+# components
 Returns the version numbers of all quadriga-lib sub-components
 
 ## Usage:

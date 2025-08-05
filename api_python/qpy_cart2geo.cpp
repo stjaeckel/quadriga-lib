@@ -23,7 +23,7 @@ Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
-# CART2GEO
+# cart2geo
 Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
 
 ## Description:
@@ -41,11 +41,11 @@ geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
 
 ## Input Argument:
 - **`cart_coords`**<br>
-  Cartesian coordinates (x,y,z), Size: `[3, n_row, n_col]`
+  Cartesian coordinates (x,y,z), Shape: `(3, n_row, n_col)`
 
 ## Output Arguments:
 - **`geo_coords`**<br>
-  Geographic coordinates, Size: `[3, n_row, n_col]`<br>
+  Geographic coordinates, Shape: `(3, n_row, n_col)`<br>
   First row: Azimuth angles in [rad], values between -pi and pi.<br>
   Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br>
   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.

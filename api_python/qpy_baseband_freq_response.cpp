@@ -23,7 +23,7 @@ Channel functions
 SECTION!*/
 
 /*!MD
-# BASEBAND_FREQ_RESPONSE
+# baseband_freq_response
 Transforms the channel into frequency domain and returns the frequency response
 
 ## Usage:
@@ -36,12 +36,12 @@ hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_
 ## Input Arguments:
 - **`coeff`**<br>
   Channel coefficients, complex-valued, List of length `n_snap`, 
-  Each list item is an munpy.ndarray of size `[ n_rx, n_tx, n_path ]` where `n_path` can be different 
+  Each list item is an munpy.ndarray of Shape `( n_rx, n_tx, n_path )` where `n_path` can be different 
   for each snapshot.
 
 - **`delay`**<br>
   Propagation delay in seconds, List of length `n_snap`, 
-  Each list item is an munpy.ndarray of size `[ n_rx, n_tx, n_path ]` or `[ 1, 1, n_path ]` where 
+  Each list item is an munpy.ndarray of Shape `( n_rx, n_tx, n_path )` or `( 1, 1, n_path )` where 
   `n_path` can be different for each snapshot.
 
 - **`bandwidth`**<br>
@@ -57,15 +57,15 @@ hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_
   bandwidth where '0' is the begin of the spectrum (i.e., the center frequency f0) and '1' is
   equal to f0+bandwidth. To obtain the channel frequency response centered around f0, the
   input variable 'pilot_grid' must be set to '(-N/2:N/2)/N', where N is the number of sub-
-  carriers. Vector of length: `[ n_carriers ]`
+  carriers. Vector of length: `( n_carriers )`
 
 - **`snap`** (optional)<br>
   Snapshot indices for which the frequency response should be generated (1-based index). If this
-  variable is not given, all snapshots are processed. Length: `[ n_out ]`
+  variable is not given, all snapshots are processed. Length: `( n_out )`
 
 ## Output Argument:
 - **`hmat`**<br>
-  Freq. domain channel matrices (H), complex-valued, Size `[ n_rx, n_tx, n_carriers, n_out ]`
+  Freq. domain channel matrices (H), complex-valued, Shape `( n_rx, n_tx, n_carriers, n_out )`
 MD!*/
 
 // #include <chrono>
