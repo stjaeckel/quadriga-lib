@@ -12,7 +12,7 @@ if package_path not in sys.path:
 
 from quadriga_lib import channel
 
-class test_hdf_rw(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
 

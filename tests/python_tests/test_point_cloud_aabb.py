@@ -13,7 +13,7 @@ if package_path not in sys.path:
 from quadriga_lib import RTtools
 
 
-class test_version(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def _aabb_numpy(self, pts: np.ndarray) -> np.ndarray:
         """Compute AABB for a set of points: [xmin, xmax, ymin, ymax, zmin, zmax]."""

@@ -12,7 +12,6 @@ if package_path not in sys.path:
 
 from quadriga_lib import RTtools
 
-
 def aabb_numpy(triangles, sub_mesh_index=None):
     """
     Reference AABB in NumPy (always float64).
@@ -41,7 +40,7 @@ def aabb_numpy(triangles, sub_mesh_index=None):
     return np.vstack(out)
 
 
-class TestTriangleMeshAABB(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def setUp(self):
         # Two simple sub-mesh clusters, separated spatially

@@ -12,7 +12,7 @@ if package_path not in sys.path:
 # Now you can import your package
 import quadriga_lib
 
-class test_cart2geo(unittest.TestCase):
+class test_case(unittest.TestCase):
 
     def test(self):
 

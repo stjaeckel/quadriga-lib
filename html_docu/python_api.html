@@ -144,6 +144,7 @@ import quadriga_lib
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+<tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates which 3D points are intersected by volumetric ray beams</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
 <tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Rearranges elements of a triangle mesh into smaller sub-meshes</td></tr>
@@ -3588,6 +3589,89 @@ result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
    For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside 
    (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b> 
    if <code>obj_ind</code> is provided. Size: <code>[n_points]</code> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="ray_point_intersect"></a>
+<b>ray_point_intersect</b> - Calculates which 3D points are intersected by volumetric ray beams
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Unlike traditional ray tracing (rays are infinitesimal lines), <b>beam tracing</b> models rays as 
+volumes. Each beam is defined by a triangular wavefront whose three vertices diverge as the 
+beam propagates, capturing real-world spread (e.g., radio-wave divergence) and enabling realistic 
+energy distribution across the beam’s cross-section. Because beams have volume, intersection tests 
+are volumetric rather than line-to-geometry.<br><br> 
+ 
+A ray beam is specified by: 
+<ul><li style="margin-bottom: 0.4em;">An origin point. 
+</li><li style="margin-bottom: 0.4em;">Three aperture vectors from the origin to the vertices of an initial triangular wavefront 
+   that defines the beam’s cross-section at the origin. 
+</li><li style="margin-bottom: 0.4em;">Three per-vertex direction vectors (one per vertex) that govern how each vertex, and thus the 
+   triangle, diverges as the beam extends. Directions need not be normalized.<br><br> 
+</li></ul>
+ 
+What the function does 
+<ul><li style="margin-bottom: 0.4em;">Tests whether each point in a 3D Cartesian point cloud lies inside any of the defined ray beams. 
+</li><li style="margin-bottom: 0.4em;">For every input point, returns a list of 0-based ray indices of beams that intersect that point.<br><br> 
+</li></ul>
+ 
+Performance & usage notes 
+<ul><li style="margin-bottom: 0.4em;">Optional support for pre-segmented point clouds (e.g., from <a href="#point_cloud_segmentation">point_cloud_segmentation</a>) to reduce computation. 
+</li><li style="margin-bottom: 0.4em;">All internal computations use single-precision floats for speed. 
+</li><li style="margin-bottom: 0.4em;">Utilizes AVX2 vectorization when supported by the CPU. 
+</li><li style="margin-bottom: 0.4em;">For best accuracy, use a small tube radius and well-distributed points. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, sub_cloud_ind, target_size )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>orig</code></b><br> 
+   Ray origins in 3D Cartesian coordinates; Shape: <code>(n_ray, 3)</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>trivec</code></b><br> 
+   Three vectors from each ray’s origin to the vertices of the triangular propagation tube (beam); 
+   Order per row: [v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]; Shape: <code>(n_ray, 9)</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tridir</code></b><br> 
+   Directions of the three vertex rays in Cartesian coordinates. Normalization not required. 
+   Order per row: [d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]; Shape: <code>(n_ray, 9)</code> 
+    
+</li><li style="margin-bottom: 0.4em;"><b><code>points</code></b><br> 
+   3D Cartesian coordinates of the point cloud to test. Shape: <code>(n_points, 3)</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sub_cloud_ind</code></b> (optional)<br> 
+   0-based start indices of sub-clouds used to partition points for performance. If not provided  
+   (empty array), sub-clouds may be computed automatically. Passing a scalar 0 disables sub-cloud calculation.  
+   Shape: (n_sub_cloud,) (strictly increasing; typically starts with 0) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>target_size</code></b> (optional)<br> 
+   Desired sub-cloud size used only if <code>sub_cloud_ind</code> is not given or empty (guides automatic segmentation). 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hit_count</code></b><br> 
+   Number of ray beams that hit a point. Shape: <code>(n_points, )</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ray_ind</code></b><br> 
+   List of length n_points; each list entry is a 1-D array of 0-based ray indices that hit that point.  
+   Entries may be empty if no hit was detected. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#icosphere">icosphere</a> (for generating beams) 
+</li><li style="margin-bottom: 0.4em;"><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for generating point cloud segments) 
+</li><li style="margin-bottom: 0.4em;"><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating intersection of rays and triangles) 
 </li></ul>
 </li>
 </ul>
