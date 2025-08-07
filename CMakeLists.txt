@@ -8,7 +8,7 @@ option(ENABLE_OCTAVE "Enable Octave MEX API" ON)
 option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
 option(ENABLE_SHARED_LIB "Enable build of shared library" OFF)
-option(ENABLE_AVX2 "Enable AVX2 Acceleration" OFF)
+option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_TESTS "Build tests" OFF)
 option(ENABLE_BIN "Build supporting binary files" OFF)
 
