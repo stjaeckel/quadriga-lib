@@ -66,7 +66,7 @@ auto ant = quadriga_lib::qdant_read<double>("antenna_data.qdant", 2, &layout);
 ## See also:
 - <a href="#arrayant">arrayant</a>
 - <a href="#.qdant_write">arrayant.qdant_write</a>
-
+- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
 // Read array antenna object and layout from QDANT file

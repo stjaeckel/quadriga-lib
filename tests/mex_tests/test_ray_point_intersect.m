@@ -133,7 +133,10 @@ end
 
 try % sub-cloud error
     [~,~] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, 1, uint32([0,7]), 5);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
+    v = quadriga_lib.version;
+    if v(end-3:end) == "AVX2"
+        error('moxunit:exceptionNotRaised', 'Expected an error!');
+    end
 catch ME
     expectedErrorMessage = 'Sub-clouds must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))

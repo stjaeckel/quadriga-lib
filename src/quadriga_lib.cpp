@@ -16,7 +16,15 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_lib.hpp"
+
+#if defined(_MSC_VER) // Windows
+#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
+#endif
+
+#if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
+#else // AVX2 disabled
+#endif
 
 // Template for time measuring:
 // #include <chrono>
@@ -30,27 +38,6 @@
 // dur = (uword)std::chrono::duration_cast<std::chrono::nanoseconds>(te - ts).count();
 // ts = te;
 // std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
-
-// Testing for AVX2 support at runtime
-#if defined(_MSC_VER) // Windows
-#include <intrin.h>
-#include <malloc.h> // Include for _aligned_malloc and _aligned_free
-#else               // Linux
-#include <cpuid.h>
-#endif
-
-static bool isAVX2Supported()
-{
-    std::vector<int> cpuidInfo(4);
-
-#if defined(_MSC_VER) // Windows
-    __cpuidex(cpuidInfo.data(), 7, 0);
-#else // Linux
-    __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
-#endif
-
-    return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
-}
 
 // Returns the arrayant_lib version number as a string
 #define AUX(x) #x
@@ -94,10 +81,12 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
     for (size_t i = 0; i < 8; ++i)
         Z[i] = 0.0f;
 
-    if (isAVX2Supported()) // CPU support for AVX2
+#if BUILD_WITH_AVX2
+    if (runtime_AVX2_Check()) // CPU support for AVX2
     {
         qd_TEST_AVX2(X, Z);
     }
+#endif
 
     // Free aligned memory
 #if defined(_MSC_VER) // Windows

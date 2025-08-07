@@ -16,31 +16,17 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_channel.hpp"
+
+#if defined(_MSC_VER) // Windows
+#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
+#endif
+
+#if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-
-// Vector size for AVX2
-#define VEC_SIZE 8
-
-// Testing for AVX2 support at runtime
-#if defined(_MSC_VER) // Windows
-#include <intrin.h>
-#include <malloc.h> // Include for _aligned_malloc and _aligned_free
-#else               // Linux
-#include <cpuid.h>
+#define VEC_SIZE 8ULL
+#else // AVX2 disabled
+#define VEC_SIZE 1ULL
 #endif
-
-static bool isAVX2Supported()
-{
-    std::vector<int> cpuidInfo(4);
-
-#if defined(_MSC_VER) // Windows
-    return false;
-#else // Linux
-    __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
-#endif
-
-    return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
-}
 
 // Generic C++ implementation of DFT
 template <typename dtype>
@@ -222,7 +208,8 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
     qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                    n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
 #else // Linux
-    if (isAVX2Supported()) // CPU support for AVX2
+#if BUILD_WITH_AVX2
+    if (runtime_AVX2_Check()) // CPU support for AVX2
     {
         qd_DFT_AVX2(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                     n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
@@ -232,6 +219,10 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
         qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                        n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
     }
+#else // AVX2 disabled
+    qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
+                   n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
+#endif
 #endif
 
 #if defined(_MSC_VER) // Windows
