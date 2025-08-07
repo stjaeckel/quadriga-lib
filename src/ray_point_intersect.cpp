@@ -16,31 +16,17 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_tools.hpp"
+
+#if defined(_MSC_VER) // Windows
+#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
+#endif
+
+#if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-
-// Vector size for AVX2
-#define VEC_SIZE 8
-
-// Testing for AVX2 support at runtime
-#if defined(_MSC_VER) // Windows
-#include <intrin.h>
-#include <malloc.h> // Include for _aligned_malloc and _aligned_free
-#else               // Linux
-#include <cpuid.h>
+#define VEC_SIZE 8ULL
+#else // AVX2 disabled
+#define VEC_SIZE 1ULL
 #endif
-
-static bool isAVX2Supported()
-{
-    std::vector<int> cpuidInfo(4);
-
-#if defined(_MSC_VER) // Windows
-    __cpuidex(cpuidInfo.data(), 7, 0);
-#else // Linux
-    __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
-#endif
-
-    return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
-}
 
 // Generic C++ implementation of RayPointIntersect
 static inline void qd_RPI_GENERIC(const float *Px, const float *Py, const float *Pz,    // Point coordinates, aligned to 32 byte, length n_point
@@ -269,19 +255,19 @@ SECTION!*/
 Calculates the intersection of ray beams with points in three dimensions
 
 ## Description:
-Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as 
-beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This 
-approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio 
-waves spreads as they travel from a point source. The volumetric nature of the beams allows for more 
-realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed 
+Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as
+beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This
+approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio
+waves spreads as they travel from a point source. The volumetric nature of the beams allows for more
+realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed
 across their cross-sectional area, affecting the intensity of the interaction with surfaces.
-Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires 
+Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires
 volumetric intersection tests. <br><br>
 
 - This function computes whether points in 3D Cartesian space are intersected by ray beams.
 - A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors.
 - Returns a list of ray indices (0-based) that intersect with each point in the input point cloud.
-- Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>) 
+- Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>)
   to reduce computational cost.
 - All internal computations use single precision for speed.
 - Uses Advanced Vector Extensions (AVX2) for efficient computation, if supported by the CPU
@@ -307,12 +293,12 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
   Ray origin positions in global coordinate system. Size: `[n_ray, 3]`.
 
 - `const arma::Mat<dtype> ***trivec**` (input)<br>
-  The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of 
-  a triangular propagation tube (the beam), the values are in the order 
+  The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of
+  a triangular propagation tube (the beam), the values are in the order
   `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ no_ray, 9 ]`
 
 - `const arma::Mat<dtype> ***tridir**` (input)<br>
-  The directions of the vertex-rays. Size: `[ n_ray, 9 ]`, Values must be given in Cartesian 
+  The directions of the vertex-rays. Size: `[ n_ray, 9 ]`, Values must be given in Cartesian
   coordinates in the order  `[ d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z  ]`; The vector does
   not need to be normalized.
 
@@ -336,11 +322,11 @@ MD!*/
 
 template <typename dtype>
 std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dtype> *points,
-                                                                   const arma::Mat<dtype> *orig,
-                                                                   const arma::Mat<dtype> *trivec,
-                                                                   const arma::Mat<dtype> *tridir,
-                                                                   const arma::u32_vec *sub_cloud_index,
-                                                                   arma::u32_vec *hit_count)
+                                                             const arma::Mat<dtype> *orig,
+                                                             const arma::Mat<dtype> *trivec,
+                                                             const arma::Mat<dtype> *tridir,
+                                                             const arma::u32_vec *sub_cloud_index,
+                                                             arma::u32_vec *hit_count)
 {
     // Input validation
     if (points == nullptr || points->n_elem == 0)
@@ -378,7 +364,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 
     // Check if the sub-cloud indices are valid
     size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
-    arma::u32_vec sci(1);                                     // Sub-cloud-index (local copy)
+    arma::u32_vec sci(1);                                           // Sub-cloud-index (local copy)
     if (sub_cloud_index != nullptr && sub_cloud_index->n_elem != 0) // Input is available
     {
         n_sub_t = (size_t)sub_cloud_index->n_elem;
@@ -619,7 +605,8 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     std::vector<unsigned> *p_hit = new std::vector<unsigned>[n_ray_t];
 
     // Call intersect function
-    if (isAVX2Supported()) // CPU support for AVX2
+#if BUILD_WITH_AVX2
+    if (runtime_AVX2_Check()) // CPU support for AVX2
     {
         qd_RPI_AVX2(Px, Py, Pz, n_point_s,
                     sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
@@ -647,6 +634,19 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                        invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
                        n_ray_t, p_hit);
     }
+#else // AVX2 disabled
+    qd_RPI_GENERIC(Px, Py, Pz, n_point_t,
+                   sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                   trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
+                   trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
+                   trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),
+                   normalA.colptr(0), normalA.colptr(1), normalA.colptr(2),
+                   dirA.colptr(0), dirA.colptr(1), dirA.colptr(2),
+                   dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
+                   dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
+                   invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
+                   n_ray_t, p_hit);
+#endif
 
 // Free aligned memory
 #if defined(_MSC_VER) // Windows
@@ -700,15 +700,15 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 }
 
 template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<float> *points,
-                                                                            const arma::Mat<float> *orig,
-                                                                            const arma::Mat<float> *trivec,
-                                                                            const arma::Mat<float> *tridir,
-                                                                            const arma::u32_vec *sub_cloud_index,
-                                                                            arma::u32_vec *hit_count);
+                                                                      const arma::Mat<float> *orig,
+                                                                      const arma::Mat<float> *trivec,
+                                                                      const arma::Mat<float> *tridir,
+                                                                      const arma::u32_vec *sub_cloud_index,
+                                                                      arma::u32_vec *hit_count);
 
 template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<double> *points,
-                                                                            const arma::Mat<double> *orig,
-                                                                            const arma::Mat<double> *trivec,
-                                                                            const arma::Mat<double> *tridir,
-                                                                            const arma::u32_vec *sub_cloud_index,
-                                                                            arma::u32_vec *hit_count);
+                                                                      const arma::Mat<double> *orig,
+                                                                      const arma::Mat<double> *trivec,
+                                                                      const arma::Mat<double> *tridir,
+                                                                      const arma::u32_vec *sub_cloud_index,
+                                                                      arma::u32_vec *hit_count);

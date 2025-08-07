@@ -78,4 +78,7 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
                  float *Hi);             // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 
+// Check for AVX2 availability at runtime
+bool runtime_AVX2_Check();
+
 #endif

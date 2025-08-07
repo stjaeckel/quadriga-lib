@@ -16,31 +16,17 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_tools.hpp"
+
+#if defined(_MSC_VER) // Windows
+#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
+#endif
+
+#if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-
-// Vector size for AVX2
 #define VEC_SIZE 8ULL
-
-// Testing for AVX2 support at runtime
-#if defined(_MSC_VER) // Windows
-#include <intrin.h>
-#include <malloc.h> // Include for _aligned_malloc and _aligned_free
-#else               // Linux
-#include <cpuid.h>
+#else // AVX2 disabled
+#define VEC_SIZE 1ULL
 #endif
-
-static bool isAVX2Supported()
-{
-    std::vector<int> cpuidInfo(4);
-
-#if defined(_MSC_VER) // Windows
-    __cpuidex(cpuidInfo.data(), 7, 0);
-#else // Linux
-    __cpuid_count(7, 0, cpuidInfo[0], cpuidInfo[1], cpuidInfo[2], cpuidInfo[3]);
-#endif
-
-    return (cpuidInfo[1] & (1 << 5)) != 0; // Check the AVX2 bit in EBX
-}
 
 // Generic C++ implementation of RayTriangleIntersect
 static inline void qd_RTI_GENERIC(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
@@ -277,15 +263,15 @@ void quadriga_lib::ray_triangle_intersect(
 
 ## Arguments:
 - `const arma::Mat<dtype> ***orig**` (input)<br>
-  Ray origins in global coordinate system (GCS). Size: `[n_ray, 3]`, or `[n_ray, 6]` if `dest == nullptr`. 
+  Ray origins in global coordinate system (GCS). Size: `[n_ray, 3]`, or `[n_ray, 6]` if `dest == nullptr`.
   In the latter case, columns must be ordered as `{xo, yo, zo, xd, yd, zd}`.
 
 - `const arma::Mat<dtype> ***dest**` (input)<br>
-  Ray destinations in GCS. Size: `[n_ray, 3]`. Set to `nullptr` if `orig` has 6 columns and contains 
+  Ray destinations in GCS. Size: `[n_ray, 3]`. Set to `nullptr` if `orig` has 6 columns and contains
   both origin and destination.
 
 - `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangular surface mesh. Size: `[n_mesh, 9]`, where each row contains the 3 vertices 
+  Triangular surface mesh. Size: `[n_mesh, 9]`, where each row contains the 3 vertices
   `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`.
 
 - `arma::Mat<dtype> ***fbs**` (optional output)<br>
@@ -316,8 +302,6 @@ void quadriga_lib::ray_triangle_intersect(
 - <a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
 - <a href="#subdivide_rays">subdivide_rays</a> (for subdivides ray beams into sub beams)
 MD!*/
-
-
 
 template <typename dtype>
 void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, const arma::Mat<dtype> *mesh,
@@ -440,7 +424,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
     // Check if the sub-mesh indices are valid
     arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
-    arma::u32_vec smi(1);                                   // Sub-mesh-index (local copy)
+    arma::u32_vec smi(1);                                         // Sub-mesh-index (local copy)
     if (sub_mesh_index != nullptr && sub_mesh_index->n_elem != 0) // Input is available
     {
         n_sub = sub_mesh_index->n_elem;
@@ -638,7 +622,8 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     // Pointer to hit counter
     unsigned *p_hit_cnt = (no_interact == nullptr) ? nullptr : hit_cnt.memptr();
 
-    if (isAVX2Supported()) // CPU support for AVX2
+#if BUILD_WITH_AVX2
+    if (runtime_AVX2_Check()) // CPU support for AVX2
     {
         qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_s,
                     smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
@@ -654,6 +639,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
                        dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
                        n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
+#else
+    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+                   smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                   origA.colptr(0), origA.colptr(1), origA.colptr(2),
+                   dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
+                   n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+#endif
 
     // Free aligned memory
 #if defined(_MSC_VER) // Windows

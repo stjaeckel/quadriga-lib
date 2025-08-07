@@ -1273,6 +1273,7 @@ unsigned ant_id = ant.qdant_write("antenna_data.qdant");
 ## See also:
 - [[arrayant]]
 - <a href="#qdant_read">qdant_read</a>
+- QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
 // ARRAYANT : Write to QDANT file
