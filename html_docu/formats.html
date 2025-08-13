@@ -7,7 +7,9 @@
   <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
   <link type="text/css" rel="stylesheet" href="style2.css">
   <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
-</head>
+  <meta name="description" content="Quadriga-Lib is an open-source C++ library for realistic radio 
+      channel modelling with MATLAB/Octave/Python APIs and tools for arrays, channel data, and site-specific simulations.">
+ </head>
  
 <body>
 
@@ -21,7 +23,7 @@
       <div id="quadriga-lib_header_spacer"></div>
       <div id="quadriga-lib_header_cell_logo_txt">
         <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
-          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+          </big><br>C++/MEX/Python Utility library for radio channel modelling and simulations</big>
       </div>
     </div>
   </div>
@@ -34,19 +36,323 @@
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="python_api.html">Python API</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu_selected" href="formats.html">Data Formats</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
-      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="download.html">Download</a></li>
     </ul>
   </div>
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN -->    <ul class="noindent">
-      <li>
-        To be done
-        <br>&nbsp;
-      </li>
-    </ul>    <!-- CONTENT END -->
+      <!-- CONTENT BEGIN --><big><b>Data Formats</b></big>
+<br><br><br>
+
+
+<b>Overview</b>
+<ul>
+<li><a href="#6cab4884">QuaDRiGa Array Antenna Exchange Format (QDANT)</a></li>
+</ul>
+<br>
+<b>QuaDRiGa Array Antenna Exchange Format (QDANT)</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#&lt;layout&gt;">&lt;layout&gt;</a></td><td>Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)</td></tr>
+<tr><td><a href="#&lt;arrayant&gt;">&lt;arrayant&gt;</a></td><td>Describes a single array antenna</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="6cab4884"></a>
+<font size=+1><b>QuaDRiGa Array Antenna Exchange Format (QDANT)</b></font>
+<br>
+<br>
+QDANT is an XML grammar for exchanging array-antenna pattern data. Tag names are 
+case-sensitive. A file contains a single <code>&lt;qdant&gt;</code> root element that may 
+include an optional <code>&lt;layout&gt;</code> and one or more <code>&lt;arrayant&gt;</code> 
+elements. A namespace is required on the root (with or without a prefix).<br><br> 
+ 
+Coordinate convention (for interpreting pattern data): 
+<ul><li style="margin-bottom: 0.4em;">Spherical (polar–spherical) angles theta (elevation) and phi (azimuth). 
+</li><li style="margin-bottom: 0.4em;">Elevation theta: −90° (down) … 0° (horizon) … +90° (up). 
+</li><li style="margin-bottom: 0.4em;">Azimuth phi: −180° (west) … −90° (south) … 0° (east) … +90° (north) … +180° (west); counting is anti-clockwise. 
+</li><li style="margin-bottom: 0.4em;">Pattern components are resolved along unit vectors ê_theta and ê_phi (far-field, no ê_r component). 
+</li></ul>
+ 
+See related read / write functions in the API documentation for details on how to use this format: 
+<ul><li style="margin-bottom: 0.4em;">C++ QDANT read function (<a href="cpp_api.html#qdant_read">qdant_read</a>) 
+</li><li style="margin-bottom: 0.4em;">C++ QDANT write function (<a href="cpp_api.html#.qdant_write">arrayant.qdant_write</a>) 
+</li><li style="margin-bottom: 0.4em;">MATLAB / Octave QDANT read function (<a href="mex_api.html#arrayant_qdant_read">arrayant_qdant_read</a>) 
+</li><li style="margin-bottom: 0.4em;">MATLAB / Octave QDANT write function (<a href="mex_api.html#arrayant_qdant_write">arrayant_qdant_write</a>) 
+</li><li style="margin-bottom: 0.4em;">Python QDANT read function (<a href="python_api.html#qdant_read">qdant_read</a>) 
+</li><li style="margin-bottom: 0.4em;">Python QDANT write function (<a href="python_api.html#qdant_write">qdant_write</a>) 
+</li></ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="&lt;layout&gt;"></a>
+<b>&lt;layout&gt;</b> - Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Content:</i></b><br><ul><li style="margin-bottom: 0.4em;">One or more column vectors, separated by spaces; entries within a vector are comma-separated. 
+</li><li style="margin-bottom: 0.4em;">Values: Integers that must match the id of corresponding <code>&lt;arrayant&gt;</code> elements. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Examples:</i></b><br><ul><li style="margin-bottom: 0.4em;">Linear list: 1 2 3 (three columns with one entry each). 
+</li><li style="margin-bottom: 0.4em;">3×2 matrix of object IDs (3 columns, each a column vector of length 2): 1,2 1,2 2,1 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="&lt;arrayant&gt;"></a>
+<b>&lt;arrayant&gt;</b> - Describes a single array antenna
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Attributes:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> (integer, required if multiple arrayants present)<br>  
+   Unique values per file; if <code>&lt;layout&gt;</code> is used, each id referenced there must exist. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Child elements:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>&lt;name&gt;</code></b> (string, optional)<br>  
+   Human-readable identifier. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;CenterFrequency&gt;</code></b> (Hz, integer or float, optional)<br> 
+   Default 300 MHz if omitted. When omitted, element positions are interpreted in wavelength multiples (i.e., meters scaled by λ at 300 MHz). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;NoElements&gt;</code></b> (integer, required for multi-element arrays)<br> 
+   Number of elements in this array. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;ElementPosition&gt;</code></b> (optional)<br> 
+     One or more position vectors [x,y,z] in meters, relative to the phase center. Axis orientation:  
+     x = east, y = north, z = up. Formatting: Vectors separated by spaces; within each vector, components  
+     separated by commas. Requires <code>&lt;NoElements&gt;</code> to be defined and to match the number of vectors. 
+     Example: <code>0,0,0 0.05,0,0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;ElevationGrid&gt;</code></b> (degrees, required)<br> 
+     List of elevation samples (−90 … +90). Example: <code>-90 -45 0 45 90</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;AzimuthGrid&gt;</code></b> (degrees, required)<br> 
+     List of azimuth samples (−180 … +180; 0 points east; anti-clockwise positive). Example: <code>-180 -90 0 90 180</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;CouplingAbs&gt;</code></b> (optional; only with <code>&lt;NoElements&gt;</code>)<br> 
+     N×M absolute values of the coupling matrix. Column vectors separated by spaces; entries within a  
+     column are separated by commas. Dimensions must be consistent with NoElements = N.  
+     M is the number of antenna ports. Example (N=2): <code>1,0 0,1</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;CouplingPhase&gt;</code></b> (optional; only with <code>&lt;NoElements&gt;</code> and <code>&lt;CouplingAbs&gt;</code>)<br> 
+     N×N phases (degrees) for the same matrix. Column vectors separated by spaces; entries within a  
+     column are separated by commas. Dimensions must be consistent with NoElements = N. 
+     Example (N=2): <code>0,0 0,0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;EthetaMag&gt;</code></b> (optional)<br> 
+     Magnitude in [dB] of the electric field aligned with the ê − θ vector of the spherical coordinate  
+     system. One line contains all azimuth values for one elevation angle. The order is given by  
+     <code>AzimuthGrid</code> (columns) and <code>ElevationGrid</code> (rows). If <code>NoElements</code> is greater than 1, an additional  
+     attribute <code>&lt;EthetaMag el="[no]"&gt;</code> must be provided. In the first example, the first line contains the  
+     values for the -90 degree elevation angle (down) and the last line contains the values for the 90  
+     degree elevation (up). If there is no field in θ-direction, this XML-element can be omitted. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;EthetaPhase&gt;</code></b> (optional; only with <code>&lt;EthetaMag&gt;</code>)<br> 
+     Phase in [degree] of the electric field aligned with the ê − θ vector. One line contains all  
+     azimuth values for one elevation angle. The order is given by <code>AzimuthGrid</code> and <code>ElevationGrid</code>.  
+     If <code>NoElements</code> is greater than 1, an additional attribute <code>&lt;EthetaPhase el="[no]"&gt;</code> must be provided.  
+     EthetaPhase cannot be defined without defining EthetaMag first. If all phases are 0, this  
+     XML-element can be omitted. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;EphiMag&gt;</code></b> (optional)<br> 
+     Magnitude in [dB] of the electric field aligned with the ê − φ vector of the spherical coordinate system. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>&lt;EphiPhase&gt;</code></b> (optional; only with <code>&lt;EphiMag&gt;</code>)<br> 
+     Phase in [degree] of the electric field aligned with the ê − φ vector. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Validation & Formatting Rules (at a glance):</i></b><br><ul><li style="margin-bottom: 0.4em;">Case-sensitive tag names. 
+</li><li style="margin-bottom: 0.4em;"><code>&lt;qdant&gt;</code> must be present; it may contain 0 or 1 <code>&lt;layout&gt;</code> and 1+ <code>&lt;arrayant&gt;</code>. 
+</li><li style="margin-bottom: 0.4em;">If <code>&lt;layout&gt;</code> is present, every integer in it must match an existing <code>&lt;arrayant id="…"&gt;</code> 
+</li><li style="margin-bottom: 0.4em;">If <code>NoElements</code> is provided:<br>  
+   (1) ElementPosition (if present) must provide exactly NoElements vectors.<br> 
+   (2) CouplingAbs and CouplingPhase (if present) must be N×N with N = NoElements.<br> 
+   (3) Pattern tags (Etheta<i>, Ephi</i>) must include el="1" … "N" for per-element data. 
+</li><li style="margin-bottom: 0.4em;">Pattern blocks: Number of lines = length of <code>ElevationGrid</code>. Numbers per line = length of <code>AzimuthGrid</code>. 
+   Magnitudes in dB; phases in degrees. 
+</li><li style="margin-bottom: 0.4em;">Omissions: If a component is everywhere zero, omit its <i>Mag (and its </i>Phase). If all phases are zero, *Phase may be omitted. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Quick Reference:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th>Element</th>
+  <th>Required</th>
+  <th>Type / Units</th>
+  <th>Notes</th>
+  <th></th>
+</tr>
+<tr>
+  <td><code>qdant</code></td>
+  <td>Yes</td>
+  <td>–</td>
+  <td>Root; carries namespace</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>layout</code></td>
+  <td>No</td>
+  <td>int matrix (text)</td>
+  <td>Columns separated by spaces; within a column, IDs comma-separated</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>arrayant@id</code></td>
+  <td>Cond.</td>
+  <td>int</td>
+  <td>Unique; referenced by <code>layout</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>No</td>
+  <td>string</td>
+  <td>Free text</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>CenterFrequency</code></td>
+  <td>No</td>
+  <td>Hz</td>
+  <td>Default 300 MHz if absent</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>NoElements</code></td>
+  <td>Cond.</td>
+  <td>int</td>
+  <td>Required for multi-element arrays</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>ElementPosition</code></td>
+  <td>No</td>
+  <td>meters</td>
+  <td>Vectors <code>x,y,z</code>; vectors space-separated; components comma-separated</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>ElevationGrid</code></td>
+  <td><b>Yes</b></td>
+  <td>degrees</td>
+  <td>−90 … +90</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>AzimuthGrid</code></td>
+  <td><b>Yes</b></td>
+  <td>degrees</td>
+  <td>−180 … +180; 0° east; anti-clockwise positive</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>CouplingAbs</code></td>
+  <td>No</td>
+  <td>matrix</td>
+  <td>N×M; columns space-sep; entries comma-sep</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>CouplingPhase</code></td>
+  <td>No</td>
+  <td>matrix (deg)</td>
+  <td>Requires <code>CouplingAbs</code>; same shape</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>EthetaMag</code></td>
+  <td>Cond.</td>
+  <td>dB grid</td>
+  <td>Rows = elevations; cols = azimuths; <code>el="n"</code> if N>1</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>EthetaPhase</code></td>
+  <td>Cond.</td>
+  <td>deg grid</td>
+  <td>Only with <code>EthetaMag</code>; omit if all zeros</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>EphiMag</code></td>
+  <td>Cond.</td>
+  <td>dB grid</td>
+  <td>Rows = elevations; cols = azimuths; <code>el="n"</code> if N>1</td>
+  <td></td>
+</tr>
+<tr>
+  <td><code>EphiPhase</code></td>
+  <td>Cond.</td>
+  <td>deg grid</td>
+  <td>Only with <code>EphiMag</code>; omit if all zeros</td>
+  <td></td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br>2-Element Cross-Polarized Array (minimal pattern values): 
+<pre>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;qdant xmlns="http://www.quadriga-channel-model.de"&gt;
+  &lt;layout&gt;1&lt;/layout&gt;
+  &lt;arrayant id="1"&gt;
+    &lt;name&gt;Simple XPOL&lt;/name&gt;
+    &lt;CenterFrequency&gt;2600000000&lt;/CenterFrequency&gt;
+    &lt;NoElements&gt;2&lt;/NoElements&gt;
+    &lt;ElementPosition&gt;0,0,0 0,0,0&lt;/ElementPosition&gt;
+
+    &lt;ElevationGrid&gt;-90 0 90&lt;/ElevationGrid&gt;
+    &lt;AzimuthGrid&gt;-180 -90 0 90 180&lt;/AzimuthGrid&gt;
+
+    &lt;CouplingAbs&gt;1,0 0,1&lt;/CouplingAbs&gt;
+    &lt;CouplingPhase&gt;0,0 0,0&lt;/CouplingPhase&gt;
+
+    &lt;EthetaMag el="1"&gt;
+      0 0 0 0 0
+      0 0 0 0 0
+      0 0 0 0 0
+    &lt;/EthetaMag&gt;
+    &lt;EthetaPhase el="1"&gt;
+      0 0 0 0 0
+      0 0 0 0 0
+      0 0 0 0 0
+    &lt;/EthetaPhase&gt;
+
+    &lt;EphiMag el="2"&gt;
+      0 0 0 0 0
+      0 0 0 0 0
+      0 0 0 0 0
+    &lt;/EphiMag&gt;
+    &lt;EphiPhase el="2"&gt;
+      0 0 0 0 0
+      0 0 0 0 0
+      0 0 0 0 0
+    &lt;/EphiPhase&gt;
+  &lt;/arrayant&gt;
+&lt;/qdant&gt;
+</pre>
+</li>
+</ul>
+    <!-- CONTENT END -->
 
     <br>
     <!-- <br> -->

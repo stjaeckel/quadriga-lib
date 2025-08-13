@@ -58,6 +58,10 @@ data = arrayant.qdant_read( fn, id )
   `center_freq`    | Center frequency in [Hz], optional, default = 0.3 GHz | Scalar
   `name`           | Name of the array antenna object                      | String
   `layout`         | Layout of multiple array antennas.                    | Matrix
+
+## See also:
+- [[qdant_write]] (for writing QDANT data)
+- QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
 py::dict arrayant_qdant_read(const std::string fn, unsigned id)

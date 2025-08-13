@@ -69,6 +69,10 @@ id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
 ## Output Argument:
 - **`id_in_file`**<br>
   ID of the antenna in the file after writing
+
+# See also:
+- [[qdant_read]] (for reading QDANT data)
+- QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
 ssize_t arrayant_qdant_write(const std::string &fn,

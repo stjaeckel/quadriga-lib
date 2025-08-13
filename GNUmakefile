@@ -70,15 +70,13 @@ documentation:   bin
 	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
 
-	python3 tools/extract_html.py html_docu/index.html tools/html_parts/index.html.part
-	python3 tools/extract_html.py html_docu/mex_api.html tools/html_parts/mex_api.html.part api_mex/ 
-	python3 tools/extract_html.py html_docu/cpp_api.html tools/html_parts/cpp_api.html.part src/ 
-	python3 tools/extract_html.py html_docu/python_api.html tools/html_parts/python_api.html.part api_python/ 
-	python3 tools/extract_html.py html_docu/formats.html tools/html_parts/formats.html.part tools/data_formats_md/
-
-	python3 tools/extract_html.py html_docu/faq.html tools/html_parts/index.html.part
-	python3 tools/extract_html.py html_docu/contact.html tools/html_parts/index.html.part
-	python3 tools/extract_html.py html_docu/download.html tools/html_parts/index.html.part
+	python3 tools/extract_html.py -o html_docu/index.html -p tools/html_parts/index.html.part
+	python3 tools/extract_html.py -o html_docu/mex_api.html -p tools/html_parts/mex_api.html.part -d api_mex/ 
+	python3 tools/extract_html.py -o html_docu/cpp_api.html -p tools/html_parts/cpp_api.html.part -d src/ 
+	python3 tools/extract_html.py -o html_docu/python_api.html -p tools/html_parts/python_api.html.part -d api_python/ 
+	python3 tools/extract_html.py -o html_docu/formats.html -p tools/html_parts/formats.html.part -d tools/data_formats_md/
+	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
+	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master
