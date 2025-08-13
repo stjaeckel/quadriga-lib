@@ -66,6 +66,10 @@ data in XML. This function reads pattern data from the specified file.
 
 - **`layout`**<br>
   Layout of multiple array antennas. Contain element ids that are present in the file
+
+## See also:
+- [[arrayant_qdant_write]] (for writing QDANT data)
+- QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -7,7 +7,9 @@
   <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
   <link type="text/css" rel="stylesheet" href="style2.css">
   <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
-</head>
+  <meta name="description" content="Quadriga-Lib is an open-source C++ library for realistic radio 
+      channel modelling with MATLAB/Octave/Python APIs and tools for arrays, channel data, and site-specific simulations.">
+ </head>
  
 <body>
 
@@ -21,7 +23,7 @@
       <div id="quadriga-lib_header_spacer"></div>
       <div id="quadriga-lib_header_cell_logo_txt">
         <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
-          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+          </big><br>C++/MEX/Python Utility library for radio channel modelling and simulations</big>
       </div>
     </div>
   </div>
@@ -34,19 +36,106 @@
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="python_api.html">Python API</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="formats.html">Data Formats</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
-      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu_selected" href="download.html">Download</a></li>
     </ul>
   </div>
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN -->    <ul class="noindent">
-      <li>
-        To be done
-        <br>&nbsp;
-      </li>
-    </ul>    <!-- CONTENT END -->
+      <!-- CONTENT BEGIN --><big><b>Download and Setup</b></big>
+<br><br><br>
+
+
+<b>Overview</b>
+<ul>
+<li><a href="#7c9ba8cc">Download</a></li>
+<li><a href="#c3101bae">Installation</a></li>
+</ul>
+<br>
+<hr class="greyline">
+<br>
+<a name="7c9ba8cc"></a>
+<font size=+1><b>Download</b></font>
+<br>
+<ul><li style="margin-bottom: 0.4em;"><b>Latest Stable Version (Source Code)</b><br> 
+   <a href="download/quadriga_lib-0.9.0.zip">quadriga_lib-0.9.0.zip</a> 
+</li></ul>
+<hr class="greyline">
+<br>
+<a name="c3101bae"></a>
+<font size=+1><b>Installation</b></font>
+<br>
+<br><br> 
+ 
+<b>Linux / Ubuntu</b><br> 
+ 
+<ul><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Install Matlab from <a href="https://www.mathworks.com">www.mathworks.com</a> - you need to obtain a license 
+</li><li style="margin-bottom: 0.4em;">Install the required packages (octave-dev is only needed if you want to use Octave): 
+</li></ul>
+<pre>
+sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or <a href="http://quadriga-lib.org">quadriga-lib.org</a>  
+</li></ul>
+<pre>
+git clone https://github.com/stjaeckel/quadriga-lib
+cd quadriga-lib
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Compile Quadriga-Lib using <code>make</code> (cmake is used internally and can also be used directly) 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Build and run tests: <code>make test</code> 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Add the library to your MATLAB path by running <code>addpath('quadriga-lib')</code> in the MATLAB command window or by adding it to your <code>startup.m</code> file. 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: If you want to use the Python API, add the library to your Python path by adding the library path to your <code>PYTHONPATH</code> environment variable. You can do this by adding the following line to your <code>.bashrc</code> or <code>.bash_profile</code> file: 
+</li></ul>
+<pre>
+export PYTHONPATH=$PYTHONPATH:/path/to/quadriga-lib/lib
+</pre>
+<br><br> 
+ 
+<b>Linux / Ubuntu with Anaconda</b><br> 
+ 
+<ul><li style="margin-bottom: 0.4em;">Install Miniconda from [Anaconda's official website](https://www.anaconda.com/products/distribution#download-section). If you already have Anaconda installed, you can skip this step. 
+</li></ul>
+<pre>
+cd ~/Downloads
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+chmod +x Miniconda3-latest-Linux-x86_64.sh
+./Miniconda3-latest-Linux-x86_64.sh
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Setup a new Anaconda environment with the required packages (you can also use the default channel instead of <code>conda-forge</code>, but octave is only available in <code>conda-forge</code>): 
+</li></ul>
+<pre>
+conda deactivate
+conda create --name quadriga-lib -c conda-forge python=3.13 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake hdf5 octave
+conda activate quadriga-lib
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org) 
+</li></ul>
+<pre>
+git clone https://github.com/stjaeckel/quadriga-lib
+cd quadriga-lib
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Compile Quadriga-Lib (C++, MATLAB, Octave, Python) using <code>make</code> (cmake is used internally and can also be used directly) 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Build and run tests: <code>make test</code> 
+</li><li style="margin-bottom: 0.4em;">[<b>ALTERNATIVE</b>]: If you only want to use the Python API, use <code>make python</code> and <code>make python_test</code>. 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Add the library to your MATLAB path by running <code>addpath('quadriga-lib')</code> in the MATLAB command window or by adding it to your <code>startup.m</code> file. 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: If you want to use the Python API, install the Python package by running: <code>make python_install</code>. This will install the <code>quadriga-lib</code> package into your Anaconda environment. 
+</li></ul>
+ 
+<br><br> 
+ 
+<b>Windows</b><br> 
+<ul><li style="margin-bottom: 0.4em;">Octave and Python are not supported yet (only MATLAB is) 
+</li><li style="margin-bottom: 0.4em;">Install Build Tools for Visual Studio 2022 from https://visualstudio.microsoft.com 
+</li><li style="margin-bottom: 0.4em;">Install Matlab from (https://www.mathworks.com) - you need to obtain a licence 
+</li><li style="margin-bottom: 0.4em;">From MATLAB Shell run "mex -setup -v" and select compiler MSVC Compiler 
+</li><li style="margin-bottom: 0.4em;">If error: https://yingzhouli.com/posts/2020-06/mex-msvc.html 
+</li><li style="margin-bottom: 0.4em;">Open "x64 Native Tools Command Prompt" from start menu 
+</li><li style="margin-bottom: 0.4em;">Navigate to library path, e.g. <code>cd Z:\quadriga-lib</code> 
+</li><li style="margin-bottom: 0.4em;">Run <code>nmake</code> to compile <code>quadriga-lib</code> and the MEX Matlab interface 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Compile and run the unit tests by running <code>nmake test</code> 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Add the library to your MATLAB path by running <code>addpath('quadriga-lib')</code> in the MATLAB command window or by adding it to your <code>startup.m</code> file. 
+</li></ul>
+    <!-- CONTENT END -->
 
     <br>
     <!-- <br> -->

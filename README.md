@@ -1,13 +1,83 @@
-# quadriga-lib
-Utility library for radio channel modelling and simulations
+# Quadriga-Lib
+C++/MEX/Python Utility library for radio channel modelling and simulations
 
 ## Introduction
 
-**`quadriga-lib`** is a support library for the handling of array antenna data. Array antenna models are usually required in Ray-Tracing applications for electromagnetig propagation modelling or in geometry-based stochastic channel models such as QuaDRiGa (https://quadriga-channel-model.de). Such simulation tools are used to determine the performance of new digital-radio technologies in either stochastic or deterministic propagation environments. 
+**Quadriga-Lib** is an open-source utility library for radio channel modelling and simulation. It generates realistic channel impulse responses for system-level studies of mobile radio networks and offers a rich toolset for antenna arrays, channel data handling, and site-specific simulations.
 
-An antenna model describes the radiated power, phase and polarization as a function of the angle from which the antenna is seen. In addition, modern radio-communication systems use multi-element antennas for MIMO communications (so-called array antennas). The array antenna is then defined by the set of all directional responses of its individual elements, also known as radiation pattern.
+For a full documentation, see the [quadriga-lib.org](http://quadriga-lib.org).
 
-This library implements an interface to both, Matlab and Octave as well as to c++. It is currently in an early stage of development. Only the array antenna interpolation in polar-spheric basis is implemented. However, this is the most computing intense operation since it is performed millions of times in a typical radio simulation. Using this library, e.g. in QuaDRiGa can significantly improve the performance.
+## Installation
+
+Installation of **`quadriga-lib`** is supported on Linux/Ubuntu and Windows. The library can be used in MATLAB, Octave, and Python.
+
+### Linux / Ubuntu
+
+* [**OPTIONAL**]: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
+* Install the required packages (octave-dev is only needed if you want to use Octave):
+```
+sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
+```
+* Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org)
+```
+git clone https://github.com/stjaeckel/quadriga-lib
+cd quadriga-lib
+```
+* Compile Quadriga-Lib using `make` (cmake is used internally and can also be used directly)
+* [**OPTIONAL**]: Build and run tests: `make test`
+* [**OPTIONAL**]: Add the library to your MATLAB path by running `addpath('quadriga-lib')` in the MATLAB command window or by adding it to your `startup.m` file.
+* [**OPTIONAL**]: If you want to use the Python API, add the library to your Python path by adding the library path to your `PYTHONPATH` environment variable. You can do this by adding the following line to your `.bashrc` or `.bash_profile` file:
+```
+export PYTHONPATH=$PYTHONPATH:/path/to/quadriga-lib/lib
+```
+
+### Linux / Ubuntu with Anaconda
+
+* Install Miniconda from [Anaconda's official website](https://www.anaconda.com/products/distribution#download-section). If you already have Anaconda installed, you can skip this step.
+```
+cd ~/Downloads
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+chmod +x Miniconda3-latest-Linux-x86_64.sh
+./Miniconda3-latest-Linux-x86_64.sh
+```
+* Setup a new Anaconda environment with the required packages (you can also use the default channel instead of `conda-forge`, but octave is only available in `conda-forge`):
+```
+conda deactivate
+conda create --name quadriga-lib -c conda-forge python=3.13 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake hdf5 octave
+conda activate quadriga-lib
+```
+* Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org)
+```
+git clone https://github.com/stjaeckel/quadriga-lib
+cd quadriga-lib
+```
+* Compile Quadriga-Lib (C++, MATLAB, Octave, Python) using `make` (cmake is used internally and can also be used directly)
+* [**OPTIONAL**]: Build and run tests: `make test`
+* [**ALTERNATIVE**]: If you only want to use the Python API, use `make python` and `make python_test`.
+* [**OPTIONAL**]: Add the library to your MATLAB path by running `addpath('quadriga-lib')` in the MATLAB command window or by adding it to your `startup.m` file.
+* [**OPTIONAL**]: If you want to use the Python API, install the Python package by running: `make python_install`. This will install the `quadriga-lib` package into your Anaconda environment.
+
+
+### Windows
+* Octave and Python are not supported yet (only MATLAB is)
+* Install Build Tools for Visual Studio 2022 from https://visualstudio.microsoft.com
+* Install Matlab from (https://www.mathworks.com) - you need to obtain a licence
+* From MATLAB Shell run "mex -setup -v" and select compiler MSVC Compiler
+* If error: https://yingzhouli.com/posts/2020-06/mex-msvc.html
+* Open "x64 Native Tools Command Prompt" from start menu
+* Navigate to library path, e.g. `cd Z:\quadriga-lib`
+* Run `nmake` to compile `quadriga-lib` and the MEX Matlab interface
+* [**OPTIONAL**]: Compile and run the unit tests by running `nmake test`
+* [**OPTIONAL**]: Add the library to your MATLAB path by running `addpath('quadriga-lib')` in the MATLAB command window or by adding it to your `startup.m` file.
+
+
+## Distribution License
+
+**`quadriga-lib`** can be used in both open-source and proprietary (closed-source) software.
+
+**`quadriga-lib`** is licensed under the Apache License, Version 2.0 (the "License").
+A copy of the License is included in the "LICENSE" file. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+
 
 ## Software Structure
 ### Folders
@@ -17,51 +87,15 @@ This library implements an interface to both, Matlab and Octave as well as to c+
 `+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
 `api_mex`       | Source files for the MATLAB / Octave MEX interface
 `api_python`    | Source files for the Python API
-`build`         | Folder for temporary build files
+`build*`        | Folder(s) for temporary build files
 `external`      | External tools used in the project
-`html_docu`     | Documentation of the API functions
+`html_docu`     | Documentation of the API functions (aka: [quadriga-lib.org](http://quadriga-lib.org))
 `include`       | Public header files for the `quadriga-lib` library
-`lib`           | Library files for static linking
+`lib`           | Library files for static and dynamic linking, Python package
 `references`    | Relevant external documents and papers
 `release`       | Folder for source packages and compiled binary packages
 `src`           | C++ source files and private header files
 `tests`         | Test files
-`tools`         | Other tools used in the project
-
-## Installation
-
-Precompiled versions for Linux (MATLAB, Octave) and Windows (MATLAB only) are already included in the `release` folder. To use them e.g. in QuaDRiGa-NG (https://github.com/stjaeckel/QuaDRiGa-NG), simply add the arrayant_lib folder to your MATLAB/Octave path.
-
-### Linux / Ubuntu
-
-* [**OPTIONAL**]: Install Matlab from (https://www.mathworks.com) - you need to obtain a license
-* Install dependencies (Python3 and Octave are optional): 
-```
-sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev
-```
-* Clone quadiga-lib from GitHub: `git clone https://github.com/stjaeckel/quadriga-lib`
-* Change to quadriga-lib folder: `cd quadriga-lib`
-* Build external modules: `make external`
-* Build Quadriga-Lib: `make -j16`
-* [**OPTIONAL**]: Generate documentation: `make documentation`
-* [**OPTIONAL**]: Run tests: `make test`
-
-### Windows
-* Octave is not supported (only MATLAB is)
-* Install Build Tools for Visual Studio 2022 from https://visualstudio.microsoft.com
-* Install Matlab from (https://www.mathworks.com) - you need to obtain a licence
-* From MATLAB Shell run "mex -setup -v" and select compiler MSVC Compiler
-* If error: https://yingzhouli.com/posts/2020-06/mex-msvc.html
-* Open "x64 Native Tools Command Prompt" from start menu
-* Navigate to library path, e.g. `cd Z:\quadriga-lib`
-* Build external modules: `nmake external`
-* Run `nmake` to compile `quadriga-lib` and the MEX Matlab interface
-* [**OPTIONAL**]: Compile and run the unit tests by running `nmake test`
+`tools`         | Other tools used in the project (e.g. the website generator)
 
 
-## Distribution License
-
-**`quadriga-lib`** can be used in both open-source and proprietary (closed-source) software.
-
-**`quadriga-lib`** is licensed under the Apache License, Version 2.0 (the "License").
-A copy of the License is included in the "LICENSE" file. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.

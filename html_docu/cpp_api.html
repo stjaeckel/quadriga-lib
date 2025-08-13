@@ -7,7 +7,9 @@
   <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
   <link type="text/css" rel="stylesheet" href="style2.css">
   <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
-</head>
+  <meta name="description" content="Quadriga-Lib is an open-source C++ library for realistic radio 
+      channel modelling with MATLAB/Octave/Python APIs and tools for arrays, channel data, and site-specific simulations.">
+ </head>
  
 <body>
 
@@ -21,7 +23,7 @@
       <div id="quadriga-lib_header_spacer"></div>
       <div id="quadriga-lib_header_cell_logo_txt">
         <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
-          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+          </big><br>C++/MEX/Python Utility library for radio channel modelling and simulations</big>
       </div>
     </div>
   </div>
@@ -34,27 +36,25 @@
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="python_api.html">Python API</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="formats.html">Data Formats</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
-      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="download.html">Download</a></li>
     </ul>
   </div>
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.8.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.9.0</b></big>
 <br><br><br>
 
 <b>Overview</b>
 <ul>
-<li><a href="#part_1">Array antenna class</a></li>
-<li><a href="#part_2">Array antenna functions</a></li>
-<li><a href="#part_3">Channel class</a></li>
-<li><a href="#part_4">Channel functions</a></li>
-<li><a href="#part_5">Miscellaneous tools</a></li>
-<li><a href="#part_6">Site-Specific Simulation Tools</a></li>
+<li><a href="#3a0c780f">Array antenna class</a></li>
+<li><a href="#e091e809">Array antenna functions</a></li>
+<li><a href="#4f5f509b">Channel class</a></li>
+<li><a href="#eab50272">Channel functions</a></li>
+<li><a href="#b7e360ab">Miscellaneous tools</a></li>
+<li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
 <br>
-<a name="part_1"></a>
 <b>Array antenna class</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -75,7 +75,6 @@
 </table>
 </ul>
 <br>
-<a name="part_2"></a>
 <b>Array antenna functions</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -95,7 +94,6 @@
 </table>
 </ul>
 <br>
-<a name="part_3"></a>
 <b>Channel class</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -108,7 +106,6 @@
 </table>
 </ul>
 <br>
-<a name="part_4"></a>
 <b>Channel functions</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -129,7 +126,6 @@
 </table>
 </ul>
 <br>
-<a name="part_5"></a>
 <b>Miscellaneous tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -144,7 +140,6 @@
 </table>
 </ul>
 <br>
-<a name="part_6"></a>
 <b>Site-Specific Simulation Tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -179,6 +174,7 @@
 <hr class="greyline">
 <br>
 <br>
+<a name="3a0c780f"></a>
 <font size=+1><b>Array antenna class</b></font>
 <br>
 <br>
@@ -753,6 +749,7 @@ unsigned ant_id = ant.qdant_write("antenna_data.qdant");
 <li style="margin-bottom: 1.5em;">
 <b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
 </li></ul>
 </li>
 </ul>
@@ -933,6 +930,7 @@ if(result.empty()) {
 <hr class="greyline">
 <br>
 <br>
+<a name="e091e809"></a>
 <font size=+1><b>Array antenna functions</b></font>
 <br>
 <br>
@@ -1417,6 +1415,7 @@ auto ant = quadriga_lib::qdant_read&lt;double&gt;("antenna_data.qdant", 2, &amp;
 <li style="margin-bottom: 1.5em;">
 <b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#.qdant_write">arrayant.qdant_write</a> 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>) 
 </li></ul>
 </li>
 </ul>
@@ -1821,6 +1820,7 @@ auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el,
 <hr class="greyline">
 <br>
 <br>
+<a name="4f5f509b"></a>
 <font size=+1><b>Channel class</b></font>
 <br>
 <br>
@@ -2148,6 +2148,7 @@ void quadriga_lib::channel&lt;dtype&gt;::write_paths_to_obj_file(
 <hr class="greyline">
 <br>
 <br>
+<a name="eab50272"></a>
 <font size=+1><b>Channel functions</b></font>
 <br>
 <br>
@@ -2869,6 +2870,7 @@ void quadriga_lib::hdf5_write_dset(
 <hr class="greyline">
 <br>
 <br>
+<a name="b7e360ab"></a>
 <font size=+1><b>Miscellaneous tools</b></font>
 <br>
 <br>
@@ -3181,6 +3183,7 @@ void write_png( const arma::Mat&lt;dtype&gt; &amp;data,
 <hr class="greyline">
 <br>
 <br>
+<a name="2c1fd9e4"></a>
 <font size=+1><b>Site-Specific Simulation Tools</b></font>
 <br>
 <br>
@@ -4993,19 +4996,19 @@ void quadriga_lib::ray_mesh_interact(
 <b>ray_point_intersect</b> - Calculates the intersection of ray beams with points in three dimensions
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as  
-beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This  
-approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio  
-waves spreads as they travel from a point source. The volumetric nature of the beams allows for more  
-realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed  
+<b><i>Description:</i></b><br>Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as 
+beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This 
+approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio 
+waves spreads as they travel from a point source. The volumetric nature of the beams allows for more 
+realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed 
 across their cross-sectional area, affecting the intensity of the interaction with surfaces. 
-Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires  
+Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires 
 volumetric intersection tests. <br><br> 
  
 <ul><li style="margin-bottom: 0.4em;">This function computes whether points in 3D Cartesian space are intersected by ray beams. 
 </li><li style="margin-bottom: 0.4em;">A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors. 
 </li><li style="margin-bottom: 0.4em;">Returns a list of ray indices (0-based) that intersect with each point in the input point cloud. 
-</li><li style="margin-bottom: 0.4em;">Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>)  
+</li><li style="margin-bottom: 0.4em;">Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>) 
    to reduce computational cost. 
 </li><li style="margin-bottom: 0.4em;">All internal computations use single precision for speed. 
 </li><li style="margin-bottom: 0.4em;">Uses Advanced Vector Extensions (AVX2) for efficient computation, if supported by the CPU 
@@ -5034,13 +5037,13 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*trivec</b></code> (input)<br> 
-   The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of  
-   a triangular propagation tube (the beam), the values are in the order  
+   The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of 
+   a triangular propagation tube (the beam), the values are in the order 
    <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ no_ray, 9 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*tridir</b></code> (input)<br> 
-   The directions of the vertex-rays. Size: <code>[ n_ray, 9 ]</code>, Values must be given in Cartesian  
+   The directions of the vertex-rays. Size: <code>[ n_ray, 9 ]</code>, Values must be given in Cartesian 
    coordinates in the order  <code>[ d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z  ]</code>; The vector does 
    not need to be normalized. 
 </li></ul>
@@ -5097,17 +5100,17 @@ void quadriga_lib::ray_triangle_intersect(
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*orig</b></code> (input)<br> 
-   Ray origins in global coordinate system (GCS). Size: <code>[n_ray, 3]</code>, or <code>[n_ray, 6]</code> if <code>dest == nullptr</code>.  
+   Ray origins in global coordinate system (GCS). Size: <code>[n_ray, 3]</code>, or <code>[n_ray, 6]</code> if <code>dest == nullptr</code>. 
    In the latter case, columns must be ordered as <code>{xo, yo, zo, xd, yd, zd}</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*dest</b></code> (input)<br> 
-   Ray destinations in GCS. Size: <code>[n_ray, 3]</code>. Set to <code>nullptr</code> if <code>orig</code> has 6 columns and contains  
+   Ray destinations in GCS. Size: <code>[n_ray, 3]</code>. Set to <code>nullptr</code> if <code>orig</code> has 6 columns and contains 
    both origin and destination. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mesh</b></code> (input)<br> 
-   Triangular surface mesh. Size: <code>[n_mesh, 9]</code>, where each row contains the 3 vertices  
+   Triangular surface mesh. Size: <code>[n_mesh, 9]</code>, where each row contains the 3 vertices 
    <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>. 
 </li></ul>
  

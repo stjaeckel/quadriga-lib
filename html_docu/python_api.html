@@ -7,7 +7,9 @@
   <link rel="icon" href="img/quadriga-lib-q_letter64.png" type="image/png">
   <link type="text/css" rel="stylesheet" href="style2.css">
   <title>Quadriga-Lib: C++/MEX Utility library for radio channel modelling and simulations</title>
-</head>
+  <meta name="description" content="Quadriga-Lib is an open-source C++ library for realistic radio 
+      channel modelling with MATLAB/Octave/Python APIs and tools for arrays, channel data, and site-specific simulations.">
+ </head>
  
 <body>
 
@@ -21,7 +23,7 @@
       <div id="quadriga-lib_header_spacer"></div>
       <div id="quadriga-lib_header_cell_logo_txt">
         <div id="quadriga-lib_logo_img2"></div><big><big><b>Quadriga-Lib</b>
-          </big><br>C++/MEX Utility library for radio channel modelling and simulations</big>
+          </big><br>C++/MEX/Python Utility library for radio channel modelling and simulations</big>
       </div>
     </div>
   </div>
@@ -34,17 +36,16 @@
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu_selected" href="python_api.html">Python API</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="formats.html">Data Formats</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="faq.html">Questions</a></li>
-      <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="contact.html">Contact</a></li>
       <li class="quadriga-lib_menu"><a class="quadriga-lib_menu" href="download.html">Download</a></li>
     </ul>
   </div>
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.8.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.9.0</b></big>
 <br><br><br>
 
-<b>Notes:</b>
+<b>Notes</b>
 <br>
 
 <ul>
@@ -55,7 +56,7 @@ Before getting started, make sure that the Python library is compiled for your s
     double precision. Hence, you need to have numpy installed and imported in your python file.</li>
 <br>    
 <li>There is currently no Microsoft Windows version of the Quadriga-Lib Python interface.
-    This os planned for a later stage.</li>
+    This is planned for a later stage.</li>
 <br>    
 <li>The Quadriga-Lib Python package is compiled into a single ".so" file located in the "lib" folder. 
 To import it in Python, the "lib" folder must be on your Python path, which is usually not the case
@@ -75,13 +76,12 @@ import quadriga_lib
 <br> 
 <b>Overview</b>
 <ul>
-<li><a href="#part_1">Array antenna functions</a></li>
-<li><a href="#part_2">Channel functions</a></li>
-<li><a href="#part_3">Miscellaneous / Tools</a></li>
-<li><a href="#part_4">Site-Specific Simulation Tools</a></li>
+<li><a href="#e091e809">Array antenna functions</a></li>
+<li><a href="#eab50272">Channel functions</a></li>
+<li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
+<li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
 <br>
-<a name="part_1"></a>
 <b>Array antenna functions</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -101,7 +101,6 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<a name="part_2"></a>
 <b>Channel functions</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -120,7 +119,6 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<a name="part_3"></a>
 <b>Miscellaneous / Tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -133,7 +131,6 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<a name="part_4"></a>
 <b>Site-Specific Simulation Tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -157,6 +154,7 @@ import quadriga_lib
 <hr class="greyline">
 <br>
 <br>
+<a name="e091e809"></a>
 <font size=+1><b>Array antenna functions</b></font>
 <br>
 <br>
@@ -1182,6 +1180,11 @@ data = arrayant.qdant_read( fn, id )
 </table><br>
 </li></ul>
 </li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#qdant_write">qdant_write</a> (for writing QDANT data) 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
+</li></ul>
+</li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qdant_write"></a>
@@ -1281,6 +1284,11 @@ id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>id_in_file</code></b><br> 
    ID of the antenna in the file after writing 
+</li></ul>
+ 
+# See also: 
+<ul><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> (for reading QDANT data) 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
 </li></ul>
 </li>
 </ul>
@@ -2009,6 +2017,7 @@ coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical
 <hr class="greyline">
 <br>
 <br>
+<a name="eab50272"></a>
 <font size=+1><b>Channel functions</b></font>
 <br>
 <br>
@@ -2729,6 +2738,7 @@ channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 <hr class="greyline">
 <br>
 <br>
+<a name="b11e2d16"></a>
 <font size=+1><b>Miscellaneous / Tools</b></font>
 <br>
 <br>
@@ -2840,6 +2850,7 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 <hr class="greyline">
 <br>
 <br>
+<a name="2c1fd9e4"></a>
 <font size=+1><b>Site-Specific Simulation Tools</b></font>
 <br>
 <br>

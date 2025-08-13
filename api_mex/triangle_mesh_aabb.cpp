@@ -39,7 +39,7 @@ comparisons of coordinates), it allows quickly excluding checks of the pairs tha
 ## Usage:
 
 ```
-aabb = quadriga_lib.subdivide_triangles( triangle_mesh, sub_mesh_index, vec_size );
+aabb = quadriga_lib. triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
 ```
 
 ## Input Arguments:

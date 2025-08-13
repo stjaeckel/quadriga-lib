@@ -1,14 +1,47 @@
 import os
 import re
 import sys
+import hashlib
+import argparse
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(
+        description="Generate HTML from files with optional preamble."
+    )
+    parser.add_argument(
+        "-o", "--output",
+        required=True,
+        help="Path to the output HTML file."
+    )
+    parser.add_argument(
+        "-p", "--preamble",
+        required=True,
+        help="Optional path to preamble HTML file."
+    )
+    parser.add_argument(
+        "-d", "--directory",
+        default="",
+        help="Optional path to folder containing source files."
+    )
+    parser.add_argument("-c", action="store_true", help="Compact format")
+    return parser
+
 
 def extract_sections(file_content):
     sections = re.findall(r'\/\*!SECTION\n(.*?)\nSECTION!\*\/', file_content, re.DOTALL)
     return sections
 
+
 def extract_md_sections(file_content):
     md_sections = re.findall(r'\/\*!MD\n(.*?)\nMD!\*\/', file_content, re.DOTALL)
     return md_sections
+
+
+def extract_sections_desc(file_content):
+    md_sections = re.findall(r'\/\*!SECTION_DESC\n(.*?)\SECTION_DESC!\*\/', file_content, re.DOTALL)
+    return md_sections
+
 
 def escape_code(match):
     code = match.group(1)
@@ -16,6 +49,7 @@ def escape_code(match):
     code = re.sub(r'<', '&lt;', code)
     code = re.sub(r'>', '&gt;', code)
     return f'<code>{code}</code>'
+
 
 def format_text(text):
      # Replace `code` with <code>code</code>
@@ -34,6 +68,7 @@ def format_text(text):
     text = re.sub(r'\[\[(.*?)\]\]', r'<a href="#\1">\1</a>', text)
 
     return text
+
 
 def format_nested_lists(text):
     lines = text.split('\n')
@@ -61,6 +96,7 @@ def format_nested_lists(text):
             formatted_text += "</li></ul>\n"
 
     return formatted_text
+
 
 def format_tables(text):
     lines = text.split('\n')
@@ -117,7 +153,8 @@ def format_tables(text):
 
     return html_content
 
-def generate_html(folder_name, html_output_file, html_preamble):
+
+def generate_html(folder_name, html_output_file, html_preamble, compact):
 
     # Read the content of the file 'tools/html_parts/html_head.html.part'
     with open("tools/html_parts/html_head.html.part", "r") as head_file:
@@ -143,10 +180,11 @@ def generate_html(folder_name, html_output_file, html_preamble):
 
         files = os.listdir(folder_name)
         section_dict = {}
+        section_desc_dict = {}
         sections = []
 
         for file_name in sorted(files):
-            if file_name.endswith('.cpp'):
+            if file_name.endswith('.cpp') or file_name.endswith('.md'):
                 with open(os.path.join(folder_name, file_name), 'r') as f:
                     content = f.read()
                     if '/*!SECTION' not in content:
@@ -154,10 +192,12 @@ def generate_html(folder_name, html_output_file, html_preamble):
 
                     file_sections = extract_sections(content)
                     file_md_sections = extract_md_sections(content)
+                    file_sections_desc = extract_sections_desc(content)
 
                     for section in file_sections:
                         if section not in section_dict:
                             section_dict[section] = []
+                            section_desc_dict[section] = []
                         
                         for md_section in file_md_sections:
                             lines = md_section.split('\n')
@@ -170,29 +210,76 @@ def generate_html(folder_name, html_output_file, html_preamble):
                             if function_name not in [func[0] for func in section_dict[section]]:
                                 section_dict[section].append((function_name, md_section, add_space))
 
+                        for sections_desc in file_sections_desc:
+                            section_desc_dict[section].append(sections_desc)
+
+
         section_dict = dict(sorted(section_dict.items()))
+        section_desc_dict = dict(sorted(section_desc_dict.items()))
         sections = list(section_dict.keys())
         
+        # Section list
         for idx, section in enumerate(sections):
-            html_content += f'<li><a href="#part_{idx + 1}">{section}</a></li>\n'
+            h = hashlib.shake_256(section.encode("utf-8"))
+            html_content += f'<li><a href="#{h.hexdigest(4)}">{section}</a></li>\n'
 
         html_content += "</ul>\n<br>\n"
 
+        # Print functions per section
+        if not compact:
+            for idx, section in enumerate(sections):
+                html_content += f'<b>{section}</b>\n<ul>\n<table style="border-collapse: separate; border-spacing: 20px 0;">\n<tbody>\n'
+
+                for function_name, md_section, add_space in section_dict[section]:
+                    lines = md_section.split('\n')
+                    description = lines[1]
+                    padding = ""
+                    if add_space:
+                        padding = ' style="padding-bottom: 10px;"'
+                    html_content += f'<tr><td{padding}><a href="#{function_name}">{function_name}</a></td><td{padding}>{description}</td></tr>\n'
+
+                html_content += '</tbody>\n</table>\n</ul>\n<br>\n'
+
         for idx, section in enumerate(sections):
-            html_content += f'<a name="part_{idx + 1}"></a>\n<b>{section}</b>\n<ul>\n<table style="border-collapse: separate; border-spacing: 20px 0;">\n<tbody>\n'
+            h = hashlib.shake_256(section.encode("utf-8"))
+            if compact:
+                html_content += f'<hr class="greyline">\n<br>\n'
+            else:
+                html_content += f'<div class="pagebreak"></div>\n<hr class="greyline">\n<hr class="greyline">\n<br>\n<br>\n'
+            html_content += f'<a name="{h.hexdigest(4)}"></a>\n'
+            html_content += f'<font size=+1><b>{section}</b></font>\n<br>\n'
+            if not compact:
+                html_content += f'<br>\n'
 
-            for function_name, md_section, add_space in section_dict[section]:
-                lines = md_section.split('\n')
-                description = lines[1]
-                padding = ""
-                if add_space:
-                    padding = ' style="padding-bottom: 10px;"'
-                html_content += f'<tr><td{padding}><a href="#{function_name}">{function_name}</a></td><td{padding}>{description}</td></tr>\n'
+            for sections_desc in section_desc_dict[section]:
+                lines = sections_desc.split('\n')
 
-            html_content += '</tbody>\n</table>\n</ul>\n<br>\n'
+                section_content = ""
+                i = 0
+                while i < len(lines):
+                    if lines[i].strip() == "```":  # Start of code block
+                        section_content += "<pre>\n"
+                        i += 1
+                        while i < len(lines) and lines[i].strip() != "```":  # End of code block
+                            ln = lines[i]
+                            ln = ln.replace('&','&amp;')
+                            ln = ln.replace("<","&lt;")
+                            ln = ln.replace(">","&gt;")
+                            section_content += ln + "\n"
+                            i += 1
+                        section_content += "</pre>\n"
+                        i += 1  # Move past the ending backticks
+                    else:
+                        ln = format_text(lines[i])
+                        section_content += ln + " \n"
+                        i += 1
 
-        for idx, section in enumerate(sections):
-            html_content += f'<div class="pagebreak"></div>\n<hr class="greyline">\n<hr class="greyline">\n<br>\n<br>\n<font size=+1><b>{section}</b></font>\n<br>\n<br>\n'
+                # Apply text formatting
+                section_content = format_nested_lists(section_content)
+                section_content = format_tables(section_content)
+                
+                html_content += f'{section_content.strip()}\n'
+
 
             for function_name, md_section, add_space in section_dict[section]:
                 lines = md_section.split('\n')
@@ -250,25 +337,19 @@ def generate_html(folder_name, html_output_file, html_preamble):
 
     return html_content
 
-if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print("Usage: python3 extract_html_mex_api.py <output.html> <preamble.html> <path_to_mex_cpp_files>")
-        sys.exit(1)
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
 
-    html_output_file = sys.argv[1]
+    html_output = generate_html(args.directory, args.output, args.preamble, args.c)
 
-    html_preamble = ""
-    if len(sys.argv) > 2:
-        html_preamble = sys.argv[2]
-
-    folder_name = ""
-    if len(sys.argv) > 3:
-        folder_name = sys.argv[3]
-      
-    html_output = generate_html(folder_name, html_output_file, html_preamble)
-
-    with open(html_output_file, "w") as f:
+    with open(args.output, "w") as f:
         f.write(html_output)
 
-    print("HTML output saved to output.html")
+    print(f"HTML output saved to {args.output}")
+
+
+if __name__ == "__main__":
+    main()
+
