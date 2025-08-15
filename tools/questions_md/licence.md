@@ -4,9 +4,9 @@ SECTION!*/
 
 /*!SECTION_DESC
 - **What is the distribution license for Quadriga-Lib?**<br>
-  Quadriga-Lib is licensed under the <a href="https://opensource.org/license/apache-2-0">Apache License 2.0</a>. 
+  Quadriga-Lib is licensed under the <a target="_blank" rel="noopener noreferrer" href="https://opensource.org/license/apache-2-0">Apache License 2.0</a>. 
   The Apache license is a permissive license; its main conditions simply require preservation of copyright 
-  and license notices. See also a <a href="https://www.tldrlegal.com/license/apache-license-2-0-apache-2-0">Quick Summary</a> 
+  and license notices. See also a <a target="_blank" rel="noopener noreferrer" href="https://www.tldrlegal.com/license/apache-license-2-0-apache-2-0">Quick Summary</a> 
   of the license.
 
 - **Can I use Quadriga-Lib in commercial products without releasing the source code?**<br>

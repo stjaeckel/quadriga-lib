@@ -8,12 +8,12 @@ SECTION!*/
 
 **Linux / Ubuntu**<br>
 
-- [**OPTIONAL**]: Install Matlab from <a href="https://www.mathworks.com">www.mathworks.com</a> - you need to obtain a license
+- [**OPTIONAL**]: Install Matlab from <a target="_blank" rel="noopener noreferrer" href="https://www.mathworks.com">www.mathworks.com</a> - you need to obtain a license
 - Install the required packages (octave-dev is only needed if you want to use Octave):
 ```
 sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
 ```
-- Get Quadriga-Lib either from Github or <a href="http://quadriga-lib.org">quadriga-lib.org</a> 
+- Get Quadriga-Lib either from Github or <a target="_blank" rel="noopener noreferrer" href="http://quadriga-lib.org">quadriga-lib.org</a> 
 ```
 git clone https://github.com/stjaeckel/quadriga-lib
 cd quadriga-lib

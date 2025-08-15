@@ -9,7 +9,7 @@ include an optional `<layout>` and one or more `<arrayant>`
 elements. A namespace is required on the root (with or without a prefix).<br><br>
 
 Coordinate convention (for interpreting pattern data):
-- Spherical (polar–spherical) angles theta (elevation) and phi (azimuth).
+- Spherical (polar-spherical) angles theta (elevation) and phi (azimuth).
 - Elevation theta: −90° (down) … 0° (horizon) … +90° (up).
 - Azimuth phi: −180° (west) … −90° (south) … 0° (east) … +90° (north) … +180° (west); counting is anti-clockwise.
 - Pattern components are resolved along unit vectors ê_theta and ê_phi (far-field, no ê_r component).

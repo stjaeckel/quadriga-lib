@@ -19,7 +19,7 @@ SECTION!*/
 
 - **Is it possible to interface Quadriga-Lib with other libraries ?**<br>
   Yes, Quadriga-Lib is designed to be easily integrated with other libraries. 
-  It uses <a href="https://arma.sourceforge.net">Armadillo</a> for linear algebra 
+  It uses <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> for linear algebra 
   operations, which is a C++ library that provides a high-level interface for matrix operations. 
   You can use Armadillo functions in your code, and Quadriga-Lib will work seamlessly with them. 
   Interfacing with other libraries can be done by creating matrices (or cubes) that use auxiliary 
