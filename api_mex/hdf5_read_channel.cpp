@@ -28,17 +28,17 @@ SECTION!*/
 Reads channel data from HDF5 files
 
 ## Description:
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 
-comprises various well-defined sets, including channel coefficients, positions of transmitters and 
-receivers, as well as path data that reflects the interaction of radio waves with the environment. 
-Typically, these datasets are multi-dimensional, encompassing data for `n_rx` receive antennas, 
-`n_tx` transmit antennas, `n_path` propagation paths, and `n_snap` snapshots. Snapshots are 
-particularly useful for recording data across different locations (such as along a trajectory) or 
+Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data
+comprises various well-defined sets, including channel coefficients, positions of transmitters and
+receivers, as well as path data that reflects the interaction of radio waves with the environment.
+Typically, these datasets are multi-dimensional, encompassing data for `n_rx` receive antennas,
+`n_tx` transmit antennas, `n_path` propagation paths, and `n_snap` snapshots. Snapshots are
+particularly useful for recording data across different locations (such as along a trajectory) or
 various frequencies. It is important to note that not all datasets include all these dimensions.<br><br>
 
-The library also supports the addition of extra datasets of any type or shape, which can be useful 
-for incorporating descriptive data or analysis results. To facilitate data access, the function 
-`quadriga_lib.hdf5_read_channel` is designed to read both structured and unstructured data from the 
+The library also supports the addition of extra datasets of any type or shape, which can be useful
+for incorporating descriptive data or analysis results. To facilitate data access, the function
+`quadriga_lib.hdf5_read_channel` is designed to read both structured and unstructured data from the
 file.
 
 ## Usage:
@@ -54,7 +54,7 @@ file.
   Filename of the HDF5 file, string
 
 - **`location`** (optional)<br>
-  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`, 
+  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`,
   `[ix,iy,iz]` or `[ix,iy,iz,iw]`; Default: `ix = iy = iz = iw = 1`
 
 - **`snap`** (optional)<br>
@@ -83,12 +83,12 @@ file.
   `interact_coord` | Interaction coordinates                                  | `[3, max(sum(no_interact)), n_snap]`
   `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3, 1]`
   `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3, 1]`
-  
+
 ## Caveat:
 - Empty outputs are returned if data set does not exist in the file
 - All structured data is stored in single precision. Hence, outputs are also in single precision.
 - Unstructured datatypes are returned as stored in the HDF file (same type, dimensions and storage order)
-- Typically, `n_path` may vary for each snapshot. In such cases, `n_path` is set to the maximum value found 
+- Typically, `n_path` may vary for each snapshot. In such cases, `n_path` is set to the maximum value found
   within the range of snapshots, and any missing paths are padded with zeroes.
 MD!*/
 
@@ -180,16 +180,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Read snapshot range
-    arma::uvec snap; // Empty = read all
+    arma::Col<size_t> snap; // Empty = read all
     if (nrhs > 2)
-        snap = qd_mex_typecast_Col<unsigned long long>(prhs[2], "snap");
+        snap = qd_mex_typecast_Col<size_t>(prhs[2], "snap");
 
     // Update snapshot index
-    unsigned long long n_snap_channel = channel.n_snap();
+    size_t n_snap_channel = channel.n_snap();
     if (snap.empty() && n_snap_channel != 0ULL)
     {
         snap.set_size(n_snap_channel);
-        unsigned long long *p = snap.memptr();
+        size_t *p = snap.memptr();
         for (auto s = 0ULL; s < n_snap_channel; ++s)
             p[s] = s;
     }
@@ -204,11 +204,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     else // n_snap_channel == 0ULL
         snap.reset();
 
-    unsigned long long n_snap = snap.n_elem;
-    unsigned long long *i_snap = snap.memptr(); // Snapshot index
+    size_t n_snap = snap.n_elem;
+    size_t *i_snap = snap.memptr(); // Snapshot index
 
     // Get number of paths
-    unsigned long long n_path = 0ULL;
+    size_t n_path = 0ULL;
     if (n_snap != 0ULL && n_snap_channel != 0ULL)
     {
         arma::uvec n_path_vec = channel.n_path();
