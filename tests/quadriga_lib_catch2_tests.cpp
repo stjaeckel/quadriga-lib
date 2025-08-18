@@ -42,6 +42,7 @@
 #include "catch2_tests/test_mitsuba_xml_file_write.cpp"
 #include "catch2_tests/test_arrayant_generate.cpp"
 #include "catch2_tests/test_write_png.cpp"
+#include "catch2_tests/test_fast_sincos.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

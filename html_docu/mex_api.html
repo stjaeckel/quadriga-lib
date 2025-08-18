@@ -97,6 +97,7 @@
 <tbody>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
+<tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#interp">interp</a></td><td>2D and 1D linear interpolation.</td></tr>
@@ -2229,17 +2230,17 @@ quadriga_lib.hdf5_create_file( fn, storage_dims );
 <b>hdf5_read_channel</b> - Reads channel data from HDF5 files
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data  
-comprises various well-defined sets, including channel coefficients, positions of transmitters and  
-receivers, as well as path data that reflects the interaction of radio waves with the environment.  
-Typically, these datasets are multi-dimensional, encompassing data for <code>n_rx</code> receive antennas,  
-<code>n_tx</code> transmit antennas, <code>n_path</code> propagation paths, and <code>n_snap</code> snapshots. Snapshots are  
-particularly useful for recording data across different locations (such as along a trajectory) or  
+<b><i>Description:</i></b><br>Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 
+comprises various well-defined sets, including channel coefficients, positions of transmitters and 
+receivers, as well as path data that reflects the interaction of radio waves with the environment. 
+Typically, these datasets are multi-dimensional, encompassing data for <code>n_rx</code> receive antennas, 
+<code>n_tx</code> transmit antennas, <code>n_path</code> propagation paths, and <code>n_snap</code> snapshots. Snapshots are 
+particularly useful for recording data across different locations (such as along a trajectory) or 
 various frequencies. It is important to note that not all datasets include all these dimensions.<br><br> 
  
-The library also supports the addition of extra datasets of any type or shape, which can be useful  
-for incorporating descriptive data or analysis results. To facilitate data access, the function  
-<code>quadriga_lib.hdf5_read_channel</code> is designed to read both structured and unstructured data from the  
+The library also supports the addition of extra datasets of any type or shape, which can be useful 
+for incorporating descriptive data or analysis results. To facilitate data access, the function 
+<code>quadriga_lib.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
 file.
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2255,7 +2256,7 @@ file.
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>location</code></b> (optional)<br> 
-   Storage location inside the file; 1-based; vector with 1-4 elements, i.e. <code>[ix]</code>, <code>[ix, iy]</code>,  
+   Storage location inside the file; 1-based; vector with 1-4 elements, i.e. <code>[ix]</code>, <code>[ix, iy]</code>, 
    <code>[ix,iy,iz]</code> or <code>[ix,iy,iz,iw]</code>; Default: <code>ix = iy = iz = iw = 1</code> 
 </li></ul>
  
@@ -2361,14 +2362,13 @@ file.
   <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
 </tr>
 </table><br>
-    
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Empty outputs are returned if data set does not exist in the file 
 </li><li style="margin-bottom: 0.4em;">All structured data is stored in single precision. Hence, outputs are also in single precision. 
 </li><li style="margin-bottom: 0.4em;">Unstructured datatypes are returned as stored in the HDF file (same type, dimensions and storage order) 
-</li><li style="margin-bottom: 0.4em;">Typically, <code>n_path</code> may vary for each snapshot. In such cases, <code>n_path</code> is set to the maximum value found  
+</li><li style="margin-bottom: 0.4em;">Typically, <code>n_path</code> may vary for each snapshot. In such cases, <code>n_path</code> is set to the maximum value found 
    within the range of snapshots, and any missing paths are padded with zeroes. 
 </li></ul>
 </li>
@@ -2763,15 +2763,15 @@ R = reshape( rotation, 3, 3 );
 <b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90° points to the zenith and θ = 0° points to the horizon.
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Transforms 3D Cartesian coordinates <code>(x, y, z)</code> into geographic coordinates: Azimuth angle [rad],  
+   Elevation angle [rad], Distance (vector norm) 
+</li><li style="margin-bottom: 0.4em;">Azimuth is measured in the x-y plane from the x-axis; elevation is from the x-y plane upward. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart )
+[ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2795,6 +2795,67 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
    Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
    Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
 </li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="fast_sincos"></a>
+<b>fast_sincos</b> - Fast, approximate sine/cosine for MATLAB numeric arrays
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Computes elementwise sine and/or cosine for input angles in radians. 
+<ul><li style="margin-bottom: 0.4em;">Works on vectors, matrices, and 3-D arrays 
+</li><li style="margin-bottom: 0.4em;">Accepts any numeric input class; best performance with single precision 
+</li><li style="margin-bottom: 0.4em;">Outputs are always single precision <code>single</code> 
+</li><li style="margin-bottom: 0.4em;">Results are approximate and may differ from MATLAB <code>sin</code> / <code>cos</code> 
+</li><li style="margin-bottom: 0.4em;">Request one or two outputs to control which results are returned 
+</li><li style="margin-bottom: 0.4em;">With one output, set the optional <code>cosineOnly</code> flag to <code>true</code> to return cosine instead of sine 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[s, c] = arrayant_lib.fast_sincos(x);
+s = arrayant_lib.fast_sincos(x);
+c = arrayant_lib.fast_sincos(x, true);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>x</b></code> (input)<br> 
+   Numeric array of angles in radians. Any size/shape. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>cosineOnly</b> = false</code> (optional input)<br> 
+   Logical scalar. When requesting a single output, set to <code>true</code> to return <code>cos(x)</code>; otherwise returns 
+   <code>sin(x)</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>s</b></code><br> 
+   Single-precision <code>sin(x)</code>. Same size as <code>x</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>c</b></code><br> 
+   Single-precision <code>cos(x)</code>. Same size as <code>x</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Examples:</i></b><br><pre>
+% Input as single for best performance
+x = single(linspace(0, 2*pi, 1000));
+
+% Compute sine and cosine
+[s, c] = arrayant_lib.fast_sincos(x);
+
+% Compute only sine (single output)
+s = arrayant_lib.fast_sincos(x);
+
+% Compute only cosine (single output with flag)
+c = arrayant_lib.fast_sincos(x, true);
+
+% Double input is accepted; outputs remain single
+xd = linspace(0, 2*pi, 8);
+s_only = arrayant_lib.fast_sincos(xd);        % class(s_only) == 'single'
+c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
+</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>

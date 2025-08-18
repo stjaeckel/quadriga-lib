@@ -91,6 +91,17 @@ namespace quadriga_lib
                       arma::Cube<dtype> &real,      // Output: Cube (real part, float or double)
                       arma::Cube<dtype> &imag);     // Output: Cube (imaginary part, float or double)
 
+    // Fast, approximate sine/cosine for single-precision vectors
+    // - Computes sin(x) and/or cos(x) for all elements of an Armadillo fvec
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Results are approximate and may differ from std::sinf / std::cosf
+    // - Either 's' or 'c' may be nullptr to compute only one function
+    // - Fallback to std::sinf / std::cosf if complied without AVX2 (or running with non-AVX2 CPU)
+    void fast_sincos(const arma::fvec &x,      // Input angles in radians; n = x.n_elem.
+                     arma::fvec *s = nullptr,  // [out] If non-null, set to sin(x). Resized to length n if needed
+                     arma::fvec *c = nullptr); // [out] If non-null, set to cos(x). Resized to length n if needed
+
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
     template <typename dtype>
