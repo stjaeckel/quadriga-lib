@@ -124,13 +124,13 @@ inline std::string qd_mex_get_string(const mxArray *input, std::string default_v
 template <typename dtype>
 inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create_copy = false)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (n_data == 0)
         return arma::Col<dtype>();
@@ -142,13 +142,13 @@ inline arma::Col<dtype> qd_mex_reinterpret_Col(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create_copy = false)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (n_data == 0)
         return arma::Mat<dtype>();
@@ -160,12 +160,12 @@ inline arma::Mat<dtype> qd_mex_reinterpret_Mat(const mxArray *input, bool create
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool create_copy = false)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
 
     if (d1 * d2 * d3 * d4 == 0)
         return arma::Cube<dtype>();
@@ -182,13 +182,13 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
 // - See also: quadriga_lib::any_type_id
 inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", bool create_copy = false)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned d34 = d3 * d4, n_data = d1 * d2 * d34;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2 or 3
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t d34 = d3 * d4, n_data = d1 * d2 * d34;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -290,15 +290,15 @@ inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", 
 
 // Reads input and converts it to desired C++ type, creates a copy of the input
 template <typename dtype>
-inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name = "", unsigned n_elem = 0)
+inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name = "", size_t n_elem = 0)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -351,22 +351,22 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
     arma::Col<dtype> output = arma::Col<dtype>(n_data, arma::fill::none);
     dtype *ptr = output.memptr();
     if (T == 1)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_d[m];
     else if (T == 2)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_f[m];
     else if (T == 3)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ui[m];
     else if (T == 4)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_i[m];
     else if (T == 5)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ull[m];
     else if (T == 6)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ll[m];
     return output;
 }
@@ -375,13 +375,13 @@ inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string va
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string var_name = "")
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -423,22 +423,22 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
     auto output = arma::Mat<dtype>(d1, d2 * d3 * d4, arma::fill::none);
     dtype *ptr = output.memptr();
     if (T == 1)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_d[m];
     else if (T == 2)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_f[m];
     else if (T == 3)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ui[m];
     else if (T == 4)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_i[m];
     else if (T == 5)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ull[m];
     else if (T == 6)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ll[m];
     return output;
 }
@@ -447,13 +447,13 @@ inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string va
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string var_name = "")
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -495,22 +495,22 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
     auto output = arma::Cube<dtype>(d1, d2, d3 * d4, arma::fill::none);
     dtype *ptr = output.memptr();
     if (T == 1)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_d[m];
     else if (T == 2)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_f[m];
     else if (T == 3)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ui[m];
     else if (T == 4)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_i[m];
     else if (T == 5)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ull[m];
     else if (T == 6)
-        for (unsigned m = 0; m < n_data; ++m)
+        for (size_t m = 0; m < n_data; ++m)
             ptr[m] = (dtype)ptr_ll[m];
     return output;
 }
@@ -597,10 +597,10 @@ inline mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input) // Row Vector
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input,          // Column Vector
-                                   bool transpose = false,                 // Transpose output
-                                   unsigned long long ns = 0,              // Number of elements in output
-                                   const unsigned long long *is = nullptr) // List of elements to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input, // Column Vector
+                                   bool transpose = false,        // Transpose output
+                                   size_t ns = 0,                 // Number of elements in output
+                                   const size_t *is = nullptr)    // List of elements to copy, 0-based
 {
     mxClassID classID;
     if (typeid(dtype).name() == typeid(float).name())
@@ -630,16 +630,16 @@ inline mxArray *qd_mex_copy2matlab(const arma::Col<dtype> *input,          // Co
     if (is == nullptr) // Copy all
         std::memcpy(ptr_o, ptr_i, sizeof(dtype) * input->n_elem);
     else // Copy selected
-        for (unsigned long long i = 0ULL; i < ns; ++i)
+        for (size_t i = 0ULL; i < ns; ++i)
             ptr_o[i] = is[i] >= input->n_elem ? *ptr_i : ptr_i[is[i]];
 
     return output;
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input,          // Matrix
-                                   unsigned long long ns = 0,              // Number of columns in output
-                                   const unsigned long long *is = nullptr) // List of columns to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
+                                   size_t ns = 0,                 // Number of columns in output
+                                   const size_t *is = nullptr)    // List of columns to copy, 0-based
 {
     mxClassID classID;
     if (typeid(dtype).name() == typeid(float).name())
@@ -660,17 +660,17 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input,          // Ma
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    unsigned long long m = input->n_rows; // Rows
-    ns = ns == 0 ? input->n_cols : ns;    // Output columns
+    size_t m = input->n_rows;          // Rows
+    ns = ns == 0 ? input->n_cols : ns; // Output columns
     mxArray *output = mxCreateNumericMatrix((mwSize)m, (mwSize)ns, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
 
     if (is == nullptr) // Copy all
         std::memcpy(ptr, input->memptr(), sizeof(dtype) * input->n_elem);
     else // Copy selected
-        for (unsigned long long i = 0ULL; i < ns; ++i)
+        for (size_t i = 0ULL; i < ns; ++i)
         {
-            unsigned long long k = is[i] >= input->n_cols ? 0ULL : is[i];
+            size_t k = is[i] >= input->n_cols ? 0ULL : is[i];
             std::memcpy(&ptr[i * m], input->colptr(k), sizeof(dtype) * m);
         }
 
@@ -678,9 +678,9 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input,          // Ma
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,               // Cube
-                                   unsigned long long ns = 0,              // Number of columns in output
-                                   const unsigned long long *is = nullptr) // List of columns to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,   // Cube
+                                   size_t ns = 0,              // Number of columns in output
+                                   const size_t *is = nullptr) // List of columns to copy, 0-based
 {
     mxClassID classID;
     if (typeid(dtype).name() == typeid(float).name())
@@ -701,8 +701,8 @@ inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,               // Cu
     if (input->empty())
         return mxCreateNumericMatrix(0, 0, classID, mxREAL);
 
-    unsigned long long m = input->n_rows * input->n_cols; // Rows and columns
-    ns = ns == 0 ? input->n_slices : ns;                  // Slices
+    size_t m = input->n_rows * input->n_cols; // Rows and columns
+    ns = ns == 0 ? input->n_slices : ns;      // Slices
     mwSize dims[3] = {(mwSize)input->n_rows, (mwSize)input->n_cols, (mwSize)ns};
     mxArray *output = mxCreateNumericArray(3, dims, classID, mxREAL);
     dtype *ptr = (dtype *)mxGetData(output);
@@ -710,9 +710,9 @@ inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,               // Cu
     if (is == nullptr) // Copy all
         std::memcpy(ptr, input->memptr(), sizeof(dtype) * input->n_elem);
     else // Copy selected
-        for (unsigned long long i = 0ULL; i < ns; ++i)
+        for (size_t i = 0ULL; i < ns; ++i)
         {
-            unsigned long long k = is[i] >= input->n_slices ? 0ULL : is[i];
+            size_t k = is[i] >= input->n_slices ? 0ULL : is[i];
             std::memcpy(&ptr[i * m], input->slice_memptr(k), sizeof(dtype) * m);
         }
 
@@ -738,7 +738,9 @@ inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
 // - zero-padding of missing data
 // - returns empty Matrix object is vector is empty
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input, unsigned long long ns = 0, const unsigned long long *is = nullptr, dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
+                                     size_t ns = 0,
+                                     const size_t *is = nullptr, dtype padding = (dtype)0)
 {
     // Get classID from dtype
     mxClassID classID;
@@ -763,7 +765,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
     bool use_padding = padding != (dtype)0;
 
     // Get maximum input data dimensions
-    unsigned long long m = 0ULL;
+    size_t m = 0ULL;
     for (auto &v : *input)
         m = v.n_rows > m ? v.n_rows : m;
     ns = ns == 0ULL ? input->size() : ns;
@@ -772,21 +774,21 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
     dtype *ptr = (dtype *)mxGetData(output);
 
     // Get snapshot range
-    unsigned long long *js;
+    size_t *js;
     if (is == nullptr)
     {
-        js = new unsigned long long[input->size()];
-        for (unsigned long long i = 0ULL; i < input->size(); ++i)
+        js = new size_t[input->size()];
+        for (size_t i = 0ULL; i < input->size(); ++i)
             js[i] = i;
     }
     else
-        js = const_cast<unsigned long long *>(is); // Dirty, but fast
+        js = const_cast<size_t *>(is); // Dirty, but fast
 
     // Copy data
-    for (unsigned long long i = 0ULL; i < ns; ++i)
+    for (size_t i = 0ULL; i < ns; ++i)
     {
-        unsigned long long k = js[i] >= input->size() ? 0ULL : js[i];
-        unsigned long long r = input->at(k).n_rows;
+        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        size_t r = input->at(k).n_rows;
 
         if (use_padding && r != m)
             for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
@@ -802,7 +804,10 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input,
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input, unsigned long long ns = 0, const unsigned long long *is = nullptr, dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
+                                     size_t ns = 0,
+                                     const size_t *is = nullptr,
+                                     dtype padding = (dtype)0)
 {
     // Get classID from dtype
     mxClassID classID;
@@ -827,12 +832,12 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
     bool use_padding = padding != (dtype)0;
 
     // Get maximum input data dimensions
-    unsigned long long n_rows = 0ULL, n_cols = 0ULL;
+    size_t n_rows = 0ULL, n_cols = 0ULL;
     for (auto &v : *input)
         n_rows = v.n_rows > n_rows ? v.n_rows : n_rows,
         n_cols = v.n_cols > n_cols ? v.n_cols : n_cols;
 
-    unsigned long long m = n_rows * n_cols;
+    size_t m = n_rows * n_cols;
     ns = ns == 0ULL ? input->size() : ns;
 
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)ns};
@@ -840,21 +845,21 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
     dtype *ptr = (dtype *)mxGetData(output);
 
     // Get snapshot range
-    unsigned long long *js;
+    size_t *js;
     if (is == nullptr)
     {
-        js = new unsigned long long[input->size()];
-        for (unsigned long long i = 0ULL; i < input->size(); ++i)
+        js = new size_t[input->size()];
+        for (size_t i = 0ULL; i < input->size(); ++i)
             js[i] = i;
     }
     else
-        js = const_cast<unsigned long long *>(is); // Dirty, but fast
+        js = const_cast<size_t *>(is); // Dirty, but fast
 
     // Copy data
-    for (unsigned long long i = 0ULL; i < ns; ++i)
+    for (size_t i = 0ULL; i < ns; ++i)
     {
-        unsigned long long k = js[i] >= input->size() ? 0ULL : js[i];
-        unsigned long long r = input->at(k).n_rows, c = input->at(k).n_cols;
+        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        size_t r = input->at(k).n_rows, c = input->at(k).n_cols;
 
         if (use_padding && r * c != m)
             for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
@@ -863,7 +868,7 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
         if (r == n_rows)
             std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r * c);
         else // Copy column by column
-            for (unsigned long long ic = 0ULL; ic < c; ++ic)
+            for (size_t ic = 0ULL; ic < c; ++ic)
                 std::memcpy(&ptr[i * m + ic * n_rows],
                             input->at(k).colptr(ic), sizeof(dtype) * r);
     }
@@ -875,7 +880,10 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input, unsigned long long ns = 0, const unsigned long long *is = nullptr, dtype padding = (dtype)0)
+inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input,
+                                     size_t ns = 0,
+                                     const size_t *is = nullptr,
+                                     dtype padding = (dtype)0)
 {
     // Get classID from dtype
     mxClassID classID;
@@ -898,13 +906,13 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     bool use_padding = padding != (dtype)0;
 
     // Get maximum input data dimensions
-    unsigned long long n_rows = 0ULL, n_cols = 0ULL, n_slices = 0ULL;
+    size_t n_rows = 0ULL, n_cols = 0ULL, n_slices = 0ULL;
     for (auto &v : *input)
         n_rows = v.n_rows > n_rows ? v.n_rows : n_rows,
         n_cols = v.n_cols > n_cols ? v.n_cols : n_cols,
         n_slices = v.n_slices > n_slices ? v.n_slices : n_slices;
 
-    unsigned long long m = n_rows * n_cols * n_slices;
+    size_t m = n_rows * n_cols * n_slices;
     ns = ns == 0ULL ? input->size() : ns;
 
     mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)ns};
@@ -912,21 +920,21 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
     dtype *ptr = (dtype *)mxGetData(output);
 
     // Get snapshot range
-    unsigned long long *js;
+    size_t *js;
     if (is == nullptr)
     {
-        js = new unsigned long long[input->size()];
-        for (unsigned long long i = 0ULL; i < input->size(); ++i)
+        js = new size_t[input->size()];
+        for (size_t i = 0ULL; i < input->size(); ++i)
             js[i] = i;
     }
     else
-        js = const_cast<unsigned long long *>(is); // Dirty, but fast
+        js = const_cast<size_t *>(is); // Dirty, but fast
 
     // Copy data
-    for (unsigned long long i = 0ULL; i < ns; ++i)
+    for (size_t i = 0ULL; i < ns; ++i)
     {
-        unsigned long long k = js[i] >= input->size() ? 0ULL : js[i];
-        unsigned long long r = input->at(k).n_rows, c = input->at(k).n_cols, s = input->at(k).n_slices;
+        size_t k = js[i] >= input->size() ? 0ULL : js[i];
+        size_t r = input->at(k).n_rows, c = input->at(k).n_cols, s = input->at(k).n_slices;
 
         if (use_padding && r * c * s != m)
             for (dtype *p = &ptr[i * m]; p < &ptr[(i + 1) * m]; ++p)
@@ -935,8 +943,8 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
         if (r == n_rows && c == n_cols)
             std::memcpy(&ptr[i * m], input->at(k).memptr(), sizeof(dtype) * r * c * s);
         else // Copy column by column
-            for (unsigned long long is = 0ULL; is < s; ++is)
-                for (unsigned long long ic = 0ULL; ic < c; ++ic)
+            for (size_t is = 0ULL; is < s; ++is)
+                for (size_t ic = 0ULL; ic < c; ++ic)
                     std::memcpy(&ptr[i * m + is * n_rows * n_cols + ic * n_rows],
                                 input->at(k).slice_colptr(is, ic), sizeof(dtype) * r);
     }
@@ -952,15 +960,15 @@ inline mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input
 // - vec_dim = Dimension used for std::vector, 0-based
 // - Data on other dimensions are vectorized and casted to <dtype>
 template <typename dtype>
-std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, unsigned vec_dim)
+std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, size_t vec_dim)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -996,114 +1004,114 @@ std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, uns
     // Convert data to armadillo output
     auto output = std::vector<arma::Col<dtype>>();
     if (vec_dim == 0)
-        for (unsigned n = 0; n < d1; ++n)
+        for (size_t n = 0; n < d1; ++n)
         {
             auto tmp = arma::Col<dtype>(d2 * d3 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_d[m * d1 + n];
             else if (T == 2)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_f[m * d1 + n];
             else if (T == 3)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ui[m * d1 + n];
             else if (T == 4)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_i[m * d1 + n];
             else if (T == 5)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ull[m * d1 + n];
             else if (T == 6)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ll[m * d1 + n];
             output.push_back(tmp);
         }
     else if (vec_dim == 1)
-        for (unsigned n = 0; n < d2; ++n)
+        for (size_t n = 0; n < d2; ++n)
         {
             auto tmp = arma::Col<dtype>(d1 * d3 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_d[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 2)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_f[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 3)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ui[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 4)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_i[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 5)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ull[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 6)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ll[m34 * d2 * d1 + n * d1 + m1];
             output.push_back(tmp);
         }
     else if (vec_dim == 2)
-        for (unsigned n = 0; n < d3; ++n)
+        for (size_t n = 0; n < d3; ++n)
         {
             auto tmp = arma::Col<dtype>(d1 * d2 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 2)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 3)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 4)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 5)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 6)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             output.push_back(tmp);
         }
     else if (vec_dim == 3)
-        for (unsigned n = 0; n < d4; ++n)
+        for (size_t n = 0; n < d4; ++n)
         {
             auto tmp = arma::Col<dtype>(d1 * d2 * d3, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_d[n * d3 * d2 * d1 + m];
             else if (T == 2)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_f[n * d3 * d2 * d1 + m];
             else if (T == 3)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ui[n * d3 * d2 * d1 + m];
             else if (T == 4)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_i[n * d3 * d2 * d1 + m];
             else if (T == 5)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ull[n * d3 * d2 * d1 + m];
             else if (T == 6)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ll[n * d3 * d2 * d1 + m];
             output.push_back(tmp);
         }
@@ -1116,15 +1124,15 @@ std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, uns
 // Creates a std::vector of armadillo types from mxArray
 // - e.g. MATLAB --> std::vector<arma::Mat<dtype>>
 template <typename dtype>
-std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, unsigned vec_dim)
+std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, size_t vec_dim)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -1160,114 +1168,114 @@ std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, uns
     // Convert data to armadillo output
     auto output = std::vector<arma::Mat<dtype>>();
     if (vec_dim == 0)
-        for (unsigned n = 0; n < d1; ++n)
+        for (size_t n = 0; n < d1; ++n)
         {
             auto tmp = arma::Mat<dtype>(d2, d3 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_d[m * d1 + n];
             else if (T == 2)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_f[m * d1 + n];
             else if (T == 3)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ui[m * d1 + n];
             else if (T == 4)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_i[m * d1 + n];
             else if (T == 5)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ull[m * d1 + n];
             else if (T == 6)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ll[m * d1 + n];
             output.push_back(tmp);
         }
     else if (vec_dim == 1)
-        for (unsigned n = 0; n < d2; ++n)
+        for (size_t n = 0; n < d2; ++n)
         {
             auto tmp = arma::Mat<dtype>(d1, d3 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_d[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 2)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_f[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 3)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ui[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 4)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_i[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 5)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ull[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 6)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ll[m34 * d2 * d1 + n * d1 + m1];
             output.push_back(tmp);
         }
     else if (vec_dim == 2)
-        for (unsigned n = 0; n < d3; ++n)
+        for (size_t n = 0; n < d3; ++n)
         {
             auto tmp = arma::Mat<dtype>(d1, d2 * d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 2)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 3)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 4)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 5)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 6)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             output.push_back(tmp);
         }
     else if (vec_dim == 3)
-        for (unsigned n = 0; n < d4; ++n)
+        for (size_t n = 0; n < d4; ++n)
         {
             auto tmp = arma::Mat<dtype>(d1, d2 * d3, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_d[n * d3 * d2 * d1 + m];
             else if (T == 2)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_f[n * d3 * d2 * d1 + m];
             else if (T == 3)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ui[n * d3 * d2 * d1 + m];
             else if (T == 4)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_i[n * d3 * d2 * d1 + m];
             else if (T == 5)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ull[n * d3 * d2 * d1 + m];
             else if (T == 6)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ll[n * d3 * d2 * d1 + m];
             output.push_back(tmp);
         }
@@ -1280,15 +1288,15 @@ std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, uns
 // Creates a std::vector of armadillo types from mxArray
 // - e.g. MATLAB --> std::vector<arma::Cube<dtype>>
 template <typename dtype>
-std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, unsigned vec_dim)
+std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, size_t vec_dim)
 {
-    unsigned n_dim = (unsigned)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
     const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
-    unsigned d1 = (unsigned)dims[0];                           // Number of elements on first dimension
-    unsigned d2 = (unsigned)dims[1];                           // Number of elements on second dimension
-    unsigned d3 = n_dim < 3 ? 1 : (unsigned)dims[2];           // Number of elements on third dimension
-    unsigned d4 = n_dim < 4 ? 1 : (unsigned)dims[3];           // Number of elements on fourth dimension
-    unsigned n_data = d1 * d2 * d3 * d4;
+    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
+    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
+    size_t n_data = d1 * d2 * d3 * d4;
 
     if (mxIsComplex(input))
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
@@ -1324,114 +1332,114 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, u
     // Convert data to armadillo output
     auto output = std::vector<arma::Cube<dtype>>();
     if (vec_dim == 0)
-        for (unsigned n = 0; n < d1; ++n)
+        for (size_t n = 0; n < d1; ++n)
         {
             auto tmp = arma::Cube<dtype>(d2, d3, d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_d[m * d1 + n];
             else if (T == 2)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_f[m * d1 + n];
             else if (T == 3)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ui[m * d1 + n];
             else if (T == 4)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_i[m * d1 + n];
             else if (T == 5)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ull[m * d1 + n];
             else if (T == 6)
-                for (unsigned m = 0; m < d2 * d3 * d4; ++m)
+                for (size_t m = 0; m < d2 * d3 * d4; ++m)
                     ptr[m] = (dtype)ptr_ll[m * d1 + n];
             output.push_back(tmp);
         }
     else if (vec_dim == 1)
-        for (unsigned n = 0; n < d2; ++n)
+        for (size_t n = 0; n < d2; ++n)
         {
             auto tmp = arma::Cube<dtype>(d1, d3, d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_d[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 2)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_f[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 3)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ui[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 4)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_i[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 5)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ull[m34 * d2 * d1 + n * d1 + m1];
             else if (T == 6)
-                for (unsigned m34 = 0; m34 < d3 * d4; ++m34)
-                    for (unsigned m1 = 0; m1 < d1; ++m1)
+                for (size_t m34 = 0; m34 < d3 * d4; ++m34)
+                    for (size_t m1 = 0; m1 < d1; ++m1)
                         ptr[m34 * d1 + m1] = (dtype)ptr_ll[m34 * d2 * d1 + n * d1 + m1];
             output.push_back(tmp);
         }
     else if (vec_dim == 2)
-        for (unsigned n = 0; n < d3; ++n)
+        for (size_t n = 0; n < d3; ++n)
         {
             auto tmp = arma::Cube<dtype>(d1, d2, d4, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_d[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 2)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_f[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 3)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ui[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 4)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_i[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 5)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ull[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             else if (T == 6)
-                for (unsigned m4 = 0; m4 < d4; ++m4)
-                    for (unsigned m12 = 0; m12 < d1 * d2; ++m12)
+                for (size_t m4 = 0; m4 < d4; ++m4)
+                    for (size_t m12 = 0; m12 < d1 * d2; ++m12)
                         ptr[m4 * d2 * d1 + m12] = (dtype)ptr_ll[m4 * d3 * d2 * d1 + n * d2 * d1 + m12];
             output.push_back(tmp);
         }
     else if (vec_dim == 3)
-        for (unsigned n = 0; n < d4; ++n)
+        for (size_t n = 0; n < d4; ++n)
         {
             auto tmp = arma::Cube<dtype>(d1, d2, d3, arma::fill::none);
             dtype *ptr = tmp.memptr();
             if (T == 1)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_d[n * d3 * d2 * d1 + m];
             else if (T == 2)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_f[n * d3 * d2 * d1 + m];
             else if (T == 3)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ui[n * d3 * d2 * d1 + m];
             else if (T == 4)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_i[n * d3 * d2 * d1 + m];
             else if (T == 5)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ull[n * d3 * d2 * d1 + m];
             else if (T == 6)
-                for (unsigned m = 0; m < d1 * d2 * d3; ++m)
+                for (size_t m = 0; m < d1 * d2 * d3; ++m)
                     ptr[m] = (dtype)ptr_ll[n * d3 * d2 * d1 + m];
             output.push_back(tmp);
         }
@@ -1442,78 +1450,78 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, u
 }
 
 // Creates an mxArray based on the armadillo type, Initializes mxArray and reinterprets armadillo object
-inline mxArray *qd_mex_init_output(arma::Row<float> *input, unsigned long long n_elem) // 1D-Single Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<float> *input, size_t n_elem) // 1D-Single Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL);
     *input = arma::Row<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<float> *input, unsigned long long n_elem, bool transpose = false) // 1D-Single Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<float> *input, size_t n_elem, bool transpose = false) // 1D-Single Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxSINGLE_CLASS, mxREAL);
     *input = arma::Col<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<float> *input, unsigned long long n_rows, unsigned long long n_cols) // 2D-Single
+inline mxArray *qd_mex_init_output(arma::Mat<float> *input, size_t n_rows, size_t n_cols) // 2D-Single
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxSINGLE_CLASS, mxREAL);
     *input = arma::Mat<float>((float *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Cube<float> *input, unsigned long long n_rows, unsigned long long n_cols, unsigned long long n_slices) // 3D-Single
+inline mxArray *qd_mex_init_output(arma::Cube<float> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-Single
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
     *input = arma::Cube<float>((float *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Row<double> *input, unsigned long long n_elem) // 1D-Double Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<double> *input, size_t n_elem) // 1D-Double Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Row<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<double> *input, unsigned long long n_elem, bool transpose = false) // 1D-Double Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<double> *input, size_t n_elem, bool transpose = false) // 1D-Double Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Col<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<double> *input, unsigned long long n_rows, unsigned long long n_cols) // 2D-Double
+inline mxArray *qd_mex_init_output(arma::Mat<double> *input, size_t n_rows, size_t n_cols) // 2D-Double
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Mat<double>((double *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Cube<double> *input, unsigned long long n_rows, unsigned long long n_cols, unsigned long long n_slices) // 3D-Double
+inline mxArray *qd_mex_init_output(arma::Cube<double> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-Double
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
     *input = arma::Cube<double>((double *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Row<unsigned> *input, unsigned long long n_elem) // 1D-UINT32 Row Vector
+inline mxArray *qd_mex_init_output(arma::Row<unsigned> *input, size_t n_elem) // 1D-UINT32 Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL);
     *input = arma::Row<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Col<unsigned> *input, unsigned long long n_elem, bool transpose = false) // 1D-UINT32 Column Vector
+inline mxArray *qd_mex_init_output(arma::Col<unsigned> *input, size_t n_elem, bool transpose = false) // 1D-UINT32 Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxUINT32_CLASS, mxREAL);
     *input = arma::Col<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Mat<unsigned> *input, unsigned long long n_rows, unsigned long long n_cols) // 2D-UINT32
+inline mxArray *qd_mex_init_output(arma::Mat<unsigned> *input, size_t n_rows, size_t n_cols) // 2D-UINT32
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxUINT32_CLASS, mxREAL);
     *input = arma::Mat<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
-inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, unsigned long long n_rows, unsigned long long n_cols, unsigned long long n_slices) // 3D-UINT32
+inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-UINT32
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxUINT32_CLASS, mxREAL);
