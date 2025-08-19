@@ -23,107 +23,22 @@
 #ifndef quadriga_lib_fastmath_vec_avx2_H
 #define quadriga_lib_fastmath_vec_avx2_H
 
-#include "fastmath_avx2.h"
-
-#include <immintrin.h>
 #include <stddef.h>
-#include <limits.h>
 
-#ifndef QD_OMP_THRESHOLD
-#define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
-#endif
-
-void qd_SINCOS_AVX2(const float *__restrict x,
+template <typename dtype> // float or double
+void qd_SINCOS_AVX2(const dtype *__restrict x,
                     float *__restrict s,
                     float *__restrict c,
-                    size_t n_val) // multiple of 8
-{
-    const size_t n_vec = n_val >> 3; // number of 8-float vectors
-    size_t done = 0;
+                    size_t n_val); // multiple of 8
 
-    while (done < n_vec)
-    {
-        size_t blk = n_vec - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP 'for' needs signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + (done << 3);
-        float *__restrict sb = s + (done << 3);
-        float *__restrict cb = c + (done << 3);
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            __m256 xv, sv, cv;
-            xv = _mm256_loadu_ps(xb + ((size_t)i << 3)); // no alignment required
-            _fm256_sincos256_ps(xv, &sv, &cv);
-            _mm256_storeu_ps(sb + ((size_t)i << 3), sv);
-            _mm256_storeu_ps(cb + ((size_t)i << 3), cv);
-        }
-
-        done += blk;
-    }
-}
-
-void qd_SIN_AVX2(const float *__restrict x,
+template <typename dtype> // float or double
+void qd_SIN_AVX2(const dtype *__restrict x,
                  float *__restrict s,
-                 size_t n_val) // multiple of 8
-{
-    const size_t n_vec = n_val >> 3; // number of 8-float vectors
-    size_t done = 0;
+                 size_t n_val); // multiple of 8
 
-    while (done < n_vec)
-    {
-        size_t blk = n_vec - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP 'for' needs signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + (done << 3);
-        float *__restrict sb = s + (done << 3);
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            __m256 xv, sv, cv;
-            xv = _mm256_loadu_ps(xb + ((size_t)i << 3)); // no alignment required
-            _fm256_sincos256_ps(xv, &sv, &cv);
-            _mm256_storeu_ps(sb + ((size_t)i << 3), sv);
-        }
-
-        done += blk;
-    }
-}
-
-void qd_COS_AVX2(const float *__restrict x,
+template <typename dtype> // float or double
+void qd_COS_AVX2(const dtype *__restrict x,
                  float *__restrict c,
-                 size_t n_val) // multiple of 8
-{
-    const size_t n_vec = n_val >> 3; // number of 8-float vectors
-    size_t done = 0;
-
-    while (done < n_vec)
-    {
-        size_t blk = n_vec - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP 'for' needs signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + (done << 3);
-        float *__restrict cb = c + (done << 3);
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            __m256 xv, sv, cv;
-            xv = _mm256_loadu_ps(xb + ((size_t)i << 3)); // no alignment required
-            _fm256_sincos256_ps(xv, &sv, &cv);
-            _mm256_storeu_ps(cb + ((size_t)i << 3), cv);
-        }
-
-        done += blk;
-    }
-}
+                 size_t n_val); // multiple of 8
 
 #endif
