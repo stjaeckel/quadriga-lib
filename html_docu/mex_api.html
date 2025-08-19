@@ -2763,15 +2763,15 @@ R = reshape( rotation, 3, 3 );
 <b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Transforms 3D Cartesian coordinates <code>(x, y, z)</code> into geographic coordinates: Azimuth angle [rad],  
-   Elevation angle [rad], Distance (vector norm) 
-</li><li style="margin-bottom: 0.4em;">Azimuth is measured in the x-y plane from the x-axis; elevation is from the x-y plane upward. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
+<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
+coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
+points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
+where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
+θ = 90° points to the zenith and θ = 0° points to the horizon.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart );
+[ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2805,8 +2805,10 @@ R = reshape( rotation, 3, 3 );
 <b><i>Description:</i></b><br>Computes elementwise sine and/or cosine for input angles in radians. 
 <ul><li style="margin-bottom: 0.4em;">Works on vectors, matrices, and 3-D arrays 
 </li><li style="margin-bottom: 0.4em;">Accepts any numeric input class; best performance with single precision 
-</li><li style="margin-bottom: 0.4em;">Outputs are always single precision <code>single</code> 
+</li><li style="margin-bottom: 0.4em;">Outputs are always single precision 
 </li><li style="margin-bottom: 0.4em;">Results are approximate and may differ from MATLAB <code>sin</code> / <code>cos</code> 
+</li><li style="margin-bottom: 0.4em;">For x in [-pi, pi], the maximum absolute error is 2^(-22.1), and larger otherwise 
+</li><li style="margin-bottom: 0.4em;">For x in [-500, 500], the maximum absolute error is 2^(-16.0) 
 </li><li style="margin-bottom: 0.4em;">Request one or two outputs to control which results are returned 
 </li><li style="margin-bottom: 0.4em;">With one output, set the optional <code>cosineOnly</code> flag to <code>true</code> to return cosine instead of sine 
 </li></ul>

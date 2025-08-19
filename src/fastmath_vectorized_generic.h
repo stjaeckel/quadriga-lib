@@ -31,87 +31,47 @@
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
 
-void qd_SINCOS_GENERIC(const float *__restrict x,
+template <typename dtype>
+void qd_SINCOS_GENERIC(const dtype *__restrict x,
                        float *__restrict s,
                        float *__restrict c,
                        size_t n_val)
 {
-    size_t done = 0;
-
-    while (done < n_val)
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
     {
-        size_t blk = n_val - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP requires signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + done;
-        float *__restrict sb = s + done;
-        float *__restrict cb = c + done;
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            const float xi = xb[i];
-            sb[i] = sinf(xi);
-            cb[i] = cosf(xi);
-        }
-
-        done += blk;
+        const float xi = (float)x[i];
+        s[i] = sinf(xi);
+        c[i] = cosf(xi);
     }
 }
 
-void qd_SIN_GENERIC(const float *__restrict x,
+template <typename dtype>
+void qd_SIN_GENERIC(const dtype *__restrict x,
                     float *__restrict s,
                     size_t n_val)
 {
-    size_t done = 0;
-
-    while (done < n_val)
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
     {
-        size_t blk = n_val - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP requires signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + done;
-        float *__restrict sb = s + done;
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            const float xi = xb[i];
-            sb[i] = sinf(xi);
-        }
-
-        done += blk;
+        const float xi = (float)x[i];
+        s[i] = sinf(xi);
     }
 }
 
-void qd_COS_GENERIC(const float *__restrict x,
+template <typename dtype>
+void qd_COS_GENERIC(const dtype *__restrict x,
                     float *__restrict c,
                     size_t n_val)
 {
-    size_t done = 0;
-
-    while (done < n_val)
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
     {
-        size_t blk = n_val - done;
-        if (blk > (size_t)INT_MAX)
-            blk = (size_t)INT_MAX; // MSVC OpenMP requires signed int
-        const int iters = (int)blk;
-
-        const float *__restrict xb = x + done;
-        float *__restrict cb = c + done;
-
-#pragma omp parallel for schedule(static) if (iters >= QD_OMP_THRESHOLD)
-        for (int i = 0; i < iters; ++i)
-        {
-            const float xi = xb[i];
-            cb[i] = cosf(xi);
-        }
-
-        done += blk;
+        const float xi = (float)x[i];
+        c[i] = cosf(xi);
     }
 }
 

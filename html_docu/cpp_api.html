@@ -134,7 +134,7 @@
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculate rotation matrices from Euler angles</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)</td></tr>
 <tr><td><a href="#colormap">colormap</a></td><td>Generate colormap</td></tr>
-<tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for single-precision vectors</td></tr>
+<tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform geographic (azimuth, elevation, length) to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp_1d / interp_2d">interp_1d / interp_2d</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
@@ -3006,36 +3006,36 @@ arma::uchar_mat cm = quadriga_lib::colormap("turbo");
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="fast_sincos"></a>
-<b>fast_sincos</b> - Fast, approximate sine/cosine for single-precision vectors
+<b>fast_sincos</b> - Fast, approximate sine/cosine
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>Computes elementwise sine and/or cosine for an Armadillo <code>fvec</code>. Designed for high throughput on modern CPUs. 
+<b><i>Description:</i></b><br>Computes elementwise sine and/or cosine for an Armadillo vector. Designed for high throughput on modern CPUs. 
 <ul><li style="margin-bottom: 0.4em;">Operates on input angles in radians 
-</li><li style="margin-bottom: 0.4em;">Accepts <code>arma::fvec</code> and writes results into provided output pointers 
 </li><li style="margin-bottom: 0.4em;">AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs 
 </li><li style="margin-bottom: 0.4em;">Parallelizes across cores with OpenMP when enabled 
 </li><li style="margin-bottom: 0.4em;">Results are approximate and may differ from <code>std::sinf</code> / <code>std::cosf</code> 
+</li><li style="margin-bottom: 0.4em;">For x in [-pi, pi], the maximum absolute error is 2^(-22.1), and larger otherwise 
+</li><li style="margin-bottom: 0.4em;">For x in [-500, 500], the maximum absolute error is 2^(-16.0) 
 </li><li style="margin-bottom: 0.4em;">Either output (<code>s</code> or <code>c</code>) may be <code>nullptr</code> to skip its computation 
-</li><li style="margin-bottom: 0.4em;">Allowed datatype: <code>float</code> (Armadillo <code>fvec</code>) 
+</li><li style="margin-bottom: 0.4em;">Allowed input datatype: <code>float</code> (Armadillo <code>fvec</code>) or <code>double</code> (Armadillo <code>vec</code>) 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-void fast_sincos(const arma::fvec &amp;x,
-                arma::fvec *s = nullptr,
-                arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::fvec &amp;x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::vec &amp;x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec <b>x</b></code> (input)<br> 
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec <b>x</b></code> or <code>const arma::vec <b>x</b></code> (input)<br> 
    Input angles in radians. Size <code>[n]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec <b>s</b> = nullptr</code> (optional output)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec <b>*s</b> = nullptr</code> (optional output)<br> 
    If non-null, set to <code>sin(x)</code>. Resized to length <code>n</code> if needed. Size <code>[n]</code> or <code>nullptr</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec <b>c</b> = nullptr</code> (optional output)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec <b>*c</b> = nullptr</code> (optional output)<br> 
    If non-null, set to <code>cos(x)</code>. Resized to length <code>n</code> if needed. Size <code>[n]</code> or <code>nullptr</code>. 
 </li></ul>
 </li>
@@ -3048,9 +3048,9 @@ void fast_sincos(const arma::fvec &amp;x,
 <b><i>Example:</i></b><br><pre>
 arma::fvec x = arma::linspace[arma::fvec](arma::fvec)(0.0f, 6.2831853f, 1000);
 arma::fvec s, c;
-fast_sincos(x, &amp;s, &amp;c);      // compute both
-fast_sincos(x, &amp;s, nullptr); // compute sine only
-fast_sincos(x, nullptr, &amp;c); // compute cosine only
+quadriga_lib::fast_sincos(x, &amp;s, &amp;c);      // compute both
+quadriga_lib::fast_sincos(x, &amp;s, nullptr); // compute sine only
+quadriga_lib::fast_sincos(x, nullptr, &amp;c); // compute cosine only
 </pre>
 </li>
 </ul>
