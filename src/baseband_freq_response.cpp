@@ -30,36 +30,51 @@
 
 // Generic C++ implementation of DFT
 template <typename dtype>
-static inline void qd_DFT_GENERIC(const dtype *CFr,       // Channel coefficients, real part, Size [n_ant, n_path]
-                                  const dtype *CFi,       // Channel coefficients, imaginary part, Size [n_ant, n_path]
-                                  const dtype *DL,        // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
-                                  const size_t n_ant,     // Number of MIMO sub-links
-                                  const size_t n_path,    // Number multipath components
-                                  const bool planar_wave, // Indicator that same delays are used for all antennas
-                                  const float *phasor,    // Phasor, -pi/2 to pi/2, aligned to 32 byte, Size [ n_carrier ]
-                                  const size_t n_carrier, // Number of carriers, mutiple of 8
-                                  float *Hr,              // Channel matrix, real part, Size [ n_carrier, n_ant ]
-                                  float *Hi)              // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
+static inline void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, real part, Size [n_ant, n_path]
+                                  const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]
+                                  const dtype *__restrict DL,     // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
+                                  const size_t n_ant,             // Number of MIMO sub-links
+                                  const size_t n_path,            // Number multipath components
+                                  const bool planar_wave,         // Indicator that same delays are used for all antennas
+                                  const float *__restrict phasor, // Phasor, -pi/2 to pi/2, Size [ n_carrier ]
+                                  const size_t n_carrier,         // Number of carriers, mutiple of 8
+                                  float *__restrict Hr,           // Channel matrix, real part, Size [ n_carrier, n_ant ]
+                                  float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 {
+    std::vector<float> crf(n_path), cif(n_path), dlf(n_path);
 
-    for (size_t i_path = 0; i_path < n_path; ++i_path) // Path loop
-        for (size_t i_ant = 0; i_ant < n_ant; ++i_ant) // Antenna loop
+    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
+    {
+        for (size_t i_path = 0; i_path < n_path; ++i_path)
         {
-            size_t i = i_path * n_ant + i_ant;
-            float cr = (float)CFr[i];
-            float ci = (float)CFi[i];
-            float dl = planar_wave ? (float)DL[i_path] : (float)DL[i];
-
-            for (size_t i_carrier = 0; i_carrier < n_carrier; ++i_carrier)
-            {
-                float phase = phasor[i_carrier] * dl;
-                float si = std::sin(phase), co = std::cos(phase);
-
-                size_t o = i_ant * n_carrier + i_carrier;
-                Hr[o] += co * cr - si * ci;
-                Hi[o] += co * ci + si * cr;
-            }
+            const size_t idx = i_path * n_ant + i_ant;
+            crf[i_path] = (float)CFr[idx];
+            cif[i_path] = (float)CFi[idx];
+            dlf[i_path] = planar_wave ? (float)DL[i_path] : (float)DL[idx];
         }
+
+        const size_t base = i_ant * n_carrier;
+
+        for (size_t k = 0; k < n_carrier; ++k)
+        {
+            float hr = 0.0f;
+            float hi = 0.0f;
+            const float pk = phasor[k];
+
+            for (size_t i_path = 0; i_path < n_path; ++i_path)
+            {
+                const float theta = pk * dlf[i_path];
+                const float s = std::sin(theta);
+                const float c = std::cos(theta);
+
+                hr += c * crf[i_path] - s * cif[i_path];
+                hi += c * cif[i_path] + s * crf[i_path];
+            }
+
+            Hr[base + k] = hr;
+            Hi[base + k] = hi;
+        }
+    }
 }
 
 /*!SECTION
@@ -199,15 +214,7 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
     for (arma::uword i_carrier = n_carrier; i_carrier < n_carrier_s; ++i_carrier)
         phasor[i_carrier] = 0.0f;
 
-    // Initialize output memory
-    for (arma::uword i = 0; i < n_carrier_s * n_ant; ++i)
-        Hr[i] = 0.0f, Hi[i] = 0.0f;
-
     // Call DFT function
-#if defined(_MSC_VER) // Windows
-    qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
-                   n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
-#else // Linux
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check()) // CPU support for AVX2
     {
@@ -222,7 +229,6 @@ void quadriga_lib::baseband_freq_response(const arma::Cube<dtype> *coeff_re,    
 #else // AVX2 disabled
     qd_DFT_GENERIC(coeff_re->memptr(), coeff_im->memptr(), delay->memptr(),
                    n_ant, n_path, planar_wave, phasor, n_carrier_s, Hr, Hi);
-#endif
 #endif
 
 #if defined(_MSC_VER) // Windows
