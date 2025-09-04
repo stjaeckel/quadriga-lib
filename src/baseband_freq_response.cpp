@@ -36,8 +36,8 @@ static inline void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coe
                                   const size_t n_ant,             // Number of MIMO sub-links
                                   const size_t n_path,            // Number multipath components
                                   const bool planar_wave,         // Indicator that same delays are used for all antennas
-                                  const float *__restrict phasor, // Phasor, -pi/2 to pi/2, Size [ n_carrier ]
-                                  const size_t n_carrier,         // Number of carriers, mutiple of 8
+                                  const float *__restrict phasor, // Phasor, Length [ n_carrier ]
+                                  const size_t n_carrier,         // Number of carriers
                                   float *__restrict Hr,           // Channel matrix, real part, Size [ n_carrier, n_ant ]
                                   float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
 {

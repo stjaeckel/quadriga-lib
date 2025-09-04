@@ -59,7 +59,7 @@
 <font size=+1><b>Download</b></font>
 <br>
 <ul><li style="margin-bottom: 0.4em;"><b>Latest Stable Version (Source Code)</b><br> 
-   <a href="download/quadriga_lib-0.9.0.zip">quadriga_lib-0.9.0.zip</a> 
+   <a href="download/quadriga_lib-0.9.1.zip">quadriga_lib-0.9.1.zip</a> 
 </li></ul>
 <hr class="greyline">
 <br>
@@ -70,7 +70,7 @@
  
 <b>Linux / Ubuntu</b><br> 
  
-<ul><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Install Matlab from <a target="_blank" rel="noopener noreferrer" href="https://www.mathworks.com">www.mathworks.com</a> - you need to obtain a license 
+<ul><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Install Matlab from <a target="_blank" rel="noopener noreferrer" href="https://www.mathworks.com">mathworks.com</a> - you need to obtain a license 
 </li><li style="margin-bottom: 0.4em;">Install the required packages (octave-dev is only needed if you want to use Octave): 
 </li></ul>
 <pre>
@@ -94,7 +94,7 @@ export PYTHONPATH=$PYTHONPATH:/path/to/quadriga-lib/lib
  
 <b>Linux / Ubuntu with Anaconda</b><br> 
  
-<ul><li style="margin-bottom: 0.4em;">Install Miniconda from [Anaconda's official website](https://www.anaconda.com/products/distribution#download-section). If you already have Anaconda installed, you can skip this step. 
+<ul><li style="margin-bottom: 0.4em;">Install Miniconda from <a target="_blank" rel="noopener noreferrer" href="https://www.anaconda.com/products/distribution#download-section">Anaconda's official website</a>. If you already have Anaconda installed, you can skip this step. 
 </li></ul>
 <pre>
 cd ~/Downloads
@@ -109,7 +109,7 @@ conda deactivate
 conda create --name quadriga-lib -c conda-forge python=3.13 numpy pandas jupyterlab seaborn pytest scipy jupyterlab_widgets ipywidgets traittypes jupyter compilers make cmake hdf5 octave
 conda activate quadriga-lib
 </pre>
-<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or [quadriga-lib.org](http://quadriga-lib.org) 
+<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or <a target="_blank" rel="noopener noreferrer" href="http://quadriga-lib.org">quadriga-lib.org</a> 
 </li></ul>
 <pre>
 git clone https://github.com/stjaeckel/quadriga-lib
@@ -126,10 +126,10 @@ cd quadriga-lib
  
 <b>Windows</b><br> 
 <ul><li style="margin-bottom: 0.4em;">Octave and Python are not supported yet (only MATLAB is) 
-</li><li style="margin-bottom: 0.4em;">Install Build Tools for Visual Studio 2022 from https://visualstudio.microsoft.com 
-</li><li style="margin-bottom: 0.4em;">Install Matlab from (https://www.mathworks.com) - you need to obtain a licence 
+</li><li style="margin-bottom: 0.4em;">Install Build Tools for Visual Studio 2022 from <a target="_blank" rel="noopener noreferrer" href="https://visualstudio.microsoft.com">visualstudio.microsoft.com</a> 
+</li><li style="margin-bottom: 0.4em;">Install Matlab from <a target="_blank" rel="noopener noreferrer" href="https://www.mathworks.com">mathworks.com</a> - you need to obtain a licence 
 </li><li style="margin-bottom: 0.4em;">From MATLAB Shell run "mex -setup -v" and select compiler MSVC Compiler 
-</li><li style="margin-bottom: 0.4em;">If error: https://yingzhouli.com/posts/2020-06/mex-msvc.html 
+</li><li style="margin-bottom: 0.4em;">If error: <a target="_blank" rel="noopener noreferrer" href="https://yingzhouli.com/posts/2020-06/mex-msvc.html">use this tutorial</a> 
 </li><li style="margin-bottom: 0.4em;">Open "x64 Native Tools Command Prompt" from start menu 
 </li><li style="margin-bottom: 0.4em;">Navigate to library path, e.g. <code>cd Z:\quadriga-lib</code> 
 </li><li style="margin-bottom: 0.4em;">Run <code>nmake</code> to compile <code>quadriga-lib</code> and the MEX Matlab interface 
