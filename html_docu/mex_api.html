@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.9.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.9.2</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -101,6 +101,7 @@
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#interp">interp</a></td><td>2D and 1D linear interpolation.</td></tr>
+<tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2957,6 +2958,51 @@ dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>dataI</code></b><br> 
    The interpolated dat; single or double (same as <code>data</code>); 
    Size: <code>[nyI, nxI, ne]</code> or <code>[1, nxI, ne]</code> for 1D case <br> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="write_png"></a>
+<b>write_png</b> - Write data to a PNG file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Converts input data into a color-coded PNG file for visualization 
+</li><li style="margin-bottom: 0.4em;">Support optional selection of a colormap, as well a minimum and maximum value limits 
+</li><li style="margin-bottom: 0.4em;">Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the PNG file, string, required 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
+   Data matrix, required, size <code>[N, M]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>colormap</code></b> (optional)<br> 
+   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo', 
+   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet' 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>min_val</code></b> (optional)<br> 
+   Minimum value. Values below this value will have be encoded with the color of the smallest value. 
+   If <code>NAN</code> is provided (default), the lowest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>max_val</code></b> (optional)<br> 
+   Maximum value. Values above this value will have be encoded with the color of the largest value. 
+   If <code>NAN</code> is provided (default), the largest values is determined from the data. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>log_transform</b></code> (optional)<br> 
+   If enabled, the <code>data</code> values are transformed to the log-domain (<code>10*log10(data)</code>) before processing. 
+   Default: false (disabled) 
 </li></ul>
 </li>
 </ul>
