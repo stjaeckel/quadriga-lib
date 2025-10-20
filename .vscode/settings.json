@@ -140,7 +140,8 @@
         "stack": "cpp",
         "__string": "cpp",
         "filesystem": "cpp",
-        "__config": "cpp"
+        "__config": "cpp",
+        "codecvt": "cpp"
     },
     "git.ignoreLimitWarning": true
 }

@@ -731,6 +731,26 @@ inline mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings)
     return cellArray;
 }
 
+inline mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools)
+{
+    if (!bools)
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Null std::vector<bool> pointer.");
+
+    const size_t n_obj = bools->size();
+
+    if (n_obj == 0)
+        return mxCreateLogicalMatrix(0, 0);
+
+    mxArray *out = mxCreateLogicalMatrix((mwSize)n_obj, 1);
+    mxLogical *dst = mxGetLogicals(out);
+
+    for (size_t i = 0; i < n_obj; ++i)
+        dst[i] = (*bools)[i] ? 1 : 0;
+
+    return out;
+}
+
+
 // Creates an mxArray based on a vector of armadillo input types
 // - adds one additional dimension, e.g. arma::Cube --> MATLAB 4D
 // - optional input: reading order of vector elements
@@ -963,7 +983,7 @@ template <typename dtype>
 std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, size_t vec_dim)
 {
     size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
     size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
     size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
     size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
@@ -1127,7 +1147,7 @@ template <typename dtype>
 std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, size_t vec_dim)
 {
     size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
     size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
     size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
     size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
@@ -1291,7 +1311,7 @@ template <typename dtype>
 std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, size_t vec_dim)
 {
     size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);               // Read number of elements elements per dimension
+    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
     size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
     size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
     size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
@@ -1445,6 +1465,77 @@ std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, s
         }
     else
         mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Armadillo object dimensions must be 0,1,2 or 3");
+
+    return output;
+}
+
+// Converts input to a std::vector<bool>
+std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input)
+{
+    std::vector<bool> output;
+
+    if (mxIsComplex(input))
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+
+    const size_t n_data = (size_t)mxGetNumberOfElements(input);
+    if (n_data == 0) // Return empty
+        return output;
+
+    output.reserve(n_data);
+
+    // Shortcut for logical arrays
+    if (mxIsLogical(input))
+    {
+        const mxLogical *data = mxGetLogicals(input);
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(data[m] != 0);
+        return output;
+    }
+
+    // Generate pointers for the supported MATLAB data types
+    double *ptr_d = nullptr;
+    float *ptr_f = nullptr;
+    unsigned *ptr_ui = nullptr;
+    int *ptr_i = nullptr;
+    unsigned long long *ptr_ull = nullptr;
+    long long *ptr_ll = nullptr;
+
+    // Assign the MATLAB data to the correct pointer
+    unsigned T = 0; // Type ID of input type
+    if (mxIsDouble(input))
+        T = 1, ptr_d = (double *)mxGetData(input);
+    else if (mxIsSingle(input))
+        T = 2, ptr_f = (float *)mxGetData(input);
+    else if (mxIsClass(input, "uint32"))
+        T = 3, ptr_ui = (unsigned *)mxGetData(input);
+    else if (mxIsClass(input, "int32"))
+        T = 4, ptr_i = (int *)mxGetData(input);
+    else if (mxIsClass(input, "uint64"))
+        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
+    else if (mxIsClass(input, "int64"))
+        T = 6, ptr_ll = (long long *)mxGetData(input);
+    else
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
+
+    // Convert types
+    if (T == 1)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_d[m] != 0.0);
+    else if (T == 2)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_f[m] != 0.0f);
+    else if (T == 3)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_ui[m] != 0U);
+    else if (T == 4)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_i[m] != 0);
+    else if (T == 5)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_ull[m] != 0ULL);
+    else if (T == 6)
+        for (size_t m = 0; m < n_data; ++m)
+            output.push_back(ptr_ll[m] != 0LL);
 
     return output;
 }

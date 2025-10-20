@@ -85,7 +85,7 @@ Write geometry and material data to a Mitsuba 3 XML scene file.
 ## Description:
 This routine converts a triangular surface mesh stored in *quadriga-lib* data structures into the
 XML format understood by **Mitsuba 3** <a href="https://www.mitsuba-renderer.org">www.mitsuba-renderer.org</a>.
-The generated file can be loaded directly by **NVIDIA Sionna RT** for differentiable radio-propagation 
+The generated file can be loaded directly by **NVIDIA Sionna RT** for differentiable radio-propagation
 simulations.<br><br>
 
 - Converts a 3D geometry mesh into Mitsuba 3 XML format for use with rendering tools.
@@ -187,10 +187,20 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     if (vert_list.n_cols != 3)
         throw std::invalid_argument("Vertex list mit have 3 columns.");
 
+    // Fix invalid characters in obj names
+    std::vector<std::string> obj_names_valid;
+    obj_names_valid.reserve(obj_names.size());
+    for (auto name : obj_names)
+    {
+        std::replace(name.begin(), name.end(), '/', '_');
+        std::replace(name.begin(), name.end(), '\\', '_');
+        obj_names_valid.push_back(name);
+    }
+
     // Check for duplicate object names
     std::unordered_set<std::string> seen;
-    seen.reserve(obj_names.size());
-    for (const auto &name : obj_names)
+    seen.reserve(obj_names_valid.size());
+    for (const auto &name : obj_names_valid)
     {
         auto [it, inserted] = seen.insert(name);
         if (!inserted)
@@ -267,7 +277,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     }
 
     // Split objects with different materials assigned to the faces
-    auto obj_names_local = obj_names;
+    auto obj_names_local = obj_names_valid;
     auto obj_ind_local = obj_ind;
     obj_names_local.reserve(2 * n_obj);
 
@@ -275,7 +285,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     for (arma::uword i_obj = 1; i_obj <= n_obj; ++i_obj)
     {
         // Get the the original object name
-        const std::string base_name = obj_names[i_obj - 1];
+        const std::string base_name = obj_names_valid[i_obj - 1];
 
         // Find all faces whose obj_ind == i_obj
         arma::uvec face_idx = arma::find(obj_ind == i_obj);

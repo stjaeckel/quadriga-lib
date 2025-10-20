@@ -45,14 +45,15 @@ Python, so you can integrate it into your existing workflows.</p><br>
 <p>Explore the source, examples, and contribution guidelines on GitHub:<br>
 <a target="_blank" rel="noopener noreferrer" href="https://github.com/stjaeckel/quadriga-lib">https://github.com/stjaeckel/quadriga-lib</a></p>
 
-<br>
-<b>Donate</b>
-<p>Help keep this open-source project alive and growing. Your support lets me spend more time building 
-features, fixing bugs, and making it better for everyone. You can donate using:</p>
+<!--
+    <br>
+    <b>Donate</b>
+    <p>Help keep this open-source project alive and growing. Your support lets me spend more time building 
+    features, fixing bugs, and making it better for everyone. You can donate using:</p>
 
-<ul>
-<li><a target="_blank" rel="noopener noreferrer" href="https://github.com/sponsors/stjaeckel">GitHub Sponsors</a></li>
-<li><a target="_blank" rel="noopener noreferrer" href="https://www.paypal.com/donate/?hosted_button_id=B2N5HS5F4HHFE">Paypal</a></li>
-<li><a target="_blank" rel="noopener noreferrer" href="https://pay.rcane.eu/apps/xkDkKTnJBr4yABvkFgqmea9XkmZ/pos">Bitcoin</a></li>
-</ul>
-
+    <ul>
+    <li><a target="_blank" rel="noopener noreferrer" href="https://github.com/sponsors/stjaeckel">GitHub Sponsors</a></li>
+    <li><a target="_blank" rel="noopener noreferrer" href="https://www.paypal.com/donate/?hosted_button_id=B2N5HS5F4HHFE">Paypal</a></li>
+    <li><a target="_blank" rel="noopener noreferrer" href="https://pay.rcane.eu/apps/xkDkKTnJBr4yABvkFgqmea9XkmZ/pos">Bitcoin</a></li>
+    </ul>
+-->
