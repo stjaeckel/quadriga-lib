@@ -30,6 +30,15 @@ cd quadriga-lib
 ```
 export PYTHONPATH=$PYTHONPATH:/path/to/quadriga-lib/lib
 ```
+* Note on MATLAB and Ubuntu 24.04 or newer: Ubuntu uses gcc13 as the default C/C++ compiler, but MATLAB uses gcc11. This leads to incompatible symbols in the GLIBCXX and the compiled MEX files will not run in MATLAB. A potential fix is to switch to gcc11:
+```
+sudo apt-get install g++-11
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 110 --slave /usr/bin/g++ g++ /usr/bin/g++-11
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+sudo update-alternatives --config gcc
+mex -v -setup C++
+
+```
 
 ### Linux / Ubuntu with Anaconda
 
