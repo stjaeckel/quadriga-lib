@@ -1635,7 +1635,7 @@ inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_
         for (const auto &str : fields)
             field_names.push_back(str.c_str());
 
-        mwSize dims[2] = {1, N}; // Creates a 1xN struct array
+        mwSize dims[2] = {1, (mwSize)N}; // Creates a 1xN struct array
         output = mxCreateStructArray(2, dims, (int)field_names.size(), field_names.data());
     }
     return output;
