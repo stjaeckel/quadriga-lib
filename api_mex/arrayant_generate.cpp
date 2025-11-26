@@ -44,6 +44,9 @@ ant = quadriga_lib.arrayant_generate('xpol', res);               % Cross-polariz
 % An antenna with a custom 3dB beam with (in degree)
 ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3db, rear_gain_lin);
 
+% A unified linear array with isotropic patterns
+ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], 1, N, [], [], spacing);
+
 % Antenna model for the 3GPP-NR channel model with 3GPP default pattern
 ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
@@ -195,9 +198,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         CALL_QD(arrayant = quadriga_lib::generate_arrayant_xpol<double>(res));
     else if (array_type == "custom")
         CALL_QD(arrayant = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res));
-    else if (array_type == "3GPP" || array_type == "3gpp")
+    else if (array_type == "3GPP" || array_type == "3gpp" || array_type == "ula")
     {
-        if (nrhs > 15)
+        if (nrhs > 15) // Use custom pattern
         {
             quadriga_lib::arrayant<double> custom_array;
             custom_array.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[15], "e_theta_re"));
@@ -223,6 +226,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                 custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
             }
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
+        }
+        else if (array_type == "ula")
+        {
+            auto custom_array = quadriga_lib::generate_arrayant_omni(res);
+            if (pol == 2 || pol == 5)
+            {
+                custom_array = quadriga_lib::generate_arrayant_xpol(res);
+            }
+            else if (pol == 3 || pol == 6)
+            {
+                custom_array.copy_element(0, 1);
+                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
+                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+            }
+            CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array));
+            arrayant.name = "ula";
         }
         else // Use 3GPP default pattern
             CALL_QD(arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res));

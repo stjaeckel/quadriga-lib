@@ -110,6 +110,10 @@ endif()
 # External include directories
 message(STATUS "Armadillo Include dir: ${ARMADILLO_INCLUDE_DIRS}")
 
+# Numeric subroutines
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+
 # Components to build
 set(BUILD_HDF5 ${HDF5_STATIC})
 set(BUILD_MATLAB ${ENABLE_MATLAB})
@@ -135,7 +139,7 @@ endif()
 
 # Build instructions for HDF5 library
 if (NOT HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
-    find_package(HDF5 COMPONENTS C HL)
+    find_package(HDF5 MODULE COMPONENTS C HL)
     if(HDF5_FOUND)
         get_filename_component(HDF5_LIB_DIR "${HDF5_LIBRARIES}" DIRECTORY)
         message(STATUS "HDF5 Include dir: ${HDF5_INCLUDE_DIRS}")
@@ -343,6 +347,13 @@ if(BUILD_MATLAB)
     foreach(mex_src ${API_MEX_FILES})
         get_filename_component(mex_basename ${mex_src} NAME_WE)
 
+        set(mex_deps ${mex_src})
+        if(mex_basename STREQUAL "ieee_chan_indoor")
+            list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
+        else()
+            list(APPEND mex_deps quadriga_static)
+        endif()
+
         if (MSVC)
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexw64")
             add_custom_command(
@@ -351,7 +362,7 @@ if(BUILD_MATLAB)
                         COMPFLAGS="${MEX_CXXFLAGS}"
                         ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} shlwapi.lib 
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                DEPENDS ${mex_src} quadriga_static
+                DEPENDS ${mex_deps}
                 COMMENT "Building MATLAB MEX file ${mex_output}"
                 VERBATIM
             )
@@ -364,7 +375,7 @@ if(BUILD_MATLAB)
                         ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS}
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         -lgomp
-                DEPENDS ${mex_src} quadriga_static
+                DEPENDS ${mex_deps}
                 COMMENT "Building MATLAB MEX file ${mex_output}"
                 VERBATIM
             )
@@ -387,12 +398,19 @@ if(BUILD_OCTAVE)
         get_filename_component(mex_basename ${mex_src} NAME_WE)
         set(octave_output "${MEX_OUTPUT_DIR}/${mex_basename}.mex")
         
+        set(mex_deps ${mex_src})
+        if(mex_basename STREQUAL "ieee_chan_indoor")
+            list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
+        else()
+            list(APPEND mex_deps quadriga_static)
+        endif()
+
         add_custom_command(
             OUTPUT ${octave_output}
             COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
                     ${mex_src} $<TARGET_FILE:quadriga_static>
                     -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
-            DEPENDS ${mex_src} quadriga_static
+            DEPENDS ${mex_deps}
             COMMENT "Building Octave MEX file ${octave_output}"
             VERBATIM
         )
@@ -468,6 +486,8 @@ if (ENABLE_TESTS)
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
 
+    target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} LAPACK::LAPACK BLAS::BLAS)
+
     if (BUILD_HDF5)
         target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} ${HDF5_LIB})
     else()
@@ -480,8 +500,6 @@ if (ENABLE_TESTS)
     else()
         target_compile_options(test_bin PRIVATE -O3 -fPIC -fopenmp -w)
     endif()
-
-    
 endif()
 
 # --- Binaries ---
