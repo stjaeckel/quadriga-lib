@@ -1621,7 +1621,7 @@ inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, size_t n_rows, s
 }
 
 // Make an empty struct
-inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields)
+inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields, size_t N = 1)
 {
     mxArray *output;
     if (fields.empty())
@@ -1635,15 +1635,15 @@ inline mxArray *qd_mex_make_struct(const std::vector<std::string> &fields)
         for (const auto &str : fields)
             field_names.push_back(str.c_str());
 
-        mwSize dims[2] = {1, 1}; // Creates a 1x1 struct array
+        mwSize dims[2] = {1, N}; // Creates a 1xN struct array
         output = mxCreateStructArray(2, dims, (int)field_names.size(), field_names.data());
     }
     return output;
 }
 
-void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data)
+void qd_mex_set_field(mxArray *strct, const std::string &field, mxArray *data, size_t n = 0)
 {
-    mxSetField(strct, 0, field.c_str(), data);
+    mxSetField(strct, n, field.c_str(), data);
 }
 
 bool qd_mex_has_field(const mxArray *strct, const std::string &field)

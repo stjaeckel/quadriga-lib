@@ -698,6 +698,9 @@ ant = quadriga_lib.arrayant_generate('xpol', res);               % Cross-polariz
 % An antenna with a custom 3dB beam with (in degree)
 ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3db, rear_gain_lin);
 
+% A unified linear array with isotropic patterns
+ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], 1, N, [], [], spacing);
+
 % Antenna model for the 3GPP-NR channel model with 3GPP default pattern
 ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);

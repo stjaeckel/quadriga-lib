@@ -141,7 +141,9 @@
         "__string": "cpp",
         "filesystem": "cpp",
         "__config": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "ranges": "cpp",
+        "barrier": "cpp"
     },
     "git.ignoreLimitWarning": true
 }
