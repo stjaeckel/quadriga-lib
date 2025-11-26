@@ -116,6 +116,8 @@ import quadriga_lib
 <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Writes channel data to HDF5 files</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
+<tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
+<tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2334,12 +2336,12 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
 </tr>
 <tr>
   <td><code>rx_orientation</code></td>
-  <td>Transmitter orientation</td>
+  <td>Receiver orientation</td>
   <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 <tr>
   <td><code>tx_orientation</code></td>
-  <td>Receiver orientation</td>
+  <td>Transmitter orientation</td>
   <td><code>[3, n_snap]</code> or <code>[3]</code></td>
 </tr>
 </table><br>
@@ -2731,6 +2733,162 @@ channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 </li><li style="margin-bottom: 0.4em;">Supported types: string, double, float, (u)int32, (u)int64 
 </li><li style="margin-bottom: 0.4em;">Supported size: up to 3 dimensions 
 </li><li style="margin-bottom: 0.4em;">Storage order is maintained 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_parse"></a>
+<b>qrt_file_parse</b> - Read metadata from a QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import channel
+
+# Separate outputs
+no_cir, no_orig, no_dest, cir_offset, orig_names, dest_names = channel.qrt_file_parse( fn )
+
+# Output as tuple
+data = channel.qrt_file_parse( fn )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the QRT file, string 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>no_cir</code></b><br> 
+   Number of channel snapshots per origin point 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_orig</code></b><br> 
+   Number of origin points (e.g., TXs) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_dest</code></b><br> 
+   Number of destinations (RX) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_offset</code></b><br> 
+   CIR offset for each destination 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_names</code></b><br> 
+   Names of the origin points (TXs), list of strings 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dest_names</code></b><br> 
+   Names of the destination points (RXs), list of strings 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_read"></a>
+<b>qrt_file_read</b> - Read ray-tracing data from QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import channel
+data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Filename of the QRT file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir</code></b><br> 
+   Snapshot index in the file, Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig</code></b><br> 
+   Origin index (for downlink Origin = TX), Default = 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>downlink</code></b><br> 
+   Switch for uplink / downlink direction, Default = true (downlink) 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
+   Dictionary containing the data in the HDF file with the following keys: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz]</td>
+  <td>scalar</td>
+</tr>
+<tr>
+  <td><code>tx_pos</code></td>
+  <td>Transmitter position</td>
+  <td>Length <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>tx_orientation</code></td>
+  <td>Transmitter orientation, Euler angles, rad</td>
+  <td>Length <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>rx_pos</code></td>
+  <td>Receiver position</td>
+  <td>Length <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>rx_orientation</code></td>
+  <td>Receiver orientation, Euler angles, rad</td>
+  <td>Length <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>fbs_pos</code></td>
+  <td>First-bounce scatterer positions</td>
+  <td>Size <code>[3, n_path]</code></td>
+</tr>
+<tr>
+  <td><code>lbs_pos</code></td>
+  <td>Last-bounce scatterer positions</td>
+  <td>Size <code>[3, n_path]</code></td>
+</tr>
+<tr>
+  <td><code>path_gain</code></td>
+  <td>Path gain before antenna, linear scale</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>path_length</code></td>
+  <td>Path length from TX to RX phase center in m</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>M</code></td>
+  <td>Polarization transfer function, interleaved complex</td>
+  <td>Size <code>[8, n_path]</code></td>
+</tr>
+<tr>
+  <td><code>aod</code></td>
+  <td>Departure azimuth angles in [rad]</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>eod</code></td>
+  <td>Departure elevation angles in [rad]</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>aoa</code></td>
+  <td>Arrival azimuth angles in [rad]</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>eoa</code></td>
+  <td>Arrival elevation angles in [rad]</td>
+  <td>Length <code>[n_path]</code></td>
+</tr>
+<tr>
+  <td><code>path_coord</code></td>
+  <td>Interaction coordinates</td>
+  <td>List of <code>[3, n_int_s]</code></td>
+</tr>
+</table><br>
 </li></ul>
 </li>
 </ul>

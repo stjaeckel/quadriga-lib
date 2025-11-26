@@ -52,6 +52,7 @@
 <li><a href="#e091e809">Array antenna functions</a></li>
 <li><a href="#4f5f509b">Channel class</a></li>
 <li><a href="#eab50272">Channel functions</a></li>
+<li><a href="#6f9553d7">Channel generation functions</a></li>
 <li><a href="#b7e360ab">Miscellaneous tools</a></li>
 <li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
@@ -80,15 +81,13 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate channel coefficients for intelligent reflective surfaces (IRS)</td></tr>
-<tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
-<tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients for spherical waves</td></tr>
 <tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
 <tr><td><a href="#generate_arrayant_omni">generate_arrayant_omni</a></td><td>Generate isotropic radiator with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_xpol">generate_arrayant_xpol</a></td><td>Generate cross-polarized isotropic radiator</td></tr>
 <tr><td><a href="#generate_arrayant_dipole">generate_arrayant_dipole</a></td><td>Generate short dipole with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_half_wave_dipole">generate_arrayant_half_wave_dipole</a></td><td>Generate half-wave dipole with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_custom">generate_arrayant_custom</a></td><td>Generate antenna with custom 3dB beamwidth</td></tr>
+<tr><td><a href="#generate_arrayant_ula">generate_arrayant_ula</a></td><td>Generate an unified linear array</td></tr>
 <tr><td><a href="#generate_arrayant_3gpp">generate_arrayant_3gpp</a></td><td>Generate 3GPP-NR compliant antenna model</td></tr>
 <tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna with support for multiple beam directions.</td></tr>
 </tbody>
@@ -123,6 +122,17 @@
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<b>Channel generation functions</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate channel coefficients for intelligent reflective surfaces (IRS)</td></tr>
+<tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
+<tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients for spherical waves</td></tr>
 </tbody>
 </table>
 </ul>
@@ -937,445 +947,6 @@ if(result.empty()) {
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="get_channels_irs"></a>
-<b>get_channels_irs</b> - Calculate channel coefficients for intelligent reflective surfaces (IRS)
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for IRS-assisted communication using two channel segments: 
-   1. TX → IRS; 2. IRS → RX 
-</li><li style="margin-bottom: 0.4em;">The IRS is modeled as a passive antenna array with phase shifts defined via its coupling matrix. 
-</li><li style="margin-bottom: 0.4em;">IRS codebook entries can be selected via a port index (<code>i_irs</code>). 
-</li><li style="margin-bottom: 0.4em;">Supports combining paths from both segments to form <code>n_path_irs</code> valid output paths, subject to a gain threshold. 
-</li><li style="margin-bottom: 0.4em;">Optional second IRS array allows different antenna behavior for TX-IRS and IRS-RX directions. 
-</li><li style="margin-bottom: 0.4em;">Returns a boolean vector indicating which path combinations are included in the output. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-std::vector&lt;bool&gt; quadriga_lib::get_channels_irs(
-                const arrayant&lt;dtype&gt; *tx_array,
-                const arrayant&lt;dtype&gt; *rx_array,
-                const arrayant&lt;dtype&gt; *irs_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                dtype Ix, dtype Iy, dtype Iz,
-                dtype Ib, dtype It, dtype Ih,
-                const arma::Mat&lt;dtype&gt; *fbs_pos_1,
-                const arma::Mat&lt;dtype&gt; *lbs_pos_1,
-                const arma::Col&lt;dtype&gt; *path_gain_1,
-                const arma::Col&lt;dtype&gt; *path_length_1,
-                const arma::Mat&lt;dtype&gt; *M_1,
-                const arma::Mat&lt;dtype&gt; *fbs_pos_2,
-                const arma::Mat&lt;dtype&gt; *lbs_pos_2,
-                const arma::Col&lt;dtype&gt; *path_gain_2,
-                const arma::Col&lt;dtype&gt; *path_length_2,
-                const arma::Mat&lt;dtype&gt; *M_2,
-                arma::Cube&lt;dtype&gt; *coeff_re,
-                arma::Cube&lt;dtype&gt; *coeff_im,
-                arma::Cube&lt;dtype&gt; *delay,
-                arma::uword i_irs = 0,
-                dtype threshold_dB = -140.0,
-                dtype center_frequency = 0.0,
-                bool use_absolute_delays = false,
-                arma::Cube&lt;dtype&gt; *aod = nullptr,
-                arma::Cube&lt;dtype&gt; *eod = nullptr,
-                arma::Cube&lt;dtype&gt; *aoa = nullptr,
-                arma::Cube&lt;dtype&gt; *eoa = nullptr,
-                const arrayant&lt;dtype&gt; *irs_array_2 = nullptr,
-                const std::vector&lt;bool&gt; *active_path = nullptr);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
-   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
-   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*irs_array</b></code> (input)<br> 
-   Pointer to the IRS array antenna (with <code>n_irs</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
-   Transmitter position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
-   Transmitter orientation (Euler angles) in radians. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
-   Receiver position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
-   Receiver orientation (Euler angles) in radians. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Ix</b>, <b>Iy</b>, <b>Iz</b></code> (input)<br> 
-   IRS position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Ib</b>, <b>It</b>, <b>Ih</b></code> (input)<br> 
-   IRS orientation (Euler angles) in radians. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos_1</b></code> (input)<br> 
-   First-bounce scatterer positions of TX → IRS paths, Size <code>[3, n_path_1]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos_1</b></code> (input)<br> 
-   Last-bounce scatterer positions of TX → IRS paths, Size <code>[3, n_path_1]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain_1</b></code> (input)<br> 
-   Path gains (linear) for TX → IRS paths, Length <code>n_path_1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length_1</b></code> (input)<br> 
-   Path lengths for TX → IRS paths, Length <code>n_path_1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M_1</b></code> (input)<br> 
-   Polarization transfer matrix for TX → IRS paths, Size <code>[8, n_path_1]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos_2</b></code> (input)<br> 
-   First-bounce scatterer positions of IRS → RX paths, Size <code>[3, n_path_2]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos_2</b></code> (input)<br> 
-   Last-bounce scatterer positions of IRS → RX paths, Size <code>[3, n_path_2]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain_2</b></code> (input)<br> 
-   Path gains (linear) for IRS → RX paths, Length <code>n_path_2</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length_2</b></code> (input)<br> 
-   Path lengths for IRS → RX paths, Length <code>n_path_2</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M_2</b></code> (input)<br> 
-   Polarization transfer matrix for IRS → RX paths, Size <code>[8, n_path_2]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
-   Real part of resulting IRS-assisted channel coefficients, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
-   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
-   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_irs</b> = 0</code> (optional input)<br> 
-   Index of IRS codebook entry (port number), Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>threshold_dB</b> = -140.0</code> (optional input)<br> 
-   Threshold (in dB) below which paths are discarded. Default: <code>-140.0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
-   Center frequency in Hz; <code>0.0</code> disables phase computation. Default: <code>0.0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
-   If true, includes LOS delay in all paths. Default: <code>false</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aod</b> = nullptr</code> (optional output)<br> 
-   Azimuth of Departure angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eod</b> = nullptr</code> (optional output)<br> 
-   Elevation of Departure angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aoa</b> = nullptr</code> (optional output)<br> 
-   Azimuth of Arrival angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eoa</b> = nullptr</code> (optional output)<br> 
-   Elevation of Arrival angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*irs_array_2</b> = nullptr</code> (optional input)<br> 
-   Optional second IRS array (TX side) for asymmetric IRS behavior. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;bool&gt; <b>*active_path</b> = nullptr</code> (optional input)<br> 
-   Optional bitmask for selecting active TX-IRS and IRS-RX path pairs. Ignores <code>threshold_dB</code> when provided. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;bool&gt;</code> <br> 
-   Boolean mask of length <code>n_path_1 * n_path_2</code>, indicating which path combinations were used. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#combine_irs_coord">combine_irs_coord</a> 
-</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_spherical">get_channels_spherical</a> 
-</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_planar">get_channels_planar</a> 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="get_channels_planar"></a>
-<b>get_channels_planar</b> - Calculate channel coefficients for planar waves
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for a set of planar wave paths between two antenna arrays. 
-</li><li style="margin-bottom: 0.4em;">Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays. 
-</li><li style="margin-bottom: 0.4em;">Supports LOS path identification based on distance (angles are ignored). 
-</li><li style="margin-bottom: 0.4em;">Polarization transfer matrix models polarization coupling and must be normalized. 
-</li><li style="margin-bottom: 0.4em;">Doppler weights can optionally be calculated from receiver motion relative to path direction. 
-</li><li style="margin-bottom: 0.4em;">Element positions and antenna orientation are fully considered for delay and phase. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-void quadriga_lib::get_channels_planar(
-                const arrayant&lt;dtype&gt; *tx_array,
-                const arrayant&lt;dtype&gt; *rx_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                const arma::Col&lt;dtype&gt; *aod,
-                const arma::Col&lt;dtype&gt; *eod,
-                const arma::Col&lt;dtype&gt; *aoa,
-                const arma::Col&lt;dtype&gt; *eoa,
-                const arma::Col&lt;dtype&gt; *path_gain,
-                const arma::Col&lt;dtype&gt; *path_length,
-                const arma::Mat&lt;dtype&gt; *M,
-                arma::Cube&lt;dtype&gt; *coeff_re,
-                arma::Cube&lt;dtype&gt; *coeff_im,
-                arma::Cube&lt;dtype&gt; *delay,
-                dtype center_frequency = dtype(0.0),
-                bool use_absolute_delays = false,
-                bool add_fake_los_path = false,
-                arma::Col&lt;dtype&gt; *rx_Doppler = nullptr);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
-   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
-   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
-   Transmitter position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
-   Transmitter orientation (Euler) angles (bank, tilt, head) in [rad]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
-   Receiver position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
-   Receiver orientation (Euler) angles (bank, tilt, head) in [rad]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*aod</b></code> (input)<br> 
-   Departure azimuth angles in radians, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*eod</b></code> (input)<br> 
-   Departure elevation angles in radians, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*aoa</b></code> (input)<br> 
-   Arrival azimuth angles in radians, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*eoa</b></code> (input)<br> 
-   Arrival elevation angles in radians, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain</b></code> (input)<br> 
-   Path gains in linear scale, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length</b></code> (input)<br> 
-   Path lengths from TX to RX phase center, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M</b></code> (input)<br> 
-   Polarization transfer matrix of size <code>[8, n_path]</code>, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
-   Real part of channel coefficients, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
-   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
-   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
-   Center frequency in Hz; set to 0 to disable phase calculation. Default: <code>0.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
-   If true, includes LOS delay in all paths. Default: <code>false</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>add_fake_los_path</b> = false</code> (optional input)<br> 
-   Adds a zero-power LOS path if no LOS is present. Default: <code>false</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*rx_Doppler</b> = nullptr</code> (optional output)<br> 
-   Doppler weights for moving RX, Length <code>n_path(+1)</code>. Positive = towards path, Negative = away. 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="get_channels_spherical"></a>
-<b>get_channels_spherical</b> - Calculate channel coefficients for spherical waves
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for a set of spherical wave paths between two antenna arrays. 
-</li><li style="margin-bottom: 0.4em;">Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays. 
-</li><li style="margin-bottom: 0.4em;">Accurately models path-based propagation using provided scatterer positions. 
-</li><li style="margin-bottom: 0.4em;">Supports LOS path identification and handles complex polarization coupling. 
-</li><li style="margin-bottom: 0.4em;">Element positions and antenna orientation are fully considered for delay and phase. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-void quadriga_lib::get_channels_spherical(
-                const arrayant&lt;dtype&gt; *tx_array,
-                const arrayant&lt;dtype&gt; *rx_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                const arma::Mat&lt;dtype&gt; *fbs_pos,
-                const arma::Mat&lt;dtype&gt; *lbs_pos,
-                const arma::Col&lt;dtype&gt; *path_gain,
-                const arma::Col&lt;dtype&gt; *path_length,
-                const arma::Mat&lt;dtype&gt; *M,
-                arma::Cube&lt;dtype&gt; *coeff_re,
-                arma::Cube&lt;dtype&gt; *coeff_im,
-                arma::Cube&lt;dtype&gt; *delay,
-                dtype center_frequency = dtype(0.0),
-                bool use_absolute_delays = false,
-                bool add_fake_los_path = false,
-                arma::Cube&lt;dtype&gt; *aod = nullptr,
-                arma::Cube&lt;dtype&gt; *eod = nullptr,
-                arma::Cube&lt;dtype&gt; *aoa = nullptr,
-                arma::Cube&lt;dtype&gt; *eoa = nullptr)
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
-   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
-   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
-   Transmitter position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
-   Transmitter orientation (Euler) angles (bank, tilt, head) in [rad]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
-   Receiver position in Cartesian coordinates [m]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
-   Receiver orientation (Euler) angles (bank, tilt, head) in [rad]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos</b></code> (input)<br> 
-   First-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos</b></code> (input)<br> 
-   Last-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain</b></code> (input)<br> 
-   Path gains in linear scale, Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length</b></code> (input)<br> 
-   Path lengths from TX to RX phase center Length <code>n_path</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M</b></code> (input)<br> 
-   Polarization transfer matrix of size <code>[8, n_path]</code>, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
-   Real part of channel coefficients, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
-   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
-   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
-   Center frequency in Hz; set to 0 to disable phase calculation. Default: <code>0.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
-   If true, includes LOS delay in all paths. Default: <code>false</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>add_fake_los_path</b> = false</code> (optional input)<br> 
-   Adds a zero-power LOS path if no LOS is present. Default: <code>false</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aod</b> = nullptr</code> (optional output)<br> 
-   Azimuth of Departure angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eod</b> = nullptr</code> (optional output)<br> 
-   Elevation of Departure angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aoa</b> = nullptr</code> (optional output)<br> 
-   Azimuth of Arrival angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <i></i>*eoa = nullptr</code> (optional output)<br> 
-   Elevation of Arrival angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qdant_read"></a>
 <b>qdant_read</b> - Reads array antenna data from QDANT files
 <ul>
@@ -1591,6 +1162,51 @@ auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(60.0, 45.0, 0.01
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_arrayant_ula"></a>
+<b>generate_arrayant_ula</b> - Generate an unified linear array
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Supports horizontal stacking of elements 
+</li><li style="margin-bottom: 0.4em;">Default pattern: Isotropic omnidirectional radiator, v-polarized 
+</li><li style="margin-bottom: 0.4em;">Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored). 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_ula(
+                arma::uword N = 1, dtype center_freq = 299792458.0, dtype spacing = 0.5,
+                const arrayant&lt;dtype&gt; *pattern = nullptr, dtype res = 1.0)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>N</b> = 1</code> (optional input)<br> 
+   Number of horizontal elements in the array. Default: <code>1</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_freq</b> = 299792458.0</code> (optional input)<br> 
+   Center frequency of the antenna array in Hz. Default: <code>299792458.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
+   Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>pattern</b> = nullptr</code> (optional input)<br> 
+   Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
+   Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: <code>1.0</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
+   Generated antenna array object according to 3GPP-NR specifications. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_3gpp"></a>
 <b>generate_arrayant_3gpp</b> - Generate 3GPP-NR compliant antenna model
 <ul>
@@ -1702,10 +1318,10 @@ auto ant = quadriga_lib::generate_arrayant_3GPP&lt;double&gt;(4, 4, 3e9, 2);
 <b>generate_arrayant_multibeam</b> - Generate a planar multi-element antenna with support for multiple beam directions.
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function generates a planar array antenna with <b>M</b> rows and <b>N</b> columns.   
-It allows customization of the per-element radiation pattern, polarization, and spacing.   
-Multiple beam directions can be specified via azimuth and elevation angles.   
-Beamforming uses <b>maximum-ratio transmission (MRT)</b>, which is optimal for a single  
+<b><i>Description:</i></b><br>This function generates a planar array antenna with <b>M</b> rows and <b>N</b> columns. 
+It allows customization of the per-element radiation pattern, polarization, and spacing. 
+Multiple beam directions can be specified via azimuth and elevation angles. 
+Beamforming uses <b>maximum-ratio transmission (MRT)</b>, which is optimal for a single 
 beam and approximate when multiple beams are specified. 
  
 Supported data types for <code>dtype</code>: <code>float</code> or <code>double</code>.
@@ -1713,19 +1329,19 @@ Supported data types for <code>dtype</code>: <code>float</code> or <code>double<
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
-                arma::uword M = 1, 
-                arma::uword N = 1, 
-                arma::Col&lt;dtype&gt; az = {0.0}, 
-                arma::Col&lt;dtype&gt; el = {0.0}, 
+                arma::uword M = 1,
+                arma::uword N = 1,
+                arma::Col&lt;dtype&gt; az = {0.0},
+                arma::Col&lt;dtype&gt; el = {0.0},
                 arma::Col&lt;dtype&gt; weight = {1.0},
-                dtype center_freq = 299792458.0, 
-                unsigned pol = 1, 
-                dtype spacing = 0.5, 
-                dtype az_3dB = 120.0, 
+                dtype center_freq = 299792458.0,
+                unsigned pol = 1,
+                dtype spacing = 0.5,
+                dtype az_3dB = 120.0,
                 dtype el_3dB = 120.0,
-                dtype rear_gain_lin = 0.0, 
-                dtype res = 1.0, 
-                bool separate_beams = false, 
+                dtype rear_gain_lin = 0.0,
+                dtype res = 1.0,
+                bool separate_beams = false,
                 bool apply_weights = false );
 </pre>
 </li>
@@ -1740,14 +1356,15 @@ arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>az</b> = {0.0}</code> (optional input)<br> 
    Azimuth beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
-    
-</li><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>el</b> = {0.0}</code> (optional input)<br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>el</b> = {0.0}</code> (optional input)<br> 
    Elevation beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>weight</b> = {1.0}</code> (optional input)<br> 
-   Scaling factors for each beam. The vector must have the same length as <code>az</code> and <code>el</code>.   
-   Values are normalized so that their sum equals 1. Can be used to prioritize beams.   
+   Scaling factors for each beam. The vector must have the same length as <code>az</code> and <code>el</code>. 
+   Values are normalized so that their sum equals 1. Can be used to prioritize beams. 
    Default: <code>{1.0}</code> 
 </li></ul>
  
@@ -1771,8 +1388,9 @@ arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
   <td>+/-45° polarized elements, results in 2NM elements</td>
 </tr>
 </table><br>
-   
-</li><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
    Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
 </li></ul>
  
@@ -2864,6 +2482,454 @@ void quadriga_lib::hdf5_write_dset(
  
 <ul><li style="margin-bottom: 0.4em;"><code>std::string <b>prefix</b> = "par_"</code> (input)<br> 
    Optional prefix for the dataset name. Default: <code>"par_"</code>. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="6f9553d7"></a>
+<font size=+1><b>Channel generation functions</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_irs"></a>
+<b>get_channels_irs</b> - Calculate channel coefficients for intelligent reflective surfaces (IRS)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for IRS-assisted communication using two channel segments: 
+   1. TX → IRS; 2. IRS → RX 
+</li><li style="margin-bottom: 0.4em;">The IRS is modeled as a passive antenna array with phase shifts defined via its coupling matrix. 
+</li><li style="margin-bottom: 0.4em;">IRS codebook entries can be selected via a port index (<code>i_irs</code>). 
+</li><li style="margin-bottom: 0.4em;">Supports combining paths from both segments to form <code>n_path_irs</code> valid output paths, subject to a gain threshold. 
+</li><li style="margin-bottom: 0.4em;">Optional second IRS array allows different antenna behavior for TX-IRS and IRS-RX directions. 
+</li><li style="margin-bottom: 0.4em;">Returns a boolean vector indicating which path combinations are included in the output. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::vector&lt;bool&gt; quadriga_lib::get_channels_irs(
+                const arrayant&lt;dtype&gt; *tx_array,
+                const arrayant&lt;dtype&gt; *rx_array,
+                const arrayant&lt;dtype&gt; *irs_array,
+                dtype Tx, dtype Ty, dtype Tz,
+                dtype Tb, dtype Tt, dtype Th,
+                dtype Rx, dtype Ry, dtype Rz,
+                dtype Rb, dtype Rt, dtype Rh,
+                dtype Ix, dtype Iy, dtype Iz,
+                dtype Ib, dtype It, dtype Ih,
+                const arma::Mat&lt;dtype&gt; *fbs_pos_1,
+                const arma::Mat&lt;dtype&gt; *lbs_pos_1,
+                const arma::Col&lt;dtype&gt; *path_gain_1,
+                const arma::Col&lt;dtype&gt; *path_length_1,
+                const arma::Mat&lt;dtype&gt; *M_1,
+                const arma::Mat&lt;dtype&gt; *fbs_pos_2,
+                const arma::Mat&lt;dtype&gt; *lbs_pos_2,
+                const arma::Col&lt;dtype&gt; *path_gain_2,
+                const arma::Col&lt;dtype&gt; *path_length_2,
+                const arma::Mat&lt;dtype&gt; *M_2,
+                arma::Cube&lt;dtype&gt; *coeff_re,
+                arma::Cube&lt;dtype&gt; *coeff_im,
+                arma::Cube&lt;dtype&gt; *delay,
+                arma::uword i_irs = 0,
+                dtype threshold_dB = -140.0,
+                dtype center_frequency = 0.0,
+                bool use_absolute_delays = false,
+                arma::Cube&lt;dtype&gt; *aod = nullptr,
+                arma::Cube&lt;dtype&gt; *eod = nullptr,
+                arma::Cube&lt;dtype&gt; *aoa = nullptr,
+                arma::Cube&lt;dtype&gt; *eoa = nullptr,
+                const arrayant&lt;dtype&gt; *irs_array_2 = nullptr,
+                const std::vector&lt;bool&gt; *active_path = nullptr);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
+   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
+   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*irs_array</b></code> (input)<br> 
+   Pointer to the IRS array antenna (with <code>n_irs</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
+   Transmitter position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
+   Transmitter orientation (Euler angles) in radians. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
+   Receiver position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
+   Receiver orientation (Euler angles) in radians. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Ix</b>, <b>Iy</b>, <b>Iz</b></code> (input)<br> 
+   IRS position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Ib</b>, <b>It</b>, <b>Ih</b></code> (input)<br> 
+   IRS orientation (Euler angles) in radians. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos_1</b></code> (input)<br> 
+   First-bounce scatterer positions of TX → IRS paths, Size <code>[3, n_path_1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos_1</b></code> (input)<br> 
+   Last-bounce scatterer positions of TX → IRS paths, Size <code>[3, n_path_1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain_1</b></code> (input)<br> 
+   Path gains (linear) for TX → IRS paths, Length <code>n_path_1</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length_1</b></code> (input)<br> 
+   Path lengths for TX → IRS paths, Length <code>n_path_1</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M_1</b></code> (input)<br> 
+   Polarization transfer matrix for TX → IRS paths, Size <code>[8, n_path_1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos_2</b></code> (input)<br> 
+   First-bounce scatterer positions of IRS → RX paths, Size <code>[3, n_path_2]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos_2</b></code> (input)<br> 
+   Last-bounce scatterer positions of IRS → RX paths, Size <code>[3, n_path_2]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain_2</b></code> (input)<br> 
+   Path gains (linear) for IRS → RX paths, Length <code>n_path_2</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length_2</b></code> (input)<br> 
+   Path lengths for IRS → RX paths, Length <code>n_path_2</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M_2</b></code> (input)<br> 
+   Polarization transfer matrix for IRS → RX paths, Size <code>[8, n_path_2]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
+   Real part of resulting IRS-assisted channel coefficients, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
+   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
+   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_irs</b> = 0</code> (optional input)<br> 
+   Index of IRS codebook entry (port number), Default: <code>0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>threshold_dB</b> = -140.0</code> (optional input)<br> 
+   Threshold (in dB) below which paths are discarded. Default: <code>-140.0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
+   Center frequency in Hz; <code>0.0</code> disables phase computation. Default: <code>0.0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
+   If true, includes LOS delay in all paths. Default: <code>false</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aod</b> = nullptr</code> (optional output)<br> 
+   Azimuth of Departure angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eod</b> = nullptr</code> (optional output)<br> 
+   Elevation of Departure angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aoa</b> = nullptr</code> (optional output)<br> 
+   Azimuth of Arrival angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eoa</b> = nullptr</code> (optional output)<br> 
+   Elevation of Arrival angles [rad], Size <code>[n_rx, n_tx, n_path_irs]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*irs_array_2</b> = nullptr</code> (optional input)<br> 
+   Optional second IRS array (TX side) for asymmetric IRS behavior. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;bool&gt; <b>*active_path</b> = nullptr</code> (optional input)<br> 
+   Optional bitmask for selecting active TX-IRS and IRS-RX path pairs. Ignores <code>threshold_dB</code> when provided. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;bool&gt;</code> <br> 
+   Boolean mask of length <code>n_path_1 * n_path_2</code>, indicating which path combinations were used. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#combine_irs_coord">combine_irs_coord</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_spherical">get_channels_spherical</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_planar">get_channels_planar</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_planar"></a>
+<b>get_channels_planar</b> - Calculate channel coefficients for planar waves
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for a set of planar wave paths between two antenna arrays. 
+</li><li style="margin-bottom: 0.4em;">Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays. 
+</li><li style="margin-bottom: 0.4em;">Supports LOS path identification based on distance (angles are ignored). 
+</li><li style="margin-bottom: 0.4em;">Polarization transfer matrix models polarization coupling and must be normalized. 
+</li><li style="margin-bottom: 0.4em;">Doppler weights can optionally be calculated from receiver motion relative to path direction. 
+</li><li style="margin-bottom: 0.4em;">Element positions and antenna orientation are fully considered for delay and phase. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::get_channels_planar(
+                const arrayant&lt;dtype&gt; *tx_array,
+                const arrayant&lt;dtype&gt; *rx_array,
+                dtype Tx, dtype Ty, dtype Tz,
+                dtype Tb, dtype Tt, dtype Th,
+                dtype Rx, dtype Ry, dtype Rz,
+                dtype Rb, dtype Rt, dtype Rh,
+                const arma::Col&lt;dtype&gt; *aod,
+                const arma::Col&lt;dtype&gt; *eod,
+                const arma::Col&lt;dtype&gt; *aoa,
+                const arma::Col&lt;dtype&gt; *eoa,
+                const arma::Col&lt;dtype&gt; *path_gain,
+                const arma::Col&lt;dtype&gt; *path_length,
+                const arma::Mat&lt;dtype&gt; *M,
+                arma::Cube&lt;dtype&gt; *coeff_re,
+                arma::Cube&lt;dtype&gt; *coeff_im,
+                arma::Cube&lt;dtype&gt; *delay,
+                dtype center_frequency = dtype(0.0),
+                bool use_absolute_delays = false,
+                bool add_fake_los_path = false,
+                arma::Col&lt;dtype&gt; *rx_Doppler = nullptr);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
+   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
+   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
+   Transmitter position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
+   Transmitter orientation (Euler) angles (bank, tilt, head) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
+   Receiver position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
+   Receiver orientation (Euler) angles (bank, tilt, head) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*aod</b></code> (input)<br> 
+   Departure azimuth angles in radians, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*eod</b></code> (input)<br> 
+   Departure elevation angles in radians, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*aoa</b></code> (input)<br> 
+   Arrival azimuth angles in radians, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*eoa</b></code> (input)<br> 
+   Arrival elevation angles in radians, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain</b></code> (input)<br> 
+   Path gains in linear scale, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length</b></code> (input)<br> 
+   Path lengths from TX to RX phase center, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M</b></code> (input)<br> 
+   Polarization transfer matrix of size <code>[8, n_path]</code>, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
+   Real part of channel coefficients, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
+   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
+   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path(+1)]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
+   Center frequency in Hz; set to 0 to disable phase calculation. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
+   If true, includes LOS delay in all paths. Default: <code>false</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>add_fake_los_path</b> = false</code> (optional input)<br> 
+   Adds a zero-power LOS path if no LOS is present. Default: <code>false</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*rx_Doppler</b> = nullptr</code> (optional output)<br> 
+   Doppler weights for moving RX, Length <code>n_path(+1)</code>. Positive = towards path, Negative = away. 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_spherical"></a>
+<b>get_channels_spherical</b> - Calculate channel coefficients for spherical waves
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates MIMO channel coefficients and delays for a set of spherical wave paths between two antenna arrays. 
+</li><li style="margin-bottom: 0.4em;">Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays. 
+</li><li style="margin-bottom: 0.4em;">Accurately models path-based propagation using provided scatterer positions. 
+</li><li style="margin-bottom: 0.4em;">Supports LOS path identification and handles complex polarization coupling. 
+</li><li style="margin-bottom: 0.4em;">Element positions and antenna orientation are fully considered for delay and phase. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::get_channels_spherical(
+                const arrayant&lt;dtype&gt; *tx_array,
+                const arrayant&lt;dtype&gt; *rx_array,
+                dtype Tx, dtype Ty, dtype Tz,
+                dtype Tb, dtype Tt, dtype Th,
+                dtype Rx, dtype Ry, dtype Rz,
+                dtype Rb, dtype Rt, dtype Rh,
+                const arma::Mat&lt;dtype&gt; *fbs_pos,
+                const arma::Mat&lt;dtype&gt; *lbs_pos,
+                const arma::Col&lt;dtype&gt; *path_gain,
+                const arma::Col&lt;dtype&gt; *path_length,
+                const arma::Mat&lt;dtype&gt; *M,
+                arma::Cube&lt;dtype&gt; *coeff_re,
+                arma::Cube&lt;dtype&gt; *coeff_im,
+                arma::Cube&lt;dtype&gt; *delay,
+                dtype center_frequency = dtype(0.0),
+                bool use_absolute_delays = false,
+                bool add_fake_los_path = false,
+                arma::Cube&lt;dtype&gt; *aod = nullptr,
+                arma::Cube&lt;dtype&gt; *eod = nullptr,
+                arma::Cube&lt;dtype&gt; *aoa = nullptr,
+                arma::Cube&lt;dtype&gt; *eoa = nullptr)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*tx_array</b></code> (input)<br> 
+   Pointer to the transmit antenna array object (with <code>n_tx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>*rx_array</b></code> (input)<br> 
+   Pointer to the receive antenna array object (with <code>n_rx</code> elements). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
+   Transmitter position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
+   Transmitter orientation (Euler) angles (bank, tilt, head) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
+   Receiver position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
+   Receiver orientation (Euler) angles (bank, tilt, head) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*fbs_pos</b></code> (input)<br> 
+   First-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*lbs_pos</b></code> (input)<br> 
+   Last-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_gain</b></code> (input)<br> 
+   Path gains in linear scale, Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*path_length</b></code> (input)<br> 
+   Path lengths from TX to RX phase center Length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*M</b></code> (input)<br> 
+   Polarization transfer matrix of size <code>[8, n_path]</code>, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (output)<br> 
+   Real part of channel coefficients, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (output)<br> 
+   Imaginary part of channel coefficients, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*delay</b></code> (output)<br> 
+   Propagation delays in seconds, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b> = 0.0</code> (optional input)<br> 
+   Center frequency in Hz; set to 0 to disable phase calculation. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
+   If true, includes LOS delay in all paths. Default: <code>false</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>add_fake_los_path</b> = false</code> (optional input)<br> 
+   Adds a zero-power LOS path if no LOS is present. Default: <code>false</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aod</b> = nullptr</code> (optional output)<br> 
+   Azimuth of Departure angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*eod</b> = nullptr</code> (optional output)<br> 
+   Elevation of Departure angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*aoa</b> = nullptr</code> (optional output)<br> 
+   Azimuth of Arrival angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <i></i>*eoa = nullptr</code> (optional output)<br> 
+   Elevation of Arrival angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
 </li></ul>
 </li>
 </ul>

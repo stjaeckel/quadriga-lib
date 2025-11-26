@@ -94,3 +94,16 @@ void quadriga_lib::complex_cast(const arma::cx_cube &complex, arma::Cube<dtype> 
         p_imag[i] = (dtype)p_complex[i].imag();
     }
 }
+
+// Template instantiation
+template void quadriga_lib::complex_cast(const arma::Mat<float> &real, const arma::Mat<float> &imag, arma::cx_mat &complex);
+template void quadriga_lib::complex_cast(const arma::Mat<double> &real, const arma::Mat<double> &imag, arma::cx_mat &complex);
+
+template void quadriga_lib::complex_cast(const arma::Cube<float> &real, const arma::Cube<float> &imag, arma::cx_cube &complex);
+template void quadriga_lib::complex_cast(const arma::Cube<double> &real, const arma::Cube<double> &imag, arma::cx_cube &complex);
+
+template void quadriga_lib::complex_cast(const arma::cx_mat &complex, arma::Mat<float> &real, arma::Mat<float> &imag);
+template void quadriga_lib::complex_cast(const arma::cx_mat &complex, arma::Mat<double> &real, arma::Mat<double> &imag);
+
+template void quadriga_lib::complex_cast(const arma::cx_cube &complex, arma::Cube<float> &real, arma::Cube<float> &imag);
+template void quadriga_lib::complex_cast(const arma::cx_cube &complex, arma::Cube<double> &real, arma::Cube<double> &imag);

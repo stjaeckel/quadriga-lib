@@ -24,7 +24,7 @@
 #include "quadriga_arrayant.hpp"
 
 /*!SECTION
-Array antenna functions
+Channel generation functions
 SECTION!*/
 
 /*!MD

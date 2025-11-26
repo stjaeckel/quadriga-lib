@@ -31,6 +31,8 @@ namespace py = pybind11;
 #include "qpy_hdf5_reshape_layout.cpp"
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
+#include "qpy_qrt_file_parse.cpp"
+#include "qpy_qrt_file_read.cpp"
 
 void quadriga_lib_channel(py::module_ &m)
 {
@@ -103,4 +105,11 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("name"),
           py::arg("data") = py::none());
+
+    m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
+
+    m.def("qrt_file_read", &qrt_file_read, py::arg("fn"),
+          py::arg("cir") = 0,
+          py::arg("orig") = 0,
+          py::arg("downlink") = true);
 }

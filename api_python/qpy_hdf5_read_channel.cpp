@@ -84,8 +84,8 @@ data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
   `path_lbs_pos`   | Last-bounce scatterer positions                          | list of `[3, n_path_s]`
   `no_interact`    | Number interaction points of paths with the environment  | uint32, list of `[n_path_s]`
   `interact_coord` | Interaction coordinates                                  | list of `[3, max(sum(no_interact))]`
-  `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3]`
-  `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3]`
+  `rx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3]`
+  `tx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3]`
 ## Caveat:
 - Only datasets that are present in the HDF file are returned in the dictionary.
 - Although the data is stored in single precision, it is converted to double precision by default.
