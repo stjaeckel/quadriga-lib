@@ -38,6 +38,9 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     if (no_dest)
         *no_dest = (arma::uword)qrt.no_dest;
 
+    if (qrt.cir_index.n_elem == 0 || qrt.cir_index[0] != 0)
+        throw std::invalid_argument("Invalid CIR index in QRT file. Potential file corruption.");
+
     if (cir_offset)
     {
         cir_offset->set_size(qrt.no_dest);
@@ -45,6 +48,9 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         for (auto &val : qrt.cir_index)
             *po++ = (arma::uword)val;
     }
+
+    if (dest_names)
+        *dest_names = qrt.dest_names;
 
     if (orig_names)
     {
@@ -57,8 +63,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         }
     }
 
-    if (dest_names)
-        *dest_names = qrt.dest_names;
+    qrt.close();
 }
 
 template <typename dtype>
@@ -71,7 +76,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                                  std::vector<arma::Mat<dtype>> *path_coord)
 {
 
-    auto qrt = qrt_file_reader(fn);
+    auto qrt = qrt_file_reader(fn, i_cir, i_orig);
 
     if (i_orig >= qrt.no_cir)
         throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
@@ -79,21 +84,23 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (i_orig >= qrt.no_orig)
         throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
+    double fGHz = (double)qrt.fGHz;
+    double gain_at_1m = -32.45 - 20.0 * std::log10(fGHz);
     if (center_frequency)
-        *center_frequency = dtype(1e9 * (double)qrt.fGHz);
+        *center_frequency = dtype(1e9 * fGHz);
 
     // Positions
-    dtype Ox = (dtype)qrt.orig_pos_all(i_orig, 0);
-    dtype Oy = (dtype)qrt.orig_pos_all(i_orig, 1);
-    dtype Oz = (dtype)qrt.orig_pos_all(i_orig, 2);
+    dtype Ox = (dtype)qrt.orig_pos_all[0];
+    dtype Oy = (dtype)qrt.orig_pos_all[1];
+    dtype Oz = (dtype)qrt.orig_pos_all[2];
     if (tx_pos && downlink)
         *tx_pos = {Ox, Oy, Oz};
     if (rx_pos && !downlink)
         *rx_pos = {Ox, Oy, Oz};
 
-    dtype Dx = (dtype)qrt.cir_pos(i_cir, 0);
-    dtype Dy = (dtype)qrt.cir_pos(i_cir, 1);
-    dtype Dz = (dtype)qrt.cir_pos(i_cir, 2);
+    dtype Dx = (dtype)qrt.cir_pos[0];
+    dtype Dy = (dtype)qrt.cir_pos[1];
+    dtype Dz = (dtype)qrt.cir_pos[2];
     if (rx_pos && downlink)
         *rx_pos = {Dx, Dy, Dz};
     if (tx_pos && !downlink)
@@ -101,66 +108,114 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
     // Orientations
     if (tx_orientation && downlink)
-        *tx_orientation = {(dtype)qrt.orig_orientation(i_orig, 0),
-                           (dtype)qrt.orig_orientation(i_orig, 1),
-                           (dtype)qrt.orig_orientation(i_orig, 2)};
+        *tx_orientation = {(dtype)qrt.orig_orientation[0],
+                           (dtype)qrt.orig_orientation[1],
+                           (dtype)qrt.orig_orientation[2]};
 
     if (tx_orientation && !downlink)
-        *tx_orientation = {(dtype)qrt.cir_orientation(i_cir, 0),
-                           (dtype)qrt.cir_orientation(i_cir, 1),
-                           (dtype)qrt.cir_orientation(i_cir, 2)};
+        *tx_orientation = {(dtype)qrt.cir_orientation[0],
+                           (dtype)qrt.cir_orientation[1],
+                           (dtype)qrt.cir_orientation[2]};
 
     if (rx_orientation && downlink)
-        *rx_orientation = {(dtype)qrt.cir_orientation(i_cir, 0),
-                           (dtype)qrt.cir_orientation(i_cir, 1),
-                           (dtype)qrt.cir_orientation(i_cir, 2)};
+        *rx_orientation = {(dtype)qrt.cir_orientation[0],
+                           (dtype)qrt.cir_orientation[1],
+                           (dtype)qrt.cir_orientation[2]};
 
     if (rx_orientation && !downlink)
-        *rx_orientation = {(dtype)qrt.orig_orientation(i_orig, 0),
-                           (dtype)qrt.orig_orientation(i_orig, 1),
-                           (dtype)qrt.orig_orientation(i_orig, 2)};
+        *rx_orientation = {(dtype)qrt.orig_orientation[0],
+                           (dtype)qrt.orig_orientation[1],
+                           (dtype)qrt.orig_orientation[2]};
 
     // Read polarization Matrix and interaction coordinates from file
     arma::u32_vec no_intR;
     arma::fmat xprmatR, coordR;
-    unsigned no_path = qrt.read_cir((unsigned)i_orig, (unsigned)i_cir, no_intR, xprmatR, coordR);
+    unsigned no_path = qrt.read_cir(0U, (unsigned)i_cir, no_intR, xprmatR, coordR); // Note: 0U because of special constructor
 
-    // Convert polarization Matrix
-    if (M)
+    // Calculate path gain and polarization matrix
+    // - xprmatR includes all interaction losses, but not the FSPL
+    // - here we calculate the normalized polarization matrix M and the PG without FSPL
+    if (M || path_gain)
     {
-        M->set_size(8, no_path);
-        dtype *dst = M->memptr();
-
-        if (downlink) // just copy and cast
+        dtype *dst = nullptr;
+        if (M)
         {
-            for (float &val : xprmatR)
-                *dst++ = (dtype)val;
+            M->set_size(8, no_path);
+            dst = M->memptr();
         }
-        else // uplink, conjugate transpose
+
+        dtype *pg = nullptr;
+        if (path_gain)
         {
-            const float *src = xprmatR.memptr();
-            for (arma::uword k = 0; k < no_path; ++k)
+            path_gain->set_size(no_path);
+            pg = path_gain->memptr();
+        }
+
+        const float *src = xprmatR.memptr();
+
+        for (arma::uword k = 0; k < no_path; ++k)
+        {
+            // load as dtype into registers
+            const dtype r11 = (dtype)src[0];
+            const dtype i11 = (dtype)src[1];
+            const dtype r21 = (dtype)src[2];
+            const dtype i21 = (dtype)src[3];
+            const dtype r12 = (dtype)src[4];
+            const dtype i12 = (dtype)src[5];
+            const dtype r22 = (dtype)src[6];
+            const dtype i22 = (dtype)src[7];
+
+            // column powers (V and H) - path gain = max column power
+            const dtype p1 = r11 * r11 + i11 * i11 + r21 * r21 + i21 * i21;
+            const dtype p2 = r12 * r12 + i12 * i12 + r22 * r22 + i22 * i22;
+            const dtype gain = (p1 > p2) ? p1 : p2;
+
+            // write path gain
+            if (pg)
+                *pg++ = gain;
+
+            // normalization factor: max column power -> 1
+            dtype scale = (dtype)0;
+            if (gain > (dtype)0)
+                scale = (dtype)1 / (dtype)std::sqrt((double)gain);
+
+            if (dst)
             {
-                dst[0] = (dtype)src[0];  // Re(h11)
-                dst[1] = -(dtype)src[1]; // -Im(h11)
-
-                dst[2] = (dtype)src[4];  // Re(h12)
-                dst[3] = -(dtype)src[5]; // -Im(h12)
-
-                dst[4] = (dtype)src[2];  // Re(h21)
-                dst[5] = -(dtype)src[3]; // -Im(h21)
-
-                dst[6] = (dtype)src[6];  // Re(h22)
-                dst[7] = -(dtype)src[7]; // -Im(h22)
-
-                src += 8;
+                if (downlink) // copy, normalize
+                {
+                    dst[0] = r11 * scale;
+                    dst[1] = i11 * scale;
+                    dst[2] = r21 * scale;
+                    dst[3] = i21 * scale;
+                    dst[4] = r12 * scale;
+                    dst[5] = i12 * scale;
+                    dst[6] = r22 * scale;
+                    dst[7] = i22 * scale;
+                }
+                else // uplink: conjugate transpose, normalize
+                {
+                    // H_UL = H_DL^H
+                    dst[0] = r11 * scale;  // Re(h11)
+                    dst[1] = -i11 * scale; // -Im(h11)
+                    dst[2] = r12 * scale;  // Re(h12)
+                    dst[3] = -i12 * scale; // -Im(h12)
+                    dst[4] = r21 * scale;  // Re(h21)
+                    dst[5] = -i21 * scale; // -Im(h21)
+                    dst[6] = r22 * scale;  // Re(h22)
+                    dst[7] = -i22 * scale; // -Im(h22)
+                }
                 dst += 8;
             }
+            src += 8;
         }
     }
 
+    bool want_angles = aod || eod || aoa || eoa;
+    bool want_length = path_gain || path_length;
+
     // Extract path metadata
-    if (fbs_pos || lbs_pos || path_gain || path_length || path_coord || aod || eod || aoa || eoa)
+    // - here we add the FSPL from path length to the PG
+    if (want_angles || want_length || fbs_pos || lbs_pos || path_coord)
     {
         // Convert interaction coordinates to desired precision (e.g. float to double)
         arma::Mat<dtype> coordD(3, coordR.n_cols, arma::fill::none);
@@ -172,12 +227,43 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
         // Convert path interaction coordinates into FBS/LBS positions, path length and angles
         arma::Mat<dtype> path_angles;
-        if (aod || eod || aoa || eoa)
+        arma::Col<dtype> path_length_local;
+
+        if (want_angles && want_length)
             quadriga_lib::coord2path<dtype>(Ox, Oy, Oz, Dx, Dy, Dz, &no_intR, &coordD,
-                                            path_length, fbs_pos, lbs_pos, &path_angles, path_coord, !downlink);
-        else
+                                            &path_length_local, fbs_pos, lbs_pos, &path_angles, path_coord, !downlink);
+        else if (want_angles && !want_length)
             quadriga_lib::coord2path<dtype>(Ox, Oy, Oz, Dx, Dy, Dz, &no_intR, &coordD,
-                                            path_length, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
+                                            nullptr, fbs_pos, lbs_pos, &path_angles, path_coord, !downlink);
+        else if (!want_angles && want_length)
+            quadriga_lib::coord2path<dtype>(Ox, Oy, Oz, Dx, Dy, Dz, &no_intR, &coordD,
+                                            &path_length_local, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
+        else // want_none
+            quadriga_lib::coord2path<dtype>(Ox, Oy, Oz, Dx, Dy, Dz, &no_intR, &coordD,
+                                            nullptr, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
+
+        // Adjust path gain to include the FSPL
+        if (want_length)
+        {
+            if (path_length)
+                path_length->set_size(no_path);
+
+            dtype *src = path_length_local.memptr();
+            dtype *pg = path_gain ? path_gain->memptr() : nullptr;
+            dtype *pl = path_length ? path_length->memptr() : nullptr;
+
+            for (arma::uword k = 0; k < no_path; ++k)
+            {
+                dtype len = src[k];
+                if (pl)
+                    pl[k] = len;
+                if (pg)
+                {
+                    double gainFS = gain_at_1m - 20.0 * std::log10((double)len);
+                    pg[k] *= (dtype)std::pow(10.0, 0.1 * gainFS);
+                }
+            }
+        }
 
         if (aod)
         {
@@ -203,6 +289,8 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             std::memcpy(eoa->memptr(), path_angles.colptr(3), no_path * sizeof(dtype));
         }
     }
+
+    qrt.close();
 }
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
