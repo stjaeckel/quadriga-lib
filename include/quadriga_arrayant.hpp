@@ -180,6 +180,16 @@ namespace quadriga_lib
                                              dtype rear_gain_lin = 0.0, // Front-back ration, linear value
                                              dtype res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
 
+    // Generate : Unified Linear Array
+    // Custom pattern: It is possible to provide a custom pattern, having 1 or more elements.
+    // Values for coupling, element positions and center frequency of the custom pattern are ignored.
+    template <typename dtype>
+    arrayant<dtype> generate_arrayant_ula(arma::uword N = 1,                        // Number of elements
+                                          dtype center_freq = 299792458.0,          // The center frequency in [Hz]
+                                          dtype spacing = 0.5,                      // Element spacing in [λ]
+                                          const arrayant<dtype> *pattern = nullptr, // Optional custom per-element pattern
+                                          dtype res = 1.0);                         // Resolution in degree, ignored if custom pattern is given
+
     // Generate : Antenna model for the 3GPP-NR channel model
     // Polarization indicator:
     //   1. K=1, vertical polarization only

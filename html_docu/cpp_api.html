@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.9.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.0</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -130,6 +130,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate channel coefficients for intelligent reflective surfaces (IRS)</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients for spherical waves</td></tr>
@@ -2494,6 +2495,121 @@ void quadriga_lib::hdf5_write_dset(
 <font size=+1><b>Channel generation functions</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_ieee_indoor"></a>
+<b>get_channels_ieee_indoor</b> - Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions. 
+</li><li style="margin-bottom: 0.4em;">2D model: no elevation angles are used; azimuth angles and planar motion are considered. 
+</li><li style="margin-bottom: 0.4em;">Supports channel model types <code>A, B, C, D, E, F</code> (as defined by TGn) via <code>ChannelType</code>. 
+</li><li style="margin-bottom: 0.4em;">Can generate MU-MIMO channels (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle offsets according to TGac 
+</li><li style="margin-bottom: 0.4em;">Optional time evolution via <code>observation_time</code>, <code>update_rate</code>, and mobility parameters. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channels_ieee_indoor(
+                const arrayant&lt;double&gt; &amp;ap_array,
+                const arrayant&lt;double&gt; &amp;sta_array,
+                std::string ChannelType,
+                double CarrierFreq_Hz = 5.25e9,
+                double tap_spacing_s = 10.0e-9,
+                arma::uword n_users = 1,
+                double observation_time = 0.0,
+                double update_rate = 1.0e-3,
+                double speed_station_kmh = 0.0,
+                double speed_env_kmh = 1.2,
+                arma::vec Dist_m = {4.99},
+                arma::uvec n_floors = {0},
+                bool uplink = false,
+                arma::mat offset_angles = {},
+                arma::uword n_subpath = 20,
+                double Doppler_effect = 50.0,
+                arma::sword seed = -1);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;double&gt; <b>ap_array</b></code> (input)<br> 
+   Access point array antenna with <code>n_tx</code> elements (= ports after element coupling). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;double&gt; <b>sta_array</b></code> (input)<br> 
+   Mobile station array antenna with <code>n_rx</code> elements (= ports after element coupling). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>ChannelType</b></code> (input)<br> 
+   Channel model type as defined by TGn. Supported: <code>A, B, C, D, E, F</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>CarrierFreq_Hz</b> = 5.25e9</code> (optional input)<br> 
+   Carrier frequency in Hz. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>tap_spacing_s</b> = 10.0e-9</code> (optional input)<br> 
+   Tap spacing in seconds. Must be equal to <code>10 ns / 2^k</code> (TGn default = <code>10e-9</code>). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_users</b> = 1</code> (optional input)<br> 
+   Number of users (only for TGac, TGah). Output vector length equals <code>n_users</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>observation_time</b> = 0.0</code> (optional input)<br> 
+   Channel observation time in seconds. <code>0.0</code> creates a static channel. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>update_rate</b> = 1.0e-3</code> (optional input)<br> 
+   Channel update interval in seconds (only relevant when <code>observation_time &gt; 0</code>). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>speed_station_kmh</b> = 0.0</code> (optional input)<br> 
+   Station movement speed in km/h. Movement direction is <code>AoA_offset</code>. Only relevant when <code>observation_time &gt; 0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>speed_env_kmh</b> = 1.2</code> (optional input)<br> 
+   Environment movement speed in km/h. Default <code>1.2</code> for TGn, use <code>0.089</code> for TGac. Only relevant when 
+   <code>observation_time &gt; 0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::vec <b>Dist_m</b> = {4.99}</code> (optional input)<br> 
+   TX-to-RX distance(s) in meters. Length <code>n_users</code> or length <code>1</code> (same distance for all users). Size 
+   <code>[n_users]</code> or <code>[1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>n_floors</b> = {0}</code> (optional input)<br> 
+   Number of floors for TGah model (per user), up to 4 floors. Length <code>n_users</code> or length <code>1</code>. Size 
+   <code>[n_users]</code> or <code>[1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>uplink</b> = false</code> (optional input)<br> 
+   Channel direction flag. Default is downlink; set to <code>true</code> to generate reverse (uplink) direction. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::mat <b>offset_angles</b> = {}</code> (optional input)<br> 
+   Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for <code>n_users &gt; 1</code>). 
+   Size <code>[4, n_users]</code> with rows: <code>AoD LOS, AoD NLOS, AoA LOS, AoA NLOS</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_subpath</b> = 20</code> (optional input)<br> 
+   Number of sub-paths per path/cluster used for Laplacian angular spread mapping. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>Doppler_effect</b> = 50.0</code> (optional input)<br> 
+   Special Doppler effects: models <code>D, E</code> (fluorescent lights, value = mains freq.) and <code>F</code> (moving 
+   vehicle speed in km/h). Use <code>0.0</code> to disable. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::sword <b>seed</b> = -1</code> (optional input)<br> 
+   Numeric seed for repeatability. <code>-1</code> disables the fixed seed and uses the system random device. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt;</code> (output)<br> 
+   Vector of channel objects with length <code>n_users</code>. Each entry contains the generated indoor channel 
+   realization for one user (including direction determined by <code>uplink</code>). 
+</li></ul>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="get_channels_irs"></a>
 <b>get_channels_irs</b> - Calculate channel coefficients for intelligent reflective surfaces (IRS)
