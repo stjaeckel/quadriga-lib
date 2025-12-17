@@ -45,8 +45,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
                                  arma::uvec n_floors = {0},      // Number of floors for the TGah model, adjusted for each user, max. 4, length n_users or length 1 (if same for all users)
                                  arma::mat offset_angles = {},   // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
                                  arma::uword n_subpath = 20,     // Number of sub-paths per path and cluster for Laplacian AS mapping
-                                 bool only_nonzero = false,      // Enable to remove zero-power paths from the output
-                                 std::optional<arma::uword> seed = std::nullopt)
+                                 arma::sword seed = -1)          // Numeric seed, optional, value -1 disables seed and uses system random device
 {
     // Input validation
     if (n_users == 0)
@@ -76,9 +75,9 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
     if (CarrierFreq_Hz <= 0.1e9)
         throw std::invalid_argument("Invalid carrier frequency, mut be at least 100 MHz.");
 
-    double tmp;
-    double bw_factor = 10.0e-9 / tap_spacing_s; // bandwidth expansion factor
-    if (std::abs(std::modf(std::log2(bw_factor), &tmp)) > 1e-9 || tap_spacing_s > 10.0e-9 || tap_spacing_s <= 0.0)
+    double tap_spacing_ns = tap_spacing_s * 1e9;
+    arma::uword bw_factor = (arma::uword)std::round(10.0 / tap_spacing_ns); // bandwidth expansion factor
+    if ((bw_factor & (bw_factor - 1)) != 0 || tap_spacing_ns > 10.0 || tap_spacing_ns <= 0.0)
         throw std::invalid_argument("Tap spacing must be equal to 10 ns divided by a power of 2.");
 
     if (offset_angles.n_elem != 0 && (offset_angles.n_rows != 4 || offset_angles.n_cols != n_users))
@@ -223,32 +222,32 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
         power_clst_dB = {{-3.3, -3.6, -3.9, -4.2, -4.6, -5.3, -6.2, -7.1, -8.2, -9.5, -11.0, -12.5, -14.3, -16.7, -19.9, -INFINITY, -INFINITY, -INFINITY},
                          {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -1.8, -2.8, -3.5, -4.4, -5.3, -7.4, -7.0, -10.3, -10.4, -13.8, -15.7, -19.9, -INFINITY, -INFINITY},
                          {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -5.7, -6.7, -10.4, -9.6, -14.1, -12.7, -18.5, -INFINITY, -INFINITY, -INFINITY},
-                         {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -8.8, -13.3, -18.7, -INFINITY, -INFINITY, -INFINITY},
-                         {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -12.9, -14.2, -16.3, -21.2}};
+                         {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -8.8, -13.3, -18.7, -INFINITY, -16.3, -21.2},
+                         {-INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -12.9, -14.2, -INFINITY, -INFINITY}};
 
         AoA_deg = {{315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 315.1, 0.0, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 180.4, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 74.7, 74.7, 74.7, 74.7, 74.7, 74.7, 74.7, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 251.5, 251.5, 251.5, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 68.5, 68.5, 246.2, 246.2}};
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 251.5, 251.5, 251.5, 0.0, 246.2, 246.2},
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 68.5, 68.5, 0.0, 0.0}};
 
         ASA_deg = {{48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 48.0, 0.0, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 55.0, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 42.0, 42.0, 42.0, 42.0, 42.0, 42.0, 42.0, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 28.6, 28.6, 28.6, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 30.7, 30.7, 38.2, 38.2}};
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 28.6, 28.6, 28.6, 0.0, 38.2, 38.2},
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 30.7, 30.7, 0.0, 0.0}};
 
         AoD_deg = {{56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 56.2, 0.0, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 183.7, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 153.0, 153.0, 153.0, 153.0, 153.0, 153.0, 153.0, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 112.5, 112.5, 112.5, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 291.0, 291.0, 62.3, 62.3}};
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 112.5, 112.5, 112.5, 0.0, 62.3, 62.3},
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 291.0, 291.0, 0.0, 0.0}};
 
         ASD_deg = {{41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 41.6, 0.0, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 55.2, 0.0, 0.0},
                    {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 47.4, 47.4, 47.4, 47.4, 47.4, 47.4, 47.4, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 27.2, 27.2, 27.2, 0.0, 0.0, 0.0},
-                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 33.0, 33.0, 38.0, 38.0}};
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 27.2, 27.2, 27.2, 0.0, 38.0, 38.0},
+                   {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 33.0, 33.0, 0.0, 0.0}};
 
         delay_ns = {0.0, 10.0, 20.0, 30.0, 50.0, 80.0, 110.0, 140.0, 180.0, 230.0, 280.0, 330.0, 400.0, 490.0, 600.0, 730.0, 880.0, 1050.0};
 
@@ -268,18 +267,106 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
     arma::uword n_cluster = power_clst_dB.n_rows;
     arma::uword n_path = power_clst_dB.n_cols;
 
-    // Initialize the random number generator
+    // PDP tap interpolation for TGac
+    // See: IEEE 802.11-09/0308r12, Section 2
+    if (bw_factor > 1)
+    {
+        // Reserve memory for interpolated data
+        arma::mat power_clst_dB_int(n_cluster, bw_factor * n_path);
+        arma::mat AoA_deg_int(n_cluster, bw_factor * n_path);
+        arma::mat ASA_deg_int(n_cluster, bw_factor * n_path);
+        arma::mat AoD_deg_int(n_cluster, bw_factor * n_path);
+        arma::mat ASD_deg_int(n_cluster, bw_factor * n_path);
+        arma::vec delay_ns_int(bw_factor * n_path);
+
+        arma::uword i_path_int = 0;
+        for (arma::uword i_path = 0; i_path < n_path; ++i_path)
+        {
+            // Copy TGn data for current path
+            std::memcpy(power_clst_dB_int.colptr(i_path_int), power_clst_dB.colptr(i_path), n_cluster * sizeof(double));
+            std::memcpy(AoA_deg_int.colptr(i_path_int), AoA_deg.colptr(i_path), n_cluster * sizeof(double));
+            std::memcpy(ASA_deg_int.colptr(i_path_int), ASA_deg.colptr(i_path), n_cluster * sizeof(double));
+            std::memcpy(AoD_deg_int.colptr(i_path_int), AoD_deg.colptr(i_path), n_cluster * sizeof(double));
+            std::memcpy(ASD_deg_int.colptr(i_path_int), ASD_deg.colptr(i_path), n_cluster * sizeof(double));
+            delay_ns_int[i_path_int] = delay_ns[i_path];
+
+            // Check if we need to interpolate
+            bool no_interpolation_needed = true;
+            for (arma::uword i_clst = 0; i_clst < n_cluster; ++i_clst)
+                if (i_path < n_path - 1 && power_clst_dB(i_clst, i_path) > -200.0 && power_clst_dB(i_clst, i_path + 1) > -200.0)
+                {
+                    no_interpolation_needed = false;
+                    break;
+                }
+
+            if (no_interpolation_needed)
+            {
+                ++i_path_int;
+                continue;
+            }
+
+            // Interpolate
+            for (arma::uword i_int = 1; i_int < bw_factor; ++i_int)
+            {
+                // Delays
+                double d0 = delay_ns(i_path);
+                double d1 = (i_path < n_path - 1) ? delay_ns(i_path + 1) : INFINITY;
+                double dI = d0 + double(i_int) * 10.0 / double(bw_factor);
+                delay_ns_int[i_path_int + i_int] = dI;
+
+                // Power, angles and spread
+                for (arma::uword i_clst = 0; i_clst < n_cluster; ++i_clst)
+                {
+                    double p0 = power_clst_dB(i_clst, i_path);
+                    double p1 = (i_path < n_path - 1) ? power_clst_dB(i_clst, i_path + 1) : -INFINITY;
+                    if (p0 > -200.0 && p1 > -200.0)
+                    {
+                        // Linear interpolation
+                        double pI = p0 + (p1 - p0) * (dI - d0) / (d1 - d0);
+                        power_clst_dB_int(i_clst, i_path_int + i_int) = pI;
+
+                        // Copy Angles and spreads
+                        AoA_deg_int(i_clst, i_path_int + i_int) = AoA_deg(i_clst, i_path);
+                        ASA_deg_int(i_clst, i_path_int + i_int) = ASA_deg(i_clst, i_path);
+                        AoD_deg_int(i_clst, i_path_int + i_int) = AoD_deg(i_clst, i_path);
+                        ASD_deg_int(i_clst, i_path_int + i_int) = ASD_deg(i_clst, i_path);
+                    }
+                    else // Ignore rest
+                    {
+                        power_clst_dB_int(i_clst, i_path_int + i_int) = -INFINITY;
+                        AoA_deg_int(i_clst, i_path_int + i_int) = 0.0;
+                        ASA_deg_int(i_clst, i_path_int + i_int) = 0.0;
+                        AoD_deg_int(i_clst, i_path_int + i_int) = 0.0;
+                        ASD_deg_int(i_clst, i_path_int + i_int) = 0.0;
+                    }
+                }
+            }
+            i_path_int += bw_factor;
+        }
+
+        // Update TGn values
+        power_clst_dB = power_clst_dB_int.head_cols(i_path_int);
+        AoA_deg = AoA_deg_int.head_cols(i_path_int);
+        ASA_deg = ASA_deg_int.head_cols(i_path_int);
+        AoD_deg = AoD_deg_int.head_cols(i_path_int);
+        ASD_deg = ASD_deg_int.head_cols(i_path_int);
+        delay_ns = delay_ns_int.head(i_path_int);
+
+        n_path = delay_ns.n_elem;
+    }
+
+    // ---------- HELPER FUNCTIONS ----------
+
+    // Random number generator
     static thread_local std::mt19937_64 rng;
-    if (seed && seed != -1)
-        rng.seed(*seed);
+    if (seed != -1)
+        rng.seed(seed);
     else
     {
         std::random_device rd;
         std::seed_seq seq{rd(), rd(), rd(), rd(), rd(), rd(), rd(), rd()};
         rng.seed(seq);
     }
-
-    // ---------- HELPER FUNCTIONS ----------
 
     const double V_PI = 3.141592653589793;
     const double V_2PI = 6.283185307179586;
@@ -483,11 +570,11 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
 
     for (arma::uword n = 0; n < n_users; ++n)
     {
-        aod.push_back(arma::mat(n_subpath, n_path_out));
-        aoa.push_back(arma::mat(n_subpath, n_path_out));
-        pow.push_back(arma::mat(n_subpath, n_path_out));
-        delay.push_back(arma::vec(n_path_out));
-        M.push_back(arma::cube(8, n_subpath, n_path_out));
+        aod.push_back(arma::mat(n_subpath, n_path_out, arma::fill::zeros));
+        aoa.push_back(arma::mat(n_subpath, n_path_out, arma::fill::zeros));
+        pow.push_back(arma::mat(n_subpath, n_path_out, arma::fill::zeros));
+        delay.push_back(arma::vec(n_path_out, arma::fill::zeros));
+        M.push_back(arma::cube(8, n_subpath, n_path_out, arma::fill::zeros));
     }
 
     // ---------- MODEL STEPS ----------
@@ -630,8 +717,8 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
             // Get current path power, can be 0
             double p_path = pdp_linear[i_path];
 
-            // Keep only non-zero paths (?)
-            if (!only_nonzero || p_path > 1.0e-14)
+            // Keep only non-zero paths
+            if (p_path > 1.0e-14)
             {
                 // Scale sub-path powers to contain the path power
                 double *vi = pow[i_user].colptr(i_path);

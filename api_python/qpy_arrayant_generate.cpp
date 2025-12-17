@@ -47,6 +47,9 @@ arrayant = arrayant.generate('half-wave-dipole', res)
 # Cross-polarized isotropic radiator
 arrayant = arrayant.generate('xpol', res)
 
+# A unified linear array with isotropic patterns
+arrayant = arrayant.generate('ula', res=30, N=4, freq=2.4e9, spacing=0.7)
+
 # An antenna with a custom 3dB beam with (in degree)
 arrayant = arrayant.generate('custom', res, az_3dB, el_3db, rear_gain_lin)
 
@@ -84,7 +87,7 @@ arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0
   Number of vertically stacked elements for `3gpp` and `multibeam`, scalar, default = 1
 
 - **`N`**<br>
-  Number of horizontally stacked elements for `3gpp` and `multibeam`, scalar, default = 1
+  Number of horizontally stacked elements for `3gpp`, `ula` and `multibeam`, scalar, default = 1
 
 - **`pol`**<br>
   Polarization indicator to be applied for each of the M elements:<br>
@@ -100,7 +103,7 @@ arrayant = arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, spacing=0
   The electric downtilt angle in [deg], Only relevant for `pol = 4/5/6`, `3gpp` only, scalar, default = 0
 
 - **`spacing`**<br>
-  Element spacing in [λ] for `3gpp` and `multibeam`, scalar, default = 0.5
+  Element spacing in [λ] for `3gpp`, `ula` and `multibeam`, scalar, default = 0.5
 
 - **`Mg`**<br>
   Number of nested panels in a column, `3gpp` only, scalar, default = 1
@@ -190,7 +193,7 @@ py::dict arrayant_generate(const std::string type,                 // Array type
         arrayant = quadriga_lib::generate_arrayant_xpol<double>(res);
     else if (type == "custom")
         arrayant = quadriga_lib::generate_arrayant_custom<double>(az_3dB, el_3dB, rear_gain_lin, res);
-    else if (type == "3GPP" || type == "3gpp")
+    else if (type == "3GPP" || type == "3gpp" || type == "ula")
     {
         if (pattern.size() != 0) // Use custom pattern
         {
@@ -219,6 +222,22 @@ py::dict arrayant_generate(const std::string type,                 // Array type
             }
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array);
         }
+        else if (type == "ula")
+        {
+            auto custom_array = quadriga_lib::generate_arrayant_omni(res);
+            if (pol == 2 || pol == 5)
+            {
+                custom_array = quadriga_lib::generate_arrayant_xpol(res);
+            }
+            else if (pol == 3 || pol == 6)
+            {
+                custom_array.copy_element(0, 1);
+                custom_array.rotate_pattern(45.0, 0.0, 0.0, 2, 0);
+                custom_array.rotate_pattern(-45.0, 0.0, 0.0, 2, 1);
+            }
+            arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array);
+            arrayant.name = "ula";
+        }
         else // Use 3GPP default pattern
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, nullptr, res);
     }
@@ -229,7 +248,7 @@ py::dict arrayant_generate(const std::string type,                 // Array type
         const auto weight = qd_python_numpy2arma_Col(beam_weight, true);
 
         arrayant = quadriga_lib::generate_arrayant_multibeam(M, N, az, el, weight, freq, pol, spacing,
-                                                             az_3dB, el_3dB, rear_gain_lin, res, 
+                                                             az_3dB, el_3dB, rear_gain_lin, res,
                                                              separate_beams, apply_weights);
     }
     else

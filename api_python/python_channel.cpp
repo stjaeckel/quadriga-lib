@@ -31,6 +31,7 @@ namespace py = pybind11;
 #include "qpy_hdf5_reshape_layout.cpp"
 #include "qpy_hdf5_write_channel.cpp"
 #include "qpy_hdf5_write_dset.cpp"
+#include "qpy_get_channels_ieee_indoor.cpp"
 #include "qpy_qrt_file_parse.cpp"
 #include "qpy_qrt_file_read.cpp"
 
@@ -105,6 +106,25 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
           py::arg("name"),
           py::arg("data") = py::none());
+
+    m.def("get_ieee_indoor", &get_channels_ieee_indoor,
+          py::arg("ap_array") = py::dict(),
+          py::arg("sta_array") = py::dict(),
+          py::arg("ChannelType"),
+          py::arg("CarrierFreq_Hz") = 5.25e9,
+          py::arg("tap_spacing_s") = 10.0e-9,
+          py::arg("n_users") = 1,
+          py::arg("observation_time") = 0.0,
+          py::arg("update_rate") = 1.0e-3,
+          py::arg("speed_station_kmh") = 0.0,
+          py::arg("speed_env_kmh") = 1.2,
+          py::arg("Dist_m") = py::array_t<double>(),
+          py::arg("n_floors") = py::array_t<arma::uword>(),
+          py::arg("uplink") = false,
+          py::arg("offset_angles") = py::array_t<double>(),
+          py::arg("n_subpath") = 20,
+          py::arg("Doppler_effect") = 50.0,
+          py::arg("seed") = -1);
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
 

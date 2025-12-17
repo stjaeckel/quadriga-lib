@@ -1,7 +1,7 @@
 # This Makefile is for Windows / MSVC environments
 
 # Set Armadillo and HDF5 sources
-hdf5_internal = OFF
+hdf5_internal = ON
 arma_internal = ON
 avx2 = ON
 
