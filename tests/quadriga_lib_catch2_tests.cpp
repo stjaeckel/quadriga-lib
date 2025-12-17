@@ -43,7 +43,7 @@
 #include "catch2_tests/test_arrayant_generate.cpp"
 #include "catch2_tests/test_write_png.cpp"
 #include "catch2_tests/test_fast_sincos.cpp"
-// #include "catch2_tests/test_qd_ieee_chan.cpp"
+#include "catch2_tests/test_qd_ieee_chan.cpp"
 #include "catch2_tests/test_qrt_reader.cpp"
 
 // Main function to run CATCH2

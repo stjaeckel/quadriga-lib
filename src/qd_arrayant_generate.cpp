@@ -585,7 +585,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     spacing = (spacing < (dtype)0.0) ? (dtype)0.5 : spacing;
     res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
 
-    double pi = arma::datum::pi, rad2deg = 180.0 / pi, deg2rad = pi / 180.0;
     double wavelength = 299792458.0 / double(center_freq);
     constexpr dtype zero = dtype(0.0);
 
@@ -600,7 +599,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(arma::uword N,
     }
 
     ant.center_frequency = center_freq;
-    arma::uword n_az = ant.n_azimuth(), n_el = ant.n_elevation();
 
     // Duplicate the existing elements in y-direction (horizontal stacking)
     arma::uword n_elements = ant.n_elements();

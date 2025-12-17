@@ -20,7 +20,7 @@
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Array antenna functions
+Channel generation functions
 SECTION!*/
 
 /*!MD

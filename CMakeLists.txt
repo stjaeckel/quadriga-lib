@@ -111,8 +111,8 @@ endif()
 message(STATUS "Armadillo Include dir: ${ARMADILLO_INCLUDE_DIRS}")
 
 # Numeric subroutines
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+# find_package(BLAS REQUIRED)
+# find_package(LAPACK REQUIRED)
 
 # Components to build
 set(BUILD_HDF5 ${HDF5_STATIC})
@@ -486,7 +486,7 @@ if (ENABLE_TESTS)
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
 
-    target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} LAPACK::LAPACK BLAS::BLAS)
+    target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB})
 
     if (BUILD_HDF5)
         target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} ${HDF5_LIB})
