@@ -4,6 +4,8 @@
 # Internal HDF5 deactivates Python and Octave
 hdf5_internal = OFF
 arma_internal = ON
+octave = ON
+matlab = ON
 avx2 = ON
 
 CMAKE_BUILD_DIR = build_linux
@@ -18,7 +20,7 @@ PYTHON_SHARED_OBJ    := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
 all:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ENABLE_MATLAB=ON -D ENABLE_OCTAVE=ON -D ENABLE_MEX_DOC=ON -D ENABLE_PYTHON=ON -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal) -D ENABLE_AVX2=$(avx2) 
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ENABLE_MATLAB=$(matlab) -D ENABLE_OCTAVE=$(octave) -D ENABLE_MEX_DOC=ON -D ENABLE_PYTHON=ON -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal) -D ENABLE_AVX2=$(avx2) 
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
@@ -49,8 +51,10 @@ test:   all   moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	$(CMAKE_BUILD_DIR)/test_bin
+ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
+endif
 endif
 ifneq ($(PYTHON_SHARED_OBJ),)
 	pytest tests/python_tests -x -s
