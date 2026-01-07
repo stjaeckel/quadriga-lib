@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.1</b></big>
 <br><br><br>
 
 <b>Notes</b>
@@ -2181,13 +2181,14 @@ channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap,
 <b><i>Declaration:</i></b><br><pre>
 from quadriga_lib import channel
 
-chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, ...
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, ...
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed);
+chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, 
+   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, 
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>ap_array:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ap_array</code></b> [1]<br> 
+<b><i>ap_array:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ap_array</code></b><br> 
    Dictionary containing the access point array antenna with <code>n_tx</code> elements (= ports after element coupling) 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -2238,7 +2239,7 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>sta_array</code></b> [2]<br> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sta_array</code></b><br> 
    Dictionary containing the mobile station array antenna with <code>n_rx</code> elements (= ports after element coupling) 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -2289,66 +2290,94 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
 </table><br>
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>ChannelType</b></code> [3]<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>ChannelType</b></code><br> 
    Channel model type as defined by TGn. String. Supported: <code>A, B, C, D, E, F</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>CarrierFreq_Hz</b> = 5.25e9</code> [4] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>CarrierFreq_Hz</b> = 5.25e9</code> (optional)<br> 
    Carrier frequency in Hz. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>tap_spacing_s</b> = 10e-9</code> [5] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>tap_spacing_s</b> = 10e-9</code> (optional)<br> 
    Tap spacing in seconds. Must be equal to <code>10 ns / 2^k</code> (TGn default = <code>10e-9</code>). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>n_users</b> = 1</code> [6] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>n_users</b> = 1</code> (optional)<br> 
    Number of users (only for TGac, TGah). Output struct array length equals <code>n_users</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>observation_time</b> = 0</code> [7] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>observation_time</b> = 0</code> (optional)<br> 
    Channel observation time in seconds. <code>0</code> creates a static channel. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>update_rate</b> = 1e-3</code> [8] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>update_rate</b> = 1e-3</code> (optional)<br> 
    Channel update interval in seconds (only relevant when <code>observation_time &gt; 0</code>). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>speed_station_kmh</b> = 0</code> [9] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>speed_station_kmh</b> = 0</code> (optional)<br> 
    Station movement speed in km/h. Movement direction is <code>AoA_offset</code>. Only relevant when <code>observation_time &gt; 0</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>speed_env_kmh</b> = 1.2</code> [10] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>speed_env_kmh</b> = 1.2</code> (optional)<br> 
    Environment movement speed in km/h. Default <code>1.2</code> for TGn, use <code>0.089</code> for TGac. Only relevant when <code>observation_time &gt; 0</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>vector <b>Dist_m</b> = [4.99]</code> [11] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>vector <b>Dist_m</b> = [4.99]</code> (optional)<br> 
    TX-to-RX distance(s) in meters. Length <code>n_users</code> or length <code>1</code> (same distance for all users). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>vector <b>n_floors</b> = [0]</code> [12] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code>vector <b>n_floors</b> = [0]</code> (optional)<br> 
    Number of floors for TGah model (per user), up to 4 floors. Length <code>n_users</code> or length <code>1</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>uplink</b> = false</code> [13] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>uplink</b> = false</code> (optional)<br> 
    Channel direction flag. Default is downlink; set to <code>true</code> to generate reverse (uplink) direction. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>offset_angles</b> = []</code> [14] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>offset_angles</b> = []</code> (optional)<br> 
    Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for <code>n_users &gt; 1</code>). 
    Shape <code>[4, n_users]</code> with rows: <code>AoD LOS, AoD NLOS, AoA LOS, AoA NLOS</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>n_subpath</b> = 20</code> [15] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>n_subpath</b> = 20</code> (optional)<br> 
    Number of sub-paths per path/cluster used for Laplacian angular spread mapping. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>Doppler_effect</b> = 50</code> [16] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>Doppler_effect</b> = 50</code> (optional)<br> 
    Special Doppler effects: models <code>D, E</code> (fluorescent lights, value = mains freq.) and <code>F</code> (moving vehicle speed in km/h). 
    Use <code>0</code> to disable. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code><b>seed</b> = -1</code> [17] (optional)<br> 
+<ul><li style="margin-bottom: 0.4em;"><code><b>seed</b> = -1</code> (optional)<br> 
    Numeric seed for repeatability. <code>-1</code> disables the fixed seed and uses the system random device. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>KF_linear</b> = NAN</code> (optional)<br> 
+   Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used: 
+   A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise). 
+   KF is applied to the first tap only. Breakpoint distance is ignored for <code>KF_linear &gt;= 0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>XPR_NLOS_linear</b> = NAN</code> (optional)<br> 
+   Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative, 
+   the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>SF_std_dB_LOS</b> = NAN</code> (optional)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
+   the model default of 3 dB is used. <code>SF_std_dB_LOS</code> is applied to all LOS channels, where the 
+   AP-STA distance d < dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>SF_std_dB_NLOS</b> = NAN</code> (optional)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
+   the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. <code>SF_std_dB_NLOS</code> is applied to all NLOS channels, 
+   where the AP-STA distance d >= dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>dBP_m</b> = NAN</code> (optional)<br> 
+   Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative, 
+   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

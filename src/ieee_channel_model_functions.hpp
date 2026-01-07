@@ -30,22 +30,27 @@
 // Generate channel parameters for the IEEE indoor channel models as defined by TGn, TGac, TGah and TGax
 // - Outputs non-zero paths and clusters where the max. n_path_out = n_cluster * n_path (+1) from the IEEE tables (+1 additional LOS cluster, if present)
 // - Sub-path aod and aoa do not include AP or Station orientation
-static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Station x/y positions, z=0 (2D model), Size: [3, n_users]
-                                 arma::mat &rx_orientation,      // Output: Station orientation in radians, Size: [3, n_users]
-                                 std::vector<arma::mat> &aod,    // Output: Sub-path departure angles in radians, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::mat> &aoa,    // Output: Sub-path arrival angles in radians, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::mat> &pow,    // Output: Sub-path power, linear, relative to 0 dBm, per-user, Size: n_subpath, n_path_out
-                                 std::vector<arma::vec> &delay,  // Output: Path delays in seconds, per-user, Length: n_path_out
-                                 std::vector<arma::cube> &M,     // Output: Polarization transfer matrix, interleaved complex, col-major, per-user, Size: 8, n_subpath, n_path_out
-                                 std::string ChannelType,        // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-                                 double CarrierFreq_Hz = 5.25e9, // Carrier frequency in Hz
-                                 double tap_spacing_s = 10.0e-9, // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
-                                 arma::uword n_users = 1,        // Number of user (only for TGac, TGah)
-                                 arma::vec Dist_m = {4.99},      // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)
-                                 arma::uvec n_floors = {0},      // Number of floors for the TGah model, adjusted for each user, max. 4, length n_users or length 1 (if same for all users)
-                                 arma::mat offset_angles = {},   // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
-                                 arma::uword n_subpath = 20,     // Number of sub-paths per path and cluster for Laplacian AS mapping
-                                 arma::sword seed = -1)          // Numeric seed, optional, value -1 disables seed and uses system random device
+static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Output: Station x/y positions, z=0 (2D model), Size: [3, n_users]
+                                 arma::mat &rx_orientation,              // Output: Station orientation in radians, Size: [3, n_users]
+                                 std::vector<arma::mat> &aod,            // Output: Sub-path departure angles in radians, per-user, Size: n_subpath, n_path_out
+                                 std::vector<arma::mat> &aoa,            // Output: Sub-path arrival angles in radians, per-user, Size: n_subpath, n_path_out
+                                 std::vector<arma::mat> &pow,            // Output: Sub-path power, linear, relative to 0 dBm, per-user, Size: n_subpath, n_path_out
+                                 std::vector<arma::vec> &delay,          // Output: Path delays in seconds, per-user, Length: n_path_out
+                                 std::vector<arma::cube> &M,             // Output: Polarization transfer matrix, interleaved complex, col-major, per-user, Size: 8, n_subpath, n_path_out
+                                 std::string ChannelType,                // Channel Model Type (A, B, C, D, E, F) as defined by TGn
+                                 double CarrierFreq_Hz = 5.25e9,         // Carrier frequency in Hz
+                                 double tap_spacing_s = 10.0e-9,         // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
+                                 arma::uword n_users = 1,                // Number of user (only for TGac, TGah)
+                                 arma::vec Dist_m = {4.99},              // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)
+                                 arma::uvec n_floors = {0},              // Number of floors for the TGah model, adjusted for each user, max. 4, length n_users or length 1 (if same for all users)
+                                 arma::mat offset_angles = {},           // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
+                                 arma::uword n_subpath = 20,             // Number of sub-paths per path and cluster for Laplacian AS mapping
+                                 arma::sword seed = -1,                  // Numeric seed, optional, value -1 disabled seed and uses system random device
+                                 double KF_linear_overwrite = NAN,       // Overwrites the default KF (linear scale)
+                                 double XPR_NLOS_linear_overwrite = NAN, // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
+                                 double SF_std_dB_LOS_overwrite = NAN,   // Overwrites the default Shadow Fading STD for LOS channels in dB
+                                 double SF_std_dB_NLOS_overwrite = NAN,  // Overwrites the default Shadow Fading STD for NLOS channels in dB
+                                 double dBP_m_overwrite = NAN)           // Overwrites the default breakpoint distance in meters
 {
     // Input validation
     if (n_users == 0)
@@ -262,6 +267,17 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
     // See: IEEE 802.11-968r4 TGah Channel Model, Table 2
     if (CarrierFreq_Hz < 1.0e9)
         SF_std_dB_LOS -= 1.0, SF_std_dB_NLOS -= 1.0;
+
+    // Apply parameter overwrites
+    KF_linear_overwrite = (KF_linear_overwrite < 0.0) ? NAN : KF_linear_overwrite;
+    XPR_NLOS_linear_overwrite = (XPR_NLOS_linear_overwrite < 0.0) ? NAN : XPR_NLOS_linear_overwrite;
+    dBP_m_overwrite = (dBP_m_overwrite < 0.0) ? NAN : dBP_m_overwrite;
+
+    KF_linear = std::isnan(KF_linear_overwrite) ? KF_linear : KF_linear_overwrite;
+    XPR_NLOS_linear = std::isnan(XPR_NLOS_linear_overwrite) ? XPR_NLOS_linear : XPR_NLOS_linear_overwrite;
+    SF_std_dB_LOS = std::isnan(SF_std_dB_LOS_overwrite) ? SF_std_dB_LOS : SF_std_dB_LOS_overwrite;
+    SF_std_dB_NLOS = std::isnan(SF_std_dB_NLOS_overwrite) ? SF_std_dB_NLOS : SF_std_dB_NLOS_overwrite;
+    dBP_m = std::isnan(dBP_m_overwrite) ? dBP_m : dBP_m_overwrite;
 
     // Get the number of paths and clusters
     arma::uword n_cluster = power_clst_dB.n_rows;
@@ -659,7 +675,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,              // Output: Stat
         arma::vec pdp_linear(n_path_out, arma::fill::ones);
 
         // Add LOS path for small distances below break-point, only when RX is on the same floor
-        bool has_los = Dist_m[i_user] < dBP_m && n_floors[i_user] == 0;
+        bool has_los = (Dist_m[i_user] < dBP_m && n_floors[i_user] == 0) || !std::isnan(KF_linear_overwrite);
         double K_los = has_los ? KF_linear / (KF_linear + 1.0) : 0.0;
         double K_nlos = has_los ? 1.0 / (KF_linear + 1.0) : 1.0;
         pdp_linear[0] = K_los * dB_2_linear(power_clst_dB[0]);

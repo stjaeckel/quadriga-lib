@@ -27,7 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_10_0
+#define QUADRIGA_LIB_VERSION v0_10_1
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
@@ -66,7 +66,12 @@ namespace quadriga_lib
                              arma::mat offset_angles = {},      // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
                              arma::uword n_subpath = 20,        // Number of sub-paths per path and cluster for Laplacian AS mapping
                              double Doppler_effect = 50.0,      // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-                             arma::sword seed = -1);            // Numeric seed, optional, value -1 disabled seed and uses system random device
+                             arma::sword seed = -1,             // Numeric seed, optional, value -1 disabled seed and uses system random device
+                             double KF_linear = NAN,            // Overwrites the default KF (linear scale)
+                             double XPR_NLOS_linear = NAN,      // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
+                             double SF_std_dB_LOS = NAN,        // Overwrites the default Shadow Fading STD for LOS channels in dB
+                             double SF_std_dB_NLOS = NAN,       // Overwrites the default Shadow Fading STD for NLOS channels in dB
+                             double dBP_m = NAN);               // Overwrites the default breakpoint distance in meters
 
 }
 

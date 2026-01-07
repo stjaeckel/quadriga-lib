@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.1</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -2212,7 +2212,7 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 </li><li style="margin-bottom: 0.4em;">2D model: no elevation angles are used; azimuth angles and planar motion are considered. 
 </li><li style="margin-bottom: 0.4em;">For 3D antenna models (default models from <a href="#arrayant_generate">arrayant_generate</a>), only the azimuth cut at <code>elevation_grid = 0</code> is used 
 </li><li style="margin-bottom: 0.4em;">Supports channel model types <code>A, B, C, D, E, F</code> (as defined by TGn) via <code>ChannelType</code>. 
-</li><li style="margin-bottom: 0.4em;">Can generate MU-MIMO channels (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle  
+</li><li style="margin-bottom: 0.4em;">Can generate MU-MIMO channels (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle 
    offsets according to TGac. 
 </li><li style="margin-bottom: 0.4em;">Optional time evolution via <code>observation_time</code>, <code>update_rate</code>, and mobility parameters. 
 </li></ul>
@@ -2221,7 +2221,8 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 <b><i>Declaration:</i></b><br><pre>
 chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, ...
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, ...
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed);
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, ...
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2357,6 +2358,34 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
  
 <ul><li style="margin-bottom: 0.4em;"><code><b>seed</b> = -1</code> [17] (optional)<br> 
    Numeric seed for repeatability. <code>-1</code> disables the fixed seed and uses the system random device. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>KF_linear</b> = []</code> [18] (optional)<br> 
+   Overwrites the model-specific KF-value. If this parameter is empty (default), NAN or negative, model defaults are used: 
+   A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise). 
+   KF is applied to the first tap only. Breakpoint distance is ignored for <code>KF_linear &gt;= 0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>XPR_NLOS_linear</b> = []</code> [19] (optional)<br> 
+   Overwrites the model-specific Cross-polarization ratio. If this parameter is empty (default), NAN or negative, 
+   the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>SF_std_dB_LOS</b> = []</code> [20] (optional)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is empty (default) or NAN, 
+   the model default of 3 dB is used. <code>SF_std_dB_LOS</code> is applied to all LOS channels, where the 
+   AP-STA distance d < dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>SF_std_dB_NLOS</b> = []</code> [21] (optional)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is empty (default) or NAN, 
+   the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. <code>SF_std_dB_NLOS</code> is applied to all NLOS channels, 
+   where the AP-STA distance d >= dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>dBP_m</b> = []</code> [22] (optional)<br> 
+   Overwrites the model-specific breakpoint distance. If this parameter is empty (default), NAN or negative, 
+   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

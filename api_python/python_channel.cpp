@@ -124,7 +124,12 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("offset_angles") = py::array_t<double>(),
           py::arg("n_subpath") = 20,
           py::arg("Doppler_effect") = 50.0,
-          py::arg("seed") = -1);
+          py::arg("seed") = -1,
+          py::arg("KF_linear") = NAN,
+          py::arg("XPR_NLOS_linear") = NAN,
+          py::arg("SF_std_dB_LOS") = NAN,
+          py::arg("SF_std_dB_NLOS") = NAN,
+          py::arg("dBP_m") = NAN);
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
 
