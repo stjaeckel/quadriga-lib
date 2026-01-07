@@ -38,13 +38,14 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 ```
 from quadriga_lib import channel
 
-chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, ...
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, ...
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed);
+chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, 
+   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, 
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m );
 ```
 
 ## ap_array:
-- **`ap_array`** [1]<br>
+- **`ap_array`**<br>
   Dictionary containing the access point array antenna with `n_tx` elements (= ports after element coupling)
   `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_ap, n_azimuth_ap, n_elements_ap)`
   `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_ap, n_azimuth_ap, n_elements_ap)`
@@ -56,7 +57,7 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
   `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_ap, n_ports_ap)`
   `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_ap, n_ports_ap)`
 
-- **`sta_array`** [2]<br>
+- **`sta_array`**<br>
   Dictionary containing the mobile station array antenna with `n_rx` elements (= ports after element coupling)
   `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_sta, n_azimuth_sta, n_elements_sta)`
   `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_sta, n_azimuth_sta, n_elements_sta)`
@@ -68,52 +69,75 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
   `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_sta, n_ports_sta)`
   `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_sta, n_ports_sta)`
 
-- `**ChannelType**` [3]<br>
+- `**ChannelType**`<br>
   Channel model type as defined by TGn. String. Supported: `A, B, C, D, E, F`.
 
-- `**CarrierFreq_Hz** = 5.25e9` [4] (optional)<br>
+- `**CarrierFreq_Hz** = 5.25e9` (optional)<br>
   Carrier frequency in Hz.
 
-- `**tap_spacing_s** = 10e-9` [5] (optional)<br>
+- `**tap_spacing_s** = 10e-9` (optional)<br>
   Tap spacing in seconds. Must be equal to `10 ns / 2^k` (TGn default = `10e-9`).
 
-- `**n_users** = 1` [6] (optional)<br>
+- `**n_users** = 1` (optional)<br>
   Number of users (only for TGac, TGah). Output struct array length equals `n_users`.
 
-- `**observation_time** = 0` [7] (optional)<br>
+- `**observation_time** = 0` (optional)<br>
   Channel observation time in seconds. `0` creates a static channel.
 
-- `**update_rate** = 1e-3` [8] (optional)<br>
+- `**update_rate** = 1e-3` (optional)<br>
   Channel update interval in seconds (only relevant when `observation_time > 0`).
 
-- `**speed_station_kmh** = 0` [9] (optional)<br>
+- `**speed_station_kmh** = 0` (optional)<br>
   Station movement speed in km/h. Movement direction is `AoA_offset`. Only relevant when `observation_time > 0`.
 
-- `**speed_env_kmh** = 1.2` [10] (optional)<br>
+- `**speed_env_kmh** = 1.2` (optional)<br>
   Environment movement speed in km/h. Default `1.2` for TGn, use `0.089` for TGac. Only relevant when `observation_time > 0`.
 
-- `vector **Dist_m** = [4.99]` [11] (optional)<br>
+- `vector **Dist_m** = [4.99]` (optional)<br>
   TX-to-RX distance(s) in meters. Length `n_users` or length `1` (same distance for all users).
 
-- `vector **n_floors** = [0]` [12] (optional)<br>
+- `vector **n_floors** = [0]` (optional)<br>
   Number of floors for TGah model (per user), up to 4 floors. Length `n_users` or length `1`.
 
-- `**uplink** = false` [13] (optional)<br>
+- `**uplink** = false` (optional)<br>
   Channel direction flag. Default is downlink; set to `true` to generate reverse (uplink) direction.
 
-- `**offset_angles** = []` [14] (optional)<br>
+- `**offset_angles** = []` (optional)<br>
   Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for `n_users > 1`).
   Shape `[4, n_users]` with rows: `AoD LOS, AoD NLOS, AoA LOS, AoA NLOS`.
 
-- `**n_subpath** = 20` [15] (optional)<br>
+- `**n_subpath** = 20` (optional)<br>
   Number of sub-paths per path/cluster used for Laplacian angular spread mapping.
 
-- `**Doppler_effect** = 50` [16] (optional)<br>
+- `**Doppler_effect** = 50` (optional)<br>
   Special Doppler effects: models `D, E` (fluorescent lights, value = mains freq.) and `F` (moving vehicle speed in km/h).
   Use `0` to disable.
 
-- `**seed** = -1` [17] (optional)<br>
+- `**seed** = -1` (optional)<br>
   Numeric seed for repeatability. `-1` disables the fixed seed and uses the system random device.
+
+- `**KF_linear** = NAN` (optional)<br>
+  Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used:
+  A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise).
+  KF is applied to the first tap only. Breakpoint distance is ignored for `KF_linear >= 0`.
+
+- `**XPR_NLOS_linear** = NAN` (optional)<br>
+  Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative,
+  the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
+
+- `**SF_std_dB_LOS** = NAN` (optional)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),
+  the model default of 3 dB is used. `SF_std_dB_LOS` is applied to all LOS channels, where the
+  AP-STA distance d < dBP.
+
+- `**SF_std_dB_NLOS** = NAN` (optional)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),
+  the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. `SF_std_dB_NLOS` is applied to all NLOS channels,
+  where the AP-STA distance d >= dBP.
+
+- `**dBP_m** = NAN` (optional)<br>
+  Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative,
+  the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
 
 ## Returns:
 - **`chan`**<br>
@@ -144,7 +168,12 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,                 // A
                                   const py::array_t<double> &offset_angles, // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
                                   const arma::uword n_subpath,              // Number of sub-paths per path and cluster for Laplacian AS mapping
                                   const double Doppler_effect,              // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-                                  const arma::sword seed)                   // Numeric seed, optional, value -1 disabled seed and uses system random device
+                                  const arma::sword seed,                   // Numeric seed, optional, value -1 disabled seed and uses system random device
+                                  const double KF_linear,                   // Overwrites the default KF (linear scale)
+                                  const double XPR_NLOS_linear,             // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
+                                  const double SF_std_dB_LOS,               // Overwrites the default Shadow Fading STD for LOS channels in dB
+                                  const double SF_std_dB_NLOS,              // Overwrites the default Shadow Fading STD for NLOS channels in dB
+                                  const double dBP_m)                       // Overwrites the default breakpoint distance in meters
 {
     // Parse input arguments
     const auto ant_tx_a = qd_python_dict2arrayant(ap_array, true);
@@ -171,7 +200,12 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,                 // A
                                                   offset_angles_a,
                                                   n_subpath,
                                                   Doppler_effect,
-                                                  seed);
+                                                  seed,
+                                                  KF_linear,
+                                                  XPR_NLOS_linear,
+                                                  SF_std_dB_LOS,
+                                                  SF_std_dB_NLOS,
+                                                  dBP_m);
 
     // Copy results to Python
     py::list list;

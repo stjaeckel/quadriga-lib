@@ -32,7 +32,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 - 2D model: no elevation angles are used; azimuth angles and planar motion are considered.
 - For 3D antenna models (default models from [[arrayant_generate]]), only the azimuth cut at `elevation_grid = 0` is used
 - Supports channel model types `A, B, C, D, E, F` (as defined by TGn) via `ChannelType`.
-- Can generate MU-MIMO channels (`n_users > 1`) with per-user distances/floors and optional angle 
+- Can generate MU-MIMO channels (`n_users > 1`) with per-user distances/floors and optional angle
   offsets according to TGac.
 - Optional time evolution via `observation_time`, `update_rate`, and mobility parameters.
 
@@ -40,7 +40,8 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 ```
 chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, ...
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, ...
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed);
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, ...
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
 ```
 
 ## ap_array:
@@ -109,10 +110,33 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
 - `**seed** = -1` [17] (optional)<br>
   Numeric seed for repeatability. `-1` disables the fixed seed and uses the system random device.
 
+- `**KF_linear** = []` [18] (optional)<br>
+  Overwrites the model-specific KF-value. If this parameter is empty (default), NAN or negative, model defaults are used:
+  A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise).
+  KF is applied to the first tap only. Breakpoint distance is ignored for `KF_linear >= 0`.
+
+- `**XPR_NLOS_linear** = []` [19] (optional)<br>
+  Overwrites the model-specific Cross-polarization ratio. If this parameter is empty (default), NAN or negative,
+  the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
+
+- `**SF_std_dB_LOS** = []` [20] (optional)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is empty (default) or NAN,
+  the model default of 3 dB is used. `SF_std_dB_LOS` is applied to all LOS channels, where the
+  AP-STA distance d < dBP.
+
+- `**SF_std_dB_NLOS** = []` [21] (optional)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is empty (default) or NAN,
+  the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. `SF_std_dB_NLOS` is applied to all NLOS channels,
+  where the AP-STA distance d >= dBP.
+
+- `**dBP_m** = []` [22] (optional)<br>
+  Overwrites the model-specific breakpoint distance. If this parameter is empty (default), NAN or negative,
+  the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
+
 ## Returns:
 - **`chan`**<br>
   Struct array of length `n_users` containing the channel data with the following fields.
-  `name`           | Channel name                                                             | String 
+  `name`           | Channel name                                                             | String
   `tx_position`    | Transmitter positions (AP for downlink, STA for uplink)                  | Size: `[3, 1]` or `[3, n_snap]`
   `rx_position`    | Receiver positions (STA for downlink, AP for uplink)                     | Size: `[3, 1]` or `[3, n_snap]`
   `tx_orientation` | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | Size: `[3, 1]` or `[3, n_snap]`
@@ -128,7 +152,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Need at least TX and RX antennas and channel type.");
 
-    if (nrhs > 17)
+    if (nrhs > 22)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many input arguments.");
 
     if (nlhs > 1)
@@ -180,6 +204,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uword n_subpath = (nrhs < 15) ? 20 : qd_mex_get_scalar<arma::uword>(prhs[14], "n_subpath", 20);
     double Doppler_effect = (nrhs < 16) ? 50.0 : qd_mex_get_scalar<double>(prhs[15], "Doppler_effect", 50.0);
     arma::sword seed = (nrhs < 17) ? -1 : qd_mex_get_scalar<arma::sword>(prhs[16], "seed", -1);
+    double KF_linear = (nrhs < 18) ? NAN : qd_mex_get_scalar<double>(prhs[17], "KF_linear", NAN);
+    double XPR_NLOS_linear = (nrhs < 19) ? NAN : qd_mex_get_scalar<double>(prhs[18], "XPR_NLOS_linear", NAN);
+    double SF_std_dB_LOS = (nrhs < 20) ? NAN : qd_mex_get_scalar<double>(prhs[19], "SF_std_dB_LOS", NAN);
+    double SF_std_dB_NLOS = (nrhs < 21) ? NAN : qd_mex_get_scalar<double>(prhs[20], "SF_std_dB_NLOS", NAN);
+    double dBP_m = (nrhs < 22) ? NAN : qd_mex_get_scalar<double>(prhs[21], "dBP_m", NAN);
 
     // Declare outputs
     std::vector<quadriga_lib::channel<double>> chan;
@@ -201,7 +230,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                           offset_angles,
                                                           n_subpath,
                                                           Doppler_effect,
-                                                          seed));
+                                                          seed,
+                                                          KF_linear,
+                                                          XPR_NLOS_linear,
+                                                          SF_std_dB_LOS,
+                                                          SF_std_dB_NLOS,
+                                                          dBP_m));
 
     if (nlhs > 0)
     {

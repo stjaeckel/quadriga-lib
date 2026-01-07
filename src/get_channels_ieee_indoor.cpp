@@ -50,7 +50,12 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
                 arma::mat offset_angles = {},
                 arma::uword n_subpath = 20,
                 double Doppler_effect = 50.0,
-                arma::sword seed = -1);
+                arma::sword seed = -1,
+                double KF_linear = NAN,
+                double XPR_NLOS_linear = NAN,
+                double SF_std_dB_LOS = NAN,
+                double SF_std_dB_NLOS = NAN,
+                double dBP_m = NAN );
 ```
 
 ## Arguments:
@@ -110,6 +115,29 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - `arma::sword **seed** = -1` (optional input)<br>
   Numeric seed for repeatability. `-1` disables the fixed seed and uses the system random device.
 
+- `double **KF_linear** = NAN` (optional input)<br>
+  Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used:
+  A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise). 
+  KF is applied to the first tap only. Breakpoint distance is ignored for `KF_linear >= 0`.
+
+- `double **XPR_NLOS_linear** = NAN` (optional input)<br>
+  Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative, 
+  the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
+
+- `double **SF_std_dB_LOS** = NAN` (optional input)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
+  the model default of 3 dB is used. `SF_std_dB_LOS` is applied to all LOS channels, where the 
+  AP-STA distance d < dBP.
+
+- `double **SF_std_dB_NLOS** = NAN` (optional input)<br>
+  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
+  the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. `SF_std_dB_NLOS` is applied to all NLOS channels, 
+  where the AP-STA distance d >= dBP.
+
+- `double **dBP_m** = NAN` (optional input)<br>
+  Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative, 
+  the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
+ 
 ## Returns:
 - `std::vector<quadriga_lib::channel<double>>` (output)<br>
   Vector of channel objects with length `n_users`. Each entry contains the generated indoor channel
@@ -133,7 +161,13 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        arma::mat offset_angles,                         // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
                                        arma::uword n_subpath,                           // Number of sub-paths per path and cluster for Laplacian AS mapping
                                        double Doppler_effect,                           // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-                                       arma::sword seed)                                // Numeric seed, optional, value -1 disables seed and uses system random device
+                                       arma::sword seed,                                // Numeric seed, optional, value -1 disabled seed and uses system random device
+                                       double KF_linear,                                // Overwrites the default KF (linear scale)
+                                       double XPR_NLOS_linear,                          // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
+                                       double SF_std_dB_LOS,                            // Overwrites the default Shadow Fading STD for LOS channels in dB
+                                       double SF_std_dB_NLOS,                           // Overwrites the default Shadow Fading STD for NLOS channels in dB
+                                       double dBP_m)                                    // Overwrites the default breakpoint distance in meters
+
 {
     // Check if the antennas are valid
     auto error_message = ap_array.is_valid();
@@ -172,7 +206,8 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
     qd_ieee_indoor_param(rx_pos, rx_orientation, aod, aoa, pow, delay, M,
                          ChannelType, CarrierFreq_Hz, tap_spacing_s, n_users, Dist_m, n_floors,
-                         offset_angles, n_subpath, seed);
+                         offset_angles, n_subpath, seed, 
+                         KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
 
     arma::uword n_tx = ap_array.n_ports();
     arma::uword n_rx = sta_array.n_ports();

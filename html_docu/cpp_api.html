@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.1</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -2526,7 +2526,12 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
                 arma::mat offset_angles = {},
                 arma::uword n_subpath = 20,
                 double Doppler_effect = 50.0,
-                arma::sword seed = -1);
+                arma::sword seed = -1,
+                double KF_linear = NAN,
+                double XPR_NLOS_linear = NAN,
+                double SF_std_dB_LOS = NAN,
+                double SF_std_dB_NLOS = NAN,
+                double dBP_m = NAN );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2601,6 +2606,35 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::sword <b>seed</b> = -1</code> (optional input)<br> 
    Numeric seed for repeatability. <code>-1</code> disables the fixed seed and uses the system random device. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>KF_linear</b> = NAN</code> (optional input)<br> 
+   Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used: 
+   A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise).  
+   KF is applied to the first tap only. Breakpoint distance is ignored for <code>KF_linear &gt;= 0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>XPR_NLOS_linear</b> = NAN</code> (optional input)<br> 
+   Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative,  
+   the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>SF_std_dB_LOS</b> = NAN</code> (optional input)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),  
+   the model default of 3 dB is used. <code>SF_std_dB_LOS</code> is applied to all LOS channels, where the  
+   AP-STA distance d < dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>SF_std_dB_NLOS</b> = NAN</code> (optional input)<br> 
+   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),  
+   the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. <code>SF_std_dB_NLOS</code> is applied to all NLOS channels,  
+   where the AP-STA distance d >= dBP. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>dBP_m</b> = NAN</code> (optional input)<br> 
+   Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative,  
+   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m. 
+   
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
