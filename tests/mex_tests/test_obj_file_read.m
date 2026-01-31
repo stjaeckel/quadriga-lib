@@ -147,7 +147,7 @@ assertEqual( size(bsdf), [0,0] );
 
 % Too many inputs
 try
-    quadriga_lib.obj_file_read(fn,0);
+    quadriga_lib.obj_file_read(fn,'bla',1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -191,4 +191,211 @@ end
 
 delete(fn);
 
+if 0
+% Test Custom Materials CSV
+csv_fn = 'custom_materials.csv';
+
+% Test 1: Basic custom materials
+f = fopen(csv_fn, 'w');
+fprintf(f, '%s\n', 'name,a,b,c,d,att');
+fprintf(f, '%s\n', 'custom_material_1,2.5,0.0,0.001,0.5,5.0');
+fprintf(f, '%s\n', 'custom_material_2,4.0,-0.1,0.05,1.2,10.0');
+fclose(f);
+
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'v -1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v -1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v -1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v -1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 5 3 1');
+fprintf(f, '%s\n', 'f 3 8 4');
+fprintf(f, '%s\n', 'f 7 6 8');
+fprintf(f, '%s\n', 'f 2 8 6');
+fprintf(f, '%s\n', 'usemtl custom_material_2');
+fprintf(f, '%s\n', 'f 1 4 2');
+fprintf(f, '%s\n', 'f 5 2 6');
+fprintf(f, '%s\n', 'f 5 7 3');
+fprintf(f, '%s\n', 'f 3 7 8');
+fprintf(f, '%s\n', 'f 7 5 6');
+fprintf(f, '%s\n', 'f 2 4 8');
+fprintf(f, '%s\n', 'f 1 3 4');
+fprintf(f, '%s\n', 'f 5 1 2');
+fclose(f);
+
+[~, mtl_prop, ~, ~, ~, mtl_ind, ~, mtl_names] = quadriga_lib.obj_file_read(fn, csv_fn);
+
+assertElementsAlmostEqual(mtl_prop(1,:), [2.5, 0.0, 0.001, 0.5, 5.0], 'absolute', 1e-14);
+assertEqual(mtl_names{1,1}, 'custom_material_1');
+assertEqual(mtl_ind(1), uint64(1));
+
+assertElementsAlmostEqual(mtl_prop(5,:), [4.0, -0.1, 0.05, 1.2, 10.0], 'absolute', 1e-14);
+assertEqual(mtl_names{2,1}, 'custom_material_2');
+assertEqual(mtl_ind(5), uint64(2));
+
+delete(fn);
+delete(csv_fn);
+
+% Test 2: Jumbled column order
+f = fopen(csv_fn, 'w');
+fprintf(f, '%s\n', 'att,d,c,b,a,name');
+fprintf(f, '%s\n', '5.0,0.5,0.001,0.0,2.5,custom_material_1');
+fprintf(f, '%s\n', '10.0,1.2,0.05,-0.1,4.0,custom_material_2');
+fclose(f);
+
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'v -1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v -1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v -1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v -1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 5 3 1');
+fprintf(f, '%s\n', 'f 3 8 4');
+fprintf(f, '%s\n', 'f 7 6 8');
+fprintf(f, '%s\n', 'f 2 8 6');
+fprintf(f, '%s\n', 'usemtl custom_material_2');
+fprintf(f, '%s\n', 'f 1 4 2');
+fprintf(f, '%s\n', 'f 5 2 6');
+fprintf(f, '%s\n', 'f 5 7 3');
+fprintf(f, '%s\n', 'f 3 7 8');
+fprintf(f, '%s\n', 'f 7 5 6');
+fprintf(f, '%s\n', 'f 2 4 8');
+fprintf(f, '%s\n', 'f 1 3 4');
+fprintf(f, '%s\n', 'f 5 1 2');
+fclose(f);
+
+[~, mtl_prop, ~, ~, ~, ~, ~, mtl_names] = quadriga_lib.obj_file_read(fn, csv_fn);
+
+assertElementsAlmostEqual(mtl_prop(1,:), [2.5, 0.0, 0.001, 0.5, 5.0], 'absolute', 1e-14);
+assertEqual(mtl_names{1,1}, 'custom_material_1');
+
+assertElementsAlmostEqual(mtl_prop(5,:), [4.0, -0.1, 0.05, 1.2, 10.0], 'absolute', 1e-14);
+assertEqual(mtl_names{2,1}, 'custom_material_2');
+
+delete(fn);
+delete(csv_fn);
+
+% Test 3: Missing column - missing 'att'
+f = fopen(csv_fn, 'w');
+fprintf(f, '%s\n', 'name,a,b,c,d');
+fprintf(f, '%s\n', 'custom_material_1,2.5,0.0,0.001,0.5');
+fclose(f);
+
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 1 2 3');
+fprintf(f, '%s\n', 'f 2 3 4');
+fclose(f);
+
+try
+    quadriga_lib.obj_file_read(fn, csv_fn);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
+        error('moxunit:exceptionNotRaised', 'Expected an error for missing column!');
+    end
+end
+
+delete(fn);
+delete(csv_fn);
+
+% Test 4: Missing multiple columns
+f = fopen(csv_fn, 'w');
+fprintf(f, '%s\n', 'name,a,b');
+fprintf(f, '%s\n', 'custom_material_1,2.5,0.0');
+fclose(f);
+
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 1 2 3');
+fprintf(f, '%s\n', 'f 2 3 4');
+fclose(f);
+
+try
+    quadriga_lib.obj_file_read(fn, csv_fn);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
+        error('moxunit:exceptionNotRaised', 'Expected an error for missing columns!');
+    end
+end
+
+delete(fn);
+delete(csv_fn);
+
+% Test 5: Duplicate material names
+f = fopen(csv_fn, 'w');
+fprintf(f, '%s\n', 'name,a,b,c,d,att');
+fprintf(f, '%s\n', 'custom_material_1,2.5,0.0,0.001,0.5,5.0');
+fprintf(f, '%s\n', 'custom_material_1,4.0,-0.1,0.05,1.2,10.0');
+fclose(f);
+
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 1 2 3');
+fprintf(f, '%s\n', 'f 2 3 4');
+fclose(f);
+
+try
+    quadriga_lib.obj_file_read(fn, csv_fn);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
+        error('moxunit:exceptionNotRaised', 'Expected an error for duplicate material names!');
+    end
+end
+
+delete(fn);
+delete(csv_fn);
+
+% Test 6: Non-existent CSV file
+f = fopen(fn, 'w');
+fprintf(f, '%s\n', 'o Cube');
+fprintf(f, '%s\n', 'v 1.0 1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 1.0 -1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 1.0');
+fprintf(f, '%s\n', 'v 1.0 -1.0 -1.0');
+fprintf(f, '%s\n', 'usemtl custom_material_1');
+fprintf(f, '%s\n', 'f 1 2 3');
+fprintf(f, '%s\n', 'f 2 3 4');
+fclose(f);
+
+try
+    quadriga_lib.obj_file_read(fn, 'nonexistent.csv');
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised')
+        error('moxunit:exceptionNotRaised', 'Expected an error for non-existent CSV file!');
+    end
+end
+
+delete(fn);
+
+
+end
 end

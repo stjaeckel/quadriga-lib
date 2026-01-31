@@ -176,7 +176,7 @@ TEST_CASE("Test OBJ File Read - Materials")
     // Materials can have a suffix separated by a dot
     REQUIRE(my_fancy_cube("cube.obj", "itu_brick.001", "itu_metal.shiny.001"));
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
-    
+
     mtl_correct = {{3.91, 0.0, 0.0238, 0.16, 0.0}};
     CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
     CHECK(mtl_names[0] == "itu_brick.001");
@@ -188,7 +188,7 @@ TEST_CASE("Test OBJ File Read - Materials")
     // Custom materials
     REQUIRE(my_fancy_cube("cube.obj", "itu_brick.001::1.1:0.1:0.2:-3:20", "something_new::5"));
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
-    
+
     mtl_correct = {{1.1, 0.1, 0.2, -3.0, 20.0}};
     CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
     CHECK(mtl_names[0] == "itu_brick.001::1.1:0.1:0.2:-3:20");
@@ -202,7 +202,7 @@ TEST_CASE("Test OBJ File Read - Materials")
     // Custom materials
     REQUIRE(my_fancy_cube("cube.obj", "BLA::1.1:0.1:0.2:-3:20:.001", "something_new::5"));
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
-    
+
     mtl_correct = {{1.1, 0.1, 0.2, -3.0, 20.0}};
     CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
     CHECK(mtl_names[0] == "BLA::1.1:0.1:0.2:-3:20:.001");
@@ -212,4 +212,142 @@ TEST_CASE("Test OBJ File Read - Materials")
     CHECK(mtl_names[1] == "something_new::5");
 
     std::remove("cube.obj");
+}
+
+TEST_CASE("Test OBJ File Read - Custom Materials csv")
+{
+    arma::mat mtl_prop;
+    arma::uvec mtl_ind;
+    std::vector<std::string> mtl_names;
+
+    // Test 1: Basic custom materials
+    {
+        std::ofstream csv_file("custom_materials.csv");
+        REQUIRE(csv_file.is_open());
+
+        csv_file << "name,a,b,c,d,att\n";
+        csv_file << "custom_material_1,2.5,0.0,0.001,0.5,5.0\n";
+        csv_file << "custom_material_2,4.0,-0.1,0.05,1.2,10.0\n";
+        csv_file.close();
+
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1", "custom_material_2"));
+
+        quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                            "custom_materials.csv");
+
+        arma::mat mtl_correct_1 = {{2.5, 0.0, 0.001, 0.5, 5.0}};
+        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct_1, "absdiff", 1e-14));
+        CHECK(mtl_names[0] == "custom_material_1");
+        CHECK(mtl_ind(0) == 1U);
+
+        arma::mat mtl_correct_2 = {{4.0, -0.1, 0.05, 1.2, 10.0}};
+        CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct_2, "absdiff", 1e-14));
+        CHECK(mtl_names[1] == "custom_material_2");
+        CHECK(mtl_ind(4) == 2U);
+
+        std::remove("cube.obj");
+        std::remove("custom_materials.csv");
+    }
+
+    // Test 2: Jumbled column order
+    {
+        std::ofstream csv_file("custom_materials.csv");
+        REQUIRE(csv_file.is_open());
+
+        csv_file << "att,d,c,b,a,name\n";
+        csv_file << "5.0,0.5,0.001,0.0,2.5,custom_material_1\n";
+        csv_file << "10.0,1.2,0.05,-0.1,4.0,custom_material_2\n";
+        csv_file.close();
+
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1", "custom_material_2"));
+
+        quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                            "custom_materials.csv");
+
+        arma::mat mtl_correct_1 = {{2.5, 0.0, 0.001, 0.5, 5.0}};
+        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct_1, "absdiff", 1e-14));
+        CHECK(mtl_names[0] == "custom_material_1");
+
+        arma::mat mtl_correct_2 = {{4.0, -0.1, 0.05, 1.2, 10.0}};
+        CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct_2, "absdiff", 1e-14));
+        CHECK(mtl_names[1] == "custom_material_2");
+
+        std::remove("cube.obj");
+        std::remove("custom_materials.csv");
+    }
+
+    // Test 3: Missing columns - missing 'att'
+    {
+        std::ofstream csv_file("custom_materials.csv");
+        REQUIRE(csv_file.is_open());
+
+        csv_file << "name,a,b,c,d\n";
+        csv_file << "custom_material_1,2.5,0.0,0.001,0.5\n";
+        csv_file.close();
+
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1"));
+
+        CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                                            "custom_materials.csv"),
+                        std::invalid_argument);
+
+        std::remove("cube.obj");
+        std::remove("custom_materials.csv");
+    }
+
+    // Test 4: Missing columns - missing multiple columns
+    {
+        std::ofstream csv_file("custom_materials.csv");
+        REQUIRE(csv_file.is_open());
+
+        csv_file << "name,a,b\n";
+        csv_file << "custom_material_1,2.5,0.0\n";
+        csv_file.close();
+
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1"));
+
+        CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                                            "custom_materials.csv"),
+                        std::invalid_argument);
+
+        std::remove("cube.obj");
+        std::remove("custom_materials.csv");
+    }
+
+    // Test 5: Duplicate material names
+    {
+        std::ofstream csv_file("custom_materials.csv");
+        REQUIRE(csv_file.is_open());
+
+        csv_file << "name,a,b,c,d,att\n";
+        csv_file << "custom_material_1,2.5,0.0,0.001,0.5,5.0\n";
+        csv_file << "custom_material_1,4.0,-0.1,0.05,1.2,10.0\n";
+        csv_file.close();
+
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1"));
+
+        CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                                            "custom_materials.csv"),
+                        std::invalid_argument);
+
+        std::remove("cube.obj");
+        std::remove("custom_materials.csv");
+    }
+
+    // Test 6: Non-existent CSV file
+    {
+        REQUIRE(my_fancy_cube("cube.obj", "custom_material_1"));
+
+        CHECK_THROWS_AS(quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr,
+                                                            nullptr, &mtl_ind, nullptr, &mtl_names, nullptr,
+                                                            "nonexistent.csv"),
+                        std::invalid_argument);
+
+        std::remove("cube.obj");
+    }
 }

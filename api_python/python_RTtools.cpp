@@ -48,7 +48,9 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("bsdf") = py::array_t<double>(),
           py::arg("map_to_itu") = false);
 
-    m.def("obj_file_read", &obj_file_read, py::arg("fn"));
+    m.def("obj_file_read", &obj_file_read, 
+        py::arg("fn"),
+        py::arg("materials_csv") = "");
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),

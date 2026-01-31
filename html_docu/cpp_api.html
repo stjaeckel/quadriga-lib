@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.2</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -4034,7 +4034,8 @@ arma::uword quadriga_lib::obj_file_read(
                 arma::uvec *mtl_ind = nullptr,
                 std::vector&lt;std::string&gt; *obj_names = nullptr,
                 std::vector&lt;std::string&gt; *mtl_names = nullptr,
-                arma::Mat&lt;dtype&gt; *bsdf = nullptr);
+                arma::Mat&lt;dtype&gt; *bsdf = nullptr, 
+                const std::string &amp;materials_csv = "");
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -4181,6 +4182,14 @@ arma::uword quadriga_lib::obj_file_read(
   <td>Default = 0.0</td>
 </tr>
 </table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>materials_csv</b></code> (optional input)<br> 
+    Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3  
+    materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary). 
+    Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),  
+    and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:  
+    sigma = c * f_GHz^d 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

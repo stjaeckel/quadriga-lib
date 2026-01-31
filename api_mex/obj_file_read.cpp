@@ -41,11 +41,23 @@ Otherwise, it defaults to using standard properties.
 ```
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
     quadriga_lib.obj_file_read( fn );
+
+% Use a custom material definition file
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
+    quadriga_lib.obj_file_read( fn, materials_csv );
+
 ```
 
 ## Input Arguments:
 - **`fn`**<br>
   Filename of the OBJ file, string
+
+- **`materials_csv`** (optional)<br>
+   Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3
+   materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary).
+   Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),
+   and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:
+   sigma = c * f_GHz^d
 
 ## Output Arguments:
 - **`mesh`**<br>
@@ -160,20 +172,22 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs != 1)
+    if (nrhs > 2 || nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 9)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string fn = qd_mex_get_string(prhs[0]);
+    std::string materials_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1]);
 
     arma::mat mesh, mtl_prop, vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf));
+    CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind,
+                                                &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv));
 
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&mesh);
