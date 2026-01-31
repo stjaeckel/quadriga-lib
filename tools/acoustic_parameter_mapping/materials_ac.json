@@ -1,0 +1,292 @@
+{
+  "description": "ITU-R P.2040 parameters for acoustic materials",
+  "model": "epsilon_r = a * f^b, sigma = c * f^d (f in GHz)",
+  "frequency_range": {
+    "min_ghz": 0.0262,
+    "max_ghz": 7.0,
+    "acoustic_min_hz": 30,
+    "acoustic_max_hz": 8000
+  },
+  "materials": [
+    {
+      "name": "air",
+      "a": 1.0,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 4.12e+02 rayls, |R| = 0.000000"
+    },
+    {
+      "name": "concrete",
+      "a": 2.401e-09,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 8.40e+06 rayls, |R| = 0.999902"
+    },
+    {
+      "name": "glass",
+      "a": 8.960770115702477e-10,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 1.38e+07 rayls, |R| = 0.999940"
+    },
+    {
+      "name": "gypsum_board",
+      "a": 9.295723456790124e-08,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 1.35e+06 rayls, |R| = 0.999390"
+    },
+    {
+      "name": "wood",
+      "a": 2.1609e-08,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 2.80e+06 rayls, |R| = 0.999706"
+    },
+    {
+      "name": "plywood",
+      "a": 7.529536e-08,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 1.50e+06 rayls, |R| = 0.999451"
+    },
+    {
+      "name": "steel",
+      "a": 7.999401654628931e-11,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 4.60e+07 rayls, |R| = 0.999982"
+    },
+    {
+      "name": "brick",
+      "a": 4.034602194787379e-09,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 6.48e+06 rayls, |R| = 0.999873"
+    },
+    {
+      "name": "marble",
+      "a": 1.6093704045689269e-09,
+      "b": 0.0,
+      "c": 0.0,
+      "d": 0.0,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Z = 1.03e+07 rayls, |R| = 0.999920"
+    },
+    {
+      "name": "foam_light_melamine",
+      "a": 0.31203201667383607,
+      "b": 0.8134874068145396,
+      "c": 0.019144586894338237,
+      "d": 0.8117437034072688,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 10000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "foam_medium_acoustic",
+      "a": 0.1959629757300006,
+      "b": 0.9912024463873985,
+      "c": 0.022916394017258045,
+      "d": 0.9006012231936984,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 20000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "fiberglass_dense",
+      "a": 0.109800649309928,
+      "b": 1.1505397149173981,
+      "c": 0.025910426962149378,
+      "d": 0.9802698574586988,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 40000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "mineral_wool",
+      "a": 0.14162632298607136,
+      "b": 1.087532977407973,
+      "c": 0.02479736627808104,
+      "d": 0.9487664887039864,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 30000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "curtain_heavy_velour",
+      "a": 0.35416768057266895,
+      "b": 0.7549126676956266,
+      "c": 0.017860327839390774,
+      "d": 0.7824563338478124,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 8000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "curtain_light_cotton",
+      "a": 0.5481664174872904,
+      "b": 0.5080307293096443,
+      "c": 0.012396234405835474,
+      "d": 0.6590153646548217,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 3000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "carpet_thick",
+      "a": 0.1959629757300006,
+      "b": 0.9912024463873985,
+      "c": 0.022916394017258045,
+      "d": 0.9006012231936984,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 20000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "carpet_thin",
+      "a": 0.31203201667383607,
+      "b": 0.8134874068145396,
+      "c": 0.019144586894338237,
+      "d": 0.8117437034072688,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "\u03c3_f = 10000 rayls/m, Delany-Bazley model"
+    },
+    {
+      "name": "couch_fabric",
+      "a": 0.05631814013695311,
+      "b": 0.7549000070760844,
+      "c": 0.016277623523613238,
+      "d": 1.3623801409817433,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.25 m"
+    },
+    {
+      "name": "couch_leather",
+      "a": 0.012987902630877915,
+      "b": 0.1635165595872772,
+      "c": 0.008299422228277223,
+      "d": 1.4208725521430494,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.25 m"
+    },
+    {
+      "name": "mattress",
+      "a": 0.047813653918590535,
+      "b": 0.7404078552064829,
+      "c": 0.015035110607822736,
+      "d": 1.4330757426841507,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.20 m"
+    },
+    {
+      "name": "chair_upholstered",
+      "a": 0.02859023681474539,
+      "b": 0.5164295710978523,
+      "c": 0.012528226771337825,
+      "d": 1.3891680121634102,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.20 m"
+    },
+    {
+      "name": "chair_wood",
+      "a": 0.01,
+      "b": 0.0,
+      "c": 0.000986582960176754,
+      "d": 1.190289999917581,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.10 m"
+    },
+    {
+      "name": "table_wood",
+      "a": 0.01,
+      "b": 0.0,
+      "c": 0.0013904338153503835,
+      "d": 0.9999999999999994,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.05 m"
+    },
+    {
+      "name": "bookshelf_filled",
+      "a": 0.014105211545820841,
+      "b": 0.22753022349085014,
+      "c": 0.009549251285190182,
+      "d": 1.2908977325794317,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.30 m"
+    },
+    {
+      "name": "person_standing",
+      "a": 0.021945444627061963,
+      "b": 0.2907058620517852,
+      "c": 0.012226464201021353,
+      "d": 1.169591632705973,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.30 m"
+    },
+    {
+      "name": "person_seated",
+      "a": 0.016867322262361262,
+      "b": 0.20893329382241266,
+      "c": 0.010804026152331248,
+      "d": 1.1978517858173068,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.25 m"
+    },
+    {
+      "name": "audience_dense",
+      "a": 0.10765867750116512,
+      "b": 0.6755589315522008,
+      "c": 0.020271943256158137,
+      "d": 1.2021925355937564,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.30 m"
+    },
+    {
+      "name": "audience_sparse",
+      "a": 0.03795013354332452,
+      "b": 0.5726081598109347,
+      "c": 0.01471443787153124,
+      "d": 1.2644988806643767,
+      "freq_min_ghz": 0.0262,
+      "freq_max_ghz": 7.0,
+      "notes": "Empirical fit from \u03b1 coeffs, d_eff = 0.30 m"
+    }
+  ]
+}

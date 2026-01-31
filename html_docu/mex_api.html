@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.2</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -2009,7 +2009,7 @@ can be used to write structured and unstructured data to an HDF5 file.
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-storage_dims = quadriga_lib.hdf5_write_channel( fn, location, rx_position, tx_position, ...
+storage_dims = quadriga_lib.hdf5_write_channel( fn, location, par, rx_position, tx_position, ...
    coeff_re, coeff_im, delay, center_freq, name, initial_pos, path_gain, path_length, ...
    path_polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
    rx_orientation, tx_orientation )
@@ -3745,11 +3745,24 @@ Otherwise, it defaults to using standard properties.
 <b><i>Usage:</i></b><br><pre>
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
     quadriga_lib.obj_file_read( fn );
+
+% Use a custom material definition file
+[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
+    quadriga_lib.obj_file_read( fn, materials_csv );
+
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
    Filename of the OBJ file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>materials_csv</code></b> (optional)<br> 
+    Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3 
+    materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary). 
+    Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles), 
+    and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity: 
+    sigma = c * f_GHz^d 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

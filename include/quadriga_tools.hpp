@@ -296,7 +296,8 @@ namespace quadriga_lib
                               arma::uvec *mtl_ind = nullptr,                 // Material index, 1-based, Size: [ n_mesh ]
                               std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) - 1 ]
                               std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) - 1 ]
-                              arma::Mat<dtype> *bsdf = nullptr);             // BSDF data from .MTL File, size [mtl_names.size, 15]
+                              arma::Mat<dtype> *bsdf = nullptr,              // BSDF data from .MTL File, size [mtl_names.size, 15]
+                              const std::string &materials_csv = "");        // Location of the material parameter file
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
     // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]

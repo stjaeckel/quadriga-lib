@@ -45,11 +45,21 @@ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsd
 
 # Return as tuple with 8 elements
 data = RTtools.obj_file_read( fn )
+
+# Use a custom material definition file
+data = RTtools.obj_file_read( fn, materials_csv )
 ```
 
 ## Input Arguments:
 - **`fn`**<br>
   Filename of the OBJ file, string
+
+- **`materials_csv`** (optional)<br>
+   Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3 
+   materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary).
+   Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles), 
+   and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity: 
+   sigma = c * f_GHz^d
 
 ## Output Arguments:
 - **`mesh`**, `data[0]`<br>
@@ -107,6 +117,7 @@ data = RTtools.obj_file_read( fn )
   15 | Anisotropic rotation  | Range 0-1     | Default = 0.0
   16 | Transmission          | Range 0-1     | Default = 0.0
 
+
 ## Material properties:
 Each material is defined by its electrical properties. Radio waves that interact with a building will
 produce losses that depend on the electrical properties of the building materials, the material
@@ -161,14 +172,14 @@ itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.
 irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
 MD!*/
 
-py::tuple obj_file_read(const std::string &fn)
+py::tuple obj_file_read(const std::string &fn, const std::string &materials_csv)
 {
     arma::mat mesh, mtl_prop, vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf);
+    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv);
 
     auto mesh_p = qd_python_copy2numpy(mesh);
     auto mtl_prop_p = qd_python_copy2numpy(mtl_prop);

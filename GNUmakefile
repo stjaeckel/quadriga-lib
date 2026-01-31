@@ -57,7 +57,7 @@ ifneq ($(OCTAVE_VERSION),)
 endif
 endif
 ifneq ($(PYTHON_SHARED_OBJ),)
-	pytest tests/python_tests -x -s
+	python3 -m pytest tests/python_tests -x -s
 endif
 
 cpp_test:   cpp
@@ -125,6 +125,7 @@ clean:
 	- rm -rf tests/.pytest_cache
 	- rm *.hdf5
 	- rm -rf external/MOxUnit-master
+	- rm include/quadriga_lib_config.hpp
 
 tidy:   clean
 	- rm -rf build*
