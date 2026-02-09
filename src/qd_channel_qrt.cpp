@@ -19,13 +19,74 @@
 #include "quadriga_tools.hpp"
 #include "qrt_file_reader.hpp"
 
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# qrt_file_parse
+Read metadata from a QRT file
+
+## Description:
+- Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies.
+- All output arguments are optional; pass `nullptr` to skip any value you don't need.
+- Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version.
+
+## Declaration:
+```
+void quadriga_lib::qrt_file_parse(
+                const std::string &fn,
+                arma::uword *no_cir = nullptr,
+                arma::uword *no_orig = nullptr,
+                arma::uword *no_dest = nullptr,
+                arma::uword *no_freq = nullptr,
+                arma::uvec *cir_offset = nullptr,
+                std::vector<std::string> *orig_names = nullptr,
+                std::vector<std::string> *dest_names = nullptr,
+                int *version = nullptr)
+```
+
+## Arguments:
+- `const std::string &**fn**` (input)<br>
+  Path to the QRT file.
+- `arma::uword ***no_cir** = nullptr` (optional output)<br>
+  Number of channel snapshots per origin point.
+- `arma::uword ***no_orig** = nullptr` (optional output)<br>
+  Number of origin points (TX).
+- `arma::uword ***no_dest** = nullptr` (optional output)<br>
+  Number of destinations (RX).
+- `arma::uword ***no_freq** = nullptr` (optional output)<br>
+  Number of frequency bands.
+- `arma::uvec ***cir_offset** = nullptr` (optional output)<br>
+  CIR offset for each destination. Size `[no_dest]`.
+- `std::vector<std::string> ***orig_names** = nullptr` (optional output)<br>
+  Names of the origin points (TXs). Size `[no_orig]`.
+- `std::vector<std::string> ***dest_names** = nullptr` (optional output)<br>
+  Names of the destination points (RXs). Size `[no_dest]`.
+- `int ***version** = nullptr` (optional output)<br>
+  QRT file version number.
+
+## Example:
+```
+arma::uword no_cir, no_orig, no_dest, no_freq;
+arma::uvec cir_offset;
+std::vector<std::string> orig_names, dest_names;
+int version;
+
+quadriga_lib::qrt_file_parse("scene.qrt", &no_cir, &no_orig, &no_dest, &no_freq,
+                              &cir_offset, &orig_names, &dest_names, &version);
+```
+MD!*/
+
 void quadriga_lib::qrt_file_parse(const std::string &fn,
                                   arma::uword *no_cir,
                                   arma::uword *no_orig,
                                   arma::uword *no_dest,
+                                  arma::uword *no_freq,
                                   arma::uvec *cir_offset,
                                   std::vector<std::string> *orig_names,
-                                  std::vector<std::string> *dest_names)
+                                  std::vector<std::string> *dest_names,
+                                  int *version)
 {
     auto qrt = qrt_file_reader(fn);
 
@@ -37,6 +98,12 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     if (no_dest)
         *no_dest = (arma::uword)qrt.no_dest;
+
+    if (no_freq)
+        *no_freq = (arma::uword)qrt.no_freq;
+
+    if (version)
+        *version = qrt.version;
 
     if (qrt.cir_index.n_elem == 0 || qrt.cir_index[0] != 0)
         throw std::invalid_argument("Invalid CIR index in QRT file. Potential file corruption.");
@@ -66,17 +133,132 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     qrt.close();
 }
 
+/*!MD
+# qrt_file_read
+Read ray-tracing data from a QRT file
+
+## Description:
+- Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point.
+- Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
+- All output arguments are optional; pass `nullptr` to skip any value you don't need.
+- The `normalize_M` parameter controls how the polarization transfer matrix `M` and path gains are returned.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+template <typename dtype>
+void quadriga_lib::qrt_file_read(
+                const std::string &fn,
+                arma::uword i_cir = 0,
+                arma::uword i_orig = 0,
+                bool downlink = true,
+                arma::Col<dtype> *center_frequency = nullptr,
+                arma::Col<dtype> *tx_pos = nullptr,
+                arma::Col<dtype> *tx_orientation = nullptr,
+                arma::Col<dtype> *rx_pos = nullptr,
+                arma::Col<dtype> *rx_orientation = nullptr,
+                arma::Mat<dtype> *fbs_pos = nullptr,
+                arma::Mat<dtype> *lbs_pos = nullptr,
+                arma::Mat<dtype> *path_gain = nullptr,
+                arma::Col<dtype> *path_length = nullptr,
+                arma::Cube<dtype> *M = nullptr,
+                arma::Col<dtype> *aod = nullptr,
+                arma::Col<dtype> *eod = nullptr,
+                arma::Col<dtype> *aoa = nullptr,
+                arma::Col<dtype> *eoa = nullptr,
+                std::vector<arma::Mat<dtype>> *path_coord = nullptr,
+                int normalize_M = 1)
+```
+
+## Arguments:
+- `const std::string &**fn**` (input)<br>
+  Path to the QRT file.
+
+- `arma::uword **i_cir** = 0` (input)<br>
+  Snapshot index (0-based).
+
+- `arma::uword **i_orig** = 0` (input)<br>
+  Origin index, 0-based. For downlink, origin corresponds to the transmitter.
+
+- `bool **downlink** = true` (input)<br>
+  If `true`, origin is TX and destination is RX (downlink). If `false`, roles are swapped (uplink).
+
+- `arma::Col<dtype> ***center_frequency** = nullptr` (optional output)<br>
+  Center frequency in Hz. Size `[n_freq]`.
+
+- `arma::Col<dtype> ***tx_pos** = nullptr` (optional output)<br>
+  Transmitter position in Cartesian coordinates. Size `[3]`.
+
+- `arma::Col<dtype> ***tx_orientation** = nullptr` (optional output)<br>
+  Transmitter orientation (bank, tilt, heading) in radians. Size `[3]`.
+
+- `arma::Col<dtype> ***rx_pos** = nullptr` (optional output)<br>
+  Receiver position in Cartesian coordinates. Size `[3]`.
+
+- `arma::Col<dtype> ***rx_orientation** = nullptr` (optional output)<br>
+  Receiver orientation (bank, tilt, heading) in radians. Size `[3]`.
+
+- `arma::Mat<dtype> ***fbs_pos** = nullptr` (optional output)<br>
+  First-bounce scatterer positions. Size `[3, n_path]`.
+
+- `arma::Mat<dtype> ***lbs_pos** = nullptr` (optional output)<br>
+  Last-bounce scatterer positions. Size `[3, n_path]`.
+
+- `arma::Mat<dtype> ***path_gain** = nullptr` (optional output)<br>
+  Path gain on linear scale. Size `[n_path, n_freq]`.
+
+- `arma::Col<dtype> ***path_length** = nullptr` (optional output)<br>
+  Absolute path length from TX to RX phase center. Size `[n_path]`.
+
+- `arma::Cube<dtype> ***M** = nullptr` (optional output)<br>
+  Polarization transfer matrix. Size `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files.
+
+- `arma::Col<dtype> ***aod** = nullptr` (optional output)<br>
+  Departure azimuth angles in radians. Size `[n_path]`.
+
+- `arma::Col<dtype> ***eod** = nullptr` (optional output)<br>
+  Departure elevation angles in radians. Size `[n_path]`.
+
+- `arma::Col<dtype> ***aoa** = nullptr` (optional output)<br>
+  Arrival azimuth angles in radians. Size `[n_path]`.
+
+- `arma::Col<dtype> ***eoa** = nullptr` (optional output)<br>
+  Arrival elevation angles in radians. Size `[n_path]`.
+
+- `std::vector<arma::Mat<dtype>> ***path_coord** = nullptr` (optional output)<br>
+  Interaction coordinates per path. Vector of length `n_path`, each matrix of size `[3, n_interact + 2]`.
+
+- `int **normalize_M** = 1` (input)<br>
+  Normalization option for the polarization transfer matrix.
+   0 | `M` as stored in QRT file, `path_gain` is -FSPL
+   1 | `M` has sum-column power of 2, `path_gain` is -FSPL minus material losses
+
+
+## Example:
+```
+arma::vec center_freq, tx_pos, rx_pos, path_length, aod, eod, aoa, eoa;
+arma::mat fbs_pos, lbs_pos, path_gain;
+arma::cube M;
+
+quadriga_lib::qrt_file_read<double>("scene.qrt", 0, 0, true,
+    &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
+    &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
+    &aod, &eod, &aoa, &eoa, nullptr, 1);
+```
+MD!*/
+
 template <typename dtype>
 void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                 dtype *center_frequency, arma::Col<dtype> *tx_pos, arma::Col<dtype> *tx_orientation,
+                                 arma::Col<dtype> *center_frequency, arma::Col<dtype> *tx_pos, arma::Col<dtype> *tx_orientation,
                                  arma::Col<dtype> *rx_pos, arma::Col<dtype> *rx_orientation,
                                  arma::Mat<dtype> *fbs_pos, arma::Mat<dtype> *lbs_pos,
-                                 arma::Col<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Mat<dtype> *M,
+                                 arma::Mat<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Cube<dtype> *M,
                                  arma::Col<dtype> *aod, arma::Col<dtype> *eod, arma::Col<dtype> *aoa, arma::Col<dtype> *eoa,
-                                 std::vector<arma::Mat<dtype>> *path_coord)
+                                 std::vector<arma::Mat<dtype>> *path_coord, int normalize_M)
 {
-
     auto qrt = qrt_file_reader(fn, i_cir, i_orig);
+    arma::uword no_freq = (arma::uword)qrt.no_freq;
+    bool v6 = qrt.version == 6;
 
     if (i_orig >= qrt.no_cir)
         throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
@@ -84,10 +266,16 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (i_orig >= qrt.no_orig)
         throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
-    double fGHz = (double)qrt.fGHz;
-    double gain_at_1m = -32.45 - 20.0 * std::log10(fGHz);
+    arma::vec gain_at_1m(no_freq);
+    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+        gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)qrt.freq[i_freq]);
+
     if (center_frequency)
-        *center_frequency = dtype(1e9 * fGHz);
+    {
+        center_frequency->set_size(no_freq);
+        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+            center_frequency->at(i_freq) = (dtype)qrt.freq[i_freq] * (dtype)1e9;
+    }
 
     // Positions
     dtype Ox = (dtype)qrt.orig_pos_all[0];
@@ -129,7 +317,8 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 
     // Read polarization Matrix and interaction coordinates from file
     arma::u32_vec no_intR;
-    arma::fmat xprmatR, coordR;
+    arma::fcube xprmatR;
+    arma::fmat coordR;
     unsigned no_path = qrt.read_cir(0U, (unsigned)i_cir, no_intR, xprmatR, coordR); // Note: 0U because of special constructor
 
     // Calculate path gain and polarization matrix
@@ -140,74 +329,88 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         dtype *dst = nullptr;
         if (M)
         {
-            M->set_size(8, no_path);
+            if (v6)
+                M->set_size(2, no_path, no_freq);
+            else
+                M->set_size(8, no_path, no_freq);
             dst = M->memptr();
         }
 
         dtype *pg = nullptr;
         if (path_gain)
         {
-            path_gain->set_size(no_path);
+            path_gain->set_size(no_path, no_freq);
             pg = path_gain->memptr();
         }
 
         const float *src = xprmatR.memptr();
 
-        for (arma::uword k = 0; k < no_path; ++k)
-        {
-            // load as dtype into registers
-            const dtype r11 = (dtype)src[0];
-            const dtype i11 = (dtype)src[1];
-            const dtype r21 = (dtype)src[2];
-            const dtype i21 = (dtype)src[3];
-            const dtype r12 = (dtype)src[4];
-            const dtype i12 = (dtype)src[5];
-            const dtype r22 = (dtype)src[6];
-            const dtype i22 = (dtype)src[7];
-
-            // column powers (V and H) - path gain = max column power
-            const dtype p1 = r11 * r11 + i11 * i11 + r21 * r21 + i21 * i21;
-            const dtype p2 = r12 * r12 + i12 * i12 + r22 * r22 + i22 * i22;
-            const dtype gain = (p1 > p2) ? p1 : p2;
-
-            // write path gain
-            if (pg)
-                *pg++ = gain;
-
-            // normalization factor: max column power -> 1
-            dtype scale = (dtype)0;
-            if (gain > (dtype)0)
-                scale = (dtype)1 / (dtype)std::sqrt((double)gain);
-
-            if (dst)
+        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+            for (arma::uword i_path = 0; i_path < no_path; ++i_path)
             {
-                if (downlink) // copy, normalize
+                // load as dtype into registers
+                const dtype r11 = (dtype)src[0];
+                const dtype i11 = (dtype)src[1];
+                const dtype r21 = v6 ? 0.0 : (dtype)src[2];
+                const dtype i21 = v6 ? 0.0 : (dtype)src[3];
+                const dtype r12 = v6 ? 0.0 : (dtype)src[4];
+                const dtype i12 = v6 ? 0.0 : (dtype)src[5];
+                const dtype r22 = v6 ? 0.0 : (dtype)src[6];
+                const dtype i22 = v6 ? 0.0 : (dtype)src[7];
+
+                // column powers (V and H) - path gain = max column power
+                dtype gain = 1.0;
+                if (normalize_M == 1)
                 {
-                    dst[0] = r11 * scale;
-                    dst[1] = i11 * scale;
-                    dst[2] = r21 * scale;
-                    dst[3] = i21 * scale;
-                    dst[4] = r12 * scale;
-                    dst[5] = i12 * scale;
-                    dst[6] = r22 * scale;
-                    dst[7] = i22 * scale;
+                    const dtype p1 = r11 * r11 + i11 * i11 + r21 * r21 + i21 * i21;
+                    const dtype p2 = r12 * r12 + i12 * i12 + r22 * r22 + i22 * i22;
+                    gain = (p1 > p2) ? p1 : p2;
                 }
-                else // uplink: conjugate transpose, normalize
+
+                // write path gain
+                if (pg)
+                    *pg++ = gain;
+
+                // normalization factor: max column power -> 1
+                dtype scale = (dtype)0;
+                if (gain > (dtype)0)
+                    scale = dtype(1.0 / std::sqrt((double)gain));
+
+                if (dst)
                 {
-                    // H_UL = H_DL^H
-                    dst[0] = r11 * scale;  // Re(h11)
-                    dst[1] = -i11 * scale; // -Im(h11)
-                    dst[2] = r12 * scale;  // Re(h12)
-                    dst[3] = -i12 * scale; // -Im(h12)
-                    dst[4] = r21 * scale;  // Re(h21)
-                    dst[5] = -i21 * scale; // -Im(h21)
-                    dst[6] = r22 * scale;  // Re(h22)
-                    dst[7] = -i22 * scale; // -Im(h22)
+                    if (downlink) // copy, normalize
+                    {
+                        dst[0] = r11 * scale;
+                        dst[1] = i11 * scale;
+                        if (!v6)
+                        {
+                            dst[2] = r21 * scale;
+                            dst[3] = i21 * scale;
+                            dst[4] = r12 * scale;
+                            dst[5] = i12 * scale;
+                            dst[6] = r22 * scale;
+                            dst[7] = i22 * scale;
+                        }
+                    }
+                    else // uplink: conjugate transpose, normalize
+                    {
+                        // H_UL = H_DL^H
+                        dst[0] = r11 * scale;  // Re(h11)
+                        dst[1] = -i11 * scale; // -Im(h11)
+                        if (!v6)
+                        {
+                            dst[2] = r12 * scale;  // Re(h12)
+                            dst[3] = -i12 * scale; // -Im(h12)
+                            dst[4] = r21 * scale;  // Re(h21)
+                            dst[5] = -i21 * scale; // -Im(h21)
+                            dst[6] = r22 * scale;  // Re(h22)
+                            dst[7] = -i22 * scale; // -Im(h22)
+                        }
+                    }
+                    dst += v6 ? 2 : 8;
                 }
-                dst += 8;
+                src += v6 ? 2 : 8;
             }
-            src += 8;
-        }
     }
 
     bool want_angles = aod || eod || aoa || eoa;
@@ -251,16 +454,20 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             dtype *src = path_length_local.memptr();
             dtype *pg = path_gain ? path_gain->memptr() : nullptr;
             dtype *pl = path_length ? path_length->memptr() : nullptr;
+            double *p_gain_at_1m = gain_at_1m.memptr();
 
-            for (arma::uword k = 0; k < no_path; ++k)
+            for (arma::uword i_path = 0; i_path < no_path; ++i_path)
             {
-                dtype len = src[k];
+                dtype len = src[i_path];
                 if (pl)
-                    pl[k] = len;
+                    pl[i_path] = len;
                 if (pg)
                 {
-                    double gainFS = gain_at_1m - 20.0 * std::log10((double)len);
-                    pg[k] *= (dtype)std::pow(10.0, 0.1 * gainFS);
+                    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+                    {
+                        double gainFS = p_gain_at_1m[i_freq] - 20.0 * std::log10((double)len);
+                        pg[i_freq * no_path + i_path] *= (dtype)std::pow(10.0, 0.1 * gainFS);
+                    }
                 }
             }
         }
@@ -294,17 +501,17 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
 }
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                          float *center_frequency, arma::Col<float> *tx_pos, arma::Col<float> *tx_orientation,
+                                          arma::Col<float> *center_frequency, arma::Col<float> *tx_pos, arma::Col<float> *tx_orientation,
                                           arma::Col<float> *rx_pos, arma::Col<float> *rx_orientation,
                                           arma::Mat<float> *fbs_pos, arma::Mat<float> *lbs_pos,
-                                          arma::Col<float> *path_gain, arma::Col<float> *path_length, arma::Mat<float> *M,
+                                          arma::Mat<float> *path_gain, arma::Col<float> *path_length, arma::Cube<float> *M,
                                           arma::Col<float> *aod, arma::Col<float> *eod, arma::Col<float> *aoa, arma::Col<float> *eoa,
-                                          std::vector<arma::Mat<float>> *path_coord);
+                                          std::vector<arma::Mat<float>> *path_coord, int normalize_M);
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
-                                          double *center_frequency, arma::Col<double> *tx_pos, arma::Col<double> *tx_orientation,
+                                          arma::Col<double> *center_frequency, arma::Col<double> *tx_pos, arma::Col<double> *tx_orientation,
                                           arma::Col<double> *rx_pos, arma::Col<double> *rx_orientation,
                                           arma::Mat<double> *fbs_pos, arma::Mat<double> *lbs_pos,
-                                          arma::Col<double> *path_gain, arma::Col<double> *path_length, arma::Mat<double> *M,
+                                          arma::Mat<double> *path_gain, arma::Col<double> *path_length, arma::Cube<double> *M,
                                           arma::Col<double> *aod, arma::Col<double> *eod, arma::Col<double> *aoa, arma::Col<double> *eoa,
-                                          std::vector<arma::Mat<double>> *path_coord);
+                                          std::vector<arma::Mat<double>> *path_coord, int normalize_M);

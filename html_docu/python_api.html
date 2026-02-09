@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.3</b></big>
 <br><br><br>
 
 <b>Notes</b>
@@ -3014,7 +3014,7 @@ channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 from quadriga_lib import channel
 
 # Separate outputs
-no_cir, no_orig, no_dest, cir_offset, orig_names, dest_names = channel.qrt_file_parse( fn )
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse( fn )
 
 # Output as tuple
 data = channel.qrt_file_parse( fn )
@@ -3038,6 +3038,10 @@ data = channel.qrt_file_parse( fn )
    Number of destinations (RX) 
 </li></ul>
  
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_freq</code></b><br> 
+   Number of frequencies 
+</li></ul>
+ 
 <ul><li style="margin-bottom: 0.4em;"><b><code>cir_offset</code></b><br> 
    CIR offset for each destination 
 </li></ul>
@@ -3048,6 +3052,10 @@ data = channel.qrt_file_parse( fn )
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dest_names</code></b><br> 
    Names of the destination points (RXs), list of strings 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>version</code></b><br> 
+   QRT file version 
 </li></ul>
 </li>
 </ul>
@@ -3077,6 +3085,20 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <ul><li style="margin-bottom: 0.4em;"><b><code>downlink</code></b><br> 
    Switch for uplink / downlink direction, Default = true (downlink) 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>normalize_M</code></b><br> 
+    Switch for different normalization options: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>0</td>
+  <td>M as in QRT file, path_gain as FSPL (no normalization)</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td>M has sum-column power is 2, path_gain is FSPL + material losses (default)</td>
+</tr>
+</table><br>
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
@@ -3085,7 +3107,7 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <tr>
   <td><code>center_freq</code></td>
   <td>Center frequency in [Hz]</td>
-  <td>scalar</td>
+  <td>Length <code>[n_freq]</code></td>
 </tr>
 <tr>
   <td><code>tx_pos</code></td>
@@ -3120,7 +3142,7 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <tr>
   <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
-  <td>Length <code>[n_path]</code></td>
+  <td>Size <code>[n_path, n_freq]</code></td>
 </tr>
 <tr>
   <td><code>path_length</code></td>
@@ -3130,7 +3152,7 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <tr>
   <td><code>M</code></td>
   <td>Polarization transfer function, interleaved complex</td>
-  <td>Size <code>[8, n_path]</code></td>
+  <td>Size <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code></td>
 </tr>
 <tr>
   <td><code>aod</code></td>

@@ -253,35 +253,41 @@ namespace quadriga_lib
                                     const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
 
     // Read metadata from a QRT file
-    void qrt_file_parse(const std::string &fn,                           // Path to the QRT file
-                        arma::uword *no_cir = nullptr,                   // Number of channel snapshots per origin point
-                        arma::uword *no_orig = nullptr,                  // Number of origin points (TX)
-                        arma::uword *no_dest = nullptr,                  // Number of destinations (RX)
-                        arma::uvec *cir_offset = nullptr,                // CIR offset for each destination
-                        std::vector<std::string> *orig_names = nullptr,  // Names of the origin points (TXs)
-                        std::vector<std::string> *dest_names = nullptr); // Names of the destination points (RXs)
+    void qrt_file_parse(const std::string &fn,                          // Path to the QRT file
+                        arma::uword *no_cir = nullptr,                  // Number of channel snapshots per origin point
+                        arma::uword *no_orig = nullptr,                 // Number of origin points (TX)
+                        arma::uword *no_dest = nullptr,                 // Number of destinations (RX)
+                        arma::uword *no_freq = nullptr,                 // Number of frequency bands
+                        arma::uvec *cir_offset = nullptr,               // CIR offset for each destination
+                        std::vector<std::string> *orig_names = nullptr, // Names of the origin points (TXs)
+                        std::vector<std::string> *dest_names = nullptr, // Names of the destination points (RXs)
+                        int *version = nullptr);                        // QRT file version
 
     // Read ray-tracing data from QRT file
+    // normalize_M options:
+    //  0 : M as in QRT file, path_gain is -FSPL
+    //  1 : M has sum-column power is 2, path_gain is -FSPL - material losses
     template <typename dtype>
-    void qrt_file_read(const std::string &fn,                                // Path to the QRT file
-                       arma::uword i_cir = 0,                                // Snapshot index
-                       arma::uword i_orig = 0,                               // Origin index (for downlink Origin = TX)
-                       bool downlink = true,                                 // Switch for uplink / downlink direction
-                       dtype *center_frequency = nullptr,                    // Center frequency in [Hz]; a value of 0 disables phase calculation in coefficients
-                       arma::Col<dtype> *tx_pos = nullptr,                   // Transmitter position in Cartesian coordinates, Size [3, 1]
-                       arma::Col<dtype> *tx_orientation = nullptr,           // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
-                       arma::Col<dtype> *rx_pos = nullptr,                   // Receiver position in Cartesian coordinates, Size [3, 1]
-                       arma::Col<dtype> *rx_orientation = nullptr,           // Receiver orientation (bank, tilt, head) in [rad], Size [3, 1]
-                       arma::Mat<dtype> *fbs_pos = nullptr,                  // First-bounce scatterer positions, matrix of size [3, n_path]
-                       arma::Mat<dtype> *lbs_pos = nullptr,                  // Last-bounce scatterer positions, matrix of size [3, n_path]
-                       arma::Col<dtype> *path_gain = nullptr,                // Path gain (linear scale), vector of length [n_path]
-                       arma::Col<dtype> *path_length = nullptr,              // Absolute path length from TX to RX phase center, vector of length [n_path]
-                       arma::Mat<dtype> *M = nullptr,                        // Polarization transfer matrix, matrix of size [8, n_path]
-                       arma::Col<dtype> *aod = nullptr,                      // Departure azimuth angles in [rad], vector of length 'n_path'
-                       arma::Col<dtype> *eod = nullptr,                      // Departure elevation angles in [rad], vector of length 'n_path'
-                       arma::Col<dtype> *aoa = nullptr,                      // Arrival azimuth angles in [rad], vector of length 'n_path'
-                       arma::Col<dtype> *eoa = nullptr,                      // Arrival elevation angles in [rad], vector of length 'n_path'
-                       std::vector<arma::Mat<dtype>> *path_coord = nullptr); // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
+    void qrt_file_read(const std::string &fn,                               // Path to the QRT file
+                       arma::uword i_cir = 0,                               // Snapshot index
+                       arma::uword i_orig = 0,                              // Origin index (for downlink Origin = TX)
+                       bool downlink = true,                                // Switch for uplink / downlink direction
+                       arma::Col<dtype> *center_frequency = nullptr,        // Center frequency in [Hz], Size [n_freq]
+                       arma::Col<dtype> *tx_pos = nullptr,                  // Transmitter position in Cartesian coordinates, Size [3, 1]
+                       arma::Col<dtype> *tx_orientation = nullptr,          // Transmitter orientation (bank, tilt, head) in [rad], Size [3, 1]
+                       arma::Col<dtype> *rx_pos = nullptr,                  // Receiver position in Cartesian coordinates, Size [3, 1]
+                       arma::Col<dtype> *rx_orientation = nullptr,          // Receiver orientation (bank, tilt, head) in [rad], Size [3, 1]
+                       arma::Mat<dtype> *fbs_pos = nullptr,                 // First-bounce scatterer positions, matrix of size [3, n_path]
+                       arma::Mat<dtype> *lbs_pos = nullptr,                 // Last-bounce scatterer positions, matrix of size [3, n_path]
+                       arma::Mat<dtype> *path_gain = nullptr,               // Path gain (linear scale), vector of length [n_path, n_freq]
+                       arma::Col<dtype> *path_length = nullptr,             // Absolute path length from TX to RX phase center, vector of length [n_path]
+                       arma::Cube<dtype> *M = nullptr,                      // Polarization transfer matrix, matrix of size [8, n_path, n_freq] or [2, n_path, n_freq] for v6 files
+                       arma::Col<dtype> *aod = nullptr,                     // Departure azimuth angles in [rad], vector of length 'n_path'
+                       arma::Col<dtype> *eod = nullptr,                     // Departure elevation angles in [rad], vector of length 'n_path'
+                       arma::Col<dtype> *aoa = nullptr,                     // Arrival azimuth angles in [rad], vector of length 'n_path'
+                       arma::Col<dtype> *eoa = nullptr,                     // Arrival elevation angles in [rad], vector of length 'n_path'
+                       std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
+                       int normalize_M = 1);                                // Normalize M options
 
 }
 

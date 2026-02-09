@@ -16,17 +16,19 @@ from quadriga_lib import channel
 
 class test_case(unittest.TestCase):
 
-    def test(self):
+    def test_v4(self):
         # Path to QRT file (mirrors C++: "tests/data/test.qrt")
         fn = os.path.join(current_dir, '../data/test.qrt')
 
         # --- qrt_file_parse ---
 
-        no_cir, no_orig, no_dest, cir_offset, orig_names, dest_names = channel.qrt_file_parse(fn)
+        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse(fn)
 
         self.assertEqual(no_orig, 3)
         self.assertEqual(no_dest, 2)
         self.assertEqual(no_cir, 7)
+        self.assertEqual(no_freq, 1)
+        self.assertEqual(version, 4)
 
         self.assertEqual(len(cir_offset), no_dest)
         self.assertEqual(cir_offset[0], 0)
@@ -105,6 +107,27 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(np.asarray(data_ul["eod"]),
                             np.asarray(data_dl["eoa"]),
                             atol=1.5e-4, rtol=0)
+        
+    def test_v5(self):
+
+        fn = os.path.join(current_dir, '../data/test_v5.qrt')
+        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse(fn)
+
+        self.assertEqual(no_orig, 1)
+        self.assertEqual(no_dest, 2)
+        self.assertEqual(no_cir, 2)
+        self.assertEqual(no_freq, 2)
+        self.assertEqual(version, 5)
+
+        self.assertEqual(len(cir_offset), no_dest)
+        self.assertEqual(cir_offset[0], 0)
+        self.assertEqual(cir_offset[1], 1)
+
+        data_0 = channel.qrt_file_read(fn, 0, 0, True)
+
+        self.assertEqual(len(data_0["center_freq"]), 2)
+        self.assertEqual(data_0["center_freq"][0], 1.0e9)
+        self.assertEqual(data_0["center_freq"][1], 1.5e9)
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ Read metadata from a QRT file
 from quadriga_lib import channel
 
 # Separate outputs
-no_cir, no_orig, no_dest, cir_offset, orig_names, dest_names = channel.qrt_file_parse( fn )
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse( fn )
 
 # Output as tuple
 data = channel.qrt_file_parse( fn )
@@ -51,6 +51,9 @@ data = channel.qrt_file_parse( fn )
 - **`no_dest`**<br>
   Number of destinations (RX)
 
+- **`no_freq`**<br>
+  Number of frequencies
+
 - **`cir_offset`**<br>
   CIR offset for each destination
 
@@ -59,19 +62,23 @@ data = channel.qrt_file_parse( fn )
 
 - **`dest_names`**<br>
   Names of the destination points (RXs), list of strings
+
+- **`version`**<br>
+  QRT file version
 MD!*/
 
 py::tuple qrt_file_parse(const std::string &fn)
 {
-    arma::uword no_cir, no_orig, no_dest;
+    arma::uword no_cir, no_orig, no_dest, no_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
+    int version;
 
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &cir_offset, &orig_names, &dest_names);
+    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version);
 
     auto cir_offset_p = qd_python_copy2numpy(cir_offset);
     auto orig_names_p = qd_python_copy2python(orig_names);
     auto dest_names_p = qd_python_copy2python(dest_names);
 
-    return py::make_tuple(no_cir, no_orig, no_dest, cir_offset_p, orig_names_p, dest_names_p);
+    return py::make_tuple(no_cir, no_orig, no_dest, no_freq, cir_offset_p, orig_names_p, dest_names_p, version);
 }
