@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.3</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -122,6 +122,8 @@
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
+<tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
+<tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2486,6 +2488,205 @@ void quadriga_lib::hdf5_write_dset(
 </li></ul>
 </li>
 </ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_parse"></a>
+<b>qrt_file_parse</b> - Read metadata from a QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies. 
+</li><li style="margin-bottom: 0.4em;">All output arguments are optional; pass <code>nullptr</code> to skip any value you don't need. 
+</li><li style="margin-bottom: 0.4em;">Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::qrt_file_parse(
+                const std::string &amp;fn,
+                arma::uword *no_cir = nullptr,
+                arma::uword *no_orig = nullptr,
+                arma::uword *no_dest = nullptr,
+                arma::uword *no_freq = nullptr,
+                arma::uvec *cir_offset = nullptr,
+                std::vector&lt;std::string&gt; *orig_names = nullptr,
+                std::vector&lt;std::string&gt; *dest_names = nullptr,
+                int *version = nullptr)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
+   Path to the QRT file. 
+</li><li style="margin-bottom: 0.4em;"><code>arma::uword <b>*no_cir</b> = nullptr</code> (optional output)<br> 
+   Number of channel snapshots per origin point. 
+</li><li style="margin-bottom: 0.4em;"><code>arma::uword <b>*no_orig</b> = nullptr</code> (optional output)<br> 
+   Number of origin points (TX). 
+</li><li style="margin-bottom: 0.4em;"><code>arma::uword <b>*no_dest</b> = nullptr</code> (optional output)<br> 
+   Number of destinations (RX). 
+</li><li style="margin-bottom: 0.4em;"><code>arma::uword <b>*no_freq</b> = nullptr</code> (optional output)<br> 
+   Number of frequency bands. 
+</li><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>*cir_offset</b> = nullptr</code> (optional output)<br> 
+   CIR offset for each destination. Size <code>[no_dest]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*orig_names</b> = nullptr</code> (optional output)<br> 
+   Names of the origin points (TXs). Size <code>[no_orig]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*dest_names</b> = nullptr</code> (optional output)<br> 
+   Names of the destination points (RXs). Size <code>[no_dest]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>int <b>*version</b> = nullptr</code> (optional output)<br> 
+   QRT file version number. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::uword no_cir, no_orig, no_dest, no_freq;
+arma::uvec cir_offset;
+std::vector&lt;std::string&gt; orig_names, dest_names;
+int version;
+
+quadriga_lib::qrt_file_parse("scene.qrt", &amp;no_cir, &amp;no_orig, &amp;no_dest, &amp;no_freq,
+                              &amp;cir_offset, &amp;orig_names, &amp;dest_names, &amp;version);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_read"></a>
+<b>qrt_file_read</b> - Read ray-tracing data from a QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point. 
+</li><li style="margin-bottom: 0.4em;">Supports both uplink and downlink directions by swapping TX/RX roles accordingly. 
+</li><li style="margin-bottom: 0.4em;">All output arguments are optional; pass <code>nullptr</code> to skip any value you don't need. 
+</li><li style="margin-bottom: 0.4em;">The <code>normalize_M</code> parameter controls how the polarization transfer matrix <code>M</code> and path gains are returned. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::qrt_file_read(
+                const std::string &amp;fn,
+                arma::uword i_cir = 0,
+                arma::uword i_orig = 0,
+                bool downlink = true,
+                arma::Col&lt;dtype&gt; *center_frequency = nullptr,
+                arma::Col&lt;dtype&gt; *tx_pos = nullptr,
+                arma::Col&lt;dtype&gt; *tx_orientation = nullptr,
+                arma::Col&lt;dtype&gt; *rx_pos = nullptr,
+                arma::Col&lt;dtype&gt; *rx_orientation = nullptr,
+                arma::Mat&lt;dtype&gt; *fbs_pos = nullptr,
+                arma::Mat&lt;dtype&gt; *lbs_pos = nullptr,
+                arma::Mat&lt;dtype&gt; *path_gain = nullptr,
+                arma::Col&lt;dtype&gt; *path_length = nullptr,
+                arma::Cube&lt;dtype&gt; *M = nullptr,
+                arma::Col&lt;dtype&gt; *aod = nullptr,
+                arma::Col&lt;dtype&gt; *eod = nullptr,
+                arma::Col&lt;dtype&gt; *aoa = nullptr,
+                arma::Col&lt;dtype&gt; *eoa = nullptr,
+                std::vector&lt;arma::Mat&lt;dtype&gt;&gt; *path_coord = nullptr,
+                int normalize_M = 1)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
+   Path to the QRT file. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_cir</b> = 0</code> (input)<br> 
+   Snapshot index (0-based). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_orig</b> = 0</code> (input)<br> 
+   Origin index, 0-based. For downlink, origin corresponds to the transmitter. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>downlink</b> = true</code> (input)<br> 
+   If <code>true</code>, origin is TX and destination is RX (downlink). If <code>false</code>, roles are swapped (uplink). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*center_frequency</b> = nullptr</code> (optional output)<br> 
+   Center frequency in Hz. Size <code>[n_freq]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*tx_pos</b> = nullptr</code> (optional output)<br> 
+   Transmitter position in Cartesian coordinates. Size <code>[3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*tx_orientation</b> = nullptr</code> (optional output)<br> 
+   Transmitter orientation (bank, tilt, heading) in radians. Size <code>[3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*rx_pos</b> = nullptr</code> (optional output)<br> 
+   Receiver position in Cartesian coordinates. Size <code>[3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*rx_orientation</b> = nullptr</code> (optional output)<br> 
+   Receiver orientation (bank, tilt, heading) in radians. Size <code>[3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*fbs_pos</b> = nullptr</code> (optional output)<br> 
+   First-bounce scatterer positions. Size <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*lbs_pos</b> = nullptr</code> (optional output)<br> 
+   Last-bounce scatterer positions. Size <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*path_gain</b> = nullptr</code> (optional output)<br> 
+   Path gain on linear scale. Size <code>[n_path, n_freq]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*path_length</b> = nullptr</code> (optional output)<br> 
+   Absolute path length from TX to RX phase center. Size <code>[n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*M</b> = nullptr</code> (optional output)<br> 
+   Polarization transfer matrix. Size <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code> for v6 files. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*aod</b> = nullptr</code> (optional output)<br> 
+   Departure azimuth angles in radians. Size <code>[n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*eod</b> = nullptr</code> (optional output)<br> 
+   Departure elevation angles in radians. Size <code>[n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*aoa</b> = nullptr</code> (optional output)<br> 
+   Arrival azimuth angles in radians. Size <code>[n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*eoa</b> = nullptr</code> (optional output)<br> 
+   Arrival elevation angles in radians. Size <code>[n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Mat&lt;dtype&gt;&gt; <b>*path_coord</b> = nullptr</code> (optional output)<br> 
+   Interaction coordinates per path. Vector of length <code>n_path</code>, each matrix of size <code>[3, n_interact + 2]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>normalize_M</b> = 1</code> (input)<br> 
+   Normalization option for the polarization transfer matrix. 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>0</td>
+  <td><code>M</code> as stored in QRT file, <code>path_gain</code> is -FSPL</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>M</code> has sum-column power of 2, <code>path_gain</code> is -FSPL minus material losses</td>
+</tr>
+</table><br>
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::vec center_freq, tx_pos, rx_pos, path_length, aod, eod, aoa, eoa;
+arma::mat fbs_pos, lbs_pos, path_gain;
+arma::cube M;
+
+quadriga_lib::qrt_file_read&lt;double&gt;("scene.qrt", 0, 0, true,
+    &amp;center_freq, &amp;tx_pos, nullptr, &amp;rx_pos, nullptr,
+    &amp;fbs_pos, &amp;lbs_pos, &amp;path_gain, &amp;path_length, &amp;M,
+    &amp;aod, &amp;eod, &amp;aoa, &amp;eoa, nullptr, 1);
+</pre>
+</li>
+</ul>
 <div class="pagebreak"></div>
 <hr class="greyline">
 <hr class="greyline">
@@ -4034,7 +4235,7 @@ arma::uword quadriga_lib::obj_file_read(
                 arma::uvec *mtl_ind = nullptr,
                 std::vector&lt;std::string&gt; *obj_names = nullptr,
                 std::vector&lt;std::string&gt; *mtl_names = nullptr,
-                arma::Mat&lt;dtype&gt; *bsdf = nullptr, 
+                arma::Mat&lt;dtype&gt; *bsdf = nullptr,
                 const std::string &amp;materials_csv = "");
 </pre>
 </li>
@@ -4185,10 +4386,10 @@ arma::uword quadriga_lib::obj_file_read(
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>std::string <b>materials_csv</b></code> (optional input)<br> 
-    Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3  
+    Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3 
     materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary). 
-    Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),  
-    and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:  
+    Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles), 
+    and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity: 
     sigma = c * f_GHz^d 
 </li></ul>
 </li>

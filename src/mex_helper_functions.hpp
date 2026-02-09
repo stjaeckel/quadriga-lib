@@ -15,8 +15,126 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-// A collection of small MEX helper functions to reduce copy and pasting code
-// Include this file in th mex-cpp files to use the functions
+// MEX Helper Functions for MATLAB ↔ Armadillo Interoperability
+// =============================================================
+//
+// This header provides convenience wrappers for converting data between MATLAB's
+// mxArray format and C++ Armadillo linear algebra types (Col, Mat, Cube). It is
+// intended to be included in MEX C++ source files to eliminate repetitive
+// boilerplate when reading inputs from MATLAB, writing outputs back, and handling
+// type conversions. All functions support up to 4D MATLAB arrays and the six
+// numeric types: double, single, uint32, int32, uint64, int64.
+//
+// ── Macro ──────────────────────────────────────────────────────────────────────
+//
+//   CALL_QD(expr)
+//       Wraps an expression in a try/catch block and forwards any C++ exception
+//       to MATLAB via mexErrMsgIdAndTxt.
+//
+// ── MATLAB → C++ (scalar / string) ────────────────────────────────────────────
+//
+//   qd_mex_get_scalar<dtype>(input, var_name="", default_value=NAN)
+//       Reads a scalar mxArray and casts it to <dtype>. Returns default_value
+//       for empty inputs (0 for integer types).
+//
+//   qd_mex_get_string(input, default_value="")
+//       Reads a MATLAB character array and returns a std::string.
+//
+// ── MATLAB → Armadillo (zero-copy reinterpret) ────────────────────────────────
+//
+//   qd_mex_reinterpret_Col<dtype>(input, create_copy=false)
+//   qd_mex_reinterpret_Mat<dtype>(input, create_copy=false)
+//   qd_mex_reinterpret_Cube<dtype>(input, create_copy=false)
+//       Reinterpret MATLAB array memory as an Armadillo Col / Mat / Cube without
+//       copying data (by default). The MATLAB type must match <dtype>. Higher
+//       dimensions are flattened: 4D → Cube merges dims 3+4 into slices, etc.
+//
+// ── MATLAB → Armadillo (type-casting copy) ────────────────────────────────────
+//
+//   qd_mex_typecast_Col<dtype>(input, var_name="", n_elem=0)
+//   qd_mex_typecast_Mat<dtype>(input, var_name="")
+//   qd_mex_typecast_Cube<dtype>(input, var_name="")
+//       Read a MATLAB array of any supported numeric type, cast each element to
+//       <dtype>, and return a new Armadillo object (always copies). Optional
+//       n_elem check for Col variant.
+//
+// ── MATLAB → Armadillo (convenience shortcuts) ────────────────────────────────
+//
+//   qd_mex_get_double_Col(input, copy=false)   → arma::vec
+//   qd_mex_get_single_Col(input, copy=false)   → arma::fvec
+//   qd_mex_get_double_Mat(input, copy=false)    → arma::mat
+//   qd_mex_get_single_Mat(input, copy=false)    → arma::fmat
+//   qd_mex_get_double_Cube(input, copy=false)   → arma::cube
+//   qd_mex_get_single_Cube(input, copy=false)   → arma::fcube
+//       If the MATLAB type already matches, reinterpret (zero-copy); otherwise
+//       typecast (copy). The copy flag forces a copy even when types match.
+//
+// ── MATLAB → std::any (generic) ──────────────────────────────────────────────
+//
+//   qd_mex_anycast(input, var_name="", create_copy=false)
+//       Wraps the input in a std::any whose contained type depends on the MATLAB
+//       shape and type: scalar → native C++ scalar, column → arma::Col, row →
+//       arma::Mat(1,N), 2D → arma::Mat, 3D/4D → arma::Cube (dims 3+4 merged).
+//       See also: quadriga_lib::any_type_id.
+//
+// ── MATLAB → std::vector (splitting along a dimension) ───────────────────────
+//
+//   qd_mex_matlab2vector_Col<dtype>(input, vec_dim)
+//   qd_mex_matlab2vector_Mat<dtype>(input, vec_dim)
+//   qd_mex_matlab2vector_Cube<dtype>(input, vec_dim)
+//       Split a MATLAB N-D array along dimension vec_dim (0-based) into a
+//       std::vector of Armadillo objects. Remaining dimensions are reshaped into
+//       the target type. Data is always type-cast and copied.
+//
+//   qd_mex_matlab2vector_Bool(input)
+//       Converts a MATLAB numeric or logical array to std::vector<bool>.
+//
+// ── Armadillo / C++ → MATLAB (copy to mxArray) ──────────────────────────────
+//
+//   qd_mex_copy2matlab(const dtype *input)                  → mxArray* (scalar)
+//   qd_mex_copy2matlab(const arma::Row<dtype> *input)       → mxArray* (row vec)
+//   qd_mex_copy2matlab(const arma::Col<dtype> *input,
+//                       transpose=false, ns=0, is=nullptr)  → mxArray* (col vec)
+//   qd_mex_copy2matlab(const arma::Mat<dtype> *input,
+//                       ns=0, is=nullptr)                   → mxArray* (matrix)
+//   qd_mex_copy2matlab(arma::Cube<dtype> *input,
+//                       ns=0, is=nullptr)                   → mxArray* (3D array)
+//   qd_mex_copy2matlab(const std::vector<std::string> *)    → mxArray* (cell)
+//   qd_mex_copy2matlab(const std::vector<bool> *)           → mxArray* (logical)
+//       Copy Armadillo data into a newly allocated mxArray. Optional ns / is
+//       parameters allow selecting a subset of columns (Mat) or slices (Cube).
+//
+// ── std::vector<arma> → MATLAB (vectorised copy) ────────────────────────────
+//
+//   qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *, ns, is, padding)
+//   qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *, ns, is, padding)
+//   qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *, ns, is, padding)
+//       Stack a std::vector of Armadillo objects into one MATLAB array with an
+//       extra trailing dimension. Sizes are padded to the largest element. An
+//       optional index list (is) selects a subset; padding fills missing values.
+//
+// ── Armadillo ← MATLAB (zero-copy output initialisation) ────────────────────
+//
+//   qd_mex_init_output(arma::{Row,Col,Mat,Cube}<T> *output, ...)
+//       Allocate a MATLAB mxArray of matching size and type (float, double, or
+//       unsigned), then bind the Armadillo object directly to the mxArray memory
+//       (zero-copy). Supported for float, double, and unsigned int. Use as:
+//           plhs[0] = qd_mex_init_output(&my_mat, n_rows, n_cols);
+//       After the call, writing to *output writes directly into the mxArray.
+//
+// ── MATLAB Struct Helpers ─────────────────────────────────────────────────────
+//
+//   qd_mex_make_struct(fields, N=1)
+//       Create an empty 1×N MATLAB struct with the given field names.
+//
+//   qd_mex_set_field(strct, field, data, n=0)
+//       Set a field of a struct array element.
+//
+//   qd_mex_has_field(strct, field) → bool
+//       Check if a struct has a given field.
+//
+//   qd_mex_get_field(strct, field) → mxArray*
+//       Retrieve a field from a struct; throws if not found.
 
 #ifndef mex_helper_H
 #define mex_helper_H

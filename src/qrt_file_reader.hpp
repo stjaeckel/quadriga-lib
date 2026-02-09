@@ -26,9 +26,11 @@ class qrt_file_reader
 {
 public:
     std::ifstream fileR;                 // File input stream
+    int version = 0;                     // QRT file version
     unsigned no_orig = 0;                // Number of origin (TX) positions in the file, may be 0
     unsigned no_cir = 0;                 // Number of channel impulse responses, same for each TX
     unsigned no_dest = 0;                // Number of destination (RX) positions (groups of CIRs)
+    unsigned no_freq = 1;                // Number of frequency bands in the file
     unsigned char cir_fmt = 7;           // CIR orientation format
     arma::fmat cir_pos;                  // CIR positions in Cartesian coordinates, size [no_cir, 3]
     arma::fmat cir_orientation;          // CIR orientation in Euler angles in rad, size [no_cir, 3]
@@ -39,7 +41,7 @@ public:
     arma::u64_vec orig_index;            // Index of the origin (TX) data, bytes from BOF, vector of length [no_cir]
     std::string orig_name;               // Current origin (TX) name
     float orig_pos[3] = {0, 0, 0};       // Current origin (TX) position
-    float fGHz = 0.0f;                   // Carrier frequency in GHz
+    arma::fvec freq;                     // Frequency in GHz
     unsigned max_no_path = 0;            // Maximum number of paths per RX
     arma::u64_vec path_data_index;       // Index of the TX-RX path data, bytes from BOF, size [no_cir]
     arma::u32_vec no_int;                // Number of mesh interactions per path of current RX, vector of length [no_path], 0=LOS
@@ -57,16 +59,31 @@ public:
             throw std::invalid_argument("Cannot open file.");
 
         // Read the ID_string and check if it is correct
-        const std::string bin_id = "#QRT-BINv04";
-        std::string bin_id_file(bin_id.size(), '\0');
-        fileR.read(&bin_id_file[0], bin_id.size());
+        const std::string bin_id_prefix = "#QRT-BINv";
+        std::string bin_id_file(bin_id_prefix.size(), '\0');
+        fileR.read(&bin_id_file[0], bin_id_prefix.size());
 
-        if (fileR.gcount() != static_cast<std::streamsize>(bin_id.size()) || bin_id_file != bin_id)
-            throw std::invalid_argument("Wrong file format.");
+        if (bin_id_file != bin_id_prefix)
+            throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
+
+        // Read the version number (2 digits)
+        std::string version_str(2, '\0');
+        fileR.read(&version_str[0], 2);
+        version = std::stoi(version_str);
+
+        if (version != 4 && version != 5 && version == 6)
+            throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
 
         fileR.read((char *)&no_orig, sizeof(unsigned));
         fileR.read((char *)&no_cir, sizeof(unsigned));
         fileR.read((char *)&no_dest, sizeof(unsigned));
+
+        if (version > 4)
+        {
+            fileR.read((char *)&no_freq, sizeof(unsigned));
+            freq.set_size(no_freq);
+            fileR.read((char *)freq.memptr(), no_freq * sizeof(float));
+        }
 
         // Read CIR metadata
         if (no_cir != 0)
@@ -136,7 +153,7 @@ public:
 
     // CONSTRUCTOR: Opens file and reads ONLY metadata for the selected iCIR and iORIG
     // - uses minimum amount of read operations to get needed data
-    // - reads no_orig, no_cir, no_dest, cir_fmt
+    // - reads no_orig, no_cir, no_dest, no_freq, cir_fmt
     // - Initializes members: cir_pos, cir_orientation, orig_pos_all, orig_orientation, orig_index
     // - These member will only contain a single entry!
     // - For the selected iCIR, sets: cir_pos(iCIR,:) and cir_orientation(iCIR,:) to values frm the file
@@ -149,17 +166,32 @@ public:
             throw std::invalid_argument("Cannot open file.");
 
         // Read the ID_string and check if it is correct
-        const std::string bin_id = "#QRT-BINv04";
-        std::string bin_id_file(bin_id.size(), '\0');
-        fileR.read(&bin_id_file[0], bin_id.size());
+        const std::string bin_id_prefix = "#QRT-BINv";
+        std::string bin_id_file(bin_id_prefix.size(), '\0');
+        fileR.read(&bin_id_file[0], bin_id_prefix.size());
 
-        if (fileR.gcount() != (std::streamsize)bin_id.size() || bin_id_file != bin_id)
-            throw std::invalid_argument("Wrong file format.");
+        if (bin_id_file != bin_id_prefix)
+            throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
+
+        // Read the version number (2 digits)
+        std::string version_str(2, '\0');
+        fileR.read(&version_str[0], 2);
+        version = std::stoi(version_str);
+
+        if (version != 4 && version != 5 && version == 6)
+            throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
 
         // Global counters
         fileR.read((char *)&no_orig, sizeof(unsigned));
         fileR.read((char *)&no_cir, sizeof(unsigned));
         fileR.read((char *)&no_dest, sizeof(unsigned));
+
+        if (version > 4)
+        {
+            fileR.read((char *)&no_freq, sizeof(unsigned));
+            freq.set_size(no_freq);
+            fileR.read((char *)freq.memptr(), no_freq * sizeof(float));
+        }
 
         if (no_orig == 0 || no_cir == 0)
             throw std::out_of_range("File does not contain any origins or CIRs.");
@@ -329,7 +361,12 @@ public:
         orig_pos[1] = orig_pos_all(iORIG, 1);
         orig_pos[2] = orig_pos_all(iORIG, 2);
 
-        fileR.read((char *)&fGHz, sizeof(float));
+        if (version == 4)
+        {
+            freq.set_size(1);
+            fileR.read((char *)freq.memptr(), sizeof(float));
+        }
+
         fileR.read((char *)&max_no_path, sizeof(unsigned));
 
         path_data_index.set_size(no_cir);
@@ -337,7 +374,7 @@ public:
     }
 
     // Random access to a specific CIR
-    unsigned read_cir(unsigned iORIG, unsigned iCIR, arma::u32_vec &no_intR, arma::fmat &xprmatR, arma::fmat &coordR)
+    unsigned read_cir(unsigned iORIG, unsigned iCIR, arma::u32_vec &no_intR, arma::fcube &xprmatR, arma::fmat &coordR)
     {
         fileR.seekg(orig_index(iORIG), std::ios::beg);
 
@@ -345,8 +382,13 @@ public:
         unsigned char tx_name_length = 0;
         fileR.read((char *)&tx_name_length, sizeof(tx_name_length));
 
-        // Skip over the name bytes + fGHz + max_no_path + skip to the single element in path_data_index[iCIR]
-        long long skip = tx_name_length + sizeof(float) + sizeof(unsigned) + iCIR * sizeof(unsigned long long);
+        // Skip over the name bytes + freq + max_no_path + skip to the single element in path_data_index[iCIR]
+        long long skip;
+        if (version == 4) // Frequency stored with BS data
+            skip = tx_name_length + sizeof(float) + sizeof(unsigned) + iCIR * sizeof(unsigned long long);
+        else // Frequency stored in header
+            skip = tx_name_length + sizeof(unsigned) + iCIR * sizeof(unsigned long long);
+
         fileR.seekg(skip, std::ios::cur);
 
         unsigned long long data_offset = 0;
@@ -372,8 +414,9 @@ public:
         }
 
         // Read polarization transfer matrix
-        xprmatR.set_size(8, no_path);
-        fileR.read((char *)xprmatR.memptr(), 8 * no_path * sizeof(float));
+        size_t xprmat_size = (version == 6) ? 2 : 8;
+        xprmatR.set_size(xprmat_size, no_path, no_freq);
+        fileR.read((char *)xprmatR.memptr(), xprmat_size * no_path * no_freq * sizeof(float));
 
         // Read interaction coordinates
         coordR.set_size(3, sum_no_int);
@@ -403,7 +446,7 @@ public:
         orig_pos[0] = 0.0f;
         orig_pos[1] = 0.0f;
         orig_pos[2] = 0.0f;
-        fGHz = 0.0f;
+        freq.reset();
         max_no_path = 0;
 
         path_data_index.reset();

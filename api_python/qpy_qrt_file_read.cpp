@@ -45,19 +45,24 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 - **`downlink`**<br>
   Switch for uplink / downlink direction, Default = true (downlink)
 
+- **`normalize_M`**<br>
+   Switch for different normalization options:
+   0 | M as in QRT file, path_gain as FSPL (no normalization)
+   1 | M has sum-column power is 2, path_gain is FSPL + material losses (default)
+
 ## Output Arguments:
 - **`data`**<br>
   Dictionary containing the data in the HDF file with the following keys:
-  `center_freq`    | Center frequency in [Hz]                                 | scalar
+  `center_freq`    | Center frequency in [Hz]                                 | Length `[n_freq]`
   `tx_pos`         | Transmitter position                                     | Length `[3]`
   `tx_orientation` | Transmitter orientation, Euler angles, rad               | Length `[3]`
   `rx_pos`         | Receiver position                                        | Length `[3]`
   `rx_orientation` | Receiver orientation, Euler angles, rad                  | Length `[3]`
   `fbs_pos`        | First-bounce scatterer positions                         | Size `[3, n_path]`
   `lbs_pos`        | Last-bounce scatterer positions                          | Size `[3, n_path]`
-  `path_gain`      | Path gain before antenna, linear scale                   | Length `[n_path]`
+  `path_gain`      | Path gain before antenna, linear scale                   | Size `[n_path, n_freq]`
   `path_length`    | Path length from TX to RX phase center in m              | Length `[n_path]`
-  `M`              | Polarization transfer function, interleaved complex      | Size `[8, n_path]`
+  `M`              | Polarization transfer function, interleaved complex      | Size `[8, n_path, n_freq]` or `[2, n_path, n_freq]`
   `aod`            | Departure azimuth angles in [rad]                        | Length `[n_path]`
   `eod`            | Departure elevation angles in [rad]                      | Length `[n_path]`
   `aoa`            | Arrival azimuth angles in [rad]                          | Length `[n_path]`
@@ -65,20 +70,20 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
   `path_coord`     | Interaction coordinates                                  | List of `[3, n_int_s]`
 MD!*/
 
-py::dict qrt_file_read(const std::string &fn, arma::uword cir, arma::uword orig, bool downlink)
+py::dict qrt_file_read(const std::string &fn, arma::uword cir, arma::uword orig, bool downlink, int normalize_M)
 {
-    double center_frequency;
-    arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa;
-    arma::mat fbs_pos, lbs_pos, M;
-    arma::vec path_gain, path_length;
+    arma::vec center_frequency;
+    arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa, path_length;
+    arma::mat fbs_pos, lbs_pos, path_gain;
+    arma::cube M;
     std::vector<arma::mat> path_coord;
 
     quadriga_lib::qrt_file_read<double>(fn, cir, orig, downlink, &center_frequency, &tx_pos, &tx_orientation,
                                         &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
-                                        &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord);
+                                        &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, normalize_M);
 
     py::dict output;
-    output["center_freq"] = center_frequency;
+    output["center_freq"] = qd_python_copy2numpy(center_frequency);
     output["tx_pos"] = qd_python_copy2numpy(tx_pos);
     output["tx_orientation"] = qd_python_copy2numpy(tx_orientation);
     output["rx_pos"] = qd_python_copy2numpy(rx_pos);

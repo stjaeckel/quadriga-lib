@@ -22,15 +22,18 @@ TEST_CASE("QRT Reader")
 {
     std::string fn = "tests/data/test.qrt";
 
-    arma::uword no_orig, no_cir, no_dest;
+    arma::uword no_orig, no_cir, no_dest, no_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
+    int version;
 
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &cir_offset, &orig_names, &dest_names);
+    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version);
 
     REQUIRE(no_orig == 3ULL);
     REQUIRE(no_dest == 2ULL);
     REQUIRE(no_cir == 7ULL);
+    REQUIRE(no_freq == 1ULL);
+    REQUIRE(version == 4);
     REQUIRE(cir_offset.n_elem == no_dest);
 
     CHECK(cir_offset[0] == 0ULL);
@@ -47,9 +50,9 @@ TEST_CASE("QRT Reader")
     CHECK(dest_names[1] == "RX2");
 
     arma::vec tx_pos, tx_orientation, rx_pos, rx_orientation, aod, eod, aoa, eoa;
-    arma::mat fbs_pos, lbs_pos, M;
-    arma::vec path_gain, path_length;
-    double center_frequency;
+    arma::cube M;
+    arma::mat fbs_pos, lbs_pos, path_gain;
+    arma::vec path_length, center_frequency;
     std::vector<arma::mat> path_coord;
 
     // Check positions and orientations of first link
@@ -57,7 +60,7 @@ TEST_CASE("QRT Reader")
                                         &rx_pos, &rx_orientation, &fbs_pos, &lbs_pos, &path_gain,
                                         &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord);
 
-    CHECK(center_frequency == 3.75e9);
+    CHECK(center_frequency[0] == 3.75e9);
 
     arma::vec T = {-12.9607, 59.6906, 2.0};
     CHECK(arma::approx_equal(tx_pos, T, "absdiff", 1.5e-4));
@@ -107,4 +110,54 @@ TEST_CASE("QRT Reader")
     CHECK(arma::approx_equal(lbs_pos, B, "absdiff", 1.5e-4));
     CHECK(arma::approx_equal(aod, aoa, "absdiff", 1.5e-4));
     CHECK(arma::approx_equal(eod, eoa, "absdiff", 1.5e-4));
+}
+
+TEST_CASE("QRT Reader v5")
+{
+    std::string fn = "tests/data/test_v5.qrt";
+
+    arma::uword no_orig, no_cir, no_dest, no_freq;
+    arma::uvec cir_offset;
+    std::vector<std::string> orig_names, dest_names;
+    int version;
+
+    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version);
+
+    CHECK(version == 5);
+    CHECK(no_freq == 2);
+
+    arma::cube M;
+    arma::mat path_gain;
+    arma::vec center_frequency;
+
+    // Check positions and orientations of first link
+    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_frequency, nullptr, nullptr,
+                                        nullptr, nullptr, nullptr, nullptr, &path_gain,
+                                        nullptr, &M, nullptr, nullptr, nullptr, nullptr, nullptr, 0);
+
+    REQUIRE(center_frequency.n_elem == 2);
+    CHECK(center_frequency[0] == 1.0e9);
+    CHECK(center_frequency[1] == 1.5e9);
+
+    CHECK(M.n_rows == 8);
+    CHECK(M.n_slices == 2);
+
+    CHECK(path_gain.n_cols == 2);
+
+    arma::vec A(M.slice_colptr(0, 0), 8);
+    arma::vec T = {0.1131, 0, 0, 0, 0, 0, -0.1131, 0};
+    CHECK(arma::approx_equal(A, T, "absdiff", 1.5e-4));
+
+    arma::vec B(M.slice_colptr(1, 0), 8);
+    T = {0.0866, 0, 0, 0, 0, 0, -0.0866, 0};
+    CHECK(arma::approx_equal(B, T, "absdiff", 1.5e-4));
+
+    // Check positions and orientations of first link
+    quadriga_lib::qrt_file_read<double>(fn, 1, 0, true, &center_frequency, nullptr, nullptr,
+                                        nullptr, nullptr, nullptr, nullptr, &path_gain,
+                                        nullptr, &M);
+
+    T = {1, 0, 0, 0, 0, 0, -1, 0};
+    arma::vec C(M.slice_colptr(1, 0), 8);
+    CHECK(arma::approx_equal(C, T, "absdiff", 1.5e-4));
 }

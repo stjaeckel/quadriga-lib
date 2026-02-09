@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.3</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -86,6 +86,8 @@
 <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Writes channel data to HDF5 files</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
+<tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
+<tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2192,6 +2194,185 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 </li><li style="margin-bottom: 0.4em;">Supported size: up to 3 dimensions 
 </li><li style="margin-bottom: 0.4em;">Storage order is maintained 
 </li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_parse"></a>
+<b>qrt_file_parse</b> - Read metadata from a QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies. 
+</li><li style="margin-bottom: 0.4em;">All output arguments are optional; MATLAB only computes outputs that are requested. 
+</li><li style="margin-bottom: 0.4em;">Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version ] = qrt_file_parse( fn );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Path to the QRT file, string. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>no_cir</code></b><br> 
+   Number of channel snapshots per origin point, scalar. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_orig</code></b><br> 
+   Number of origin points (TX), scalar. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_dest</code></b><br> 
+   Number of destinations (RX), scalar. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>no_freq</code></b><br> 
+   Number of frequency bands, scalar. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_offset</code></b><br> 
+   CIR offset for each destination, uint64 vector of size <code>[no_dest, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_names</code></b><br> 
+   Names of the origin points (TXs), cell array of strings with <code>no_orig</code> entries. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>dest_names</code></b><br> 
+   Names of the destination points (RXs), cell array of strings with <code>no_dest</code> entries. 
+    
+</li><li style="margin-bottom: 0.4em;"><b><code>version</code></b><br> 
+   QRT file version number, scalar integer. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version] = ...
+    qrt_file_parse('scene.qrt');
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_read"></a>
+<b>qrt_file_read</b> - Read ray-tracing data from a QRT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point. 
+</li><li style="margin-bottom: 0.4em;">Supports both uplink and downlink directions by swapping TX/RX roles accordingly. 
+</li><li style="margin-bottom: 0.4em;">All output arguments are optional; MATLAB only computes outputs that are requested. 
+</li><li style="margin-bottom: 0.4em;">The <code>normalize_M</code> parameter controls how the polarization transfer matrix <code>M</code> and path gains are returned. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, ...
+  path_gain, path_length, M, aod, eod, aoa, eoa, path_coord ] = ...
+    qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b><br> 
+   Path to the QRT file, string. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>i_cir</code></b> (optional)<br> 
+   Snapshot index (1-based), scalar. Default: 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>i_orig</code></b> (optional)<br> 
+   Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>downlink</code></b> (optional)<br> 
+   If <code>true</code>, origin is TX and destination is RX (downlink). If <code>false</code>, roles are swapped (uplink),  
+   logical scalar. Default: <code>true</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>normalize_M</code></b> (optional)<br> 
+   Normalization option for the polarization transfer matrix, scalar integer. Default: 1 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>0</td>
+  <td><code>M</code> as stored in QRT file, <code>path_gain</code> is -FSPL</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td><code>M</code> has sum-column power of 2, <code>path_gain</code> is -FSPL minus material losses</td>
+</tr>
+</table><br>
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b><br> 
+   Center frequency in Hz, double vector of size <code>[n_freq, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b><br> 
+   Transmitter position in Cartesian coordinates, double vector of size <code>[3, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_orientation</code></b><br> 
+   Transmitter orientation (bank, tilt, heading) in radians, double vector of size <code>[3, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b><br> 
+   Receiver position in Cartesian coordinates, double vector of size <code>[3, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_orientation</code></b><br> 
+   Receiver orientation (bank, tilt, heading) in radians, double vector of size <code>[3, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fbs_pos</code></b><br> 
+   First-bounce scatterer positions, double matrix of size <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>lbs_pos</code></b><br> 
+   Last-bounce scatterer positions, double matrix of size <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_gain</code></b><br> 
+   Path gain on linear scale, double matrix of size <code>[n_path, n_freq]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b><br> 
+   Absolute path length from TX to RX phase center, double vector of size <code>[n_path, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b><br> 
+   Polarization transfer matrix, double array of size <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code>  
+   for v6 files. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aod</code></b><br> 
+   Departure azimuth angles in radians, double vector of size <code>[n_path, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eod</code></b><br> 
+   Departure elevation angles in radians, double vector of size <code>[n_path, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aoa</code></b><br> 
+   Arrival azimuth angles in radians, double vector of size <code>[n_path, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>eoa</code></b><br> 
+   Arrival elevation angles in radians, double vector of size <code>[n_path, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_coord</code></b><br> 
+   Interaction coordinates per path, cell array of length <code>n_path</code>. Each cell contains a double matrix  
+   of size <code>[3, n_interact + 2]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+[center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
+    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 0, 0, true, 1);
+</pre>
 </li>
 </ul>
 <div class="pagebreak"></div>
