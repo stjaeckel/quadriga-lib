@@ -292,6 +292,199 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 }
 
 /*!MD
+# qrt_read_cache_init
+Initialize a QRT read cache for fast repeated access
+
+## Description:
+- Reads all fixed metadata from a QRT file into a `qrt_read_cache` struct.
+- Pre-computes byte offsets so that subsequent `qrt_file_read` calls only need to
+  perform 2 seeks and 4 reads (the per-CIR path data) instead of re-parsing the header.
+- Populate the cache once, then pass it to `qrt_file_read` together with a shared
+  `std::ifstream` for maximum performance in tight loops.
+
+## Declaration:
+```
+quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
+                const std::string &fn,
+                std::ifstream *file = nullptr)
+```
+
+## Arguments:
+- `const std::string &**fn**` (input)<br>
+  Path to the QRT file.
+
+- `std::ifstream ***file** = nullptr` (optional input)<br>
+  Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn`
+  and closed on return. If provided, the stream is left open.
+
+## Returns:
+- `qrt_read_cache **cache**` (output)<br>
+  Populated cache structure.
+
+## Example:
+```
+std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
+auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
+
+arma::vec center_freq, tx_pos, rx_pos;
+arma::mat path_gain;
+arma::cube M;
+
+for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
+    for (arma::uword io = 0; io < cache.no_orig; ++io)
+        quadriga_lib::qrt_file_read<double>("", ic, io, true,
+            &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
+            nullptr, nullptr, &path_gain, nullptr, &M,
+            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
+            nullptr, nullptr, &stream, &cache);
+```
+MD!*/
+
+quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string &fn,
+                                                               std::ifstream *file)
+{
+    quadriga_lib::qrt_read_cache cache;
+
+    // --- Determine which stream to use and whether we own it ----------------
+    std::ifstream local_stream;
+    bool own_stream = (file == nullptr);
+    std::ifstream &fileR = own_stream ? local_stream : *file;
+
+    if (own_stream)
+    {
+        fileR.open(fn, std::ios::in | std::ios::binary);
+        if (!fileR.is_open())
+            throw std::invalid_argument("Cannot open file.");
+    }
+    else
+    {
+        fileR.seekg(0, std::ios::beg);
+        if (!fileR.good())
+            throw std::invalid_argument("Supplied ifstream is not in a good state.");
+    }
+
+    // --- Read and validate the header ---------------------------------------
+    const std::string bin_id_prefix = "#QRT-BINv";
+    std::string bin_id_file(bin_id_prefix.size(), '\0');
+    fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
+
+    if (bin_id_file != bin_id_prefix)
+        throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
+
+    std::string version_str(2, '\0');
+    fileR.read(&version_str[0], 2);
+    cache.version = std::stoi(version_str);
+
+    if (cache.version != 4 && cache.version != 5 && cache.version != 6)
+        throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
+
+    // --- Global counters ----------------------------------------------------
+    fileR.read((char *)&cache.no_orig, sizeof(unsigned));
+    fileR.read((char *)&cache.no_cir, sizeof(unsigned));
+    fileR.read((char *)&cache.no_dest, sizeof(unsigned));
+
+    cache.no_freq = 1;
+    if (cache.version > 4)
+    {
+        fileR.read((char *)&cache.no_freq, sizeof(unsigned));
+        cache.freq.set_size(cache.no_freq);
+        fileR.read((char *)cache.freq.memptr(), cache.no_freq * sizeof(float));
+    }
+
+    // --- CIR metadata (read all) --------------------------------------------
+    if (cache.no_cir != 0)
+    {
+        unsigned char cir_fmt = 0;
+        fileR.read((char *)&cir_fmt, sizeof(unsigned char));
+
+        cache.cir_pos.set_size(cache.no_cir, 3);
+        fileR.read((char *)cache.cir_pos.memptr(), cache.no_cir * 3 * sizeof(float));
+
+        cache.cir_orientation.zeros(cache.no_cir, 3);
+        if (cir_fmt > 3)
+            fileR.read((char *)cache.cir_orientation.colptr(0), cache.no_cir * sizeof(float));
+        if (cir_fmt == 2 || cir_fmt == 3 || cir_fmt == 6 || cir_fmt == 7)
+            fileR.read((char *)cache.cir_orientation.colptr(1), cache.no_cir * sizeof(float));
+        if (cir_fmt == 1 || cir_fmt == 3 || cir_fmt == 5 || cir_fmt == 7)
+            fileR.read((char *)cache.cir_orientation.colptr(2), cache.no_cir * sizeof(float));
+    }
+
+    // --- Skip destination metadata ------------------------------------------
+    if (cache.no_dest != 0)
+    {
+        fileR.seekg((std::streamoff)(cache.no_dest * sizeof(unsigned)), std::ios::cur);
+        for (unsigned i = 0; i < cache.no_dest; ++i)
+        {
+            unsigned char mt_name_length = 0;
+            fileR.read((char *)&mt_name_length, sizeof(unsigned char));
+            if (mt_name_length != 0)
+                fileR.seekg((std::streamoff)mt_name_length, std::ios::cur);
+        }
+    }
+
+    // --- Origin metadata (read all) -----------------------------------------
+    if (cache.no_orig != 0)
+    {
+        unsigned char bs_fmt = 0;
+        fileR.read((char *)&bs_fmt, sizeof(unsigned char));
+
+        cache.orig_pos_all.set_size(cache.no_orig, 3);
+        fileR.read((char *)cache.orig_pos_all.memptr(), cache.no_orig * 3 * sizeof(float));
+
+        cache.orig_orientation.zeros(cache.no_orig, 3);
+        if (bs_fmt > 3)
+            fileR.read((char *)cache.orig_orientation.colptr(0), cache.no_orig * sizeof(float));
+        if (bs_fmt == 2 || bs_fmt == 3 || bs_fmt == 6 || bs_fmt == 7)
+            fileR.read((char *)cache.orig_orientation.colptr(1), cache.no_orig * sizeof(float));
+        if (bs_fmt == 1 || bs_fmt == 3 || bs_fmt == 5 || bs_fmt == 7)
+            fileR.read((char *)cache.orig_orientation.colptr(2), cache.no_orig * sizeof(float));
+
+        cache.orig_index.set_size(cache.no_orig);
+        fileR.read((char *)cache.orig_index.memptr(), cache.no_orig * sizeof(unsigned long long));
+    }
+
+    // --- Version 4: frequency stored per-origin, read from first origin -----
+    if (cache.version == 4 && cache.no_orig != 0)
+    {
+        fileR.seekg((std::streampos)cache.orig_index(0));
+        unsigned char tx_name_length = 0;
+        fileR.read((char *)&tx_name_length, sizeof(unsigned char));
+        fileR.seekg((std::streamoff)tx_name_length, std::ios::cur);
+        cache.freq.set_size(1);
+        fileR.read((char *)cache.freq.memptr(), sizeof(float));
+    }
+
+    // --- Pre-compute path_data_offset for each origin -----------------------
+    // For each origin, this is the absolute byte offset to the start of the
+    // path_data_index[] array within that origin's data block.
+    // Layout: [tx_name_length(1)] [tx_name(N)] [freq(4, v4 only)] [max_no_path(4)] [path_data_index[no_cir]]
+    // So: path_data_offset = orig_index + 1 + tx_name_length + (v4 ? 4 : 0) + 4
+    if (cache.no_orig != 0)
+    {
+        cache.path_data_offset.set_size(cache.no_orig);
+        unsigned extra = (cache.version == 4) ? (unsigned)sizeof(float) : 0u;
+
+        for (unsigned i = 0; i < cache.no_orig; ++i)
+        {
+            fileR.seekg((std::streampos)cache.orig_index(i));
+            unsigned char tx_name_length = 0;
+            fileR.read((char *)&tx_name_length, sizeof(unsigned char));
+
+            cache.path_data_offset(i) = cache.orig_index(i) + 1ull              // tx_name_length byte
+                                        + (unsigned long long)tx_name_length    // tx_name
+                                        + (unsigned long long)extra             // freq (v4 only)
+                                        + (unsigned long long)sizeof(unsigned); // max_no_path
+        }
+    }
+
+    // --- Close only if we opened the stream ourselves -----------------------
+    if (own_stream && fileR.is_open())
+        fileR.close();
+
+    return cache;
+}
+
+/*!MD
 # qrt_file_read
 Read ray-tracing data from a QRT file
 
@@ -300,6 +493,8 @@ Read ray-tracing data from a QRT file
 - Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
 - All output arguments are optional; pass `nullptr` to skip any value you don't need.
 - The `normalize_M` parameter controls how the polarization transfer matrix `M` and path gains are returned.
+- For maximum performance in tight loops, pass a pre-opened `std::ifstream` and a pre-populated
+  `qrt_read_cache`. With both, the per-call I/O is reduced to 2 seeks and 4 reads.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
@@ -328,12 +523,13 @@ void quadriga_lib::qrt_file_read(
                 int normalize_M = 1,
                 arma::u32_vec *no_int = nullptr,
                 arma::fmat *coord = nullptr,
-                std::ifstream *file = nullptr)
+                std::ifstream *file = nullptr,
+                const qrt_read_cache *cache = nullptr)
 ```
 
 ## Arguments:
 - `const std::string &**fn**` (input)<br>
-  Path to the QRT file.
+  Path to the QRT file. Ignored when both `file` and `cache` are provided.
 
 - `arma::uword **i_cir** = 0` (input)<br>
   Snapshot index (0-based).
@@ -402,9 +598,11 @@ void quadriga_lib::qrt_file_read(
 
 - `std::ifstream ***file** = nullptr` (optional input)<br>
   Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn` and closed
-  on return. If provided, the stream is seeked to BOF on entry and left open after return.
-  Reusing a stream avoids repeated open/close overhead in tight loops.
+  on return. If provided, the stream is left open after return.
 
+- `const qrt_read_cache ***cache** = nullptr` (optional input)<br>
+  Optional pre-parsed metadata cache (from `qrt_read_cache_init`). When provided together with
+  `file`, per-call I/O is reduced to 2 seeks and 4 reads.
 
 ## Example:
 ```
@@ -418,14 +616,18 @@ quadriga_lib::qrt_file_read<double>("scene.qrt", 0, 0, true,
     &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
     &aod, &eod, &aoa, &eoa, nullptr, 1);
 
-// Reusing a stream for repeated calls:
+// Maximum performance with cache and shared stream:
 std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
-for (arma::uword ic = 0; ic < n_cir; ++ic)
-    for (arma::uword io = 0; io < n_orig; ++io)
+quadriga_lib::qrt_read_cache cache;
+quadriga_lib::qrt_read_cache_init("scene.qrt", &cache, &stream);
+
+for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
+    for (arma::uword io = 0; io < cache.no_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, true,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
             &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-            &aod, &eod, &aoa, &eoa, nullptr, 1, nullptr, nullptr, &stream);
+            &aod, &eod, &aoa, &eoa, nullptr, 1,
+            nullptr, nullptr, &stream, &cache);
 ```
 MD!*/
 
@@ -437,9 +639,9 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                                  arma::Mat<dtype> *path_gain, arma::Col<dtype> *path_length, arma::Cube<dtype> *M,
                                  arma::Col<dtype> *aod, arma::Col<dtype> *eod, arma::Col<dtype> *aoa, arma::Col<dtype> *eoa,
                                  std::vector<arma::Mat<dtype>> *path_coord, int normalize_M, arma::u32_vec *no_int, arma::fmat *coord,
-                                 std::ifstream *file)
+                                 std::ifstream *file, const qrt_read_cache *cache)
 {
-    // --- Determine which stream to use and whether we own it ----------------
+    // === Stream setup =======================================================
     std::ifstream local_stream;
     bool own_stream = (file == nullptr);
     std::ifstream &fileR = own_stream ? local_stream : *file;
@@ -450,228 +652,239 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         if (!fileR.is_open())
             throw std::invalid_argument("Cannot open file.");
     }
-    else
+
+    // === Obtain metadata ====================================================
+    int ver;
+    unsigned l_no_cir, l_no_freq;
+    const float *p_freq;                                  // points at freq data (no copy needed)
+    float cir_px, cir_py, cir_pz;                         // CIR position
+    float cir_ox = 0.0f, cir_oy = 0.0f, cir_oz = 0.0f;    // CIR orientation
+    float orig_px, orig_py, orig_pz;                      // Origin position
+    float orig_ox = 0.0f, orig_oy = 0.0f, orig_oz = 0.0f; // Origin orientation
+    unsigned long long l_path_data_offset;                // Absolute byte offset to path_data_index array
+
+    arma::fvec l_freq_buf; // Local buffer for slow path; must outlive p_freq usage
+
+    if (cache) // === FAST PATH: metadata from cache (zero I/O) ===============
+    {
+        ver = cache->version;
+        l_no_cir = cache->no_cir;
+        l_no_freq = cache->no_freq;
+        p_freq = cache->freq.memptr();
+
+        if ((unsigned)i_cir >= l_no_cir)
+            throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
+        if ((unsigned)i_orig >= cache->no_orig)
+            throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
+
+        // CIR position / orientation (column-major: [no_cir, 3])
+        cir_px = cache->cir_pos((arma::uword)i_cir, 0);
+        cir_py = cache->cir_pos((arma::uword)i_cir, 1);
+        cir_pz = cache->cir_pos((arma::uword)i_cir, 2);
+        cir_ox = cache->cir_orientation((arma::uword)i_cir, 0);
+        cir_oy = cache->cir_orientation((arma::uword)i_cir, 1);
+        cir_oz = cache->cir_orientation((arma::uword)i_cir, 2);
+
+        // Origin position / orientation
+        orig_px = cache->orig_pos_all((arma::uword)i_orig, 0);
+        orig_py = cache->orig_pos_all((arma::uword)i_orig, 1);
+        orig_pz = cache->orig_pos_all((arma::uword)i_orig, 2);
+        orig_ox = cache->orig_orientation((arma::uword)i_orig, 0);
+        orig_oy = cache->orig_orientation((arma::uword)i_orig, 1);
+        orig_oz = cache->orig_orientation((arma::uword)i_orig, 2);
+
+        l_path_data_offset = cache->path_data_offset((arma::uword)i_orig);
+    }
+    else // === SLOW PATH: parse header + selective metadata from file =========
     {
         fileR.seekg(0, std::ios::beg);
         if (!fileR.good())
             throw std::invalid_argument("Supplied ifstream is not in a good state.");
-    }
 
-    // --- Read and validate the header ---------------------------------------
-    const std::string bin_id_prefix = "#QRT-BINv";
-    std::string bin_id_file(bin_id_prefix.size(), '\0');
-    fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
+        // --- Read and validate the header -----------------------------------
+        const std::string bin_id_prefix = "#QRT-BINv";
+        std::string bin_id_file(bin_id_prefix.size(), '\0');
+        fileR.read(&bin_id_file[0], (std::streamsize)bin_id_prefix.size());
 
-    if (bin_id_file != bin_id_prefix)
-        throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
+        if (bin_id_file != bin_id_prefix)
+            throw std::invalid_argument("Invalid file format: missing QRT-BIN header");
 
-    std::string version_str(2, '\0');
-    fileR.read(&version_str[0], 2);
-    int ver = std::stoi(version_str);
+        std::string version_str(2, '\0');
+        fileR.read(&version_str[0], 2);
+        ver = std::stoi(version_str);
 
-    if (ver != 4 && ver != 5 && ver != 6)
-        throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
+        if (ver != 4 && ver != 5 && ver != 6)
+            throw std::invalid_argument("Only QRT versions 4, 5 and 6 are supported");
 
-    // --- Global counters ----------------------------------------------------
-    unsigned l_no_orig = 0, l_no_cir = 0, l_no_dest = 0, l_no_freq = 1;
-    fileR.read((char *)&l_no_orig, sizeof(unsigned));
-    fileR.read((char *)&l_no_cir, sizeof(unsigned));
-    fileR.read((char *)&l_no_dest, sizeof(unsigned));
+        // --- Global counters ------------------------------------------------
+        unsigned l_no_orig = 0, l_no_dest = 0;
+        l_no_freq = 1;
+        fileR.read((char *)&l_no_orig, sizeof(unsigned));
+        fileR.read((char *)&l_no_cir, sizeof(unsigned));
+        fileR.read((char *)&l_no_dest, sizeof(unsigned));
 
-    if (l_no_orig == 0 || l_no_cir == 0)
-        throw std::out_of_range("File does not contain any origins or CIRs.");
-    if ((unsigned)i_cir >= l_no_cir)
-        throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
-    if ((unsigned)i_orig >= l_no_orig)
-        throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
+        if (l_no_orig == 0 || l_no_cir == 0)
+            throw std::out_of_range("File does not contain any origins or CIRs.");
+        if ((unsigned)i_cir >= l_no_cir)
+            throw std::invalid_argument("CIR index exceeds number of CIRs in file.");
+        if ((unsigned)i_orig >= l_no_orig)
+            throw std::invalid_argument("Origin (TX) index exceeds number of origin points in file.");
 
-    // --- Frequencies (v5/v6: stored in header) ------------------------------
-    arma::fvec l_freq;
-    if (ver > 4)
-    {
-        fileR.read((char *)&l_no_freq, sizeof(unsigned));
-        l_freq.set_size(l_no_freq);
-        fileR.read((char *)l_freq.memptr(), l_no_freq * sizeof(float));
+        // --- Frequencies (v5/v6: stored in header) --------------------------
+        if (ver > 4)
+        {
+            fileR.read((char *)&l_no_freq, sizeof(unsigned));
+            l_freq_buf.set_size(l_no_freq);
+            fileR.read((char *)l_freq_buf.memptr(), l_no_freq * sizeof(float));
+        }
+
+        // --- CIR metadata (selective read for i_cir) ------------------------
+        {
+            unsigned char cir_fmt = 0;
+            fileR.read((char *)&cir_fmt, sizeof(unsigned char));
+
+            std::streamoff skip_before = (std::streamoff)((unsigned)i_cir * (unsigned)sizeof(float));
+            std::streamoff skip_after = (std::streamoff)((l_no_cir - (unsigned)i_cir - 1u) * (unsigned)sizeof(float));
+            float val;
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            cir_px = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            cir_py = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            cir_pz = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            if (cir_fmt > 3) // Bank angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                cir_ox = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+            if (cir_fmt == 2 || cir_fmt == 3 || cir_fmt == 6 || cir_fmt == 7) // Tilt angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                cir_oy = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+            if (cir_fmt == 1 || cir_fmt == 3 || cir_fmt == 5 || cir_fmt == 7) // Heading angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                cir_oz = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+        }
+
+        // --- Skip destination metadata --------------------------------------
+        if (l_no_dest != 0)
+        {
+            fileR.seekg((std::streamoff)(l_no_dest * sizeof(unsigned)), std::ios::cur);
+            for (unsigned i = 0; i < l_no_dest; ++i)
+            {
+                unsigned char mt_name_length = 0;
+                fileR.read((char *)&mt_name_length, sizeof(unsigned char));
+                if (mt_name_length != 0)
+                    fileR.seekg((std::streamoff)mt_name_length, std::ios::cur);
+            }
+        }
+
+        // --- Origin metadata (selective read for i_orig) --------------------
+        {
+            unsigned char bs_fmt = 0;
+            fileR.read((char *)&bs_fmt, sizeof(unsigned char));
+
+            std::streamoff skip_before = (std::streamoff)((unsigned)i_orig * (unsigned)sizeof(float));
+            std::streamoff skip_after = (std::streamoff)((l_no_orig - (unsigned)i_orig - 1u) * (unsigned)sizeof(float));
+            float val;
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            orig_px = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            orig_py = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            fileR.seekg(skip_before, std::ios::cur);
+            fileR.read((char *)&val, sizeof(float));
+            orig_pz = val;
+            fileR.seekg(skip_after, std::ios::cur);
+
+            if (bs_fmt > 3) // Bank angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                orig_ox = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+            if (bs_fmt == 2 || bs_fmt == 3 || bs_fmt == 6 || bs_fmt == 7) // Tilt angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                orig_oy = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+            if (bs_fmt == 1 || bs_fmt == 3 || bs_fmt == 5 || bs_fmt == 7) // Heading angle
+            {
+                fileR.seekg(skip_before, std::ios::cur);
+                fileR.read((char *)&val, sizeof(float));
+                orig_oz = val;
+                fileR.seekg(skip_after, std::ios::cur);
+            }
+
+            // Read orig_index[i_orig] and compute path_data_offset
+            std::streamoff skip64_before = (std::streamoff)((unsigned)i_orig * (unsigned)sizeof(unsigned long long));
+            fileR.seekg(skip64_before, std::ios::cur);
+
+            unsigned long long l_orig_index;
+            fileR.read((char *)&l_orig_index, sizeof(unsigned long long));
+
+            // Seek to the origin block, read tx_name_length, compute offset
+            fileR.seekg((std::streampos)l_orig_index);
+            unsigned char tx_name_length = 0;
+            fileR.read((char *)&tx_name_length, sizeof(unsigned char));
+
+            l_path_data_offset = l_orig_index + 1ull + (unsigned long long)tx_name_length + (unsigned long long)((ver == 4) ? sizeof(float) : 0u) + (unsigned long long)sizeof(unsigned);
+        }
+
+        // --- Version 4: frequency stored per-origin -------------------------
+        if (ver == 4)
+        {
+            // Frequency is at: path_data_offset - sizeof(unsigned) - sizeof(float)
+            //                 = orig_index + 1 + tx_name_length
+            unsigned long long freq_offset = l_path_data_offset - (unsigned long long)sizeof(unsigned) - (unsigned long long)sizeof(float);
+            fileR.seekg((std::streampos)freq_offset);
+            l_freq_buf.set_size(1);
+            fileR.read((char *)l_freq_buf.memptr(), sizeof(float));
+        }
+
+        p_freq = l_freq_buf.memptr();
     }
 
     arma::uword no_freq = (arma::uword)l_no_freq;
     bool v6 = (ver == 6);
 
-    // --- CIR metadata (selective read for i_cir) ----------------------------
-    float cir_px, cir_py, cir_pz;
-    float cir_ox = 0.0f, cir_oy = 0.0f, cir_oz = 0.0f;
-    {
-        unsigned char cir_fmt = 0;
-        fileR.read((char *)&cir_fmt, sizeof(unsigned char));
-
-        std::streamoff skip_before = (std::streamoff)((unsigned)i_cir * (unsigned)sizeof(float));
-        std::streamoff skip_after = (std::streamoff)((l_no_cir - (unsigned)i_cir - 1u) * (unsigned)sizeof(float));
-        float val;
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); cir_px = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); cir_py = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); cir_pz = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        if (cir_fmt > 3) // Bank angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); cir_ox = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-        if (cir_fmt == 2 || cir_fmt == 3 || cir_fmt == 6 || cir_fmt == 7) // Tilt angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); cir_oy = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-        if (cir_fmt == 1 || cir_fmt == 3 || cir_fmt == 5 || cir_fmt == 7) // Heading angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); cir_oz = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-    }
-
-    // --- Skip destination metadata ------------------------------------------
-    if (l_no_dest != 0)
-    {
-        fileR.seekg((std::streamoff)(l_no_dest * sizeof(unsigned)), std::ios::cur);
-        for (unsigned i = 0; i < l_no_dest; ++i)
-        {
-            unsigned char mt_name_length = 0;
-            fileR.read((char *)&mt_name_length, sizeof(unsigned char));
-            if (mt_name_length != 0)
-                fileR.seekg((std::streamoff)mt_name_length, std::ios::cur);
-        }
-    }
-
-    // --- Origin metadata (selective read for i_orig) ------------------------
-    float orig_px, orig_py, orig_pz;
-    float orig_ox = 0.0f, orig_oy = 0.0f, orig_oz = 0.0f;
-    unsigned long long l_orig_index;
-    {
-        unsigned char bs_fmt = 0;
-        fileR.read((char *)&bs_fmt, sizeof(unsigned char));
-
-        std::streamoff skip_before = (std::streamoff)((unsigned)i_orig * (unsigned)sizeof(float));
-        std::streamoff skip_after = (std::streamoff)((l_no_orig - (unsigned)i_orig - 1u) * (unsigned)sizeof(float));
-        float val;
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); orig_px = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); orig_py = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        fileR.seekg(skip_before, std::ios::cur);
-        fileR.read((char *)&val, sizeof(float)); orig_pz = val;
-        fileR.seekg(skip_after, std::ios::cur);
-
-        if (bs_fmt > 3) // Bank angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); orig_ox = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-        if (bs_fmt == 2 || bs_fmt == 3 || bs_fmt == 6 || bs_fmt == 7) // Tilt angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); orig_oy = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-        if (bs_fmt == 1 || bs_fmt == 3 || bs_fmt == 5 || bs_fmt == 7) // Heading angle
-        {
-            fileR.seekg(skip_before, std::ios::cur);
-            fileR.read((char *)&val, sizeof(float)); orig_oz = val;
-            fileR.seekg(skip_after, std::ios::cur);
-        }
-
-        // Read orig_index[i_orig]
-        std::streamoff skip64_before = (std::streamoff)((unsigned)i_orig * (unsigned)sizeof(unsigned long long));
-        fileR.seekg(skip64_before, std::ios::cur);
-        fileR.read((char *)&l_orig_index, sizeof(unsigned long long));
-        // Note: we don't need the remaining orig_index entries, so no skip_after
-    }
-
-    // --- Version 4: frequency stored per-origin -----------------------------
-    if (ver == 4)
-    {
-        fileR.seekg((std::streampos)l_orig_index);
-        unsigned char tx_name_length = 0;
-        fileR.read((char *)&tx_name_length, sizeof(unsigned char));
-        fileR.seekg((std::streamoff)tx_name_length, std::ios::cur);
-        l_freq.set_size(1);
-        fileR.read((char *)l_freq.memptr(), sizeof(float));
-    }
-
-    // --- Gain at 1 m (FSPL reference) ---------------------------------------
-    arma::vec gain_at_1m(no_freq);
-    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-        gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)l_freq[i_freq]);
-
-    // --- Output: center_frequency -------------------------------------------
-    if (center_frequency)
-    {
-        center_frequency->set_size(no_freq);
-        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            center_frequency->at(i_freq) = (dtype)l_freq[i_freq] * (dtype)1e9;
-    }
-
-    // --- Output: positions --------------------------------------------------
-    dtype Ox = (dtype)orig_px, Oy = (dtype)orig_py, Oz = (dtype)orig_pz;
-    dtype Dx = (dtype)cir_px, Dy = (dtype)cir_py, Dz = (dtype)cir_pz;
-
-    if (tx_pos && downlink)
-        *tx_pos = {Ox, Oy, Oz};
-    if (rx_pos && !downlink)
-        *rx_pos = {Ox, Oy, Oz};
-
-    if (rx_pos && downlink)
-        *rx_pos = {Dx, Dy, Dz};
-    if (tx_pos && !downlink)
-        *tx_pos = {Dx, Dy, Dz};
-
-    // --- Output: orientations -----------------------------------------------
-    if (tx_orientation && downlink)
-        *tx_orientation = {(dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz};
-    if (tx_orientation && !downlink)
-        *tx_orientation = {(dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz};
-
-    if (rx_orientation && downlink)
-        *rx_orientation = {(dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz};
-    if (rx_orientation && !downlink)
-        *rx_orientation = {(dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz};
-
-    // --- Read CIR path data (inlined from read_cir) -------------------------
-    // Seek to origin data block, skip name + optional freq + max_no_path,
-    // read path_data_index[i_cir], then seek to and read the path data.
-    fileR.seekg((std::streampos)l_orig_index, std::ios::beg);
-
-    unsigned char tx_name_length = 0;
-    fileR.read((char *)&tx_name_length, sizeof(unsigned char));
-
-    {
-        long long skip;
-        if (ver == 4) // freq(4) + max_no_path(4) + path_data_index offset
-            skip = (long long)tx_name_length + sizeof(float) + sizeof(unsigned) + (unsigned)i_cir * sizeof(unsigned long long);
-        else // max_no_path(4) + path_data_index offset
-            skip = (long long)tx_name_length + sizeof(unsigned) + (unsigned)i_cir * sizeof(unsigned long long);
-        fileR.seekg(skip, std::ios::cur);
-    }
+    // === Read CIR path data (2 seeks + 4 reads) =============================
+    // Seek directly to path_data_index[i_cir] within the origin block
+    fileR.seekg((std::streampos)(l_path_data_offset + (unsigned long long)i_cir * sizeof(unsigned long long)));
 
     unsigned long long data_offset = 0;
     fileR.read((char *)&data_offset, sizeof(unsigned long long));
-    fileR.seekg((std::streampos)data_offset, std::ios::beg);
+
+    // Seek to the actual CIR data block
+    fileR.seekg((std::streampos)data_offset);
 
     // Number of paths
     unsigned no_path;
@@ -701,18 +914,56 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     arma::fmat coordR(3, sum_no_int);
     fileR.read((char *)coordR.memptr(), 3 * sum_no_int * sizeof(float));
 
-    // --- Close only if we opened the stream ourselves -----------------------
+    // === Close only if we opened the stream ourselves =======================
     if (own_stream && fileR.is_open())
         fileR.close();
 
-    // --- Output: raw interaction data ---------------------------------------
+    // === Gain at 1 m (FSPL reference) =======================================
+    arma::vec gain_at_1m(no_freq);
+    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+        gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)p_freq[i_freq]);
+
+    // === Output: center_frequency ===========================================
+    if (center_frequency)
+    {
+        center_frequency->set_size(no_freq);
+        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+            center_frequency->at(i_freq) = (dtype)p_freq[i_freq] * (dtype)1e9;
+    }
+
+    // === Output: positions ==================================================
+    dtype Ox = (dtype)orig_px, Oy = (dtype)orig_py, Oz = (dtype)orig_pz;
+    dtype Dx = (dtype)cir_px, Dy = (dtype)cir_py, Dz = (dtype)cir_pz;
+
+    if (tx_pos && downlink)
+        *tx_pos = {Ox, Oy, Oz};
+    if (rx_pos && !downlink)
+        *rx_pos = {Ox, Oy, Oz};
+
+    if (rx_pos && downlink)
+        *rx_pos = {Dx, Dy, Dz};
+    if (tx_pos && !downlink)
+        *tx_pos = {Dx, Dy, Dz};
+
+    // === Output: orientations ===============================================
+    if (tx_orientation && downlink)
+        *tx_orientation = {(dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz};
+    if (tx_orientation && !downlink)
+        *tx_orientation = {(dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz};
+
+    if (rx_orientation && downlink)
+        *rx_orientation = {(dtype)cir_ox, (dtype)cir_oy, (dtype)cir_oz};
+    if (rx_orientation && !downlink)
+        *rx_orientation = {(dtype)orig_ox, (dtype)orig_oy, (dtype)orig_oz};
+
+    // === Output: raw interaction data =======================================
     if (no_int)
         *no_int = no_intR;
 
     if (coord)
         *coord = coordR;
 
-    // Calculate path gain and polarization matrix
+    // === Calculate path gain and polarization matrix M ======================
     // - xprmatR includes all interaction losses, but not the FSPL
     // - here we calculate the normalized polarization matrix M and the PG without FSPL
     if (M || path_gain)
@@ -807,7 +1058,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     bool want_angles = aod || eod || aoa || eoa;
     bool want_length = path_gain || path_length;
 
-    // Extract path metadata
+    // === Extract path metadata ==============================================
     // - here we add the FSPL from path length to the PG
     if (want_angles || want_length || fbs_pos || lbs_pos || path_coord)
     {
@@ -896,7 +1147,7 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_c
                                           arma::Mat<float> *path_gain, arma::Col<float> *path_length, arma::Cube<float> *M,
                                           arma::Col<float> *aod, arma::Col<float> *eod, arma::Col<float> *aoa, arma::Col<float> *eoa,
                                           std::vector<arma::Mat<float>> *path_coord, int normalize_M, arma::u32_vec *no_int, arma::fmat *coord,
-                                          std::ifstream *file);
+                                          std::ifstream *file, const qrt_read_cache *cache);
 
 template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma::uword i_orig, bool downlink,
                                           arma::Col<double> *center_frequency, arma::Col<double> *tx_pos, arma::Col<double> *tx_orientation,
@@ -905,4 +1156,4 @@ template void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_c
                                           arma::Mat<double> *path_gain, arma::Col<double> *path_length, arma::Cube<double> *M,
                                           arma::Col<double> *aod, arma::Col<double> *eod, arma::Col<double> *aoa, arma::Col<double> *eoa,
                                           std::vector<arma::Mat<double>> *path_coord, int normalize_M, arma::u32_vec *no_int, arma::fmat *coord,
-                                          std::ifstream *file);
+                                          std::ifstream *file, const qrt_read_cache *cache);
