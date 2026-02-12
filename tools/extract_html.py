@@ -127,7 +127,18 @@ def format_tables(text):
 
         return html_content
 
+    in_pre = False
     for line in lines:
+        # Track <pre> blocks and skip table parsing inside them
+        if "<pre>" in line:
+            in_pre = True
+        if "</pre>" in line:
+            in_pre = False
+            html_content += line + '\n'
+            continue
+        if in_pre:
+            html_content += line + '\n'
+            continue
         # Check if we are entering a table
         if "|" in line and not in_table:
             in_table = True

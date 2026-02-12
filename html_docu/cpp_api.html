@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.3</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.4</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -123,6 +123,7 @@
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
+<tr><td><a href="#qrt_read_cache_init">qrt_read_cache_init</a></td><td>Initialize a QRT read cache for fast repeated access</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
 </tbody>
 </table>
@@ -2546,6 +2547,59 @@ quadriga_lib::qrt_file_parse("scene.qrt", &amp;no_cir, &amp;no_orig, &amp;no_des
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_read_cache_init"></a>
+<b>qrt_read_cache_init</b> - Initialize a QRT read cache for fast repeated access
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads all fixed metadata from a QRT file into a <code>qrt_read_cache</code> struct. 
+</li><li style="margin-bottom: 0.4em;">Pre-computes byte offsets so that subsequent <code>qrt_file_read</code> calls only need to 
+   perform 2 seeks and 4 reads (the per-CIR path data) instead of re-parsing the header. 
+</li><li style="margin-bottom: 0.4em;">Populate the cache once, then pass it to <code>qrt_file_read</code> together with a shared 
+   <code>std::ifstream</code> for maximum performance in tight loops. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
+                const std::string &amp;fn,
+                std::ifstream *file = nullptr)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
+   Path to the QRT file. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::ifstream <b>*file</b> = nullptr</code> (optional input)<br> 
+   Optional pre-opened binary ifstream. If <code>nullptr</code>, the file is opened from <code>fn</code> 
+   and closed on return. If provided, the stream is left open. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>qrt_read_cache <b>cache</b></code> (output)<br> 
+   Populated cache structure. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
+auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &amp;stream);
+
+arma::vec center_freq, tx_pos, rx_pos;
+arma::mat path_gain;
+arma::cube M;
+
+for (arma::uword ic = 0; ic &lt; cache.no_cir; ++ic)
+    for (arma::uword io = 0; io &lt; cache.no_orig; ++io)
+        quadriga_lib::qrt_file_read&lt;double&gt;("", ic, io, true,
+            &amp;center_freq, &amp;tx_pos, nullptr, &amp;rx_pos, nullptr,
+            nullptr, nullptr, &amp;path_gain, nullptr, &amp;M,
+            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
+            nullptr, nullptr, &amp;stream, &amp;cache);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qrt_file_read"></a>
 <b>qrt_file_read</b> - Read ray-tracing data from a QRT file
 <ul>
@@ -2554,6 +2608,8 @@ quadriga_lib::qrt_file_parse("scene.qrt", &amp;no_cir, &amp;no_orig, &amp;no_des
 </li><li style="margin-bottom: 0.4em;">Supports both uplink and downlink directions by swapping TX/RX roles accordingly. 
 </li><li style="margin-bottom: 0.4em;">All output arguments are optional; pass <code>nullptr</code> to skip any value you don't need. 
 </li><li style="margin-bottom: 0.4em;">The <code>normalize_M</code> parameter controls how the polarization transfer matrix <code>M</code> and path gains are returned. 
+</li><li style="margin-bottom: 0.4em;">For maximum performance in tight loops, pass a pre-opened <code>std::ifstream</code> and a pre-populated 
+   <code>qrt_read_cache</code>. With both, the per-call I/O is reduced to 2 seeks and 4 reads. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
@@ -2580,12 +2636,16 @@ void quadriga_lib::qrt_file_read(
                 arma::Col&lt;dtype&gt; *aoa = nullptr,
                 arma::Col&lt;dtype&gt; *eoa = nullptr,
                 std::vector&lt;arma::Mat&lt;dtype&gt;&gt; *path_coord = nullptr,
-                int normalize_M = 1)
+                int normalize_M = 1,
+                arma::u32_vec *no_int = nullptr,
+                arma::fmat *coord = nullptr,
+                std::ifstream *file = nullptr,
+                const qrt_read_cache *cache = nullptr)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
-   Path to the QRT file. 
+   Path to the QRT file. Ignored when both <code>file</code> and <code>cache</code> are provided. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_cir</b> = 0</code> (input)<br> 
@@ -2673,6 +2733,24 @@ void quadriga_lib::qrt_file_read(
 </tr>
 </table><br>
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*no_int</b> = nullptr</code> (optional output)<br> 
+   Number of mesh interactions per path. Size <code>[n_path]</code>. A value of 0 indicates a LOS path. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fmat <b>*coord</b> = nullptr</code> (optional output)<br> 
+   Interaction coordinates. Size <code>[3, sum(no_int)]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::ifstream <b>*file</b> = nullptr</code> (optional input)<br> 
+   Optional pre-opened binary ifstream. If <code>nullptr</code>, the file is opened from <code>fn</code> and closed 
+   on return. If provided, the stream is left open after return. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const qrt_read_cache <b>*cache</b> = nullptr</code> (optional input)<br> 
+   Optional pre-parsed metadata cache (from <code>qrt_read_cache_init</code>). When provided together with 
+   <code>file</code>, per-call I/O is reduced to 2 seeks and 4 reads. 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
@@ -2680,10 +2758,24 @@ arma::vec center_freq, tx_pos, rx_pos, path_length, aod, eod, aoa, eoa;
 arma::mat fbs_pos, lbs_pos, path_gain;
 arma::cube M;
 
+// Single call (opens and closes file internally):
 quadriga_lib::qrt_file_read&lt;double&gt;("scene.qrt", 0, 0, true,
     &amp;center_freq, &amp;tx_pos, nullptr, &amp;rx_pos, nullptr,
     &amp;fbs_pos, &amp;lbs_pos, &amp;path_gain, &amp;path_length, &amp;M,
     &amp;aod, &amp;eod, &amp;aoa, &amp;eoa, nullptr, 1);
+
+// Maximum performance with cache and shared stream:
+std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
+quadriga_lib::qrt_read_cache cache;
+quadriga_lib::qrt_read_cache_init("scene.qrt", &amp;cache, &amp;stream);
+
+for (arma::uword ic = 0; ic &lt; cache.no_cir; ++ic)
+    for (arma::uword io = 0; io &lt; cache.no_orig; ++io)
+        quadriga_lib::qrt_file_read&lt;double&gt;("", ic, io, true,
+            &amp;center_freq, &amp;tx_pos, nullptr, &amp;rx_pos, nullptr,
+            &amp;fbs_pos, &amp;lbs_pos, &amp;path_gain, &amp;path_length, &amp;M,
+            &amp;aod, &amp;eod, &amp;aoa, &amp;eoa, nullptr, 1,
+            nullptr, nullptr, &amp;stream, &amp;cache);
 </pre>
 </li>
 </ul>

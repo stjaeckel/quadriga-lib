@@ -25,6 +25,7 @@
 #include <cstring>
 #include <cmath>
 #include <complex>
+#include <fstream>
 
 namespace quadriga_lib
 {
@@ -252,6 +253,30 @@ namespace quadriga_lib
                                     std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
                                     const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
 
+    // Pre-parsed QRT file metadata cache for repeated qrt_file_read calls
+    // - Holds all fixed metadata so that only per-CIR path data is read from disk
+    // - Populate once via qrt_read_cache_init(), then pass to qrt_file_read()
+    // - Plain data, no file handles, safe to copy and destroy
+    struct qrt_read_cache
+    {
+        int version = 0;                // QRT file version
+        unsigned no_orig = 0;           // Number of origin (TX) positions
+        unsigned no_cir = 0;            // Number of CIRs per origin
+        unsigned no_dest = 0;           // Number of destinations (RX)
+        unsigned no_freq = 1;           // Number of frequency bands
+        arma::fvec freq;                // Frequency in GHz, length [no_freq]
+        arma::fmat cir_pos;             // CIR positions, size [no_cir, 3]
+        arma::fmat cir_orientation;     // CIR orientations (Euler), size [no_cir, 3]
+        arma::fmat orig_pos_all;        // Origin positions, size [no_orig, 3]
+        arma::fmat orig_orientation;    // Origin orientations (Euler), size [no_orig, 3]
+        arma::u64_vec orig_index;       // Byte offsets from BOF to each origin data block, length [no_orig]
+        arma::u64_vec path_data_offset; // Pre-computed absolute offset to path_data_index array per origin, length [no_orig]
+    };
+
+    // Initialize a QRT read cache from a file
+    qrt_read_cache qrt_read_cache_init(const std::string &fn,          // Path to the QRT file
+                                       std::ifstream *file = nullptr); // Optional pre-opened ifstream
+
     // Read metadata from a QRT file
     void qrt_file_parse(const std::string &fn,                          // Path to the QRT file
                         arma::uword *no_cir = nullptr,                  // Number of channel snapshots per origin point
@@ -261,7 +286,13 @@ namespace quadriga_lib
                         arma::uvec *cir_offset = nullptr,               // CIR offset for each destination
                         std::vector<std::string> *orig_names = nullptr, // Names of the origin points (TXs)
                         std::vector<std::string> *dest_names = nullptr, // Names of the destination points (RXs)
-                        int *version = nullptr);                        // QRT file version
+                        int *version = nullptr,                         // QRT file version
+                        arma::fvec *fGHz = nullptr,                     // Center frequency in GHz as stored in the QRT file
+                        arma::fmat *cir_pos = nullptr,                  // CIR positions in Cartesian coordinates, size [no_cir, 3]
+                        arma::fmat *cir_orientation = nullptr,          // CIR orientation in Euler angles in rad, size [no_cir, 3]
+                        arma::fmat *orig_pos = nullptr,                 // Origin (TX) positions, size [no_orig, 3]
+                        arma::fmat *orig_orientation = nullptr,         // Origin (TX) orientations, Euler angels in rad, size [no_orig, 3]
+                        std::ifstream *file = nullptr);                 // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
 
     // Read ray-tracing data from QRT file
     // normalize_M options:
@@ -287,8 +318,11 @@ namespace quadriga_lib
                        arma::Col<dtype> *aoa = nullptr,                     // Arrival azimuth angles in [rad], vector of length 'n_path'
                        arma::Col<dtype> *eoa = nullptr,                     // Arrival elevation angles in [rad], vector of length 'n_path'
                        std::vector<arma::Mat<dtype>> *path_coord = nullptr, // Interaction coordinates, vector (n_path) of matrices of size [3, n_interact + 2]
-                       int normalize_M = 1);                                // Normalize M options
-
+                       int normalize_M = 1,                                 // Normalize M options
+                       arma::u32_vec *no_int = nullptr,                     // Number of mesh interactions per path of current RX, vector of length [no_path], 0=LOS
+                       arma::fmat *coord = nullptr,                         // Interaction coordinates, size [3, sum(no_int)]
+                       std::ifstream *file = nullptr,                       // Optional pre-opened ifstream; if nullptr the file is opened from fn and closed on return
+                       const qrt_read_cache *cache = nullptr);              // Optional pre-parsed metadata cache for maximum performance in tight loops
 }
 
 #endif
