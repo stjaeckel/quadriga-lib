@@ -31,7 +31,7 @@ Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel 
 to structured datasets, the library facilitates the inclusion of extra datasets of various types
 and shapes. This feature is particularly beneficial for integrating descriptive data or analysis
 results. The function `quadriga_lib.channel.hdf5_read_dset` retrieves a single unstructured dataset.
-Theo output type of the function is defined by the datatype in the file. An empty matrix is returned
+The output type of the function is defined by the datatype in the file. An empty matrix is returned
 if the dataset does not exist in the file.
 
 ## Usage:

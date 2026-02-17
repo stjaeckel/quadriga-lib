@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,84 +28,6 @@
 /*!SECTION
 Array antenna functions
 SECTION!*/
-
-/*!MD
-# qdant_read
-Reads array antenna data from QDANT files
-
-## Description:
-- Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file, which stores antenna pattern data in XML format.
-- Returns an antenna array (`arrayant`) object constructed from the specified data in the QDANT file.
-- Allowed datatypes (`dtype`): `float` or `double`
-
-## Declaration:
-```
-arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id = 1, arma::u32_mat *layout = nullptr);
-```
-
-## Arguments:
-- `std::string **fn**` (input)<br>
-  Filename of the QDANT file from which antenna pattern data will be read. Cannot be empty.
-
-- `unsigned **id** = 1` (optional input)<br>
-  ID of the antenna within the QDANT file to read. Default is `1`.
-
-- `arma::u32_mat **layout** = nullptr` (optional output)<br>
-  Pointer to a matrix that will store the layout information of multiple antenna elements from the file. The layout contains element IDs present in the QDANT file.
-
-## Returns:
-- `arrayant<dtype>`<br>
-  Antenna array object containing data from the specified antenna ID within the QDANT file.
-
-## Example:
-```
-arma::u32_mat layout;
-auto ant = quadriga_lib::qdant_read<double>("antenna_data.qdant", 2, &layout);
-```
-
-## See also:
-- <a href="#arrayant">arrayant</a>
-- <a href="#.qdant_write">arrayant.qdant_write</a>
-- QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
-MD!*/
-
-// Read array antenna object and layout from QDANT file
-template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::u32_mat *layout)
-{
-    quadriga_lib::arrayant<dtype> ant;
-    std::string error_message;
-
-    if (layout == nullptr)
-    {
-        arma::Mat<unsigned> tmp_layout;
-        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
-                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
-                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
-                                               &tmp_layout);
-        tmp_layout.reset();
-    }
-    else
-        error_message = qd_arrayant_qdant_read(fn, id, &ant.name,
-                                               &ant.e_theta_re, &ant.e_theta_im, &ant.e_phi_re, &ant.e_phi_im,
-                                               &ant.azimuth_grid, &ant.elevation_grid, &ant.element_pos,
-                                               &ant.coupling_re, &ant.coupling_im, &ant.center_frequency,
-                                               layout);
-
-    // Throw parsing errors
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Throw validation errors
-    error_message = ant.validate();
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    return ant;
-}
-template quadriga_lib::arrayant<float> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
-template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(std::string fn, unsigned id, arma::Mat<unsigned> *layout);
 
 /*!MD
 # generate_arrayant_omni
