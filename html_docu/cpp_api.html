@@ -81,7 +81,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
+<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric loudspeaker directivity model</td></tr>
 <tr><td><a href="#generate_arrayant_omni">generate_arrayant_omni</a></td><td>Generate isotropic radiator with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_xpol">generate_arrayant_xpol</a></td><td>Generate cross-polarized isotropic radiator</td></tr>
 <tr><td><a href="#generate_arrayant_dipole">generate_arrayant_dipole</a></td><td>Generate short dipole with vertical polarization</td></tr>
@@ -90,6 +90,9 @@
 <tr><td><a href="#generate_arrayant_ula">generate_arrayant_ula</a></td><td>Generate an unified linear array</td></tr>
 <tr><td><a href="#generate_arrayant_3gpp">generate_arrayant_3gpp</a></td><td>Generate 3GPP-NR compliant antenna model</td></tr>
 <tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna with support for multiple beam directions.</td></tr>
+<tr><td><a href="#qdant_write_multi">qdant_write_multi</a></td><td>Write a vector of array antenna objects to a single QDANT file</td></tr>
+<tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
+<tr><td><a href="#qdant_read_multi">qdant_read_multi</a></td><td>Read all array antenna objects from a QDANT file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -951,49 +954,173 @@ if(result.empty()) {
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="qdant_read"></a>
-<b>qdant_read</b> - Reads array antenna data from QDANT files
+<a name="generate_speaker"></a>
+<b>generate_speaker</b> - Generate a parametric loudspeaker directivity model
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file, which stores antenna pattern data in XML format. 
-</li><li style="margin-bottom: 0.4em;">Returns an antenna array (<code>arrayant</code>) object constructed from the specified data in the QDANT file. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model  
+   with an enclosure radiation modifier and a Butterworth-style bandpass frequency response. 
+</li><li style="margin-bottom: 0.4em;">Returns a vector of <code>arrayant</code> objects, one per frequency sample, where each contains the complex-valued  
+   directivity balloon at that frequency stored in <code>e_theta_re</code>. The <code>center_frequency</code> field of each  
+   arrayant is set to the corresponding frequency in Hz. 
+</li><li style="margin-bottom: 0.4em;">Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and  
+   combining them via <code>append</code> and <code>element_pos</code>. Crossover behavior emerges naturally from overlapping  
+   bandpass responses. 
+</li><li style="margin-bottom: 0.4em;">The frequency response follows a Butterworth-style bandpass filter:  
+   H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order  
+   n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies. 
+</li><li style="margin-bottom: 0.4em;">Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL:  
+   sens_lin = 10^((sensitivity - 85) / 20). 
+</li><li style="margin-bottom: 0.4em;">If no frequency vector is provided, third-octave band center frequencies are auto-generated  
+   covering the range from one band below the lower cutoff to one band above the upper cutoff,  
+   clipped to 20-20000 Hz. 
+</li><li style="margin-bottom: 0.4em;">The speed of sound is assumed to be 344 m/s. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+ 
+Three driver directivity models are supported: 
+<ul><li style="margin-bottom: 0.4em;"><b>Piston</b>: Circular piston in a baffle, using the classical formula  
+   D(theta) = 2<i>J1(ka</i>sin(theta)) / (ka<i>sin(theta)), where k = 2</i>pi*f/c is the wavenumber and a is  
+   the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional  
+   at low ka to progressively narrower beaming at high ka. Uses C++17 <code>std::cyl_bessel_j</code> for the Bessel f 
+   unction J1. 
+</li><li style="margin-bottom: 0.4em;"><b>Horn</b>: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal  
+   and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived  
+   from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency,  
+   the pattern blends toward omnidirectional using a second-order transition:  
+   blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius. 
+</li><li style="margin-bottom: 0.4em;"><b>Omni</b>: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for  
+   subwoofers at frequencies where the driver is small relative to the wavelength. 
+</li></ul>
+ 
+Four enclosure radiation types modify the base driver pattern: 
+<ul><li style="margin-bottom: 0.4em;"><b>Monopole</b>: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space. 
+</li><li style="margin-bottom: 0.4em;"><b>Hemisphere</b>: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional  
+   to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2),  
+   where f_baffle = c / (pi <i> sqrt(W</i>H)) is derived from the baffle dimensions. The radiation modifier is  
+   R = (1-alpha) + alpha <i> 0.5 </i> (1 + cos(theta_off)). At low frequencies the pattern is nearly  
+   omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately 
+   6 dB front-to-back ratio. 
+</li><li style="margin-bottom: 0.4em;"><b>Dipole</b>: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree  
+   phase inversion (negative sign in <code>e_theta_re</code>) in the rear hemisphere. Nulls occur at 90 degrees off-axis. 
+</li><li style="margin-bottom: 0.4em;"><b>Cardioid</b>: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear,  
+   half-amplitude at the sides. No phase inversion. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::qdant_read(std::string fn, unsigned id = 1, arma::u32_mat *layout = nullptr);
+std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
+        std::string driver_type = "piston",
+        dtype radius = 0.05,
+        dtype lower_cutoff = 80.0,
+        dtype upper_cutoff = 12000.0,
+        dtype lower_rolloff_slope = 12.0,
+        dtype upper_rolloff_slope = 12.0,
+        dtype sensitivity = 85.0,
+        std::string radiation_type = "hemisphere",
+        dtype hor_coverage = 0.0,
+        dtype ver_coverage = 0.0,
+        dtype horn_control_freq = 0.0,
+        dtype baffle_width = 0.15,
+        dtype baffle_height = 0.25,
+        arma::Col&lt;dtype&gt; frequencies = arma::Col&lt;dtype&gt;(),
+        dtype angular_resolution = 5.0)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the QDANT file from which antenna pattern data will be read. Cannot be empty. 
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>driver_type</b> = "piston"</code> (optional input)<br> 
+   Driver directivity model. Supported values: <code>"piston"</code> (cone/dome via Bessel function), <code>"horn"</code>  
+   (cosine-power with frequency-dependent pattern control), <code>"omni"</code> (omnidirectional subwoofer). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>id</b> = 1</code> (optional input)<br> 
-   ID of the antenna within the QDANT file to read. Default is <code>1</code>. 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>radius</b> = 0.05</code> (optional input)<br> 
+   Effective radiating radius in meters. For <code>"piston"</code>: the cone or dome radius. For <code>"horn"</code>: the horn  
+   mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m  
+   (approximately a 4-inch driver). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>layout</b> = nullptr</code> (optional output)<br> 
-   Pointer to a matrix that will store the layout information of multiple antenna elements from the file. The layout contains element IDs present in the QDANT file. 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_cutoff</b> = 80.0</code> (optional input)<br> 
+   Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_cutoff</b> = 12000.0</code> (optional input)<br> 
+   Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_rolloff_slope</b> = 12.0</code> (optional input)<br> 
+   Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order  
+   n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_rolloff_slope</b> = 12.0</code> (optional input)<br> 
+   High-frequency rolloff slope in dB per octave. Default: 12.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>sensitivity</b> = 85.0</code> (optional input)<br> 
+   On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as  
+   reference (i.e. 85 dB gives unity amplitude). Default: 85.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>radiation_type</b> = "hemisphere"</code> (optional input)<br> 
+   Enclosure radiation model. Supported values: <code>"monopole"</code> (4*pi, no modification), <code>"hemisphere"</code>  
+   (sealed box with frequency-dependent baffle step), <code>"dipole"</code> (open baffle, figure-8), <code>"cardioid"</code>  
+   (monopole + dipole combination). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>hor_coverage</b> = 0.0</code> (optional input)<br> 
+   Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>ver_coverage</b> = 0.0</code> (optional input)<br> 
+   Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>horn_control_freq</b> = 0.0</code> (optional input)<br> 
+   Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the  
+   mouth radius as f_ctrl = c / (2<i>pi</i>radius). Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_width</b> = 0.15</code> (optional input)<br> 
+   Enclosure baffle width in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
+   step frequency. Default: 0.15 m. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_height</b> = 0.25</code> (optional input)<br> 
+   Enclosure baffle height in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
+   step frequency. Default: 0.25 m. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>frequencies</b> = arma::Col&lt;dtype&gt;()</code> (optional input)<br> 
+   Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated  
+   overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>angular_resolution</b> = 5.0</code> (optional input)<br> 
+   Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object containing data from the specified antenna ID within the QDANT file. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
+   Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity  
+   pattern stored in <code>e_theta_re</code> (real-valued except for dipole rear hemisphere where negative values encode  
+   180-degree phase inversion). The <code>center_frequency</code> field is set to the corresponding frequency in Hz. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-arma::u32_mat layout;
-auto ant = quadriga_lib::qdant_read&lt;double&gt;("antenna_data.qdant", 2, &amp;layout);
+// Generate a default cheap piston speaker at specific frequencies
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
+auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.05, 80.0, 12000.0,
+                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+
+// Generate a horn driver with auto-derived parameters at third-octave bands
+auto horn = quadriga_lib::generate_speaker&lt;double&gt;("horn");
+
+// Generate a subwoofer
+arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
+auto sub = quadriga_lib::generate_speaker&lt;double&gt;("omni", 0.13, 30.0, 200.0,
+                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
 </pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
-</li><li style="margin-bottom: 0.4em;"><a href="#.qdant_write">arrayant.qdant_write</a> 
-</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>) 
-</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -1437,6 +1564,173 @@ arma::vec weight = {2.0, 1.0};
 
 auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el, weight, freq);
 </pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qdant_write_multi"></a>
+<b>qdant_write_multi</b> - Write a vector of array antenna objects to a single QDANT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Writes multiple <code>arrayant</code> objects to a single QuaDRiGa array antenna exchange format (QDANT) file,  
+   one per sequential ID. 
+</li><li style="margin-bottom: 0.4em;">Each entry in the input vector is assigned a 1-based ID (1, 2, ..., n_entries) and written to the file  
+   using the <code>arrayant::qdant_write</code> member function. 
+</li><li style="margin-bottom: 0.4em;">A layout matrix of size <code>[n_entries, 1]</code> is created automatically with entries <code>1, 2, ..., n_entries</code>  
+   to describe the organization inside the file. 
+</li><li style="margin-bottom: 0.4em;">If the output file already exists, it is deleted before writing to ensure a clean file. 
+</li><li style="margin-bottom: 0.4em;">All arrayant objects in the vector are validated before writing. An exception is thrown if any entry is invalid. 
+</li><li style="margin-bottom: 0.4em;">This function is the primary mechanism for storing frequency-dependent models, where each arrayant  
+   in the vector represents the directivity pattern at a specific frequency. The corresponding frequency  
+   is stored in the <code>center_frequency</code> field of each arrayant. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::qdant_write_multi(
+        const std::string &amp;fn,
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
+   Filename of the QDANT file to write. If the file already exists, it is overwritten. Cannot be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input)<br> 
+   Vector of arrayant objects to write. Each entry is stored with a sequential 1-based ID. The vector must not be empty and all entries must be valid arrayant objects. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>void</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a loudspeaker model and write to file
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
+auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.05, 80.0, 12000.0,
+                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+
+quadriga_lib::qdant_write_multi("speaker.qdant", spk);
+
+// Read back a specific frequency entry (e.g. the 3rd one, ID = 3)
+auto ant = quadriga_lib::qdant_read&lt;double&gt;("speaker.qdant", 3);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#.qdant_write">arrayant.qdant_write</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qdant_read"></a>
+<b>qdant_read</b> - Reads array antenna data from QDANT files
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file,  
+   which stores antenna pattern data in XML format. 
+</li><li style="margin-bottom: 0.4em;">Returns an antenna array (<code>arrayant</code>) object constructed from the specified data in the QDANT file. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+arrayant&lt;dtype&gt; quadriga_lib::qdant_read(std::string fn, unsigned id = 1, arma::u32_mat *layout = nullptr);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
+   Filename of the QDANT file from which antenna pattern data will be read. Cannot be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>id</b> = 1</code> (optional input)<br> 
+   ID of the antenna within the QDANT file to read. Default is <code>1</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>layout</b> = nullptr</code> (optional output)<br> 
+   Pointer to a matrix that will store the layout information of multiple antenna elements from the file. The layout contains element IDs present in the QDANT file. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
+   Antenna array object containing data from the specified antenna ID within the QDANT file. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::u32_mat layout;
+auto ant = quadriga_lib::qdant_read&lt;double&gt;("antenna_data.qdant", 2, &amp;layout);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#.qdant_write">arrayant.qdant_write</a> 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>) 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qdant_read_multi"></a>
+<b>qdant_read_multi</b> - Read all array antenna objects from a QDANT file
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads all <code>arrayant</code> objects stored in a QuaDRiGa array antenna exchange format (QDANT) file and  
+   returns them as a vector. 
+</li><li style="margin-bottom: 0.4em;">The file layout is obtained by probing the file with ID 1. Even if ID 1 does not exist as an entry,  
+   the internal reader still returns the layout describing the file contents. This layout is then used  
+   to determine which IDs to read. 
+</li><li style="margin-bottom: 0.4em;">Unique non-zero IDs are extracted from the layout in the order of their first appearance (scanning rows  
+   within each column). Each unique ID is read exactly once, regardless of how many times it appears in the layout. 
+</li><li style="margin-bottom: 0.4em;">All read arrayant objects are validated. An exception is thrown if any entry cannot be read or fails validation. 
+</li><li style="margin-bottom: 0.4em;">This function is the counterpart to <code>qdant_write_multi</code> and the primary mechanism for loading frequency-dependent  
+   models. The frequency corresponding to each entry is stored in the <code>center_frequency</code> field of the returned arrayant objects. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::qdant_read_multi(
+        const std::string &amp;fn,
+        arma::u32_mat *layout = nullptr)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::string &amp;<b>fn</b></code> (input)<br> 
+   Filename of the QDANT file to read. Cannot be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>*layout</b> = nullptr</code> (optional output)<br> 
+   Pointer to a matrix that will receive the layout information from the file. The layout describes the organization of array antenna entries inside the file, with non-zero values corresponding to entry IDs. If <code>nullptr</code>, the layout is not returned. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
+   Vector of arrayant objects, one per unique ID found in the layout. Entries are ordered by their first appearance in the layout. Each arrayant contains the full pattern data including <code>center_frequency</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Read all entries from a file
+auto spk = quadriga_lib::qdant_read_multi&lt;double&gt;("speaker.qdant");
+
+// Read with layout information
+arma::u32_mat layout;
+auto spk2 = quadriga_lib::qdant_read_multi&lt;double&gt;("speaker.qdant", &amp;layout);
+std::cout &lt;&lt; "File contains " &lt;&lt; spk2.size() &lt;&lt; " entries" &lt;&lt; std::endl;
+std::cout &lt;&lt; "Layout: " &lt;&lt; std::endl;
+layout.print();
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#qdant_write_multi">qdant_write_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div>

@@ -145,12 +145,29 @@ namespace quadriga_lib
         std::string validate();                              // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
     };
 
+    // Write a vector of array antenna objects to a single QDANT file
+    // - Each arrayant is stored with a sequential ID (1-based) in the file
+    // - A layout matrix of size [n_entries, 1] with entries 1...n_entries is created automatically
+    // - Overwrites the file if it already exists
+    template <typename dtype>
+    void qdant_write_multi(const std::string &fn,                             // Filename of the QDANT file
+                           const std::vector<arrayant<dtype>> &arrayant_vec); // Vector of arrayant objects to write
+
     // Read array antenna object and layout from QDANT file
     // - The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern data in XML
     template <typename dtype>
     arrayant<dtype> qdant_read(std::string fn,                   // Filename of the QDANT file, string
                                unsigned id = 1,                  // ID of the antenna to be read from the file
                                arma::u32_mat *layout = nullptr); // Layout of multiple array antennas. Contain element ids that are present in the file
+
+    // Read all array antenna objects from a QDANT file
+    // - Reads the layout from the file to determine which IDs are stored
+    // - Returns a vector of arrayant objects, one per unique ID found in the layout
+    // - Entries are returned in the order they first appear in the layout (row-major scan)
+    // - Optionally returns the layout matrix via the layout pointer
+    template <typename dtype>
+    std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
+                                                  arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
 
     // Generate isotropic radiator with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
@@ -233,6 +250,34 @@ namespace quadriga_lib
                                                 dtype res = 1.0,                 // Resolution of the antenna pattern sampling grid in degree
                                                 bool separate_beams = false,     // If true, create a separate beam for each angle pair (ignores weights)
                                                 bool apply_weights = false);     // Switch to apply the beamforming weights
+
+    // Generate a parametric loudspeaker model
+    // - Returns a vector of arrayant objects, one per frequency sample
+    // - Each arrayant contains the complex-valued directivity balloon at that frequency
+    // - Multi-driver speakers are modelled as multi-element arrayants (one element per driver)
+    // - Driver positions are mapped to element_pos, orientations are applied via rotate_pattern
+    // - Supported driver types: "piston" (cone/dome), "horn" (constant directivity), "omni" (subwoofer)
+    // - Supported radiation types: "monopole" (4pi), "hemisphere" (2pi, sealed box), "dipole" (figure-8), "cardioid"
+    // - If horn parameters (hor_coverage, ver_coverage, horn_control_freq) are 0, they are auto-derived from radius
+    // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
+    // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
+    template <typename dtype>
+    std::vector<arrayant<dtype>> generate_speaker(
+        std::string driver_type = "piston",                // Driver type: "piston", "horn", "omni"
+        dtype radius = 0.05,                               // Effective radiating radius in [m] (piston: cone, horn: mouth)
+        dtype lower_cutoff = 80.0,                         // Lower -3 dB frequency in [Hz]
+        dtype upper_cutoff = 12000.0,                      // Upper -3 dB frequency in [Hz]
+        dtype lower_rolloff_slope = 12.0,                  // Low-frequency rolloff in [dB/octave]
+        dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
+        dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
+        std::string radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
+        dtype hor_coverage = 0.0,                          // Horizontal coverage angle in [deg], horn only, 0 = auto (90)
+        dtype ver_coverage = 0.0,                          // Vertical coverage angle in [deg], horn only, 0 = auto (60)
+        dtype horn_control_freq = 0.0,                     // Horn pattern control frequency in [Hz], 0 = auto from radius
+        dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
+        dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
+        arma::Col<dtype> frequencies = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
+        dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
