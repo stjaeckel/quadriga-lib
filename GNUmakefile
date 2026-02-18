@@ -66,7 +66,7 @@ cpp_test:   cpp
 	$(CMAKE_BUILD_DIR)/test_bin
 
 python_test: 
-	pytest tests/python_tests -x -s
+	python3 -m pytest tests/python_tests -x -s
 
 # Documentation
 documentation:   bin

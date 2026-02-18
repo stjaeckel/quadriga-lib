@@ -30,6 +30,7 @@ namespace py = pybind11;
 #include "qpy_arrayant_qdant_read.cpp"
 #include "qpy_arrayant_qdant_write.cpp"
 #include "qpy_arrayant_rotate_pattern.cpp"
+#include "qpy_arrayant_speaker.cpp"
 #include "qpy_get_channels_planar.cpp"
 #include "qpy_get_channels_spherical.cpp"
 
@@ -81,6 +82,23 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("separate_beams") = false,
           py::arg("apply_weights") = false,
           py::arg("pattern") = py::dict());
+
+    m.def("generate_speaker", &arrayant_generate_speaker,
+          py::arg("driver_type") = "piston",
+          py::arg("radius") = 0.05,
+          py::arg("lower_cutoff") = 80.0,
+          py::arg("upper_cutoff") = 12000.0,
+          py::arg("lower_rolloff_slope") = 12.0,
+          py::arg("upper_rolloff_slope") = 12.0,
+          py::arg("sensitivity") = 85.0,
+          py::arg("radiation_type") = "hemisphere",
+          py::arg("hor_coverage") = 0.0,
+          py::arg("ver_coverage") = 0.0,
+          py::arg("horn_control_freq") = 0.0,
+          py::arg("baffle_width") = 0.15,
+          py::arg("baffle_height") = 0.25,
+          py::arg("frequencies") = py::array_t<double>(),
+          py::arg("angular_resolution") = 5.0);
 
     m.def("interpolate", &arrayant_interpolate,
           py::arg("arrayant") = py::dict(),
