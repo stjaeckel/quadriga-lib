@@ -81,7 +81,6 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric loudspeaker directivity model</td></tr>
 <tr><td><a href="#generate_arrayant_omni">generate_arrayant_omni</a></td><td>Generate isotropic radiator with vertical polarization</td></tr>
 <tr><td><a href="#generate_arrayant_xpol">generate_arrayant_xpol</a></td><td>Generate cross-polarized isotropic radiator</td></tr>
 <tr><td><a href="#generate_arrayant_dipole">generate_arrayant_dipole</a></td><td>Generate short dipole with vertical polarization</td></tr>
@@ -90,9 +89,16 @@
 <tr><td><a href="#generate_arrayant_ula">generate_arrayant_ula</a></td><td>Generate an unified linear array</td></tr>
 <tr><td><a href="#generate_arrayant_3gpp">generate_arrayant_3gpp</a></td><td>Generate 3GPP-NR compliant antenna model</td></tr>
 <tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna with support for multiple beam directions.</td></tr>
+<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric loudspeaker directivity model</td></tr>
+<tr><td><a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a></td><td>Interpolate multi-frequency array antenna patterns at arbitrary frequencies</td></tr>
 <tr><td><a href="#qdant_write_multi">qdant_write_multi</a></td><td>Write a vector of array antenna objects to a single QDANT file</td></tr>
 <tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
 <tr><td><a href="#qdant_read_multi">qdant_read_multi</a></td><td>Read all array antenna objects from a QDANT file</td></tr>
+<tr><td><a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a></td><td>Validate a vector of array antenna objects for multi-frequency consistency</td></tr>
+<tr><td><a href="#arrayant_copy_element_multi">arrayant_copy_element_multi</a></td><td>Copy antenna elements across all entries in a multi-frequency arrayant vector</td></tr>
+<tr><td><a href="#arrayant_set_element_pos_multi">arrayant_set_element_pos_multi</a></td><td>Set element positions for all entries in a multi-frequency arrayant vector</td></tr>
+<tr><td><a href="#arrayant_rotate_pattern_multi">arrayant_rotate_pattern_multi</a></td><td>Rotate antenna patterns across all entries in a multi-frequency arrayant vector</td></tr>
+<tr><td><a href="#arrayant_concat_multi">arrayant_concat_multi</a></td><td>Concatenate two multi-frequency arrayant vectors into a single multi-element model</td></tr>
 </tbody>
 </table>
 </ul>
@@ -138,6 +144,7 @@
 <tbody>
 <tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate channel coefficients for intelligent reflective surfaces (IRS)</td></tr>
+<tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Calculate channel coefficients for spherical waves across multiple frequencies</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients for spherical waves</td></tr>
 </tbody>
@@ -806,12 +813,13 @@ ant.remove_zeros(); // Modifies ant in-place
 <b>.rotate_pattern</b> - Adjust orientation of antenna patterns
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>* Adjusts the orientation of antenna radiation patterns by performing precise rotations around the 
-  three principal axes (x, y, z) of the local Cartesian coordinate system (Euler rotations) 
-* Transforms both uniformly and non-uniformly sampled antenna patterns, useful for precise adjustments 
-  in antennas like parabolic antennas with small apertures. 
-* Member function of <a href="#arrayant">arrayant</a> 
-* Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code>
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Adjusts the orientation of antenna radiation patterns by performing precise rotations around the 
+   three principal axes (x, y, z) of the local Cartesian coordinate system (Euler rotations) 
+</li><li style="margin-bottom: 0.4em;">Transforms both uniformly and non-uniformly sampled antenna patterns, useful for precise adjustments 
+   in antennas like parabolic antennas with small apertures. 
+</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
@@ -838,8 +846,29 @@ void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>usage</b> = 0</code> (optional input)<br> 
-   Rotation usage model, specifying which components to rotate: (<code>0</code>): Rotate both pattern and polarization, 
-   (<code>1</code>): Rotate only pattern, (<code>2</code>): Rotate only polarization, (<code>3</code>): Rotate both pattern and polarization without adjusting the grid 
+   Rotation usage model, specifying which components to rotate: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>0</code></td>
+  <td>Rotate both pattern and polarization (with grid adjustment for non-uniform grids),</td>
+</tr>
+<tr>
+  <td><code>1</code></td>
+  <td>Rotate only pattern (with grid adjustment for non-uniform grids),</td>
+</tr>
+<tr>
+  <td><code>2</code></td>
+  <td>Rotate only polarization,</td>
+</tr>
+<tr>
+  <td><code>3</code></td>
+  <td>Rotate both pattern and polarization without adjusting the grid,</td>
+</tr>
+<tr>
+  <td><code>4</code></td>
+  <td>Rotate only pattern without adjusting the grid</td>
+</tr>
+</table><br>
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>element</b> = -1</code> (optional input)<br> 
@@ -848,6 +877,54 @@ void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
  
 <ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt; <b>output</b> = nullptr</code> (optional output)<br> 
    Pointer to an antenna array object to store the modified pattern data. If <code>nullptr</code> (default), modifications are applied directly to the calling antenna object. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage Modes:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th>Mode</th>
+  <th>Pattern</th>
+  <th>Polarization</th>
+  <th>Grid Adjustment</th>
+</tr>
+<tr>
+  <td>0</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>Yes</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>Yes</td>
+  <td>Yes</td>
+  <td>No</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>Yes</td>
+  <td>No</td>
+  <td>No</td>
+</tr>
+</table><br>
+ 
+<ul><li style="margin-bottom: 0.4em;">Modes 0 and 1 adjust the angular sampling grid when the input grid is non-uniform (e.g. for parabolic  
+   antennas with small apertures). This ensures the rotated pattern is properly sampled. 
+</li><li style="margin-bottom: 0.4em;">Modes 3 and 4 skip grid adjustment, which is faster and preserves the original grid structure. This  
+   is appropriate for uniformly sampled patterns such as loudspeaker models generated by <code>generate_speaker</code>. 
+</li><li style="margin-bottom: 0.4em;">Mode 4 is particularly useful for rotating loudspeaker directivity patterns where the acoustic  
+   pressure field is scalar (stored only in <code>e_theta_re</code>) and polarization rotation has no physical meaning. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -953,176 +1030,6 @@ if(result.empty()) {
 <font size=+1><b>Array antenna functions</b></font>
 <br>
 <br>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="generate_speaker"></a>
-<b>generate_speaker</b> - Generate a parametric loudspeaker directivity model
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model  
-   with an enclosure radiation modifier and a Butterworth-style bandpass frequency response. 
-</li><li style="margin-bottom: 0.4em;">Returns a vector of <code>arrayant</code> objects, one per frequency sample, where each contains the complex-valued  
-   directivity balloon at that frequency stored in <code>e_theta_re</code>. The <code>center_frequency</code> field of each  
-   arrayant is set to the corresponding frequency in Hz. 
-</li><li style="margin-bottom: 0.4em;">Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and  
-   combining them via <code>append</code> and <code>element_pos</code>. Crossover behavior emerges naturally from overlapping  
-   bandpass responses. 
-</li><li style="margin-bottom: 0.4em;">The frequency response follows a Butterworth-style bandpass filter:  
-   H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order  
-   n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies. 
-</li><li style="margin-bottom: 0.4em;">Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL:  
-   sens_lin = 10^((sensitivity - 85) / 20). 
-</li><li style="margin-bottom: 0.4em;">If no frequency vector is provided, third-octave band center frequencies are auto-generated  
-   covering the range from one band below the lower cutoff to one band above the upper cutoff,  
-   clipped to 20-20000 Hz. 
-</li><li style="margin-bottom: 0.4em;">The speed of sound is assumed to be 344 m/s. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
- 
-Three driver directivity models are supported: 
-<ul><li style="margin-bottom: 0.4em;"><b>Piston</b>: Circular piston in a baffle, using the classical formula  
-   D(theta) = 2<i>J1(ka</i>sin(theta)) / (ka<i>sin(theta)), where k = 2</i>pi*f/c is the wavenumber and a is  
-   the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional  
-   at low ka to progressively narrower beaming at high ka. Uses C++17 <code>std::cyl_bessel_j</code> for the Bessel f 
-   unction J1. 
-</li><li style="margin-bottom: 0.4em;"><b>Horn</b>: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal  
-   and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived  
-   from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency,  
-   the pattern blends toward omnidirectional using a second-order transition:  
-   blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius. 
-</li><li style="margin-bottom: 0.4em;"><b>Omni</b>: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for  
-   subwoofers at frequencies where the driver is small relative to the wavelength. 
-</li></ul>
- 
-Four enclosure radiation types modify the base driver pattern: 
-<ul><li style="margin-bottom: 0.4em;"><b>Monopole</b>: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space. 
-</li><li style="margin-bottom: 0.4em;"><b>Hemisphere</b>: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional  
-   to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2),  
-   where f_baffle = c / (pi <i> sqrt(W</i>H)) is derived from the baffle dimensions. The radiation modifier is  
-   R = (1-alpha) + alpha <i> 0.5 </i> (1 + cos(theta_off)). At low frequencies the pattern is nearly  
-   omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately 
-   6 dB front-to-back ratio. 
-</li><li style="margin-bottom: 0.4em;"><b>Dipole</b>: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree  
-   phase inversion (negative sign in <code>e_theta_re</code>) in the rear hemisphere. Nulls occur at 90 degrees off-axis. 
-</li><li style="margin-bottom: 0.4em;"><b>Cardioid</b>: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear,  
-   half-amplitude at the sides. No phase inversion. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
-        std::string driver_type = "piston",
-        dtype radius = 0.05,
-        dtype lower_cutoff = 80.0,
-        dtype upper_cutoff = 12000.0,
-        dtype lower_rolloff_slope = 12.0,
-        dtype upper_rolloff_slope = 12.0,
-        dtype sensitivity = 85.0,
-        std::string radiation_type = "hemisphere",
-        dtype hor_coverage = 0.0,
-        dtype ver_coverage = 0.0,
-        dtype horn_control_freq = 0.0,
-        dtype baffle_width = 0.15,
-        dtype baffle_height = 0.25,
-        arma::Col&lt;dtype&gt; frequencies = arma::Col&lt;dtype&gt;(),
-        dtype angular_resolution = 5.0)
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>driver_type</b> = "piston"</code> (optional input)<br> 
-   Driver directivity model. Supported values: <code>"piston"</code> (cone/dome via Bessel function), <code>"horn"</code>  
-   (cosine-power with frequency-dependent pattern control), <code>"omni"</code> (omnidirectional subwoofer). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>radius</b> = 0.05</code> (optional input)<br> 
-   Effective radiating radius in meters. For <code>"piston"</code>: the cone or dome radius. For <code>"horn"</code>: the horn  
-   mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m  
-   (approximately a 4-inch driver). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_cutoff</b> = 80.0</code> (optional input)<br> 
-   Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_cutoff</b> = 12000.0</code> (optional input)<br> 
-   Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_rolloff_slope</b> = 12.0</code> (optional input)<br> 
-   Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order  
-   n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_rolloff_slope</b> = 12.0</code> (optional input)<br> 
-   High-frequency rolloff slope in dB per octave. Default: 12.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>sensitivity</b> = 85.0</code> (optional input)<br> 
-   On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as  
-   reference (i.e. 85 dB gives unity amplitude). Default: 85.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>radiation_type</b> = "hemisphere"</code> (optional input)<br> 
-   Enclosure radiation model. Supported values: <code>"monopole"</code> (4*pi, no modification), <code>"hemisphere"</code>  
-   (sealed box with frequency-dependent baffle step), <code>"dipole"</code> (open baffle, figure-8), <code>"cardioid"</code>  
-   (monopole + dipole combination). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>hor_coverage</b> = 0.0</code> (optional input)<br> 
-   Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>ver_coverage</b> = 0.0</code> (optional input)<br> 
-   Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>horn_control_freq</b> = 0.0</code> (optional input)<br> 
-   Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the  
-   mouth radius as f_ctrl = c / (2<i>pi</i>radius). Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_width</b> = 0.15</code> (optional input)<br> 
-   Enclosure baffle width in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
-   step frequency. Default: 0.15 m. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_height</b> = 0.25</code> (optional input)<br> 
-   Enclosure baffle height in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
-   step frequency. Default: 0.25 m. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>frequencies</b> = arma::Col&lt;dtype&gt;()</code> (optional input)<br> 
-   Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated  
-   overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>angular_resolution</b> = 5.0</code> (optional input)<br> 
-   Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
-   Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity  
-   pattern stored in <code>e_theta_re</code> (real-valued except for dipole rear hemisphere where negative values encode  
-   180-degree phase inversion). The <code>center_frequency</code> field is set to the corresponding frequency in Hz. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-// Generate a default cheap piston speaker at specific frequencies
-arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
-auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.05, 80.0, 12000.0,
-                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
-
-// Generate a horn driver with auto-derived parameters at third-octave bands
-auto horn = quadriga_lib::generate_speaker&lt;double&gt;("horn");
-
-// Generate a subwoofer
-arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
-auto sub = quadriga_lib::generate_speaker&lt;double&gt;("omni", 0.13, 30.0, 200.0,
-                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
-</pre>
-</li>
-</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_omni"></a>
 <b>generate_arrayant_omni</b> - Generate isotropic radiator with vertical polarization
@@ -1567,20 +1474,337 @@ auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el,
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_speaker"></a>
+<b>generate_speaker</b> - Generate a parametric loudspeaker directivity model
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model  
+   with an enclosure radiation modifier and a Butterworth-style bandpass frequency response. 
+</li><li style="margin-bottom: 0.4em;">Returns a vector of <code>arrayant</code> objects, one per frequency sample, where each contains the complex-valued  
+   directivity balloon at that frequency stored in <code>e_theta_re</code>. The <code>center_frequency</code> field of each  
+   arrayant is set to the corresponding frequency in Hz. 
+</li><li style="margin-bottom: 0.4em;">Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and  
+   combining them via <code>append</code> and <code>element_pos</code>. Crossover behavior emerges naturally from overlapping  
+   bandpass responses. 
+</li><li style="margin-bottom: 0.4em;">The frequency response follows a Butterworth-style bandpass filter:  
+   H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order  
+   n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies. 
+</li><li style="margin-bottom: 0.4em;">Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL:  
+   sens_lin = 10^((sensitivity - 85) / 20). 
+</li><li style="margin-bottom: 0.4em;">If no frequency vector is provided, third-octave band center frequencies are auto-generated  
+   covering the range from one band below the lower cutoff to one band above the upper cutoff,  
+   clipped to 20-20000 Hz. 
+</li><li style="margin-bottom: 0.4em;">The speed of sound is assumed to be 344 m/s. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+ 
+Three driver directivity models are supported: 
+<ul><li style="margin-bottom: 0.4em;"><b>Piston</b>: Circular piston in a baffle, using the classical formula  
+   D(theta) = 2<i>J1(ka</i>sin(theta)) / (ka<i>sin(theta)), where k = 2</i>pi*f/c is the wavenumber and a is  
+   the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional  
+   at low ka to progressively narrower beaming at high ka. Uses C++17 <code>std::cyl_bessel_j</code> for the Bessel f 
+   unction J1. 
+</li><li style="margin-bottom: 0.4em;"><b>Horn</b>: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal  
+   and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived  
+   from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency,  
+   the pattern blends toward omnidirectional using a second-order transition:  
+   blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius. 
+</li><li style="margin-bottom: 0.4em;"><b>Omni</b>: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for  
+   subwoofers at frequencies where the driver is small relative to the wavelength. 
+</li></ul>
+ 
+Four enclosure radiation types modify the base driver pattern: 
+<ul><li style="margin-bottom: 0.4em;"><b>Monopole</b>: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space. 
+</li><li style="margin-bottom: 0.4em;"><b>Hemisphere</b>: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional  
+   to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2),  
+   where f_baffle = c / (pi <i> sqrt(W</i>H)) is derived from the baffle dimensions. The radiation modifier is  
+   R = (1-alpha) + alpha <i> 0.5 </i> (1 + cos(theta_off)). At low frequencies the pattern is nearly  
+   omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately 
+   6 dB front-to-back ratio. 
+</li><li style="margin-bottom: 0.4em;"><b>Dipole</b>: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree  
+   phase inversion (negative sign in <code>e_theta_re</code>) in the rear hemisphere. Nulls occur at 90 degrees off-axis. 
+</li><li style="margin-bottom: 0.4em;"><b>Cardioid</b>: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear,  
+   half-amplitude at the sides. No phase inversion. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
+        std::string driver_type = "piston",
+        dtype radius = 0.05,
+        dtype lower_cutoff = 80.0,
+        dtype upper_cutoff = 12000.0,
+        dtype lower_rolloff_slope = 12.0,
+        dtype upper_rolloff_slope = 12.0,
+        dtype sensitivity = 85.0,
+        std::string radiation_type = "hemisphere",
+        dtype hor_coverage = 0.0,
+        dtype ver_coverage = 0.0,
+        dtype horn_control_freq = 0.0,
+        dtype baffle_width = 0.15,
+        dtype baffle_height = 0.25,
+        arma::Col&lt;dtype&gt; frequencies = arma::Col&lt;dtype&gt;(),
+        dtype angular_resolution = 5.0)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>driver_type</b> = "piston"</code> (optional input)<br> 
+   Driver directivity model. Supported values: <code>"piston"</code> (cone/dome via Bessel function), <code>"horn"</code>  
+   (cosine-power with frequency-dependent pattern control), <code>"omni"</code> (omnidirectional subwoofer). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>radius</b> = 0.05</code> (optional input)<br> 
+   Effective radiating radius in meters. For <code>"piston"</code>: the cone or dome radius. For <code>"horn"</code>: the horn  
+   mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m  
+   (approximately a 4-inch driver). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_cutoff</b> = 80.0</code> (optional input)<br> 
+   Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_cutoff</b> = 12000.0</code> (optional input)<br> 
+   Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_rolloff_slope</b> = 12.0</code> (optional input)<br> 
+   Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order  
+   n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_rolloff_slope</b> = 12.0</code> (optional input)<br> 
+   High-frequency rolloff slope in dB per octave. Default: 12.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>sensitivity</b> = 85.0</code> (optional input)<br> 
+   On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as  
+   reference (i.e. 85 dB gives unity amplitude). Default: 85.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>radiation_type</b> = "hemisphere"</code> (optional input)<br> 
+   Enclosure radiation model. Supported values: <code>"monopole"</code> (4*pi, no modification), <code>"hemisphere"</code>  
+   (sealed box with frequency-dependent baffle step), <code>"dipole"</code> (open baffle, figure-8), <code>"cardioid"</code>  
+   (monopole + dipole combination). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>hor_coverage</b> = 0.0</code> (optional input)<br> 
+   Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>ver_coverage</b> = 0.0</code> (optional input)<br> 
+   Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>horn_control_freq</b> = 0.0</code> (optional input)<br> 
+   Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the  
+   mouth radius as f_ctrl = c / (2<i>pi</i>radius). Default: 0.0. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_width</b> = 0.15</code> (optional input)<br> 
+   Enclosure baffle width in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
+   step frequency. Default: 0.15 m. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_height</b> = 0.25</code> (optional input)<br> 
+   Enclosure baffle height in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
+   step frequency. Default: 0.25 m. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>frequencies</b> = arma::Col&lt;dtype&gt;()</code> (optional input)<br> 
+   Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated  
+   overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>angular_resolution</b> = 5.0</code> (optional input)<br> 
+   Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
+   Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity  
+   pattern stored in <code>e_theta_re</code> (real-valued except for dipole rear hemisphere where negative values encode  
+   180-degree phase inversion). The <code>center_frequency</code> field is set to the corresponding frequency in Hz. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a default cheap piston speaker at specific frequencies
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
+auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.05, 80.0, 12000.0,
+                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
+
+// Generate a horn driver with auto-derived parameters at third-octave bands
+auto horn = quadriga_lib::generate_speaker&lt;double&gt;("horn");
+
+// Generate a subwoofer
+arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
+auto sub = quadriga_lib::generate_speaker&lt;double&gt;("omni", 0.13, 30.0, 200.0,
+                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_interpolate_multi"></a>
+<b>arrayant_interpolate_multi</b> - Interpolate multi-frequency array antenna patterns at arbitrary frequencies
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes interpolated complex-valued antenna field patterns at arbitrary spatial angles and 
+   frequencies from a multi-frequency <code>arrayant</code> vector (e.g. a loudspeaker model generated by 
+   <code>generate_speaker</code>). 
+</li><li style="margin-bottom: 0.4em;">For each requested frequency, the function identifies the two arrayant entries with the closest 
+   center frequencies that bracket the target frequency, performs spatial pattern interpolation on 
+   both using <code>qd_arrayant_interpolate</code>, and then blends the two results in the frequency dimension. 
+</li><li style="margin-bottom: 0.4em;">Frequency interpolation uses spherical interpolation (SLERP) of the complex field values with 
+   automatic fallback to linear interpolation when the phase difference between the two bracketing 
+   values exceeds a threshold. This is the same mixed-mode algorithm used by <code>qd_arrayant_interpolate</code> 
+   for spatial grid interpolation, ensuring smooth amplitude and phase transitions. 
+</li><li style="margin-bottom: 0.4em;">If the requested frequency is below the lowest or above the highest <code>center_frequency</code> in the 
+   vector, the nearest entry is used without extrapolation (clamping). This is intentional: a 
+   subwoofer model queried at 12 kHz returns its 12 kHz response if available, or its highest 
+   frequency sample otherwise, reflecting the physical roll-off already encoded in the pattern data. 
+</li><li style="margin-bottom: 0.4em;">The function calls <code>qd_arrayant_interpolate</code> directly (bypassing the member function wrapper) for 
+   maximum performance. This avoids redundant validation on each call since the arrayant vector is 
+   validated once upfront (when <code>validate_input</code> is true). 
+</li><li style="margin-bottom: 0.4em;">A simple caching mechanism avoids redundant spatial interpolation when consecutive frequency 
+   requests share the same bracketing entry. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::arrayant_interpolate_multi(
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        const arma::Mat&lt;dtype&gt; *azimuth,
+        const arma::Mat&lt;dtype&gt; *elevation,
+        const arma::Col&lt;dtype&gt; *frequency,
+        arma::Cube&lt;dtype&gt; *V_re,
+        arma::Cube&lt;dtype&gt; *V_im,
+        arma::Cube&lt;dtype&gt; *H_re,
+        arma::Cube&lt;dtype&gt; *H_im,
+        arma::uvec i_element = {},
+        const arma::Cube&lt;dtype&gt; *orientation = nullptr,
+        const arma::Mat&lt;dtype&gt; *element_pos_i = nullptr,
+        bool validate_input = true)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input)<br> 
+   Multi-frequency arrayant vector. Each entry must have a valid <code>center_frequency</code>. Entries need not 
+   be sorted by frequency (sorting is handled internally). All entries must share the same angular 
+   grids and element structure. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*azimuth</b></code> (input)<br> 
+   Azimuth angles in [rad] for spatial interpolation. Cannot be NULL.<br> 
+   Size <code>[1, n_ang]</code> (same angles for all elements) or <code>[n_out, n_ang]</code> (per-element angles). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*elevation</b></code> (input)<br> 
+   Elevation angles in [rad] for spatial interpolation. Cannot be NULL.<br> 
+   Size must match <code>azimuth</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*frequency</b></code> (input)<br> 
+   Target frequencies in [Hz] at which to evaluate the pattern. Cannot be NULL or empty.<br> 
+   Size <code>[n_freq]</code>. Values need not be sorted. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*V_re</b></code> (output)<br> 
+   Real part of the interpolated e-theta (vertical) field component.<br> 
+   Size <code>[n_out, n_ang, n_freq]</code>. Resized automatically if needed. Cannot be NULL. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*V_im</b></code> (output)<br> 
+   Imaginary part of the interpolated e-theta (vertical) field component.<br> 
+   Size <code>[n_out, n_ang, n_freq]</code>. Cannot be NULL. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*H_re</b></code> (output)<br> 
+   Real part of the interpolated e-phi (horizontal) field component.<br> 
+   Size <code>[n_out, n_ang, n_freq]</code>. Cannot be NULL. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*H_im</b></code> (output)<br> 
+   Imaginary part of the interpolated e-phi (horizontal) field component.<br> 
+   Size <code>[n_out, n_ang, n_freq]</code>. Cannot be NULL. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>i_element</b> = {}</code> (optional input)<br> 
+   0-based element indices to interpolate. If empty, all elements are included (<code>n_out = n_elements</code>). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; <b>*orientation</b> = nullptr</code> (optional input)<br> 
+   Array antenna orientation (bank, tilt, heading) in [rad]. Applied identically at all frequencies. 
+   Sizes: <code>nullptr</code>, <code>[3,1,1]</code>, <code>[3,n_out,1]</code>, <code>[3,1,n_ang]</code>, or <code>[3,n_out,n_ang]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*element_pos_i</b> = nullptr</code> (optional input)<br> 
+   Alternative element positions in [m], Size <code>[3, n_out]</code>. If <code>nullptr</code>, positions from the first 
+   arrayant entry are used (positions are identical across all frequency entries by construction). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>validate_input</b> = true</code> (optional input)<br> 
+   If <code>true</code>, the arrayant vector is validated with <code>arrayant_is_valid_multi</code> before processing. Set 
+   to <code>false</code> to skip validation in performance-critical loops where the vector is known to be valid. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Performance Notes:</i></b><br><ul><li style="margin-bottom: 0.4em;">The function caches spatial interpolation results to avoid redundant <code>qd_arrayant_interpolate</code> calls 
+   when consecutive frequency requests share the same bracketing entry. For best cache utilization, 
+   provide the <code>frequency</code> vector sorted in ascending or descending order. 
+</li><li style="margin-bottom: 0.4em;">For single-frequency queries that exactly match a <code>center_frequency</code>, no frequency interpolation is 
+   performed (direct copy from the spatial interpolation result). 
+</li><li style="margin-bottom: 0.4em;">For maximum throughput in RT simulations, set <code>validate_input = false</code> after initial validation. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Build a 2-way speaker model
+arma::vec freqs_model = {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0};
+auto woofer = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.083, 50.0, 3000.0,
+    12.0, 24.0, 87.0, "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, freqs_model, 10.0);
+auto tweeter = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.013, 1500.0, 20000.0,
+    24.0, 12.0, 90.0, "hemisphere", 0.0, 0.0, 0.0, 0.20, 0.30, freqs_model, 10.0);
+auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
+
+// Query at 4 specific directions, 3 arbitrary frequencies
+arma::mat azimuth = {0.0, 1.5708, -1.5708, 3.14159};
+arma::mat elevation(1, 4, arma::fill::zeros);
+arma::vec query_freqs = {250.0, 1500.0, 8000.0};
+
+arma::cube V_re, V_im, H_re, H_im;
+quadriga_lib::arrayant_interpolate_multi(speaker, &amp;azimuth, &amp;elevation, &amp;query_freqs,
+                                          &amp;V_re, &amp;V_im, &amp;H_re, &amp;H_im);
+
+// V_re has size [2, 4, 3]:  2 elements × 4 angles × 3 frequencies
+// V_re.slice(0) = response at 250 Hz (interpolated between 200 and 500 Hz entries)
+// V_re.slice(1) = response at 1500 Hz (interpolated between 1000 and 2000 Hz entries)
+// V_re.slice(2) = response at 8000 Hz (interpolated between 5000 and 10000 Hz entries)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#.interpolate">arrayant.interpolate</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_concat_multi">arrayant_concat_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qdant_write_multi"></a>
 <b>qdant_write_multi</b> - Write a vector of array antenna objects to a single QDANT file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Writes multiple <code>arrayant</code> objects to a single QuaDRiGa array antenna exchange format (QDANT) file,  
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Writes multiple <code>arrayant</code> objects to a single QuaDRiGa array antenna exchange format (QDANT) file, 
    one per sequential ID. 
-</li><li style="margin-bottom: 0.4em;">Each entry in the input vector is assigned a 1-based ID (1, 2, ..., n_entries) and written to the file  
+</li><li style="margin-bottom: 0.4em;">Each entry in the input vector is assigned a 1-based ID (1, 2, ..., n_entries) and written to the file 
    using the <code>arrayant::qdant_write</code> member function. 
-</li><li style="margin-bottom: 0.4em;">A layout matrix of size <code>[n_entries, 1]</code> is created automatically with entries <code>1, 2, ..., n_entries</code>  
+</li><li style="margin-bottom: 0.4em;">A layout matrix of size <code>[n_entries, 1]</code> is created automatically with entries <code>1, 2, ..., n_entries</code> 
    to describe the organization inside the file. 
 </li><li style="margin-bottom: 0.4em;">If the output file already exists, it is deleted before writing to ensure a clean file. 
 </li><li style="margin-bottom: 0.4em;">All arrayant objects in the vector are validated before writing. An exception is thrown if any entry is invalid. 
-</li><li style="margin-bottom: 0.4em;">This function is the primary mechanism for storing frequency-dependent models, where each arrayant  
-   in the vector represents the directivity pattern at a specific frequency. The corresponding frequency  
+</li><li style="margin-bottom: 0.4em;">This function is the primary mechanism for storing frequency-dependent models, where each arrayant 
+   in the vector represents the directivity pattern at a specific frequency. The corresponding frequency 
    is stored in the <code>center_frequency</code> field of each arrayant. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
@@ -1631,7 +1855,7 @@ auto ant = quadriga_lib::qdant_read&lt;double&gt;("speaker.qdant", 3);
 <b>qdant_read</b> - Reads array antenna data from QDANT files
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file,  
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads antenna pattern data and layout from a QuaDRiGa array antenna exchange format (QDANT) file, 
    which stores antenna pattern data in XML format. 
 </li><li style="margin-bottom: 0.4em;">Returns an antenna array (<code>arrayant</code>) object constructed from the specified data in the QDANT file. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
@@ -1678,15 +1902,15 @@ auto ant = quadriga_lib::qdant_read&lt;double&gt;("antenna_data.qdant", 2, &amp;
 <b>qdant_read_multi</b> - Read all array antenna objects from a QDANT file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads all <code>arrayant</code> objects stored in a QuaDRiGa array antenna exchange format (QDANT) file and  
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads all <code>arrayant</code> objects stored in a QuaDRiGa array antenna exchange format (QDANT) file and 
    returns them as a vector. 
-</li><li style="margin-bottom: 0.4em;">The file layout is obtained by probing the file with ID 1. Even if ID 1 does not exist as an entry,  
-   the internal reader still returns the layout describing the file contents. This layout is then used  
+</li><li style="margin-bottom: 0.4em;">The file layout is obtained by probing the file with ID 1. Even if ID 1 does not exist as an entry, 
+   the internal reader still returns the layout describing the file contents. This layout is then used 
    to determine which IDs to read. 
-</li><li style="margin-bottom: 0.4em;">Unique non-zero IDs are extracted from the layout in the order of their first appearance (scanning rows  
+</li><li style="margin-bottom: 0.4em;">Unique non-zero IDs are extracted from the layout in the order of their first appearance (scanning rows 
    within each column). Each unique ID is read exactly once, regardless of how many times it appears in the layout. 
 </li><li style="margin-bottom: 0.4em;">All read arrayant objects are validated. An exception is thrown if any entry cannot be read or fails validation. 
-</li><li style="margin-bottom: 0.4em;">This function is the counterpart to <code>qdant_write_multi</code> and the primary mechanism for loading frequency-dependent  
+</li><li style="margin-bottom: 0.4em;">This function is the counterpart to <code>qdant_write_multi</code> and the primary mechanism for loading frequency-dependent 
    models. The frequency corresponding to each entry is stored in the <code>center_frequency</code> field of the returned arrayant objects. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
@@ -1730,6 +1954,418 @@ layout.print();
 </li><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#qdant_write_multi">qdant_write_multi</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_is_valid_multi"></a>
+<b>arrayant_is_valid_multi</b> - Validate a vector of array antenna objects for multi-frequency consistency
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Validates that a vector of <code>arrayant</code> objects forms a consistent multi-frequency model 
+</li><li style="margin-bottom: 0.4em;">Each individual entry is validated using its <code>is_valid</code> member function. The <code>quick_check</code> parameter 
+   is passed through to control whether pointer-based fast validation or full deep validation is performed per entry. 
+</li><li style="margin-bottom: 0.4em;">Beyond individual validity, the function checks that all entries in the vector are structurally compatible by verifying: 
+</li><li style="margin-bottom: 0.4em;">Azimuth and elevation grids have identical sizes and values across all entries. 
+</li><li style="margin-bottom: 0.4em;">The number of antenna elements is the same for all entries. 
+</li><li style="margin-bottom: 0.4em;">Element positions are identical across all entries (physical antenna/driver layout does not change with frequency). 
+</li><li style="margin-bottom: 0.4em;">Coupling matrices have the same shape (same number of elements and ports) across all entries. 
+</li><li style="margin-bottom: 0.4em;">The function does not check pattern data values, center frequencies, or coupling matrix values, as these are expected to vary with frequency. 
+</li><li style="margin-bottom: 0.4em;">Validation stops at the first error found and returns a descriptive message indicating which entry and what property failed. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::string quadriga_lib::arrayant_is_valid_multi(
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        bool quick_check = true)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input)<br> 
+   Vector of arrayant objects to validate. Must not be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>quick_check</b> = true</code> (optional input)<br> 
+   If <code>true</code>, individual entry validation uses the fast pointer-based check (skips deep validation when <code>check_ptr</code> matches). If <code>false</code>, performs a full deep validation of every entry. Default: <code>true</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string</code><br> 
+   Empty string if the vector is valid and all entries are consistent. Otherwise, a descriptive error message indicating which entry (by index) and what property caused the validation failure. For example: <code>"Entry 3: Azimuth grid values do not match entry 0."</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a speaker model and validate
+auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston");
+std::string err = quadriga_lib::is_valid_multi(spk, false);
+if (!err.empty())
+    std::cerr &lt;&lt; "Validation error: " &lt;&lt; err &lt;&lt; std::endl;
+
+// Detect tampered element positions
+spk[2].element_pos(0, 0) = 999.0;
+err = quadriga_lib::is_valid_multi(spk, false);
+// Returns: "Entry 2: Element positions do not match entry 0."
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#.is_valid">arrayant.is_valid</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_copy_element_multi"></a>
+<b>arrayant_copy_element_multi</b> - Copy antenna elements across all entries in a multi-frequency arrayant vector
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Copies the pattern data, element position, and coupling weights from a source element to one or more 
+   destination elements, applied identically to every frequency entry in the vector. 
+</li><li style="margin-bottom: 0.4em;">Calls the <code>arrayant::copy_element</code> member function for each entry in the vector. This member function handles 
+   all internal details including pattern data copying, element position copying, and coupling matrix management. 
+</li><li style="margin-bottom: 0.4em;">If any destination index exceeds the current number of elements, the arrayant is automatically enlarged. 
+   New elements receive an identity coupling entry (one additional port per added element), consistent with 
+   the behavior of the underlying <code>arrayant::copy_element</code> member function. 
+</li><li style="margin-bottom: 0.4em;">Source and destination indices are 0-based. 
+</li><li style="margin-bottom: 0.4em;">Two overloads are provided: one accepting a vector of destination indices (<code>arma::uvec</code>) for copying 
+   to multiple targets, and one accepting a single destination index (<code>arma::uword</code>). 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::arrayant_copy_element_multi(
+        std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        arma::uword source,
+        arma::uvec destination)
+
+void quadriga_lib::arrayant_copy_element_multi(
+        std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        arma::uword source,
+        arma::uword destination)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input/output)<br> 
+   Vector of arrayant objects to update. Modified in-place. Must not be empty. All entries must be valid arrayant objects. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>source</b></code> (input)<br> 
+   0-based index of the source element to copy from. Must be within the current element count. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>destination</b></code> (input)<br> 
+   0-based indices of the destination elements to copy to. If any index exceeds the current element count, the arrayant is enlarged accordingly. Must not be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>destination</b></code> (input)<br> 
+   Single 0-based destination element index (convenience overload). 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>void</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Build a 4-element line array from a single driver template
+arma::vec freqs = {500.0, 1000.0, 2000.0, 5000.0};
+auto driver = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.05, 80.0, 12000.0, 12.0, 12.0, 85.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.15, 0.25, freqs, 10.0);
+
+// Replicate element 0 to create elements 1, 2, 3
+arma::uvec dest = {1, 2, 3};
+quadriga_lib::arrayant_copy_element_multi(driver, 0, dest);
+
+// Now set the individual positions (vertical line array, 15 cm spacing)
+arma::mat positions(3, 4, arma::fill::zeros);
+positions(2, 0) = -0.225;  // z = -22.5 cm
+positions(2, 1) = -0.075;  // z = -7.5 cm
+positions(2, 2) =  0.075;  // z = +7.5 cm
+positions(2, 3) =  0.225;  // z = +22.5 cm
+quadriga_lib::arrayant_set_element_pos_multi(driver, positions);
+
+// Result: 4 identical elements, 4 independent ports, per frequency entry
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#.copy_element">arrayant.copy_element</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_set_element_pos_multi">arrayant_set_element_pos_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_concat_multi">arrayant_concat_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_set_element_pos_multi"></a>
+<b>arrayant_set_element_pos_multi</b> - Set element positions for all entries in a multi-frequency arrayant vector
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Updates the <code>element_pos</code> field of every <code>arrayant</code> in a multi-frequency vector in-place. 
+</li><li style="margin-bottom: 0.4em;">If <code>i_element</code> is empty (default), all element positions are replaced. In this case, <code>element_pos</code> 
+   must have exactly <code>n_elements</code> columns matching the number of elements in the arrayant. 
+</li><li style="margin-bottom: 0.4em;">If <code>i_element</code> is provided, only the specified elements (0-based indices) are updated. The number 
+   of columns in <code>element_pos</code> must match the number of indices in <code>i_element</code>. 
+</li><li style="margin-bottom: 0.4em;">All entries in the vector must have the same number of elements. If any entry has a different 
+   element count, an exception is thrown. 
+</li><li style="margin-bottom: 0.4em;">If an entry's <code>element_pos</code> is empty (uninitialized), it is initialized to zeros before 
+   applying the update. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::arrayant_set_element_pos_multi(
+        std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        const arma::Mat&lt;dtype&gt; &amp;element_pos,
+        arma::uvec i_element = arma::uvec())
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input/output)<br> 
+   Vector of arrayant objects to update. Modified in-place. Must not be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>element_pos</b></code> (input)<br> 
+   New element positions with size <code>[3, n_update]</code>, where each column contains the (x, y, z) coordinates of one element in meters. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>i_element</b> = arma::uvec()</code> (optional input)<br> 
+   0-based indices of the elements to update. If empty, all elements are updated and <code>element_pos</code> must have <code>n_elements</code> columns. If provided, <code>element_pos</code> must have the same number of columns as <code>i_element</code> has entries. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a two-driver speaker (woofer + tweeter) at multiple frequencies
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0};
+auto woofer = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.08, 50.0, 2000.0);
+auto tweeter = quadriga_lib::generate_speaker&lt;double&gt;("horn", 0.025, 1500.0, 20000.0);
+
+// Set the woofer position: centered, 10 cm below the tweeter
+arma::mat pos = arma::mat({0.0, 0.0, -0.10}).t();
+quadriga_lib::arrayant_set_element_pos_multi(woofer, pos);
+
+// Or update a specific element in a multi-element arrayant
+arma::mat tweeter_pos = arma::mat({0.0, 0.0, 0.10}).t();
+arma::uvec idx = {0};
+quadriga_lib::arrayant_set_element_pos_multi(tweeter, tweeter_pos, idx);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_rotate_pattern_multi"></a>
+<b>arrayant_rotate_pattern_multi</b> - Rotate antenna patterns across all entries in a multi-frequency arrayant vector
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Applies Euler rotations to every frequency entry in a multi-frequency <code>arrayant</code> vector, 
+   modifying the patterns in-place. 
+</li><li style="margin-bottom: 0.4em;">Grid adjustment is always disabled because multi-frequency loudspeaker models use uniform angular 
+   grids that must remain consistent across all frequency entries. Non-uniform grid resampling would break this consistency. 
+</li><li style="margin-bottom: 0.4em;">If <code>i_element</code> is empty (default), all elements are rotated. If <code>i_element</code> is provided, only the specified 
+   elements (0-based indices) are rotated, leaving others unchanged. This is useful for rotating individual drivers in a multi-driver speaker model. 
+</li><li style="margin-bottom: 0.4em;">For acoustic speaker models where the pressure field is scalar (stored only in <code>e_theta_re</code>), usage mode 1 
+   (pattern only) is recommended to avoid spurious polarization effects. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::arrayant_rotate_pattern_multi(
+        std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+        dtype x_deg = 0.0,
+        dtype y_deg = 0.0,
+        dtype z_deg = 0.0,
+        unsigned usage = 0,
+        arma::uvec i_element = arma::uvec())
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec</b></code> (input/output)<br> 
+   Vector of arrayant objects to update. Modified in-place. Must not be empty. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>x_deg</b> = 0.0</code> (optional input)<br> 
+   Rotation angle around the x-axis (bank angle) in degrees. Default: <code>0.0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>y_deg</b> = 0.0</code> (optional input)<br> 
+   Rotation angle around the y-axis (tilt angle) in degrees. Default: <code>0.0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>z_deg</b> = 0.0</code> (optional input)<br> 
+   Rotation angle around the z-axis (heading angle) in degrees. Default: <code>0.0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>usage</b> = 0</code> (optional input)<br> 
+   Rotation mode: <code>0</code> = rotate both pattern and polarization, <code>1</code> = rotate only pattern, <code>2</code> = rotate only polarization. Grid adjustment is always disabled. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>i_element</b> = arma::uvec()</code> (optional input)<br> 
+   0-based indices of the elements to rotate. If empty, all elements are rotated. If provided, only the specified elements are affected. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage Mode Mapping:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th>Input Mode</th>
+  <th>Behavior</th>
+  <th>Internal rotate_pattern Mode</th>
+</tr>
+<tr>
+  <td>0</td>
+  <td>Pattern + polarization</td>
+  <td>3 (no grid adjustment)</td>
+</tr>
+<tr>
+  <td>1</td>
+  <td>Pattern only</td>
+  <td>4 (no grid adjustment)</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>Polarization only</td>
+  <td>2 (no grid adjustment)</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Generate a 2-way speaker model
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
+auto woofer = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+auto tweeter = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+auto speaker = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
+
+// Rotate entire speaker 30 degrees around the z-axis (heading)
+quadriga_lib::arrayant_rotate_pattern_multi(speaker, 0.0, 0.0, 30.0, 1);
+
+// Tilt only the tweeter (element 1) upward by 10 degrees
+arma::uvec tweeter_idx = {1};
+quadriga_lib::arrayant_rotate_pattern_multi(speaker, 0.0, 10.0, 0.0, 1, tweeter_idx);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#.rotate_pattern">arrayant.rotate_pattern</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_concat_multi">arrayant_concat_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_set_element_pos_multi">arrayant_set_element_pos_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_concat_multi"></a>
+<b>arrayant_concat_multi</b> - Concatenate two multi-frequency arrayant vectors into a single multi-element model
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Combines two multi-frequency <code>arrayant</code> vectors into a single vector representing a multi-driver 
+   loudspeaker (or any multi-element antenna array). 
+</li><li style="margin-bottom: 0.4em;">Both input vectors must have the same number of frequency entries, identical angular grids (azimuth and elevation), 
+   and matching center frequencies at each index. 
+</li><li style="margin-bottom: 0.4em;">For each frequency entry, the function performs: 
+</li><li style="margin-bottom: 0.4em;"><b>Pattern concatenation</b>: The 3D pattern cubes (<code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code>) 
+   are joined along the element (slice) dimension, producing <code>n_elem1 + n_elem2</code> elements. 
+</li><li style="margin-bottom: 0.4em;"><b>Element position concatenation</b>: The <code>element_pos</code> matrices are horizontally concatenated. 
+   If either input has empty positions, zeros are substituted. 
+</li><li style="margin-bottom: 0.4em;"><b>Block-diagonal coupling assembly</b>: The coupling matrices are assembled in block-diagonal form, 
+   preserving independent port sets from each input. If vec1 has <code>p1</code> ports and vec2 has <code>p2</code> ports, the 
+   output has <code>p1 + p2</code> ports with no cross-coupling between the two driver groups. 
+</li><li style="margin-bottom: 0.4em;">Both inputs are validated with <code>is_valid_multi</code> before processing, and each output entry is 
+   validated with <code>validate</code> before returning. 
+</li><li style="margin-bottom: 0.4em;">The output inherits the name, azimuth grid, elevation grid, and center frequency from the first 
+   input vector. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::arrayant_concat_multi(
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec1,
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec2)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec1</b></code> (input)<br> 
+   First arrayant vector. All entries must be valid and mutually consistent (same grids, element counts, coupling shape). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>arrayant_vec2</b></code> (input)<br> 
+   Second arrayant vector. Must have the same number of entries as <code>arrayant_vec1</code>, with matching angular grids and center frequencies. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
+   Combined arrayant vector with <code>n_elem1 + n_elem2</code> elements and <code>n_ports1 + n_ports2</code> ports per frequency entry. The coupling matrix has block-diagonal structure. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Coupling Matrix Structure:</i></b><br>For a woofer with 1 element / 1 port and a tweeter with 1 element / 1 port, the combined coupling matrix is: 
+<pre>
+                    Port 1 (woofer)   Port 2 (tweeter)
+Elem 1 (woofer)     1.0                0.0
+Elem 2 (tweeter)    0.0                1.0
+</pre>
+ 
+For more complex arrays (e.g. a line array with 4 elements / 2 ports combined with a tweeter of 1 element / 1 port): 
+<pre>
+     P1    P2    P3
+E1   c11   c12   0
+E2   c21   c22   0
+E3   c31   c32   0
+E4   c41   c42   0
+E5   0     0     1
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Build a 2-way loudspeaker: woofer + tweeter at matching frequencies
+arma::vec freqs = {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0};
+
+// Generate woofer: 6.5" piston, sealed box, 50-3000 Hz passband
+auto woofer = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+
+// Generate tweeter: 1" dome, sealed box, 1500-20000 Hz passband
+auto tweeter = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+
+// Position the drivers: woofer centered, tweeter 12 cm above
+arma::mat woofer_pos = arma::mat({0.0, 0.0, 0.0}).t();
+arma::mat tweeter_pos = arma::mat({0.0, 0.0, 0.12}).t();
+quadriga_lib::arrayant_set_element_pos_multi(woofer, woofer_pos);
+quadriga_lib::arrayant_set_element_pos_multi(tweeter, tweeter_pos);
+
+// Combine into a single 2-way speaker model
+auto speaker_2way = quadriga_lib::arrayant_concat_multi(woofer, tweeter);
+
+// Result: 2 elements, 2 ports per frequency entry
+// Port 1 drives the woofer, Port 2 drives the tweeter
+// Crossover behavior emerges from overlapping bandpass responses
+
+// Write to file
+quadriga_lib::qdant_write_multi("speaker_2way.qdant", speaker_2way);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_set_element_pos_multi">arrayant_set_element_pos_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#qdant_write_multi">qdant_write_multi</a> 
 </li></ul>
 </li>
 </ul>
@@ -3421,6 +4057,202 @@ std::vector&lt;bool&gt; quadriga_lib::get_channels_irs(
 <b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#combine_irs_coord">combine_irs_coord</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#get_channels_spherical">get_channels_spherical</a> 
 </li><li style="margin-bottom: 0.4em;"><a href="#get_channels_planar">get_channels_planar</a> 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_multifreq"></a>
+<b>get_channels_multifreq</b> - Calculate channel coefficients for spherical waves across multiple frequencies
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Extends <code>get_channels_spherical</code> to support frequency-dependent antenna patterns, path gains, 
+   and polarization transfer (Jones) matrices across multiple output frequencies. 
+</li><li style="margin-bottom: 0.4em;"><b>Geometry is computed once</b>: departure angles, arrival angles, element-resolved path delays, and LOS 
+   path detection are frequency-independent and reused for all output frequencies. This avoids redundant 
+   trigonometry and distance calculations. 
+</li><li style="margin-bottom: 0.4em;"><b>Four frequency grids</b> are aligned by interpolation: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td>1.</td>
+  <td>TX array frequencies (defined by <code>tx_array[i].center_frequency</code>)</td>
+</tr>
+<tr>
+  <td>2.</td>
+  <td>RX array frequencies (defined by <code>rx_array[i].center_frequency</code>)</td>
+</tr>
+<tr>
+  <td>3.</td>
+  <td>Input sample frequencies (<code>freq_in</code>) at which <code>path_gain</code> and <code>M</code> are provided</td>
+</tr>
+<tr>
+  <td>4.</td>
+  <td>Target output frequencies (<code>freq_out</code>) at which coefficients and delays are returned</td>
+</tr>
+</table><br>
+</li><li style="margin-bottom: 0.4em;">For each output frequency, TX and RX antenna patterns are interpolated from their respective 
+   multi-frequency vectors using spherical interpolation (SLERP) with linear fallback, the same 
+   algorithm used in <code>arrayant_interpolate_multi</code>. The private <code>qd_arrayant_interpolate</code> function is 
+   called directly for maximum performance. 
+</li><li style="margin-bottom: 0.4em;">Path gain is interpolated linearly across frequency. The Jones matrix <code>M</code> is interpolated using 
+   SLERP for each complex entry pair to preserve phase coherence. 
+</li><li style="margin-bottom: 0.4em;"><b>Extrapolation</b> is handled by clamping to the nearest available frequency entry in all four grids. 
+</li><li style="margin-bottom: 0.4em;"><b>Propagation speed</b> can be set to support both radio (speed of light, default) and acoustic 
+   (speed of sound, ~343 m/s) simulations. This affects wavelength, wave number, and delay calculations. 
+</li><li style="margin-bottom: 0.4em;">The Jones matrix <code>M</code> supports two formats: 8 rows for full polarimetric 
+   (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), or 2 rows for scalar pressure waves 
+   (ReVV, ImVV only), where VH, HV, and HH entries are implicitly zero. 
+</li><li style="margin-bottom: 0.4em;">Antenna element coupling is applied using the coupling matrices from the first entry of each 
+   multi-frequency vector (consistent across all entries by <code>arrayant_is_valid_multi</code> constraints). 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::get_channels_multifreq(
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;tx_array,
+        const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;rx_array,
+        dtype Tx, dtype Ty, dtype Tz,
+        dtype Tb, dtype Tt, dtype Th,
+        dtype Rx, dtype Ry, dtype Rz,
+        dtype Rb, dtype Rt, dtype Rh,
+        const arma::Mat&lt;dtype&gt; &amp;fbs_pos,
+        const arma::Mat&lt;dtype&gt; &amp;lbs_pos,
+        const arma::Mat&lt;dtype&gt; &amp;path_gain,
+        const arma::Col&lt;dtype&gt; &amp;path_length,
+        const arma::Cube&lt;dtype&gt; &amp;M,
+        const arma::Col&lt;dtype&gt; &amp;freq_in,
+        const arma::Col&lt;dtype&gt; &amp;freq_out,
+        std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_re,
+        std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_im,
+        std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;delay,
+        bool use_absolute_delays = false,
+        bool add_fake_los_path = false,
+        dtype propagation_speed = dtype(299792458.0))
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>tx_array</b></code> (input)<br> 
+   Multi-frequency transmit array antenna vector. All entries must pass <code>arrayant_is_valid_multi</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;<b>rx_array</b></code> (input)<br> 
+   Multi-frequency receive array antenna vector. All entries must pass <code>arrayant_is_valid_multi</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tx</b>, <b>Ty</b>, <b>Tz</b></code> (input)<br> 
+   Transmitter position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Tb</b>, <b>Tt</b>, <b>Th</b></code> (input)<br> 
+   Transmitter orientation (bank, tilt, heading) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rx</b>, <b>Ry</b>, <b>Rz</b></code> (input)<br> 
+   Receiver position in Cartesian coordinates [m]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>Rb</b>, <b>Rt</b>, <b>Rh</b></code> (input)<br> 
+   Receiver orientation (bank, tilt, heading) in [rad]. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>fbs_pos</b></code> (input)<br> 
+   First-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>lbs_pos</b></code> (input)<br> 
+   Last-bounce scatterer positions, Size: <code>[3, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>path_gain</b></code> (input)<br> 
+   Path gain in linear scale, Size: <code>[n_path, n_freq_in]</code>. Each column corresponds to one input frequency. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; &amp;<b>path_length</b></code> (input)<br> 
+   Absolute path lengths from TX to RX phase center, Length: <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; &amp;<b>M</b></code> (input)<br> 
+   Polarization transfer matrix, Size: <code>[8, n_path, n_freq_in]</code> for full polarimetric or 
+   <code>[2, n_path, n_freq_in]</code> for scalar pressure. Each slice corresponds to one input frequency. 
+   Interleaved complex format: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) for 8 rows, 
+   or (ReVV, ImVV) for 2 rows. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; &amp;<b>freq_in</b></code> (input)<br> 
+   Input sample frequencies in [Hz] at which <code>path_gain</code> and <code>M</code> are defined, Length: <code>n_freq_in</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; &amp;<b>freq_out</b></code> (input)<br> 
+   Target frequencies in [Hz] at which to compute output coefficients and delays, Length: <code>n_freq_out</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>coeff_re</b></code> (output)<br> 
+   Real part of channel coefficients. Vector of length <code>n_freq_out</code>, each cube of size <code>[n_rx, n_tx, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>coeff_im</b></code> (output)<br> 
+   Imaginary part of channel coefficients. Same structure as <code>coeff_re</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>delay</b></code> (output)<br> 
+   Propagation delays in seconds. Same structure as <code>coeff_re</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>use_absolute_delays</b> = false</code> (optional input)<br> 
+   If true, LOS delay is included in all paths. Default: <code>false</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>add_fake_los_path</b> = false</code> (optional input)<br> 
+   Adds a zero-power LOS path if no LOS path was detected. Default: <code>false</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>propagation_speed</b> = 299792458.0</code> (optional input)<br> 
+   Wave propagation speed in [m/s]. Default is the speed of light for radio simulations. 
+   Set to ~343.0 for acoustic simulations in air. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Build a 2-way speaker as TX (source)
+arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
+auto tx_woofer = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+auto tx_tweeter = quadriga_lib::generate_speaker&lt;double&gt;(
+    "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
+    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
+auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
+
+// Omnidirectional microphone as RX (single entry, clamped for all frequencies)
+std::vector&lt;quadriga_lib::arrayant&lt;double&gt;&gt; rx = { quadriga_lib::generate_arrayant_omni&lt;double&gt;() };
+
+// Simple LOS path setup
+arma::mat fbs = arma::mat({0.5, 0.0, 0.0}).t();
+arma::mat lbs = arma::mat({0.5, 0.0, 0.0}).t();
+arma::vec path_length = {1.0};               // 1 meter distance
+
+// Frequency-flat path gain and scalar Jones matrix
+arma::vec freq_in = {100.0, 10000.0};
+arma::mat path_gain_mat(1, 2, arma::fill::ones);
+arma::cube M_cube(2, 1, 2, arma::fill::zeros);
+M_cube(0, 0, 0) = 1.0; M_cube(0, 0, 1) = 1.0;  // ReVV = 1 at both freqs
+
+arma::vec freq_out = {200.0, 1000.0, 5000.0};
+std::vector&lt;arma::cube&gt; coeff_re, coeff_im, delays;
+
+quadriga_lib::get_channels_multifreq(tx, rx,
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // TX at origin
+    1.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // RX at (1,0,0)
+    fbs_pos, lbs_pos, path_gain_mat, path_length, M_cube,
+    freq_in, freq_out, coeff_re, coeff_im, delays,
+    false, false, 343.0);             // Speed of sound for acoustics
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#get_channels_spherical">get_channels_spherical</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#arrayant_concat_multi">arrayant_concat_multi</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#generate_speaker">generate_speaker</a> 
 </li></ul>
 </li>
 </ul>

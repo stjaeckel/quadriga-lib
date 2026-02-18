@@ -121,7 +121,7 @@ namespace quadriga_lib
         //   rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system
         // - Also adjusts the sampling grid for non-uniformly sampled antennas, such as parabolic antennas with small apertures
         // - Uses Euler rotations
-        // - Usage models : 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting
+        // - Usage models : 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting, 4: as (1), but w/o grid adjusting
         // - Calling this function without the argument "output" updates the arrayant properties inplace
         void rotate_pattern(dtype x_deg = 0.0,                  // The rotation angle around x-axis (bank angle) in [degrees]
                             dtype y_deg = 0.0,                  // The rotation angle around y-axis (tilt angle) in [degrees]
@@ -142,8 +142,59 @@ namespace quadriga_lib
 
         // Validate integrity
         std::string is_valid(bool quick_check = true) const; // Returns an empty string if arrayant object is valid or an error message otherwise
-        std::string validate();                              // Same, but sets the "valid" property in the objet and initializes the element positions and coupling matrix
+        std::string validate();                              // Same, but sets the "valid" property in the object and initializes the element positions and coupling matrix
     };
+
+    // Validate a vector of array antenna objects for multi-frequency consistency
+    // - Validates each individual arrayant entry
+    // - Checks that all entries share the same angular grids, element positions, and coupling matrix shape
+    // - Returns an empty string if valid, or an error message describing the first inconsistency found
+    template <typename dtype>
+    std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to validate
+                                        bool quick_check = true);
+
+    // Copy antenna elements across all entries in a multi-frequency arrayant vector
+    // - Calls the arrayant member function copy_element for each frequency entry
+    // - Enlarges the array size if the destination index exceeds the current element count
+    // - Source and destination indices are 0-based
+    template <typename dtype>
+    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
+                                     arma::uword source,                         // Source element index (0-based)
+                                     arma::uvec destination);                    // Destination element indices (0-based)
+
+    template <typename dtype>
+    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
+                                     arma::uword source,                         // Source element index (0-based)
+                                     arma::uword destination);                   // Destination element index (0-based)
+
+    // Concatenate two multi-frequency arrayant vectors into a single multi-element model
+    // - Both inputs must have the same number of frequency entries, angular grids, and center frequencies
+    // - Patterns are concatenated along the element dimension (3rd cube dimension)
+    // - Element positions are horizontally concatenated
+    // - Coupling matrices are assembled in block-diagonal form (independent port sets)
+    template <typename dtype>
+    std::vector<arrayant<dtype>> arrayant_concat_multi(const std::vector<arrayant<dtype>> &arrayant_vec1,  // First arrayant vector (e.g. woofer)
+                                                       const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector (e.g. tweeter)
+
+    // Interpolate multi-frequency array antenna patterns at arbitrary frequencies
+    // - For each requested frequency, finds the two bracketing entries by center_frequency
+    // - Interpolates the pattern spatially using qd_arrayant_interpolate (no input validation)
+    // - Interpolates between the two frequency samples using spherical interpolation with linear fallback
+    // - Clamps to nearest entry for out-of-range frequencies (extrapolation)
+    // - Outputs are cubes of size [n_out, n_ang, n_freq]
+    template <typename dtype>
+    void arrayant_interpolate_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Multi-frequency arrayant vector
+                                    const arma::Mat<dtype> *azimuth,                  // Azimuth angles [rad],          Size [1, n_ang] or [n_out, n_ang]
+                                    const arma::Mat<dtype> *elevation,                // Elevation angles [rad],        Size [1, n_ang] or [n_out, n_ang]
+                                    const arma::Col<dtype> *frequency,                // Target frequencies [Hz],       Size [n_freq]
+                                    arma::Cube<dtype> *V_re,                          // Output e_theta real,           Size [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *V_im,                          // Output e_theta imaginary,      Size [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *H_re,                          // Output e_phi real,             Size [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *H_im,                          // Output e_phi imaginary,        Size [n_out, n_ang, n_freq]
+                                    arma::uvec i_element = {},                        // Element indices (0-based),     Length n_out, empty = all
+                                    const arma::Cube<dtype> *orientation = nullptr,   // Orientation [rad],             Size [3,1,1] or [3,n_out,1] or [3,1,n_ang] or [3,n_out,n_ang]
+                                    const arma::Mat<dtype> *element_pos_i = nullptr,  // Alt. element positions,        Size [3, n_out] or nullptr
+                                    bool validate_input = true);                      // Validate arrayant_vec before use
 
     // Write a vector of array antenna objects to a single QDANT file
     // - Each arrayant is stored with a sequential ID (1-based) in the file
@@ -168,6 +219,27 @@ namespace quadriga_lib
     template <typename dtype>
     std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
                                                   arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
+
+    // Set element positions for all entries in a multi-frequency arrayant vector
+    // - Updates element_pos in-place for every arrayant in the vector
+    // - If i_element is empty, all elements are updated and element_pos must have n_elements columns
+    // - If i_element is provided, only the specified elements (0-based) are updated
+    template <typename dtype>
+    void arrayant_set_element_pos_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
+                                        const arma::Mat<dtype> &element_pos,        // New element positions, size [3, n_update]
+                                        arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
+
+    // Rotate antenna patterns across all entries in a multi-frequency arrayant vector
+    // - Applies rotate_pattern to every frequency entry in the vector
+    // - Usage modes 0, 1, 2 are supported; grid adjustment is always disabled (0→3, 1→4)
+    // - If i_element is empty, all elements are rotated; otherwise only the specified elements
+    template <typename dtype>
+    void arrayant_rotate_pattern_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
+                                       dtype x_deg = 0.0,                          // Rotation angle around x-axis (bank) in [deg]
+                                       dtype y_deg = 0.0,                          // Rotation angle around y-axis (tilt) in [deg]
+                                       dtype z_deg = 0.0,                          // Rotation angle around z-axis (heading) in [deg]
+                                       unsigned usage = 0,                         // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
+                                       arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
 
     // Generate isotropic radiator with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
@@ -311,6 +383,35 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eoa = nullptr);   // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+
+    // Calculate channel coefficients for spherical waves across multiple frequencies
+    // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices
+    // - Geometry (angles, delays, LOS detection) is computed once and reused for all output frequencies
+    // - TX/RX antenna patterns are interpolated from multi-frequency arrayant vectors at each output frequency
+    // - Path gain and polarization transfer matrix are interpolated from freq_in to freq_out grids
+    // - Supports both radio (speed of light) and acoustic (speed of sound) propagation
+    // - Jones matrix M can have 2 rows (scalar pressure: ReVV, ImVV only) or 8 rows (full polarimetric)
+    // - Output coefficients and delays are returned as vectors of cubes, one per output frequency
+    template <typename dtype>
+    void get_channels_multifreq(const std::vector<arrayant<dtype>> &tx_array, // Multi-frequency transmit array
+                                const std::vector<arrayant<dtype>> &rx_array, // Multi-frequency receive array
+                                dtype Tx, dtype Ty, dtype Tz,                 // Transmitter position [m]
+                                dtype Tb, dtype Tt, dtype Th,                 // Transmitter orientation (bank, tilt, head) [rad]
+                                dtype Rx, dtype Ry, dtype Rz,                 // Receiver position [m]
+                                dtype Rb, dtype Rt, dtype Rh,                 // Receiver orientation (bank, tilt, head) [rad]
+                                const arma::Mat<dtype> &fbs_pos,              // First-bounce scatterer positions [3, n_path]
+                                const arma::Mat<dtype> &lbs_pos,              // Last-bounce scatterer positions [3, n_path]
+                                const arma::Mat<dtype> &path_gain,            // Path gain (linear), [n_path, n_freq_in]
+                                const arma::Col<dtype> &path_length,          // Absolute path length TX→RX [n_path]
+                                const arma::Cube<dtype> &M,                   // Polarization transfer matrix [8, n_path, n_freq_in] or [2, n_path, n_freq_in]
+                                const arma::Col<dtype> &freq_in,              // Input sample frequencies [Hz], length [n_freq_in]
+                                const arma::Col<dtype> &freq_out,             // Target frequencies [Hz], length [n_freq_out]
+                                std::vector<arma::Cube<dtype>> &coeff_re,     // Output: real part of coefficients, length [n_freq_out], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &coeff_im,     // Output: imag part of coefficients, length [n_freq_out], each [n_rx, n_tx, n_path]
+                                std::vector<arma::Cube<dtype>> &delay,        // Output: delays [s], length [n_freq_out], each [n_rx, n_tx, n_path]
+                                bool use_absolute_delays = false,             // If true, include LOS delay in all paths
+                                bool add_fake_los_path = false,               // Add zero-power LOS path if none present
+                                dtype propagation_speed = 299792458.0);       // Wave propagation speed [m/s]
 
     // Calculate channels for Intelligent Reflective Surfaces (IRS)
     // - IRS is provided as a 3rd array antenna model comprised of 'n_irs' elements
