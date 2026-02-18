@@ -43,6 +43,8 @@ auto pyarray = qd_python_copy2numpy(CubeRe, CubeIm, i_slice);       // Copy Re/I
 auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Col);        // Cast column vector from u32 to int
 auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Mat);        // Cast matrix from u32 to int
 
+auto pyarray = qd_python_copy2numpy_4d(vecCubes);                   // Stack vector of Cubes into 4D Numpy array
+
 - Copy std::vector of Armadillo types to py::list of Numpy arrays
 
 auto pylist = qd_python_copy2numpy(vecCol/Mat/Cube, i_vec);         // Copy vector of Col, Mat or Cubes
@@ -55,12 +57,13 @@ auto pylist = qd_python_copy2python(vecStrings, i_vec);             // Copy vect
 auto pyarray = qd_python_init_output(n_rows, Col);                          // Init 1D and map to Col
 auto pyarray = qd_python_init_output(n_rows, n_cols, Mat);                  // Init 2D and map to Mat
 auto pyarray = qd_python_init_output(n_rows, n_cols, n_slices, Cube);       // Init 3D and map to Cube
-auto pyarray = qd_python_init_output(n_rows, n_cols, n_slices, n_frames);   // Init 4D
+auto pyarray = qd_python_init_output(n_rows, n_cols, n_slices, n_frames, &vecCubes);  // Init 4D and map frames to vector<Cube>
 
 - Parse shape of a Numpy array or list of Numpy arrays
   0: n_row, 1: n_cols, 2: n_slices, 3-5: Strides in number of elements, 6: Fortran-contiguous, 7: n_elem, 8: n_bytes
 
-std::array<size_t, 9> shape = qd_python_get_shape(pyarray);         // For Numpy arrays
+std::array<size_t, 9> shape = qd_python_get_shape(pyarray);         // For Numpy arrays (1D-3D)
+std::array<size_t, 9> shape = qd_python_get_shape(pyarray, false, &n_frames, &stride_frames); // Also accept 4D
 
 std::vector<dtype *> pointers;                                      // Direct memory pointers
 std::vector<py::array_t<dtype>> owned_arrays;                       // Needed for type conversion
@@ -82,6 +85,7 @@ qd_python_copy2arma(pyarrayComplex, outCubeRe, outCubeIm);          // Copy from
 auto Col = qd_python_numpy2arma_Col(pyarray, view, strict);         // Map to Col
 auto Mat = qd_python_numpy2arma_Mat(pyarray, view, strict);         // Map to Mat
 auto Cube = qd_python_numpy2arma_Cube(pyarray, view, strict);       // Map to Mat
+auto vecCube = qd_python_numpy2arma_vecCube(pyarray, view, strict); // Map 4D array to vector<Cube>
 
 - Copy py::list of Numpy arrays to std::vector of Armadillo types
 
@@ -324,6 +328,31 @@ static py::array_t<std::complex<dtype>> qd_python_copy2numpy(const arma::Cube<dt
     return output;
 }
 
+// Stack a vector of Cubes into a single 4D Numpy array (frames = vector index)
+template <typename dtype>
+static py::array_t<dtype> qd_python_copy2numpy_4d(const std::vector<arma::Cube<dtype>> &input)
+{
+    if (input.empty())
+        return py::array_t<dtype>();
+
+    const ssize_t n_bytes = sizeof(dtype);
+    const ssize_t n_rows = (ssize_t)input[0].n_rows;
+    const ssize_t n_cols = (ssize_t)input[0].n_cols;
+    const ssize_t n_slices = (ssize_t)input[0].n_slices;
+    const ssize_t n_frames = (ssize_t)input.size();
+    const size_t frame_size = (size_t)n_rows * (size_t)n_cols * (size_t)n_slices;
+
+    std::array<ssize_t, 4> shape = {n_rows, n_cols, n_slices, n_frames};
+    std::array<ssize_t, 4> strides = {n_bytes, n_rows * n_bytes, ssize_t(n_rows * n_cols) * n_bytes, ssize_t(frame_size) * n_bytes};
+    py::array_t<dtype> output(shape, strides);
+    dtype *p_out = output.mutable_data();
+
+    for (ssize_t f = 0; f < n_frames; ++f)
+        std::memcpy(p_out + f * frame_size, input[f].memptr(), frame_size * n_bytes);
+
+    return output;
+}
+
 template <typename dtype>
 static py::list qd_python_copy2numpy(const std::vector<dtype> &input, // Vector of Stuff
                                      const arma::uvec &indices = {})  // Optional elements to copy
@@ -432,13 +461,23 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
 }
 
 template <typename dtype>
-static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices, arma::uword n_frames)
+static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices, arma::uword n_frames,
+                                                std::vector<arma::Cube<dtype>> *cubes = nullptr)
 {
     const ssize_t n_bytes = (ssize_t)sizeof(dtype);
 
     std::array<ssize_t, 4> shape = {(ssize_t)n_rows, (ssize_t)n_cols, (ssize_t)n_slices, (ssize_t)n_frames};
     std::array<ssize_t, 4> strides = {n_bytes, (ssize_t)n_rows * n_bytes, ssize_t(n_rows * n_cols) * n_bytes, ssize_t(n_rows * n_cols * n_slices) * n_bytes};
     py::array_t<dtype> output(shape, strides);
+
+    if (cubes != nullptr)
+    {
+        cubes->resize(n_frames);
+        dtype *base = (dtype *)output.mutable_data();
+        size_t frame_stride = (size_t)n_rows * (size_t)n_cols * (size_t)n_slices;
+        for (arma::uword i = 0; i < n_frames; ++i)
+            (*cubes)[i] = arma::Cube<dtype>(base + i * frame_stride, n_rows, n_cols, n_slices, false, true);
+    }
 
     return output;
 }
@@ -450,27 +489,47 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
 //   6: Fortran-contiguous (1) or C-contiguous (0)
 //   7: Total number of elements
 //   8: Total number of bytes
+// Optional: n_frames (4th dim, 1 if input is 1D-3D), stride_frames (stride of 4th dim in elements)
 template <typename dtype>
-static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input, bool shape_only = false)
+static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input, bool shape_only = false,
+                                                  size_t *n_frames = nullptr, size_t *stride_frames = nullptr)
 {
     auto buf = input.request();
     int nd = (int)buf.ndim;
     const size_t n_bytes = sizeof(dtype);
 
-    if (nd > 3)
+    if (n_frames == nullptr && nd > 3)
         throw std::invalid_argument("Expected 1D, 2D or 3D array, got " + std::to_string(nd) + "D");
 
+    if (nd > 4)
+        throw std::invalid_argument("Expected 1D, 2D, 3D or 4D array, got " + std::to_string(nd) + "D");
+
     if (nd == 0)
+    {
+        if (n_frames != nullptr)
+            *n_frames = 1;
+        if (stride_frames != nullptr)
+            *stride_frames = 1;
         return {1, 1, 1, 1, 1, 1, 1, 1, n_bytes};
+    }
 
     std::array<size_t, 9> shape;
     shape[0] = (size_t)buf.shape[0];
     shape[1] = (nd >= 2) ? (size_t)buf.shape[1] : 1;
-    shape[2] = (nd == 3) ? (size_t)buf.shape[2] : 1;
+    shape[2] = (nd >= 3) ? (size_t)buf.shape[2] : 1;
+
+    size_t nf = (nd == 4) ? (size_t)buf.shape[3] : 1;
+    if (n_frames != nullptr)
+        *n_frames = nf;
+
     nd = (shape[1] == 1 && shape[2] == 1) ? 1 : (shape[2] == 1 ? 2 : 3);
 
     if (shape_only)
+    {
+        if (stride_frames != nullptr)
+            *stride_frames = shape[0] * shape[1] * shape[2];
         return shape;
+    }
 
     if (buf.itemsize != (ssize_t)n_bytes)
         throw std::invalid_argument("Dtype size mismatch");
@@ -479,11 +538,16 @@ static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input
     shape[4] = (nd >= 2) ? (size_t)buf.strides[1] / n_bytes : shape[0];
     shape[5] = (nd == 3) ? (size_t)buf.strides[2] / n_bytes : shape[0] * shape[1];
 
-    // Check if input is Fortran-contiguous
-    shape[6] = (shape[3] == 1) && (shape[4] == shape[0]) && (shape[5] == shape[0] * shape[1]);
+    size_t sf = (nf > 1) ? (size_t)buf.strides[3] / n_bytes : shape[0] * shape[1] * shape[2];
+    if (stride_frames != nullptr)
+        *stride_frames = sf;
 
-    shape[7] = shape[0] * shape[1] * shape[2];           // Total number of elements
-    shape[8] = shape[0] * shape[1] * shape[2] * n_bytes; // Total number of bytes
+    // Check if input is Fortran-contiguous (including 4th dim if present)
+    shape[6] = (shape[3] == 1) && (shape[4] == shape[0]) && (shape[5] == shape[0] * shape[1]) &&
+               (sf == shape[0] * shape[1] * shape[2]);
+
+    shape[7] = shape[0] * shape[1] * shape[2];           // Total number of elements (per frame)
+    shape[8] = shape[0] * shape[1] * shape[2] * n_bytes; // Total number of bytes (per frame)
 
     return shape;
 }
@@ -707,6 +771,56 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool v
         view = false;
     }
     return qd_python_numpy2arma_Cube(pyarray, view, strict);
+}
+
+// Convert a 3D or 4D Numpy array to std::vector<arma::Cube<dtype>>
+// 3D input → vector with 1 entry, 4D input → vector with n_frames entries
+template <typename dtype>
+static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::array_t<dtype> &input,
+                                                                    bool view = false, bool strict = false)
+{
+    size_t n_frames, stride_frames;
+    auto shape = qd_python_get_shape(input, !view, &n_frames, &stride_frames);
+
+    std::vector<arma::Cube<dtype>> output(n_frames);
+
+    if (view && shape[6]) // Fully Fortran-contiguous: direct memory views
+    {
+        dtype *base = const_cast<dtype *>(input.data());
+        for (size_t i = 0; i < n_frames; ++i)
+            output[i] = arma::Cube<dtype>(base + i * stride_frames, shape[0], shape[1], shape[2], true, false);
+        return output;
+    }
+
+    if (view && strict)
+        throw std::invalid_argument("Could not obtain memory view, possibly due to mismatching strides.");
+
+    // Copy path: offset source pointer per frame, delegate to existing copy2arma
+    const dtype *src = input.data();
+    for (size_t i = 0; i < n_frames; ++i)
+    {
+        output[i].set_size(shape[0], shape[1], shape[2]);
+        qd_python_copy2arma(src + i * stride_frames, shape, output[i]);
+    }
+    return output;
+}
+
+// py::handle overload for qd_python_numpy2arma_vecCube
+template <typename dtype>
+static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::handle &obj,
+                                                                    bool view = false, bool strict = false)
+{
+    py::array_t<dtype> pyarray;
+    if (py::isinstance<py::array_t<dtype>>(obj))
+        pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
+    else
+    {
+        if (view && strict)
+            throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
+        pyarray = py::cast<py::array_t<dtype>>(obj);
+        view = false;
+    }
+    return qd_python_numpy2arma_vecCube(pyarray, view, strict);
 }
 
 // -------------------------------- qd_python_list2vector --------------------------------
