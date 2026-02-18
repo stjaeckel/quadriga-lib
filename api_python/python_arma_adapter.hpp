@@ -780,7 +780,10 @@ static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::arr
                                                                     bool view = false, bool strict = false)
 {
     size_t n_frames, stride_frames;
-    auto shape = qd_python_get_shape(input, !view, &n_frames, &stride_frames);
+    // Always compute full strides (shape_only=false): the copy path below passes shape
+    // to qd_python_copy2arma(ptr, shape, cube) which reads shape[3..8] (strides, Fortran
+    // flag, byte count). With shape_only=true those fields are uninitialized → UB.
+    auto shape = qd_python_get_shape(input, false, &n_frames, &stride_frames);
 
     std::vector<arma::Cube<dtype>> output(n_frames);
 

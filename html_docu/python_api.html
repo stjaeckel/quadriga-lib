@@ -96,6 +96,7 @@ import quadriga_lib
 <tr><td><a href="#qdant_read">qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
 <tr><td><a href="#qdant_write">qdant_write</a></td><td>Writes array antenna data to QDANT files</td></tr>
 <tr><td><a href="#rotate_pattern">rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
+<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generates a parametric loudspeaker directivity model</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients from path data and antenna patterns</td></tr>
 </tbody>
@@ -398,34 +399,55 @@ arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_
 <b>copy_element</b> - Create copies of array antenna elements
 <ul>
 <li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Copies one or more antenna elements to new positions within the arrayant, expanding the element 
+count if necessary. Supports both single-frequency arrayants (3D pattern fields) and multi-frequency 
+arrayants (4D pattern fields). For multi-frequency inputs, element copying is applied consistently 
+across all frequency entries. 
+ 
+The function auto-detects whether the input is single-frequency or multi-frequency by inspecting 
+the dimensionality of the <code>e_theta_re</code> field (3D = single, 4D = multi).
+</li>
+<li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 from quadriga_lib import arrayant
-arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
+
+# Single-frequency: copy element 0 to position 1
+arrayant_out = arrayant.copy_element(ant, source_element=[0], dest_element=[1])
+
+# Single-frequency: copy element 0 to positions 2 and 3
+arrayant_out = arrayant.copy_element(ant, source_element=[0], dest_element=[2, 3])
+
+# Multi-frequency (4D patterns): same interface
+speaker_out = arrayant.copy_element(speaker, source_element=[0], dest_element=[1])
+
+# Copy multiple sources to multiple destinations (must be same length)
+arrayant_out = arrayant.copy_element(ant, source_element=[0, 1], dest_element=[2, 3])
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [1] (required)<br> 
-   Dictionary containing the arrayant data with the following keys: 
+   Dictionary containing the arrayant data. Pattern fields may be 3D (single-frequency) or 
+   4D (multi-frequency, 4th dimension = frequency). The following keys are expected: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
@@ -445,17 +467,17 @@ arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 <tr>
   <td><code>coupling_re</code></td>
   <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>coupling_im</code></td>
   <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
 </tr>
 <tr>
   <td><code>center_freq</code></td>
   <td>Center frequency in [Hz], optional</td>
-  <td>Scalar</td>
+  <td>Scalar or 1D array <code>(n_freq)</code></td>
 </tr>
 <tr>
   <td><code>name</code></td>
@@ -476,64 +498,8 @@ arrayant_out = arrayant.copy_element(arrayant, source_element, dest_element);
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
-   Dictionary containing the arrayant data with the following keys: 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions</td>
-  <td>Shape: <code>(3, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], default = 0.3 GHz</td>
-  <td>Scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the array antenna object</td>
-  <td>String</td>
-</tr>
-</table><br>
+   Dictionary containing the arrayant data with the copied elements. Output format matches the 
+   input format (3D for single-frequency, 4D for multi-frequency). 
 </li></ul>
 </li>
 </ul>
@@ -1102,13 +1068,27 @@ vr,vi,hr,hi,az_local,el_local,gamma = arrayant.interpolate(arrayant, azimuth, el
 <b>qdant_read</b> - Reads array antenna data from QDANT files
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
-data in XML. This function reads pattern data from the specified file.
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
+   data in XML. This function reads pattern data from the specified file. 
+</li><li style="margin-bottom: 0.4em;">Supports both single-entry and multi-entry (multi-frequency) reading: 
+</li><li style="margin-bottom: 0.4em;"><b>Single-entry (id &ge; 1):</b> Reads one antenna entry from the file. Pattern fields are returned as 
+   3D arrays <code>(n_el, n_az, n_elem)</code>. This is the default behavior. 
+</li><li style="margin-bottom: 0.4em;"><b>Multi-entry (id = 0):</b> Reads all antenna entries from the file and returns them as a single 
+   multi-frequency arrayant dict. Pattern fields are returned as 4D arrays 
+   <code>(n_el, n_az, n_elem, n_freq)</code>, center frequencies as a 1D array, and coupling matrices as 3D 
+   arrays if they vary across entries. This is the inverse of <code>qdant_write</code> with 4D input. 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 from quadriga_lib import arrayant
-data = arrayant.qdant_read( fn, id )
+
+# Read a single antenna entry (default: first entry)
+data = arrayant.qdant_read('antenna.qdant')
+data = arrayant.qdant_read('antenna.qdant', id=2)
+
+# Read all entries as multi-frequency arrayant (4D patterns)
+data = arrayant.qdant_read('speaker.qdant', id=0)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -1117,333 +1097,40 @@ data = arrayant.qdant_read( fn, id )
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> (optional)<br> 
-   ID of the antenna to be read from the file, optional, Default: Read first 
+   ID of the antenna to be read from the file. Default: <code>1</code> (read first entry). 
+   Set to <code>0</code> to read all entries as a multi-frequency arrayant. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b><br> 
    Dictionary containing the data in the QDANT file with the following keys: 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], optional, default = 0.3 GHz</td>
-  <td>Scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the array antenna object</td>
-  <td>String</td>
-</tr>
-<tr>
-  <td><code>layout</code></td>
-  <td>Layout of multiple array antennas.</td>
-  <td>Matrix</td>
-</tr>
-</table><br>
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#qdant_write">qdant_write</a> (for writing QDANT data) 
-</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="qdant_write"></a>
-<b>qdant_write</b> - Writes array antenna data to QDANT files
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
-data in XML. This function writes pattern data to the specified file.
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Usage:</i></b><br><pre>
-from quadriga_lib import arrayant
-id_in_file = arrayant.qdant_write( fn, arrayant, id, layout);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Multiple array antennas can be stored in the same file using the <code>id</code> parameter. 
-</li><li style="margin-bottom: 0.4em;">If writing to an exisiting file without specifying an <code>id</code>, the data gests appended at the end. 
-   The output <code>id_in_file</code> identifies the location inside the file. 
-</li><li style="margin-bottom: 0.4em;">An optional storage <code>layout</code> can be provided to organize data inside the file. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> [1]<br> 
-   Filename of the QDANT file, string 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [2] (optional)<br> 
-   Dictionary containing the arrayant data with the following keys: 
+  For single-entry (id &ge; 1): 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>e_theta_re</code></td>
   <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code></td>
 </tr>
 <tr>
   <td><code>e_theta_im</code></td>
   <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_re</code></td>
   <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code></td>
 </tr>
 <tr>
   <td><code>e_phi_im</code></td>
   <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code></td>
 </tr>
 <tr>
   <td><code>azimuth_grid</code></td>
   <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], optional, default = 0.3 GHz</td>
-  <td>Scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the array antenna object, optional</td>
-  <td>String</td>
-</tr>
-</table><br>
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> [3] (optional)<br> 
-   ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>layout</code></b> [4] (optional)<br> 
-   Layout of multiple array antennas. Must only contain element ids that are present in the file. optional 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>id_in_file</code></b><br> 
-   ID of the antenna in the file after writing 
-</li></ul>
- 
-# See also: 
-<ul><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> (for reading QDANT data) 
-</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
-</li></ul>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="rotate_pattern"></a>
-<b>rotate_pattern</b> - Rotates antenna patterns
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms the radiation patterns of array antenna elements, allowing for 
-precise rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system. 
-The 3 rotations are applies in the order: 1. rotation around the x-axis (bank angle); 
-2. rotation around the y-axis (tilt angle), 3. rotation around the z-axis (heading angle)
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Usage:</i></b><br><pre>
-from quadriga_lib import arrayant
-arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, element);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b><br> 
-   Dictionary containing the arrayant data with the following keys: 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elements, n_ports)</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], optional</td>
-  <td>Scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the array antenna object, optional</td>
-  <td>String</td>
-</tr>
-</table><br>
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>x_deg</code></b> (optional)<br> 
-   The rotation angle around x-axis (bank angle) in [degrees] 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>y_deg</code></b> (optional)<br> 
-   The rotation angle around y-axis (tilt angle) in [degrees] 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>z_deg</code></b> (optional)<br> 
-   The rotation angle around z-axis (heading angle) in [degrees] 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>usage</code></b> (optional)<br> 
-   The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization. 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>usage = 0</code></td>
-  <td>Rotate both, pattern and polarization, adjusts sampling grid (default)</td>
-</tr>
-<tr>
-  <td><code>usage = 1</code></td>
-  <td>Rotate only pattern, adjusts sampling grid</td>
-</tr>
-<tr>
-  <td><code>usage = 2</code></td>
-  <td>Rotate only polarization</td>
-</tr>
-<tr>
-  <td><code>usage = 3</code></td>
-  <td>Rotate both, but do not adjust the sampling grid</td>
-</tr>
-</table><br>
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> (optional)<br> 
-   The element indices for which the pattern should be transformed. Optional parameter. Values must 
-   be between 1 and n_elements. If this parameter is not provided (or an empty array is passed), 
-   all elements will be rotated by the same angles. Shape: <code>(1, n_elements)</code> or empty <code>()</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
-   Dictionary containing the arrayant data with the following keys: 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation, n_azimuth, n_elements)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad] -pi to pi, sorted</td>
   <td>Shape: <code>(n_azimuth)</code></td>
 </tr>
 <tr>
@@ -1468,8 +1155,552 @@ arrayant_out = arrayant.rotate_pattern(arrayant, bank, tilt, head, usage, elemen
 </tr>
 <tr>
   <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz], default = 0.3 GHz</td>
+  <td>Center frequency in [Hz]</td>
   <td>Scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>layout</code></td>
+  <td>Layout of multiple array antennas</td>
+  <td>Matrix</td>
+</tr>
+</table><br>
+ 
+  For multi-entry (id = 0): 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Shape: <code>(n_azimuth)</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Shape: <code>(n_elevation)</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Shape: <code>(3, n_elements)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequencies in [Hz]</td>
+  <td>Shape: <code>(n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>layout</code></td>
+  <td>Layout of multiple array antennas</td>
+  <td>Matrix</td>
+</tr>
+</table><br>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#qdant_write">qdant_write</a> (for writing QDANT data) 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qdant_write"></a>
+<b>qdant_write</b> - Writes array antenna data to QDANT files
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern 
+   data in XML. This function writes pattern data to the specified file. 
+</li><li style="margin-bottom: 0.4em;">Supports both single-frequency arrayants (3D pattern fields) and multi-frequency arrayants 
+   (4D pattern fields). The function auto-detects the format by inspecting the dimensionality of 
+   <code>e_theta_re</code> (3D = single, 4D = multi). 
+</li><li style="margin-bottom: 0.4em;"><b>Single-frequency:</b> Writes one antenna entry to the file. The <code>id</code> parameter controls where the 
+   entry is placed. Multiple antennas can be stored in the same file by calling this function 
+   repeatedly with different IDs. 
+</li><li style="margin-bottom: 0.4em;"><b>Multi-frequency:</b> Writes all frequency entries as sequential IDs (1-based) to the file. The file 
+   is overwritten if it already exists. A layout matrix is created automatically. The <code>id</code> and <code>layout</code> 
+   parameters are ignored for multi-frequency inputs. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
+# Single-frequency: write with optional ID
+id_in_file = arrayant.qdant_write('antenna.qdant', ant)
+id_in_file = arrayant.qdant_write('antenna.qdant', ant, id=2)
+
+# Multi-frequency (4D patterns): writes all frequencies sequentially
+arrayant.qdant_write('speaker.qdant', speaker)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> [1]<br> 
+   Filename of the QDANT file, string 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b> [2] (optional)<br> 
+   Dictionary containing the arrayant data. Pattern fields may be 3D (single-frequency) or 
+   4D (multi-frequency, 4th dimension = frequency). The following keys are expected: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Shape: <code>(n_azimuth)</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Shape: <code>(n_elevation)</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Shape: <code>(3, n_elements)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional</td>
+  <td>Scalar or 1D array <code>(n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>id</code></b> [3] (optional, single-frequency only)<br> 
+   ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1. 
+   Ignored for multi-frequency inputs. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>layout</code></b> [4] (optional, single-frequency only)<br> 
+   Layout of multiple array antennas. Must only contain element ids that are present in the file. 
+   Ignored for multi-frequency inputs. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>id_in_file</code></b><br> 
+   For single-frequency: ID of the antenna in the file after writing. 
+   For multi-frequency: always returns 0 (all entries are written sequentially starting at ID 1). 
+</li></ul>
+ 
+# See also: 
+<ul><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> (for reading QDANT data) 
+</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="rotate_pattern"></a>
+<b>rotate_pattern</b> - Rotates antenna patterns
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function transforms the radiation patterns of array antenna elements, allowing for 
+   precise rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system. 
+   The 3 rotations are applied in the order: 1. rotation around the x-axis (bank angle); 
+   2. rotation around the y-axis (tilt angle), 3. rotation around the z-axis (heading angle). 
+</li><li style="margin-bottom: 0.4em;">Supports both single-frequency arrayants (3D pattern fields) and multi-frequency arrayants 
+   (4D pattern fields). For multi-frequency inputs, the rotation is applied consistently across all 
+   frequency entries. The function auto-detects the format by inspecting the dimensionality of 
+   <code>e_theta_re</code> (3D = single, 4D = multi). 
+</li><li style="margin-bottom: 0.4em;"><b>Note on usage modes for multi-frequency:</b> Grid adjustment (usage 0 and 1) is not supported for 
+   multi-frequency arrayants because all frequency entries must share the same angular grid. The multi- 
+   frequency path automatically maps usage 0 → 3 (pattern + polarization, no grid adjust) and 
+   usage 1 → 4 (pattern only, no grid adjust). Usage 2 (polarization only) works identically in both 
+   paths. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
+# Single-frequency: rotate all elements by 45 deg bank
+arrayant_out = arrayant.rotate_pattern(ant, x_deg=45.0)
+
+# Single-frequency: rotate only elements 0 and 1 (0-based)
+arrayant_out = arrayant.rotate_pattern(ant, z_deg=90.0, element=[0, 1])
+
+# Multi-frequency (4D patterns): same interface
+speaker_out = arrayant.rotate_pattern(speaker, y_deg=10.0)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant</code></b><br> 
+   Dictionary containing the arrayant data. Pattern fields may be 3D (single-frequency) or 
+   4D (multi-frequency, 4th dimension = frequency). The following keys are expected: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
+  <td>Shape: <code>(n_azimuth)</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
+  <td>Shape: <code>(n_elevation)</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions, optional</td>
+  <td>Shape: <code>(3, n_elements)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part, optional</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part, optional</td>
+  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz], optional</td>
+  <td>Scalar or 1D array <code>(n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object, optional</td>
+  <td>String</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>x_deg</code></b> (optional)<br> 
+   The rotation angle around x-axis (bank angle) in [degrees]. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>y_deg</code></b> (optional)<br> 
+   The rotation angle around y-axis (tilt angle) in [degrees]. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>z_deg</code></b> (optional)<br> 
+   The rotation angle around z-axis (heading angle) in [degrees]. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>usage</code></b> (optional)<br> 
+   The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization. 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>usage = 0</code></td>
+  <td>Rotate both, pattern and polarization, adjusts sampling grid (default; multi-freq: no grid adjust)</td>
+</tr>
+<tr>
+  <td><code>usage = 1</code></td>
+  <td>Rotate only pattern, adjusts sampling grid (multi-freq: no grid adjust)</td>
+</tr>
+<tr>
+  <td><code>usage = 2</code></td>
+  <td>Rotate only polarization</td>
+</tr>
+<tr>
+  <td><code>usage = 3</code></td>
+  <td>Rotate both, but do not adjust the sampling grid</td>
+</tr>
+<tr>
+  <td><code>usage = 4</code></td>
+  <td>Rotate only pattern, do not adjust the sampling grid</td>
+</tr>
+</table><br>
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> (optional)<br> 
+   The element indices for which the pattern should be transformed. Optional parameter. Values must 
+   be between 0 and n_elements-1 (0-based). If this parameter is not provided (or an empty array is 
+   passed), all elements will be rotated by the same angles. Shape: <code>(n_elements)</code> or empty <code>()</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>arrayant_out</code></b><br> 
+   Dictionary containing the arrayant data with the rotated patterns. Output format matches the 
+   input format (3D for single-frequency, 4D for multi-frequency). 
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_speaker"></a>
+<b>generate_speaker</b> - Generates a parametric loudspeaker directivity model
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>This function generates frequency-dependent loudspeaker radiation patterns by combining a driver 
+directivity model with an enclosure radiation modifier and a Butterworth-style bandpass frequency 
+response. Returns a multi-frequency arrayant dictionary where the pattern fields are 4D arrays 
+(the 4th dimension is frequency) and <code>center_freq</code> is a 1D array of frequency samples in Hz. 
+ 
+Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and 
+combining them via <code>arrayant_concat_multi</code>. Crossover behavior emerges naturally from overlapping 
+bandpass responses.<br><br> 
+ 
+Three driver types are supported: 
+<ul><li style="margin-bottom: 0.4em;"><b><code>piston</code></b>: Circular piston in a baffle using the classical Bessel J1 formula. Transitions from 
+   omnidirectional at low ka to progressively narrower beaming at high ka. 
+</li><li style="margin-bottom: 0.4em;"><b><code>horn</code></b>: Separable cosine-power directivity with frequency-dependent pattern control. Below the 
+   horn control frequency, the pattern blends toward omnidirectional. 
+</li><li style="margin-bottom: 0.4em;"><b><code>omni</code></b>: Frequency-independent omnidirectional pattern (suitable for subwoofers).<br><br> 
+</li></ul>
+ 
+Four enclosure radiation types modify the base driver pattern: 
+<ul><li style="margin-bottom: 0.4em;"><b><code>monopole</code></b>: No modification (4π radiation). Appropriate for subwoofers in free space. 
+</li><li style="margin-bottom: 0.4em;"><b><code>hemisphere</code></b>: Sealed box on a finite baffle with frequency-dependent baffle step transition. 
+</li><li style="margin-bottom: 0.4em;"><b><code>dipole</code></b>: Open baffle / planar speaker with figure-8 pattern. 
+</li><li style="margin-bottom: 0.4em;"><b><code>cardioid</code></b>: Monopole + dipole combination with null at the rear.<br><br> 
+</li></ul>
+ 
+The frequency response follows a Butterworth-style bandpass filter. If no frequency vector is 
+provided, third-octave band center frequencies are auto-generated covering the range from one band 
+below the lower cutoff to one band above the upper cutoff, clipped to 20–20000 Hz.
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import arrayant
+
+# Default piston driver (4-inch, 80 Hz – 12 kHz)
+speaker = arrayant.generate_speaker()
+
+# Horn tweeter with custom coverage
+speaker = arrayant.generate_speaker(
+    driver_type='horn',
+    radius=0.025,
+    lower_cutoff=1500.0,
+    upper_cutoff=20000.0,
+    radiation_type='hemisphere',
+    hor_coverage=90.0,
+    ver_coverage=60.0
+)
+
+# Omnidirectional subwoofer with steep rolloff
+speaker = arrayant.generate_speaker(
+    driver_type='omni',
+    radius=0.165,
+    lower_cutoff=30.0,
+    upper_cutoff=300.0,
+    lower_rolloff_slope=24.0,
+    upper_rolloff_slope=24.0,
+    sensitivity=90.0,
+    radiation_type='monopole'
+)
+
+# Piston driver at specific frequencies
+import numpy as np
+speaker = arrayant.generate_speaker(
+    frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
+    angular_resolution=5.0
+)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>driver_type</code></b><br> 
+   Driver directivity model, string. Supported values: <code>"piston"</code> (cone/dome via Bessel function), 
+   <code>"horn"</code> (cosine-power with frequency-dependent pattern control), <code>"omni"</code> (omnidirectional 
+   subwoofer). Default: <code>"piston"</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>radius</code></b><br> 
+   Effective radiating radius in meters, scalar. For <code>"piston"</code>: cone or dome radius. For <code>"horn"</code>: 
+   mouth radius (pattern control frequency auto-derived if not specified). Default: <code>0.05</code> (~4-inch driver) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>lower_cutoff</code></b><br> 
+   Lower −3 dB frequency of the bandpass response in Hz, scalar. Default: <code>80.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>upper_cutoff</code></b><br> 
+   Upper −3 dB frequency of the bandpass response in Hz, scalar. Default: <code>12000.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>lower_rolloff_slope</code></b><br> 
+   Low-frequency rolloff slope in dB per octave, scalar. Butterworth order = slope / 6 
+   (e.g. 12 dB/oct = 2nd order). Default: <code>12.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>upper_rolloff_slope</code></b><br> 
+   High-frequency rolloff slope in dB per octave, scalar. Default: <code>12.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>sensitivity</code></b><br> 
+   On-axis sensitivity in dB SPL at 1W/1m, scalar. Scales amplitude linearly relative to 85 dB 
+   reference. Default: <code>85.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>radiation_type</code></b><br> 
+   Enclosure radiation modifier, string. Supported values: <code>"monopole"</code>, <code>"hemisphere"</code>, 
+   <code>"dipole"</code>, <code>"cardioid"</code>. Default: <code>"hemisphere"</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>hor_coverage</code></b><br> 
+   Horizontal coverage angle in degrees, scalar. Horn driver only. 0 = auto (90°). Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>ver_coverage</code></b><br> 
+   Vertical coverage angle in degrees, scalar. Horn driver only. 0 = auto (60°). Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>horn_control_freq</code></b><br> 
+   Horn pattern control frequency in Hz, scalar. 0 = auto-derived from mouth radius. Default: <code>0.0</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>baffle_width</code></b><br> 
+   Enclosure baffle width in meters, scalar. Piston driver only (used for baffle step model). 
+   Default: <code>0.15</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>baffle_height</code></b><br> 
+   Enclosure baffle height in meters, scalar. Piston driver only. Default: <code>0.25</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>frequencies</code></b><br> 
+   Frequency sample points in Hz, 1D numpy array. If empty, third-octave bands are auto-generated. 
+   Default: empty (auto) 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>angular_resolution</code></b><br> 
+   Angular grid resolution in degrees, scalar. Used to generate azimuth and elevation grids. 
+   Default: <code>5.0</code> 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>speaker</code></b><br> 
+   Dictionary containing the multi-frequency arrayant data with the following keys: 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td>Shape: <code>(n_elevation, n_azimuth, n_elements, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in [rad], −π to π, sorted</td>
+  <td>Shape: <code>(n_azimuth)</code></td>
+</tr>
+<tr>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in [rad], −π/2 to π/2</td>
+  <td>Shape: <code>(n_elevation)</code></td>
+</tr>
+<tr>
+  <td><code>element_pos</code></td>
+  <td>Antenna element (x,y,z) positions</td>
+  <td>Shape: <code>(3, n_elements)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part</td>
+  <td>Shape: <code>(n_elements, n_ports)</code> or <code>(n_elements, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td>Shape: <code>(n_elements, n_ports)</code> or <code>(n_elements, n_ports, n_freq)</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Frequency samples in Hz</td>
+  <td>Shape: <code>(n_freq)</code> - 1D array</td>
 </tr>
 <tr>
   <td><code>name</code></td>
