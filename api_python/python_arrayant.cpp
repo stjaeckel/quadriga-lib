@@ -107,6 +107,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("element") = py::array_t<arma::uword>(),
           py::arg("orientation") = py::array_t<double>(),
           py::arg("element_pos") = py::array_t<double>(),
+          py::arg("frequency") = py::array_t<double>(),
           py::arg("complex") = false,
           py::arg("dist") = false,
           py::arg("local_angles") = false,
