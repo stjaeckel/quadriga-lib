@@ -45,10 +45,10 @@ Read ray-tracing data from a QRT file
   Path to the QRT file, string.
 
 - **`i_cir`** (optional)<br>
-  Snapshot index (1-based), scalar. Default: 0
+  Snapshot index (1-based), scalar. Default: 1
 
 - **`i_orig`** (optional)<br>
-  Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 0
+  Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 1
 
 - **`downlink`** (optional)<br>
   If `true`, origin is TX and destination is RX (downlink). If `false`, roles are swapped (uplink), 
@@ -125,10 +125,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     std::string fn = qd_mex_get_string(prhs[0]);
-    arma::uword i_cir = (nrhs < 2) ? 0 : qd_mex_get_scalar<arma::uword>(prhs[1], "i_cir", 0);
-    arma::uword i_orig = (nrhs < 3) ? 0 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 0);
+    arma::uword i_cir = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "i_cir", 1);
+    arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
     bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
     int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
+
+    i_cir -= 1;
+    i_orig -=1;
 
     // Declare outputs
     arma::vec center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation;
