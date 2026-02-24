@@ -128,6 +128,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
@@ -3516,6 +3517,62 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <font size=+1><b>Miscellaneous / Tools</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="acdf"></a>
+<b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the empirical CDF from the given data matrix, where each column represents an 
+   independent data set (e.g., repeated experiment runs). 
+</li><li style="margin-bottom: 0.4em;">Individual CDFs are computed per column and an averaged CDF is obtained by interpolation in 
+   quantile space. 
+</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values in the data are excluded from the computation. 
+</li><li style="margin-bottom: 0.4em;">If <code>bins</code> is <code>None</code> or empty, 201 equally spaced bins spanning the data range are generated. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+import quadriga_lib
+result = quadriga_lib.tools.acdf( data, bins, n_bins )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>data</b></code> (input)<br> 
+   Input data matrix. Shape <code>(n_samples, n_sets)</code>. Each column is one data set. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>bins</b> = None</code> (optional input)<br> 
+   Bin centers for the histogram. Shape <code>(n_bins,)</code>. If <code>None</code> or empty, bins are auto-generated. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>n_bins</b> = 201</code> (input)<br> 
+   Number of bins to generate when bins are auto-generated. Must be at least 2. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dict</code> with keys:<br> 
+   <code>"bins"</code> — Bin centers, shape <code>(n_bins,)</code>.<br> 
+   <code>"Sh"</code> — Individual CDFs, shape <code>(n_bins, n_sets)</code>.<br> 
+   <code>"Sc"</code> — Averaged CDF, shape <code>(n_bins,)</code>.<br> 
+   <code>"mu"</code> — Mean quantiles at 0.1–0.9, shape <code>(9,)</code>.<br> 
+   <code>"sig"</code> — Std of quantiles at 0.1–0.9, shape <code>(9,)</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+import numpy as np
+import quadriga_lib
+
+data = np.random.randn(10000, 5)
+result = quadriga_lib.tools.acdf(data)
+bins = result["bins"]   # 201 bin centers
+Sh = result["Sh"]       # Individual CDFs, shape (201, 5)
+Sc = result["Sc"]       # Averaged CDF, shape (201,)
+mu = result["mu"]       # Mean quantiles, shape (9,)
+sig = result["sig"]     # Std of quantiles, shape (9,)
+</pre>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_delay_spread"></a>
 <b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]

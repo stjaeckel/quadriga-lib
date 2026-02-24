@@ -157,6 +157,7 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
+<tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
 </tbody>
 </table>
 </ul>
@@ -4585,6 +4586,86 @@ std::vector&lt;arma::vec&gt; powers = { {1.0, 0.5, 0.25} };
 arma::vec mean_delay;
 arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &amp;mean_delay);
 // ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="acdf"></a>
+<b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the empirical CDF from the given data matrix, where each column represents an 
+   independent data set (e.g., repeated experiment runs). 
+</li><li style="margin-bottom: 0.4em;">Individual CDFs are computed per column by histogramming into the given (or auto-generated) bins 
+   and taking the cumulative sum normalized by the number of valid samples. 
+</li><li style="margin-bottom: 0.4em;">An averaged CDF is obtained by interpolating in quantile space: for a fine grid of probability 
+   levels, the corresponding x-values from each individual CDF are averaged, then the result is 
+   mapped back to the bin grid. 
+</li><li style="margin-bottom: 0.4em;">Quantile statistics (mean and standard deviation) are reported at the 0.1, 0.2, ..., 0.9 
+   probability levels. 
+</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values in the data are excluded from the computation. 
+</li><li style="margin-bottom: 0.4em;">If <code>bins</code> points to an empty vector, 201 equally spaced bins spanning the data range are 
+   generated and stored back. If <code>bins</code> points to a non-empty vector, those bin centers are used. 
+   If <code>bins</code> is <code>nullptr</code>, bins are auto-generated internally. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::acdf(const arma::Mat&lt;dtype&gt; &amp;data,
+                        arma::Col&lt;dtype&gt; *bins = nullptr,
+                        arma::Mat&lt;dtype&gt; *Sh = nullptr,
+                        arma::Col&lt;dtype&gt; *Sc = nullptr,
+                        arma::Col&lt;dtype&gt; *mu = nullptr,
+                        arma::Col&lt;dtype&gt; *sig = nullptr,
+                        arma::uword n_bins = 201);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>data</b></code> (input)<br> 
+   Input data matrix. Size <code>[n_samples, n_sets]</code>. Each column is one data set. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*bins</b> = nullptr</code> (optional input/output)<br> 
+   Bin centers for the histogram. Length <code>[n_bins]</code>. If pointing to an empty vector, auto-generated 
+   bins are stored here. If pointing to a non-empty vector, those bin centers are used. If <code>nullptr</code>, 
+   bins are auto-generated internally. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*Sh</b> = nullptr</code> (optional output)<br> 
+   Individual CDFs, one per column of data. Size <code>[n_bins, n_sets]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*Sc</b> = nullptr</code> (optional output)<br> 
+   Averaged CDF obtained by quantile-space averaging across data sets. Length <code>[n_bins]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mu</b> = nullptr</code> (optional output)<br> 
+   Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*sig</b> = nullptr</code> (optional output)<br> 
+   Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_bins</b> = 201</code> (input)<br> 
+   Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when 
+   non-empty bins are provided. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+#include "quadriga_tools.hpp"
+
+// Generate random data: 10000 samples x 5 experiment runs
+arma::mat data = arma::randn&lt;arma::mat&gt;(10000, 5);
+
+arma::vec bins;
+arma::mat Sh;
+arma::vec Sc, mu, sig;
+quadriga_lib::acdf(data, &amp;bins, &amp;Sh, &amp;Sc, &amp;mu, &amp;sig);
+
+// bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
 </pre>
 </li>
 </ul>

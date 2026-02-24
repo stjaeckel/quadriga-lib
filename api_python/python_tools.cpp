@@ -24,9 +24,15 @@ namespace py = pybind11;
 #include "qpy_cart2geo.cpp"
 #include "qpy_write_png.cpp"
 #include "qpy_calc_delay_spread.cpp"
+#include "qpy_acdf.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
+    m.def("acdf", &acdf,
+          py::arg("data"),
+          py::arg("bins") = py::none(),
+          py::arg("n_bins") = 201);
+
     m.def("cart2geo", &cart2geo, py::arg("cart"));
 
     m.def("write_png", &write_png,
