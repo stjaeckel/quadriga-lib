@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.5</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -53,6 +53,7 @@
 <li><a href="#4f5f509b">Channel class</a></li>
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#6f9553d7">Channel generation functions</a></li>
+<li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
 <li><a href="#b7e360ab">Miscellaneous tools</a></li>
 <li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
@@ -147,6 +148,15 @@
 <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Calculate channel coefficients for spherical waves across multiple frequencies</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients for spherical waves</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<b>Miscellaneous / Tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 </tbody>
 </table>
 </ul>
@@ -4500,6 +4510,82 @@ void quadriga_lib::get_channels_spherical(
 <ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <i></i>*eoa = nullptr</code> (optional output)<br> 
    Elevation of Arrival angles in radians, Size <code>[n_rx, n_tx, n_path]</code>. 
 </li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="b11e2d16"></a>
+<font size=+1><b>Miscellaneous / Tools</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_delay_spread"></a>
+<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
+   linear-scale powers for each channel impulse response (CIR). 
+</li><li style="margin-bottom: 0.4em;">An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
+   power below <code>p_max(dB) - threshold</code> are excluded from the calculation. 
+</li><li style="margin-bottom: 0.4em;">An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths 
+   falling into the same delay bin are summed before computing the delay spread. This is useful 
+   when the system bandwidth limits the time resolution (e.g. 50 ns at 20 MHz bandwidth). 
+</li><li style="margin-bottom: 0.4em;">When granularity is applied the function recursively calls itself on the binned power delay 
+   profile. 
+</li><li style="margin-bottom: 0.4em;">Optionally returns the mean delay for each CIR. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+arma::Col&lt;dtype&gt; quadriga_lib::calc_delay_spread(
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;delays,
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;powers,
+    dtype threshold = 100.0,
+    dtype granularity = 0.0,
+    arma::Col&lt;dtype&gt; *mean_delay = nullptr);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>delays</b></code> (input)<br> 
+   Delays in [s]. A vector of length <code>n_cir</code>, where each element is an Armadillo column vector 
+   of length <code>n_path</code> (the number of paths may differ per CIR). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>powers</b></code> (input)<br> 
+   Path powers on a linear scale [W]. Same structure as <code>delays</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>threshold</b> = 100.0</code> (input)<br> 
+   Power threshold in [dB] relative to the strongest path. Paths with power below 
+   <code>max_power / 10^(0.1 * threshold)</code> are excluded. Default: 100 dB (effectively all paths). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>granularity</b> = 0.0</code> (input)<br> 
+   Window size in [s] for grouping paths in the delay domain. Paths whose delays fall into the 
+   same bin of width <code>granularity</code> have their powers summed. Default: 0 (no grouping). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mean_delay</b> = nullptr</code> (optional output)<br> 
+   Mean delay in [s] for each CIR. Length <code>[n_cir]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>ds</b></code> (output)<br> 
+   RMS delay spread in [s] for each CIR. Length <code>[n_cir]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+std::vector&lt;arma::vec&gt; delays = { {0.0, 1e-6, 2e-6} };
+std::vector&lt;arma::vec&gt; powers = { {1.0, 0.5, 0.25} };
+arma::vec mean_delay;
+arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &amp;mean_delay);
+// ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
+</pre>
 </li>
 </ul>
 <div class="pagebreak"></div>

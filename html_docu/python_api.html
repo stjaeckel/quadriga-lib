@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.10.5</b></big>
 <br><br><br>
 
 <b>Notes</b>
@@ -128,6 +128,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
@@ -3515,6 +3516,63 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
 <font size=+1><b>Miscellaneous / Tools</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_delay_spread"></a>
+<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
+   linear-scale powers for each channel impulse response (CIR). 
+</li><li style="margin-bottom: 0.4em;">An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
+   power below <code>p_max(dB) - threshold</code> are excluded from the calculation. 
+</li><li style="margin-bottom: 0.4em;">An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths 
+   falling into the same delay bin are summed before computing the delay spread. 
+</li><li style="margin-bottom: 0.4em;">Optionally returns the mean delay for each CIR. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+import quadriga_lib
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold=100.0, granularity=0.0)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>delays</b></code> (input)<br> 
+   Delays in [s]. A list of length <code>n_cir</code>, where each element is a 1D numpy array of path delays. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>powers</b></code> (input)<br> 
+   Path powers on a linear scale [W]. Same structure as <code>delays</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>float <b>threshold</b> = 100.0</code> (input)<br> 
+   Power threshold in [dB] relative to the strongest path. Default: 100 dB. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>float <b>granularity</b> = 0.0</code> (input)<br> 
+   Window size in [s] for grouping paths in the delay domain. Default: 0 (no grouping). 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>ds</b></code> (output)<br> 
+   RMS delay spread in [s] for each CIR. Shape <code>(n_cir,)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>mean_delay</b></code> (output)<br> 
+   Mean delay in [s] for each CIR. Shape <code>(n_cir,)</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+import numpy as np
+import quadriga_lib
+
+delays = [np.array([0.0, 1e-6, 2e-6])]
+powers = [np.array([1.0, 0.5, 0.25])]
+ds, mean_delay = quadriga_lib.calc_delay_spread(delays, powers)
+</pre>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="cart2geo"></a>
 <b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
