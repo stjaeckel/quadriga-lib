@@ -248,7 +248,9 @@ CHECK(name == "TX1");
 - Avoid nested initializer lists, e.g. arma::mat X = {{1, 2}, {3, 4}}; instead, use `arma::mat X(2, 2); X.col(0) = {1, 3}; X.col(1) = {2, 4};` for better readability and error messages. Single-level initializer lists for vectors are fine.
 - For functions that don't operate on files, generate synthetic test data programmatically within the test.
 - Test data paths are relative to the project root: tests/data/<file> (if test data is used, it will be specified in the request).
-  
+- In templated function, always use typed null pointers since nullptr can't be implicitly matched to template parameters, e.g. 
+  nullptr to arma::Col<dtype>*
+
 ---
 
 ## FILE 3: Python Wrapper (`qpy_<name>.cpp`)
@@ -372,8 +374,6 @@ result = quadriga_lib.channel.function_name( fn, arg1, arg2 )
 \```
 ```
 
-
-
 ### API Declaration
 
 After the wrapper function, provide the `m.def(...)` declaration for `pybind11`:
@@ -390,7 +390,7 @@ m.def("function_name", &function_name,
 - Index parameters are **0-based** (same as C++)
 - Always pass all output pointers (no `nullptr` optimization) since all outputs are returned to Python
 - `int` and `bool` parameters are passed directly (no conversion needed)
-- Use py::tuple when outputs are a fixed, small set of scalars/arrays with a natural ordering. Use py::dict when outputs are numerous or the user would typically access them by name. If unsure, default to py::dict for better readability and maintainability.
+- Use py::tuple when outputs are a fixed, small set (less than 7 values) of scalars/arrays with a natural ordering. Use py::dict when outputs are numerous (more than 6) or the user would typically access them by name. If unsure, default to py::dict for better readability and maintainability.
 
 ---
 
@@ -646,6 +646,9 @@ Use `/*!MD ... MD!*/` with MATLAB-style usage and 1-based indexing:
 - All optional outputs governed by `nlhs`
 - All optional inputs governed by `nrhs` with defaults
 - If output size is known before calling the library, prefer `qd_mex_init_output` to allocate zero-copy output arrays and pass pointers to the library for direct writing
+- In the documentation, distinguish between "Input Arguments" and "Output Arguments" sections, and clearly specify the expected MATLAB types and shapes for each parameter.
+- Only define input data types when they are fixed (i.e. other types would throw an error, e.g. strings). qd_mex_get_scalar always casts to the requested type, so the library function should be robust to receiving different numeric types (e.g. int, double). The "qd_mex_get_double_*" function variants handle varying input types gracefully, so the library should be robust to receiving any type as long as it can be cast to double. 
+- Always state the output types and shapes in the documentation
 
 ---
 

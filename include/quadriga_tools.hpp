@@ -36,6 +36,19 @@ namespace quadriga_lib
 
     // ---- Miscellaneous tools ----
 
+    // Calculate the empirical averaged cumulative distribution function (CDF)
+    // Input data matrix has samples in rows and data sets in columns.
+    // Individual CDFs are computed per column. An averaged CDF is obtained by
+    // quantile-space averaging. Inf and NaN values are excluded.
+    template <typename dtype>
+    void acdf(const arma::Mat<dtype> &data,     // Input data, Size [n_samples, n_sets]
+              arma::Col<dtype> *bins = nullptr, // Bin centers (in/out), Length [n_bins]
+              arma::Mat<dtype> *Sh = nullptr,   // Individual CDFs, Size [n_bins, n_sets]
+              arma::Col<dtype> *Sc = nullptr,   // Averaged CDF, Length [n_bins]
+              arma::Col<dtype> *mu = nullptr,   // Mean 0.1-0.9 quantiles, Length [9]
+              arma::Col<dtype> *sig = nullptr,  // Std of 0.1-0.9 quantiles, Length [9]
+              arma::uword n_bins = 201);        // Number of auto-generated bins
+
     // Calculates the rotation matrix from Euler angles
     // - Returns: Coefficients of the rotation matrix in column-major ordering, Size: [9, n_row, n_col]
     // - Internal calculations are done in double precision, even if the <dtype> is <float>
