@@ -25,6 +25,7 @@ namespace py = pybind11;
 #include "qpy_write_png.cpp"
 #include "qpy_calc_delay_spread.cpp"
 #include "qpy_acdf.cpp"
+#include "qpy_calc_angular_spreads_sphere.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -42,6 +43,13 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("min_val") = NAN,
           py::arg("max_val") = NAN,
           py::arg("log_transform") = false);
+
+    m.def("calc_angular_spreads_sphere", &calc_angular_spreads_sphere,
+          py::arg("az"),
+          py::arg("el"),
+          py::arg("pw"),
+          py::arg("calc_bank_angle") = true,
+          py::arg("quantize") = 0.0);
 
     m.def("calc_delay_spread", &calc_delay_spread,
           py::arg("delays"),

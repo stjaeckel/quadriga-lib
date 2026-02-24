@@ -51,7 +51,8 @@
 // #include "catch2_tests/test_arrayant_interpolate_multi.cpp"
 // #include "catch2_tests/test_get_channels_multifreq.cpp"
 // #include "catch2_tests/test_calc_delay_spread.cpp"
-#include "catch2_tests/test_acdf.cpp"
+// #include "catch2_tests/test_acdf.cpp"
+#include "catch2_tests/test_calc_angular_spreads_sphere.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

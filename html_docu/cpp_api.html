@@ -158,6 +158,7 @@
 <tbody>
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
+<tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
 </tbody>
 </table>
 </ul>
@@ -4666,6 +4667,99 @@ arma::vec Sc, mu, sig;
 quadriga_lib::acdf(data, &amp;bins, &amp;Sh, &amp;Sc, &amp;mu, &amp;sig);
 
 // bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_angular_spreads_sphere"></a>
+<b>calc_angular_spreads_sphere</b> - Calculate azimuth and elevation angular spreads with spherical wrapping
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
+</li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
+   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
+   on the equator before computing spreads. 
+</li><li style="margin-bottom: 0.4em;">Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread 
+   despite energy being focused into a small solid angle). This method corrects for that. 
+</li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
+   elevation spread, corresponding to the principal axes of the angular power distribution. 
+</li><li style="margin-bottom: 0.4em;">The bank angle is derived analytically from the eigenvectors of the 2×2 power-weighted 
+   covariance matrix of the centered azimuth and elevation angles. 
+</li><li style="margin-bottom: 0.4em;">An optional quantization step can group nearby paths before computing the spread. 
+</li><li style="margin-bottom: 0.4em;">If <code>pow</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, the power vector is replicated for all 
+   angle sets. 
+</li><li style="margin-bottom: 0.4em;">If <code>el</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, elevation is assumed to be zero for all paths. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::calc_angular_spreads_sphere(
+    const arma::Mat&lt;dtype&gt; &amp;az,
+    const arma::Mat&lt;dtype&gt; &amp;el,
+    const arma::Mat&lt;dtype&gt; &amp;pow,
+    arma::Col&lt;dtype&gt; *azimuth_spread = nullptr,
+    arma::Col&lt;dtype&gt; *elevation_spread = nullptr,
+    arma::Mat&lt;dtype&gt; *orientation = nullptr,
+    arma::Mat&lt;dtype&gt; *phi = nullptr,
+    arma::Mat&lt;dtype&gt; *theta = nullptr,
+    bool calc_bank_angle = true,
+    dtype quantize = (dtype)0);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>az</b></code> (input)<br> 
+   Azimuth angles in [rad], ranging from -pi to pi. Size <code>[n_ang, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>el</b></code> (input)<br> 
+   Elevation angles in [rad], ranging from -pi/2 to pi/2. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>pow</b></code> (input)<br> 
+   Path powers in [W]. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*azimuth_spread</b> = nullptr</code> (optional output)<br> 
+   RMS azimuth angular spread in [rad]. Length <code>[n_ang]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*elevation_spread</b> = nullptr</code> (optional output)<br> 
+   RMS elevation angular spread in [rad]. Length <code>[n_ang]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*orientation</b> = nullptr</code> (optional output)<br> 
+   Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle, 
+   row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size <code>[3, n_ang]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*phi</b> = nullptr</code> (optional output)<br> 
+   Rotated azimuth angles in [rad]. Size <code>[n_ang, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*theta</b> = nullptr</code> (optional output)<br> 
+   Rotated elevation angles in [rad]. Size <code>[n_ang, n_path]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>calc_bank_angle</b> = true</code> (input)<br> 
+   If true, the optimal bank angle is computed analytically. If false, bank is set to zero. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>quantize</b> = 0</code> (input)<br> 
+   Angular quantization step in [deg]. Paths within this angular distance are grouped and their 
+   powers summed before computing the spread. Set to 0 to treat all paths independently. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::mat az = {{0.1, 0.2, -0.1, 0.3}};      // 1 angle set, 4 paths
+arma::mat el = {{0.0, 0.05, -0.05, 0.02}};
+arma::mat pw = {{1.0, 2.0, 1.5, 0.5}};
+
+arma::vec as, es;
+arma::mat orient;
+quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &amp;as, &amp;es, &amp;orient);
+// as(0) contains the azimuth spread, es(0) the elevation spread
 </pre>
 </li>
 </ul>
