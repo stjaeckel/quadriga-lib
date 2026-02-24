@@ -245,7 +245,7 @@ CHECK(name == "TX1");
 - Validate all scalar outputs, vector sizes, string outputs, array shapes and sample values.
 - **Edge cases**: Invalid file paths, out-of-range indices (wrap in `CHECK_THROWS_AS(..., std::invalid_argument)`).
 - **Physical consistency**: Where possible, independently validate the physical correctness of outputs (e.g. path gains should be negative, angles within expected ranges).
-- Avoid nested initializer lists, e.g. arma::mat X = {{1, 2}, {3, 4}}; instead, use `arma::mat X(2, 2); X.col(0) = {1, 3}; X.col(1) = {2, 4};` for better readability and error messages. Single-level initializer lists for vectors are fine.
+- IMPORTANT (!!!!!) - Avoid nested initializer lists, e.g. arma::mat X = {{1, 2}, {3, 4}}; instead, use `arma::mat X(2, 2); X.col(0) = {1, 3}; X.col(1) = {2, 4};. Using something arma::mat pw = {{1.0}}; in will crash !!!!!
 - For functions that don't operate on files, generate synthetic test data programmatically within the test.
 - Test data paths are relative to the project root: tests/data/<file> (if test data is used, it will be specified in the request).
 - In templated function, always use typed null pointers since nullptr can't be implicitly matched to template parameters, e.g. 

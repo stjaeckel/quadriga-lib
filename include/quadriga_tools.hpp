@@ -72,6 +72,21 @@ namespace quadriga_lib
                                        dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
                                        arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
 
+    // Calculate azimuth and elevation angular spreads with spherical wrapping
+    // The power-weighted mean direction is rotated to the equator to decouple spreads,
+    // and an optional bank angle aligns the angular distribution to its principal axes.
+    template <typename dtype>
+    void calc_angular_spreads_sphere(const arma::Mat<dtype> &az,                   // Azimuth angles in [rad], Size [n_ang, n_path]
+                                     const arma::Mat<dtype> &el,                   // Elevation angles in [rad], Size [n_ang, n_path] or [1, n_path]
+                                     const arma::Mat<dtype> &pow,                  // Path powers in [W], Size [n_ang, n_path] or [1, n_path]
+                                     arma::Col<dtype> *azimuth_spread = nullptr,   // RMS azimuth angular spread in [rad], Length [n_ang]
+                                     arma::Col<dtype> *elevation_spread = nullptr, // RMS elevation angular spread in [rad], Length [n_ang]
+                                     arma::Mat<dtype> *orientation = nullptr,      // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_ang]
+                                     arma::Mat<dtype> *phi = nullptr,              // Rotated azimuth angles in [rad], Size [n_ang, n_path]
+                                     arma::Mat<dtype> *theta = nullptr,            // Rotated elevation angles in [rad], Size [n_ang, n_path]
+                                     bool calc_bank_angle = true,                  // Compute optimal bank angle analytically
+                                     dtype quantize = 0.0);                        // Angular quantization step in [deg], 0 = disabled
+
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
     // - Input: Cartesian coordinates, size [3, n_row, n_col]
     // - Output: Geographic coordinates, size [n_row, n_col, 3]
