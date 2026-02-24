@@ -50,6 +50,15 @@ namespace quadriga_lib
     template <typename dtype>
     arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
 
+    // Calculate the RMS delay spread in [s]
+    // Returns: RMS delay spread, size: [ n_cir ]
+    template <typename dtype>
+    arma::Col<dtype> calc_delay_spread(const std::vector<arma::Col<dtype>> &delays, // Delays in [s], Vector (n_cir) of vectors of length [n_path]
+                                       const std::vector<arma::Col<dtype>> &powers, // Path powers, linear scale, Vector (n_cir) of vectors of length [n_path]
+                                       dtype threshold = 100.0,                     // Threshold in [dB] relative to strongest path, paths below p_max(dB)-threshold are excluded
+                                       dtype granularity = 0.0,                     // Window size in seconds to group paths in delay domain
+                                       arma::Col<dtype> *mean_delay = nullptr);     // Optional output: mean delay in [s].
+
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
     // - Input: Cartesian coordinates, size [3, n_row, n_col]
     // - Output: Geographic coordinates, size [n_row, n_col, 3]

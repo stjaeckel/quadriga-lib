@@ -23,6 +23,7 @@ namespace py = pybind11;
 // Include parts
 #include "qpy_cart2geo.cpp"
 #include "qpy_write_png.cpp"
+#include "qpy_calc_delay_spread.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -35,4 +36,10 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("min_val") = NAN,
           py::arg("max_val") = NAN,
           py::arg("log_transform") = false);
+
+    m.def("calc_delay_spread", &calc_delay_spread,
+          py::arg("delays"),
+          py::arg("powers"),
+          py::arg("threshold") = 100.0,
+          py::arg("granularity") = 0.0);
 }

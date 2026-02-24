@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.4</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.10.5</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -108,6 +108,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
@@ -3477,6 +3478,62 @@ execution of this process, several pieces of input data are required:<br><br>
 <font size=+1><b>Miscellaneous / Tools</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_delay_spread"></a>
+<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
+   linear-scale powers for each channel impulse response (CIR). 
+</li><li style="margin-bottom: 0.4em;">An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
+   power below <code>p_max(dB) - threshold</code> are excluded. 
+</li><li style="margin-bottom: 0.4em;">An optional granularity parameter in [s] groups paths in the delay domain. 
+</li><li style="margin-bottom: 0.4em;">Optionally returns the mean delay for each CIR. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+ds = quadriga_lib.calc_delay_spread( delays, powers );
+ds = quadriga_lib.calc_delay_spread( delays, powers, threshold );
+ds = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
+[ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>delays</b></code> (input)<br> 
+   Delays in [s]. A 2D matrix of size <code>[n_cir, n_path]</code>. Each row is one CIR. Rows may be 
+   zero-padded if CIRs have different numbers of paths. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>powers</b></code> (input)<br> 
+   Path powers on a linear scale [W]. Same size as <code>delays</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>threshold</b> = 100.0</code> (input)<br> 
+   Power threshold in [dB] relative to the strongest path. Default: 100 dB. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>granularity</b> = 0.0</code> (input)<br> 
+   Window size in [s] for grouping paths in the delay domain. Default: 0. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>double <b>ds</b></code> (output)<br> 
+   RMS delay spread in [s] for each CIR. Size <code>[n_cir, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>double <b>mean_delay</b></code> (optional output)<br> 
+   Mean delay in [s] for each CIR. Size <code>[n_cir, 1]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+delays = [0, 1e-6, 2e-6];
+powers = [1.0, 0.5, 0.25];
+[ds, mean_delay] = quadriga_lib.calc_delay_spread( delays, powers );
+</pre>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_rotation_matrix"></a>
 <b>calc_rotation_matrix</b> - Calculates a 3x3 rotation matrix from a 3-element orientation vector

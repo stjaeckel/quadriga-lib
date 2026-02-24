@@ -73,17 +73,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - n_div           Number of sub-segments per edge, results in n_faces = 20 * n_div^2 elements
-    //  1 - radius          Radius of the icosphere in meters
-    //  2 - direction_xyz   Direction format indicator: 0 = Spherical (default), 1 = Cartesian
-
-    // Output:
-    //  0 - center          Pointing vector from the origin to the center of the triangle, matrix of size [no_faces, 3]
-    //  1 - length          Length of the pointing vector "center" (slightly smaller than 1), vector of length [no_faces]
-    //  2 - vert            Vectors pointing from "center" to the vertices of the triangle, matrix of size [no_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-    //  3 - direction       Directions of the vertex-rays in rad; matrix of size [no_ray, 6], the values are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
-
     if (nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:icosphere:io_error", "Too many input arguments.");
 
@@ -117,23 +106,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[3] = qd_mex_init_output(&direction, n_rows, 6);
 
     // Call the quadriga-lib function
-    try
-    {
-        if (nlhs > 3)
-            quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
-        else if (nlhs > 2)
-            quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert);
-        else if (nlhs > 1)
-            quadriga_lib::icosphere<double>(n_div, radius, &center, &length);
-        else if (nlhs > 0)
-            quadriga_lib::icosphere<double>(n_div, radius, &center);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:icosphere:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:icosphere:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    if (nlhs > 3)
+        CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz));
+    else if (nlhs > 2)
+        CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert));
+    else if (nlhs > 1)
+        CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, &center, &length));
+    else if (nlhs > 0)
+        CALL_QD(quadriga_lib::icosphere<double>(n_div, radius, &center));
 }
