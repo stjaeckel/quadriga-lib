@@ -22,7 +22,8 @@ class test_case(unittest.TestCase):
 
         # --- qrt_file_parse ---
 
-        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse(fn)
+        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, \
+            fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation = channel.qrt_file_parse(fn)
 
         self.assertEqual(no_orig, 3)
         self.assertEqual(no_dest, 2)
@@ -43,6 +44,27 @@ class test_case(unittest.TestCase):
 
         self.assertEqual(dest_names[0], "RX1")
         self.assertEqual(dest_names[1], "RX2")
+
+        # Frequency
+        self.assertEqual(len(fGHz), no_freq)
+        npt.assert_allclose(fGHz[0], 3.75, atol=1e-6, rtol=0)
+
+        # CIR positions and orientations
+        self.assertEqual(cir_pos.shape, (no_cir, 3))
+        self.assertEqual(cir_orientation.shape, (no_cir, 3))
+
+        npt.assert_allclose(cir_pos[0, :], np.array([-8.83498, 57.1893, 1.0]), atol=1.5e-4, rtol=0)
+        npt.assert_allclose(cir_pos[1, :], np.array([-5.86144, 53.8124, 1.0]), atol=1.5e-4, rtol=0)
+        npt.assert_allclose(cir_orientation[1, :], np.array([0.0, 0.0, 1.2753]), atol=1.5e-4, rtol=0)
+
+        # Origin (TX) positions and orientations
+        self.assertEqual(orig_pos.shape, (no_orig, 3))
+        self.assertEqual(orig_orientation.shape, (no_orig, 3))
+
+        npt.assert_allclose(orig_pos[0, :], np.array([-12.9607, 59.6906, 2.0]), atol=1.5e-4, rtol=0)
+        npt.assert_allclose(orig_pos[1, :], np.array([-2.67888, 60.257, 2.0]), atol=1.5e-4, rtol=0)
+        npt.assert_allclose(orig_orientation[0, :], np.array([0.0, 0.0, 0.0]), atol=1.5e-4, rtol=0)
+        npt.assert_allclose(orig_orientation[1, :], np.array([0.0, 0.0, np.pi]), atol=1.5e-4, rtol=0)
 
         # --- qrt_file_read: first link (downlink, i_cir=0, i_orig=0) ---
 
@@ -111,7 +133,8 @@ class test_case(unittest.TestCase):
     def test_v5(self):
 
         fn = os.path.join(current_dir, '../data/test_v5.qrt')
-        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse(fn)
+        no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, \
+            fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation = channel.qrt_file_parse(fn)
 
         self.assertEqual(no_orig, 1)
         self.assertEqual(no_dest, 2)
@@ -122,6 +145,17 @@ class test_case(unittest.TestCase):
         self.assertEqual(len(cir_offset), no_dest)
         self.assertEqual(cir_offset[0], 0)
         self.assertEqual(cir_offset[1], 1)
+
+        # Frequencies
+        self.assertEqual(len(fGHz), no_freq)
+        npt.assert_allclose(fGHz[0], 1.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(fGHz[1], 1.5, atol=1e-6, rtol=0)
+
+        # Shape checks
+        self.assertEqual(cir_pos.shape, (no_cir, 3))
+        self.assertEqual(cir_orientation.shape, (no_cir, 3))
+        self.assertEqual(orig_pos.shape, (no_orig, 3))
+        self.assertEqual(orig_orientation.shape, (no_orig, 3))
 
         data_0 = channel.qrt_file_read(fn, 0, 0, True)
 

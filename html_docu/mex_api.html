@@ -2208,7 +2208,8 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version ] = qrt_file_parse( fn );
+[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
+  fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation ] = qrt_file_parse( fn );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -2247,10 +2248,31 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 </li><li style="margin-bottom: 0.4em;"><b><code>version</code></b><br> 
    QRT file version number, scalar integer. 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fGHz</code></b><br> 
+   Center frequency in GHz, float vector of size <code>[no_freq, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_pos</code></b><br> 
+   CIR positions in Cartesian coordinates, float matrix of size <code>[no_cir, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_orientation</code></b><br> 
+   CIR orientation in Euler angles in rad, float matrix of size <code>[no_cir, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_pos</code></b><br> 
+   Origin (TX) positions in Cartesian coordinates, float matrix of size <code>[no_orig, 3]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_orientation</code></b><br> 
+   Origin (TX) orientations in Euler angles in rad, float matrix of size <code>[no_orig, 3]</code>. 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version] = ...
+[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
+    fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
     qrt_file_parse('scene.qrt');
 </pre>
 </li>
@@ -2279,11 +2301,11 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>i_cir</code></b> (optional)<br> 
-   Snapshot index (1-based), scalar. Default: 0 
+   Snapshot index (1-based), scalar. Default: 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>i_orig</code></b> (optional)<br> 
-   Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 0 
+   Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 1 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>downlink</code></b> (optional)<br> 
@@ -2371,7 +2393,7 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
 [center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
-    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 0, 0, true, 1);
+    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 1, 1, true, 1);
 </pre>
 </li>
 </ul>

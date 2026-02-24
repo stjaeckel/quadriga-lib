@@ -3317,7 +3317,7 @@ channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 from quadriga_lib import channel
 
 # Separate outputs
-no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version = channel.qrt_file_parse( fn )
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation = channel.qrt_file_parse( fn )
 
 # Output as tuple
 data = channel.qrt_file_parse( fn )
@@ -3359,6 +3359,26 @@ data = channel.qrt_file_parse( fn )
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>version</code></b><br> 
    QRT file version 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fGHz</code></b><br> 
+   Center frequency in GHz as stored in the QRT file, numpy array of floats 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_pos</code></b><br> 
+   CIR positions in Cartesian coordinates, numpy array of shape [no_cir, 3] 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>cir_orientation</code></b><br> 
+   CIR orientation in Euler angles in rad, numpy array of shape [no_cir, 3] 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_pos</code></b><br> 
+   Origin (TX) positions in Cartesian coordinates, numpy array of shape [no_orig, 3] 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>orig_orientation</code></b><br> 
+   Origin (TX) orientations in Euler angles in rad, numpy array of shape [no_orig, 3] 
 </li></ul>
 </li>
 </ul>
