@@ -110,7 +110,7 @@ Read ray-tracing data from a QRT file
 ## Example:
 ```
 [center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
-    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 0, 0, true, 1);
+    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 1, 1, true, 1);
 ```
 MD!*/
 

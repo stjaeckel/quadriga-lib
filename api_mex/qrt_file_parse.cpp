@@ -34,7 +34,8 @@ Read metadata from a QRT file
 
 ## Usage:
 ```
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version ] = qrt_file_parse( fn );
+[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
+  fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation ] = qrt_file_parse( fn );
 ```
 
 ## Input Argument:
@@ -66,10 +67,26 @@ Read metadata from a QRT file
 - **`version`**<br>
   QRT file version number, scalar integer.
 
+- **`fGHz`**<br>
+  Center frequency in GHz, float vector of size `[no_freq, 1]`.
+
+- **`cir_pos`**<br>
+  CIR positions in Cartesian coordinates, float matrix of size `[no_cir, 3]`.
+
+- **`cir_orientation`**<br>
+  CIR orientation in Euler angles in rad, float matrix of size `[no_cir, 3]`.
+
+- **`orig_pos`**<br>
+  Origin (TX) positions in Cartesian coordinates, float matrix of size `[no_orig, 3]`.
+
+- **`orig_orientation`**<br>
+  Origin (TX) orientations in Euler angles in rad, float matrix of size `[no_orig, 3]`.
+
 ## Example:
 
 ```
-[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version] = ...
+[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
+    fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
     qrt_file_parse('scene.qrt');
 ```
 MD!*/
@@ -79,7 +96,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 8)
+    if (nlhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read filename
@@ -90,6 +107,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
+    arma::fvec fGHz;
+    arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Set up optional output pointers based on nlhs
     arma::uword *p_no_cir = (nlhs > 0) ? &no_cir : nullptr;
@@ -100,10 +119,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_orig_names = (nlhs > 5) ? &orig_names : nullptr;
     std::vector<std::string> *p_dest_names = (nlhs > 6) ? &dest_names : nullptr;
     int *p_version = (nlhs > 7) ? &version : nullptr;
+    arma::fvec *p_fGHz = (nlhs > 8) ? &fGHz : nullptr;
+    arma::fmat *p_cir_pos = (nlhs > 9) ? &cir_pos : nullptr;
+    arma::fmat *p_cir_orientation = (nlhs > 10) ? &cir_orientation : nullptr;
+    arma::fmat *p_orig_pos = (nlhs > 11) ? &orig_pos : nullptr;
+    arma::fmat *p_orig_orientation = (nlhs > 12) ? &orig_orientation : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::qrt_file_parse(fn, p_no_cir, p_no_orig, p_no_dest, p_no_freq,
-                                         p_cir_offset, p_orig_names, p_dest_names, p_version));
+                                         p_cir_offset, p_orig_names, p_dest_names, p_version,
+                                         p_fGHz, p_cir_pos, p_cir_orientation, p_orig_pos, p_orig_orientation));
 
     // Write to MATLAB
     if (nlhs > 0)
@@ -122,4 +147,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = qd_mex_copy2matlab(&dest_names);
     if (nlhs > 7)
         plhs[7] = qd_mex_copy2matlab(&version);
+    if (nlhs > 8)
+        plhs[8] = qd_mex_copy2matlab(&fGHz);
+    if (nlhs > 9)
+        plhs[9] = qd_mex_copy2matlab(&cir_pos);
+    if (nlhs > 10)
+        plhs[10] = qd_mex_copy2matlab(&cir_orientation);
+    if (nlhs > 11)
+        plhs[11] = qd_mex_copy2matlab(&orig_pos);
+    if (nlhs > 12)
+        plhs[12] = qd_mex_copy2matlab(&orig_orientation);
 }
