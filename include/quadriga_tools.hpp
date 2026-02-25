@@ -88,19 +88,37 @@ namespace quadriga_lib
                                      bool calc_bank_angle = true,                    // Compute optimal bank angle analytically (only for disable_wrapping = false)
                                      dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
 
-    // // Calculate the Rician K-Factor
-    // // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths
-    // // - LOS path is identified by matching the absolute path length with the distance between TX and RX dTR
-    // // - All paths arriving before dTR + window_size are considered LOS and their power is added
-    // // - Paths arriving after dTR + window_size, are considered NLOS
-    // template <typename dtype>
-    // void calc_rician_k_factor(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
-    //                           const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, Vector (n_cir) of vectors of length [n_path]
-    //                           const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates. Size [3,1] (fixed TX) or [3, n_cir] (mobile TX).
-    //                           const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
-    //                           arma::Col<dtype> *kf = nullptr,                   // Rician K-factor, linear scale, Length [n_cir]
-    //                           arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers), Length [n_cir]
-    //                           dtype window_size = 0.01);                        // LOS window size in meters
+    // Calculate the Rician K-Factor
+    // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths
+    // - LOS path is identified by matching the absolute path length with the distance between TX and RX dTR
+    // - All paths arriving before dTR + window_size are considered LOS and their power is added
+    // - Paths arriving after dTR + window_size, are considered NLOS
+    template <typename dtype>
+    void calc_rician_k_factor(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+                              const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, Vector (n_cir) of vectors of length [n_path]
+                              const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates. Size [3,1] (fixed TX) or [3, n_cir] (mobile TX).
+                              const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
+                              arma::Col<dtype> *kf = nullptr,                   // Rician K-factor, linear scale, Length [n_cir]
+                              arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers), Length [n_cir]
+                              dtype window_size = 0.01);                        // LOS window size in meters
+
+    // Calculate the cross-polarization ratio
+    // - Only applies for NLOS paths (LOS always has M = {{1, 0}, {0,-1}})
+    // - LOS path is identified by matching the absolute path length with the distance between TX and RX dTR
+    // - All paths arriving before dTR + window_size are excluded from the XPR calculation
+    // - M may or may not be normalized (should have sum-column power of 2, if normalized)
+    // - Effective path powers results from combining the "powers" with the powers in "M"
+    // - XPR results from a power-weighted sum of the individual per-path XPRs
+    template <typename dtype>
+    void clac_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix. Vector (n_cir) of matrices of size [8, n_path]
+                                       const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, Vector (n_cir) of vectors of length [n_path]
+                                       const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates. Size [3,1] (fixed TX) or [3, n_cir] (mobile TX).
+                                       const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
+                                       arma::Col<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Length [n_cir]
+                                       arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers + powers in M), Length [n_cir]
+                                       bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
+                                       dtype window_size = 0.01);                        // LOS window size in meters
 
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
     // - Input: Cartesian coordinates, size [3, n_row, n_col]
