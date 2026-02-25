@@ -102,23 +102,26 @@ namespace quadriga_lib
                               arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers), Length [n_cir]
                               dtype window_size = 0.01);                        // LOS window size in meters
 
-    // Calculate the cross-polarization ratio
-    // - Only applies for NLOS paths (LOS always has M = {{1, 0}, {0,-1}})
-    // - LOS path is identified by matching the absolute path length with the distance between TX and RX dTR
-    // - All paths arriving before dTR + window_size are excluded from the XPR calculation
-    // - M may or may not be normalized (should have sum-column power of 2, if normalized)
-    // - Effective path powers results from combining the "powers" with the powers in "M"
-    // - XPR results from a power-weighted sum of the individual per-path XPRs
+    // Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
+    // - Uses the aggregate power ratio method: total co-pol / total cross-pol across all paths
+    // - Computes XPR in both linear (V/H) and circular (LHCP/RHCP) polarization bases
+    // - Circular basis obtained via Jones matrix transformation: M_circ = T * M_lin * T^-1
+    // - Only applies for NLOS paths by default; LOS identified by path_length ≈ dTR
+    // - All paths with path_length < dTR + window_size are excluded unless include_los is true
+    // - M is column-major with interleaved Re/Im: rows = [Re(Mvv),Im(Mvv),Re(Mhv),Im(Mhv),Re(Mvh),Im(Mvh),Re(Mhh),Im(Mhh)]
+    // - M may or may not be normalized (normalization cancels in the XPR ratio)
+    // - pg is always computed over all paths (including LOS), regardless of include_los
+    // - If cross-polarized power is zero, XPR is set to 0 (undefined)
     template <typename dtype>
-    void clac_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
-                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix. Vector (n_cir) of matrices of size [8, n_path]
-                                       const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, Vector (n_cir) of vectors of length [n_path]
-                                       const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates. Size [3,1] (fixed TX) or [3, n_cir] (mobile TX).
-                                       const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
-                                       arma::Col<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Length [n_cir]
-                                       arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers + powers in M), Length [n_cir]
+    void calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+                                       const std::vector<arma::Mat<dtype>> &M,           // Polarization transfer matrix, Vector (n_cir) of matrices of size [8, n_path]
+                                       const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center in [m], Vector (n_cir) of vectors of length [n_path]
+                                       const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates, Size [3, 1] (fixed TX) or [3, n_cir] (mobile TX)
+                                       const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates, Size [3, 1] (fixed RX) or [3, n_cir] (mobile RX)
+                                       arma::Mat<dtype> *xpr = nullptr,                  // Cross-polarization ratio, linear scale, Size [n_cir, 6], Cols: 0=agg. linear, 1=V-XPR, 2=H-XPR, 3=agg. circular, 4=LHCP, 5=RHCP
+                                       arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers × polarimetric powers in M), Length [n_cir]
                                        bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
-                                       dtype window_size = 0.01);                        // LOS window size in meters
+                                       dtype window_size = 0.01);                        // LOS window size in meters, paths within dTR + window_size are excluded
 
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
     // - Input: Cartesian coordinates, size [3, n_row, n_col]

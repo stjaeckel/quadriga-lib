@@ -53,7 +53,8 @@
 // #include "catch2_tests/test_calc_delay_spread.cpp"
 // #include "catch2_tests/test_acdf.cpp"
 // #include "catch2_tests/test_calc_angular_spreads_sphere.cpp"
-#include "catch2_tests/test_calc_rician_k_factor.cpp"
+// #include "catch2_tests/test_calc_rician_k_factor.cpp"
+#include "catch2_tests/test_calc_cross_polarization_ratio.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
