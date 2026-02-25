@@ -56,8 +56,8 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#&lt;layout&gt;">&lt;layout&gt;</a></td><td>Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)</td></tr>
 <tr><td><a href="#&lt;arrayant&gt;">&lt;arrayant&gt;</a></td><td>Describes a single array antenna</td></tr>
+<tr><td><a href="#&lt;layout&gt;">&lt;layout&gt;</a></td><td>Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)</td></tr>
 </tbody>
 </table>
 </ul>
@@ -91,21 +91,6 @@ See related read / write functions in the API documentation for details on how t
 </li><li style="margin-bottom: 0.4em;">Python QDANT read function (<a href="python_api.html#qdant_read">qdant_read</a>) 
 </li><li style="margin-bottom: 0.4em;">Python QDANT write function (<a href="python_api.html#qdant_write">qdant_write</a>) 
 </li></ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="&lt;layout&gt;"></a>
-<b>&lt;layout&gt;</b> - Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Content:</i></b><br><ul><li style="margin-bottom: 0.4em;">One or more column vectors, separated by spaces; entries within a vector are comma-separated. 
-</li><li style="margin-bottom: 0.4em;">Values: Integers that must match the id of corresponding <code>&lt;arrayant&gt;</code> elements. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Examples:</i></b><br><ul><li style="margin-bottom: 0.4em;">Linear list: 1 2 3 (three columns with one entry each). 
-</li><li style="margin-bottom: 0.4em;">3×2 matrix of object IDs (3 columns, each a column vector of length 2): 1,2 1,2 2,1 
-</li></ul>
-</li>
-</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="&lt;arrayant&gt;"></a>
 <b>&lt;arrayant&gt;</b> - Describes a single array antenna
@@ -351,6 +336,21 @@ See related read / write functions in the API documentation for details on how t
   &lt;/arrayant&gt;
 &lt;/qdant&gt;
 </pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="&lt;layout&gt;"></a>
+<b>&lt;layout&gt;</b> - Defines how multiple &lt;arrayant&gt; objects are arranged into an object array (optional)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Content:</i></b><br><ul><li style="margin-bottom: 0.4em;">One or more column vectors, separated by spaces; entries within a vector are comma-separated. 
+</li><li style="margin-bottom: 0.4em;">Values: Integers that must match the id of corresponding <code>&lt;arrayant&gt;</code> elements. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Examples:</i></b><br><ul><li style="margin-bottom: 0.4em;">Linear list: 1 2 3 (three columns with one entry each). 
+</li><li style="margin-bottom: 0.4em;">3×2 matrix of object IDs (3 columns, each a column vector of length 2): 1,2 1,2 2,1 
+</li></ul>
 </li>
 </ul>
     <!-- CONTENT END -->

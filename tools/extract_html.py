@@ -227,6 +227,11 @@ def generate_html(folder_name, html_output_file, html_preamble, compact):
 
         section_dict = dict(sorted(section_dict.items()))
         section_desc_dict = dict(sorted(section_desc_dict.items()))
+
+        # regular functions sort first, then member functions — both groups alphabetically
+        for section in section_dict:
+            section_dict[section].sort(key=lambda x: (x[0].startswith('.'), x[0]))
+
         sections = list(section_dict.keys())
         
         # Section list

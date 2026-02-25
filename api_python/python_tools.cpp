@@ -27,6 +27,7 @@ namespace py = pybind11;
 #include "qpy_acdf.cpp"
 #include "qpy_calc_angular_spreads_sphere.cpp"
 #include "qpy_calc_rician_k_factor.cpp"
+#include "qpy_calc_cross_polarization_ratio.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -64,5 +65,14 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("path_length"),
           py::arg("tx_pos"),
           py::arg("rx_pos"),
+          py::arg("window_size") = 0.01);
+
+    m.def("calc_cross_polarization_ratio", &calc_cross_polarization_ratio,
+          py::arg("powers"),
+          py::arg("M"),
+          py::arg("path_length"),
+          py::arg("tx_pos"),
+          py::arg("rx_pos"),
+          py::arg("include_los") = false,
           py::arg("window_size") = 0.01);
 }
