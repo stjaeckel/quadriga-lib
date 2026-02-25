@@ -54,7 +54,6 @@
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#6f9553d7">Channel generation functions</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
-<li><a href="#b7e360ab">Miscellaneous tools</a></li>
 <li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
 <br>
@@ -156,23 +155,15 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
-<tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
-<tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
-</tbody>
-</table>
-</ul>
-<br>
-<b>Miscellaneous tools</b>
-<ul>
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tbody>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculate rotation matrices from Euler angles</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)</td></tr>
 <tr><td><a href="#colormap">colormap</a></td><td>Generate colormap</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform geographic (azimuth, elevation, length) to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp_1d / interp_2d">interp_1d / interp_2d</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
+<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
+<tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
+<tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
@@ -4524,255 +4515,6 @@ void quadriga_lib::get_channels_spherical(
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="calc_delay_spread"></a>
-<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
-   linear-scale powers for each channel impulse response (CIR). 
-</li><li style="margin-bottom: 0.4em;">An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
-   power below <code>p_max(dB) - threshold</code> are excluded from the calculation. 
-</li><li style="margin-bottom: 0.4em;">An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths 
-   falling into the same delay bin are summed before computing the delay spread. This is useful 
-   when the system bandwidth limits the time resolution (e.g. 50 ns at 20 MHz bandwidth). 
-</li><li style="margin-bottom: 0.4em;">When granularity is applied the function recursively calls itself on the binned power delay 
-   profile. 
-</li><li style="margin-bottom: 0.4em;">Optionally returns the mean delay for each CIR. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-template &lt;typename dtype&gt;
-arma::Col&lt;dtype&gt; quadriga_lib::calc_delay_spread(
-    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;delays,
-    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;powers,
-    dtype threshold = 100.0,
-    dtype granularity = 0.0,
-    arma::Col&lt;dtype&gt; *mean_delay = nullptr);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>delays</b></code> (input)<br> 
-   Delays in [s]. A vector of length <code>n_cir</code>, where each element is an Armadillo column vector 
-   of length <code>n_path</code> (the number of paths may differ per CIR). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>powers</b></code> (input)<br> 
-   Path powers on a linear scale [W]. Same structure as <code>delays</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>threshold</b> = 100.0</code> (input)<br> 
-   Power threshold in [dB] relative to the strongest path. Paths with power below 
-   <code>max_power / 10^(0.1 * threshold)</code> are excluded. Default: 100 dB (effectively all paths). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>granularity</b> = 0.0</code> (input)<br> 
-   Window size in [s] for grouping paths in the delay domain. Paths whose delays fall into the 
-   same bin of width <code>granularity</code> have their powers summed. Default: 0 (no grouping). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mean_delay</b> = nullptr</code> (optional output)<br> 
-   Mean delay in [s] for each CIR. Length <code>[n_cir]</code>. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>ds</b></code> (output)<br> 
-   RMS delay spread in [s] for each CIR. Length <code>[n_cir]</code>. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-std::vector&lt;arma::vec&gt; delays = { {0.0, 1e-6, 2e-6} };
-std::vector&lt;arma::vec&gt; powers = { {1.0, 0.5, 0.25} };
-arma::vec mean_delay;
-arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &amp;mean_delay);
-// ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
-</pre>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="acdf"></a>
-<b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the empirical CDF from the given data matrix, where each column represents an 
-   independent data set (e.g., repeated experiment runs). 
-</li><li style="margin-bottom: 0.4em;">Individual CDFs are computed per column by histogramming into the given (or auto-generated) bins 
-   and taking the cumulative sum normalized by the number of valid samples. 
-</li><li style="margin-bottom: 0.4em;">An averaged CDF is obtained by interpolating in quantile space: for a fine grid of probability 
-   levels, the corresponding x-values from each individual CDF are averaged, then the result is 
-   mapped back to the bin grid. 
-</li><li style="margin-bottom: 0.4em;">Quantile statistics (mean and standard deviation) are reported at the 0.1, 0.2, ..., 0.9 
-   probability levels. 
-</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values in the data are excluded from the computation. 
-</li><li style="margin-bottom: 0.4em;">If <code>bins</code> points to an empty vector, 201 equally spaced bins spanning the data range are 
-   generated and stored back. If <code>bins</code> points to a non-empty vector, those bin centers are used. 
-   If <code>bins</code> is <code>nullptr</code>, bins are auto-generated internally. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-template &lt;typename dtype&gt;
-void quadriga_lib::acdf(const arma::Mat&lt;dtype&gt; &amp;data,
-                        arma::Col&lt;dtype&gt; *bins = nullptr,
-                        arma::Mat&lt;dtype&gt; *Sh = nullptr,
-                        arma::Col&lt;dtype&gt; *Sc = nullptr,
-                        arma::Col&lt;dtype&gt; *mu = nullptr,
-                        arma::Col&lt;dtype&gt; *sig = nullptr,
-                        arma::uword n_bins = 201);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>data</b></code> (input)<br> 
-   Input data matrix. Size <code>[n_samples, n_sets]</code>. Each column is one data set. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*bins</b> = nullptr</code> (optional input/output)<br> 
-   Bin centers for the histogram. Length <code>[n_bins]</code>. If pointing to an empty vector, auto-generated 
-   bins are stored here. If pointing to a non-empty vector, those bin centers are used. If <code>nullptr</code>, 
-   bins are auto-generated internally. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*Sh</b> = nullptr</code> (optional output)<br> 
-   Individual CDFs, one per column of data. Size <code>[n_bins, n_sets]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*Sc</b> = nullptr</code> (optional output)<br> 
-   Averaged CDF obtained by quantile-space averaging across data sets. Length <code>[n_bins]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mu</b> = nullptr</code> (optional output)<br> 
-   Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*sig</b> = nullptr</code> (optional output)<br> 
-   Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_bins</b> = 201</code> (input)<br> 
-   Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when 
-   non-empty bins are provided. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-#include "quadriga_tools.hpp"
-
-// Generate random data: 10000 samples x 5 experiment runs
-arma::mat data = arma::randn&lt;arma::mat&gt;(10000, 5);
-
-arma::vec bins;
-arma::mat Sh;
-arma::vec Sc, mu, sig;
-quadriga_lib::acdf(data, &amp;bins, &amp;Sh, &amp;Sc, &amp;mu, &amp;sig);
-
-// bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
-</pre>
-</li>
-</ul>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="calc_angular_spreads_sphere"></a>
-<b>calc_angular_spreads_sphere</b> - Calculate azimuth and elevation angular spreads with spherical wrapping
-<ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
-</li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
-   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
-   on the equator before computing spreads. 
-</li><li style="margin-bottom: 0.4em;">Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread 
-   despite energy being focused into a small solid angle). This method corrects for that. 
-</li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
-   elevation spread, corresponding to the principal axes of the angular power distribution. 
-</li><li style="margin-bottom: 0.4em;">The bank angle is derived analytically from the eigenvectors of the 2×2 power-weighted 
-   covariance matrix of the centered azimuth and elevation angles. 
-</li><li style="margin-bottom: 0.4em;">An optional quantization step can group nearby paths before computing the spread. 
-</li><li style="margin-bottom: 0.4em;">If <code>pow</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, the power vector is replicated for all 
-   angle sets. 
-</li><li style="margin-bottom: 0.4em;">If <code>el</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, elevation is assumed to be zero for all paths. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Declaration:</i></b><br><pre>
-template &lt;typename dtype&gt;
-void quadriga_lib::calc_angular_spreads_sphere(
-    const arma::Mat&lt;dtype&gt; &amp;az,
-    const arma::Mat&lt;dtype&gt; &amp;el,
-    const arma::Mat&lt;dtype&gt; &amp;pow,
-    arma::Col&lt;dtype&gt; *azimuth_spread = nullptr,
-    arma::Col&lt;dtype&gt; *elevation_spread = nullptr,
-    arma::Mat&lt;dtype&gt; *orientation = nullptr,
-    arma::Mat&lt;dtype&gt; *phi = nullptr,
-    arma::Mat&lt;dtype&gt; *theta = nullptr,
-    bool calc_bank_angle = true,
-    dtype quantize = (dtype)0);
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>az</b></code> (input)<br> 
-   Azimuth angles in [rad], ranging from -pi to pi. Size <code>[n_ang, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>el</b></code> (input)<br> 
-   Elevation angles in [rad], ranging from -pi/2 to pi/2. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>pow</b></code> (input)<br> 
-   Path powers in [W]. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*azimuth_spread</b> = nullptr</code> (optional output)<br> 
-   RMS azimuth angular spread in [rad]. Length <code>[n_ang]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*elevation_spread</b> = nullptr</code> (optional output)<br> 
-   RMS elevation angular spread in [rad]. Length <code>[n_ang]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*orientation</b> = nullptr</code> (optional output)<br> 
-   Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle, 
-   row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size <code>[3, n_ang]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*phi</b> = nullptr</code> (optional output)<br> 
-   Rotated azimuth angles in [rad]. Size <code>[n_ang, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*theta</b> = nullptr</code> (optional output)<br> 
-   Rotated elevation angles in [rad]. Size <code>[n_ang, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>calc_bank_angle</b> = true</code> (input)<br> 
-   If true, the optimal bank angle is computed analytically. If false, bank is set to zero. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>quantize</b> = 0</code> (input)<br> 
-   Angular quantization step in [deg]. Paths within this angular distance are grouped and their 
-   powers summed before computing the spread. Set to 0 to treat all paths independently. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-arma::mat az = {{0.1, 0.2, -0.1, 0.3}};      // 1 angle set, 4 paths
-arma::mat el = {{0.0, 0.05, -0.05, 0.02}};
-arma::mat pw = {{1.0, 2.0, 1.5, 0.5}};
-
-arma::vec as, es;
-arma::mat orient;
-quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &amp;as, &amp;es, &amp;orient);
-// as(0) contains the azimuth spread, es(0) the elevation spread
-</pre>
-</li>
-</ul>
-<div class="pagebreak"></div>
-<hr class="greyline">
-<hr class="greyline">
-<br>
-<br>
-<a name="b7e360ab"></a>
-<font size=+1><b>Miscellaneous tools</b></font>
-<br>
-<br>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_rotation_matrix"></a>
 <b>calc_rotation_matrix</b> - Calculate rotation matrices from Euler angles
 <ul>
@@ -5068,6 +4810,262 @@ arma::vec xi = arma::linspace(0, 4, 5);
 arma::vec xo = arma::linspace(0, 4, 10);
 
 auto output = quadriga_lib::interp_1D(input, xi, xo);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_delay_spread"></a>
+<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
+   linear-scale powers for each channel impulse response (CIR). 
+</li><li style="margin-bottom: 0.4em;">An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
+   power below <code>p_max(dB) - threshold</code> are excluded from the calculation. 
+</li><li style="margin-bottom: 0.4em;">An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths 
+   falling into the same delay bin are summed before computing the delay spread. This is useful 
+   when the system bandwidth limits the time resolution (e.g. 50 ns at 20 MHz bandwidth). 
+</li><li style="margin-bottom: 0.4em;">When granularity is applied the function recursively calls itself on the binned power delay 
+   profile. 
+</li><li style="margin-bottom: 0.4em;">Optionally returns the mean delay for each CIR. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+arma::Col&lt;dtype&gt; quadriga_lib::calc_delay_spread(
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;delays,
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;powers,
+    dtype threshold = 100.0,
+    dtype granularity = 0.0,
+    arma::Col&lt;dtype&gt; *mean_delay = nullptr);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>delays</b></code> (input)<br> 
+   Delays in [s]. A vector of length <code>n_cir</code>, where each element is an Armadillo column vector 
+   of length <code>n_path</code> (the number of paths may differ per CIR). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>powers</b></code> (input)<br> 
+   Path powers on a linear scale [W]. Same structure as <code>delays</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>threshold</b> = 100.0</code> (input)<br> 
+   Power threshold in [dB] relative to the strongest path. Paths with power below 
+   <code>max_power / 10^(0.1 * threshold)</code> are excluded. Default: 100 dB (effectively all paths). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>granularity</b> = 0.0</code> (input)<br> 
+   Window size in [s] for grouping paths in the delay domain. Paths whose delays fall into the 
+   same bin of width <code>granularity</code> have their powers summed. Default: 0 (no grouping). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mean_delay</b> = nullptr</code> (optional output)<br> 
+   Mean delay in [s] for each CIR. Length <code>[n_cir]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>ds</b></code> (output)<br> 
+   RMS delay spread in [s] for each CIR. Length <code>[n_cir]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+std::vector&lt;arma::vec&gt; delays = { {0.0, 1e-6, 2e-6} };
+std::vector&lt;arma::vec&gt; powers = { {1.0, 0.5, 0.25} };
+arma::vec mean_delay;
+arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &amp;mean_delay);
+// ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="acdf"></a>
+<b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the empirical CDF from the given data matrix, where each column represents an 
+   independent data set (e.g., repeated experiment runs). 
+</li><li style="margin-bottom: 0.4em;">Individual CDFs are computed per column by histogramming into the given (or auto-generated) bins 
+   and taking the cumulative sum normalized by the number of valid samples. 
+</li><li style="margin-bottom: 0.4em;">An averaged CDF is obtained by interpolating in quantile space: for a fine grid of probability 
+   levels, the corresponding x-values from each individual CDF are averaged, then the result is 
+   mapped back to the bin grid. 
+</li><li style="margin-bottom: 0.4em;">Quantile statistics (mean and standard deviation) are reported at the 0.1, 0.2, ..., 0.9 
+   probability levels. 
+</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values in the data are excluded from the computation. 
+</li><li style="margin-bottom: 0.4em;">If <code>bins</code> points to an empty vector, 201 equally spaced bins spanning the data range are 
+   generated and stored back. If <code>bins</code> points to a non-empty vector, those bin centers are used. 
+   If <code>bins</code> is <code>nullptr</code>, bins are auto-generated internally. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::acdf(const arma::Mat&lt;dtype&gt; &amp;data,
+                        arma::Col&lt;dtype&gt; *bins = nullptr,
+                        arma::Mat&lt;dtype&gt; *Sh = nullptr,
+                        arma::Col&lt;dtype&gt; *Sc = nullptr,
+                        arma::Col&lt;dtype&gt; *mu = nullptr,
+                        arma::Col&lt;dtype&gt; *sig = nullptr,
+                        arma::uword n_bins = 201);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>data</b></code> (input)<br> 
+   Input data matrix. Size <code>[n_samples, n_sets]</code>. Each column is one data set. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*bins</b> = nullptr</code> (optional input/output)<br> 
+   Bin centers for the histogram. Length <code>[n_bins]</code>. If pointing to an empty vector, auto-generated 
+   bins are stored here. If pointing to a non-empty vector, those bin centers are used. If <code>nullptr</code>, 
+   bins are auto-generated internally. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*Sh</b> = nullptr</code> (optional output)<br> 
+   Individual CDFs, one per column of data. Size <code>[n_bins, n_sets]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*Sc</b> = nullptr</code> (optional output)<br> 
+   Averaged CDF obtained by quantile-space averaging across data sets. Length <code>[n_bins]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*mu</b> = nullptr</code> (optional output)<br> 
+   Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*sig</b> = nullptr</code> (optional output)<br> 
+   Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_bins</b> = 201</code> (input)<br> 
+   Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when 
+   non-empty bins are provided. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+#include "quadriga_tools.hpp"
+
+// Generate random data: 10000 samples x 5 experiment runs
+arma::mat data = arma::randn&lt;arma::mat&gt;(10000, 5);
+
+arma::vec bins;
+arma::mat Sh;
+arma::vec Sc, mu, sig;
+quadriga_lib::acdf(data, &amp;bins, &amp;Sh, &amp;Sc, &amp;mu, &amp;sig);
+
+// bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_angular_spreads_sphere"></a>
+<b>calc_angular_spreads_sphere</b> - Calculate azimuth and elevation angular spreads with spherical wrapping
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
+</li><li style="margin-bottom: 0.4em;">Inputs and outputs use <code>std::vector&lt;arma::Col&lt;dtype&gt;&gt;</code> so that each channel impulse response 
+   (CIR) can have a different number of paths. 
+</li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
+   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
+   on the equator before computing spreads. 
+</li><li style="margin-bottom: 0.4em;">Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread 
+   despite energy being focused into a small solid angle). This method corrects for that. 
+</li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
+   elevation spread, corresponding to the principal axes of the angular power distribution. 
+</li><li style="margin-bottom: 0.4em;">The bank angle is derived analytically from the eigenvectors of the 2x2 power-weighted 
+   covariance matrix of the centered azimuth and elevation angles. 
+</li><li style="margin-bottom: 0.4em;">An optional quantization step can group nearby paths before computing the spread. 
+</li><li style="margin-bottom: 0.4em;">Setting <code>disable_wrapping</code> to true skips the rotation and computes spreads directly from the 
+   raw azimuth and elevation angles (equivalent to treating them as independent 1D variables). 
+   In this mode, the orientation output will be zero and phi/theta will equal the input az/el. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::calc_angular_spreads_sphere(
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;az,
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;el,
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;powers,
+    arma::Col&lt;dtype&gt; *azimuth_spread = nullptr,
+    arma::Col&lt;dtype&gt; *elevation_spread = nullptr,
+    arma::Mat&lt;dtype&gt; *orientation = nullptr,
+    std::vector&lt;arma::Col&lt;dtype&gt;&gt; *phi = nullptr,
+    std::vector&lt;arma::Col&lt;dtype&gt;&gt; *theta = nullptr,
+    bool disable_wrapping = false,
+    bool calc_bank_angle = true,
+    dtype quantize = (dtype)0);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>az</b></code> (input)<br> 
+   Azimuth angles in [rad], ranging from -pi to pi. Vector of length <code>n_cir</code>, each element has 
+   length <code>n_path</code> (may differ per CIR). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>el</b></code> (input)<br> 
+   Elevation angles in [rad], ranging from -pi/2 to pi/2. Vector of length <code>n_cir</code>, each element 
+   has length <code>n_path</code> matching the corresponding element in <code>az</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>powers</b></code> (input)<br> 
+   Path powers in [W]. Vector of length <code>n_cir</code>, each element has length <code>n_path</code> matching the 
+   corresponding element in <code>az</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*azimuth_spread</b> = nullptr</code> (optional output)<br> 
+   RMS azimuth angular spread in [rad]. Length <code>[n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*elevation_spread</b> = nullptr</code> (optional output)<br> 
+   RMS elevation angular spread in [rad]. Length <code>[n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*orientation</b> = nullptr</code> (optional output)<br> 
+   Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle, 
+   row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size <code>[3, n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Col&lt;dtype&gt;&gt; <b>*phi</b> = nullptr</code> (optional output)<br> 
+   Rotated azimuth angles in [rad]. Vector of length <code>n_cir</code>, each element has length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Col&lt;dtype&gt;&gt; <b>*theta</b> = nullptr</code> (optional output)<br> 
+   Rotated elevation angles in [rad]. Vector of length <code>n_cir</code>, each element has length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>disable_wrapping</b> = false</code> (input)<br> 
+   If true, skip the spherical rotation and compute spreads directly from raw angles. The 
+   orientation output will be zero and phi/theta will equal the input az/el. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>calc_bank_angle</b> = true</code> (input)<br> 
+   If true, the optimal bank angle is computed analytically. Only used when <code>disable_wrapping</code> 
+   is false. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>quantize</b> = 0</code> (input)<br> 
+   Angular quantization step in [deg]. Paths within this angular distance are grouped and their 
+   powers summed before computing the spread. Set to 0 to treat all paths independently. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+std::vector&lt;arma::vec&gt; az(2), el(2), powers(2);
+az[0] = {0.1, -0.1, 0.05};              // CIR 0: 3 paths
+az[1] = {0.2, -0.2, 0.1, -0.1};         // CIR 1: 4 paths
+el[0] = {0.0, 0.0, 0.0};
+el[1] = {0.05, -0.05, 0.0, 0.0};
+powers[0] = {1.0, 1.0, 0.5};
+powers[1] = {2.0, 1.0, 1.5, 0.5};
+
+arma::vec as, es;
+arma::mat orient;
+quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &amp;as, &amp;es, &amp;orient);
+// as(0), as(1) contain the azimuth spreads for each CIR
 </pre>
 </li>
 </ul>

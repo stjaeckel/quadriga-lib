@@ -18,7 +18,7 @@
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Miscellaneous tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD

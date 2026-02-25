@@ -19,6 +19,7 @@
 
 #include <cmath>
 #include <stdexcept>
+#include <string>
 
 /*!SECTION
 Miscellaneous / Tools
@@ -30,6 +31,8 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 
 ## Description:
 - Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
+- Inputs and outputs use `std::vector<arma::Col<dtype>>` so that each channel impulse response
+  (CIR) can have a different number of paths.
 - Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
   on the equator before computing spreads.
@@ -37,57 +40,66 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
   despite energy being focused into a small solid angle). This method corrects for that.
 - Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
   elevation spread, corresponding to the principal axes of the angular power distribution.
-- The bank angle is derived analytically from the eigenvectors of the 2×2 power-weighted
+- The bank angle is derived analytically from the eigenvectors of the 2x2 power-weighted
   covariance matrix of the centered azimuth and elevation angles.
 - An optional quantization step can group nearby paths before computing the spread.
-- If `pow` has only 1 row but `az` has `n_ang` rows, the power vector is replicated for all
-  angle sets.
-- If `el` has only 1 row but `az` has `n_ang` rows, elevation is assumed to be zero for all paths.
+- Setting `disable_wrapping` to true skips the rotation and computes spreads directly from the
+  raw azimuth and elevation angles (equivalent to treating them as independent 1D variables).
+  In this mode, the orientation output will be zero and phi/theta will equal the input az/el.
 
 ## Declaration:
 ```
 template <typename dtype>
 void quadriga_lib::calc_angular_spreads_sphere(
-    const arma::Mat<dtype> &az,
-    const arma::Mat<dtype> &el,
-    const arma::Mat<dtype> &pow,
+    const std::vector<arma::Col<dtype>> &az,
+    const std::vector<arma::Col<dtype>> &el,
+    const std::vector<arma::Col<dtype>> &powers,
     arma::Col<dtype> *azimuth_spread = nullptr,
     arma::Col<dtype> *elevation_spread = nullptr,
     arma::Mat<dtype> *orientation = nullptr,
-    arma::Mat<dtype> *phi = nullptr,
-    arma::Mat<dtype> *theta = nullptr,
+    std::vector<arma::Col<dtype>> *phi = nullptr,
+    std::vector<arma::Col<dtype>> *theta = nullptr,
+    bool disable_wrapping = false,
     bool calc_bank_angle = true,
     dtype quantize = (dtype)0);
 ```
 
 ## Arguments:
-- `const arma::Mat<dtype> &**az**` (input)<br>
-  Azimuth angles in [rad], ranging from -pi to pi. Size `[n_ang, n_path]`.
+- `const std::vector<arma::Col<dtype>> &**az**` (input)<br>
+  Azimuth angles in [rad], ranging from -pi to pi. Vector of length `n_cir`, each element has
+  length `n_path` (may differ per CIR).
 
-- `const arma::Mat<dtype> &**el**` (input)<br>
-  Elevation angles in [rad], ranging from -pi/2 to pi/2. Size `[n_ang, n_path]` or `[1, n_path]`.
+- `const std::vector<arma::Col<dtype>> &**el**` (input)<br>
+  Elevation angles in [rad], ranging from -pi/2 to pi/2. Vector of length `n_cir`, each element
+  has length `n_path` matching the corresponding element in `az`.
 
-- `const arma::Mat<dtype> &**pow**` (input)<br>
-  Path powers in [W]. Size `[n_ang, n_path]` or `[1, n_path]`.
+- `const std::vector<arma::Col<dtype>> &**powers**` (input)<br>
+  Path powers in [W]. Vector of length `n_cir`, each element has length `n_path` matching the
+  corresponding element in `az`.
 
 - `arma::Col<dtype> ***azimuth_spread** = nullptr` (optional output)<br>
-  RMS azimuth angular spread in [rad]. Length `[n_ang]`.
+  RMS azimuth angular spread in [rad]. Length `[n_cir]`.
 
 - `arma::Col<dtype> ***elevation_spread** = nullptr` (optional output)<br>
-  RMS elevation angular spread in [rad]. Length `[n_ang]`.
+  RMS elevation angular spread in [rad]. Length `[n_cir]`.
 
 - `arma::Mat<dtype> ***orientation** = nullptr` (optional output)<br>
   Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle,
-  row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size `[3, n_ang]`.
+  row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size `[3, n_cir]`.
 
-- `arma::Mat<dtype> ***phi** = nullptr` (optional output)<br>
-  Rotated azimuth angles in [rad]. Size `[n_ang, n_path]`.
+- `std::vector<arma::Col<dtype>> ***phi** = nullptr` (optional output)<br>
+  Rotated azimuth angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
 
-- `arma::Mat<dtype> ***theta** = nullptr` (optional output)<br>
-  Rotated elevation angles in [rad]. Size `[n_ang, n_path]`.
+- `std::vector<arma::Col<dtype>> ***theta** = nullptr` (optional output)<br>
+  Rotated elevation angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
+
+- `bool **disable_wrapping** = false` (input)<br>
+  If true, skip the spherical rotation and compute spreads directly from raw angles. The
+  orientation output will be zero and phi/theta will equal the input az/el.
 
 - `bool **calc_bank_angle** = true` (input)<br>
-  If true, the optimal bank angle is computed analytically. If false, bank is set to zero.
+  If true, the optimal bank angle is computed analytically. Only used when `disable_wrapping`
+  is false.
 
 - `dtype **quantize** = 0` (input)<br>
   Angular quantization step in [deg]. Paths within this angular distance are grouped and their
@@ -95,14 +107,18 @@ void quadriga_lib::calc_angular_spreads_sphere(
 
 ## Example:
 ```
-arma::mat az = {0.1, 0.2, -0.1, 0.3};      // 1 angle set, 4 paths
-arma::mat el = {0.0, 0.05, -0.05, 0.02};
-arma::mat pw = {1.0, 2.0, 1.5, 0.5};
+std::vector<arma::vec> az(2), el(2), powers(2);
+az[0] = {0.1, -0.1, 0.05};              // CIR 0: 3 paths
+az[1] = {0.2, -0.2, 0.1, -0.1};         // CIR 1: 4 paths
+el[0] = {0.0, 0.0, 0.0};
+el[1] = {0.05, -0.05, 0.0, 0.0};
+powers[0] = {1.0, 1.0, 0.5};
+powers[1] = {2.0, 1.0, 1.5, 0.5};
 
 arma::vec as, es;
 arma::mat orient;
-quadriga_lib::calc_angular_spreads_sphere(az, el, pw, &as, &es, &orient);
-// as(0) contains the azimuth spread, es(0) the elevation spread
+quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
+// as(0), as(1) contain the azimuth spreads for each CIR
 ```
 MD!*/
 
@@ -125,7 +141,7 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
     for (arma::uword i = 0; i < L; i++)
     {
         dtype d = ang[i] - mean_ang;
-        dp[i] = std::atan2(std::sin(d), std::cos(d)); // wrap
+        dp[i] = std::atan2(std::sin(d), std::cos(d));
     }
 
     const dtype *pw_use = pw;
@@ -195,38 +211,41 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
 
 // --- Main function ---
 template <typename dtype>
-void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
-                                               const arma::Mat<dtype> &el,
-                                               const arma::Mat<dtype> &pow,
-                                               arma::Col<dtype> *azimuth_spread,
-                                               arma::Col<dtype> *elevation_spread,
-                                               arma::Mat<dtype> *orientation,
-                                               arma::Mat<dtype> *phi_out,
-                                               arma::Mat<dtype> *theta_out,
-                                               bool calc_bank_angle,
-                                               dtype quantize)
+void quadriga_lib::calc_angular_spreads_sphere(
+    const std::vector<arma::Col<dtype>> &az,
+    const std::vector<arma::Col<dtype>> &el,
+    const std::vector<arma::Col<dtype>> &powers,
+    arma::Col<dtype> *azimuth_spread,
+    arma::Col<dtype> *elevation_spread,
+    arma::Mat<dtype> *orientation,
+    std::vector<arma::Col<dtype>> *phi_out,
+    std::vector<arma::Col<dtype>> *theta_out,
+    bool disable_wrapping,
+    bool calc_bank_angle,
+    dtype quantize)
 {
-    arma::uword N = az.n_rows; // Number of angle sets
-    arma::uword L = az.n_cols; // Number of paths
+    arma::uword N = (arma::uword)az.size();
 
     // --- Input validation ---
-    if (N == 0 || L == 0)
+    if (N == 0)
         throw std::invalid_argument("Input 'az' must not be empty.");
 
-    if (el.n_cols != L)
-        throw std::invalid_argument("Input 'el' must have the same number of columns as 'az'.");
+    if ((arma::uword)el.size() != N)
+        throw std::invalid_argument("Input 'el' must have the same number of elements as 'az'.");
 
-    if (pow.n_cols != L)
-        throw std::invalid_argument("Input 'pow' must have the same number of columns as 'az'.");
+    if ((arma::uword)powers.size() != N)
+        throw std::invalid_argument("Input 'powers' must have the same number of elements as 'az'.");
 
-    if (el.n_rows != N && el.n_rows != 1 && el.n_rows != 0)
-        throw std::invalid_argument("Input 'el' must have n_ang rows, 1 row, or be empty.");
-
-    if (pow.n_rows != N && pow.n_rows != 1)
-        throw std::invalid_argument("Input 'pow' must have n_ang rows or 1 row.");
-
-    bool el_broadcast = (el.n_rows < N);
-    bool pow_broadcast = (pow.n_rows < N);
+    for (arma::uword n = 0; n < N; n++)
+    {
+        arma::uword L = az[n].n_elem;
+        if (L == 0)
+            throw std::invalid_argument("Element " + std::to_string(n) + " of 'az' must not be empty.");
+        if (el[n].n_elem != L)
+            throw std::invalid_argument("Element " + std::to_string(n) + " of 'el' must have the same length as 'az'.");
+        if (powers[n].n_elem != L)
+            throw std::invalid_argument("Element " + std::to_string(n) + " of 'powers' must have the same length as 'az'.");
+    }
 
     dtype quantize_rad = quantize * (dtype)(3.14159265358979323846 / 180.0);
     dtype pi_val = (dtype)3.14159265358979323846;
@@ -239,45 +258,59 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
         elevation_spread->set_size(N);
 
     if (orientation != nullptr)
-        orientation->set_size(3, N);
+        orientation->zeros(3, N);
 
     if (phi_out != nullptr)
-        phi_out->set_size(N, L);
+        phi_out->resize(N);
 
     if (theta_out != nullptr)
-        theta_out->set_size(N, L);
+        theta_out->resize(N);
 
-    // --- Process each angle set ---
+    // --- Process each CIR ---
     for (arma::uword n = 0; n < N; n++)
     {
-        const dtype *az_row = az.colptr(0) + n; // Armadillo is column-major
-        const dtype *el_row = el_broadcast ? el.colptr(0) : (el.colptr(0) + n);
-        const dtype *pw_row = pow_broadcast ? pow.colptr(0) : (pow.colptr(0) + n);
-        arma::uword az_stride = N;
-        arma::uword el_stride = el_broadcast ? el.n_rows : N;
-        arma::uword pw_stride = pow_broadcast ? pow.n_rows : N;
+        arma::uword L = az[n].n_elem;
+        const dtype *az_ptr = az[n].memptr();
+        const dtype *el_ptr = el[n].memptr();
+        const dtype *pw_ptr = powers[n].memptr();
 
         // --- Normalize power weights ---
         arma::Col<dtype> pn(L);
         dtype *pnp = pn.memptr();
         dtype pt = (dtype)0;
         for (arma::uword i = 0; i < L; i++)
-            pt += pw_row[i * pw_stride];
+            pt += pw_ptr[i];
         if (pt <= (dtype)0)
-            throw std::invalid_argument("Sum of powers must be positive.");
+            throw std::invalid_argument("Sum of powers for element " + std::to_string(n) + " must be positive.");
         for (arma::uword i = 0; i < L; i++)
-            pnp[i] = pw_row[i * pw_stride] / pt;
+            pnp[i] = pw_ptr[i] / pt;
+
+        // --- Disable wrapping: compute 1D spreads directly ---
+        if (disable_wrapping)
+        {
+            if (azimuth_spread != nullptr)
+                (*azimuth_spread)(n) = calc_angular_spread_1d(az_ptr, pnp, L, quantize_rad);
+
+            if (elevation_spread != nullptr)
+                (*elevation_spread)(n) = calc_angular_spread_1d(el_ptr, pnp, L, quantize_rad);
+
+            if (phi_out != nullptr)
+                (*phi_out)[n] = az[n];
+
+            if (theta_out != nullptr)
+                (*theta_out)[n] = el[n];
+
+            continue;
+        }
 
         // --- Step 1: Closed-form power-weighted mean direction ---
         dtype mx = (dtype)0, my = (dtype)0, mz = (dtype)0;
         for (arma::uword i = 0; i < L; i++)
         {
-            dtype a = az_row[i * az_stride];
-            dtype e = el_row[i * el_stride];
-            dtype ce = std::cos(e);
-            mx += pnp[i] * std::cos(a) * ce;
-            my += pnp[i] * std::sin(a) * ce;
-            mz += pnp[i] * std::sin(e);
+            dtype ce = std::cos(el_ptr[i]);
+            mx += pnp[i] * std::cos(az_ptr[i]) * ce;
+            my += pnp[i] * std::sin(az_ptr[i]) * ce;
+            mz += pnp[i] * std::sin(el_ptr[i]);
         }
 
         dtype heading = std::atan2(my, mx);
@@ -287,30 +320,22 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
         dtype ch = std::cos(heading), sh = std::sin(heading);
         dtype ct = std::cos(tilt), st = std::sin(tilt);
 
-        // R = Ry(-tilt) * Rz(-heading), transposed convention:
-        //   row 0: [ ct*ch,   ct*sh,  -st ]
-        //   row 1: [ -sh,     ch,      0  ]
-        //   row 2: [ st*ch,   st*sh,   ct ]
         dtype R00 = ct * ch, R01 = ct * sh, R02 = -st;
         dtype R10 = -sh, R11 = ch, R12 = (dtype)0;
         dtype R20 = st * ch, R21 = st * sh, R22 = ct;
 
-        // Transform all paths to Cartesian, rotate, convert back to spherical
         arma::Col<dtype> phi_n(L), theta_n(L);
-        arma::Col<dtype> Cx(L), Cy(L), Cz(L); // Keep Cartesian for bank-angle rotation
+        arma::Col<dtype> Cx(L), Cy(L), Cz(L);
         dtype *phip = phi_n.memptr(), *thp = theta_n.memptr();
         dtype *cxp = Cx.memptr(), *cyp = Cy.memptr(), *czp = Cz.memptr();
 
         for (arma::uword i = 0; i < L; i++)
         {
-            dtype a = az_row[i * az_stride];
-            dtype e = el_row[i * el_stride];
-            dtype ce = std::cos(e);
-            dtype x = std::cos(a) * ce;
-            dtype y = std::sin(a) * ce;
-            dtype z = std::sin(e);
+            dtype ce = std::cos(el_ptr[i]);
+            dtype x = std::cos(az_ptr[i]) * ce;
+            dtype y = std::sin(az_ptr[i]) * ce;
+            dtype z = std::sin(el_ptr[i]);
 
-            // Rotate
             dtype rx = R00 * x + R01 * y + R02 * z;
             dtype ry = R10 * x + R11 * y + R12 * z;
             dtype rz = R20 * x + R21 * y + R22 * z;
@@ -327,7 +352,6 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
 
         if (calc_bank_angle && L > 1)
         {
-            // Power-weighted covariance of centered angles
             dtype m_phi = (dtype)0, m_th = (dtype)0;
             dtype var_phi = (dtype)0, var_th = (dtype)0, cov_pt = (dtype)0;
             for (arma::uword i = 0; i < L; i++)
@@ -344,12 +368,10 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
                 cov_pt += pnp[i] * dp * dt;
             }
 
-            // Principal-axis angle of the 2x2 covariance matrix
             bank = (dtype)0.5 * std::atan2((dtype)-2.0 * cov_pt, var_phi - var_th);
 
             if (std::abs(bank) > (dtype)1e-8)
             {
-                // Apply bank rotation Rx(bank)
                 dtype cb = std::cos(bank), sb = std::sin(bank);
 
                 for (arma::uword i = 0; i < L; i++)
@@ -358,39 +380,31 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
                     dtype rz = sb * cyp[i] + cb * czp[i];
                     phip[i] = std::atan2(ry, cxp[i]);
                     thp[i] = std::atan2(rz, std::sqrt(cxp[i] * cxp[i] + ry * ry));
-                    // Note: cxp[i] is unchanged by Rx rotation
-                    cyp[i] = ry; // Update for potential theta_out
+                    cyp[i] = ry;
                     czp[i] = rz;
                 }
 
-                // Verify: if ES > AS after rotation, swap to the other eigenvector
                 dtype as_test = calc_angular_spread_1d(phip, pnp, L, quantize_rad);
                 dtype es_test = calc_angular_spread_1d(thp, pnp, L, quantize_rad);
 
                 if (es_test > as_test)
                 {
-                    // Undo and reapply with bank + pi/2
                     bank = std::atan2(std::sin(bank + pi_val * (dtype)0.5),
                                       std::cos(bank + pi_val * (dtype)0.5));
 
                     dtype cb2 = std::cos(bank), sb2 = std::sin(bank);
 
-                    // Recompute from original centered Cartesian (before first bank rotation)
                     for (arma::uword i = 0; i < L; i++)
                     {
-                        dtype a = az_row[i * az_stride];
-                        dtype e = el_row[i * el_stride];
-                        dtype ce = std::cos(e);
-                        dtype x = std::cos(a) * ce;
-                        dtype y = std::sin(a) * ce;
-                        dtype z = std::sin(e);
+                        dtype ce = std::cos(el_ptr[i]);
+                        dtype x = std::cos(az_ptr[i]) * ce;
+                        dtype y = std::sin(az_ptr[i]) * ce;
+                        dtype z = std::sin(el_ptr[i]);
 
-                        // Apply heading+tilt rotation first
                         dtype rx = R00 * x + R01 * y + R02 * z;
                         dtype ry = R10 * x + R11 * y + R12 * z;
                         dtype rz = R20 * x + R21 * y + R22 * z;
 
-                        // Then bank rotation
                         dtype ry2 = cb2 * ry - sb2 * rz;
                         dtype rz2 = sb2 * ry + cb2 * rz;
 
@@ -411,7 +425,6 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
         if (elevation_spread != nullptr)
             (*elevation_spread)(n) = calc_angular_spread_1d(thp, pnp, L, quantize_rad);
 
-        // --- Store orientation ---
         if (orientation != nullptr)
         {
             dtype *op = orientation->colptr(n);
@@ -420,26 +433,25 @@ void quadriga_lib::calc_angular_spreads_sphere(const arma::Mat<dtype> &az,
             op[2] = std::atan2(std::sin(heading), std::cos(heading));
         }
 
-        // --- Store rotated angles ---
         if (phi_out != nullptr)
-            for (arma::uword i = 0; i < L; i++)
-                phi_out->at(n, i) = phip[i];
+            (*phi_out)[n] = phi_n;
 
         if (theta_out != nullptr)
-            for (arma::uword i = 0; i < L; i++)
-                theta_out->at(n, i) = thp[i];
+            (*theta_out)[n] = theta_n;
     }
 }
 
 // --- Explicit template instantiations ---
 template void quadriga_lib::calc_angular_spreads_sphere(
-    const arma::Mat<float> &az, const arma::Mat<float> &el, const arma::Mat<float> &pow,
-    arma::Col<float> *azimuth_spread, arma::Col<float> *elevation_spread,
-    arma::Mat<float> *orientation, arma::Mat<float> *phi_out, arma::Mat<float> *theta_out,
-    bool calc_bank_angle, float quantize);
+    const std::vector<arma::Col<float>> &, const std::vector<arma::Col<float>> &,
+    const std::vector<arma::Col<float>> &,
+    arma::Col<float> *, arma::Col<float> *, arma::Mat<float> *,
+    std::vector<arma::Col<float>> *, std::vector<arma::Col<float>> *,
+    bool, bool, float);
 
 template void quadriga_lib::calc_angular_spreads_sphere(
-    const arma::Mat<double> &az, const arma::Mat<double> &el, const arma::Mat<double> &pow,
-    arma::Col<double> *azimuth_spread, arma::Col<double> *elevation_spread,
-    arma::Mat<double> *orientation, arma::Mat<double> *phi_out, arma::Mat<double> *theta_out,
-    bool calc_bank_angle, double quantize);
+    const std::vector<arma::Col<double>> &, const std::vector<arma::Col<double>> &,
+    const std::vector<arma::Col<double>> &,
+    arma::Col<double> *, arma::Col<double> *, arma::Mat<double> *,
+    std::vector<arma::Col<double>> *, std::vector<arma::Col<double>> *,
+    bool, bool, double);

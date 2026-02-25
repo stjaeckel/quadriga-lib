@@ -19,7 +19,7 @@
 #include "lodepng.h"
 
 /*!SECTION
-Miscellaneous tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD

@@ -3580,6 +3580,7 @@ sig = result["sig"]     # Std of quantiles, shape (9,)
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
+</li><li style="margin-bottom: 0.4em;">Inputs use lists of 1D numpy arrays so that each CIR can have a different number of paths. 
 </li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
    direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
    on the equator before computing spreads. 
@@ -3587,58 +3588,63 @@ sig = result["sig"]     # Std of quantiles, shape (9,)
    despite energy being focused into a small solid angle). This method corrects for that. 
 </li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
    elevation spread, corresponding to the principal axes of the angular power distribution. 
-</li><li style="margin-bottom: 0.4em;">If <code>pow</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, the power vector is replicated. 
-</li><li style="margin-bottom: 0.4em;">If <code>el</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, elevation is assumed zero. 
+</li><li style="margin-bottom: 0.4em;">Setting <code>disable_wrapping</code> to True skips the rotation and computes spreads directly from 
+   raw angles. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
 import quadriga_lib
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spreads_sphere(az, el, pw)
 as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spreads_sphere(
-    az, el, pw, calc_bank_angle=True, quantize=0.0)
+    az, el, powers)
+as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spreads_sphere(
+    az, el, powers, disable_wrapping=False, calc_bank_angle=True, quantize=0.0)
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>az</b></code> (input)<br> 
-   Azimuth angles in [rad], ranging from -pi to pi. Shape <code>(n_ang, n_path)</code>. 
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>az</b></code> (input)<br> 
+   Azimuth angles in [rad]. List of length <code>n_cir</code>, each element is a 1D array of length <code>n_path</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>el</b></code> (input)<br> 
-   Elevation angles in [rad], ranging from -pi/2 to pi/2. Shape <code>(n_ang, n_path)</code> or <code>(1, n_path)</code>. 
+<ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>el</b></code> (input)<br> 
+   Elevation angles in [rad]. List of length <code>n_cir</code>, each element is a 1D array of length <code>n_path</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>pw</b></code> (input)<br> 
-   Path powers in [W]. Shape <code>(n_ang, n_path)</code> or <code>(1, n_path)</code>. 
+<ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>powers</b></code> (input)<br> 
+   Path powers in [W]. List of length <code>n_cir</code>, each element is a 1D array of length <code>n_path</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>bool <b>disable_wrapping</b> = False</code> (input)<br> 
+   If True, skip spherical rotation and compute spreads from raw angles. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>bool <b>calc_bank_angle</b> = True</code> (input)<br> 
-   If True, the optimal bank angle is computed analytically. 
+   If True, compute the optimal bank angle analytically. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>float <b>quantize</b> = 0.0</code> (input)<br> 
-   Angular quantization step in [deg]. Set to 0 to treat all paths independently. 
+   Angular quantization step in [deg]. Set to 0 for no quantization. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>azimuth_spread</b></code> (output)<br> 
-   RMS azimuth angular spread in [rad]. Shape <code>(n_ang,)</code>. 
+   RMS azimuth angular spread in [rad]. Shape <code>(n_cir,)</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>elevation_spread</b></code> (output)<br> 
-   RMS elevation angular spread in [rad]. Shape <code>(n_ang,)</code>. 
+   RMS elevation angular spread in [rad]. Shape <code>(n_cir,)</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>orientation</b></code> (output)<br> 
-   Mean-angle orientation [bank, tilt, heading] in [rad]. Shape <code>(3, n_ang)</code>. 
+   Mean-angle orientation [bank, tilt, heading] in [rad]. Shape <code>(3, n_cir)</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>phi</b></code> (output)<br> 
-   Rotated azimuth angles in [rad]. Shape <code>(n_ang, n_path)</code>. 
+<ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>phi</b></code> (output)<br> 
+   Rotated azimuth angles in [rad]. List of length <code>n_cir</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>theta</b></code> (output)<br> 
-   Rotated elevation angles in [rad]. Shape <code>(n_ang, n_path)</code>. 
+<ul><li style="margin-bottom: 0.4em;"><code>list of np.ndarray <b>theta</b></code> (output)<br> 
+   Rotated elevation angles in [rad]. List of length <code>n_cir</code>. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3646,10 +3652,11 @@ as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_
 import numpy as np
 import quadriga_lib
 
-az = np.array([[0.1, 0.2, -0.1, 0.3]])
-el = np.array([[0.0, 0.05, -0.05, 0.02]])
-pw = np.array([[1.0, 2.0, 1.5, 0.5]])
-as_spread, es_spread, orient, phi, theta = quadriga_lib.tools.calc_angular_spreads_sphere(az, el, pw)
+az = [np.array([0.1, -0.1, 0.05]), np.array([0.2, -0.2, 0.1, -0.1])]
+el = [np.array([0.0, 0.0, 0.0]), np.array([0.05, -0.05, 0.0, 0.0])]
+powers = [np.array([1.0, 1.0, 0.5]), np.array([2.0, 1.0, 1.5, 0.5])]
+as_spread, es_spread, orient, phi, theta = quadriga_lib.tools.calc_angular_spreads_sphere(
+    az, el, powers)
 </pre>
 </li>
 </ul>

@@ -76,16 +76,31 @@ namespace quadriga_lib
     // The power-weighted mean direction is rotated to the equator to decouple spreads,
     // and an optional bank angle aligns the angular distribution to its principal axes.
     template <typename dtype>
-    void calc_angular_spreads_sphere(const arma::Mat<dtype> &az,                   // Azimuth angles in [rad], Size [n_ang, n_path]
-                                     const arma::Mat<dtype> &el,                   // Elevation angles in [rad], Size [n_ang, n_path] or [1, n_path]
-                                     const arma::Mat<dtype> &pow,                  // Path powers in [W], Size [n_ang, n_path] or [1, n_path]
-                                     arma::Col<dtype> *azimuth_spread = nullptr,   // RMS azimuth angular spread in [rad], Length [n_ang]
-                                     arma::Col<dtype> *elevation_spread = nullptr, // RMS elevation angular spread in [rad], Length [n_ang]
-                                     arma::Mat<dtype> *orientation = nullptr,      // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_ang]
-                                     arma::Mat<dtype> *phi = nullptr,              // Rotated azimuth angles in [rad], Size [n_ang, n_path]
-                                     arma::Mat<dtype> *theta = nullptr,            // Rotated elevation angles in [rad], Size [n_ang, n_path]
-                                     bool calc_bank_angle = true,                  // Compute optimal bank angle analytically
-                                     dtype quantize = 0.0);                        // Angular quantization step in [deg], 0 = disabled
+    void calc_angular_spreads_sphere(const std::vector<arma::Col<dtype>> &az,        // Azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                                     const std::vector<arma::Col<dtype>> &el,        // Elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                                     const std::vector<arma::Col<dtype>> &powers,    // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+                                     arma::Col<dtype> *azimuth_spread = nullptr,     // RMS azimuth angular spread in [rad], Length [n_cir]
+                                     arma::Col<dtype> *elevation_spread = nullptr,   // RMS elevation angular spread in [rad], Length [n_cir]
+                                     arma::Mat<dtype> *orientation = nullptr,        // Mean-angle orientation [bank;tilt;heading] in [rad], Size [3, n_cir]
+                                     std::vector<arma::Col<dtype>> *phi = nullptr,   // Rotated azimuth angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                                     std::vector<arma::Col<dtype>> *theta = nullptr, // Rotated elevation angles in [rad], Vector (n_cir) of vectors of length [n_path]
+                                     bool disable_wrapping = false,                  // Disable the rotation and use raw az/el angles for spread calculation
+                                     bool calc_bank_angle = true,                    // Compute optimal bank angle analytically (only for disable_wrapping = false)
+                                     dtype quantize = 0.0);                          // Angular quantization step in [deg], 0 = disabled
+
+    // // Calculate the Rician K-Factor
+    // // - KF = ratio of signal power in the dominant line-of-sight (LOS) path to the power in the scattered (non-line-of-sight, or NLOS) paths
+    // // - LOS path is identified by matching the absolute path length with the distance between TX and RX dTR
+    // // - All paths arriving before dTR + window_size are considered LOS and their power is added
+    // // - Paths arriving after dTR + window_size, are considered NLOS
+    // template <typename dtype>
+    // void calc_rician_k_factor(const std::vector<arma::Col<dtype>> &powers,      // Path powers in [W], Vector (n_cir) of vectors of length [n_path]
+    //                           const std::vector<arma::Col<dtype>> &path_length, // Absolute path length from TX to RX phase center, Vector (n_cir) of vectors of length [n_path]
+    //                           const arma::Mat<dtype> &tx_pos,                   // Transmitter position in Cartesian coordinates. Size [3,1] (fixed TX) or [3, n_cir] (mobile TX).
+    //                           const arma::Mat<dtype> &rx_pos,                   // Receiver position in Cartesian coordinates. Size [3,1] (fixed RX) or [3, n_cir] (mobile RX).
+    //                           arma::Col<dtype> *kf = nullptr,                   // Rician K-factor, linear scale, Length [n_cir]
+    //                           arma::Col<dtype> *pg = nullptr,                   // Total path gain (sum of path-powers), Length [n_cir]
+    //                           dtype window_size = 0.01);                        // LOS window size in meters
 
     // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
     // - Input: Cartesian coordinates, size [3, n_row, n_col]

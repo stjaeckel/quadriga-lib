@@ -201,7 +201,7 @@ Use the **full declaration** (including all parameters) in the `## Declaration:`
 
 ```cpp
 #include <catch2/catch_test_macros.hpp>
-#include "quadriga_channel.hpp"
+#include "quadriga_channel.hpp" // or appropriate header from the project
 ```
 
 ### Test Structure
@@ -245,6 +245,7 @@ CHECK(name == "TX1");
 - Validate all scalar outputs, vector sizes, string outputs, array shapes and sample values.
 - **Edge cases**: Invalid file paths, out-of-range indices (wrap in `CHECK_THROWS_AS(..., std::invalid_argument)`).
 - **Physical consistency**: Where possible, independently validate the physical correctness of outputs (e.g. path gains should be negative, angles within expected ranges).
+- Error handling
 - IMPORTANT (!!!!!) - Avoid nested initializer lists, e.g. arma::mat X = {{1, 2}, {3, 4}}; instead, use `arma::mat X(2, 2); X.col(0) = {1, 3}; X.col(1) = {2, 4};. Using something arma::mat pw = {{1.0}}; in will crash !!!!!
 - For functions that don't operate on files, generate synthetic test data programmatically within the test.
 - Test data paths are relative to the project root: tests/data/<file> (if test data is used, it will be specified in the request).
@@ -489,9 +490,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // IMPORTANT: Convert 1-based MATLAB indices to 0-based C++ indices
     idx -= 1;
 
+    // Convert MATLAB matrix to std::vector of column vectors (split along dim, 0-based):
+    // A [M, K] MATLAB matrix with vec_dim=1 becomes K vectors of length M
+    // std::vector<arma::vec> vec_of_cols = qd_mex_matlab2vector_Col<double>(prhs[4], 1);
+
     // Declare output variables
     arma::mat out_mat_fixed;
     arma::vec out_vec;
+    // std::vector<arma::vec> out_vec_of_cols;
     // ...
 
     // Alternative zero-copy: if output size is known, and output is requested
@@ -499,6 +505,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Set up optional output pointers based on nlhs
     arma::vec *p_out_vec = (nlhs > 0) ? &out_vec : nullptr;
+    // std::vector<arma::vec> *p_out_voc = (nlhs > 2) ? &out_vec_of_cols : nullptr;
 
     // For known output size, allocate zero-copy output arrays
     size_t r = 10, c = 5; // Example length, replace with actual expected size
@@ -511,6 +518,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Write to MATLAB
     if (nlhs > 1)
         plhs[1] = qd_mex_copy2matlab(&out_vec);
+
+    // Convert std::vector of column vectors back to MATLAB matrix:
+    // K vectors of length M become a [M, K] MATLAB matrix (padded to longest if lengths differ)
+    // if (nlhs > 2)
+    //     plhs[2] = qd_mex_vector2matlab(&out_vec_of_cols);
 }
 ```
 
@@ -678,6 +690,17 @@ assertElementsAlmostEqual(actual, expected_double, 'absolute', 1.5e-4); % Double
 % Shape checks
 assertEqual(size(mat_out), [double(no_rows), 3]);
 
+% Error handling test
+try
+    directivity = quadriga_lib.arrayant_calc_directivity( A, B, C );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Wrong number of input arguments.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 end
 ```
 
@@ -701,6 +724,7 @@ end
 - Test all relevant outputs, including scalars, vectors, matrices, and strings. Validate shapes and sample values.
 - Test failure cases (e.g. invalid file paths, out-of-range indices) - they should throw errors that can be caught with `assertError` or `assertErrorThrown`.
 - For functions that don't operate on files, generate synthetic test data programmatically within the test.
+- For the error handling tests, check if CALL_QD correctly forward C++ exceptions to MATLAB. The error message should match the one thrown in C++/MEX (e.g. "Wrong number of input arguments."). If you cant determine the exact error message, at least check that an error is thrown.
 
 ---
 
@@ -801,5 +825,5 @@ void qrt_file_parse(const std::string &fn,                          // Path to t
 - [ ] MATLAB MEX uses `CALL_QD(...)` macro
 - [ ] MATLAB test uses correct types (`uint64`, `int32`, `single`, `double`)
 - [ ] All tests cover: basic functionality, edge cases, uplink/downlink if applicable, multi-frequency if applicable
-- [ ] Stream/cache patterns followed if function takes `std::ifstream*`
+- [ ] Stream patterns followed if function takes `std::ifstream*`
 - [ ] No `nullptr` optimization in Python wrapper (all outputs always computed)
