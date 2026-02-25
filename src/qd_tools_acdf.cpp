@@ -345,8 +345,6 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     dtype mean_val = sum_val / (dtype)count;
                     mu_local(q) = mean_val;
 
-                    // Sample standard deviation
-                    dtype variance = sum_sq / (dtype)count - mean_val * mean_val;
                     // Use population std for consistency with MATLAB's std (which uses N-1),
                     // but we are computing over a window, so use sample std
                     dtype n_f = (dtype)count;

@@ -24,7 +24,7 @@
 #endif
 
 /*!SECTION
-Miscellaneous tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD

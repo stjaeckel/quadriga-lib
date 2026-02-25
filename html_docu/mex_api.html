@@ -3549,6 +3549,9 @@ data = randn(10000, 5);
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
+</li><li style="margin-bottom: 0.4em;">Inputs and outputs for angles and powers are provided as 2D matrices where each column 
+   represents a CIR (internally converted to vectors of column vectors to allow variable path 
+   counts per CIR when called from C++). 
 </li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
    direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
    on the equator before computing spreads. 
@@ -3556,67 +3559,69 @@ data = randn(10000, 5);
    despite energy being focused into a small solid angle). This method corrects for that. 
 </li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
    elevation spread, corresponding to the principal axes of the angular power distribution. 
-</li><li style="margin-bottom: 0.4em;">If <code>pow</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, the power vector is replicated. 
-</li><li style="margin-bottom: 0.4em;">If <code>el</code> has only 1 row but <code>az</code> has <code>n_ang</code> rows, elevation is assumed zero. 
+</li><li style="margin-bottom: 0.4em;">Setting <code>disable_wrapping</code> to true skips the rotation and computes spreads from raw angles. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, pw );
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, pw, calc_bank_angle, quantize );
+[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers );
+[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers, disable_wrapping, calc_bank_angle, quantize );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az</code></b><br> 
-   Azimuth angles in [rad], ranging from -pi to pi. Size <code>[n_ang, n_path]</code>. 
+   Azimuth angles in [rad], ranging from -pi to pi. Size <code>[n_path, n_cir]</code> (each column is one CIR). 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>el</code></b><br> 
-   Elevation angles in [rad], ranging from -pi/2 to pi/2. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
+   Elevation angles in [rad], ranging from -pi/2 to pi/2. Size <code>[n_path, n_cir]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>pw</code></b><br> 
-   Path powers in [W]. Size <code>[n_ang, n_path]</code> or <code>[1, n_path]</code>. 
+<ul><li style="margin-bottom: 0.4em;"><b><code>powers</code></b><br> 
+   Path powers in [W]. Size <code>[n_path, n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>disable_wrapping</code></b> (optional)<br> 
+   Logical. If true, skip spherical rotation and compute spreads from raw angles. Default: false. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>calc_bank_angle</code></b> (optional)<br> 
-   Logical. If true (default), the optimal bank angle is computed analytically. If false, bank is 
-   set to zero. 
+   Logical. If true (default), compute the optimal bank angle analytically. Only used when 
+   <code>disable_wrapping</code> is false. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>quantize</code></b> (optional)<br> 
-   Angular quantization step in [deg]. Paths within this angular distance are grouped and their 
-   powers summed before computing the spread. Default: 0 (no quantization). 
+   Angular quantization step in [deg]. Default: 0 (no quantization). 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>as</code></b><br> 
-   RMS azimuth angular spread in [rad]. Type: <code>double</code>. Size <code>[n_ang, 1]</code>. 
+   RMS azimuth angular spread in [rad]. Type: <code>double</code>. Size <code>[n_cir, 1]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>es</code></b><br> 
-   RMS elevation angular spread in [rad]. Type: <code>double</code>. Size <code>[n_ang, 1]</code>. 
+   RMS elevation angular spread in [rad]. Type: <code>double</code>. Size <code>[n_cir, 1]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b><br> 
    Power-weighted mean-angle orientation: row 1 = bank angle, row 2 = tilt angle, row 3 = heading 
-   angle, all in [rad]. Type: <code>double</code>. Size <code>[3, n_ang]</code>. 
+   angle, all in [rad]. Type: <code>double</code>. Size <code>[3, n_cir]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>phi</code></b><br> 
-   Rotated azimuth angles in [rad]. Type: <code>double</code>. Size <code>[n_ang, n_path]</code>. 
+   Rotated azimuth angles in [rad]. Type: <code>double</code>. Size <code>[n_path, n_cir]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>theta</code></b><br> 
-   Rotated elevation angles in [rad]. Type: <code>double</code>. Size <code>[n_ang, n_path]</code>. 
+   Rotated elevation angles in [rad]. Type: <code>double</code>. Size <code>[n_path, n_cir]</code>. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-az = [0.1, 0.2, -0.1, 0.3];
-el = [0.0, 0.05, -0.05, 0.02];
-pw = [1.0, 2.0, 1.5, 0.5];
-[as, es, orient] = quadriga_lib.calc_angular_spreads_sphere(az, el, pw);
+az = [0.1, 0.2; -0.1, -0.2; 0.05, 0.0];
+el = [0.0, 0.05; 0.0, -0.05; 0.0, 0.0];
+powers = [1.0, 2.0; 1.0, 1.0; 0.5, 1.5];
+[as, es, orient] = quadriga_lib.calc_angular_spreads_sphere(az, el, powers);
 </pre>
 </li>
 </ul>

@@ -19,7 +19,7 @@
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD

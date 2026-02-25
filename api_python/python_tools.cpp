@@ -47,7 +47,8 @@ void quadriga_lib_tools(py::module_ &m)
     m.def("calc_angular_spreads_sphere", &calc_angular_spreads_sphere,
           py::arg("az"),
           py::arg("el"),
-          py::arg("pw"),
+          py::arg("powers"),
+          py::arg("disable_wrapping") = false,
           py::arg("calc_bank_angle") = true,
           py::arg("quantize") = 0.0);
 
