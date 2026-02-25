@@ -164,6 +164,7 @@
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
 <tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
+<tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
@@ -5066,6 +5067,90 @@ arma::vec as, es;
 arma::mat orient;
 quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &amp;as, &amp;es, &amp;orient);
 // as(0), as(1) contain the azimuth spreads for each CIR
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_rician_k_factor"></a>
+<b>calc_rician_k_factor</b> - Calculate the Rician K-Factor from channel impulse response data
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">The Rician K-Factor (KF) is defined as the ratio of signal power in the dominant line-of-sight 
+   (LOS) path to the power in the scattered (non-line-of-sight, NLOS) paths. 
+</li><li style="margin-bottom: 0.4em;">The LOS path is identified by matching the absolute path length with the direct distance between 
+   TX and RX positions (<code>dTR</code>). 
+</li><li style="margin-bottom: 0.4em;">All paths arriving within <code>dTR + window_size</code> are considered LOS and their power is summed. 
+</li><li style="margin-bottom: 0.4em;">Paths arriving after <code>dTR + window_size</code> are considered NLOS and their power is summed. 
+</li><li style="margin-bottom: 0.4em;">If the total NLOS power is zero (i.e. no scattered paths), the K-Factor is set to infinity (<code>HUGE_VAL</code>). 
+</li><li style="margin-bottom: 0.4em;">If the total LOS power is zero (i.e. no LOS paths), the K-Factor is set to zero. 
+</li><li style="margin-bottom: 0.4em;">The transmitter and receiver positions can be fixed (size <code>[3, 1]</code>) or mobile (size <code>[3, n_cir]</code>). 
+   Fixed positions are reused for all channel snapshots. 
+</li><li style="margin-bottom: 0.4em;">Optional output <code>pg</code> returns the total path gain (sum of all path powers) for each snapshot. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::calc_rician_k_factor(
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;powers,
+    const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;path_length,
+    const arma::Mat&lt;dtype&gt; &amp;tx_pos,
+    const arma::Mat&lt;dtype&gt; &amp;rx_pos,
+    arma::Col&lt;dtype&gt; *kf = nullptr,
+    arma::Col&lt;dtype&gt; *pg = nullptr,
+    dtype window_size = 0.01);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>powers</b></code> (input)<br> 
+   Path powers in Watts [W]. Vector of length <code>n_cir</code>, where each element is a column vector of 
+   length <code>n_path</code> (number of paths may vary per snapshot). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Col&lt;dtype&gt;&gt; &amp;<b>path_length</b></code> (input)<br> 
+   Absolute path lengths from TX to RX phase center in meters. Vector of length <code>n_cir</code>, where 
+   each element is a column vector of length <code>n_path</code> matching the corresponding entry in <code>powers</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>tx_pos</b></code> (input)<br> 
+   Transmitter position in Cartesian coordinates [x; y; z]. Size <code>[3, 1]</code> for a fixed TX or 
+   <code>[3, n_cir]</code> for a mobile TX. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; &amp;<b>rx_pos</b></code> (input)<br> 
+   Receiver position in Cartesian coordinates [x; y; z]. Size <code>[3, 1]</code> for a fixed RX or 
+   <code>[3, n_cir]</code> for a mobile RX. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*kf</b> = nullptr</code> (optional output)<br> 
+   Rician K-Factor on linear scale. Length <code>[n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*pg</b> = nullptr</code> (optional output)<br> 
+   Total path gain (sum of path powers). Length <code>[n_cir]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>window_size</b> = 0.01</code> (input)<br> 
+   LOS window size in meters. Paths with length ≤ <code>dTR + window_size</code> are considered LOS. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+#include "quadriga_tools.hpp"
+
+// Single snapshot with 3 paths
+std::vector&lt;arma::vec&gt; powers(1), path_length(1);
+powers[0] = {1.0, 0.5, 0.25};       // Path powers in W
+path_length[0] = {10.0, 11.0, 12.0}; // Path lengths in m
+
+arma::mat tx_pos(3, 1), rx_pos(3, 1);
+tx_pos.col(0) = {0.0, 0.0, 0.0};
+rx_pos.col(0) = {10.0, 0.0, 0.0};   // dTR = 10.0 m
+
+arma::vec kf, pg;
+quadriga_lib::calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, &amp;kf, &amp;pg, 0.01);
+// kf[0] = 1.0 / (0.5 + 0.25) = 1.333...
+// pg[0] = 1.0 + 0.5 + 0.25 = 1.75
 </pre>
 </li>
 </ul>

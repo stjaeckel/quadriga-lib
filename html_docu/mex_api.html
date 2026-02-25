@@ -111,6 +111,7 @@
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
 <tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
+<tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
@@ -3679,6 +3680,65 @@ delays = [0, 1e-6, 2e-6];
 powers = [1.0, 0.5, 0.25];
 [ds, mean_delay] = quadriga_lib.calc_delay_spread( delays, powers );
 </pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_rician_k_factor"></a>
+<b>calc_rician_k_factor</b> - Calculate the Rician K-Factor from channel impulse response data
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">The Rician K-Factor (KF) is defined as the ratio of signal power in the dominant line-of-sight 
+   (LOS) path to the power in the scattered (non-line-of-sight, NLOS) paths. 
+</li><li style="margin-bottom: 0.4em;">The LOS path is identified by matching the absolute path length with the direct distance between 
+   TX and RX positions (<code>dTR</code>). 
+</li><li style="margin-bottom: 0.4em;">All paths arriving within <code>dTR + window_size</code> are considered LOS and their power is summed. 
+</li><li style="margin-bottom: 0.4em;">Paths arriving after <code>dTR + window_size</code> are considered NLOS and their power is summed. 
+</li><li style="margin-bottom: 0.4em;">If the total NLOS power is zero, the K-Factor is set to infinity. 
+</li><li style="margin-bottom: 0.4em;">If the total LOS power is zero, the K-Factor is set to zero. 
+</li><li style="margin-bottom: 0.4em;">The transmitter and receiver positions can be fixed (size <code>[3, 1]</code>) or mobile (size <code>[3, n_cir]</code>). 
+   Fixed positions are reused for all channel snapshots. 
+</li><li style="margin-bottom: 0.4em;">Optional output <code>pg</code> returns the total path gain (sum of all path powers) for each snapshot. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ kf, pg ] = quadriga_lib.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>powers</code></b> (required)<br> 
+   Path powers in Watts [W]. A 2D matrix of size <code>[n_path_max, n_cir]</code> where columns correspond to 
+   channel snapshots. Shorter paths are zero-padded. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>path_length</code></b> (required)<br> 
+   Absolute path lengths from TX to RX phase center in meters. A 2D matrix of size 
+   <code>[n_path_max, n_cir]</code> matching <code>powers</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tx_pos</code></b> (required)<br> 
+   Transmitter position in Cartesian coordinates. Size <code>[3, 1]</code> for fixed TX or <code>[3, n_cir]</code> for 
+   mobile TX. Type: double. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>rx_pos</code></b> (required)<br> 
+   Receiver position in Cartesian coordinates. Size <code>[3, 1]</code> for fixed RX or <code>[3, n_cir]</code> for 
+   mobile RX. Type: double. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>window_size</code></b> (optional)<br> 
+   LOS window size in meters. Default: <code>0.01</code>. Paths with length ≤ <code>dTR + window_size</code> are 
+   considered LOS. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>kf</code></b> (optional)<br> 
+   Rician K-Factor on linear scale. Size <code>[n_cir, 1]</code>, type: double. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>pg</code></b> (optional)<br> 
+   Total path gain (sum of path powers). Size <code>[n_cir, 1]</code>, type: double. 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>

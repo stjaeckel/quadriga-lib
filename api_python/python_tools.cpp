@@ -26,6 +26,7 @@ namespace py = pybind11;
 #include "qpy_calc_delay_spread.cpp"
 #include "qpy_acdf.cpp"
 #include "qpy_calc_angular_spreads_sphere.cpp"
+#include "qpy_calc_rician_k_factor.cpp"
 
 void quadriga_lib_tools(py::module_ &m)
 {
@@ -57,4 +58,11 @@ void quadriga_lib_tools(py::module_ &m)
           py::arg("powers"),
           py::arg("threshold") = 100.0,
           py::arg("granularity") = 0.0);
+
+    m.def("calc_rician_k_factor", &calc_rician_k_factor,
+          py::arg("powers"),
+          py::arg("path_length"),
+          py::arg("tx_pos"),
+          py::arg("rx_pos"),
+          py::arg("window_size") = 0.01);
 }
