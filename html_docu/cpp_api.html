@@ -134,6 +134,7 @@
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
 <tr><td><a href="#qrt_read_cache_init">qrt_read_cache_init</a></td><td>Initialize a QRT read cache for fast repeated access</td></tr>
+<tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
 </tbody>
 </table>
 </ul>
@@ -3711,6 +3712,109 @@ for (arma::uword ic = 0; ic &lt; cache.no_cir; ++ic)
             nullptr, nullptr, &amp;path_gain, nullptr, &amp;M,
             nullptr, nullptr, nullptr, nullptr, nullptr, 1,
             nullptr, nullptr, &amp;stream, &amp;cache);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="quantize_delays"></a>
+<b>quantize_delays</b> - Fixes the path delays to a grid of delay bins
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid 
+   of delay bins (taps). Rounding delays to the nearest tap causes discontinuities in the frequency 
+   domain when a delay crosses a tap boundary (e.g. as a mobile terminal moves). This function 
+   instead approximates each path delay using two adjacent taps with power-weighted coefficients, 
+   producing smooth transitions. 
+</li><li style="margin-bottom: 0.4em;">For a path at fractional offset &delta; between tap indices, two taps are created with complex 
+   coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power 
+   exponent. The default &alpha;=1.0 (linear interpolation) is optimal for narrowband systems. Use 
+   &alpha;=0.5 to preserve wideband (incoherent) power. 
+</li><li style="margin-bottom: 0.4em;">If input delays are already quantized (all fractional offsets below 0.01), the interpolation 
+   weight computation is skipped but the same delay-selection logic is used. 
+</li><li style="margin-bottom: 0.4em;">The <code>fix_taps</code> parameter controls whether delay grids are shared across antenna pairs and/or 
+   snapshots, trading accuracy for a more compact representation. 
+</li><li style="margin-bottom: 0.4em;">Input delays may be per-antenna <code>[n_rx, n_tx, n_path_s]</code> or shared <code>[1, 1, n_path_s]</code>. When 
+   shared and fix_taps is 0 or 3, delays are expanded internally and output delays are per-antenna. 
+   When shared and fix_taps is 1 or 2, output delays remain shared <code>[1, 1, n_taps]</code>. 
+</li><li style="margin-bottom: 0.4em;">The number of antennas <code>n_rx</code> and <code>n_tx</code> must be the same across all snapshots, but the number 
+   of paths <code>n_path_s</code> may differ per snapshot. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+template &lt;typename dtype&gt;
+void quadriga_lib::quantize_delays(
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_re,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_im,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *delay,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_re_quant,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_im_quant,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *delay_quant,
+    dtype tap_spacing = (dtype)5.0e-9,
+    arma::uword max_no_taps = 48,
+    dtype power_exponent = (dtype)1.0,
+    int fix_taps = 0);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_re</b></code> (input)<br> 
+   Channel coefficients, real part. Vector of length <code>n_snap</code>, each cube of size 
+   <code>[n_rx, n_tx, n_path_s]</code> where <code>n_path_s</code> may differ across snapshots. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_im</b></code> (input)<br> 
+   Channel coefficients, imaginary part. Same sizes as <code>coeff_re</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*delay</b></code> (input)<br> 
+   Path delays in seconds. Vector of length <code>n_snap</code>, each cube of size 
+   <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code>. The number of paths must match <code>coeff_re</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_re_quant</b></code> (output)<br> 
+   Output coefficients, real part. Vector of length <code>n_snap</code>, each cube of size <code>[n_rx, n_tx, n_taps]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_im_quant</b></code> (output)<br> 
+   Output coefficients, imaginary part. Vector of length <code>n_snap</code>, each cube of size <code>[n_rx, n_tx, n_taps]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*delay_quant</b></code> (output)<br> 
+   Output delays in seconds. Vector of length <code>n_snap</code>, each cube of size <code>[n_rx, n_tx, n_taps]</code> or 
+   <code>[1, 1, n_taps]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>tap_spacing</b> = 5.0e-9</code> (input)<br> 
+   Spacing of the delay bins in seconds. Default: 5 ns (200 MHz sampling rate). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>max_no_taps</b> = 48</code> (input)<br> 
+   Maximum number of output taps. 0 means unlimited. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>power_exponent</b> = 1.0</code> (input)<br> 
+   Interpolation exponent &alpha;. Use 1.0 for narrowband (linear) or 0.5 for wideband (power-preserving). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>fix_taps</b> = 0</code> (input)<br> 
+   Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all, 
+   2 = per snapshot, 3 = per tx-rx pair. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+// Create synthetic test data: 2 snapshots with different numbers of paths
+std::vector&lt;arma::Cube&lt;double&gt;&gt; cre(2), cim(2), dl(2);
+cre[0].set_size(1, 1, 3); cim[0].set_size(1, 1, 3); dl[0].set_size(1, 1, 3);
+cre[1].set_size(1, 1, 2); cim[1].set_size(1, 1, 2); dl[1].set_size(1, 1, 2);
+cre[0](0,0,0) = 1.0; cre[0](0,0,1) = 0.5; cre[0](0,0,2) = 0.3;
+cre[1](0,0,0) = 0.8; cre[1](0,0,1) = 0.4;
+cim[0].zeros(); cim[1].zeros();
+dl[0](0,0,0) = 0.0; dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9;
+dl[1](0,0,0) = 0.0; dl[1](0,0,1) = 10.0e-9;
+
+std::vector&lt;arma::Cube&lt;double&gt;&gt; cre_q, cim_q, dl_q;
+quadriga_lib::quantize_delays(&amp;cre, &amp;cim, &amp;dl, &amp;cre_q, &amp;cim_q, &amp;dl_q, 5.0e-9, 48, 1.0, 0);
 </pre>
 </li>
 </ul>

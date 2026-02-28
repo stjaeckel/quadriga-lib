@@ -88,6 +88,7 @@
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
+<tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2400,6 +2401,73 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 [center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
     aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 1, 1, true, 1);
 </pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="quantize_delays"></a>
+<b>quantize_delays</b> - Fixes the path delays to a grid of delay bins
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid 
+   of delay bins (taps). This function approximates each path delay using two adjacent taps with 
+   power-weighted coefficients, producing smooth transitions in the frequency domain. 
+</li><li style="margin-bottom: 0.4em;">For a path at fractional offset &delta; between tap indices, two taps are created with complex 
+   coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power 
+   exponent. 
+</li><li style="margin-bottom: 0.4em;">Input delays may be per-antenna <code>[n_rx, n_tx, n_path, n_snap]</code> or shared <code>[1, 1, n_path, n_snap]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ coeff_re_q, coeff_im_q, delay_q ] = quadriga_lib.quantize_delays( coeff_re, coeff_im, delay, ...
+    tap_spacing, max_no_taps, power_exponent, fix_taps );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b> (required)<br> 
+   Channel coefficients, real part. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> (double). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b> (required)<br> 
+   Channel coefficients, imaginary part. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> (double). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>delay</code></b> (required)<br> 
+   Path delays in seconds. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> or 
+   <code>[1, 1, n_path, n_snap]</code> (double). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tap_spacing</code></b> (optional)<br> 
+   Spacing of the delay bins in seconds. Scalar double. Default: 5e-9 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>max_no_taps</code></b> (optional)<br> 
+   Maximum number of output taps. Scalar integer. 0 = unlimited. Default: 48 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>power_exponent</code></b> (optional)<br> 
+   Interpolation exponent. Scalar double. Default: 1.0 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>fix_taps</code></b> (optional)<br> 
+   Delay sharing mode. Scalar integer (0-3). Default: 0<br> 
+   0 = per tx-rx pair and snapshot, 1 = single grid for all, 
+   2 = per snapshot, 3 = per tx-rx pair. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re_q</code></b><br> 
+   Output coefficients, real part. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> (double). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im_q</code></b><br> 
+   Output coefficients, imaginary part. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> (double). 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>delay_q</code></b><br> 
+   Output delays in seconds. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> or 
+   <code>[1, 1, n_taps, n_snap]</code> (double). 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div>

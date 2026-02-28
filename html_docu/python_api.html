@@ -120,6 +120,7 @@ import quadriga_lib
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
+<tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
 </tbody>
 </table>
 </ul>
@@ -3508,6 +3509,77 @@ data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
   <td>List of <code>[3, n_int_s]</code></td>
 </tr>
 </table><br>
+</li></ul>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="quantize_delays"></a>
+<b>quantize_delays</b> - Fixes the path delays to a grid of delay bins
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid 
+   of delay bins (taps). This function approximates each path delay using two adjacent taps with 
+   power-weighted coefficients, producing smooth transitions in the frequency domain. 
+</li><li style="margin-bottom: 0.4em;">For a path at fractional offset &delta; between tap indices, two taps are created with complex 
+   coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power 
+   exponent. 
+</li><li style="margin-bottom: 0.4em;">Input delays may be per-antenna <code>[n_rx, n_tx, n_path_s]</code> or shared <code>[1, 1, n_path_s]</code>. Output 
+   delay shape depends on <code>fix_taps</code> mode. 
+</li><li style="margin-bottom: 0.4em;">The number of paths <code>n_path_s</code> may differ across snapshots. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+import quadriga_lib
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays(
+    coeff_re, coeff_im, delay,
+    tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>list <b>*coeff_re</b></code> (input)<br> 
+   Channel coefficients, real part. List of <code>n_snap</code> numpy arrays, each of shape 
+   <code>[n_rx, n_tx, n_path_s]</code>. The number of paths may differ per snapshot. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>list <b>*coeff_im</b></code> (input)<br> 
+   Channel coefficients, imaginary part. Same shapes as <code>coeff_re</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>list <b>*delay</b></code> (input)<br> 
+   Path delays in seconds. List of <code>n_snap</code> numpy arrays, each of shape 
+   <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>float <b>tap_spacing</b> = 5e-9</code> (input)<br> 
+   Spacing of the delay bins in seconds. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>max_no_taps</b> = 48</code> (input)<br> 
+   Maximum number of output taps. 0 means unlimited. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>float <b>power_exponent</b> = 1.0</code> (input)<br> 
+   Interpolation exponent. Use 1.0 for narrowband or 0.5 for wideband. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>fix_taps</b> = 0</code> (input)<br> 
+   Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all, 
+   2 = per snapshot, 3 = per tx-rx pair. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>coeff_re_q</b></code> (output)<br> 
+   Output coefficients, real part. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>coeff_im_q</b></code> (output)<br> 
+   Output coefficients, imaginary part. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>np.ndarray <b>delay_q</b></code> (output)<br> 
+   Output delays in seconds. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code> or 
+   <code>[1, 1, n_taps, n_snap]</code>. 
 </li></ul>
 </li>
 </ul>

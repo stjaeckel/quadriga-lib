@@ -253,6 +253,20 @@ namespace quadriga_lib
                                     std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
                                     const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
 
+    // Fixes the path delays to a grid of delay bins
+    // - Todo: explain fix_taps options here
+    template <typename dtype>
+    void quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                         const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
+                         const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
+                         std::vector<arma::Cube<dtype>> *coeff_re_quant, // Output coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
+                         std::vector<arma::Cube<dtype>> *coeff_im_quant, // Output coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps]
+                         std::vector<arma::Cube<dtype>> *delay_quant,    // Output delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_taps] or [1, 1, n_taps]
+                         dtype tap_spacing = 5.0e-9,                     // Tap spacing in seconds
+                         arma::uword max_no_taps = 48,                   // 0 = unlimited
+                         dtype power_exponent = 1.0,                     // Interpolation exponent (0.5=wideband, 1.0=narrowband)
+                         int fix_taps = 0);                              // 0-3, delay sharing mode
+
     // Pre-parsed QRT file metadata cache for repeated qrt_file_read calls
     // - Holds all fixed metadata so that only per-CIR path data is read from disk
     // - Populate once via qrt_read_cache_init(), then pass to qrt_file_read()

@@ -34,6 +34,7 @@ namespace py = pybind11;
 #include "qpy_get_channels_ieee_indoor.cpp"
 #include "qpy_qrt_file_parse.cpp"
 #include "qpy_qrt_file_read.cpp"
+#include "qpy_quantize_delays.cpp"
 
 void quadriga_lib_channel(py::module_ &m)
 {
@@ -130,6 +131,15 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("SF_std_dB_LOS") = NAN,
           py::arg("SF_std_dB_NLOS") = NAN,
           py::arg("dBP_m") = NAN);
+
+    m.def("quantize_delays", &quantize_delays,
+          py::arg("coeff_re"),
+          py::arg("coeff_im"),
+          py::arg("delay"),
+          py::arg("tap_spacing") = 5.0e-9,
+          py::arg("max_no_taps") = 48,
+          py::arg("power_exponent") = 1.0,
+          py::arg("fix_taps") = 0);
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
 
