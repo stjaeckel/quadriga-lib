@@ -76,6 +76,9 @@ MD!*/
 - Scalar parameters: `` `type **name** = default` ``
 - Annotate each as `(input)`, `(output)`, or `(optional output)`
 - Include size info in backticks: Size `[n_rows, n_cols]` or Length `[n_elem]`
+  
+**General rules:**
+- Do not use Latex equations
 
 **SECTION rules:**
 - The project defines the following sections (use exact names):
@@ -119,14 +122,14 @@ void function_name(const std::string &fn,                            // Required
 
 **Parameter passing conventions:**
 
-| Role | Convention | Example |
-|---|---|---|
-| Required input (large type) | `const TYPE &` | `const std::string &fn`, `const arma::fmat &data` |
-| Required input (scalar) | Pass by value | `arma::uword i_cir`, `bool downlink` |
-| Optional input (scalar) | Pass by value with default | `arma::uword i_cir = 0`, `int normalize_M = 1` |
-| Optional input (object/handle) | Pointer with `nullptr` default | `std::ifstream *file = nullptr`, `const qrt_read_cache *cache = nullptr` |
-| Required output | `TYPE *` (no default) | — (rare; most outputs are optional) |
-| Optional output | `TYPE *` with `nullptr` default | `arma::Col<dtype> *tx_pos = nullptr` |
+| Role                           | Convention                      | Example                                                                  |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------ |
+| Required input (large type)    | `const TYPE &`                  | `const std::string &fn`, `const arma::fmat &data`                        |
+| Required input (scalar)        | Pass by value                   | `arma::uword i_cir`, `bool downlink`                                     |
+| Optional input (scalar)        | Pass by value with default      | `arma::uword i_cir = 0`, `int normalize_M = 1`                           |
+| Optional input (object/handle) | Pointer with `nullptr` default  | `std::ifstream *file = nullptr`, `const qrt_read_cache *cache = nullptr` |
+| Required output                | `TYPE *` (no default)           | — (rare; most outputs are optional)                                      |
+| Optional output                | `TYPE *` with `nullptr` default | `arma::Col<dtype> *tx_pos = nullptr`                                     |
 
 **Parameter ordering:**
 1. Required inputs (filename, indices, flags)
@@ -268,7 +271,10 @@ CHECK(name == "TX1");
 **For functions returning multiple values → `py::tuple`:**
 
 ```cpp
-py::tuple function_name(const std::string &fn /*, other args */)
+py::tuple function_name(const std::string &fn, 
+                        const py::array_t<arma::uword> array,
+                        const py::array_t<double> double_matrix,
+                        const py::list &list_of_arrays)
 {
     // Declare Armadillo outputs
     arma::uword scalar_out;
@@ -276,15 +282,27 @@ py::tuple function_name(const std::string &fn /*, other args */)
     arma::mat mat_out;
     std::vector<std::string> names;
 
+    // Convert Python inputs to Armadillo types:
+    const arma::uvec array_a = qd_python_numpy2arma_Col(array, true);           // 1D, Typed, 2n parameter attempts view if possible
+    const arma::mat matrix_a = qd_python_numpy2arma_Mat(double_matrix, true);   // 2D, Typed, 2n parameter attempts view if possible
+    const arma::cube cube_a = qd_python_numpy2arma_Mat(double_matrix, true);    // 3D, Typed, 2n parameter attempts view if possible
+
+    // Input 4D converters (if needed):
+    const std::vector<arma::vec> vec_of_vecs = qd_python_list2vector_Col<double>(list_of_arrays); // List of 1D arrays → vector of arma::vec
+    const std::vector<arma::mat> vec_of_mats = qd_python_list2vector_Col<double>(list_of_arrays); // List of 2D arrays → vector of arma::mat
+    const std::vector<arma::cube> vec_of_cubes = qd_python_list2vector_Col<double>(list_of_arrays); // List of 3D arrays → vector of arma::cube
+
     // Call C++ library (always pass all output pointers — no nullptr optimization in Python)
-    quadriga_lib::function_name(fn, &scalar_out, &vec_out, &mat_out, &names);
+    std::vector<arma::Cube<double>> cubes_out = quadriga_lib::function_name(fn, &scalar_out, &vec_out, &mat_out, &names);
 
     // Convert to Python types
     auto vec_out_p = qd_python_copy2numpy(vec_out);
     auto mat_out_p = qd_python_copy2numpy(mat_out);
     auto names_p = qd_python_copy2python(names);
 
-    return py::make_tuple(scalar_out, vec_out_p, mat_out_p, names_p);
+    auto list_of_3Darrays = qd_python_copy2numpy(cubes_out); // vector of cubes → list of 3D numpy arrays
+
+    return py::make_tuple(scalar_out, vec_out_p, mat_out_p, names_p, list_of_3Darrays);
 }
 ```
 
@@ -315,53 +333,53 @@ py::dict function_name(const std::string &fn, arma::uword idx /*, ... */)
 
 **Armadillo → Python (output conversion)**
 
-| Function | C++ input | Python output | Notes |
-|---|---|---|---|
-| `qd_python_copy2numpy(Col)` | `arma::Col<T>` | `np.ndarray` 1D | Optional `transpose=true` → shape `(1, N)` |
-| `qd_python_copy2numpy(Col, indices)` | `arma::Col<T>`, `arma::uvec` | `np.ndarray` 1D | Copy subset of elements |
-| `qd_python_copy2numpy<Tsrc, Tdst>(Col)` | `arma::Col<Tsrc>` | `np.ndarray` 1D (Tdst) | Type-casting copy (e.g. `u32` → `ssize_t`) |
-| `qd_python_copy2numpy(Mat)` | `arma::Mat<T>` | `np.ndarray` 2D | Optional `indices` for column subset |
-| `qd_python_copy2numpy(Cube)` | `arma::Cube<T>` | `np.ndarray` 3D | Optional `indices` for slice subset |
-| `qd_python_copy2numpy(MatRe, MatIm)` | Two `arma::Mat<T>` | `np.ndarray` 2D complex | Interleaves Re/Im |
-| `qd_python_copy2numpy(CubeRe, CubeIm)` | Two `arma::Cube<T>` | `np.ndarray` 3D complex | Interleaves Re/Im |
-| `qd_python_copy2numpy_4d(vecCubes)` | `std::vector<arma::Cube<T>>` | `np.ndarray` 4D | Stacks cubes into 4th dimension |
-| `qd_python_copy2numpy(vecCol/Mat/Cube)` | `std::vector<arma::Col/Mat/Cube<T>>` | `py::list` of `np.ndarray` | Optional `indices` for subset |
-| `qd_python_copy2numpy(vecMatRe, vecMatIm)` | Two `std::vector<arma::Mat<T>>` | `py::list` of complex `np.ndarray` | |
-| `qd_python_copy2python(vecStrings)` | `std::vector<std::string>` | `py::list` of `str` | Optional `indices` for subset |
+| Function                                   | C++ input                            | Python output                      | Notes                                      |
+| ------------------------------------------ | ------------------------------------ | ---------------------------------- | ------------------------------------------ |
+| `qd_python_copy2numpy(Col)`                | `arma::Col<T>`                       | `np.ndarray` 1D                    | Optional `transpose=true` → shape `(1, N)` |
+| `qd_python_copy2numpy(Col, indices)`       | `arma::Col<T>`, `arma::uvec`         | `np.ndarray` 1D                    | Copy subset of elements                    |
+| `qd_python_copy2numpy<Tsrc, Tdst>(Col)`    | `arma::Col<Tsrc>`                    | `np.ndarray` 1D (Tdst)             | Type-casting copy (e.g. `u32` → `ssize_t`) |
+| `qd_python_copy2numpy(Mat)`                | `arma::Mat<T>`                       | `np.ndarray` 2D                    | Optional `indices` for column subset       |
+| `qd_python_copy2numpy(Cube)`               | `arma::Cube<T>`                      | `np.ndarray` 3D                    | Optional `indices` for slice subset        |
+| `qd_python_copy2numpy(MatRe, MatIm)`       | Two `arma::Mat<T>`                   | `np.ndarray` 2D complex            | Interleaves Re/Im                          |
+| `qd_python_copy2numpy(CubeRe, CubeIm)`     | Two `arma::Cube<T>`                  | `np.ndarray` 3D complex            | Interleaves Re/Im                          |
+| `qd_python_copy2numpy_4d(vecCubes)`        | `std::vector<arma::Cube<T>>`         | `np.ndarray` 4D                    | Stacks cubes into 4th dimension            |
+| `qd_python_copy2numpy(vecCol/Mat/Cube)`    | `std::vector<arma::Col/Mat/Cube<T>>` | `py::list` of `np.ndarray`         | Optional `indices` for subset              |
+| `qd_python_copy2numpy(vecMatRe, vecMatIm)` | Two `std::vector<arma::Mat<T>>`      | `py::list` of complex `np.ndarray` |                                            |
+| `qd_python_copy2python(vecStrings)`        | `std::vector<std::string>`           | `py::list` of `str`                | Optional `indices` for subset              |
 
 **Python → Armadillo (input conversion)**
 
-| Function | Python input | C++ output | Notes |
-|---|---|---|---|
-| `qd_python_numpy2arma_Col(pyarray)` | `np.ndarray` 1D | `arma::Col<T>` | `view=1` for zero-copy if strides match |
-| `qd_python_numpy2arma_Mat(pyarray)` | `np.ndarray` 2D | `arma::Mat<T>` | `view=1` for zero-copy if strides match |
-| `qd_python_numpy2arma_Cube(pyarray)` | `np.ndarray` 3D | `arma::Cube<T>` | `view=1` for zero-copy if strides match |
-| `qd_python_numpy2arma_vecCube(pyarray)` | `np.ndarray` 4D | `std::vector<arma::Cube<T>>` | |
-| `qd_python_list2vector_Col<T>(pylist)` | `py::list` of `np.ndarray` | `std::vector<arma::Col<T>>` | Always copies |
-| `qd_python_list2vector_Mat<T>(pylist)` | `py::list` of `np.ndarray` | `std::vector<arma::Mat<T>>` | Always copies |
-| `qd_python_list2vector_Cube<T>(pylist)` | `py::list` of `np.ndarray` | `std::vector<arma::Cube<T>>` | Always copies |
-| `qd_python_list2vector_Strings(pylist)` | `py::list` of `str` | `std::vector<std::string>` | |
+| Function                                | Python input               | C++ output                   | Notes                                   |
+| --------------------------------------- | -------------------------- | ---------------------------- | --------------------------------------- |
+| `qd_python_numpy2arma_Col(pyarray)`     | `np.ndarray` 1D            | `arma::Col<T>`               | `view=1` for zero-copy if strides match |
+| `qd_python_numpy2arma_Mat(pyarray)`     | `np.ndarray` 2D            | `arma::Mat<T>`               | `view=1` for zero-copy if strides match |
+| `qd_python_numpy2arma_Cube(pyarray)`    | `np.ndarray` 3D            | `arma::Cube<T>`              | `view=1` for zero-copy if strides match |
+| `qd_python_numpy2arma_vecCube(pyarray)` | `np.ndarray` 4D            | `std::vector<arma::Cube<T>>` |                                         |
+| `qd_python_list2vector_Col<T>(pylist)`  | `py::list` of `np.ndarray` | `std::vector<arma::Col<T>>`  | Always copies                           |
+| `qd_python_list2vector_Mat<T>(pylist)`  | `py::list` of `np.ndarray` | `std::vector<arma::Mat<T>>`  | Always copies                           |
+| `qd_python_list2vector_Cube<T>(pylist)` | `py::list` of `np.ndarray` | `std::vector<arma::Cube<T>>` | Always copies                           |
+| `qd_python_list2vector_Strings(pylist)` | `py::list` of `str`        | `std::vector<std::string>`   |                                         |
 
 **Zero-copy output (allocate in Python, Armadillo writes directly)**
 
-| Function | Allocates | Maps to | Notes |
-|---|---|---|---|
-| `qd_python_init_output(n_rows, Col)` | `np.ndarray` 1D | `arma::Col<T>` | No copy needed |
-| `qd_python_init_output(n_rows, n_cols, Mat)` | `np.ndarray` 2D | `arma::Mat<T>` | |
-| `qd_python_init_output(n_rows, n_cols, n_slices, Cube)` | `np.ndarray` 3D | `arma::Cube<T>` | |
-| `qd_python_init_output(nr, nc, ns, nf, &vecCubes)` | `np.ndarray` 4D | `std::vector<arma::Cube<T>>` | |
+| Function                                                | Allocates       | Maps to                      | Notes          |
+| ------------------------------------------------------- | --------------- | ---------------------------- | -------------- |
+| `qd_python_init_output(n_rows, Col)`                    | `np.ndarray` 1D | `arma::Col<T>`               | No copy needed |
+| `qd_python_init_output(n_rows, n_cols, Mat)`            | `np.ndarray` 2D | `arma::Mat<T>`               |                |
+| `qd_python_init_output(n_rows, n_cols, n_slices, Cube)` | `np.ndarray` 3D | `arma::Cube<T>`              |                |
+| `qd_python_init_output(nr, nc, ns, nf, &vecCubes)`      | `np.ndarray` 4D | `std::vector<arma::Cube<T>>` |                |
 
 **Utilities**
 
-| Function | Purpose |
-|---|---|
-| `qd_python_get_shape(pyarray)` | Returns `std::array<size_t, 9>` with dims/strides/info |
-| `qd_python_get_list_shape(pylist, ptrs, owned)` | Shape info + direct pointers for lists |
-| `qd_python_copy2arma(ptr, shape, Cube)` | Copy from raw pointer to `arma::Cube` |
-| `qd_python_copy2arma(pyarray, Cube)` | Copy from numpy to `arma::Cube` |
-| `qd_python_Complex2Interleaved(Mat)` | `arma::Mat<complex<T>>` → `arma::Mat<T>` (2×rows) |
-| `qd_python_Interleaved2Complex(Mat)` | `arma::Mat<T>` (even rows) → `arma::Mat<complex<T>>` |
-| `qd_python_anycast(py::handle, name)` | Convert Python object → `std::any` |
+| Function                                        | Purpose                                                |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| `qd_python_get_shape(pyarray)`                  | Returns `std::array<size_t, 9>` with dims/strides/info |
+| `qd_python_get_list_shape(pylist, ptrs, owned)` | Shape info + direct pointers for lists                 |
+| `qd_python_copy2arma(ptr, shape, Cube)`         | Copy from raw pointer to `arma::Cube`                  |
+| `qd_python_copy2arma(pyarray, Cube)`            | Copy from numpy to `arma::Cube`                        |
+| `qd_python_Complex2Interleaved(Mat)`            | `arma::Mat<complex<T>>` → `arma::Mat<T>` (2×rows)      |
+| `qd_python_Interleaved2Complex(Mat)`            | `arma::Mat<T>` (even rows) → `arma::Mat<complex<T>>`   |
+| `qd_python_anycast(py::handle, name)`           | Convert Python object → `std::any`                     |
 
 ### Python Documentation
 
@@ -530,100 +548,100 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
 **Macro**
 
-| Macro | Purpose |
-|---|---|
+| Macro           | Purpose                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------- |
 | `CALL_QD(expr)` | Wraps expression in try/catch, forwards C++ exceptions to MATLAB via `mexErrMsgIdAndTxt` |
 
 **MATLAB → C++ (scalar / string input)**
 
-| Function | Signature | Returns | Notes |
-|---|---|---|---|
-| `qd_mex_get_scalar<T>` | `(const mxArray*, var_name="", default=NAN)` | `T` | Casts any MATLAB numeric to `<T>`. Returns default for empty. |
-| `qd_mex_get_string` | `(const mxArray*, default="")` | `std::string` | Reads MATLAB char array |
+| Function               | Signature                                    | Returns       | Notes                                                         |
+| ---------------------- | -------------------------------------------- | ------------- | ------------------------------------------------------------- |
+| `qd_mex_get_scalar<T>` | `(const mxArray*, var_name="", default=NAN)` | `T`           | Casts any MATLAB numeric to `<T>`. Returns default for empty. |
+| `qd_mex_get_string`    | `(const mxArray*, default="")`               | `std::string` | Reads MATLAB char array                                       |
 
 **MATLAB → Armadillo (zero-copy reinterpret, MATLAB type must match)**
 
-| Function | Returns | Notes |
-|---|---|---|
-| `qd_mex_reinterpret_Col<T>(input, copy=false)` | `arma::Col<T>` | Zero-copy if `copy=false` |
-| `qd_mex_reinterpret_Mat<T>(input, copy=false)` | `arma::Mat<T>` | |
+| Function                                        | Returns         | Notes                       |
+| ----------------------------------------------- | --------------- | --------------------------- |
+| `qd_mex_reinterpret_Col<T>(input, copy=false)`  | `arma::Col<T>`  | Zero-copy if `copy=false`   |
+| `qd_mex_reinterpret_Mat<T>(input, copy=false)`  | `arma::Mat<T>`  |                             |
 | `qd_mex_reinterpret_Cube<T>(input, copy=false)` | `arma::Cube<T>` | 4D → Cube (dims 3+4 merged) |
 
 **MATLAB → Armadillo (type-casting copy, any numeric input)**
 
-| Function | Returns | Notes |
-|---|---|---|
-| `qd_mex_typecast_Col<T>(input, name="", n_elem=0)` | `arma::Col<T>` | Optional element count validation |
-| `qd_mex_typecast_Mat<T>(input, name="")` | `arma::Mat<T>` | |
-| `qd_mex_typecast_Cube<T>(input, name="")` | `arma::Cube<T>` | |
+| Function                                           | Returns         | Notes                             |
+| -------------------------------------------------- | --------------- | --------------------------------- |
+| `qd_mex_typecast_Col<T>(input, name="", n_elem=0)` | `arma::Col<T>`  | Optional element count validation |
+| `qd_mex_typecast_Mat<T>(input, name="")`           | `arma::Mat<T>`  |                                   |
+| `qd_mex_typecast_Cube<T>(input, name="")`          | `arma::Cube<T>` |                                   |
 
 **MATLAB → Armadillo (convenience shortcuts, auto zero-copy or typecast)**
 
-| Function | Returns | Notes |
-|---|---|---|
-| `qd_mex_get_double_Col(input, copy=false)` | `arma::vec` | Zero-copy if input is double |
-| `qd_mex_get_single_Col(input, copy=false)` | `arma::fvec` | Zero-copy if input is single |
-| `qd_mex_get_double_Mat(input, copy=false)` | `arma::mat` | |
-| `qd_mex_get_single_Mat(input, copy=false)` | `arma::fmat` | |
-| `qd_mex_get_double_Cube(input, copy=false)` | `arma::cube` | |
-| `qd_mex_get_single_Cube(input, copy=false)` | `arma::fcube` | |
+| Function                                    | Returns       | Notes                        |
+| ------------------------------------------- | ------------- | ---------------------------- |
+| `qd_mex_get_double_Col(input, copy=false)`  | `arma::vec`   | Zero-copy if input is double |
+| `qd_mex_get_single_Col(input, copy=false)`  | `arma::fvec`  | Zero-copy if input is single |
+| `qd_mex_get_double_Mat(input, copy=false)`  | `arma::mat`   |                              |
+| `qd_mex_get_single_Mat(input, copy=false)`  | `arma::fmat`  |                              |
+| `qd_mex_get_double_Cube(input, copy=false)` | `arma::cube`  |                              |
+| `qd_mex_get_single_Cube(input, copy=false)` | `arma::fcube` |                              |
 
 **MATLAB → std::vector (splitting along a dimension)**
 
-| Function | Returns | Notes |
-|---|---|---|
-| `qd_mex_matlab2vector_Col<T>(input, vec_dim)` | `std::vector<arma::Col<T>>` | Split along dim `vec_dim` (0-based) |
-| `qd_mex_matlab2vector_Mat<T>(input, vec_dim)` | `std::vector<arma::Mat<T>>` | |
-| `qd_mex_matlab2vector_Cube<T>(input, vec_dim)` | `std::vector<arma::Cube<T>>` | |
-| `qd_mex_matlab2vector_Bool(input)` | `std::vector<bool>` | Any numeric/logical → bool |
+| Function                                       | Returns                      | Notes                               |
+| ---------------------------------------------- | ---------------------------- | ----------------------------------- |
+| `qd_mex_matlab2vector_Col<T>(input, vec_dim)`  | `std::vector<arma::Col<T>>`  | Split along dim `vec_dim` (0-based) |
+| `qd_mex_matlab2vector_Mat<T>(input, vec_dim)`  | `std::vector<arma::Mat<T>>`  |                                     |
+| `qd_mex_matlab2vector_Cube<T>(input, vec_dim)` | `std::vector<arma::Cube<T>>` |                                     |
+| `qd_mex_matlab2vector_Bool(input)`             | `std::vector<bool>`          | Any numeric/logical → bool          |
 
 **MATLAB → std::any (generic)**
 
-| Function | Returns | Notes |
-|---|---|---|
+| Function                                     | Returns    | Notes                                                                                    |
+| -------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------- |
 | `qd_mex_anycast(input, name="", copy=false)` | `std::any` | scalar→native, col→`arma::Col`, row→`arma::Mat(1,N)`, 2D→`arma::Mat`, 3D/4D→`arma::Cube` |
 
 **Armadillo / C++ → MATLAB (copy to mxArray)**
 
-| Function | C++ input | MATLAB output | Notes |
-|---|---|---|---|
-| `qd_mex_copy2matlab(const T*)` | Scalar pointer (`double`, `float`, `int`, `unsigned`, `unsigned long long`, `arma::uword`) | `mxArray*` scalar | |
-| `qd_mex_copy2matlab(const arma::Row<T>*)` | Row vector | `mxArray*` `[1, N]` | |
-| `qd_mex_copy2matlab(const arma::Col<T>*, transpose, ns, is)` | Column vector | `mxArray*` `[N, 1]` or `[1, N]` | Optional column subset via `ns`/`is` |
-| `qd_mex_copy2matlab(const arma::Mat<T>*, ns, is)` | Matrix | `mxArray*` 2D | Optional column subset |
-| `qd_mex_copy2matlab(arma::Cube<T>*, ns, is)` | Cube | `mxArray*` 3D | Optional slice subset |
-| `qd_mex_copy2matlab(const std::vector<std::string>*)` | String vector | `mxArray*` cell array of char | |
-| `qd_mex_copy2matlab(const std::vector<bool>*)` | Bool vector | `mxArray*` logical | |
+| Function                                                     | C++ input                                                                                  | MATLAB output                   | Notes                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------- | ------------------------------------ |
+| `qd_mex_copy2matlab(const T*)`                               | Scalar pointer (`double`, `float`, `int`, `unsigned`, `unsigned long long`, `arma::uword`) | `mxArray*` scalar               |                                      |
+| `qd_mex_copy2matlab(const arma::Row<T>*)`                    | Row vector                                                                                 | `mxArray*` `[1, N]`             |                                      |
+| `qd_mex_copy2matlab(const arma::Col<T>*, transpose, ns, is)` | Column vector                                                                              | `mxArray*` `[N, 1]` or `[1, N]` | Optional column subset via `ns`/`is` |
+| `qd_mex_copy2matlab(const arma::Mat<T>*, ns, is)`            | Matrix                                                                                     | `mxArray*` 2D                   | Optional column subset               |
+| `qd_mex_copy2matlab(arma::Cube<T>*, ns, is)`                 | Cube                                                                                       | `mxArray*` 3D                   | Optional slice subset                |
+| `qd_mex_copy2matlab(const std::vector<std::string>*)`        | String vector                                                                              | `mxArray*` cell array of char   |                                      |
+| `qd_mex_copy2matlab(const std::vector<bool>*)`               | Bool vector                                                                                | `mxArray*` logical              |                                      |
 
 Supported types for `T`: `double`, `float`, `unsigned`, `int`, `unsigned long long`, `long long`
 
 **std::vector<Armadillo> → MATLAB (stack into higher-dim array)**
 
-| Function | C++ input | MATLAB output | Notes |
-|---|---|---|---|
-| `qd_mex_vector2matlab(const std::vector<arma::Col<T>>*, ns, is, padding)` | Vector of cols | `mxArray*` 2D | Extra dim = vector index |
-| `qd_mex_vector2matlab(const std::vector<arma::Mat<T>>*, ns, is, padding)` | Vector of mats | `mxArray*` 3D | Padded to largest element |
-| `qd_mex_vector2matlab(const std::vector<arma::Cube<T>>*, ns, is, padding)` | Vector of cubes | `mxArray*` 4D | |
+| Function                                                                   | C++ input       | MATLAB output | Notes                     |
+| -------------------------------------------------------------------------- | --------------- | ------------- | ------------------------- |
+| `qd_mex_vector2matlab(const std::vector<arma::Col<T>>*, ns, is, padding)`  | Vector of cols  | `mxArray*` 2D | Extra dim = vector index  |
+| `qd_mex_vector2matlab(const std::vector<arma::Mat<T>>*, ns, is, padding)`  | Vector of mats  | `mxArray*` 3D | Padded to largest element |
+| `qd_mex_vector2matlab(const std::vector<arma::Cube<T>>*, ns, is, padding)` | Vector of cubes | `mxArray*` 4D |                           |
 
 **Armadillo ← MATLAB (zero-copy output initialization)**
 
-| Function | Allocates | Maps to | Supported types |
-|---|---|---|---|
-| `qd_mex_init_output(&Row, n_elem)` | `mxArray*` `[1, N]` | `arma::Row<T>` | `float`, `double`, `unsigned` |
-| `qd_mex_init_output(&Col, n_elem, transpose=false)` | `mxArray*` `[N, 1]` | `arma::Col<T>` | `float`, `double`, `unsigned` |
-| `qd_mex_init_output(&Mat, n_rows, n_cols)` | `mxArray*` 2D | `arma::Mat<T>` | `float`, `double`, `unsigned` |
-| `qd_mex_init_output(&Cube, n_rows, n_cols, n_slices)` | `mxArray*` 3D | `arma::Cube<T>` | `float`, `double`, `unsigned` |
+| Function                                              | Allocates           | Maps to         | Supported types               |
+| ----------------------------------------------------- | ------------------- | --------------- | ----------------------------- |
+| `qd_mex_init_output(&Row, n_elem)`                    | `mxArray*` `[1, N]` | `arma::Row<T>`  | `float`, `double`, `unsigned` |
+| `qd_mex_init_output(&Col, n_elem, transpose=false)`   | `mxArray*` `[N, 1]` | `arma::Col<T>`  | `float`, `double`, `unsigned` |
+| `qd_mex_init_output(&Mat, n_rows, n_cols)`            | `mxArray*` 2D       | `arma::Mat<T>`  | `float`, `double`, `unsigned` |
+| `qd_mex_init_output(&Cube, n_rows, n_cols, n_slices)` | `mxArray*` 3D       | `arma::Cube<T>` | `float`, `double`, `unsigned` |
 
 Usage: `plhs[0] = qd_mex_init_output(&my_mat, nr, nc);` — writing to `my_mat` writes directly to MATLAB memory.
 
 **MATLAB Struct Helpers**
 
-| Function | Purpose |
-|---|---|
-| `qd_mex_make_struct(fields, N=1)` | Create empty `1×N` struct with field names |
-| `qd_mex_set_field(strct, field, data, n=0)` | Set field of struct element |
-| `qd_mex_has_field(strct, field) → bool` | Check if field exists |
-| `qd_mex_get_field(strct, field) → mxArray*` | Get field (throws if missing) |
+| Function                                    | Purpose                                    |
+| ------------------------------------------- | ------------------------------------------ |
+| `qd_mex_make_struct(fields, N=1)`           | Create empty `1×N` struct with field names |
+| `qd_mex_set_field(strct, field, data, n=0)` | Set field of struct element                |
+| `qd_mex_has_field(strct, field) → bool`     | Check if field exists                      |
+| `qd_mex_get_field(strct, field) → mxArray*` | Get field (throws if missing)              |
 
 ### Cell Array Output Pattern (for `std::vector<arma::mat>`)
 
@@ -706,14 +724,14 @@ end
 
 ### Type Mapping (C++ → MATLAB)
 
-| C++ type | MATLAB type |
-|---|---|
-| `arma::uword` | `uint64` |
-| `int` | `int32` |
-| `arma::fvec`, `arma::fmat` | `single` |
-| `arma::vec`, `arma::mat`, `arma::cube` | `double` |
-| `arma::uvec` | `uint64` |
-| `std::vector<std::string>` | cell array of `char` |
+| C++ type                               | MATLAB type          |
+| -------------------------------------- | -------------------- |
+| `arma::uword`                          | `uint64`             |
+| `int`                                  | `int32`              |
+| `arma::fvec`, `arma::fmat`             | `single`             |
+| `arma::vec`, `arma::mat`, `arma::cube` | `double`             |
+| `arma::uvec`                           | `uint64`             |
+| `std::vector<std::string>`             | cell array of `char` |
 
 ### Rules
 - Indices are **1-based**
@@ -732,27 +750,27 @@ end
 
 ### Index Convention Summary
 
-| Interface | Index base | Example: first element |
-|---|---|---|
-| C++ | 0-based | `i_cir = 0` |
-| Python | 0-based | `cir=0` |
-| MATLAB | 1-based | `i_cir = 1` (converted to 0 inside MEX) |
+| Interface | Index base | Example: first element                  |
+| --------- | ---------- | --------------------------------------- |
+| C++       | 0-based    | `i_cir = 0`                             |
+| Python    | 0-based    | `cir=0`                                 |
+| MATLAB    | 1-based    | `i_cir = 1` (converted to 0 inside MEX) |
 
 ### Precision Summary
 
-| Interface | Template type | Notes |
-|---|---|---|
-| C++ implementation | `<dtype>` (float + double) | Explicit instantiation for both |
-| Python wrapper | `<double>` only | All outputs are double numpy arrays |
-| MATLAB MEX | `<double>` only | MATLAB default is double |
+| Interface          | Template type              | Notes                               |
+| ------------------ | -------------------------- | ----------------------------------- |
+| C++ implementation | `<dtype>` (float + double) | Explicit instantiation for both     |
+| Python wrapper     | `<double>` only            | All outputs are double numpy arrays |
+| MATLAB MEX         | `<double>` only            | MATLAB default is double            |
 
 ### Vector Orientation
 
-| Context | Orientation | Example |
-|---|---|---|
+| Context       | Orientation    | Example                                     |
+| ------------- | -------------- | ------------------------------------------- |
 | C++ Armadillo | Column vectors | `arma::vec pos = {x, y, z}` → size `[3, 1]` |
-| Python numpy | 1D arrays | `pos.shape = (3,)` |
-| MATLAB | Column vectors | `pos = [x; y; z]` → size `[3, 1]` |
+| Python numpy  | 1D arrays      | `pos.shape = (3,)`                          |
+| MATLAB        | Column vectors | `pos = [x; y; z]` → size `[3, 1]`           |
 
 For array sizes, always follow the header declaration.
 
@@ -770,14 +788,14 @@ If only a reference implementation is provided, you must reverse-engineer the de
 
 Six files (or a subset specified in the request), each complete and ready to drop into the codebase:
 
-| # | File | Purpose |
-|---|---|---|
-| 1 | `qd_<module>_<topic>.cpp` | C++ implementation with documentation |
-| 2 | `test_<name>.cpp` | Catch2 tests |
-| 3 | `qpy_<name>.cpp` | pybind11 Python wrapper with documentation |
-| 4 | `test_<name>.py` | Python unittest tests |
-| 5 | `<name>.cpp` (MEX) | MATLAB MEX wrapper with documentation |
-| 6 | `test_<name>.m` | MATLAB MOxUnit tests |
+| #   | File                      | Purpose                                    |
+| --- | ------------------------- | ------------------------------------------ |
+| 1   | `qd_<module>_<topic>.cpp` | C++ implementation with documentation      |
+| 2   | `test_<name>.cpp`         | Catch2 tests                               |
+| 3   | `qpy_<name>.cpp`          | pybind11 Python wrapper with documentation |
+| 4   | `test_<name>.py`          | Python unittest tests                      |
+| 5   | `<name>.cpp` (MEX)        | MATLAB MEX wrapper with documentation      |
+| 6   | `test_<name>.m`           | MATLAB MOxUnit tests                       |
 
 Plus: the `m.def(...)` pybind11 declaration and an updated header declaration (if documentation can be improved).
 

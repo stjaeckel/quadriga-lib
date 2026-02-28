@@ -128,12 +128,3 @@ static py::tuple calc_angular_spreads_sphere(py::list az_py,
 
     return py::make_tuple(as_py, es_py, orient_py, phi_py, theta_py);
 }
-
-// pybind11 module declaration (to be placed in the appropriate module init)
-// m.def("calc_angular_spreads_sphere", &calc_angular_spreads_sphere,
-//       py::arg("az"),
-//       py::arg("el"),
-//       py::arg("powers"),
-//       py::arg("disable_wrapping") = false,
-//       py::arg("calc_bank_angle") = true,
-//       py::arg("quantize") = 0.0);
