@@ -655,11 +655,10 @@ void quadriga_lib::quantize_delays(
                 {
                     if (k > max_used)
                         max_used = k;
-                    goto next_snap; // Found a non-zero in this snapshot
+                    continue;
                 }
             }
         }
-    next_snap:;
     }
     if (max_used == 0)
         max_used = 1;
