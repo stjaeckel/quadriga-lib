@@ -49,7 +49,7 @@ class test_case(unittest.TestCase):
         self.assertEqual(pg.shape, (1,))
 
         # pg includes all paths
-        npt.assert_allclose(pg[0], 3.225, atol=1e-10, rtol=0)
+        npt.assert_allclose(pg[0], 0.5*3.225, atol=1e-10, rtol=0)
 
         # V-XPR = 0.65 / 0.05 = 13.0
         npt.assert_allclose(xpr[0, 1], 13.0, atol=1e-10, rtol=0)
@@ -99,7 +99,7 @@ class test_case(unittest.TestCase):
         abs2_vh = 0.05**2 + 0.05**2  # 0.005
         abs2_hh = 0.7**2 + 0.3**2   # 0.58
 
-        npt.assert_allclose(pg[0], abs2_vv + abs2_hv + abs2_vh + abs2_hh, atol=1e-14, rtol=0)
+        npt.assert_allclose(pg[0], 0.5*(abs2_vv + abs2_hv + abs2_vh + abs2_hh), atol=1e-14, rtol=0)
         npt.assert_allclose(xpr[0, 1], abs2_vv / abs2_hv, atol=1e-10, rtol=0)
         npt.assert_allclose(xpr[0, 2], abs2_hh / abs2_vh, atol=1e-10, rtol=0)
         npt.assert_allclose(xpr[0, 0], (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh), atol=1e-10, rtol=0)
@@ -132,7 +132,7 @@ class test_case(unittest.TestCase):
         npt.assert_allclose(xpr[1, 1], 0.144 / 0.036, atol=1e-10, rtol=0)
 
     def test_circular_xpr_diagonal_m(self):
-        """Diagonal M with M_hh=-1 should have zero circular co-pol"""
+        """Diagonal M with M_hh=-1: perfect linear isolation, zero circular co-pol"""
         tx = np.array([[0.0], [0.0], [0.0]])
         rx = np.array([[5.0], [0.0], [0.0]])
 
@@ -142,8 +142,12 @@ class test_case(unittest.TestCase):
 
         xpr, _ = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
 
-        # All XPR values should be 0 (undefined: either zero numerator or zero denominator)
-        npt.assert_allclose(xpr[0, :], 0.0, atol=1e-14, rtol=0)
+        # Linear XPR: perfect isolation (co-pol > 0, cross-pol = 0) => Inf
+        # Circular XPR: co-pol = 0, cross-pol > 0 => 0
+        npt.assert_equal(xpr[0, 0], np.inf)
+        npt.assert_equal(xpr[0, 1], np.inf)
+        npt.assert_equal(xpr[0, 2], np.inf)
+        npt.assert_allclose(xpr[0, 3:], 0.0, atol=1e-14, rtol=0)
 
     def test_window_size_effect(self):
         """Window size controls which near-LOS paths are excluded"""

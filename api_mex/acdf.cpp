@@ -87,13 +87,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read input data
     arma::mat data = qd_mex_get_double_Mat(prhs[0]);
-
-    // Read optional bins
-    arma::vec bins;
-    if (nrhs >= 2 && !mxIsEmpty(prhs[1]))
-        bins = qd_mex_get_double_Col(prhs[1]);
-
-    // Read optional n_bins
+    arma::vec bins = (nrhs < 2) ? arma::vec() : qd_mex_get_double_Col(prhs[1]);
     arma::uword n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);
 
     // Set up output pointers based on nlhs
@@ -101,13 +95,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec Sc, mu, sig;
 
     arma::mat *p_Sh = (nlhs > 0) ? &Sh : nullptr;
-    arma::vec *p_bins = (nlhs > 1 || bins.n_elem == 0) ? &bins : nullptr;
     arma::vec *p_Sc = (nlhs > 2) ? &Sc : nullptr;
     arma::vec *p_mu = (nlhs > 3) ? &mu : nullptr;
     arma::vec *p_sig = (nlhs > 4) ? &sig : nullptr;
 
     // Call library function (double precision)
-    CALL_QD(quadriga_lib::acdf<double>(data, p_bins, p_Sh, p_Sc, p_mu, p_sig, n_bins));
+    CALL_QD(quadriga_lib::acdf<double>(data, &bins, p_Sh, p_Sc, p_mu, p_sig, n_bins));
 
     // Write outputs
     if (nlhs > 0)

@@ -45,8 +45,9 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
   Re(M_hh), Im(M_hh)], i.e., 8 rows per path.
 - `M` may or may not be normalized. Normalization does not affect the XPR since it cancels
   in the ratio. However, it does affect the path gain output `pg`.
-- If the total cross-polarized power is zero (perfect polarization isolation), the XPR is
-  set to 0 (undefined). Check `pg` to distinguish this from a true zero-isolation channel.
+- If the total cross-polarized power is zero and co-polarized power is positive (perfect
+  polarization isolation), the XPR is set to infinity. If both are zero (no qualifying paths),
+  the XPR is set to 0.
 
 ## Declaration:
 ```
@@ -221,14 +222,14 @@ void quadriga_lib::calc_cross_polarization_ratio(
         for (arma::uword p = 0; p < n_path; ++p)
         {
             arma::uword offset = p * 8;
-            dtype a = pM[offset];       // Re(M_vv)
-            dtype b = pM[offset + 1];   // Im(M_vv)
-            dtype c = pM[offset + 2];   // Re(M_hv)
-            dtype d = pM[offset + 3];   // Im(M_hv)
-            dtype e = pM[offset + 4];   // Re(M_vh)
-            dtype f = pM[offset + 5];   // Im(M_vh)
-            dtype g = pM[offset + 6];   // Re(M_hh)
-            dtype h = pM[offset + 7];   // Im(M_hh)
+            dtype a = pM[offset];     // Re(M_vv)
+            dtype b = pM[offset + 1]; // Im(M_vv)
+            dtype c = pM[offset + 2]; // Re(M_hv)
+            dtype d = pM[offset + 3]; // Im(M_hv)
+            dtype e = pM[offset + 4]; // Re(M_vh)
+            dtype f = pM[offset + 5]; // Im(M_vh)
+            dtype g = pM[offset + 6]; // Re(M_hh)
+            dtype h = pM[offset + 7]; // Im(M_hh)
 
             dtype abs2_vv = a * a + b * b;
             dtype abs2_hv = c * c + d * d;
@@ -236,7 +237,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
             dtype abs2_hh = g * g + h * h;
 
             dtype w = pP[p];
-            dtype path_power = w * (abs2_vv + abs2_hv + abs2_vh + abs2_hh);
+            dtype path_power = dtype(0.5) * w * (abs2_vv + abs2_hv + abs2_vh + abs2_hh);
 
             // Always accumulate total path gain (all paths including LOS)
             P_total += path_power;
@@ -284,23 +285,37 @@ void quadriga_lib::calc_cross_polarization_ratio(
 
             // Col 0: Aggregate linear XPR
             dtype cross_lin = P_hv + P_vh;
-            pX[i] = (cross_lin > (dtype)0) ? (P_vv + P_hh) / cross_lin : (dtype)0;
+            dtype co_lin = P_vv + P_hh;
+            pX[i] = (cross_lin > (dtype)0) ? co_lin / cross_lin
+                    : (co_lin > (dtype)0)  ? std::numeric_limits<dtype>::infinity()
+                                           : (dtype)0;
 
             // Col 1: V-XPR
-            pX[i + stride] = (P_hv > (dtype)0) ? P_vv / P_hv : (dtype)0;
+            pX[i + stride] = (P_hv > (dtype)0)   ? P_vv / P_hv
+                             : (P_vv > (dtype)0) ? std::numeric_limits<dtype>::infinity()
+                                                 : (dtype)0;
 
             // Col 2: H-XPR
-            pX[i + 2 * stride] = (P_vh > (dtype)0) ? P_hh / P_vh : (dtype)0;
+            pX[i + 2 * stride] = (P_vh > (dtype)0)   ? P_hh / P_vh
+                                 : (P_hh > (dtype)0) ? std::numeric_limits<dtype>::infinity()
+                                                     : (dtype)0;
 
             // Col 3: Aggregate circular XPR
             dtype cross_circ = P_RL + P_LR;
-            pX[i + 3 * stride] = (cross_circ > (dtype)0) ? (P_LL + P_RR) / cross_circ : (dtype)0;
+            dtype co_circ = P_LL + P_RR;
+            pX[i + 3 * stride] = (cross_circ > (dtype)0) ? co_circ / cross_circ
+                                 : (co_circ > (dtype)0)  ? std::numeric_limits<dtype>::infinity()
+                                                         : (dtype)0;
 
             // Col 4: LHCP XPR (transmit L, co=LL, cross=RL)
-            pX[i + 4 * stride] = (P_RL > (dtype)0) ? P_LL / P_RL : (dtype)0;
+            pX[i + 4 * stride] = (P_RL > (dtype)0)   ? P_LL / P_RL
+                                 : (P_LL > (dtype)0) ? std::numeric_limits<dtype>::infinity()
+                                                     : (dtype)0;
 
             // Col 5: RHCP XPR (transmit R, co=RR, cross=LR)
-            pX[i + 5 * stride] = (P_LR > (dtype)0) ? P_RR / P_LR : (dtype)0;
+            pX[i + 5 * stride] = (P_LR > (dtype)0)   ? P_RR / P_LR
+                                 : (P_RR > (dtype)0) ? std::numeric_limits<dtype>::infinity()
+                                                     : (dtype)0;
         }
     }
 }
