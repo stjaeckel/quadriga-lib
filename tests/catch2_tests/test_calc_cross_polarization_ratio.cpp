@@ -71,7 +71,7 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     // LOS: 1.0 * (1 + 0 + 0 + 1) = 2.0
     // NLOS1: 0.5 * (0.81 + 0.01 + 0.01 + 0.64) = 0.5 * 1.47 = 0.735
     // NLOS2: 0.5 * (0.49 + 0.09 + 0.04 + 0.36) = 0.5 * 0.98 = 0.49
-    CHECK(std::abs(pg(0) - 3.225) < 1e-10);
+    CHECK(std::abs(pg(0) - 0.5 * 3.225) < 1e-10);
 
     // XPR only from NLOS paths (LOS excluded by default)
     // P_vv = 0.5*0.81 + 0.5*0.49 = 0.405 + 0.245 = 0.65
@@ -166,13 +166,13 @@ TEST_CASE("calc_cross_polarization_ratio - Circular polarization identity check"
     arma::mat xpr;
     quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr);
 
-    // Linear XPR should be very high (zero cross-pol => returns 0 for undefined)
+    // Linear XPR should be infinite (zero cross-pol, nonzero co-pol => perfect isolation)
     // M_vv=1, M_hv=0, M_vh=0, M_hh=-1
     // P_vv = 1, P_hv = 0, P_vh = 0, P_hh = 1
-    // Cross-pol = 0 => XPR = 0 (undefined)
-    CHECK(xpr(0, 0) == 0.0);
-    CHECK(xpr(0, 1) == 0.0);
-    CHECK(xpr(0, 2) == 0.0);
+    // Cross-pol = 0, Co-pol = 2 => XPR = Inf
+    CHECK(std::isinf(xpr(0, 0)));
+    CHECK(std::isinf(xpr(0, 1)));
+    CHECK(std::isinf(xpr(0, 2)));
 
     // Circular: M_LL = (1+(-1))/2 = 0, M_RR = (1+(-1))/2 = 0
     //           M_LR = (1-(-1))/2 = 1, M_RL = (1-(-1))/2 = 1
@@ -188,7 +188,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
     // This is a double-bounce / polarization-preserving channel
     // Circular: M_LL = (1+1)/2 = 1, M_RR = (1+1)/2 = 1
     //           M_LR = (1-1)/2 = 0, M_RL = (1-1)/2 = 0
-    // => Circular XPR = infinite (co-pol = 2, cross-pol = 0) => returns 0
+    // => Circular XPR = infinite (co-pol = 2, cross-pol = 0) => returns Inf
 
     arma::mat tx(3, 1);
     tx.col(0) = arma::vec({0.0, 0.0, 0.0});
@@ -211,11 +211,11 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR for identity matrix")
     arma::mat xpr;
     quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr);
 
-    // Linear XPR: P_vv=1, P_hh=1, P_hv=0, P_vh=0 => undefined (0)
-    CHECK(xpr(0, 0) == 0.0);
+    // Linear XPR: P_vv=1, P_hh=1, P_hv=0, P_vh=0 => perfect isolation (Inf)
+    CHECK(std::isinf(xpr(0, 0)));
 
-    // Circular XPR: co=2, cross=0 => undefined (0)
-    CHECK(xpr(0, 3) == 0.0);
+    // Circular XPR: co=2, cross=0 => perfect isolation (Inf)
+    CHECK(std::isinf(xpr(0, 3)));
 }
 
 TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
@@ -250,7 +250,7 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     double abs2_vh = 0.05 * 0.05 + 0.05 * 0.05; // 0.005
     double abs2_hh = 0.7 * 0.7 + 0.3 * 0.3;   // 0.58
 
-    CHECK(std::abs(pg(0) - (abs2_vv + abs2_hv + abs2_vh + abs2_hh)) < 1e-14);
+    CHECK(std::abs(pg(0) - 0.5*(abs2_vv + abs2_hv + abs2_vh + abs2_hh)) < 1e-14);
     CHECK(std::abs(xpr(0, 1) - abs2_vv / abs2_hv) < 1e-10);
     CHECK(std::abs(xpr(0, 2) - abs2_hh / abs2_vh) < 1e-10);
     CHECK(std::abs(xpr(0, 0) - (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh)) < 1e-10);
@@ -380,7 +380,7 @@ TEST_CASE("calc_cross_polarization_ratio - Only pg output requested")
                                                         (arma::Mat<double> *)nullptr, &pg);
 
     REQUIRE(pg.n_elem == 1);
-    CHECK(std::abs(pg(0) - 4.0) < 1e-14); // 2.0 * (1+0+0+1) = 4.0
+    CHECK(std::abs(pg(0) - 2.0) < 1e-14); // (1+0+0+1) = 2.0
 }
 
 TEST_CASE("calc_cross_polarization_ratio - Input validation errors")

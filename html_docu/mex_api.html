@@ -110,7 +110,7 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
-<tr><td><a href="#calc_angular_spreads_sphere">calc_angular_spreads_sphere</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
+<tr><td><a href="#calc_angular_spread">calc_angular_spread</a></td><td>Calculate azimuth and elevation angular spread with spherical wrapping</td></tr>
 <tr><td><a href="#calc_cross_polarization_ratio">calc_cross_polarization_ratio</a></td><td>Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases</td></tr>
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
@@ -3614,28 +3614,28 @@ data = randn(10000, 5);
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="calc_angular_spreads_sphere"></a>
-<b>calc_angular_spreads_sphere</b> - Calculate azimuth and elevation angular spreads with spherical wrapping
+<a name="calc_angular_spread"></a>
+<b>calc_angular_spread</b> - Calculate azimuth and elevation angular spread with spherical wrapping
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spread from a set of power-weighted angles. 
 </li><li style="margin-bottom: 0.4em;">Inputs and outputs for angles and powers are provided as 2D matrices where each column 
    represents a CIR (internally converted to vectors of column vectors to allow variable path 
    counts per CIR when called from C++). 
-</li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
+</li><li style="margin-bottom: 0.4em;">Uses optional spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
    direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
    on the equator before computing spreads. 
 </li><li style="margin-bottom: 0.4em;">Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread 
    despite energy being focused into a small solid angle). This method corrects for that. 
 </li><li style="margin-bottom: 0.4em;">Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
    elevation spread, corresponding to the principal axes of the angular power distribution. 
-</li><li style="margin-bottom: 0.4em;">Setting <code>disable_wrapping</code> to true skips the rotation and computes spreads from raw angles. 
+</li><li style="margin-bottom: 0.4em;">Setting <code>wrapping</code> to true enables spherical wrapping. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers );
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers, disable_wrapping, calc_bank_angle, quantize );
+[ as, es ] = quadriga_lib.calc_angular_spread( az, el, powers );
+[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -3651,13 +3651,13 @@ data = randn(10000, 5);
    Path powers in [W]. Size <code>[n_path, n_cir]</code>. 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>disable_wrapping</code></b> (optional)<br> 
-   Logical. If true, skip spherical rotation and compute spreads from raw angles. Default: false. 
+<ul><li style="margin-bottom: 0.4em;"><b><code>wrapping</code></b> (optional)<br> 
+   Logical. If true, enable spherical rotation. Default: false (use raw angles) 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>calc_bank_angle</code></b> (optional)<br> 
-   Logical. If true (default), compute the optimal bank angle analytically. Only used when 
-   <code>disable_wrapping</code> is false. 
+   Logical. If true, compute the optimal bank angle analytically. Only used when 
+   <code>wrapping</code> is true. Default: false. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>quantize</code></b> (optional)<br> 
@@ -3691,7 +3691,7 @@ data = randn(10000, 5);
 az = [0.1, 0.2; -0.1, -0.2; 0.05, 0.0];
 el = [0.0, 0.05; 0.0, -0.05; 0.0, 0.0];
 powers = [1.0, 2.0; 1.0, 1.0; 0.5, 1.5];
-[as, es, orient] = quadriga_lib.calc_angular_spreads_sphere(az, el, powers);
+[as, es, orient] = quadriga_lib.calc_angular_spread(az, el, powers);
 </pre>
 </li>
 </ul>
@@ -3783,7 +3783,7 @@ ds = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>delays</b></code> (input)<br> 
-   Delays in [s]. A 2D matrix of size <code>[n_cir, n_path]</code>. Each row is one CIR. Rows may be 
+   Delays in [s]. A 2D matrix of size <code>[n_path, n_cir]</code>. Each row is one CIR. Rows may be 
    zero-padded if CIRs have different numbers of paths. 
 </li></ul>
  

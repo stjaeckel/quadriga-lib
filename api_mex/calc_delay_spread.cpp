@@ -45,7 +45,7 @@ ds = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
 
 ## Arguments:
 - `**delays**` (input)<br>
-  Delays in [s]. A 2D matrix of size `[n_cir, n_path]`. Each row is one CIR. Rows may be
+  Delays in [s]. A 2D matrix of size `[n_path, n_cir]`. Each row is one CIR. Rows may be
   zero-padded if CIRs have different numbers of paths.
 
 - `**powers**` (input)<br>
@@ -82,25 +82,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // --- Read inputs ---
 
-    // delays: [n_cir, n_path] matrix -> split rows into vector of column vectors
-    arma::mat delays_mat = qd_mex_get_double_Mat(prhs[0]);
-    arma::mat powers_mat = qd_mex_get_double_Mat(prhs[1]);
-
-    arma::uword n_cir = delays_mat.n_rows;
-    arma::uword n_path = delays_mat.n_cols;
-
-    if (powers_mat.n_rows != n_cir || powers_mat.n_cols != n_path)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Delays and powers must have the same size.");
-
-    // Convert rows to vector of column vectors
-    std::vector<arma::vec> delays(n_cir);
-    std::vector<arma::vec> powers(n_cir);
-    for (arma::uword i = 0; i < n_cir; ++i)
-    {
-        delays[i] = delays_mat.row(i).t();
-        powers[i] = powers_mat.row(i).t();
-    }
-
+    // Read inputs: powers and path_length as vectors of column vectors
+    std::vector<arma::vec> delays = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
+    std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
+    
     // Optional scalar inputs
     double threshold = (nrhs < 3) ? 100.0 : qd_mex_get_scalar<double>(prhs[2], "threshold", 100.0);
     double granularity = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "granularity", 0.0);

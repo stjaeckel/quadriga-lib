@@ -23,7 +23,7 @@ assertEqual(size(xpr), [1, 6]);
 assertEqual(size(pg), [1, 1]);
 
 % pg includes all paths
-assertElementsAlmostEqual(pg, 3.225, 'absolute', 1e-10);
+assertElementsAlmostEqual(pg, 0.5*3.225, 'absolute', 1e-10);
 
 % V-XPR = 0.65 / 0.05 = 13.0
 assertElementsAlmostEqual(xpr(1,2), 13.0, 'absolute', 1e-10);
@@ -61,7 +61,7 @@ abs2_hv = 0.1^2 + 0.1^2;
 abs2_vh = 0.05^2 + 0.05^2;
 abs2_hh = 0.7^2 + 0.3^2;
 
-assertElementsAlmostEqual(pg3, abs2_vv + abs2_hv + abs2_vh + abs2_hh, 'absolute', 1e-14);
+assertElementsAlmostEqual(pg3, 0.5*(abs2_vv + abs2_hv + abs2_vh + abs2_hh), 'absolute', 1e-14);
 assertElementsAlmostEqual(xpr3(1,2), abs2_vv / abs2_hv, 'absolute', 1e-10);
 assertElementsAlmostEqual(xpr3(1,3), abs2_hh / abs2_vh, 'absolute', 1e-10);
 assertElementsAlmostEqual(xpr3(1,1), (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh), 'absolute', 1e-10);

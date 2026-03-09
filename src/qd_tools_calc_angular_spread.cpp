@@ -33,6 +33,9 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 - Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
 - Inputs and outputs use `std::vector<arma::Col<dtype>>` so that each channel impulse response
   (CIR) can have a different number of paths.
+- The RMS angular spread is computed as `sqrt(sum(pw .* d.^2))` where `d` are the wrapped
+  deviations from the circular mean. This is the second-moment definition used in 3GPP TR 38.901,
+  as opposed to the standard-deviation form `sqrt(E[d^2] - E[d]^2)`.
 - Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
   on the equator before computing spreads.
@@ -197,16 +200,12 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
         L_use = nBins;
     }
 
-    // RMS angular spread: sqrt( E[phi^2] - E[phi]^2 )
-    dtype E_phi = (dtype)0, E_phi2 = (dtype)0;
+    // RMS angular spread: sqrt( sum(pw .* d.^2) ), 3GPP TR 38.901 definition
+    dtype E_phi2 = (dtype)0;
     for (arma::uword i = 0; i < L_use; i++)
-    {
-        E_phi += pw_use[i] * dp_use[i];
         E_phi2 += pw_use[i] * dp_use[i] * dp_use[i];
-    }
 
-    dtype var = E_phi2 - E_phi * E_phi;
-    return (var > (dtype)0) ? std::sqrt(var) : (dtype)0;
+    return (E_phi2 > (dtype)0) ? std::sqrt(E_phi2) : (dtype)0;
 }
 
 // --- Main function ---

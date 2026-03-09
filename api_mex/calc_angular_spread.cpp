@@ -24,27 +24,27 @@ Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
-# calc_angular_spreads_sphere
-Calculate azimuth and elevation angular spreads with spherical wrapping
+# calc_angular_spread
+Calculate azimuth and elevation angular spread with spherical wrapping
 
 ## Description:
-- Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
+- Calculates the RMS azimuth and elevation angular spread from a set of power-weighted angles.
 - Inputs and outputs for angles and powers are provided as 2D matrices where each column
   represents a CIR (internally converted to vectors of column vectors to allow variable path
   counts per CIR when called from C++).
-- Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
+- Uses optional spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
   on the equator before computing spreads.
 - Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread
   despite energy being focused into a small solid angle). This method corrects for that.
 - Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
   elevation spread, corresponding to the principal axes of the angular power distribution.
-- Setting `disable_wrapping` to true skips the rotation and computes spreads from raw angles.
+- Setting `wrapping` to true enables spherical wrapping.
 
 ## Usage:
 ```
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers );
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spreads_sphere( az, el, powers, disable_wrapping, calc_bank_angle, quantize );
+[ as, es ] = quadriga_lib.calc_angular_spread( az, el, powers );
+[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize );
 ```
 
 ## Input Arguments:
@@ -57,12 +57,12 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 - **`powers`**<br>
   Path powers in [W]. Size `[n_path, n_cir]`.
 
-- **`disable_wrapping`** (optional)<br>
-  Logical. If true, skip spherical rotation and compute spreads from raw angles. Default: false.
+- **`wrapping`** (optional)<br>
+  Logical. If true, enable spherical rotation. Default: false (use raw angles)
 
 - **`calc_bank_angle`** (optional)<br>
-  Logical. If true (default), compute the optimal bank angle analytically. Only used when
-  `disable_wrapping` is false.
+  Logical. If true, compute the optimal bank angle analytically. Only used when
+  `wrapping` is true. Default: false.
 
 - **`quantize`** (optional)<br>
   Angular quantization step in [deg]. Default: 0 (no quantization).
@@ -89,7 +89,7 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 az = [0.1, 0.2; -0.1, -0.2; 0.05, 0.0];
 el = [0.0, 0.05; 0.0, -0.05; 0.0, 0.0];
 powers = [1.0, 2.0; 1.0, 1.0; 0.5, 1.5];
-[as, es, orient] = quadriga_lib.calc_angular_spreads_sphere(az, el, powers);
+[as, es, orient] = quadriga_lib.calc_angular_spread(az, el, powers);
 ```
 MD!*/
 
@@ -106,8 +106,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::vec> el = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
     std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
 
-    bool disable_wrapping = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "disable_wrapping", false);
-    bool calc_bank_angle = (nrhs < 5) ? true : qd_mex_get_scalar<bool>(prhs[4], "calc_bank_angle", true);
+    bool wrapping = (nrhs < 4) ? false : qd_mex_get_scalar<bool>(prhs[3], "wrapping", false);
+    bool calc_bank_angle = (nrhs < 5) ? false : qd_mex_get_scalar<bool>(prhs[4], "calc_bank_angle", false);
     double quantize = (nrhs < 6) ? 0.0 : qd_mex_get_scalar<double>(prhs[5], "quantize", 0.0);
 
     // --- Declare output variables ---
@@ -125,7 +125,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // --- Call library function (double precision only) ---
     CALL_QD(quadriga_lib::calc_angular_spreads_sphere<double>(
         az, el, powers, p_as, p_es, p_orient, p_phi, p_theta,
-        disable_wrapping, calc_bank_angle, quantize));
+        !wrapping, calc_bank_angle, quantize));
 
     // --- Write outputs to MATLAB ---
     if (nlhs > 0)

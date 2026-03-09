@@ -4708,6 +4708,9 @@ quadriga_lib::acdf(data, &amp;bins, &amp;Sh, &amp;Sc, &amp;mu, &amp;sig);
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles. 
 </li><li style="margin-bottom: 0.4em;">Inputs and outputs use <code>std::vector&lt;arma::Col&lt;dtype&gt;&gt;</code> so that each channel impulse response 
    (CIR) can have a different number of paths. 
+</li><li style="margin-bottom: 0.4em;">The RMS angular spread is computed as <code>sqrt(sum(pw .* d.^2))</code> where <code>d</code> are the wrapped 
+   deviations from the circular mean. This is the second-moment definition used in 3GPP TR 38.901, 
+   as opposed to the standard-deviation form <code>sqrt(E[d^2] - E[d]^2)</code>. 
 </li><li style="margin-bottom: 0.4em;">Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
    direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
    on the equator before computing spreads. 
@@ -4830,8 +4833,9 @@ quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &amp;as, &amp;es, &amp
    Re(M_hh), Im(M_hh)], i.e., 8 rows per path. 
 </li><li style="margin-bottom: 0.4em;"><code>M</code> may or may not be normalized. Normalization does not affect the XPR since it cancels 
    in the ratio. However, it does affect the path gain output <code>pg</code>. 
-</li><li style="margin-bottom: 0.4em;">If the total cross-polarized power is zero (perfect polarization isolation), the XPR is 
-   set to 0 (undefined). Check <code>pg</code> to distinguish this from a true zero-isolation channel. 
+</li><li style="margin-bottom: 0.4em;">If the total cross-polarized power is zero and co-polarized power is positive (perfect 
+   polarization isolation), the XPR is set to infinity. If both are zero (no qualifying paths), 
+   the XPR is set to 0. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
