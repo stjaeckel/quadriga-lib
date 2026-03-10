@@ -33,6 +33,7 @@ namespace py = pybind11;
 #include "qpy_arrayant_speaker.cpp"
 #include "qpy_get_channels_planar.cpp"
 #include "qpy_get_channels_spherical.cpp"
+#include "qpy_get_channels_multifreq.cpp"
 
 void quadriga_lib_arrayant(py::module_ &m)
 {
@@ -163,4 +164,22 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
           py::arg("angles") = false);
+
+    m.def("get_channels_multifreq", &get_channels_multifreq,
+          py::arg("ant_tx"),
+          py::arg("ant_rx"),
+          py::arg("fbs_pos"),
+          py::arg("lbs_pos"),
+          py::arg("path_gain"),
+          py::arg("path_length"),
+          py::arg("M"),
+          py::arg("tx_pos"),
+          py::arg("tx_orientation"),
+          py::arg("rx_pos"),
+          py::arg("rx_orientation"),
+          py::arg("freq_in"),
+          py::arg("freq_out"),
+          py::arg("use_absolute_delays") = false,
+          py::arg("add_fake_los_path") = false,
+          py::arg("propagation_speed") = 299792458.0);
 }

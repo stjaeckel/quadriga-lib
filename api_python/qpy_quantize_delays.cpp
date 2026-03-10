@@ -41,8 +41,7 @@ Fixes the path delays to a grid of delay bins
 ```
 import quadriga_lib
 coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays(
-    coeff_re, coeff_im, delay,
-    tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+    coeff_re, coeff_im, delay, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
 ```
 
 ## Arguments:
