@@ -56,6 +56,7 @@
 #include "catch2_tests/test_calc_rician_k_factor.cpp"
 #include "catch2_tests/test_calc_cross_polarization_ratio.cpp"
 #include "catch2_tests/test_quantize_delays.cpp"
+#include "catch2_tests/test_baseband_freq_response_multi.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])
