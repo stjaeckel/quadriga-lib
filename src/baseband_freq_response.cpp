@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -411,3 +411,373 @@ template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::C
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<double>> *coeff_re, const std::vector<arma::Cube<double>> *coeff_im,
                                                        const std::vector<arma::Cube<double>> *delay, const arma::Col<double> *pilot_grid, const double bandwidth,
                                                        std::vector<arma::Cube<double>> *hmat_re, std::vector<arma::Cube<double>> *hmat_im, const arma::Col<unsigned> *i_snap);
+
+/*!MD
+# baseband_freq_response_multi
+Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+
+## Description:
+- Computes the frequency-domain channel transfer function H(f) from multi-frequency channel coefficients
+  obtained by sampling the channel at a coarse set of carrier frequencies (e.g., every 500 MHz).
+- Designed for ultra-wideband (UWB) channels where antenna patterns, path gains, and polarization transfer
+  matrices vary across a large bandwidth (e.g., 500 MHz to 20 GHz).
+- For each multipath component (MPC), the complex coefficient envelope is interpolated from the coarse
+  input frequency grid `freq_in` to the dense output frequency grid `freq_out` using SLERP (Spherical
+  Linear Interpolation): magnitude is interpolated linearly, phase is unwrapped and interpolated linearly
+  along the shortest arc.
+- The delay-induced phase rotation `exp(-j * 2 * pi * freq_out * delay)` is applied per output carrier.
+  Since the output frequencies are absolute (not baseband offsets), the phase computation uses double
+  precision internally to avoid loss of accuracy at high carrier frequencies.
+- **Delay phase removal** (`remove_delay_phase = true`, default): Channel generation functions such as
+  `get_channels_multifreq` bake the delay-induced phase `exp(-j * 2 * pi * freq_in[f] * delay)` into
+  the output coefficients at each input frequency. This means the coefficient phase rotates rapidly across
+  the input frequency grid (e.g., 50 full cycles per 500 MHz step for a 100 ns excess delay), which
+  prevents meaningful SLERP interpolation. When `remove_delay_phase` is enabled, this function undoes the
+  baked-in delay phase by multiplying each coefficient by `exp(+j * 2 * pi * freq_in[f] * delay)` before
+  extracting the slowly-varying envelope for interpolation. The full delay phase at the output frequency
+  is then re-applied analytically. This must be enabled when consuming output from `get_channels_multifreq`
+  or `get_channels_spherical`. Set to `false` only if the input coefficients are already pure envelopes
+  without baked-in delay phase (e.g., from manual construction or external sources).
+- Delays are taken from `delay[0]` only, since path geometry (and thus propagation delay) is
+  frequency-independent. All entries in the `delay` vector should contain identical values.
+- The delay cube supports broadcastable shape `[1, 1, n_path]` (planar wave, same delay for all antenna
+  pairs) or full shape `[n_rx, n_tx, n_path]` (spherical wave, per-antenna-pair delays).
+- For output frequencies outside the range of `freq_in`, the nearest endpoint coefficient is used
+  (constant extrapolation in magnitude/phase domain).
+- The Nyquist condition for the coarse sampling grid applies to the coefficient envelope only (magnitude
+  and phase of antenna patterns, path gains, and Jones matrix elements). The fast-rotating delay phase is
+  handled analytically and does not require dense sampling. Adjacent envelope phase differences should stay
+  well below pi to avoid interpolation artifacts.
+- Allowed datatypes (`dtype`): `float` or `double`
+
+## Declaration:
+```
+void quadriga_lib::baseband_freq_response_multi(
+                const std::vector<arma::Cube<dtype>> &coeff_re,
+                const std::vector<arma::Cube<dtype>> &coeff_im,
+                const std::vector<arma::Cube<dtype>> &delay,
+                const arma::Col<dtype> &freq_in,
+                const arma::Col<dtype> &freq_out,
+                arma::Cube<dtype> *hmat_re = nullptr,
+                arma::Cube<dtype> *hmat_im = nullptr,
+                arma::Cube<std::complex<dtype>> *hmat = nullptr,
+                bool remove_delay_phase = true);
+```
+
+## Arguments:
+- `const std::vector<arma::Cube<dtype>> &**coeff_re**` (input)<br>
+  Real part of channel coefficients at each input frequency. Vector of length `n_freq_in`, each cube
+  has shape `[n_rx, n_tx, n_path]`.
+
+- `const std::vector<arma::Cube<dtype>> &**coeff_im**` (input)<br>
+  Imaginary part of channel coefficients at each input frequency. Same structure as `coeff_re`.
+
+- `const std::vector<arma::Cube<dtype>> &**delay**` (input)<br>
+  Path delays in seconds. Vector of length `n_freq_in`. Only `delay[0]` is used (delays are
+  frequency-independent). Shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`.
+
+- `const arma::Col<dtype> &**freq_in**` (input)<br>
+  Input sample frequencies in Hz, sorted in ascending order. Length `[n_freq_in]`.
+
+- `const arma::Col<dtype> &**freq_out**` (input)<br>
+  Output carrier frequencies in Hz (absolute, not baseband offsets). Length `[n_carrier]`.
+
+- `arma::Cube<dtype> ***hmat_re** = nullptr` (optional output)<br>
+  Real part of the frequency-domain channel matrix. Size `[n_rx, n_tx, n_carrier]`.
+
+- `arma::Cube<dtype> ***hmat_im** = nullptr` (optional output)<br>
+  Imaginary part of the frequency-domain channel matrix. Size `[n_rx, n_tx, n_carrier]`.
+
+- `arma::Cube<std::complex<dtype>> ***hmat** = nullptr` (optional output)<br>
+  Complex-valued frequency-domain channel matrix. Size `[n_rx, n_tx, n_carrier]`.
+
+- `bool **remove_delay_phase** = true` (optional input)<br>
+  If `true` (default), the delay-induced phase `exp(-j * 2 * pi * freq_in[f] * delay)` that is baked
+  into the input coefficients by channel generation functions (e.g., `get_channels_multifreq`) is removed
+  before SLERP interpolation and re-applied at each output frequency. Must be enabled when the input
+  comes from `get_channels_multifreq` or `get_channels_spherical`. Set to `false` only when the input
+  coefficients contain pure slowly-varying envelopes without delay phase.
+
+## Example:
+```
+// Using output from get_channels_multifreq (delay phase is baked in)
+std::vector<arma::Cube<double>> coeff_re, coeff_im, delays;
+arma::Col<double> freq_in = {0.5e9, 1.0e9, 1.5e9, 2.0e9};
+arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(0.5e9, 2.0e9, 2048);
+
+// ... call get_channels_multifreq to populate coeff_re, coeff_im, delays ...
+
+arma::Cube<double> Hr, Hi;
+quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays,
+    freq_in, freq_out, &Hr, &Hi, nullptr, true);  // remove_delay_phase = true (default)
+```
+
+## See also:
+- [[baseband_freq_response]] (for single-frequency narrowband channels)
+- [[baseband_freq_response_vec]] (for batched narrowband channels)
+- [[get_channels_multifreq]] (produces the multi-frequency coefficients consumed by this function)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re, // Real part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
+                                                const std::vector<arma::Cube<dtype>> &coeff_im, // Imag part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
+                                                const std::vector<arma::Cube<dtype>> &delay,    // Delays [s], length [n_freq_in], each [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                                const arma::Col<dtype> &freq_in,                // Input sample frequencies [Hz], length [n_freq_in]
+                                                const arma::Col<dtype> &freq_out,               // Output carrier frequencies [Hz], length [n_carrier]
+                                                arma::Cube<dtype> *hmat_re,                     // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
+                                                arma::Cube<dtype> *hmat_im,                     // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
+                                                arma::Cube<std::complex<dtype>> *hmat,          // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
+                                                bool remove_delay_phase)                        // Remove baked-in delay phase before SLERP interpolation
+{
+    // --- Input validation ---
+
+    size_t n_freq_in = (size_t)freq_in.n_elem;
+    size_t n_carrier = (size_t)freq_out.n_elem;
+
+    if (n_freq_in == 0)
+        throw std::invalid_argument("Input 'freq_in' must have at least one element.");
+
+    if (n_carrier == 0)
+        throw std::invalid_argument("Input 'freq_out' must have at least one element.");
+
+    if (coeff_re.size() != n_freq_in)
+        throw std::invalid_argument("Length of 'coeff_re' must match length of 'freq_in'.");
+
+    if (coeff_im.size() != n_freq_in)
+        throw std::invalid_argument("Length of 'coeff_im' must match length of 'freq_in'.");
+
+    if (delay.size() != n_freq_in)
+        throw std::invalid_argument("Length of 'delay' must match length of 'freq_in'.");
+
+    // Get dimensions from first element
+    arma::uword n_rx = coeff_re[0].n_rows;
+    arma::uword n_tx = coeff_re[0].n_cols;
+    arma::uword n_ant = n_rx * n_tx;
+    arma::uword n_path = coeff_re[0].n_slices;
+
+    if (n_rx == 0 || n_tx == 0)
+        throw std::invalid_argument("Coefficient cubes must not be empty.");
+
+    // Validate all coefficient cubes have consistent dimensions
+    for (size_t f = 0; f < n_freq_in; ++f)
+    {
+        if (coeff_re[f].n_rows != n_rx || coeff_re[f].n_cols != n_tx || coeff_re[f].n_slices != n_path)
+            throw std::invalid_argument("All cubes in 'coeff_re' must have the same dimensions.");
+        if (coeff_im[f].n_rows != n_rx || coeff_im[f].n_cols != n_tx || coeff_im[f].n_slices != n_path)
+            throw std::invalid_argument("All cubes in 'coeff_im' must have the same dimensions.");
+    }
+
+    // Validate delay[0] shape (only delay[0] is used)
+    const arma::Cube<dtype> &delay0 = delay[0];
+    bool planar_wave = (delay0.n_rows == 1 && delay0.n_cols == 1 && delay0.n_slices == n_path);
+
+    if (!planar_wave && !(delay0.n_rows == n_rx && delay0.n_cols == n_tx && delay0.n_slices == n_path))
+        throw std::invalid_argument("Input 'delay[0]' must have shape [n_rx, n_tx, n_path] or [1, 1, n_path].");
+
+    // --- Set output size ---
+
+    bool use_re = (hmat_re != nullptr);
+    bool use_im = (hmat_im != nullptr);
+    bool use_cplx = (hmat != nullptr);
+
+    if (use_re)
+    {
+        if (hmat_re->n_rows != n_rx || hmat_re->n_cols != n_tx || hmat_re->n_slices != (arma::uword)n_carrier)
+            hmat_re->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        if (n_path == 0)
+            hmat_re->zeros();
+    }
+    if (use_im)
+    {
+        if (hmat_im->n_rows != n_rx || hmat_im->n_cols != n_tx || hmat_im->n_slices != (arma::uword)n_carrier)
+            hmat_im->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        if (n_path == 0)
+            hmat_im->zeros();
+    }
+    if (use_cplx)
+    {
+        if (hmat->n_rows != n_rx || hmat->n_cols != n_tx || hmat->n_slices != (arma::uword)n_carrier)
+            hmat->set_size(n_rx, n_tx, (arma::uword)n_carrier);
+        if (n_path == 0)
+            hmat->zeros();
+    }
+    if (n_path == 0)
+        return;
+
+    // --- Precompute interpolation table ---
+    // For each output carrier k, find the left segment index and fractional weight in freq_in
+
+    const dtype *p_fin = freq_in.memptr();
+    const dtype *p_fout = freq_out.memptr();
+
+    std::vector<size_t> seg(n_carrier);    // Left segment index into freq_in
+    std::vector<double> frac(n_carrier);   // Fractional position within segment [0, 1]
+    std::vector<double> phasor(n_carrier); // -2 * pi * freq_out[k]
+
+    for (size_t k = 0; k < n_carrier; ++k)
+    {
+        phasor[k] = -6.283185307179586 * (double)p_fout[k];
+
+        if (n_freq_in == 1)
+        {
+            seg[k] = 0;
+            frac[k] = 0.0;
+        }
+        else
+        {
+            // Clamp to input frequency range (constant extrapolation)
+            if (p_fout[k] <= p_fin[0])
+            {
+                seg[k] = 0;
+                frac[k] = 0.0;
+            }
+            else if (p_fout[k] >= p_fin[n_freq_in - 1])
+            {
+                seg[k] = n_freq_in - 2;
+                frac[k] = 1.0;
+            }
+            else
+            {
+                // Linear search (n_freq_in is small, typically ~40)
+                size_t s = 0;
+                for (size_t i = 1; i < n_freq_in - 1; ++i)
+                    if (p_fout[k] >= p_fin[i])
+                        s = i;
+                seg[k] = s;
+                double denom = (double)p_fin[s + 1] - (double)p_fin[s];
+                frac[k] = (denom > 0.0) ? ((double)p_fout[k] - (double)p_fin[s]) / denom : 0.0;
+            }
+        }
+    }
+
+    // --- Get raw pointers to coefficient data for each input frequency ---
+
+    std::vector<const dtype *> p_cre(n_freq_in), p_cim(n_freq_in);
+    for (size_t f = 0; f < n_freq_in; ++f)
+    {
+        p_cre[f] = coeff_re[f].memptr();
+        p_cim[f] = coeff_im[f].memptr();
+    }
+    const dtype *p_delay = delay0.memptr();
+
+    // --- Precompute delay-phase undo phasors for each input frequency ---
+    // When remove_delay_phase is true, we need +2*pi*freq_in[f] to undo the baked-in exp(-j*2*pi*f*tau)
+    std::vector<double> undo_phasor(n_freq_in, 0.0);
+    if (remove_delay_phase)
+    {
+        for (size_t f = 0; f < n_freq_in; ++f)
+            undo_phasor[f] = 6.283185307179586 * (double)p_fin[f];
+    }
+
+    // --- Get output pointers ---
+
+    dtype *p_hmat_re = use_re ? hmat_re->memptr() : nullptr;
+    dtype *p_hmat_im = use_im ? hmat_im->memptr() : nullptr;
+    std::complex<dtype> *p_hmat = use_cplx ? hmat->memptr() : nullptr;
+
+    // --- SLERP + accumulate core ---
+    // For each antenna pair and path:
+    //   1. Extract n_freq_in complex coefficient samples, compute magnitude and unwrapped phase
+    //   2. For each output carrier: SLERP-interpolate magnitude and phase, combine with delay phase,
+    //      and accumulate into output
+
+    // Working buffers for one path's coefficient samples across input frequencies
+    std::vector<double> mag_buf(n_freq_in), phi_buf(n_freq_in);
+
+    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
+    {
+        // Initialize accumulators for this antenna pair
+        std::vector<double> Hr(n_carrier, 0.0), Hi(n_carrier, 0.0);
+
+        for (size_t i_path = 0; i_path < n_path; ++i_path)
+        {
+            const size_t idx = i_path * n_ant + i_ant;
+
+            // Get delay for this path/antenna pair (needed before coefficient extraction for phase undo)
+            double dl = planar_wave ? (double)p_delay[i_path] : (double)p_delay[idx];
+
+            // --- Extract coefficient samples and convert to magnitude + phase ---
+            // If remove_delay_phase is enabled, undo the baked-in exp(-j*2*pi*freq_in[f]*delay)
+            // by multiplying with exp(+j*2*pi*freq_in[f]*delay) to recover the slowly-varying envelope
+            for (size_t f = 0; f < n_freq_in; ++f)
+            {
+                double re = (double)p_cre[f][idx];
+                double im = (double)p_cim[f][idx];
+
+                if (remove_delay_phase)
+                {
+                    double undo_phase = undo_phasor[f] * dl; // +2*pi*freq_in[f]*delay
+                    double c_undo = std::cos(undo_phase);
+                    double s_undo = std::sin(undo_phase);
+                    double re_env = re * c_undo - im * s_undo;
+                    double im_env = re * s_undo + im * c_undo;
+                    re = re_env;
+                    im = im_env;
+                }
+
+                mag_buf[f] = std::sqrt(re * re + im * im);
+                phi_buf[f] = std::atan2(im, re);
+            }
+
+            // --- Phase unwrapping ---
+            // Ensure adjacent phase differences are in (-pi, pi] for correct interpolation
+            for (size_t f = 1; f < n_freq_in; ++f)
+            {
+                double d = phi_buf[f] - phi_buf[f - 1];
+                while (d > 3.141592653589793)
+                    d -= 6.283185307179586;
+                while (d < -3.141592653589793)
+                    d += 6.283185307179586;
+                phi_buf[f] = phi_buf[f - 1] + d;
+            }
+
+            // --- Interpolate and accumulate for each output carrier ---
+            for (size_t k = 0; k < n_carrier; ++k)
+            {
+                // SLERP: linear interpolation of magnitude and unwrapped phase
+                double mag_k, phi_k;
+                if (n_freq_in == 1)
+                {
+                    mag_k = mag_buf[0];
+                    phi_k = phi_buf[0];
+                }
+                else
+                {
+                    size_t s = seg[k];
+                    double t = frac[k];
+                    mag_k = (1.0 - t) * mag_buf[s] + t * mag_buf[s + 1];
+                    phi_k = (1.0 - t) * phi_buf[s] + t * phi_buf[s + 1];
+                }
+
+                // Combined phase: envelope phase + delay phase
+                // phasor[k] = -2 * pi * freq_out[k], so total_phase = phi_k - 2*pi*f*tau
+                double total_phase = phi_k + phasor[k] * dl;
+
+                Hr[k] += mag_k * std::cos(total_phase);
+                Hi[k] += mag_k * std::sin(total_phase);
+            }
+        }
+
+        // --- Write output for this antenna pair ---
+        for (size_t k = 0; k < n_carrier; ++k)
+        {
+            size_t o = k * n_ant + i_ant; // Output index in column-major [n_rx, n_tx, n_carrier]
+            if (use_re)
+                p_hmat_re[o] = (dtype)Hr[k];
+            if (use_im)
+                p_hmat_im[o] = (dtype)Hi[k];
+            if (use_cplx)
+                p_hmat[o] = {(dtype)Hr[k], (dtype)Hi[k]};
+        }
+    }
+}
+
+template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<float>> &coeff_re, const std::vector<arma::Cube<float>> &coeff_im,
+                                                         const std::vector<arma::Cube<float>> &delay, const arma::Col<float> &freq_in,
+                                                         const arma::Col<float> &freq_out, arma::Cube<float> *hmat_re, arma::Cube<float> *hmat_im,
+                                                         arma::Cube<std::complex<float>> *hmat, bool remove_delay_phase);
+
+template void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<double>> &coeff_re, const std::vector<arma::Cube<double>> &coeff_im,
+                                                         const std::vector<arma::Cube<double>> &delay, const arma::Col<double> &freq_in,
+                                                         const arma::Col<double> &freq_out, arma::Cube<double> *hmat_re, arma::Cube<double> *hmat_im,
+                                                         arma::Cube<std::complex<double>> *hmat, bool remove_delay_phase);

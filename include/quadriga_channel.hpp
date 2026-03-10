@@ -239,6 +239,24 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *hmat_im = nullptr,             // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carriers]
                                 arma::Cube<std::complex<dtype>> *hmat = nullptr); // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carriers]
 
+    // Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
+    // - Interpolates multi-frequency coefficients from a coarse input grid to a dense output grid using SLERP
+    // - Applies delay-induced phase rotation analytically at each output carrier frequency
+    // - When remove_delay_phase is true (default), undoes the delay phase baked in by get_channels_multifreq
+    //   before interpolation, then re-applies it at the output frequency; set to false for pure envelope inputs
+    // - Delays are taken from delay[0] only (frequency-independent geometry); supports [n_rx, n_tx, n_path]
+    //   or broadcastable [1, 1, n_path]
+    template <typename dtype>
+    void baseband_freq_response_multi(const std::vector<arma::Cube<dtype>> &coeff_re,  // Real part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
+                                      const std::vector<arma::Cube<dtype>> &coeff_im,  // Imag part of coefficients, length [n_freq_in], each [n_rx, n_tx, n_path]
+                                      const std::vector<arma::Cube<dtype>> &delay,     // Delays [s], length [n_freq_in], each [n_rx, n_tx, n_path] or [1, 1, n_path]
+                                      const arma::Col<dtype> &freq_in,                 // Input sample frequencies [Hz], length [n_freq_in]
+                                      const arma::Col<dtype> &freq_out,                // Output carrier frequencies [Hz], length [n_carrier]
+                                      arma::Cube<dtype> *hmat_re = nullptr,            // Output: Channel matrix (H), real part, Size [n_rx, n_tx, n_carrier]
+                                      arma::Cube<dtype> *hmat_im = nullptr,            // Output: Channel matrix (H), imaginary part, Size [n_rx, n_tx, n_carrier]
+                                      arma::Cube<std::complex<dtype>> *hmat = nullptr, // Output: Channel matrix (H), complex-valued, Size [n_rx, n_tx, n_carrier]
+                                      bool remove_delay_phase = true);                 // Remove baked-in delay phase before SLERP interpolation
+
     // Compute the baseband frequency response of multiple MIMO channels
     // - Wrapper function for "quadriga_lib::baseband_freq_response" to process multiple snapshot at once
     // - Optional input i_snap can be used to select a subset of the given coeff_re, coeff_im, delay
