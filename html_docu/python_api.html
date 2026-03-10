@@ -108,7 +108,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Transforms the channel into frequency domain and returns the frequency response</td></tr>
+<tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the frequency-domain channel response from time-domain coefficients</td></tr>
 <tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
 <tr><td><a href="#get_ieee_indoor">get_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
@@ -2631,53 +2631,111 @@ speaker_out = arrayant.rotate_pattern(speaker, y_deg=10.0)
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="baseband_freq_response"></a>
-<b>baseband_freq_response</b> - Transforms the channel into frequency domain and returns the frequency response
+<b>baseband_freq_response</b> - Compute the frequency-domain channel response from time-domain coefficients
 <ul>
 <li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Transforms channel impulse response data into the frequency domain and returns the channel transfer 
+   function H(f) at specified sub-carrier or output frequencies. 
+</li><li style="margin-bottom: 0.4em;">Supports two operating modes determined by the dimensionality of the input coefficient arrays: 
+   1. <b>Single-frequency (3D inputs)</b>: Each list item is a 3D array of shape <code>(n_rx, n_tx, n_path)</code>. 
+   Calls <code>baseband_freq_response</code> per snapshot using a DFT with AVX2 acceleration. 
+   2. <b>Multi-frequency (4D inputs)</b>: Each list item is a 4D array of shape 
+   <code>(n_rx, n_tx, n_path, n_freq_in)</code>. Calls <code>baseband_freq_response_multi</code> per snapshot using 
+   SLERP interpolation of the coefficient envelope across frequency. 
+</li><li style="margin-bottom: 0.4em;">Coefficients can be provided as a single complex array (<code>coeff</code>) or as separate real and imaginary 
+   parts (<code>coeff_re</code>, <code>coeff_im</code>). Providing both is an error. 
+</li><li style="margin-bottom: 0.4em;">The output frequency grid can be defined in two ways: 
+   1. <code>bandwidth</code> + <code>pilot_grid</code> (or <code>carriers</code>): baseband offsets, for single-frequency mode. 
+   2. <code>freq_in</code> + <code>freq_out</code>: absolute frequencies in Hz, works for both single-frequency and 
+   multi-frequency mode. For single-frequency inputs, <code>bandwidth</code> and <code>pilot_grid</code> are derived 
+   internally from <code>freq_out</code>. 
+</li><li style="margin-bottom: 0.4em;">When using multi-frequency mode, the <code>remove_delay_phase</code> flag (default <code>True</code>) undoes the 
+   delay-induced phase baked into coefficients by <code>get_channels_multifreq</code> before SLERP interpolation, 
+   then re-applies it analytically at each output frequency. Set to <code>False</code> only if the input 
+   coefficients are pure slowly-varying envelopes without baked-in delay phase. 
+</li><li style="margin-bottom: 0.4em;">Snapshots are processed in parallel using OpenMP. The number of paths <code>n_path</code> may vary across 
+   snapshots, but <code>n_rx</code>, <code>n_tx</code>, and (for 4D) <code>n_freq_in</code> must be consistent. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-from quadriga_lib import channel
-hmat = channel.baseband_freq_response( coeff, delay, bandwidth, carriers, pilot_grid, snap );
+import quadriga_lib
+
+# Single-frequency with bandwidth + carriers
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6 )
+
+# Single-frequency with freq_in + freq_out
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay,
+    freq_in=np.array([2.0e9]), freq_out=np.linspace(1.95e9, 2.05e9, 128) )
+
+# Multi-frequency with separate re/im
+hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay,
+    freq_in=freq_in, freq_out=freq_out )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff</code></b><br> 
-   Channel coefficients, complex-valued, List of length <code>n_snap</code>,  
-   Each list item is an munpy.ndarray of Shape <code>( n_rx, n_tx, n_path )</code> where <code>n_path</code> can be different  
-   for each snapshot. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff</code></b> (optional)<br> 
+   Channel coefficients, complex-valued. List of length <code>n_snap</code>. Each item is a numpy array of 
+   shape <code>(n_rx, n_tx, n_path)</code> (single-freq) or <code>(n_rx, n_tx, n_path, n_freq_in)</code> (multi-freq). 
+   Mutually exclusive with <code>coeff_re</code> / <code>coeff_im</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>delay</code></b><br> 
-   Propagation delay in seconds, List of length <code>n_snap</code>,  
-   Each list item is an munpy.ndarray of Shape <code>( n_rx, n_tx, n_path )</code> or <code>( 1, 1, n_path )</code> where  
-   <code>n_path</code> can be different for each snapshot. 
+   Propagation delays in seconds, real-valued. List of length <code>n_snap</code>. Each item is a numpy array 
+   of shape <code>(n_rx, n_tx, n_path)</code> or <code>(1, 1, n_path)</code> (single-freq), or the same shapes with an 
+   additional 4th dimension <code>n_freq_in</code> (multi-freq). For multi-freq, a 3D delay is broadcast to 
+   all input frequencies (since delays are frequency-independent). 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>bandwidth</code></b><br> 
-   The baseband bandwidth in [Hz], scalar 
+<ul><li style="margin-bottom: 0.4em;"><b><code>bandwidth</code></b> (optional)<br> 
+   Baseband bandwidth in Hz. Used with <code>pilot_grid</code> or <code>carriers</code> to define sub-carrier positions. 
+   Cannot be combined with <code>freq_out</code>. Default: <code>0.0</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>carriers</code></b> (optional)<br> 
-   Number of carriers, equally spaced across the bandwidth. The first entry of the generated spectrum 
-   is equal to the center frequency f0. The spectrum is generated from f0 to f0+bandwidth. This 
-   argument is only evaluated if <code>pilot_grid</code> is not provided. Default value = 128 
+   Number of equally spaced carriers across the bandwidth. Only used if <code>pilot_grid</code> is not given 
+   and <code>freq_out</code> is not given. Default: <code>128</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>pilot_grid</code></b> (optional)<br> 
-   Sub-carrier positions relative to the bandwidth. The carrier positions are given relative to the 
-   bandwidth where '0' is the begin of the spectrum (i.e., the center frequency f0) and '1' is 
-   equal to f0+bandwidth. To obtain the channel frequency response centered around f0, the 
-   input variable 'pilot_grid' must be set to '(-N/2:N/2)/N', where N is the number of sub- 
-   carriers. Vector of length: <code>( n_carriers )</code> 
+   Sub-carrier positions relative to bandwidth (0 = center freq, 1 = center + bandwidth). 
+   1D numpy array of length <code>n_carriers</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>snap</code></b> (optional)<br> 
-   Snapshot indices for which the frequency response should be generated (1-based index). If this 
-   variable is not given, all snapshots are processed. Length: <code>( n_out )</code> 
+   0-based snapshot indices to process. If not given, all snapshots are processed. 
+   1D numpy array of length <code>n_out</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b> (optional)<br> 
+   Real part of channel coefficients. Same list/shape structure as <code>coeff</code>. 
+   Must be provided together with <code>coeff_im</code>. Mutually exclusive with <code>coeff</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b> (optional)<br> 
+   Imaginary part of channel coefficients. Must match <code>coeff_re</code> in structure and shape. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>freq_in</code></b> (optional)<br> 
+   Input sample frequencies in Hz, 1D numpy array. Required for multi-freq (4D) inputs. 
+   For single-freq (3D) inputs, used together with <code>freq_out</code> to derive baseband parameters. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>freq_out</code></b> (optional)<br> 
+   Output carrier frequencies in Hz, 1D numpy array. Required for multi-freq (4D) inputs. 
+   For single-freq (3D) inputs, can replace <code>bandwidth</code> + <code>pilot_grid</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>remove_delay_phase</code></b> (optional)<br> 
+   If <code>True</code> (default), removes the delay-induced phase baked into coefficients by channel 
+   generation functions (e.g. <code>get_channels_multifreq</code>) before SLERP interpolation in multi-freq 
+   mode. Has no effect in single-freq mode. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat</code></b><br> 
-   Freq. domain channel matrices (H), complex-valued, Shape <code>( n_rx, n_tx, n_carriers, n_out )</code> 
+   Complex-valued frequency-domain channel matrix, numpy array of shape 
+   <code>(n_rx, n_tx, n_carriers, n_out)</code>. 
 </li></ul>
 </li>
 </ul>
