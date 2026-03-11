@@ -165,7 +165,10 @@
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculate rotation matrices from Euler angles</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)</td></tr>
 <tr><td><a href="#colormap">colormap</a></td><td>Generate colormap</td></tr>
+<tr><td><a href="#fast_acos">fast_acos</a></td><td>Fast, approximate arc-cosine</td></tr>
+<tr><td><a href="#fast_asin">fast_asin</a></td><td>Fast, approximate arc-sine</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine</td></tr>
+<tr><td><a href="#fast_slerp">fast_slerp</a></td><td>Fast, approximate spherical interpolation (SLERP) for complex value pairs</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform geographic (azimuth, elevation, length) to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp_1d / interp_2d">interp_1d / interp_2d</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
@@ -5366,6 +5369,82 @@ arma::uchar_mat cm = quadriga_lib::colormap("turbo");
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="fast_acos"></a>
+<b>fast_acos</b> - Fast, approximate arc-cosine
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Computes elementwise arc-cosine for an Armadillo vector. Designed for high throughput on modern CPUs. 
+<ul><li style="margin-bottom: 0.4em;">Operates on input values in [-1, 1] 
+</li><li style="margin-bottom: 0.4em;">AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs 
+</li><li style="margin-bottom: 0.4em;">Parallelizes across cores with OpenMP when enabled 
+</li><li style="margin-bottom: 0.4em;">Results are approximate and may differ from <code>std::acosf</code> 
+</li><li style="margin-bottom: 0.4em;">For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7) 
+</li><li style="margin-bottom: 0.4em;">Input values outside [-1, 1] produce NaN (IEEE compliant) 
+</li><li style="margin-bottom: 0.4em;">Allowed input datatype: <code>float</code> (Armadillo <code>fvec</code>) or <code>double</code> (Armadillo <code>vec</code>) 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::fast_acos(const arma::fvec &amp;x, arma::fvec &amp;c);
+void quadriga_lib::fast_acos(const arma::vec &amp;x, arma::fvec &amp;c);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>x</b></code> or <code>const arma::vec &amp;<b>x</b></code> (input)<br> 
+   Input values in [-1, 1]. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec &amp;<b>c</b></code> (output)<br> 
+   Set to <code>acos(x)</code>. Resized to length <code>n</code> if needed. Length <code>[n]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::fvec x = arma::linspace&lt;arma::fvec&gt;(-1.0f, 1.0f, 1000);
+arma::fvec c;
+quadriga_lib::fast_acos(x, c);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="fast_asin"></a>
+<b>fast_asin</b> - Fast, approximate arc-sine
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Computes elementwise arc-sine for an Armadillo vector. Designed for high throughput on modern CPUs. 
+<ul><li style="margin-bottom: 0.4em;">Operates on input values in [-1, 1] 
+</li><li style="margin-bottom: 0.4em;">AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs 
+</li><li style="margin-bottom: 0.4em;">Parallelizes across cores with OpenMP when enabled 
+</li><li style="margin-bottom: 0.4em;">Results are approximate and may differ from <code>std::asinf</code> 
+</li><li style="margin-bottom: 0.4em;">For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7) 
+</li><li style="margin-bottom: 0.4em;">Input values outside [-1, 1] produce NaN (IEEE compliant) 
+</li><li style="margin-bottom: 0.4em;">Allowed input datatype: <code>float</code> (Armadillo <code>fvec</code>) or <code>double</code> (Armadillo <code>vec</code>) 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::fast_asin(const arma::fvec &amp;x, arma::fvec &amp;s);
+void quadriga_lib::fast_asin(const arma::vec &amp;x, arma::fvec &amp;s);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>x</b></code> or <code>const arma::vec &amp;<b>x</b></code> (input)<br> 
+   Input values in [-1, 1]. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec &amp;<b>s</b></code> (output)<br> 
+   Set to <code>asin(x)</code>. Resized to length <code>n</code> if needed. Length <code>[n]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::fvec x = arma::linspace&lt;arma::fvec&gt;(-1.0f, 1.0f, 1000);
+arma::fvec s;
+quadriga_lib::fast_asin(x, s);
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="fast_sincos"></a>
 <b>fast_sincos</b> - Fast, approximate sine/cosine
 <ul>
@@ -5412,6 +5491,79 @@ arma::fvec s, c;
 quadriga_lib::fast_sincos(x, &amp;s, &amp;c);      // compute both
 quadriga_lib::fast_sincos(x, &amp;s, nullptr); // compute sine only
 quadriga_lib::fast_sincos(x, nullptr, &amp;c); // compute cosine only
+</pre>
+</li>
+</ul>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="fast_slerp"></a>
+<b>fast_slerp</b> - Fast, approximate spherical interpolation (SLERP) for complex value pairs
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br>Interpolates elementwise between two complex-valued vectors using spherical linear interpolation 
+(SLERP) on the normalised directions and linear interpolation of amplitudes. 
+<ul><li style="margin-bottom: 0.4em;">Processes per-element interpolation weights (0 = A, 1 = B) 
+</li><li style="margin-bottom: 0.4em;">AVX2-optimized (8 complex pairs per lane); scalar fallback without AVX2 or on non-AVX2 CPUs 
+</li><li style="margin-bottom: 0.4em;">Parallelizes across cores with OpenMP when enabled 
+</li><li style="margin-bottom: 0.4em;">Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback 
+</li><li style="margin-bottom: 0.4em;">If both input amplitudes are negligible, the output is zero 
+</li><li style="margin-bottom: 0.4em;">Maximum error versus double-precision reference is approximately 100 ULP (~1.2e-5 relative error, ~17.5 effective bits) 
+</li><li style="margin-bottom: 0.4em;">Allowed input datatype: <code>float</code> (Armadillo <code>fvec</code>) or <code>double</code> (Armadillo <code>vec</code>) 
+</li><li style="margin-bottom: 0.4em;">All input vectors must have the same length 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Declaration:</i></b><br><pre>
+void quadriga_lib::fast_slerp(const arma::fvec &amp;Ar, const arma::fvec &amp;Ai,
+                              const arma::fvec &amp;Br, const arma::fvec &amp;Bi,
+                              const arma::fvec &amp;w,
+                              arma::fvec &amp;Xr, arma::fvec &amp;Xi);
+void quadriga_lib::fast_slerp(const arma::vec &amp;Ar, const arma::vec &amp;Ai,
+                              const arma::vec &amp;Br, const arma::vec &amp;Bi,
+                              const arma::vec &amp;w,
+                              arma::fvec &amp;Xr, arma::fvec &amp;Xi);
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>Ar</b></code> or <code>const arma::vec &amp;<b>Ar</b></code> (input)<br> 
+   Real part of source A. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>Ai</b></code> or <code>const arma::vec &amp;<b>Ai</b></code> (input)<br> 
+   Imaginary part of source A. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>Br</b></code> or <code>const arma::vec &amp;<b>Br</b></code> (input)<br> 
+   Real part of source B. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>Bi</b></code> or <code>const arma::vec &amp;<b>Bi</b></code> (input)<br> 
+   Imaginary part of source B. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::fvec &amp;<b>w</b></code> or <code>const arma::vec &amp;<b>w</b></code> (input)<br> 
+   Per-element interpolation weight in [0, 1]. 0 returns A, 1 returns B. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec &amp;<b>Xr</b></code> (output)<br> 
+   Real part of interpolated result. Resized to length <code>n</code> if needed. Length <code>[n]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>arma::fvec &amp;<b>Xi</b></code> (output)<br> 
+   Imaginary part of interpolated result. Resized to length <code>n</code> if needed. Length <code>[n]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>void</code> (output)<br> 
+   No return value. Results written to Xr and Xi. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Example:</i></b><br><pre>
+arma::fvec Ar = {1.0f, 0.0f}, Ai = {0.0f, 1.0f};
+arma::fvec Br = {0.0f, 1.0f}, Bi = {1.0f, 0.0f};
+arma::fvec w = {0.5f, 0.5f};
+arma::fvec Xr, Xi;
+quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
 </pre>
 </li>
 </ul>

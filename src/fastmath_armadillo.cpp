@@ -303,3 +303,138 @@ void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
 
 template void quadriga_lib::fast_acos(const arma::Col<float> &x, arma::fvec &c);
 template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c);
+
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# fast_slerp
+Fast, approximate spherical interpolation (SLERP) for complex value pairs
+
+## Description:
+Interpolates elementwise between two complex-valued vectors using spherical linear interpolation
+(SLERP) on the normalised directions and linear interpolation of amplitudes.
+- Processes per-element interpolation weights (0 = A, 1 = B)
+- AVX2-optimized (8 complex pairs per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback
+- If both input amplitudes are negligible, the output is zero
+- Maximum error versus double-precision reference is approximately 100 ULP (~1.2e-5 relative error, ~17.5 effective bits)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- All input vectors must have the same length
+
+## Declaration:
+```
+void quadriga_lib::fast_slerp(const arma::fvec &Ar, const arma::fvec &Ai,
+                              const arma::fvec &Br, const arma::fvec &Bi,
+                              const arma::fvec &w,
+                              arma::fvec &Xr, arma::fvec &Xi);
+void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
+                              const arma::vec &Br, const arma::vec &Bi,
+                              const arma::vec &w,
+                              arma::fvec &Xr, arma::fvec &Xi);
+```
+
+## Arguments:
+- `const arma::fvec &**Ar**` or `const arma::vec &**Ar**` (input)<br>
+  Real part of source A. Length `[n]`.
+
+- `const arma::fvec &**Ai**` or `const arma::vec &**Ai**` (input)<br>
+  Imaginary part of source A. Length `[n]`.
+
+- `const arma::fvec &**Br**` or `const arma::vec &**Br**` (input)<br>
+  Real part of source B. Length `[n]`.
+
+- `const arma::fvec &**Bi**` or `const arma::vec &**Bi**` (input)<br>
+  Imaginary part of source B. Length `[n]`.
+
+- `const arma::fvec &**w**` or `const arma::vec &**w**` (input)<br>
+  Per-element interpolation weight in [0, 1]. 0 returns A, 1 returns B. Length `[n]`.
+
+- `arma::fvec &**Xr**` (output)<br>
+  Real part of interpolated result. Resized to length `n` if needed. Length `[n]`.
+
+- `arma::fvec &**Xi**` (output)<br>
+  Imaginary part of interpolated result. Resized to length `n` if needed. Length `[n]`.
+
+## Returns:
+- `void` (output)<br>
+  No return value. Results written to Xr and Xi.
+
+## Example:
+```
+arma::fvec Ar = {1.0f, 0.0f}, Ai = {0.0f, 1.0f};
+arma::fvec Br = {0.0f, 1.0f}, Bi = {1.0f, 0.0f};
+arma::fvec w = {0.5f, 0.5f};
+arma::fvec Xr, Xi;
+quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype> &Ai,
+                               const arma::Col<dtype> &Br, const arma::Col<dtype> &Bi,
+                               const arma::Col<dtype> &w,
+                               arma::fvec &Xr, arma::fvec &Xi)
+{
+    const arma::uword n_val = Ar.n_elem;
+
+    if (Ai.n_elem != n_val || Br.n_elem != n_val || Bi.n_elem != n_val || w.n_elem != n_val)
+        throw std::invalid_argument("All input vectors must have the same length.");
+
+    if (Xr.n_elem != n_val)
+        Xr.set_size(n_val);
+    if (Xi.n_elem != n_val)
+        Xi.set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict pAr = Ar.memptr();
+    const dtype *__restrict pAi = Ai.memptr();
+    const dtype *__restrict pBr = Br.memptr();
+    const dtype *__restrict pBi = Bi.memptr();
+    const dtype *__restrict pw = w.memptr();
+    float *__restrict pXr = Xr.memptr();
+    float *__restrict pXi = Xi.memptr();
+
+    // Check for aliasing between any input and any output
+    const void *inputs[] = {pAr, pAi, pBr, pBi, pw};
+    const void *outputs[] = {pXr, pXi};
+    for (auto iv : inputs)
+        for (auto ov : outputs)
+            if (iv == ov)
+                throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+    if (pXr == pXi)
+        throw std::invalid_argument("Output Xr and Xi cannot be the same buffer.");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_SLERP_AVX2(pAr, pAi, pBr, pBi, pw, pXr, pXi, bulk);
+        if (tail)
+            qd_SLERP_GENERIC(pAr + bulk, pAi + bulk, pBr + bulk, pBi + bulk, pw + bulk,
+                              pXr + bulk, pXi + bulk, tail);
+    }
+    else
+    {
+        qd_SLERP_GENERIC(pAr, pAi, pBr, pBi, pw, pXr, pXi, n_val);
+    }
+#else
+    qd_SLERP_GENERIC(pAr, pAi, pBr, pBi, pw, pXr, pXi, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_slerp(const arma::Col<float> &Ar, const arma::Col<float> &Ai,
+                                        const arma::Col<float> &Br, const arma::Col<float> &Bi,
+                                        const arma::Col<float> &w,
+                                        arma::fvec &Xr, arma::fvec &Xi);
+template void quadriga_lib::fast_slerp(const arma::Col<double> &Ar, const arma::Col<double> &Ai,
+                                        const arma::Col<double> &Br, const arma::Col<double> &Bi,
+                                        const arma::Col<double> &w,
+                                        arma::fvec &Xr, arma::fvec &Xi);

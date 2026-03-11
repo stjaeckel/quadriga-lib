@@ -51,4 +51,11 @@ void qd_ACOS_AVX2(const dtype *__restrict x,
                   float *__restrict c,
                   size_t n_val); // multiple of 8
 
+template <typename dtype> // float or double
+void qd_SLERP_AVX2(const dtype *__restrict Ar, const dtype *__restrict Ai,
+                    const dtype *__restrict Br, const dtype *__restrict Bi,
+                    const dtype *__restrict w,
+                    float *__restrict Xr, float *__restrict Xi,
+                    size_t n_val); // multiple of 8
+
 #endif

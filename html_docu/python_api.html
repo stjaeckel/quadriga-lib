@@ -2648,7 +2648,7 @@ speaker_out = arrayant.rotate_pattern(speaker, y_deg=10.0)
    1. <code>bandwidth</code> + <code>pilot_grid</code> (or <code>carriers</code>): baseband offsets, for single-frequency mode. 
    2. <code>freq_in</code> + <code>freq_out</code>: absolute frequencies in Hz, works for both single-frequency and 
    multi-frequency mode. For single-frequency inputs, <code>bandwidth</code> and <code>pilot_grid</code> are derived 
-   internally from <code>freq_out</code>. 
+     internally from <code>freq_out</code>. 
 </li><li style="margin-bottom: 0.4em;">When using multi-frequency mode, the <code>remove_delay_phase</code> flag (default <code>True</code>) undoes the 
    delay-induced phase baked into coefficients by <code>get_channels_multifreq</code> before SLERP interpolation, 
    then re-applies it analytically at each output frequency. Set to <code>False</code> only if the input 
