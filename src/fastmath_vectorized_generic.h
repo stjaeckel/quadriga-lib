@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -72,6 +72,34 @@ void qd_COS_GENERIC(const dtype *__restrict x,
     {
         const float xi = (float)x[i];
         c[i] = cosf(xi);
+    }
+}
+
+template <typename dtype>
+void qd_ASIN_GENERIC(const dtype *__restrict x,
+                     float *__restrict s,
+                     size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        const float xi = (float)x[i];
+        s[i] = asinf(xi);
+    }
+}
+
+template <typename dtype>
+void qd_ACOS_GENERIC(const dtype *__restrict x,
+                     float *__restrict c,
+                     size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        const float xi = (float)x[i];
+        c[i] = acosf(xi);
     }
 }
 

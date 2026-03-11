@@ -407,7 +407,7 @@ if(BUILD_OCTAVE)
 
         add_custom_command(
             OUTPUT ${octave_output}
-            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS}" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
+            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
                     ${mex_src} $<TARGET_FILE:quadriga_static>
                     -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
             DEPENDS ${mex_deps}

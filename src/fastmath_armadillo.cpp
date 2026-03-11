@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (https://sjc-wireless.com)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -145,3 +145,161 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
 
 template void quadriga_lib::fast_sincos(const arma::Col<float> &x, arma::fvec *s, arma::fvec *c);
 template void quadriga_lib::fast_sincos(const arma::Col<double> &x, arma::fvec *s, arma::fvec *c);
+
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# fast_asin
+Fast, approximate arc-sine
+
+## Description:
+Computes elementwise arc-sine for an Armadillo vector. Designed for high throughput on modern CPUs.
+- Operates on input values in [-1, 1]
+- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Results are approximate and may differ from `std::asinf`
+- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
+- Input values outside [-1, 1] produce NaN (IEEE compliant)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+
+## Declaration:
+```
+void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
+void quadriga_lib::fast_asin(const arma::vec &x, arma::fvec &s);
+```
+
+## Arguments:
+- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
+  Input values in [-1, 1]. Length `[n]`.
+
+- `arma::fvec &**s**` (output)<br>
+  Set to `asin(x)`. Resized to length `n` if needed. Length `[n]`.
+
+## Example:
+```
+arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
+arma::fvec s;
+quadriga_lib::fast_asin(x, s);
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &s)
+{
+    const arma::uword n_val = x.n_elem;
+
+    if (s.n_elem != n_val)
+        s.set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict Xa = x.memptr();
+    float *__restrict Sa = s.memptr();
+
+    if (static_cast<const void *>(Xa) == static_cast<const void *>(Sa))
+        throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_ASIN_AVX2(Xa, Sa, bulk);
+        if (tail)
+            qd_ASIN_GENERIC(Xa + bulk, Sa + bulk, tail);
+    }
+    else
+    {
+        qd_ASIN_GENERIC(Xa, Sa, n_val);
+    }
+#else
+    qd_ASIN_GENERIC(Xa, Sa, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_asin(const arma::Col<float> &x, arma::fvec &s);
+template void quadriga_lib::fast_asin(const arma::Col<double> &x, arma::fvec &s);
+
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# fast_acos
+Fast, approximate arc-cosine
+
+## Description:
+Computes elementwise arc-cosine for an Armadillo vector. Designed for high throughput on modern CPUs.
+- Operates on input values in [-1, 1]
+- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Results are approximate and may differ from `std::acosf`
+- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
+- Input values outside [-1, 1] produce NaN (IEEE compliant)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+
+## Declaration:
+```
+void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
+void quadriga_lib::fast_acos(const arma::vec &x, arma::fvec &c);
+```
+
+## Arguments:
+- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
+  Input values in [-1, 1]. Length `[n]`.
+
+- `arma::fvec &**c**` (output)<br>
+  Set to `acos(x)`. Resized to length `n` if needed. Length `[n]`.
+
+## Example:
+```
+arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
+arma::fvec c;
+quadriga_lib::fast_acos(x, c);
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
+{
+    const arma::uword n_val = x.n_elem;
+
+    if (c.n_elem != n_val)
+        c.set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict Xa = x.memptr();
+    float *__restrict Ca = c.memptr();
+
+    if (static_cast<const void *>(Xa) == static_cast<const void *>(Ca))
+        throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_ACOS_AVX2(Xa, Ca, bulk);
+        if (tail)
+            qd_ACOS_GENERIC(Xa + bulk, Ca + bulk, tail);
+    }
+    else
+    {
+        qd_ACOS_GENERIC(Xa, Ca, n_val);
+    }
+#else
+    qd_ACOS_GENERIC(Xa, Ca, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_acos(const arma::Col<float> &x, arma::fvec &c);
+template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,5 +40,15 @@ template <typename dtype> // float or double
 void qd_COS_AVX2(const dtype *__restrict x,
                  float *__restrict c,
                  size_t n_val); // multiple of 8
+
+template <typename dtype> // float or double
+void qd_ASIN_AVX2(const dtype *__restrict x,
+                  float *__restrict s,
+                  size_t n_val); // multiple of 8
+
+template <typename dtype> // float or double
+void qd_ACOS_AVX2(const dtype *__restrict x,
+                  float *__restrict c,
+                  size_t n_val); // multiple of 8
 
 #endif

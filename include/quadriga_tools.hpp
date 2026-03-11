@@ -176,6 +176,30 @@ namespace quadriga_lib
                      arma::fvec *s = nullptr,   // [out] If non-null, set to sin(x). Resized to length n if needed
                      arma::fvec *c = nullptr);  // [out] If non-null, set to cos(x). Resized to length n if needed
 
+    // Fast, approximate arc-sine for single-precision vectors
+    // - Computes asin(x) for all elements of an Armadillo vector
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Results are approximate and may differ from std::asinf
+    // - For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
+    // - Input values outside [-1, 1] produce NaN (IEEE compliant)
+    // - Fallback to std::asinf if compiled without AVX2 (or running with non-AVX2 CPU)
+    template <typename dtype>
+    void fast_asin(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
+                   arma::fvec &s);            // [out] Set to asin(x). Resized to length n if needed
+
+    // Fast, approximate arc-cosine for single-precision vectors
+    // - Computes acos(x) for all elements of an Armadillo vector
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Results are approximate and may differ from std::acosf
+    // - For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
+    // - Input values outside [-1, 1] produce NaN (IEEE compliant)
+    // - Fallback to std::acosf if compiled without AVX2 (or running with non-AVX2 CPU)
+    template <typename dtype>
+    void fast_acos(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
+                   arma::fvec &c);            // [out] Set to acos(x). Resized to length n if needed
+
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
     template <typename dtype>
