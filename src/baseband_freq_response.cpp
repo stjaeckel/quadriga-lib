@@ -16,6 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_channel.hpp"
+#include "slerp.h"
 
 #if defined(_MSC_VER) // Windows
 #include <malloc.h>   // Include for _aligned_malloc and _aligned_free
@@ -549,6 +550,11 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     if (delay.size() != n_freq_in)
         throw std::invalid_argument("Length of 'delay' must match length of 'freq_in'.");
 
+    // Verify that freq_in is sorted in strictly ascending order
+    for (size_t f = 1; f < n_freq_in; ++f)
+        if (freq_in[f] <= freq_in[f - 1])
+            throw std::invalid_argument("Input 'freq_in' must be sorted in strictly ascending order.");
+
     // Get dimensions from first element
     arma::uword n_rx = coeff_re[0].n_rows;
     arma::uword n_tx = coeff_re[0].n_cols;
@@ -677,12 +683,12 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
 
     // --- SLERP + accumulate core ---
     // For each antenna pair and path:
-    //   1. Extract n_freq_in complex coefficient samples, compute magnitude and unwrapped phase
-    //   2. For each output carrier: SLERP-interpolate magnitude and phase, combine with delay phase,
-    //      and accumulate into output
+    //   1. Extract n_freq_in complex envelope samples (with delay phase removed if requested)
+    //   2. For each output carrier: SLERP-interpolate between bracketing envelope samples,
+    //      apply delay phase, and accumulate into output
 
-    // Working buffers for one path's coefficient samples across input frequencies
-    std::vector<double> mag_buf(n_freq_in), phi_buf(n_freq_in);
+    // Working buffer for one path's envelope samples across input frequencies
+    std::vector<double> env_re(n_freq_in), env_im(n_freq_in);
 
     for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
     {
@@ -696,7 +702,7 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
             // Get delay for this path/antenna pair (needed before coefficient extraction for phase undo)
             double dl = planar_wave ? (double)p_delay[i_path] : (double)p_delay[idx];
 
-            // --- Extract coefficient samples and convert to magnitude + phase ---
+            // --- Extract coefficient samples as complex envelope ---
             // If remove_delay_phase is enabled, undo the baked-in exp(-j*2*pi*freq_in[f]*delay)
             // by multiplying with exp(+j*2*pi*freq_in[f]*delay) to recover the slowly-varying envelope
             for (size_t f = 0; f < n_freq_in; ++f)
@@ -715,46 +721,34 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                     im = im_env;
                 }
 
-                mag_buf[f] = std::sqrt(re * re + im * im);
-                phi_buf[f] = std::atan2(im, re);
+                env_re[f] = re;
+                env_im[f] = im;
             }
 
-            // --- Phase unwrapping ---
-            // Ensure adjacent phase differences are in (-pi, pi] for correct interpolation
-            for (size_t f = 1; f < n_freq_in; ++f)
-            {
-                double d = phi_buf[f] - phi_buf[f - 1];
-                while (d > 3.141592653589793)
-                    d -= 6.283185307179586;
-                while (d < -3.141592653589793)
-                    d += 6.283185307179586;
-                phi_buf[f] = phi_buf[f - 1] + d;
-            }
-
-            // --- Interpolate and accumulate for each output carrier ---
+            // --- SLERP interpolate and accumulate for each output carrier ---
             for (size_t k = 0; k < n_carrier; ++k)
             {
-                // SLERP: linear interpolation of magnitude and unwrapped phase
-                double mag_k, phi_k;
+                double int_re, int_im;
                 if (n_freq_in == 1)
                 {
-                    mag_k = mag_buf[0];
-                    phi_k = phi_buf[0];
+                    int_re = env_re[0];
+                    int_im = env_im[0];
                 }
                 else
                 {
                     size_t s = seg[k];
                     double t = frac[k];
-                    mag_k = (1.0 - t) * mag_buf[s] + t * mag_buf[s + 1];
-                    phi_k = (1.0 - t) * phi_buf[s] + t * phi_buf[s + 1];
+                    slerp_complex_mf<double>(env_re[s], env_im[s], env_re[s + 1], env_im[s + 1], t, int_re, int_im);
                 }
 
-                // Combined phase: envelope phase + delay phase
-                // phasor[k] = -2 * pi * freq_out[k], so total_phase = phi_k - 2*pi*f*tau
-                double total_phase = phi_k + phasor[k] * dl;
+                // Apply delay phase: multiply envelope by exp(-j*2*pi*freq_out[k]*delay)
+                // phasor[k] = -2 * pi * freq_out[k], so phase = phasor[k] * dl
+                double delay_phase = phasor[k] * dl;
+                double c_dl = std::cos(delay_phase);
+                double s_dl = std::sin(delay_phase);
 
-                Hr[k] += mag_k * std::cos(total_phase);
-                Hi[k] += mag_k * std::sin(total_phase);
+                Hr[k] += int_re * c_dl - int_im * s_dl;
+                Hi[k] += int_re * s_dl + int_im * c_dl;
             }
         }
 

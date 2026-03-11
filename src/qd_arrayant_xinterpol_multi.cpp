@@ -24,69 +24,11 @@
 #include <cmath>
 #include <algorithm>
 
+#include "slerp.h"
+
 /*!SECTION
 Array antenna functions
 SECTION!*/
-
-// Spherical interpolation with mixed-mode / linear fallback for a single complex value pair
-// Same algorithm as used in qd_arrayant_interpolate for spatial grid interpolation
-template <typename dtype>
-static inline void slerp_complex(dtype fAr, dtype fAi, dtype fBr, dtype fBi, dtype w,
-                                 dtype &fXr, dtype &fXi)
-{
-    constexpr dtype one = dtype(1.0), neg_one = dtype(-1.0), zero = dtype(0.0),
-                    tL = dtype(-0.999), tS = dtype(-0.99), dT = one / (tS - tL);
-    const dtype R0 = std::numeric_limits<dtype>::epsilon() * std::numeric_limits<dtype>::epsilon() * std::numeric_limits<dtype>::epsilon();
-    const dtype R1 = std::numeric_limits<dtype>::epsilon();
-
-    dtype wp = w, wn = one - w;
-
-    dtype ampA = std::sqrt(fAr * fAr + fAi * fAi);
-    dtype ampB = std::sqrt(fBr * fBr + fBi * fBi);
-
-    // Normalize to get phase unit vectors
-    dtype gAr = one / ampA, gBr = one / ampB;
-    dtype gAi = fAi * gAr, gBi = fBi * gBr;
-    gAr = fAr * gAr;
-    gBr = fBr * gBr;
-
-    dtype cPhase = (ampA < R1 || ampB < R1) ? neg_one : gAr * gBr + gAi * gBi;
-    bool linear_int = cPhase < tS;
-
-    // Linear interpolation path
-    dtype fLr = zero, fLi = zero;
-    if (linear_int)
-        fLr = wn * fAr + wp * fBr, fLi = wn * fAi + wp * fBi;
-
-    // Spherical interpolation path
-    if (cPhase > tL)
-    {
-        dtype Phase = (cPhase >= one) ? R0 : std::acos(cPhase) + R0;
-        dtype sPhase = one / std::sin(Phase);
-        dtype swp = std::sin(wp * Phase) * sPhase;
-        dtype swn = std::sin(wn * Phase) * sPhase;
-        dtype gXr = swn * gAr + swp * gBr;
-        dtype gXi = swn * gAi + swp * gBi;
-        dtype ampX = wn * ampA + wp * ampB;
-
-        if (linear_int) // Mixed mode
-        {
-            dtype mw = (tS - cPhase) * dT, mwn = one - mw;
-            fXr = mwn * gXr * ampX + mw * fLr;
-            fXi = mwn * gXi * ampX + mw * fLi;
-        }
-        else
-        {
-            fXr = gXr * ampX;
-            fXi = gXi * ampX;
-        }
-    }
-    else
-    {
-        fXr = fLr;
-        fXi = fLi;
-    }
-}
 
 /*!MD
 # arrayant_interpolate_multi
@@ -446,10 +388,8 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<quadriga_lib::ar
 
             for (arma::uword j = 0; j < n_vals; ++j)
             {
-                slerp_complex(pVr_lo[j], pVi_lo[j], pVr_hi[j], pVi_hi[j], w,
-                              pVr_out[j], pVi_out[j]);
-                slerp_complex(pHr_lo[j], pHi_lo[j], pHr_hi[j], pHi_hi[j], w,
-                              pHr_out[j], pHi_out[j]);
+                slerp_complex_mf(pVr_lo[j], pVi_lo[j], pVr_hi[j], pVi_hi[j], w, pVr_out[j], pVi_out[j]);
+                slerp_complex_mf(pHr_lo[j], pHi_lo[j], pHr_hi[j], pHi_hi[j], w, pHr_out[j], pHi_out[j]);
             }
         }
     }
