@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,6 +57,7 @@
 #include "catch2_tests/test_calc_cross_polarization_ratio.cpp"
 #include "catch2_tests/test_quantize_delays.cpp"
 #include "catch2_tests/test_baseband_freq_response_multi.cpp"
+#include "catch2_tests/test_fast_asincos.cpp"
 
 // Main function to run CATCH2
 int main(int argc, char *argv[])

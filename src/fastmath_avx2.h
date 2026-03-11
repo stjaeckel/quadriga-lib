@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *_
     x = _mm256_fmadd_ps(y, DP3, x);
 
     // Common powers
-    __m256 z = _mm256_mul_ps(x, x);
+    __m256 z = _mm256_mul_ps(x, x); 
     __m256 z2 = _mm256_mul_ps(z, z);
 
     // -------- Estrin: SIN --------
@@ -106,6 +106,127 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *_
     sign_bit_sin = _mm256_xor_ps(sign_bit_sin, swap_sin);
     *s = _mm256_xor_ps(sin_approx, sign_bit_sin);
     *c = _mm256_xor_ps(cos_approx, sign_bit_cos);
+}
+
+// AVX2 accelerated arc-sine (single precision, full [-1, 1] domain)
+// Uses Cephes-style rational polynomial with half-angle identity for |x| > 0.5
+// Max error: ~2 ULP
+static inline __m256 _fm256_asin256_ps(__m256 x)
+{
+    // Constants
+    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+    const __m256 abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 two = _mm256_set1_ps(2.0f);
+    const __m256 pio2 = _mm256_set1_ps(1.5707963267948966f); // pi/2
+
+    // Cephes single-precision asin polynomial coefficients (degree-5 on x^2)
+    // asin(x) ≈ x + x^3 * P(x^2)
+    const __m256 P0 = _mm256_set1_ps(4.2163199048E-2f);
+    const __m256 P1 = _mm256_set1_ps(2.4181311049E-2f);
+    const __m256 P2 = _mm256_set1_ps(4.5470025998E-2f);
+    const __m256 P3 = _mm256_set1_ps(7.4953002686E-2f);
+    const __m256 P4 = _mm256_set1_ps(1.6666752422E-1f);
+
+    // Extract sign and compute |x|
+    __m256 sign = _mm256_and_ps(x, sign_mask);
+    __m256 ax = _mm256_and_ps(x, abs_mask);
+
+    // Region selection: mask is all-ones where |x| > 0.5
+    __m256 big = _mm256_cmp_ps(ax, half, _CMP_GT_OQ);
+
+    // Region A (|x| <= 0.5): u = x^2,    base = |x|
+    // Region B (|x| >  0.5): u = (1-|x|)/2, base = sqrt(u)
+    __m256 uA = _mm256_mul_ps(ax, ax);
+    __m256 uB = _mm256_mul_ps(_mm256_sub_ps(one, ax), half);
+    __m256 u = _mm256_blendv_ps(uA, uB, big);
+
+    __m256 base_B = _mm256_sqrt_ps(u);
+    __m256 base = _mm256_blendv_ps(ax, base_B, big);
+
+    // Evaluate P(u) = P0*u^4 + P1*u^3 + P2*u^2 + P3*u + P4  (Cephes degree-4)
+    // Estrin decomposition: (P0*u^2 + P1*u + P2)*u^2 + (P3*u + P4)
+    //   level 0: t0 = P0*u + P1,  t1 = P3*u + P4  (parallel)
+    //   level 1: t2 = t0*u + P2                     (serial on t0)
+    //   level 2: poly = t2*u^2 + t1                  (serial on t2, uses t1)
+    __m256 u2 = _mm256_mul_ps(u, u);
+    __m256 t0 = _mm256_fmadd_ps(P0, u, P1);  // P0*u + P1
+    __m256 t1 = _mm256_fmadd_ps(P3, u, P4);  // P3*u + P4
+    __m256 t2 = _mm256_fmadd_ps(t0, u, P2);  // (P0*u + P1)*u + P2
+    __m256 poly = _mm256_fmadd_ps(t2, u2, t1); // t2*u^2 + t1
+
+    // r = base + base * u * poly  =  base * (1 + u * poly)
+    __m256 r = _mm256_fmadd_ps(_mm256_mul_ps(base, u), poly, base);
+
+    // Reconstruction
+    // Region A: asin = r           (with original sign)
+    // Region B: asin = pi/2 - 2*r  (with original sign)
+    __m256 rB = _mm256_fnmadd_ps(two, r, pio2); // pi/2 - 2*r
+    __m256 result = _mm256_blendv_ps(r, rB, big);
+
+    // Restore sign
+    return _mm256_or_ps(result, sign);
+}
+
+// AVX2 accelerated arc-cosine (single precision)
+// Thin wrapper: acos(x) = pi/2 - asin(x)
+static inline __m256 _fm256_acos256_ps(__m256 x)
+{
+    // Constants
+    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+    const __m256 abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 half = _mm256_set1_ps(0.5f);
+    const __m256 two = _mm256_set1_ps(2.0f);
+    const __m256 pio2 = _mm256_set1_ps(1.5707963267948966f); // pi/2
+    const __m256 pi = _mm256_set1_ps(3.14159265358979323846f);
+
+    // Same Cephes polynomial coefficients as asin
+    const __m256 P0 = _mm256_set1_ps(4.2163199048E-2f);
+    const __m256 P1 = _mm256_set1_ps(2.4181311049E-2f);
+    const __m256 P2 = _mm256_set1_ps(4.5470025998E-2f);
+    const __m256 P3 = _mm256_set1_ps(7.4953002686E-2f);
+    const __m256 P4 = _mm256_set1_ps(1.6666752422E-1f);
+
+    // Sign and |x|
+    __m256 sign = _mm256_and_ps(x, sign_mask);
+    __m256 ax = _mm256_and_ps(x, abs_mask);
+
+    // Region selection mask: true where |x| > 0.5
+    __m256 big = _mm256_cmp_ps(ax, half, _CMP_GT_OQ);
+
+    // Region A: u = x^2,         base = |x|
+    // Region B: u = (1-|x|)/2,   base = sqrt(u)
+    __m256 uA = _mm256_mul_ps(ax, ax);
+    __m256 uB = _mm256_mul_ps(_mm256_sub_ps(one, ax), half);
+    __m256 u = _mm256_blendv_ps(uA, uB, big);
+
+    __m256 base_B = _mm256_sqrt_ps(u);
+    __m256 base = _mm256_blendv_ps(ax, base_B, big);
+
+    // Same polynomial: P(u) = P0*u^4 + P1*u^3 + P2*u^2 + P3*u + P4
+    __m256 u2 = _mm256_mul_ps(u, u);
+    __m256 t0 = _mm256_fmadd_ps(P0, u, P1);
+    __m256 t1 = _mm256_fmadd_ps(P3, u, P4);
+    __m256 t2 = _mm256_fmadd_ps(t0, u, P2);
+    __m256 poly = _mm256_fmadd_ps(t2, u2, t1);
+
+    // r = base + base * u * poly  (core asin approximation on reduced argument)
+    __m256 r = _mm256_fmadd_ps(_mm256_mul_ps(base, u), poly, base);
+
+    // Reconstruction (avoids catastrophic cancellation near |x| → 1):
+    //   Region A:          acos(x) = pi/2 - r  (with sign of x applied to r)
+    //   Region B, x > 0:   acos(x) = 2*r
+    //   Region B, x < 0:   acos(x) = pi - 2*r
+    __m256 neg = _mm256_cmp_ps(x, _mm256_setzero_ps(), _CMP_LT_OQ);
+
+    __m256 rA = _mm256_sub_ps(pio2, _mm256_or_ps(r, sign)); // pi/2 - (±r)
+    __m256 rB_pos = _mm256_mul_ps(two, r);                   // 2*r
+    __m256 rB_neg = _mm256_fnmadd_ps(two, r, pi);            // pi - 2*r
+    __m256 rB = _mm256_blendv_ps(rB_pos, rB_neg, neg);
+
+    return _mm256_blendv_ps(rA, rB, big);
 }
 
 #endif

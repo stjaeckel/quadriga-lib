@@ -151,3 +151,77 @@ void qd_COS_AVX2(const double *__restrict x,
         _mm256_storeu_ps(c + off, cv);
     }
 }
+
+template <> // float
+void qd_ASIN_AVX2(const float *__restrict x,
+                  float *__restrict s,
+                  size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 xv = _mm256_loadu_ps(x + off); // no alignment required
+        _mm256_storeu_ps(s + off, _fm256_asin256_ps(xv));
+    }
+}
+
+template <> // double
+void qd_ASIN_AVX2(const double *__restrict x,
+                  float *__restrict s,
+                  size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        const double *xp = x + off;            // 8 doubles
+        __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
+        __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
+        __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
+        __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
+        __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
+        _mm256_storeu_ps(s + off, _fm256_asin256_ps(xv));
+    }
+}
+
+template <> // float
+void qd_ACOS_AVX2(const float *__restrict x,
+                  float *__restrict c,
+                  size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 xv = _mm256_loadu_ps(x + off); // no alignment required
+        _mm256_storeu_ps(c + off, _fm256_acos256_ps(xv));
+    }
+}
+
+template <> // double
+void qd_ACOS_AVX2(const double *__restrict x,
+                  float *__restrict c,
+                  size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        const double *xp = x + off;            // 8 doubles
+        __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
+        __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
+        __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
+        __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
+        __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
+        _mm256_storeu_ps(c + off, _fm256_acos256_ps(xv));
+    }
+}
