@@ -28,6 +28,21 @@
 #include <limits.h>
 #include "slerp.h"
 
+// Scalar double-precision Cody–Waite range reduction: map x into [-pi, pi].
+// Two-constant split: CW_C1 + CW_C2 = 2*pi, with CW_C1 exactly representable.
+// Matches the AVX2 _fm256_range_reduce_2pi_pd helper.
+static const double QD_INV_TWO_PI = 0.15915494309189533577;  // 1 / (2*pi)
+static const double QD_CW_C1 = 6.28125;                     // high bits of 2*pi
+static const double QD_CW_C2 = 1.9353071795864769253e-03;   // 2*pi - CW_C1
+
+static inline double qd_range_reduce_2pi(double x)
+{
+    double n = round(x * QD_INV_TWO_PI);    // nearest integer multiple of 2*pi
+    x -= n * QD_CW_C1;                      // exact by Sterbenz when n*C1 ≈ x
+    x -= n * QD_CW_C2;                      // mop up low bits
+    return x;
+}
+
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
@@ -42,7 +57,7 @@ void qd_SINCOS_GENERIC(const dtype *__restrict x,
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_val_ll; ++i)
     {
-        const float xi = (float)x[i];
+        const float xi = (float)qd_range_reduce_2pi((double)x[i]);
         s[i] = sinf(xi);
         c[i] = cosf(xi);
     }
@@ -57,7 +72,7 @@ void qd_SIN_GENERIC(const dtype *__restrict x,
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_val_ll; ++i)
     {
-        const float xi = (float)x[i];
+        const float xi = (float)qd_range_reduce_2pi((double)x[i]);
         s[i] = sinf(xi);
     }
 }
@@ -71,7 +86,7 @@ void qd_COS_GENERIC(const dtype *__restrict x,
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_val_ll; ++i)
     {
-        const float xi = (float)x[i];
+        const float xi = (float)qd_range_reduce_2pi((double)x[i]);
         c[i] = cosf(xi);
     }
 }

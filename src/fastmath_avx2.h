@@ -246,7 +246,6 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
                                            __m256 *__restrict Xr, __m256 *__restrict Xi)
 {
     // ---- Constants ----
-    const __m256 zero = _mm256_setzero_ps();
     const __m256 one = _mm256_set1_ps(1.0f);
     const __m256 neg_one = _mm256_set1_ps(-1.0f);
 

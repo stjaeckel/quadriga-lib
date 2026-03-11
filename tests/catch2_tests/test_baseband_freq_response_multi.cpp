@@ -255,8 +255,8 @@ TEST_CASE("baseband_freq_response_multi - Single freq, single path, zero delay, 
 
     for (arma::uword k = 0; k < 3; ++k)
     {
-        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-12);
-        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-12);
+        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-7);
+        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-7);
     }
 }
 
@@ -288,8 +288,8 @@ TEST_CASE("baseband_freq_response_multi - Single freq, nonzero delay, no phase r
         double expected_phase = -6.283185307179586 * f * tau_val;
         double expected_re = amp * std::cos(expected_phase);
         double expected_im = amp * std::sin(expected_phase);
-        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-10);
-        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-10);
+        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-7);
+        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-7);
     }
 }
 
@@ -326,8 +326,8 @@ TEST_CASE("baseband_freq_response_multi - Two-path superposition, no phase remov
         double phase2 = -6.283185307179586 * f * tau2;
         double expected_re = A1 * std::cos(phase1) + A2 * std::cos(phase2);
         double expected_im = A1 * std::sin(phase1) + A2 * std::sin(phase2);
-        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-10);
-        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-10);
+        CHECK(std::abs(Hr(0, 0, k) - expected_re) < 1e-7);
+        CHECK(std::abs(Hi(0, 0, k) - expected_im) < 1e-7);
     }
 }
 
@@ -363,8 +363,8 @@ TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phas
     {
         double t = (freq_out(k) - 1.0e9) / 1.0e9;
         double expected_mag = 1.0 + t * 2.0;
-        CHECK(std::abs(Hr(0, 0, k) - expected_mag) < 1e-10);
-        CHECK(std::abs(Hi(0, 0, k)) < 1e-10);
+        CHECK(std::abs(Hr(0, 0, k) - expected_mag) < 1e-7);
+        CHECK(std::abs(Hi(0, 0, k)) < 1e-7);
     }
 }
 
@@ -396,15 +396,15 @@ TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input r
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Below range: clamped to 1.0
-    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-7);
     // At 1 GHz: exactly 1.0
-    CHECK(std::abs(Hr(0, 0, 1) - 1.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 1) - 1.0) < 1e-7);
     // At 1.5 GHz: interpolated to 1.5
-    CHECK(std::abs(Hr(0, 0, 2) - 1.5) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 2) - 1.5) < 1e-7);
     // At 2 GHz: exactly 2.0
-    CHECK(std::abs(Hr(0, 0, 3) - 2.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 3) - 2.0) < 1e-7);
     // Above range: clamped to 2.0
-    CHECK(std::abs(Hr(0, 0, 4) - 2.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 4) - 2.0) < 1e-7);
 }
 
 // ================================================================================================
@@ -445,8 +445,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase correctness")
     REQUIRE(Hr_test.n_slices == 32);
     for (arma::uword k = 0; k < 32; ++k)
     {
-        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-10);
-        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-10);
+        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-7);
+        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-7);
     }
 }
 
@@ -506,8 +506,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase multi-path")
 
     for (arma::uword k = 0; k < freq_out.n_elem; ++k)
     {
-        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-9);
-        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-9);
+        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-7);
+        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-7);
     }
 }
 
@@ -556,8 +556,8 @@ TEST_CASE("baseband_freq_response_multi - Phase unwrapping across pi boundary")
     double expected_re = amp * std::cos(mid_phase);
     double expected_im = amp * std::sin(mid_phase);
 
-    CHECK(std::abs(Hr(0, 0, 0) - expected_re) < 1e-10);
-    CHECK(std::abs(Hi(0, 0, 0) - expected_im) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 0) - expected_re) < 1e-7);
+    CHECK(std::abs(Hi(0, 0, 0) - expected_im) < 1e-7);
 
     // The result should be near phase = pi, i.e. Re ≈ -1.0
     CHECK(Hr(0, 0, 0) < -0.99);
@@ -598,12 +598,12 @@ TEST_CASE("baseband_freq_response_multi - Spherical wave delays")
         double f = freq_out(k);
 
         double phase0 = -6.283185307179586 * f * tau_rx0;
-        CHECK(std::abs(Hr(0, 0, k) - std::cos(phase0)) < 1e-10);
-        CHECK(std::abs(Hi(0, 0, k) - std::sin(phase0)) < 1e-10);
+        CHECK(std::abs(Hr(0, 0, k) - std::cos(phase0)) < 1e-7);
+        CHECK(std::abs(Hi(0, 0, k) - std::sin(phase0)) < 1e-7);
 
         double phase1 = -6.283185307179586 * f * tau_rx1;
-        CHECK(std::abs(Hr(1, 0, k) - std::cos(phase1)) < 1e-10);
-        CHECK(std::abs(Hi(1, 0, k) - std::sin(phase1)) < 1e-10);
+        CHECK(std::abs(Hr(1, 0, k) - std::cos(phase1)) < 1e-7);
+        CHECK(std::abs(Hi(1, 0, k) - std::sin(phase1)) < 1e-7);
     }
 }
 
@@ -638,10 +638,10 @@ TEST_CASE("baseband_freq_response_multi - 2x2 MIMO")
     REQUIRE(Hr.n_cols == 2);
     REQUIRE(Hr.n_slices == 1);
 
-    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-12);
-    CHECK(std::abs(Hr(1, 0, 0) - 2.0) < 1e-12);
-    CHECK(std::abs(Hr(0, 1, 0) - 3.0) < 1e-12);
-    CHECK(std::abs(Hr(1, 1, 0) - 4.0) < 1e-12);
+    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-7);
+    CHECK(std::abs(Hr(1, 0, 0) - 2.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 1, 0) - 3.0) < 1e-7);
+    CHECK(std::abs(Hr(1, 1, 0) - 4.0) < 1e-7);
 }
 
 // ================================================================================================
@@ -674,8 +674,8 @@ TEST_CASE("baseband_freq_response_multi - Complex output consistency")
     REQUIRE(Hc.n_slices == 8);
     for (arma::uword k = 0; k < 8; ++k)
     {
-        CHECK(std::abs(Hc(0, 0, k).real() - Hr(0, 0, k)) < 1e-12);
-        CHECK(std::abs(Hc(0, 0, k).imag() - Hi(0, 0, k)) < 1e-12);
+        CHECK(std::abs(Hc(0, 0, k).real() - Hr(0, 0, k)) < 1e-7);
+        CHECK(std::abs(Hc(0, 0, k).imag() - Hi(0, 0, k)) < 1e-7);
     }
 }
 
@@ -699,7 +699,7 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
                                                    (arma::Cube<double> *)nullptr,
                                                    (arma::Cube<std::complex<double>> *)nullptr, false);
         REQUIRE(Hr.n_slices == 1);
-        CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-12);
+        CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-7);
     }
 
     // Only hmat_im
@@ -709,7 +709,7 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
                                                    (arma::Cube<double> *)nullptr, &Hi,
                                                    (arma::Cube<std::complex<double>> *)nullptr, false);
         REQUIRE(Hi.n_slices == 1);
-        CHECK(std::abs(Hi(0, 0, 0)) < 1e-12);
+        CHECK(std::abs(Hi(0, 0, 0)) < 1e-7);
     }
 
     // Only hmat (complex)
@@ -719,8 +719,8 @@ TEST_CASE("baseband_freq_response_multi - Selective output pointers")
                                                    (arma::Cube<double> *)nullptr,
                                                    (arma::Cube<double> *)nullptr, &Hc, false);
         REQUIRE(Hc.n_slices == 1);
-        CHECK(std::abs(Hc(0, 0, 0).real() - 1.0) < 1e-12);
-        CHECK(std::abs(Hc(0, 0, 0).imag()) < 1e-12);
+        CHECK(std::abs(Hc(0, 0, 0).real() - 1.0) < 1e-7);
+        CHECK(std::abs(Hc(0, 0, 0).imag()) < 1e-7);
     }
 }
 
@@ -784,13 +784,13 @@ TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selec
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // At 1.5 GHz: first segment, t=0.5, mag = 1.0 + 0.5*2.0 = 2.0
-    CHECK(std::abs(Hr(0, 0, 0) - 2.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 0) - 2.0) < 1e-7);
 
     // At 2.0 GHz: boundary, t=1.0 in first segment, mag = 3.0
-    CHECK(std::abs(Hr(0, 0, 1) - 3.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 1) - 3.0) < 1e-7);
 
     // At 3.0 GHz: second segment [2.0, 4.0], t=0.5, mag = 3.0 + 0.5*4.0 = 5.0
-    CHECK(std::abs(Hr(0, 0, 2) - 5.0) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 2) - 5.0) < 1e-7);
 }
 
 // ================================================================================================
@@ -920,8 +920,8 @@ TEST_CASE("baseband_freq_response_multi - remove_delay_phase with spherical dela
     for (arma::uword k = 0; k < freq_out.n_elem; ++k)
         for (arma::uword r = 0; r < n_rx; ++r)
         {
-            CHECK(std::abs(Hr_test(r, 0, k) - Hr_ref(r, 0, k)) < 1e-9);
-            CHECK(std::abs(Hi_test(r, 0, k) - Hi_ref(r, 0, k)) < 1e-9);
+            CHECK(std::abs(Hr_test(r, 0, k) - Hr_ref(r, 0, k)) < 1e-7);
+            CHECK(std::abs(Hi_test(r, 0, k) - Hi_ref(r, 0, k)) < 1e-7);
         }
 }
 
@@ -974,9 +974,9 @@ TEST_CASE("baseband_freq_response_multi - Frequency-dependent envelope with bake
     {
         double power_ref = Hr_ref(0, 0, k) * Hr_ref(0, 0, k) + Hi_ref(0, 0, k) * Hi_ref(0, 0, k);
         double power_test = Hr_test(0, 0, k) * Hr_test(0, 0, k) + Hi_test(0, 0, k) * Hi_test(0, 0, k);
-        CHECK(std::abs(power_ref - power_test) / (power_ref + 1e-30) < 1e-10);
-        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-9);
-        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-9);
+        CHECK(std::abs(power_ref - power_test) / (power_ref + 1e-30) < 1e-7);
+        CHECK(std::abs(Hr_test(0, 0, k) - Hr_ref(0, 0, k)) < 1e-7);
+        CHECK(std::abs(Hi_test(0, 0, k) - Hi_ref(0, 0, k)) < 1e-7);
     }
 }
 
@@ -1043,7 +1043,7 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     for (arma::uword k = 0; k < freq_out.n_elem; ++k)
     {
         double power = Hr(0, 0, k) * Hr(0, 0, k) + Hi(0, 0, k) * Hi(0, 0, k);
-        CHECK(std::abs(power - 1.0) < 1e-10);
+        CHECK(std::abs(power - 1.0) < 1e-7);
     }
 
     // Verify phase at exact input frequency matches expected value
@@ -1051,6 +1051,6 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     double expected_phase = -6.283185307179586 * 1000.0 * tau_val;
     double expected_re = std::cos(expected_phase);
     double expected_im = std::sin(expected_phase);
-    CHECK(std::abs(Hr(0, 0, 2) - expected_re) < 1e-10);
-    CHECK(std::abs(Hi(0, 0, 2) - expected_im) < 1e-10);
+    CHECK(std::abs(Hr(0, 0, 2) - expected_re) < 1e-7);
+    CHECK(std::abs(Hi(0, 0, 2) - expected_im) < 1e-7);
 }

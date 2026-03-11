@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_channel.hpp"
-#include "slerp.h"
+#include "quadriga_tools.hpp"
 
 #if defined(_MSC_VER) // Windows
 #include <malloc.h>   // Include for _aligned_malloc and _aligned_free
@@ -681,28 +681,80 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
     dtype *p_hmat_im = use_im ? hmat_im->memptr() : nullptr;
     std::complex<dtype> *p_hmat = use_cplx ? hmat->memptr() : nullptr;
 
-    // --- SLERP + accumulate core ---
-    // For each antenna pair and path:
-    //   1. Extract n_freq_in complex envelope samples (with delay phase removed if requested)
-    //   2. For each output carrier: SLERP-interpolate between bracketing envelope samples,
-    //      apply delay phase, and accumulate into output
+    // --- SLERP + accumulate core (vectorized) ---
+    // Loop order: path-outer, antenna-inner.
+    // For planar waves, the delay-phase sincos depends only on the path (not the antenna),
+    // so fast_sincos is called once per path and reused across all n_ant antenna pairs.
+    // For spherical waves, fast_sincos is called per (path, antenna) pair.
+    // SLERP interpolation is vectorized across all n_carrier output frequencies per call.
+    // Accumulators are kept in double precision to preserve summation accuracy across paths.
 
-    // Working buffer for one path's envelope samples across input frequencies
+    const arma::uword n_carrier_u = (arma::uword)n_carrier;
+
+    // Pre-build SLERP weight vector from fractional interpolation table (path/antenna-independent)
+    arma::Col<dtype> w_vec;
+    if (n_freq_in > 1)
+    {
+        w_vec.set_size(n_carrier_u);
+        dtype *pw = w_vec.memptr();
+        for (size_t k = 0; k < n_carrier; ++k)
+            pw[k] = (dtype)frac[k];
+    }
+
+    // Working buffers (allocated once, reused across iterations)
+    arma::dvec theta(n_carrier_u);       // delay-phase angles, double for range reduction
+    arma::fvec s_dl, c_dl;               // sincos output, single precision
+    arma::Col<dtype> slerp_Ar, slerp_Ai; // SLERP gather: left bracket
+    arma::Col<dtype> slerp_Br, slerp_Bi; // SLERP gather: right bracket
+    arma::fvec Xr, Xi;                   // SLERP output, single precision
+    if (n_freq_in > 1)
+    {
+        slerp_Ar.set_size(n_carrier_u);
+        slerp_Ai.set_size(n_carrier_u);
+        slerp_Br.set_size(n_carrier_u);
+        slerp_Bi.set_size(n_carrier_u);
+    }
+
+    // Envelope samples for one (antenna, path) pair across input frequencies
     std::vector<double> env_re(n_freq_in), env_im(n_freq_in);
 
-    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
-    {
-        // Initialize accumulators for this antenna pair
-        std::vector<double> Hr(n_carrier, 0.0), Hi(n_carrier, 0.0);
+    // Accumulators for all antenna pairs, flat layout [i_ant * n_carrier + k], double precision
+    std::vector<double> Hr(n_ant * n_carrier, 0.0), Hi(n_ant * n_carrier, 0.0);
 
-        for (size_t i_path = 0; i_path < n_path; ++i_path)
+    for (size_t i_path = 0; i_path < n_path; ++i_path)
+    {
+        // --- Planar wave: compute delay-phase sincos once per path ---
+        double dl_planar = 0.0;
+        if (planar_wave)
+        {
+            dl_planar = (double)p_delay[i_path];
+            double *p_theta = theta.memptr();
+            for (size_t k = 0; k < n_carrier; ++k)
+                p_theta[k] = phasor[k] * dl_planar;
+            quadriga_lib::fast_sincos(theta, &s_dl, &c_dl); // double input: range-reduced internally
+        }
+
+        for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
         {
             const size_t idx = i_path * n_ant + i_ant;
 
-            // Get delay for this path/antenna pair (needed before coefficient extraction for phase undo)
-            double dl = planar_wave ? (double)p_delay[i_path] : (double)p_delay[idx];
+            // --- Get delay for this path/antenna pair ---
+            double dl;
+            if (planar_wave)
+            {
+                dl = dl_planar;
+            }
+            else
+            {
+                dl = (double)p_delay[idx];
+                // Spherical wave: compute delay-phase sincos per (path, antenna)
+                double *p_theta = theta.memptr();
+                for (size_t k = 0; k < n_carrier; ++k)
+                    p_theta[k] = phasor[k] * dl;
+                quadriga_lib::fast_sincos(theta, &s_dl, &c_dl);
+            }
 
-            // --- Extract coefficient samples as complex envelope ---
+            // --- Extract coefficient envelope samples ---
             // If remove_delay_phase is enabled, undo the baked-in exp(-j*2*pi*freq_in[f]*delay)
             // by multiplying with exp(+j*2*pi*freq_in[f]*delay) to recover the slowly-varying envelope
             for (size_t f = 0; f < n_freq_in; ++f)
@@ -725,43 +777,68 @@ void quadriga_lib::baseband_freq_response_multi(const std::vector<arma::Cube<dty
                 env_im[f] = im;
             }
 
-            // --- SLERP interpolate and accumulate for each output carrier ---
+            // --- SLERP interpolation across output carriers ---
+            const float *pXr, *pXi;
+
+            if (n_freq_in == 1)
+            {
+                // No interpolation: broadcast the single envelope sample into Xr, Xi
+                Xr.set_size(n_carrier_u);
+                Xi.set_size(n_carrier_u);
+                Xr.fill((float)env_re[0]);
+                Xi.fill((float)env_im[0]);
+                pXr = Xr.memptr();
+                pXi = Xi.memptr();
+            }
+            else
+            {
+                // Gather SLERP bracket inputs from envelope via the segment table
+                dtype *pAr = slerp_Ar.memptr(), *pAi = slerp_Ai.memptr();
+                dtype *pBr = slerp_Br.memptr(), *pBi = slerp_Bi.memptr();
+                for (size_t k = 0; k < n_carrier; ++k)
+                {
+                    const size_t s = seg[k];
+                    pAr[k] = (dtype)env_re[s];
+                    pAi[k] = (dtype)env_im[s];
+                    pBr[k] = (dtype)env_re[s + 1];
+                    pBi[k] = (dtype)env_im[s + 1];
+                }
+
+                quadriga_lib::fast_slerp(slerp_Ar, slerp_Ai, slerp_Br, slerp_Bi, w_vec, Xr, Xi);
+                pXr = Xr.memptr();
+                pXi = Xi.memptr();
+            }
+
+            // --- Accumulate: interpolated envelope * exp(-j*2*pi*freq_out*delay) ---
+            // Cast float products to double before accumulating to preserve summation precision
+            const float *pC = c_dl.memptr(), *pS = s_dl.memptr();
+            double *pHr = &Hr[i_ant * n_carrier];
+            double *pHi = &Hi[i_ant * n_carrier];
+
             for (size_t k = 0; k < n_carrier; ++k)
             {
-                double int_re, int_im;
-                if (n_freq_in == 1)
-                {
-                    int_re = env_re[0];
-                    int_im = env_im[0];
-                }
-                else
-                {
-                    size_t s = seg[k];
-                    double t = frac[k];
-                    slerp_complex_mf<double>(env_re[s], env_im[s], env_re[s + 1], env_im[s + 1], t, int_re, int_im);
-                }
-
-                // Apply delay phase: multiply envelope by exp(-j*2*pi*freq_out[k]*delay)
-                // phasor[k] = -2 * pi * freq_out[k], so phase = phasor[k] * dl
-                double delay_phase = phasor[k] * dl;
-                double c_dl = std::cos(delay_phase);
-                double s_dl = std::sin(delay_phase);
-
-                Hr[k] += int_re * c_dl - int_im * s_dl;
-                Hi[k] += int_re * s_dl + int_im * c_dl;
+                const double xr = (double)pXr[k], xi = (double)pXi[k];
+                const double cd = (double)pC[k], sd = (double)pS[k];
+                pHr[k] += xr * cd - xi * sd;
+                pHi[k] += xr * sd + xi * cd;
             }
         }
+    }
 
-        // --- Write output for this antenna pair ---
+    // --- Write output for all antenna pairs ---
+    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
+    {
+        const double *pHr = &Hr[i_ant * n_carrier];
+        const double *pHi = &Hi[i_ant * n_carrier];
         for (size_t k = 0; k < n_carrier; ++k)
         {
-            size_t o = k * n_ant + i_ant; // Output index in column-major [n_rx, n_tx, n_carrier]
+            size_t o = k * n_ant + i_ant; // Column-major index [n_rx, n_tx, n_carrier]
             if (use_re)
-                p_hmat_re[o] = (dtype)Hr[k];
+                p_hmat_re[o] = (dtype)pHr[k];
             if (use_im)
-                p_hmat_im[o] = (dtype)Hi[k];
+                p_hmat_im[o] = (dtype)pHi[k];
             if (use_cplx)
-                p_hmat[o] = {(dtype)Hr[k], (dtype)Hi[k]};
+                p_hmat[o] = {(dtype)pHr[k], (dtype)pHi[k]};
         }
     }
 }
