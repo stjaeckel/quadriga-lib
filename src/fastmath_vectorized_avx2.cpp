@@ -225,3 +225,61 @@ void qd_ACOS_AVX2(const double *__restrict x,
         _mm256_storeu_ps(c + off, _fm256_acos256_ps(xv));
     }
 }
+
+template <> // float
+void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
+                    const float *__restrict Br, const float *__restrict Bi,
+                    const float *__restrict w,
+                    float *__restrict Xr, float *__restrict Xi,
+                    size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 vAr = _mm256_loadu_ps(Ar + off);
+        __m256 vAi = _mm256_loadu_ps(Ai + off);
+        __m256 vBr = _mm256_loadu_ps(Br + off);
+        __m256 vBi = _mm256_loadu_ps(Bi + off);
+        __m256 vw = _mm256_loadu_ps(w + off);
+        __m256 vXr, vXi;
+        _fm256_slerp_complex_ps(vAr, vAi, vBr, vBi, vw, &vXr, &vXi);
+        _mm256_storeu_ps(Xr + off, vXr);
+        _mm256_storeu_ps(Xi + off, vXi);
+    }
+}
+
+template <> // double
+void qd_SLERP_AVX2(const double *__restrict Ar, const double *__restrict Ai,
+                    const double *__restrict Br, const double *__restrict Bi,
+                    const double *__restrict w,
+                    float *__restrict Xr, float *__restrict Xi,
+                    size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+
+        // Load 8 doubles as two groups of 4, convert each to float, pack into __m256
+        __m256 vAr = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(Ar + off + 4)),
+                                     _mm256_cvtpd_ps(_mm256_loadu_pd(Ar + off)));
+        __m256 vAi = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(Ai + off + 4)),
+                                     _mm256_cvtpd_ps(_mm256_loadu_pd(Ai + off)));
+        __m256 vBr = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(Br + off + 4)),
+                                     _mm256_cvtpd_ps(_mm256_loadu_pd(Br + off)));
+        __m256 vBi = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(Bi + off + 4)),
+                                     _mm256_cvtpd_ps(_mm256_loadu_pd(Bi + off)));
+        __m256 vw = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(w + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(w + off)));
+
+        __m256 vXr, vXi;
+        _fm256_slerp_complex_ps(vAr, vAi, vBr, vBi, vw, &vXr, &vXi);
+        _mm256_storeu_ps(Xr + off, vXr);
+        _mm256_storeu_ps(Xi + off, vXi);
+    }
+}

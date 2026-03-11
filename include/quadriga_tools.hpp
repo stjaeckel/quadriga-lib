@@ -200,6 +200,24 @@ namespace quadriga_lib
     void fast_acos(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
                    arma::fvec &c);            // [out] Set to acos(x). Resized to length n if needed
 
+    // Fast, approximate spherical interpolation (SLERP) for complex value pairs
+    // - Interpolates between two complex-valued vectors using SLERP on normalized directions
+    //   and linear interpolation of amplitudes
+    // - Uses AVX2 to process 8 complex pairs per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Near-antipodal inputs (phase angle close to pi) smoothly transition to linear interpolation
+    // - Both amplitudes negligible → output is zero
+    // - Maximum error vs double-precision reference: ~100 ULP (~1.2e-5 relative, ~17.5 effective bits of 23)
+    // - Fallback to scalar slerp_complex_mf if compiled without AVX2 (or running with non-AVX2 CPU)
+    template <typename dtype>
+    void fast_slerp(const arma::Col<dtype> &Ar, // Real part of source A, Length [n]
+                    const arma::Col<dtype> &Ai, // Imaginary part of source A, Length [n]
+                    const arma::Col<dtype> &Br, // Real part of source B, Length [n]
+                    const arma::Col<dtype> &Bi, // Imaginary part of source B, Length [n]
+                    const arma::Col<dtype> &w,  // Per-element interpolation weight in [0,1], 0 = A, 1 = B, Length [n]
+                    arma::fvec &Xr,             // [out] Real part of interpolated result, Length [n]
+                    arma::fvec &Xi);            // [out] Imaginary part of interpolated result, Length [n]
+
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
     template <typename dtype>

@@ -26,6 +26,7 @@
 #include <math.h>
 #include <stddef.h>
 #include <limits.h>
+#include "slerp.h"
 
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
@@ -100,6 +101,26 @@ void qd_ACOS_GENERIC(const dtype *__restrict x,
     {
         const float xi = (float)x[i];
         c[i] = acosf(xi);
+    }
+}
+
+template <typename dtype>
+void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
+                       const dtype *__restrict Br, const dtype *__restrict Bi,
+                       const dtype *__restrict w,
+                       float *__restrict Xr, float *__restrict Xi,
+                       size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        float xr, xi;
+        slerp_complex_mf<float>((float)Ar[i], (float)Ai[i],
+                                (float)Br[i], (float)Bi[i],
+                                (float)w[i], xr, xi);
+        Xr[i] = xr;
+        Xi[i] = xi;
     }
 }
 

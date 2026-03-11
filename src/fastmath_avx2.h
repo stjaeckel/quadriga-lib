@@ -229,4 +229,145 @@ static inline __m256 _fm256_acos256_ps(__m256 x)
     return _mm256_blendv_ps(rA, rB, big);
 }
 
+// AVX2 accelerated spherical interpolation (SLERP) for complex value pairs
+// Processes 8 complex pairs simultaneously with per-lane interpolation weight.
+// Behaviour matches the scalar slerp_complex_mf<float> template exactly:
+//   - Spherical interpolation of normalised direction
+//   - Linear interpolation of amplitude
+//   - Smooth transition to linear fallback for near-antipodal directions
+//   - Zero output when both input amplitudes are negligible
+//
+// Parameters (all __m256, i.e. 8 lanes of float):
+//   Ar, Ai  – real/imag parts of source A
+//   Br, Bi  – real/imag parts of source B
+//   w       – interpolation weight per lane  (0 → A, 1 → B)
+//   Xr, Xi  – output real/imag parts (written via restrict pointer)
+static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m256 Bi, __m256 w,
+                                           __m256 *__restrict Xr, __m256 *__restrict Xi)
+{
+    // ---- Constants ----
+    const __m256 zero = _mm256_setzero_ps();
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 neg_one = _mm256_set1_ps(-1.0f);
+
+    // Guard constants matching the scalar implementation
+    // R0 = eps^3 ≈ 1.694066e-21  (prevents sin(Phase) == 0 in the denominator)
+    // R1 = eps   ≈ 1.192093e-7   (amplitude threshold for "tiny" vectors)
+    const __m256 R0 = _mm256_set1_ps(1.6940659e-21f);
+    const __m256 R1 = _mm256_set1_ps(1.1920929e-7f);
+
+    // Transition-zone boundaries: pure-linear below tL, spherical above tS
+    const __m256 tL = _mm256_set1_ps(-0.999f);
+    const __m256 tS = _mm256_set1_ps(-0.99f);
+    const __m256 dT = _mm256_set1_ps(1.0f / (-0.99f - (-0.999f))); // 1 / (tS - tL)
+
+    // ---- Weights ----
+    __m256 wB = w;
+    __m256 wA = _mm256_sub_ps(one, w);
+
+    // ---- Amplitudes ----
+    __m256 ampA = _mm256_sqrt_ps(_mm256_fmadd_ps(Ar, Ar, _mm256_mul_ps(Ai, Ai)));
+    __m256 ampB = _mm256_sqrt_ps(_mm256_fmadd_ps(Br, Br, _mm256_mul_ps(Bi, Bi)));
+
+    // ---- Tiny-amplitude masks ----
+    __m256 tinyA = _mm256_cmp_ps(ampA, R1, _CMP_LT_OQ);
+    __m256 tinyB = _mm256_cmp_ps(ampB, R1, _CMP_LT_OQ);
+    __m256 both_tiny = _mm256_and_ps(tinyA, tinyB);
+    __m256 either_tiny = _mm256_or_ps(tinyA, tinyB);
+
+    // ---- Normalise (safe division: replace tiny amplitudes with 1 to avoid 0/0) ----
+    __m256 inv_ampA = _mm256_div_ps(one, _mm256_blendv_ps(ampA, one, tinyA));
+    __m256 inv_ampB = _mm256_div_ps(one, _mm256_blendv_ps(ampB, one, tinyB));
+
+    // Normalised direction; zeroed where amplitude is tiny
+    __m256 gAr = _mm256_andnot_ps(tinyA, _mm256_mul_ps(Ar, inv_ampA));
+    __m256 gAi = _mm256_andnot_ps(tinyA, _mm256_mul_ps(Ai, inv_ampA));
+    __m256 gBr = _mm256_andnot_ps(tinyB, _mm256_mul_ps(Br, inv_ampB));
+    __m256 gBi = _mm256_andnot_ps(tinyB, _mm256_mul_ps(Bi, inv_ampB));
+
+    // ---- Cosine of phase angle between normalised directions ----
+    // Set to -1 if either amplitude is tiny (forces linear path)
+    __m256 cPhase = _mm256_fmadd_ps(gAr, gBr, _mm256_mul_ps(gAi, gBi));
+    cPhase = _mm256_blendv_ps(cPhase, neg_one, either_tiny);
+
+    // ---- Region masks ----
+    // linear_int: cPhase < tS  →  need linear result (pure linear or transition zone)
+    // do_slerp:   cPhase > tL  →  need spherical result (pure spherical or transition zone)
+    __m256 linear_int = _mm256_cmp_ps(cPhase, tS, _CMP_LT_OQ);
+    __m256 do_slerp = _mm256_cmp_ps(cPhase, tL, _CMP_GT_OQ);
+
+    // ---- Linear fallback (computed for all lanes, selected by mask later) ----
+    __m256 fXr = _mm256_fmadd_ps(wA, Ar, _mm256_mul_ps(wB, Br));
+    __m256 fXi = _mm256_fmadd_ps(wA, Ai, _mm256_mul_ps(wB, Bi));
+
+    // ---- Spherical path (computed for all lanes, selected by mask later) ----
+    // Clamp cPhase to [_, 1] to prevent NaN from acos receiving values > 1.0
+    // (no lower clamp needed: lanes with cPhase < tL are never used from slerp)
+    __m256 cPhase_clamped = _mm256_min_ps(cPhase, one);
+
+    // Phase angle with epsilon guard to keep sin(Phase) away from exact zero
+    __m256 Phase = _mm256_add_ps(_fm256_acos256_ps(cPhase_clamped), R0);
+
+    // 1 / sin(Phase)
+    __m256 sinPhase, cosPhase_unused;
+    _fm256_sincos256_ps(Phase, &sinPhase, &cosPhase_unused);
+    __m256 sPhase = _mm256_div_ps(one, sinPhase);
+
+    // SLERP weight factors: wp = sin(wB*Phase) / sin(Phase)
+    //                       wn = sin(wA*Phase) / sin(Phase)
+    __m256 sinWB, cosWB_unused, sinWA, cosWA_unused;
+    _fm256_sincos256_ps(_mm256_mul_ps(wB, Phase), &sinWB, &cosWB_unused);
+    _fm256_sincos256_ps(_mm256_mul_ps(wA, Phase), &sinWA, &cosWA_unused);
+
+    __m256 wp = _mm256_mul_ps(sinWB, sPhase);
+    __m256 wn = _mm256_mul_ps(sinWA, sPhase);
+
+    // Spherical interpolation of normalised direction
+    __m256 gXr = _mm256_fmadd_ps(wn, gAr, _mm256_mul_ps(wp, gBr));
+    __m256 gXi = _mm256_fmadd_ps(wn, gAi, _mm256_mul_ps(wp, gBi));
+
+    // Linear interpolation of amplitude
+    __m256 ampX = _mm256_fmadd_ps(wA, ampA, _mm256_mul_ps(wB, ampB));
+
+    // Pure spherical result = direction * amplitude
+    __m256 sXr = _mm256_mul_ps(gXr, ampX);
+    __m256 sXi = _mm256_mul_ps(gXi, ampX);
+
+    // ---- Transition-zone blending (tL < cPhase < tS) ----
+    // m = (tS - cPhase) / (tS - tL)  ∈ [0, 1],  n = 1 - m
+    // result = n * spherical + m * linear
+    __m256 m = _mm256_mul_ps(_mm256_sub_ps(tS, cPhase), dT);
+    __m256 n = _mm256_sub_ps(one, m);
+    __m256 tXr = _mm256_fmadd_ps(n, sXr, _mm256_mul_ps(m, fXr));
+    __m256 tXi = _mm256_fmadd_ps(n, sXi, _mm256_mul_ps(m, fXi));
+
+    // ---- Assemble results per region ----
+    // Regions are mutually exclusive:
+    //   cPhase >= tS              →  pure spherical    (do_slerp & !linear_int)
+    //   tL < cPhase < tS          →  transition blend  (do_slerp &  linear_int)
+    //   cPhase <= tL              →  pure linear       (!do_slerp, linear_int is always true here)
+    //   both amplitudes tiny      →  zero              (overrides everything)
+    __m256 transition = _mm256_and_ps(do_slerp, linear_int);
+    __m256 pure_slerp = _mm256_andnot_ps(linear_int, do_slerp);
+
+    // Start with linear result (covers the pure-linear region)
+    __m256 resXr = fXr;
+    __m256 resXi = fXi;
+
+    // Overwrite transition-zone lanes
+    resXr = _mm256_blendv_ps(resXr, tXr, transition);
+    resXi = _mm256_blendv_ps(resXi, tXi, transition);
+
+    // Overwrite pure-spherical lanes
+    resXr = _mm256_blendv_ps(resXr, sXr, pure_slerp);
+    resXi = _mm256_blendv_ps(resXi, sXi, pure_slerp);
+
+    // Zero out lanes where both amplitudes are negligible
+    resXr = _mm256_andnot_ps(both_tiny, resXr);
+    resXi = _mm256_andnot_ps(both_tiny, resXi);
+
+    *Xr = resXr;
+    *Xi = resXi;
+}
+
 #endif
