@@ -21,6 +21,21 @@
 #include <immintrin.h>
 #include <limits.h>
 
+// Double-precision Cody–Waite range reduction: map x into [-pi, pi].
+// Two-constant split: C1 + C2 = 2*pi, with C1 exactly representable.
+// The first FMA (x - n*C1) is exact by Sterbenz; the second mops up
+// the low bits. Result has full double precision before float conversion.
+static inline __m256d _fm256_range_reduce_2pi_pd(__m256d x)
+{
+    const __m256d INV_TWO_PI = _mm256_set1_pd(0.15915494309189533577); // 1 / (2*pi)
+    const __m256d CW_C1 = _mm256_set1_pd(6.28125);                     // high bits of 2*pi
+    const __m256d CW_C2 = _mm256_set1_pd(1.9353071795864769253e-03);   // 2*pi - C1
+    __m256d n = _mm256_round_pd(_mm256_mul_pd(x, INV_TWO_PI), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
+    x = _mm256_fnmadd_pd(n, CW_C1, x); // x -= n * C1
+    x = _mm256_fnmadd_pd(n, CW_C2, x); // x -= n * C2
+    return x;
+}
+
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
@@ -60,6 +75,8 @@ void qd_SINCOS_AVX2(const double *__restrict x,
         const double *xp = x + off;            // 8 doubles
         __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
         __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
+        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
+        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
         __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
         __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
         __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
@@ -102,6 +119,8 @@ void qd_SIN_AVX2(const double *__restrict x,
         const double *xp = x + off;            // 8 doubles
         __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
         __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
+        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
+        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
         __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
         __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
         __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
@@ -143,6 +162,8 @@ void qd_COS_AVX2(const double *__restrict x,
         const double *xp = x + off;            // 8 doubles
         __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
         __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
+        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
+        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
         __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
         __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
         __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
@@ -228,10 +249,10 @@ void qd_ACOS_AVX2(const double *__restrict x,
 
 template <> // float
 void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
-                    const float *__restrict Br, const float *__restrict Bi,
-                    const float *__restrict w,
-                    float *__restrict Xr, float *__restrict Xi,
-                    size_t n_val) // multiple of 8
+                   const float *__restrict Br, const float *__restrict Bi,
+                   const float *__restrict w,
+                   float *__restrict Xr, float *__restrict Xi,
+                   size_t n_val) // multiple of 8
 {
     const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
 
@@ -253,10 +274,10 @@ void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
 
 template <> // double
 void qd_SLERP_AVX2(const double *__restrict Ar, const double *__restrict Ai,
-                    const double *__restrict Br, const double *__restrict Bi,
-                    const double *__restrict w,
-                    float *__restrict Xr, float *__restrict Xi,
-                    size_t n_val) // multiple of 8
+                   const double *__restrict Br, const double *__restrict Bi,
+                   const double *__restrict w,
+                   float *__restrict Xr, float *__restrict Xi,
+                   size_t n_val) // multiple of 8
 {
     const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
 
