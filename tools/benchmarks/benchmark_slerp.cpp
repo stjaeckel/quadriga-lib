@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cstdio>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 
 // Scalar reference for comparison (bypasses AVX2 entirely)
 #include "slerp.h"
@@ -14,6 +16,20 @@ static double now_ms()
     return std::chrono::duration<double, std::milli>(
                std::chrono::high_resolution_clock::now().time_since_epoch())
         .count();
+}
+
+// ULP distance between two floats (sign-magnitude aware)
+static int32_t ulp_dist(float a, float b)
+{
+    if (std::isnan(a) || std::isnan(b))
+        return INT32_MAX;
+    int32_t ia, ib;
+    std::memcpy(&ia, &a, 4);
+    std::memcpy(&ib, &b, 4);
+    if (ia < 0) ia = (int32_t)0x80000000 - ia;
+    if (ib < 0) ib = (int32_t)0x80000000 - ib;
+    int32_t d = ia - ib;
+    return d < 0 ? -d : d;
 }
 
 int main()
@@ -52,6 +68,9 @@ int main()
             quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr_f, Xi_f);
         double dt_avx_f = (now_ms() - t0) / n_reps;
 
+        // Save AVX2 float-path result for ULP comparison later
+        arma::fvec Xr_avx_f = Xr_f, Xi_avx_f = Xi_f;
+
         // --- 2. AVX2 path via fast_slerp (double input, converted internally) ---
         for (int i = 0; i < n_warmup; ++i)
             quadriga_lib::fast_slerp(dAr, dAi, dBr, dBi, dw, Xr_f, Xi_f);
@@ -60,6 +79,9 @@ int main()
         for (int i = 0; i < n_reps; ++i)
             quadriga_lib::fast_slerp(dAr, dAi, dBr, dBi, dw, Xr_f, Xi_f);
         double dt_avx_d = (now_ms() - t0) / n_reps;
+
+        // Save AVX2 double-path result for ULP comparison later
+        arma::fvec Xr_avx_d = Xr_f, Xi_avx_d = Xi_f;
 
         // --- 3. Scalar reference (float, single-threaded) ---
         arma::fvec Xr_s(n), Xi_s(n);
@@ -105,18 +127,57 @@ int main()
             }
         double dt_scalar_d = (now_ms() - t0) / n_reps;
 
+        // --- ULP accuracy: AVX2 output vs double-precision scalar reference ---
+        // Reference: slerp_complex_mf<double> cast to float (best possible single-precision answer)
+        // ULP is computed per component (Xr, Xi) and the max of both is taken per element
+
+        // Float input path: AVX2/f vs double-precision reference
+        int32_t max_ulp_f = 0;
+        int64_t sum_ulp_f = 0;
+        const float *pXr_af = Xr_avx_f.memptr(), *pXi_af = Xi_avx_f.memptr();
+        for (size_t j = 0; j < n; ++j)
+        {
+            double ref_xr, ref_xi;
+            slerp_complex_mf<double>(pdAr[j], pdAi[j], pdBr[j], pdBi[j], pdw[j], ref_xr, ref_xi);
+            int32_t dr = ulp_dist(pXr_af[j], (float)ref_xr);
+            int32_t di = ulp_dist(pXi_af[j], (float)ref_xi);
+            int32_t d = dr > di ? dr : di;
+            if (d > max_ulp_f) max_ulp_f = d;
+            sum_ulp_f += d;
+        }
+        double mean_ulp_f = (double)sum_ulp_f / (double)n;
+
+        // Double input path: AVX2/d vs double-precision reference
+        int32_t max_ulp_d = 0;
+        int64_t sum_ulp_d = 0;
+        const float *pXr_ad = Xr_avx_d.memptr(), *pXi_ad = Xi_avx_d.memptr();
+        for (size_t j = 0; j < n; ++j)
+        {
+            double ref_xr, ref_xi;
+            slerp_complex_mf<double>(pdAr[j], pdAi[j], pdBr[j], pdBi[j], pdw[j], ref_xr, ref_xi);
+            int32_t dr = ulp_dist(pXr_ad[j], (float)ref_xr);
+            int32_t di = ulp_dist(pXi_ad[j], (float)ref_xi);
+            int32_t d = dr > di ? dr : di;
+            if (d > max_ulp_d) max_ulp_d = d;
+            sum_ulp_d += d;
+        }
+        double mean_ulp_d = (double)sum_ulp_d / (double)n;
+
         // --- Report ---
         double pairs_M = (double)n / 1e6;
         printf("n = %7zu | AVX2/f: %7.3f ms (%7.1f Mpairs/s) | AVX2/d: %7.3f ms (%7.1f Mpairs/s) "
                "| Scalar/f: %7.3f ms (%7.1f Mpairs/s) | Scalar/d: %7.3f ms (%7.1f Mpairs/s) "
-               "| Speedup f: %5.1fx | Speedup d: %5.1fx\n",
+               "| Speedup f: %5.1fx | Speedup d: %5.1fx "
+               "| ULP/f: avg %5.1f max %4d | ULP/d: avg %5.1f max %4d\n",
                n,
                dt_avx_f, pairs_M / dt_avx_f * 1e3,
                dt_avx_d, pairs_M / dt_avx_d * 1e3,
                dt_scalar_f, pairs_M / dt_scalar_f * 1e3,
                dt_scalar_d, pairs_M / dt_scalar_d * 1e3,
                dt_scalar_f / dt_avx_f,
-               dt_scalar_d / dt_avx_d);
+               dt_scalar_d / dt_avx_d,
+               mean_ulp_f, max_ulp_f,
+               mean_ulp_d, max_ulp_d);
     }
 
     return 0;

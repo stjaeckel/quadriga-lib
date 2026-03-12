@@ -248,6 +248,44 @@ void qd_ACOS_AVX2(const double *__restrict x,
 }
 
 template <> // float
+void qd_ATAN2_AVX2(const float *__restrict y,
+                   const float *__restrict x,
+                   float *__restrict a,
+                   size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 yv = _mm256_loadu_ps(y + off);
+        __m256 xv = _mm256_loadu_ps(x + off);
+        _mm256_storeu_ps(a + off, _fm256_atan2256_ps(yv, xv));
+    }
+}
+
+template <> // double
+void qd_ATAN2_AVX2(const double *__restrict y,
+                   const double *__restrict x,
+                   float *__restrict a,
+                   size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3; // number of 8-float vectors
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 yv = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(y + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(y + off)));
+        __m256 xv = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(x + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(x + off)));
+        _mm256_storeu_ps(a + off, _fm256_atan2256_ps(yv, xv));
+    }
+}
+
+template <> // float
 void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
                    const float *__restrict Br, const float *__restrict Bi,
                    const float *__restrict w,
