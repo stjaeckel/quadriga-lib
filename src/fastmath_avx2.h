@@ -108,6 +108,100 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *_
     *c = _mm256_xor_ps(cos_approx, sign_bit_cos);
 }
 
+// Double-input variant: takes two __m256d (8 doubles as low/high halves),
+// does Cody–Waite range reduction to [-pi/4, pi/4] in double precision,
+// converts to float, then evaluates the same Cephes polynomial + reconstruction.
+// This avoids the cascaded reduction problem where the float kernel would
+// re-reduce an already-reduced input, losing precision near octant boundaries.
+static inline void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 *__restrict s, __m256 *__restrict c)
+{
+    // --- Double-precision constants for range reduction ---
+    const __m256d abs_mask_d = _mm256_castsi256_pd(
+        _mm256_set_epi64x(0x7FFFFFFFFFFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL,
+                          0x7FFFFFFFFFFFFFFFLL, 0x7FFFFFFFFFFFFFFFLL));
+    const __m256d FOPI_D = _mm256_set1_pd(1.2732395447351626862); // 4/pi
+
+    // Two-constant Cody–Waite split of pi/4:
+    //   DP1_D has few mantissa bits → j*DP1_D is exact for reasonable j
+    //   DP1_D + DP2_D = pi/4 to full double precision
+    const __m256d DP1_D = _mm256_set1_pd(0.78515625);
+    const __m256d DP2_D = _mm256_set1_pd(2.4191339744830961566e-4);
+
+    const __m128i one_128 = _mm_set1_epi32(1);
+    const __m128i inv1_128 = _mm_set1_epi32(~1);
+
+    // --- Process low 4 doubles ---
+    __m256d sign_dl = _mm256_andnot_pd(abs_mask_d, xl);       // sign bits
+    __m256d axl = _mm256_and_pd(xl, abs_mask_d);              // |x|
+    __m256d yl = _mm256_mul_pd(axl, FOPI_D);                  // |x| * 4/pi
+    __m128i jl = _mm256_cvttpd_epi32(yl);                     // truncate → 4 int32
+    jl = _mm_and_si128(_mm_add_epi32(jl, one_128), inv1_128); // (j+1) & ~1
+    __m256d jdl = _mm256_cvtepi32_pd(jl);                     // j → double
+    axl = _mm256_fnmadd_pd(jdl, DP1_D, axl);                  // ax -= j*DP1
+    axl = _mm256_fnmadd_pd(jdl, DP2_D, axl);                  // ax -= j*DP2
+
+    // --- Process high 4 doubles ---
+    __m256d sign_dh = _mm256_andnot_pd(abs_mask_d, xh);
+    __m256d axh = _mm256_and_pd(xh, abs_mask_d);
+    __m256d yh = _mm256_mul_pd(axh, FOPI_D);
+    __m128i jh = _mm256_cvttpd_epi32(yh);
+    jh = _mm_and_si128(_mm_add_epi32(jh, one_128), inv1_128);
+    __m256d jdh = _mm256_cvtepi32_pd(jh);
+    axh = _mm256_fnmadd_pd(jdh, DP1_D, axh);
+    axh = _mm256_fnmadd_pd(jdh, DP2_D, axh);
+
+    // --- Pack into 8-wide float/int vectors ---
+    __m256 x8 = _mm256_set_m128(_mm256_cvtpd_ps(axh), _mm256_cvtpd_ps(axl));
+    __m256i j = _mm256_set_m128i(jh, jl);
+    __m256 sign_bit_sin = _mm256_set_m128(_mm256_cvtpd_ps(sign_dh),
+                                          _mm256_cvtpd_ps(sign_dl));
+
+    // --- From here: identical to _fm256_sincos256_ps after its range reduction ---
+    const __m256i pi32_0 = _mm256_set1_epi32(0);
+    const __m256i pi32_2 = _mm256_set1_epi32(2);
+    const __m256i pi32_4 = _mm256_set1_epi32(4);
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 n_half = _mm256_set1_ps(-0.5f);
+
+    const __m256 Sp0 = _mm256_set1_ps(-1.9515295891E-4f);
+    const __m256 Sp1 = _mm256_set1_ps(8.3321608736E-3f);
+    const __m256 Sp2 = _mm256_set1_ps(-1.6666654611E-1f);
+    const __m256 Cp0 = _mm256_set1_ps(2.443315711809948E-005f);
+    const __m256 Cp1 = _mm256_set1_ps(-1.388731625493765E-003f);
+    const __m256 Cp2 = _mm256_set1_ps(4.166664568298827E-002f);
+
+    // Swap/sign/poly flags from j
+    __m256 swap_sin = _mm256_castsi256_ps(_mm256_slli_epi32(_mm256_and_si256(j, pi32_4), 29));
+    __m256 sign_bit_cos = _mm256_castsi256_ps(
+        _mm256_slli_epi32(_mm256_andnot_si256(_mm256_sub_epi32(j, pi32_2), pi32_4), 29));
+    __m256 poly = _mm256_castsi256_ps(_mm256_cmpeq_epi32(_mm256_and_si256(j, pi32_2), pi32_0));
+
+    // Common powers
+    __m256 z = _mm256_mul_ps(x8, x8);
+    __m256 z2 = _mm256_mul_ps(z, z);
+
+    // Estrin: SIN   sin(x) ~ x * (1 + Sp2*z + Sp1*z^2 + Sp0*z^3)
+    __m256 t0s = _mm256_fmadd_ps(Sp2, z, one);
+    __m256 t1s = _mm256_fmadd_ps(Sp0, z, Sp1);
+    __m256 Qs = _mm256_fmadd_ps(z2, t1s, t0s);
+    __m256 ys = _mm256_mul_ps(Qs, x8);
+
+    // Estrin: COS   cos(x) ~ 1 - 0.5*z + z^2*(Cp2 + Cp1*z + Cp0*z^2)
+    __m256 te = _mm256_fmadd_ps(Cp0, z2, Cp2);
+    __m256 ev = _mm256_fmadd_ps(z2, te, one);
+    __m256 to = _mm256_fmadd_ps(Cp1, z2, n_half);
+    __m256 yc = _mm256_fmadd_ps(z, to, ev);
+
+    // Select between sin/cos polys
+    __m256 sin_approx = _mm256_or_ps(_mm256_and_ps(poly, ys), _mm256_andnot_ps(poly, yc));
+    __m256 cos_approx = _mm256_or_ps(_mm256_and_ps(poly, yc), _mm256_andnot_ps(poly, ys));
+
+    // Apply signs
+    sign_bit_sin = _mm256_xor_ps(sign_bit_sin, swap_sin);
+    *s = _mm256_xor_ps(sin_approx, sign_bit_sin);
+    *c = _mm256_xor_ps(cos_approx, sign_bit_cos);
+}
+
 // AVX2 accelerated arc-sine (single precision, full [-1, 1] domain)
 // Uses Cephes-style rational polynomial with half-angle identity for |x| > 0.5
 // Max error: ~2 ULP

@@ -21,21 +21,6 @@
 #include <immintrin.h>
 #include <limits.h>
 
-// Double-precision Cody–Waite range reduction: map x into [-pi, pi].
-// Two-constant split: C1 + C2 = 2*pi, with C1 exactly representable.
-// The first FMA (x - n*C1) is exact by Sterbenz; the second mops up
-// the low bits. Result has full double precision before float conversion.
-static inline __m256d _fm256_range_reduce_2pi_pd(__m256d x)
-{
-    const __m256d INV_TWO_PI = _mm256_set1_pd(0.15915494309189533577); // 1 / (2*pi)
-    const __m256d CW_C1 = _mm256_set1_pd(6.28125);                     // high bits of 2*pi
-    const __m256d CW_C2 = _mm256_set1_pd(1.9353071795864769253e-03);   // 2*pi - C1
-    __m256d n = _mm256_round_pd(_mm256_mul_pd(x, INV_TWO_PI), _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
-    x = _mm256_fnmadd_pd(n, CW_C1, x); // x -= n * C1
-    x = _mm256_fnmadd_pd(n, CW_C2, x); // x -= n * C2
-    return x;
-}
-
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
@@ -72,16 +57,9 @@ void qd_SINCOS_AVX2(const double *__restrict x,
     for (long long i = 0; i < n_vec; ++i)
     {
         const size_t off = (static_cast<size_t>(i) << 3);
-        const double *xp = x + off;            // 8 doubles
-        __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
-        __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
-        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
-        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
-        __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
-        __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
-        __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
+        const double *xp = x + off;
         __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
+        _fm256_sincos256_pd(_mm256_loadu_pd(xp), _mm256_loadu_pd(xp + 4), &sv, &cv);
         _mm256_storeu_ps(s + off, sv);
         _mm256_storeu_ps(c + off, cv);
     }
@@ -116,16 +94,9 @@ void qd_SIN_AVX2(const double *__restrict x,
     for (long long i = 0; i < n_vec; ++i)
     {
         const size_t off = (static_cast<size_t>(i) << 3);
-        const double *xp = x + off;            // 8 doubles
-        __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
-        __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
-        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
-        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
-        __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
-        __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
-        __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
+        const double *xp = x + off;
         __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
+        _fm256_sincos256_pd(_mm256_loadu_pd(xp), _mm256_loadu_pd(xp + 4), &sv, &cv);
         _mm256_storeu_ps(s + off, sv);
     }
 }
@@ -159,16 +130,9 @@ void qd_COS_AVX2(const double *__restrict x,
     for (long long i = 0; i < n_vec; ++i)
     {
         const size_t off = (static_cast<size_t>(i) << 3);
-        const double *xp = x + off;            // 8 doubles
-        __m256d x0 = _mm256_loadu_pd(xp);      // 0..3
-        __m256d x1 = _mm256_loadu_pd(xp + 4);  // 4..7
-        x0 = _fm256_range_reduce_2pi_pd(x0);   // [-pi, pi]
-        x1 = _fm256_range_reduce_2pi_pd(x1);   // [-pi, pi]
-        __m128 xf0 = _mm256_cvtpd_ps(x0);      // 4f
-        __m128 xf1 = _mm256_cvtpd_ps(x1);      // 4f
-        __m256 xv = _mm256_set_m128(xf1, xf0); // pack 8f
+        const double *xp = x + off;
         __m256 sv, cv;
-        _fm256_sincos256_ps(xv, &sv, &cv);
+        _fm256_sincos256_pd(_mm256_loadu_pd(xp), _mm256_loadu_pd(xp + 4), &sv, &cv);
         _mm256_storeu_ps(c + off, cv);
     }
 }
