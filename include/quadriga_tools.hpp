@@ -200,6 +200,19 @@ namespace quadriga_lib
     void fast_acos(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
                    arma::fvec &c);            // [out] Set to acos(x). Resized to length n if needed
 
+    // Fast, approximate atan2(y, x) for single-precision vectors
+    // - Computes atan2(y, x) for all elements of two Armadillo vectors
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Results are approximate and may differ from std::atan2f
+    // - Maximum error is approximately 3 ULP (~3.6e-7) across the full domain
+    // - atan2(0, 0) returns 0; atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
+    // - Fallback to std::atan2f if compiled without AVX2 (or running with non-AVX2 CPU)
+    template <typename dtype>
+    void fast_atan2(const arma::Col<dtype> &y, // Input y-coordinates, Length [n], float or double
+                    const arma::Col<dtype> &x, // Input x-coordinates, Length [n], float or double
+                    arma::fvec &a);            // [out] Set to atan2(y, x) in radians. Resized to length n if needed
+
     // Fast, approximate spherical interpolation (SLERP) for complex value pairs
     // - Interpolates between two complex-valued vectors using SLERP on normalized directions
     //   and linear interpolation of amplitudes

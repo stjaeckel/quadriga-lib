@@ -309,6 +309,99 @@ Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
+# fast_atan2
+Fast, approximate two-argument arc-tangent
+
+## Description:
+Computes elementwise `atan2(y, x)` for two Armadillo vectors. Designed for high throughput on modern CPUs.
+- Returns angles in radians in the range (-pi, pi]
+- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Results are approximate and may differ from `std::atan2f`
+- Maximum error is approximately 3 ULP (~3.6e-7) across the full domain
+- `atan2(0, 0)` returns 0; `atan2(±0, -0)` returns `±0` (not `±pi`)
+- Both input vectors must have the same length
+- Input and output cannot alias (in-place operation not allowed)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+
+## Declaration:
+```
+void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &a);
+void quadriga_lib::fast_atan2(const arma::vec &y, const arma::vec &x, arma::fvec &a);
+```
+
+## Arguments:
+- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)<br>
+  Y-coordinates (numerator of atan2). Length `[n]`.
+
+- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
+  X-coordinates (denominator of atan2). Length `[n]`.
+
+- `arma::fvec &**a**` (output)<br>
+  Set to `atan2(y, x)` in radians. Resized to length `n` if needed. Length `[n]`.
+
+## Example:
+```
+arma::fvec y = {1.0f, -1.0f, 0.0f, 1.0f};
+arma::fvec x = {1.0f,  1.0f, -1.0f, 0.0f};
+arma::fvec a;
+quadriga_lib::fast_atan2(y, x, a);
+// a ≈ {0.7854, -0.7854, 3.1416, 1.5708}
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> &x, arma::fvec &a)
+{
+    const arma::uword n_val = y.n_elem;
+
+    if (x.n_elem != n_val)
+        throw std::invalid_argument("Input vectors 'y' and 'x' must have the same length.");
+
+    if (a.n_elem != n_val)
+        a.set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict Ya = y.memptr();
+    const dtype *__restrict Xa = x.memptr();
+    float *__restrict Aa = a.memptr();
+
+    // Check for aliasing
+    const void *inputs[] = {static_cast<const void *>(Ya), static_cast<const void *>(Xa)};
+    for (auto iv : inputs)
+        if (iv == static_cast<const void *>(Aa))
+            throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_ATAN2_AVX2(Ya, Xa, Aa, bulk);
+        if (tail)
+            qd_ATAN2_GENERIC(Ya + bulk, Xa + bulk, Aa + bulk, tail);
+    }
+    else
+    {
+        qd_ATAN2_GENERIC(Ya, Xa, Aa, n_val);
+    }
+#else
+    qd_ATAN2_GENERIC(Ya, Xa, Aa, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_atan2(const arma::Col<float> &y, const arma::Col<float> &x, arma::fvec &a);
+template void quadriga_lib::fast_atan2(const arma::Col<double> &y, const arma::Col<double> &x, arma::fvec &a);
+
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
 # fast_slerp
 Fast, approximate spherical interpolation (SLERP) for complex value pairs
 

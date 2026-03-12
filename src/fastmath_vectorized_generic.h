@@ -120,6 +120,22 @@ void qd_ACOS_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
+void qd_ATAN2_GENERIC(const dtype *__restrict y,
+                      const dtype *__restrict x,
+                      float *__restrict a,
+                      size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        const float yi = (float)y[i];
+        const float xi = (float)x[i];
+        a[i] = atan2f(yi, xi);
+    }
+}
+
+template <typename dtype>
 void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
                        const dtype *__restrict Br, const dtype *__restrict Bi,
                        const dtype *__restrict w,
