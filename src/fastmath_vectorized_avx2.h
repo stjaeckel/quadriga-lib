@@ -59,9 +59,20 @@ void qd_ATAN2_AVX2(const dtype *__restrict y,
 
 template <typename dtype> // float or double
 void qd_SLERP_AVX2(const dtype *__restrict Ar, const dtype *__restrict Ai,
-                    const dtype *__restrict Br, const dtype *__restrict Bi,
-                    const dtype *__restrict w,
-                    float *__restrict Xr, float *__restrict Xi,
-                    size_t n_val); // multiple of 8
+                   const dtype *__restrict Br, const dtype *__restrict Bi,
+                   const dtype *__restrict w,
+                   float *__restrict Xr, float *__restrict Xi,
+                   size_t n_val); // multiple of 8
 
+template <typename dtype> // float or double
+void qd_GEO2CART_AVX2(const dtype *__restrict az, const dtype *__restrict el,
+                      float *__restrict x, float *__restrict y, float *__restrict z,
+                      float *__restrict sAZ, float *__restrict cAZ,
+                      float *__restrict sEL, float *__restrict cEL,
+                      size_t n_val); // multiple of 8
+
+template <typename dtype> // float or double
+void qd_CART2GEO_AVX2(const dtype *__restrict x, const dtype *__restrict y, const dtype *__restrict z,
+                      float *__restrict az, float *__restrict el,
+                      size_t n_val); // multiple of 8
 #endif

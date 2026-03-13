@@ -31,15 +31,15 @@
 // Scalar double-precision Cody–Waite range reduction: map x into [-pi, pi].
 // Two-constant split: CW_C1 + CW_C2 = 2*pi, with CW_C1 exactly representable.
 // Matches the AVX2 _fm256_range_reduce_2pi_pd helper.
-static const double QD_INV_TWO_PI = 0.15915494309189533577;  // 1 / (2*pi)
+static const double QD_INV_TWO_PI = 0.15915494309189533577; // 1 / (2*pi)
 static const double QD_CW_C1 = 6.28125;                     // high bits of 2*pi
 static const double QD_CW_C2 = 1.9353071795864769253e-03;   // 2*pi - CW_C1
 
 static inline double qd_range_reduce_2pi(double x)
 {
-    double n = round(x * QD_INV_TWO_PI);    // nearest integer multiple of 2*pi
-    x -= n * QD_CW_C1;                      // exact by Sterbenz when n*C1 ≈ x
-    x -= n * QD_CW_C2;                      // mop up low bits
+    double n = round(x * QD_INV_TWO_PI); // nearest integer multiple of 2*pi
+    x -= n * QD_CW_C1;                   // exact by Sterbenz when n*C1 ≈ x
+    x -= n * QD_CW_C2;                   // mop up low bits
     return x;
 }
 
@@ -137,10 +137,10 @@ void qd_ATAN2_GENERIC(const dtype *__restrict y,
 
 template <typename dtype>
 void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
-                       const dtype *__restrict Br, const dtype *__restrict Bi,
-                       const dtype *__restrict w,
-                       float *__restrict Xr, float *__restrict Xi,
-                       size_t n_val)
+                      const dtype *__restrict Br, const dtype *__restrict Bi,
+                      const dtype *__restrict w,
+                      float *__restrict Xr, float *__restrict Xi,
+                      size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
@@ -152,6 +152,51 @@ void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
                                 (float)w[i], xr, xi);
         Xr[i] = xr;
         Xi[i] = xi;
+    }
+}
+
+template <typename dtype>
+void qd_GEO2CART_GENERIC(const dtype *__restrict az, const dtype *__restrict el,
+                         float *__restrict x, float *__restrict y, float *__restrict z,
+                         float *__restrict sAZ, float *__restrict cAZ,
+                         float *__restrict sEL, float *__restrict cEL,
+                         size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        const float azi = (float)qd_range_reduce_2pi((double)az[i]);
+        const float eli = (float)qd_range_reduce_2pi((double)el[i]);
+        float sa = sinf(azi), ca = cosf(azi);
+        float se = sinf(eli), ce = cosf(eli);
+        x[i] = ce * ca;
+        y[i] = ce * sa;
+        z[i] = se;
+        if (sAZ)
+            sAZ[i] = sa;
+        if (cAZ)
+            cAZ[i] = ca;
+        if (sEL)
+            sEL[i] = se;
+        if (cEL)
+            cEL[i] = ce;
+    }
+}
+
+template <typename dtype>
+void qd_CART2GEO_GENERIC(const dtype *__restrict x, const dtype *__restrict y, const dtype *__restrict z,
+                         float *__restrict az, float *__restrict el,
+                         size_t n_val)
+{
+    const long long n_val_ll = (long long)n_val;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_val_ll; ++i)
+    {
+        float xi = (float)x[i], yi = (float)y[i], zi = (float)z[i];
+        az[i] = atan2f(yi, xi);
+        zi = zi > 1.0f ? 1.0f : (zi < -1.0f ? -1.0f : zi);
+        el[i] = asinf(zi);
     }
 }
 

@@ -451,9 +451,9 @@ MD!*/
 
 template <typename dtype>
 void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype> &Ai,
-                               const arma::Col<dtype> &Br, const arma::Col<dtype> &Bi,
-                               const arma::Col<dtype> &w,
-                               arma::fvec &Xr, arma::fvec &Xi)
+                              const arma::Col<dtype> &Br, const arma::Col<dtype> &Bi,
+                              const arma::Col<dtype> &w,
+                              arma::fvec &Xr, arma::fvec &Xi)
 {
     const arma::uword n_val = Ar.n_elem;
 
@@ -496,7 +496,7 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype>
             qd_SLERP_AVX2(pAr, pAi, pBr, pBi, pw, pXr, pXi, bulk);
         if (tail)
             qd_SLERP_GENERIC(pAr + bulk, pAi + bulk, pBr + bulk, pBi + bulk, pw + bulk,
-                              pXr + bulk, pXi + bulk, tail);
+                             pXr + bulk, pXi + bulk, tail);
     }
     else
     {
@@ -508,10 +508,267 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype>
 }
 
 template void quadriga_lib::fast_slerp(const arma::Col<float> &Ar, const arma::Col<float> &Ai,
-                                        const arma::Col<float> &Br, const arma::Col<float> &Bi,
-                                        const arma::Col<float> &w,
-                                        arma::fvec &Xr, arma::fvec &Xi);
+                                       const arma::Col<float> &Br, const arma::Col<float> &Bi,
+                                       const arma::Col<float> &w,
+                                       arma::fvec &Xr, arma::fvec &Xi);
 template void quadriga_lib::fast_slerp(const arma::Col<double> &Ar, const arma::Col<double> &Ai,
-                                        const arma::Col<double> &Br, const arma::Col<double> &Bi,
-                                        const arma::Col<double> &w,
-                                        arma::fvec &Xr, arma::fvec &Xi);
+                                       const arma::Col<double> &Br, const arma::Col<double> &Bi,
+                                       const arma::Col<double> &w,
+                                       arma::fvec &Xr, arma::fvec &Xi);
+
+/*!MD
+# fast_geo2cart
+Fast, approximate geographic-to-Cartesian conversion
+
+## Description:
+Converts elementwise azimuth/elevation angles (in radians) to unit-sphere Cartesian coordinates.
+- x = cos(el) * cos(az), y = cos(el) * sin(az), z = sin(el)
+- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Results are approximate and may differ from `std::sinf` / `std::cosf`
+- Optionally returns intermediate sin/cos values via pointer arguments; pass `nullptr` to skip
+- Both input vectors must have the same length
+- Input and output cannot alias (in-place operation not allowed)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+
+## Declaration:
+```
+void quadriga_lib::fast_geo2cart(const arma::fvec &az, const arma::fvec &el,
+                                 arma::fvec &x, arma::fvec &y, arma::fvec &z,
+                                 arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
+                                 arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
+void quadriga_lib::fast_geo2cart(const arma::vec &az, const arma::vec &el,
+                                 arma::fvec &x, arma::fvec &y, arma::fvec &z,
+                                 arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
+                                 arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
+```
+
+## Arguments:
+- `const arma::fvec &**az**` or `const arma::vec &**az**` (input)<br>
+  Azimuth angles in radians. Length `[n]`.
+
+- `const arma::fvec &**el**` or `const arma::vec &**el**` (input)<br>
+  Elevation angles in radians. Length `[n]`.
+
+- `arma::fvec &**x**` (output)<br>
+  X-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
+
+- `arma::fvec &**y**` (output)<br>
+  Y-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
+
+- `arma::fvec &**z**` (output)<br>
+  Z-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
+
+- `arma::fvec ***sAZ** = nullptr` (optional output)<br>
+  If non-null, set to `sin(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
+
+- `arma::fvec ***cAZ** = nullptr` (optional output)<br>
+  If non-null, set to `cos(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
+
+- `arma::fvec ***sEL** = nullptr` (optional output)<br>
+  If non-null, set to `sin(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
+
+- `arma::fvec ***cEL** = nullptr` (optional output)<br>
+  If non-null, set to `cos(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
+
+## Example:
+```
+arma::fvec az = {0.0f, 1.5708f, 3.1416f};
+arma::fvec el = {0.0f, 0.5f, -0.5f};
+arma::fvec x, y, z, sAZ, cEL;
+quadriga_lib::fast_geo2cart(az, el, x, y, z, &sAZ, nullptr, nullptr, &cEL);
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dtype> &el,
+                                 arma::fvec &x, arma::fvec &y, arma::fvec &z,
+                                 arma::fvec *sAZ, arma::fvec *cAZ,
+                                 arma::fvec *sEL, arma::fvec *cEL)
+{
+    const arma::uword n_val = az.n_elem;
+
+    if (el.n_elem != n_val)
+        throw std::invalid_argument("Input vectors 'az' and 'el' must have the same length.");
+
+    // Resize required outputs
+    if (x.n_elem != n_val)
+        x.set_size(n_val);
+    if (y.n_elem != n_val)
+        y.set_size(n_val);
+    if (z.n_elem != n_val)
+        z.set_size(n_val);
+
+    // Resize optional outputs
+    if (sAZ != nullptr && sAZ->n_elem != n_val)
+        sAZ->set_size(n_val);
+    if (cAZ != nullptr && cAZ->n_elem != n_val)
+        cAZ->set_size(n_val);
+    if (sEL != nullptr && sEL->n_elem != n_val)
+        sEL->set_size(n_val);
+    if (cEL != nullptr && cEL->n_elem != n_val)
+        cEL->set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict pAZ = az.memptr();
+    const dtype *__restrict pEL = el.memptr();
+    float *__restrict pX = x.memptr();
+    float *__restrict pY = y.memptr();
+    float *__restrict pZ = z.memptr();
+    float *__restrict pSAZ = (sAZ == nullptr) ? nullptr : sAZ->memptr();
+    float *__restrict pCAZ = (cAZ == nullptr) ? nullptr : cAZ->memptr();
+    float *__restrict pSEL = (sEL == nullptr) ? nullptr : sEL->memptr();
+    float *__restrict pCEL = (cEL == nullptr) ? nullptr : cEL->memptr();
+
+    // Check for aliasing between any input and any output
+    const void *inputs[] = {static_cast<const void *>(pAZ), static_cast<const void *>(pEL)};
+    const void *outputs[] = {pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL};
+    for (auto iv : inputs)
+        for (auto ov : outputs)
+            if (ov && iv == ov)
+                throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_GEO2CART_AVX2(pAZ, pEL, pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL, bulk);
+        if (tail)
+            qd_GEO2CART_GENERIC(pAZ + bulk, pEL + bulk,
+                                pX + bulk, pY + bulk, pZ + bulk,
+                                pSAZ ? pSAZ + bulk : nullptr, pCAZ ? pCAZ + bulk : nullptr,
+                                pSEL ? pSEL + bulk : nullptr, pCEL ? pCEL + bulk : nullptr,
+                                tail);
+    }
+    else
+    {
+        qd_GEO2CART_GENERIC(pAZ, pEL, pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL, n_val);
+    }
+#else
+    qd_GEO2CART_GENERIC(pAZ, pEL, pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_geo2cart(const arma::Col<float> &az, const arma::Col<float> &el,
+                                          arma::fvec &x, arma::fvec &y, arma::fvec &z,
+                                          arma::fvec *sAZ, arma::fvec *cAZ,
+                                          arma::fvec *sEL, arma::fvec *cEL);
+template void quadriga_lib::fast_geo2cart(const arma::Col<double> &az, const arma::Col<double> &el,
+                                          arma::fvec &x, arma::fvec &y, arma::fvec &z,
+                                          arma::fvec *sAZ, arma::fvec *cAZ,
+                                          arma::fvec *sEL, arma::fvec *cEL);
+
+/*!MD
+# fast_cart2geo
+Fast, approximate Cartesian-to-geographic conversion
+
+## Description:
+Converts elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles (in radians).
+- az = atan2(y, x), el = asin(clamp(z, -1, 1))
+- The z-coordinate is clamped to [-1, 1] before computing asin, guarding against FMA rounding artefacts
+  from upstream matrix multiplications that can push abs(z) slightly above 1
+- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
+- Parallelizes across cores with OpenMP when enabled
+- Results are approximate and may differ from `std::atan2f` / `std::asinf`
+- All input vectors must have the same length
+- Input and output cannot alias (in-place operation not allowed)
+- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+
+## Declaration:
+```
+void quadriga_lib::fast_cart2geo(const arma::fvec &x, const arma::fvec &y, const arma::fvec &z,
+                                 arma::fvec &az, arma::fvec &el);
+void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const arma::vec &z,
+                                 arma::fvec &az, arma::fvec &el);
+```
+
+## Arguments:
+- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
+  X-coordinates. Length `[n]`.
+
+- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)<br>
+  Y-coordinates. Length `[n]`.
+
+- `const arma::fvec &**z**` or `const arma::vec &**z**` (input)<br>
+  Z-coordinates. Length `[n]`.
+
+- `arma::fvec &**az**` (output)<br>
+  Azimuth angles in radians. Resized to length `n` if needed. Length `[n]`.
+
+- `arma::fvec &**el**` (output)<br>
+  Elevation angles in radians. Resized to length `n` if needed. Length `[n]`.
+
+## Example:
+```
+arma::fvec x = {1.0f, 0.0f, -1.0f};
+arma::fvec y = {0.0f, 1.0f, 0.0f};
+arma::fvec z = {0.0f, 0.0f, 0.0f};
+arma::fvec az, el;
+quadriga_lib::fast_cart2geo(x, y, z, az, el);
+// az ≈ {0.0, 1.5708, 3.1416},  el ≈ {0.0, 0.0, 0.0}
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtype> &y, const arma::Col<dtype> &z,
+                                 arma::fvec &az, arma::fvec &el)
+{
+    const arma::uword n_val = x.n_elem;
+
+    if (y.n_elem != n_val || z.n_elem != n_val)
+        throw std::invalid_argument("Input vectors 'x', 'y', and 'z' must have the same length.");
+
+    if (az.n_elem != n_val)
+        az.set_size(n_val);
+    if (el.n_elem != n_val)
+        el.set_size(n_val);
+
+    if (n_val == 0)
+        return;
+
+    const dtype *__restrict pX = x.memptr();
+    const dtype *__restrict pY = y.memptr();
+    const dtype *__restrict pZ = z.memptr();
+    float *__restrict pAZ = az.memptr();
+    float *__restrict pEL = el.memptr();
+
+    // Check for aliasing between any input and any output
+    const void *inputs[] = {static_cast<const void *>(pX), static_cast<const void *>(pY), static_cast<const void *>(pZ)};
+    const void *outputs[] = {static_cast<const void *>(pAZ), static_cast<const void *>(pEL)};
+    for (auto iv : inputs)
+        for (auto ov : outputs)
+            if (iv == ov)
+                throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
+    if (pAZ == pEL)
+        throw std::invalid_argument("Output az and el cannot be the same buffer.");
+
+#if BUILD_WITH_AVX2
+    const size_t bulk = (n_val / 8) * 8;
+    const size_t tail = n_val - bulk;
+
+    if (runtime_AVX2_Check())
+    {
+        if (bulk)
+            qd_CART2GEO_AVX2(pX, pY, pZ, pAZ, pEL, bulk);
+        if (tail)
+            qd_CART2GEO_GENERIC(pX + bulk, pY + bulk, pZ + bulk,
+                                pAZ + bulk, pEL + bulk, tail);
+    }
+    else
+    {
+        qd_CART2GEO_GENERIC(pX, pY, pZ, pAZ, pEL, n_val);
+    }
+#else
+    qd_CART2GEO_GENERIC(pX, pY, pZ, pAZ, pEL, n_val);
+#endif
+}
+
+template void quadriga_lib::fast_cart2geo(const arma::Col<float> &x, const arma::Col<float> &y, const arma::Col<float> &z,
+                                          arma::fvec &az, arma::fvec &el);
+template void quadriga_lib::fast_cart2geo(const arma::Col<double> &x, const arma::Col<double> &y, const arma::Col<double> &z,
+                                          arma::fvec &az, arma::fvec &el);

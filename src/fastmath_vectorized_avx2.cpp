@@ -306,3 +306,116 @@ void qd_SLERP_AVX2(const double *__restrict Ar, const double *__restrict Ai,
         _mm256_storeu_ps(Xi + off, vXi);
     }
 }
+
+template <> // float
+void qd_GEO2CART_AVX2(const float *__restrict az, const float *__restrict el,
+                      float *__restrict x, float *__restrict y, float *__restrict z,
+                      float *__restrict sAZ, float *__restrict cAZ,
+                      float *__restrict sEL, float *__restrict cEL,
+                      size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3;
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 vaz = _mm256_loadu_ps(az + off);
+        __m256 vel = _mm256_loadu_ps(el + off);
+        __m256 vx, vy, vz, vsa, vca, vse, vce;
+        _fm256_geo2cart_ps(vaz, vel, &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
+        _mm256_storeu_ps(x + off, vx);
+        _mm256_storeu_ps(y + off, vy);
+        _mm256_storeu_ps(z + off, vz);
+        if (sAZ)
+            _mm256_storeu_ps(sAZ + off, vsa);
+        if (cAZ)
+            _mm256_storeu_ps(cAZ + off, vca);
+        if (sEL)
+            _mm256_storeu_ps(sEL + off, vse);
+        if (cEL)
+            _mm256_storeu_ps(cEL + off, vce);
+    }
+}
+
+template <> // double
+void qd_GEO2CART_AVX2(const double *__restrict az, const double *__restrict el,
+                      float *__restrict x, float *__restrict y, float *__restrict z,
+                      float *__restrict sAZ, float *__restrict cAZ,
+                      float *__restrict sEL, float *__restrict cEL,
+                      size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3;
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        const double *azp = az + off;
+        const double *elp = el + off;
+
+        // Sincos of azimuth: double-precision range reduction → float polynomial
+        __m256 vsa, vca;
+        _fm256_sincos256_pd(_mm256_loadu_pd(azp), _mm256_loadu_pd(azp + 4), &vsa, &vca);
+
+        // Sincos of elevation: double-precision range reduction → float polynomial
+        __m256 vse, vce;
+        _fm256_sincos256_pd(_mm256_loadu_pd(elp), _mm256_loadu_pd(elp + 4), &vse, &vce);
+
+        // x = cos(el) * cos(az),  y = cos(el) * sin(az),  z = sin(el)
+        _mm256_storeu_ps(x + off, _mm256_mul_ps(vce, vca));
+        _mm256_storeu_ps(y + off, _mm256_mul_ps(vce, vsa));
+        _mm256_storeu_ps(z + off, vse);
+        if (sAZ)
+            _mm256_storeu_ps(sAZ + off, vsa);
+        if (cAZ)
+            _mm256_storeu_ps(cAZ + off, vca);
+        if (sEL)
+            _mm256_storeu_ps(sEL + off, vse);
+        if (cEL)
+            _mm256_storeu_ps(cEL + off, vce);
+    }
+}
+
+template <> // float
+void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, const float *__restrict z,
+                      float *__restrict az, float *__restrict el, size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3;
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 vx = _mm256_loadu_ps(x + off);
+        __m256 vy = _mm256_loadu_ps(y + off);
+        __m256 vz = _mm256_loadu_ps(z + off);
+        __m256 vaz, vel;
+        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel);
+        _mm256_storeu_ps(az + off, vaz);
+        _mm256_storeu_ps(el + off, vel);
+    }
+}
+
+template <> // double
+void qd_CART2GEO_AVX2(const double *__restrict x, const double *__restrict y, const double *__restrict z,
+                      float *__restrict az, float *__restrict el, size_t n_val) // multiple of 8
+{
+    const long long n_vec = (long long)n_val >> 3;
+
+#pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
+    for (long long i = 0; i < n_vec; ++i)
+    {
+        const size_t off = (static_cast<size_t>(i) << 3);
+        __m256 vx = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(x + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(x + off)));
+        __m256 vy = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(y + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(y + off)));
+        __m256 vz = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(z + off + 4)),
+                                    _mm256_cvtpd_ps(_mm256_loadu_pd(z + off)));
+        __m256 vaz, vel;
+        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel);
+        _mm256_storeu_ps(az + off, vaz);
+        _mm256_storeu_ps(el + off, vel);
+    }
+}
