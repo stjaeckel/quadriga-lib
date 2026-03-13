@@ -146,10 +146,6 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
 template void quadriga_lib::fast_sincos(const arma::Col<float> &x, arma::fvec *s, arma::fvec *c);
 template void quadriga_lib::fast_sincos(const arma::Col<double> &x, arma::fvec *s, arma::fvec *c);
 
-/*!SECTION
-Miscellaneous / Tools
-SECTION!*/
-
 /*!MD
 # fast_asin
 Fast, approximate arc-sine
@@ -225,10 +221,6 @@ void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &s)
 template void quadriga_lib::fast_asin(const arma::Col<float> &x, arma::fvec &s);
 template void quadriga_lib::fast_asin(const arma::Col<double> &x, arma::fvec &s);
 
-/*!SECTION
-Miscellaneous / Tools
-SECTION!*/
-
 /*!MD
 # fast_acos
 Fast, approximate arc-cosine
@@ -303,10 +295,6 @@ void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
 
 template void quadriga_lib::fast_acos(const arma::Col<float> &x, arma::fvec &c);
 template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c);
-
-/*!SECTION
-Miscellaneous / Tools
-SECTION!*/
 
 /*!MD
 # fast_atan2
@@ -396,10 +384,6 @@ void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> 
 
 template void quadriga_lib::fast_atan2(const arma::Col<float> &y, const arma::Col<float> &x, arma::fvec &a);
 template void quadriga_lib::fast_atan2(const arma::Col<double> &y, const arma::Col<double> &x, arma::fvec &a);
-
-/*!SECTION
-Miscellaneous / Tools
-SECTION!*/
 
 /*!MD
 # fast_slerp
