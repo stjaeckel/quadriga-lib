@@ -340,6 +340,140 @@ static inline __m256 _fm256_acos256_ps(__m256 x)
     return _mm256_blendv_ps(rA, rB, big);
 }
 
+// AVX2 accelerated atan2(y, x) (single precision, full domain)
+//
+// Algorithm:
+//   1. Octant reduction via min/max swap  →  ratio in [0, 1]
+//   2. Cephes two-region reduction (threshold at tan(pi/8) ≈ 0.4142):
+//        Region A (ratio <= 0.4142): evaluate polynomial directly
+//        Region B (ratio >  0.4142): reduce via (ratio-1)/(ratio+1), offset pi/4
+//      Both regions share a single division by blending numerator/denominator
+//      before dividing (the reduced argument is always in [-0.4142, 0.4142]).
+//   3. Cephes degree-7 minimax polynomial on the reduced argument
+//   4. Quadrant reconstruction with sign copy
+//
+// Max error: < 2 ULP  (polynomial kernel < 0.3 ULP; reconstruction adds ~1 ULP)
+//
+// Special cases (IEEE-compliant except as noted):
+//   atan2(±y, 0)   → ±pi/2        atan2(0, +x)    → 0
+//   atan2(±0, -x)  → ±pi          atan2(±0, +0)   → ±0
+// Note: atan2(±0, -0) returns ±0 (not ±pi); irrelevant for well-conditioned inputs.
+static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
+{
+    // Bit masks
+    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+    const __m256 abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+
+    // Constants
+    const __m256 zero = _mm256_setzero_ps();
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 pio4 = _mm256_set1_ps(0.78539816339744830962f);   // pi/4
+    const __m256 pio2 = _mm256_set1_ps(1.5707963267948966f);       // pi/2
+    const __m256 pi = _mm256_set1_ps(3.14159265358979324f);        // pi
+    const __m256 tanpio8 = _mm256_set1_ps(0.4142135623730950488f); // tan(pi/8)
+
+    // Cephes single-precision atan polynomial coefficients (degree 7 odd, on [-0.4142, 0.4142])
+    // atan(a) ≈ a + a * z * P(z),  z = a^2
+    // P(z) = Ap3 + Ap2*z + Ap1*z^2 + Ap0*z^3
+    const __m256 Ap0 = _mm256_set1_ps(8.05374449538e-2f);
+    const __m256 Ap1 = _mm256_set1_ps(-1.38776856032e-1f);
+    const __m256 Ap2 = _mm256_set1_ps(1.99777106478e-1f);
+    const __m256 Ap3 = _mm256_set1_ps(-3.33329491539e-1f);
+
+    // |x|, |y|
+    __m256 ax = _mm256_and_ps(x, abs_mask);
+    __m256 ay = _mm256_and_ps(y, abs_mask);
+
+    // Octant reduction: work with min/max of |x|, |y|
+    __m256 mn = _mm256_min_ps(ax, ay);
+    __m256 mx = _mm256_max_ps(ax, ay);
+
+    // Cephes two-region reduction (decided BEFORE dividing):
+    //   big = (mn > tan(pi/8) * mx)   i.e. ratio = mn/mx > 0.4142
+    //   Region A: num = mn,      den = mx       → ratio = mn/mx ∈ [0, 0.4142]
+    //   Region B: num = mn - mx, den = mn + mx  → ratio = (mn/mx-1)/(mn/mx+1) ∈ (-0.4142, 0]
+    __m256 big = _mm256_cmp_ps(mn, _mm256_mul_ps(tanpio8, mx), _CMP_GT_OQ);
+
+    __m256 num = _mm256_blendv_ps(mn, _mm256_sub_ps(mn, mx), big);
+    __m256 den = _mm256_blendv_ps(mx, _mm256_add_ps(mn, mx), big);
+
+    // Guard: if den == 0 (both x and y are zero), set den = 1 to avoid 0/0.
+    // num is also 0 in this case, so ratio = 0 → result = 0.
+    __m256 den_zero = _mm256_cmp_ps(den, zero, _CMP_EQ_OQ);
+    den = _mm256_blendv_ps(den, one, den_zero);
+
+    __m256 a = _mm256_div_ps(num, den);
+
+    // -------- Cephes polynomial: atan(a) ≈ a + a*z*P(z), z = a^2 --------
+    // Estrin evaluation of P(z) = Ap3 + Ap2*z + Ap1*z^2 + Ap0*z^3
+    //                           = (Ap3 + Ap2*z) + z^2*(Ap1 + Ap0*z)
+    __m256 z = _mm256_mul_ps(a, a);
+    __m256 z2 = _mm256_mul_ps(z, z);
+
+    __m256 t0 = _mm256_fmadd_ps(Ap2, z, Ap3);  // Ap3 + Ap2*z
+    __m256 t1 = _mm256_fmadd_ps(Ap0, z, Ap1);  // Ap1 + Ap0*z
+    __m256 poly = _mm256_fmadd_ps(t1, z2, t0); // (Ap3+Ap2*z) + z^2*(Ap1+Ap0*z)
+
+    // r = a + a*z*poly  =  fma(a*z, poly, a)
+    __m256 r = _mm256_fmadd_ps(_mm256_mul_ps(a, z), poly, a);
+
+    // Add pi/4 offset for the big-ratio region
+    r = _mm256_blendv_ps(r, _mm256_add_ps(r, pio4), big);
+
+    // Octant fixup: if |y| > |x|, we computed atan(|x|/|y|); apply identity:
+    //   atan(a) + atan(1/a) = pi/2  →  r = pi/2 - r
+    __m256 swap = _mm256_cmp_ps(ay, ax, _CMP_GT_OQ);
+    r = _mm256_blendv_ps(r, _mm256_sub_ps(pio2, r), swap);
+
+    // Quadrant fixup: if x < 0  →  r = pi - r
+    __m256 x_neg = _mm256_cmp_ps(x, zero, _CMP_LT_OQ);
+    r = _mm256_blendv_ps(r, _mm256_sub_ps(pi, r), x_neg);
+
+    // Apply sign of y (r is non-negative here, so OR with sign bit suffices)
+    r = _mm256_or_ps(r, _mm256_and_ps(y, sign_mask));
+
+    return r;
+}
+
+// Convert geographic (azimuth, elevation) to Cartesian (x, y, z)
+// Optionally returns the intermediate sincos values via restrict pointers.
+// Pass NULL for any intermediate you don't need.
+//   x = cos(el) * cos(az)
+//   y = cos(el) * sin(az)
+//   z = sin(el)
+static inline void _fm256_geo2cart_ps(__m256 az, __m256 el, __m256 *__restrict x, __m256 *__restrict y, __m256 *__restrict z,
+                                      __m256 *__restrict sAZ = nullptr, __m256 *__restrict cAZ = nullptr,
+                                      __m256 *__restrict sEL = nullptr, __m256 *__restrict cEL = nullptr)
+{
+    __m256 sa, ca, se, ce;
+    _fm256_sincos256_ps(az, &sa, &ca);
+    _fm256_sincos256_ps(el, &se, &ce);
+
+    *x = _mm256_mul_ps(ce, ca);
+    *y = _mm256_mul_ps(ce, sa);
+    *z = se;
+
+    if (sAZ)
+        *sAZ = sa;
+    if (cAZ)
+        *cAZ = ca;
+    if (sEL)
+        *sEL = se;
+    if (cEL)
+        *cEL = ce;
+}
+
+// Convert Cartesian (x, y, z) to geographic (azimuth, elevation)
+// z is clamped to [-1, +1] before asin to guard against out-of-range
+// values from upstream matrix multiplications or FMA rounding.
+//   az = atan2(y, x)
+//   el = asin(clamp(z, -1, 1))
+static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z, __m256 *__restrict az, __m256 *__restrict el)
+{
+    *az = _fm256_atan2256_ps(y, x);
+    *el = _fm256_asin256_ps(_fm256_clamp_pm1_ps(z));
+}
+
 // Convert complex RE/IM to polar form (magnitude and phase angle)
 // abs = sqrt(re² + im²),  arg = atan2(im, re)
 static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 *__restrict abs, __m256 *__restrict arg)
@@ -515,101 +649,6 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
 
     *Xr = resXr;
     *Xi = resXi;
-}
-
-// AVX2 accelerated atan2(y, x) (single precision, full domain)
-//
-// Algorithm:
-//   1. Octant reduction via min/max swap  →  ratio in [0, 1]
-//   2. Cephes two-region reduction (threshold at tan(pi/8) ≈ 0.4142):
-//        Region A (ratio <= 0.4142): evaluate polynomial directly
-//        Region B (ratio >  0.4142): reduce via (ratio-1)/(ratio+1), offset pi/4
-//      Both regions share a single division by blending numerator/denominator
-//      before dividing (the reduced argument is always in [-0.4142, 0.4142]).
-//   3. Cephes degree-7 minimax polynomial on the reduced argument
-//   4. Quadrant reconstruction with sign copy
-//
-// Max error: < 2 ULP  (polynomial kernel < 0.3 ULP; reconstruction adds ~1 ULP)
-//
-// Special cases (IEEE-compliant except as noted):
-//   atan2(±y, 0)   → ±pi/2        atan2(0, +x)    → 0
-//   atan2(±0, -x)  → ±pi          atan2(±0, +0)   → ±0
-// Note: atan2(±0, -0) returns ±0 (not ±pi); irrelevant for well-conditioned inputs.
-static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
-{
-    // Bit masks
-    const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
-    const __m256 abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
-
-    // Constants
-    const __m256 zero = _mm256_setzero_ps();
-    const __m256 one = _mm256_set1_ps(1.0f);
-    const __m256 pio4 = _mm256_set1_ps(0.78539816339744830962f);   // pi/4
-    const __m256 pio2 = _mm256_set1_ps(1.5707963267948966f);       // pi/2
-    const __m256 pi = _mm256_set1_ps(3.14159265358979324f);        // pi
-    const __m256 tanpio8 = _mm256_set1_ps(0.4142135623730950488f); // tan(pi/8)
-
-    // Cephes single-precision atan polynomial coefficients (degree 7 odd, on [-0.4142, 0.4142])
-    // atan(a) ≈ a + a * z * P(z),  z = a^2
-    // P(z) = Ap3 + Ap2*z + Ap1*z^2 + Ap0*z^3
-    const __m256 Ap0 = _mm256_set1_ps(8.05374449538e-2f);
-    const __m256 Ap1 = _mm256_set1_ps(-1.38776856032e-1f);
-    const __m256 Ap2 = _mm256_set1_ps(1.99777106478e-1f);
-    const __m256 Ap3 = _mm256_set1_ps(-3.33329491539e-1f);
-
-    // |x|, |y|
-    __m256 ax = _mm256_and_ps(x, abs_mask);
-    __m256 ay = _mm256_and_ps(y, abs_mask);
-
-    // Octant reduction: work with min/max of |x|, |y|
-    __m256 mn = _mm256_min_ps(ax, ay);
-    __m256 mx = _mm256_max_ps(ax, ay);
-
-    // Cephes two-region reduction (decided BEFORE dividing):
-    //   big = (mn > tan(pi/8) * mx)   i.e. ratio = mn/mx > 0.4142
-    //   Region A: num = mn,      den = mx       → ratio = mn/mx ∈ [0, 0.4142]
-    //   Region B: num = mn - mx, den = mn + mx  → ratio = (mn/mx-1)/(mn/mx+1) ∈ (-0.4142, 0]
-    __m256 big = _mm256_cmp_ps(mn, _mm256_mul_ps(tanpio8, mx), _CMP_GT_OQ);
-
-    __m256 num = _mm256_blendv_ps(mn, _mm256_sub_ps(mn, mx), big);
-    __m256 den = _mm256_blendv_ps(mx, _mm256_add_ps(mn, mx), big);
-
-    // Guard: if den == 0 (both x and y are zero), set den = 1 to avoid 0/0.
-    // num is also 0 in this case, so ratio = 0 → result = 0.
-    __m256 den_zero = _mm256_cmp_ps(den, zero, _CMP_EQ_OQ);
-    den = _mm256_blendv_ps(den, one, den_zero);
-
-    __m256 a = _mm256_div_ps(num, den);
-
-    // -------- Cephes polynomial: atan(a) ≈ a + a*z*P(z), z = a^2 --------
-    // Estrin evaluation of P(z) = Ap3 + Ap2*z + Ap1*z^2 + Ap0*z^3
-    //                           = (Ap3 + Ap2*z) + z^2*(Ap1 + Ap0*z)
-    __m256 z = _mm256_mul_ps(a, a);
-    __m256 z2 = _mm256_mul_ps(z, z);
-
-    __m256 t0 = _mm256_fmadd_ps(Ap2, z, Ap3);  // Ap3 + Ap2*z
-    __m256 t1 = _mm256_fmadd_ps(Ap0, z, Ap1);  // Ap1 + Ap0*z
-    __m256 poly = _mm256_fmadd_ps(t1, z2, t0); // (Ap3+Ap2*z) + z^2*(Ap1+Ap0*z)
-
-    // r = a + a*z*poly  =  fma(a*z, poly, a)
-    __m256 r = _mm256_fmadd_ps(_mm256_mul_ps(a, z), poly, a);
-
-    // Add pi/4 offset for the big-ratio region
-    r = _mm256_blendv_ps(r, _mm256_add_ps(r, pio4), big);
-
-    // Octant fixup: if |y| > |x|, we computed atan(|x|/|y|); apply identity:
-    //   atan(a) + atan(1/a) = pi/2  →  r = pi/2 - r
-    __m256 swap = _mm256_cmp_ps(ay, ax, _CMP_GT_OQ);
-    r = _mm256_blendv_ps(r, _mm256_sub_ps(pio2, r), swap);
-
-    // Quadrant fixup: if x < 0  →  r = pi - r
-    __m256 x_neg = _mm256_cmp_ps(x, zero, _CMP_LT_OQ);
-    r = _mm256_blendv_ps(r, _mm256_sub_ps(pi, r), x_neg);
-
-    // Apply sign of y (r is non-negative here, so OR with sign bit suffices)
-    r = _mm256_or_ps(r, _mm256_and_ps(y, sign_mask));
-
-    return r;
 }
 
 #endif

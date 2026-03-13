@@ -95,6 +95,38 @@ namespace quadriga_lib
                     arma::fvec &Xr,             // [out] Real part of interpolated result, Length [n]
                     arma::fvec &Xi);            // [out] Imaginary part of interpolated result, Length [n]
 
+    // Fast, approximate geographic-to-Cartesian conversion
+    // - Converts azimuth/elevation angles to unit-sphere Cartesian coordinates
+    // - x = cos(el) * cos(az), y = cos(el) * sin(az), z = sin(el)
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Optionally returns the intermediate sin/cos values for downstream use
+    // - Fallback to std::sinf/std::cosf if compiled without AVX2
+    template <typename dtype>
+    void fast_geo2cart(const arma::Col<dtype> &az, // Input azimuth angles in radians, Length [n]
+                       const arma::Col<dtype> &el, // Input elevation angles in radians, Length [n]
+                       arma::fvec &x,              // Output x-coordinates, Length [n]
+                       arma::fvec &y,              // Output y-coordinates, Length [n]
+                       arma::fvec &z,              // Output z-coordinates, Length [n]
+                       arma::fvec *sAZ = nullptr,  // Optional output: sin(az), Length [n]
+                       arma::fvec *cAZ = nullptr,  // Optional output: cos(az), Length [n]
+                       arma::fvec *sEL = nullptr,  // Optional output: sin(el), Length [n]
+                       arma::fvec *cEL = nullptr); // Optional output: cos(el), Length [n]
+
+    // Fast, approximate Cartesian-to-geographic conversion
+    // - Converts unit-sphere Cartesian coordinates to azimuth/elevation angles
+    // - az = atan2(y, x), el = asin(clamp(z, -1, 1))
+    // - z is clamped to [-1, 1] to guard against FMA rounding artefacts
+    // - Uses AVX2 to process 8 floats per vector lane
+    // - Parallelizes across cores with OpenMP
+    // - Fallback to std::atan2f/std::asinf if compiled without AVX2
+    template <typename dtype>
+    void fast_cart2geo(const arma::Col<dtype> &x, // Input x-coordinates, Length [n]
+                       const arma::Col<dtype> &y, // Input y-coordinates, Length [n]
+                       const arma::Col<dtype> &z, // Input z-coordinates, Length [n]
+                       arma::fvec &az,            // Output azimuth angles in radians, Length [n]
+                       arma::fvec &el);           // Output elevation angles in radians, Length [n]
+
 }
 
 #endif
