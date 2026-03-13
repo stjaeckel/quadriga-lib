@@ -15,8 +15,8 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
+#include "quadriga_math.hpp"
 #include "quadriga_channel.hpp"
-#include "quadriga_tools.hpp"
 
 #if defined(_MSC_VER) // Windows
 #include <malloc.h>   // Include for _aligned_malloc and _aligned_free

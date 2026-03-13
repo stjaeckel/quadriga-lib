@@ -21,8 +21,8 @@
 #include <armadillo>
 #include <string>
 #include <vector>
-#include <optional>
 
+#include "quadriga_math.hpp"
 #include "quadriga_arrayant.hpp"
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
