@@ -1,7 +1,7 @@
 // Compile: 
 // g++ -std=c++17 -mavx2 -mfma -fopenmp -O2 -I/sjc/quadriga-lib/include -I/sjc/quadriga-lib/external/armadillo-14.2.2/include -I/sjc/quadriga-lib/src -o bench_slerp benchmark_slerp.cpp  /sjc/quadriga-lib/lib/libquadriga.a
 
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include <chrono>
 #include <cstdio>
 #include <cmath>

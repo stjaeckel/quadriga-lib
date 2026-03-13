@@ -22,6 +22,23 @@
 
 #include <immintrin.h>
 
+// AVX2 signum: returns -1.0f, 0.0f, or +1.0f per lane
+static inline __m256 _fm256_signum_ps(__m256 x)
+{
+    const __m256 zero = _mm256_setzero_ps();
+    const __m256 one = _mm256_set1_ps(1.0f);
+    const __m256 neg_one = _mm256_set1_ps(-1.0f);
+    __m256 pos = _mm256_and_ps(_mm256_cmp_ps(x, zero, _CMP_GT_OQ), one);     // x > 0 → 1.0
+    __m256 neg = _mm256_and_ps(_mm256_cmp_ps(x, zero, _CMP_LT_OQ), neg_one); // x < 0 → -1.0
+    return _mm256_or_ps(pos, neg);
+}
+
+// Clamp to [-1, +1]
+static inline __m256 _fm256_clamp_pm1_ps(__m256 x)
+{
+    return _mm256_max_ps(_mm256_min_ps(x, _mm256_set1_ps(1.0f)), _mm256_set1_ps(-1.0f));
+}
+
 // Note: A SINE / COSINE-only version provides no significant performance advantage
 // Just compute both and drop the unwanted one
 static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *__restrict c)
@@ -321,6 +338,24 @@ static inline __m256 _fm256_acos256_ps(__m256 x)
     __m256 rB = _mm256_blendv_ps(rB_pos, rB_neg, neg);
 
     return _mm256_blendv_ps(rA, rB, big);
+}
+
+// Convert complex RE/IM to polar form (magnitude and phase angle)
+// abs = sqrt(re² + im²),  arg = atan2(im, re)
+static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 *__restrict abs, __m256 *__restrict arg)
+{
+    *abs = _mm256_sqrt_ps(_mm256_fmadd_ps(re, re, _mm256_mul_ps(im, im)));
+    *arg = _fm256_atan2256_ps(im, re);
+}
+
+// Convert polar form (magnitude and phase angle) to complex RE/IM
+// Equivalent to std::polar(abs, arg): re = abs * cos(arg),  im = abs * sin(arg)
+static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 *__restrict re, __m256 *__restrict im)
+{
+    __m256 s, c;
+    _fm256_sincos256_ps(arg, &s, &c);
+    *re = _mm256_mul_ps(abs, c);
+    *im = _mm256_mul_ps(abs, s);
 }
 
 // AVX2 accelerated spherical interpolation (SLERP) for complex value pairs
