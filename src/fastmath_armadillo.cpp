@@ -397,7 +397,7 @@ Interpolates elementwise between two complex-valued vectors using spherical line
 - Parallelizes across cores with OpenMP when enabled
 - Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback
 - If both input amplitudes are negligible, the output is zero
-- Maximum error versus double-precision reference is approximately 100 ULP (~1.2e-5 relative error, ~17.5 effective bits)
+- Maximum error versus double-precision reference is approximately 5 ULP
 - Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
 - All input vectors must have the same length
 
