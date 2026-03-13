@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "fastmath_vectorized_generic.h"
 
 #if BUILD_WITH_AVX2
@@ -24,7 +24,7 @@
 #endif
 
 /*!SECTION
-Miscellaneous / Tools
+Math Functions
 SECTION!*/
 
 /*!MD

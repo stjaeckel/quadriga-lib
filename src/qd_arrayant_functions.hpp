@@ -45,6 +45,20 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re,       // Verti
                              arma::Mat<dtype> *elevation_loc = nullptr, // Elevation angles [rad] in local antenna coordinates, optional,  Size [n_out, n_ang] or []
                              arma::Mat<dtype> *gamma = nullptr);        // Polarization rotation angles in [rad], optional,                Size [n_out, n_ang] or []
 
+template <typename dtype>
+void qd_arrayant_interpolate_avx2(const arma::Cube<dtype> *e_theta_re, const arma::Cube<dtype> *e_theta_im,
+                                  const arma::Cube<dtype> *e_phi_re, const arma::Cube<dtype> *e_phi_im,
+                                  const arma::Col<dtype> *azimuth_grid, const arma::Col<dtype> *elevation_grid,
+                                  const arma::Mat<dtype> *azimuth, const arma::Mat<dtype> *elevation,
+                                  const arma::Col<unsigned> *i_element, const arma::Cube<dtype> *orientation,
+                                  const arma::Mat<dtype> *element_pos,
+                                  arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
+                                  arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+                                  arma::Mat<dtype> *dist = nullptr,
+                                  arma::Mat<dtype> *azimuth_loc = nullptr,
+                                  arma::Mat<dtype> *elevation_loc = nullptr,
+                                  arma::Mat<dtype> *gamma = nullptr);
+
 // Returns empty string if there was no error or an error message otherwise
 template <typename dtype> // float or double
 std::string qd_arrayant_qdant_read(const std::string fn, const int id,
