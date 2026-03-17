@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "quadriga_arrayant.hpp"
-#include "qd_arrayant_functions.hpp"
+#include "qd_arrayant_interpolate.hpp"
 
 #include <stdexcept>
 #include <string>
