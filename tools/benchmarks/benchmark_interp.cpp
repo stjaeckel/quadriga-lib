@@ -4,8 +4,9 @@
 // Note: qd_arrayant_interpolate_avx2.cpp must be compiled into the library
 //       (or linked separately) before building this benchmark.
 
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_tools.hpp"
+#include "qd_arrayant_interpolate.hpp"
+#include "qd_arrayant_interpolate_avx2.hpp"
+
 #include <chrono>
 #include <cstdio>
 #include <cmath>

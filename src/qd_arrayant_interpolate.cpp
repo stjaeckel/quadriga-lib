@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <iostream>
-#include "qd_arrayant_functions.hpp"
-#include "quadriga_tools.hpp"
+#include "qd_arrayant_interpolate.hpp"
 
 // Implements signum (-1, 0, or 1)
 template <typename dtype>
@@ -25,6 +23,52 @@ static inline dtype signum(dtype val)
 {
     constexpr dtype zero = dtype(0.0);
     return dtype((zero < val) - (val < zero));
+}
+
+// Euler rotations to rotation matrix
+template <typename dtype>
+static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientation vectors (Euler rotations)
+                                      dtype *rotation_matrix_9xN,    // Rotation matrix in column-major ordering
+                                      size_t N = 1,                  // Number of elements
+                                      bool invert_y_axis = false,    // Inverts the y-axis
+                                      bool transposeR = false)       // Returns the transpose of R
+{
+    for (size_t i = 0; i < 3 * N; i += 3)
+    {
+        const dtype *O = &euler_angles_3xN[i];
+        dtype *R = &rotation_matrix_9xN[3 * i];
+
+        double cc = (double)O[0], sc = std::sin(cc);
+        double cb = (double)O[1], sb = std::sin(cb);
+        double ca = (double)O[2], sa = std::sin(ca);
+        ca = std::cos(ca), cb = std::cos(cb), cc = std::cos(cc);
+        sb = invert_y_axis ? -sb : sb;
+
+        if (transposeR)
+        {
+            R[0] = dtype(ca * cb);
+            R[1] = dtype(ca * sb * sc - sa * cc);
+            R[2] = dtype(ca * sb * cc + sa * sc);
+            R[3] = dtype(sa * cb);
+            R[4] = dtype(sa * sb * sc + ca * cc);
+            R[5] = dtype(sa * sb * cc - ca * sc);
+            R[6] = dtype(-sb);
+            R[7] = dtype(cb * sc);
+            R[8] = dtype(cb * cc);
+        }
+        else
+        {
+            R[0] = dtype(ca * cb);
+            R[1] = dtype(sa * cb);
+            R[2] = dtype(-sb);
+            R[3] = dtype(ca * sb * sc - sa * cc);
+            R[4] = dtype(sa * sb * sc + ca * cc);
+            R[5] = dtype(cb * sc);
+            R[6] = dtype(ca * sb * cc + sa * sc);
+            R[7] = dtype(sa * sb * cc - ca * sc);
+            R[8] = dtype(cb * cc);
+        }
+    }
 }
 
 template <typename dtype>
@@ -82,7 +126,8 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     dtype *p_gamma = (gamma == nullptr || gamma->is_empty()) ? nullptr : gamma->memptr();
 
     // Rotation matrix [3,3,n_out] or [3,3,1]
-    arma::Cube<dtype> R_typed = quadriga_lib::calc_rotation_matrix(*orientation, true, true);
+    arma::Cube<dtype> R_typed(9, orientation->n_cols, orientation->n_slices, arma::fill::none);
+    qd_rotation_matrix(orientation->memptr(), R_typed.memptr(), orientation->n_cols * orientation->n_slices, true, true);
 
     // Obtain pointers for direct memory access
     const unsigned *p_i_element = i_element->memptr();                                  // Elements

@@ -24,6 +24,7 @@
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "qd_arrayant_interpolate.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION

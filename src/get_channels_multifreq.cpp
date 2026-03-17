@@ -23,8 +23,8 @@
 #include <limits>
 
 #include "quadriga_arrayant.hpp"
-#include "qd_arrayant_functions.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "qd_arrayant_interpolate.hpp"
 #include "slerp.h"
 
 /*!SECTION
