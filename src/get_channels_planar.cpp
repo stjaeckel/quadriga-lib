@@ -239,12 +239,12 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     dtype dist_rx_tx = std::sqrt(x * x + y * y + z * z);
 
     // Interpolate the antenna patterns for all paths
-    arma::Mat<dtype> Vt_re(n_tx, n_out, arma::fill::none), Vt_im(n_tx, n_out, arma::fill::none),
-        Ht_re(n_tx, n_out, arma::fill::none), Ht_im(n_tx, n_out, arma::fill::none),
-        Vr_re(n_rx, n_out, arma::fill::none), Vr_im(n_rx, n_out, arma::fill::none),
-        Hr_re(n_rx, n_out, arma::fill::none), Hr_im(n_rx, n_out, arma::fill::none),
-        Pt(n_tx, n_out, arma::fill::none), Pr(n_rx, n_out, arma::fill::none);
-    arma::Mat<dtype> AOA_loc, EOA_loc, EMPTY;
+    arma::Mat<dtype> Vt_re(n_tx, n_path, arma::fill::none), Vt_im(n_tx, n_path, arma::fill::none),
+        Ht_re(n_tx, n_path, arma::fill::none), Ht_im(n_tx, n_path, arma::fill::none),
+        Vr_re(n_rx, n_path, arma::fill::none), Vr_im(n_rx, n_path, arma::fill::none),
+        Hr_re(n_rx, n_path, arma::fill::none), Hr_im(n_rx, n_path, arma::fill::none),
+        Pt(n_tx, n_path, arma::fill::none), Pr(n_rx, n_path, arma::fill::none);
+    arma::Mat<dtype> AOA_loc, EOA_loc;
 
     // To calculate the Doppler weights, we need the arrival in local antenna-coordinates
     if (rx_Doppler != nullptr)
@@ -264,10 +264,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     if (tx_array->element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), tx_array->element_pos.memptr(), 3ULL * n_tx * sizeof(dtype));
 
-    qd_arrayant_interpolate(&tx_array->e_theta_re, &tx_array->e_theta_im, &tx_array->e_phi_re, &tx_array->e_phi_im,
-                            &tx_array->azimuth_grid, &tx_array->elevation_grid, &AOD, &EOD,
-                            &i_element, &tx_orientation, &element_pos_interp,
-                            &Vt_re, &Vt_im, &Ht_re, &Ht_im, &Pt, &EMPTY, &EMPTY, &EMPTY);
+    qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
+                            tx_array->azimuth_grid, tx_array->elevation_grid, AOD, EOD,
+                            i_element, tx_orientation, element_pos_interp,
+                            Vt_re, Vt_im, Ht_re, Ht_im, &Pt);
 
     i_element.set_size(n_rx);
     p_element = i_element.memptr();
@@ -278,10 +278,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     if (rx_array->element_pos.n_elem != 0ULL)
         std::memcpy(element_pos_interp.memptr(), rx_array->element_pos.memptr(), 3ULL * n_rx * sizeof(dtype));
 
-    qd_arrayant_interpolate(&rx_array->e_theta_re, &rx_array->e_theta_im, &rx_array->e_phi_re, &rx_array->e_phi_im,
-                            &rx_array->azimuth_grid, &rx_array->elevation_grid, &AOA, &EOA,
-                            &i_element, &rx_orientation, &element_pos_interp,
-                            &Vr_re, &Vr_im, &Hr_re, &Hr_im, &Pr, &AOA_loc, &EOA_loc, &EMPTY);
+    qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
+                            rx_array->azimuth_grid, rx_array->elevation_grid, AOA, EOA,
+                            i_element, rx_orientation, element_pos_interp,
+                            Vr_re, Vr_im, Hr_re, Hr_im, &Pr, &AOA_loc, &EOA_loc);
 
     element_pos_interp.reset();
 

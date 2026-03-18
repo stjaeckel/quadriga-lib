@@ -486,18 +486,20 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         // Calculate TX antenna response
         const arma::Mat<dtype> AOD_j(&p_aod[o_slice], n_links, 1, false, true);
         const arma::Mat<dtype> EOD_j(&p_eod[o_slice], n_links, 1, false, true);
-        qd_arrayant_interpolate(&tx_array->e_theta_re, &tx_array->e_theta_im, &tx_array->e_phi_re, &tx_array->e_phi_im,
-                                &tx_array->azimuth_grid, &tx_array->elevation_grid, &AOD_j, &EOD_j,
-                                &i_tx_element, &tx_orientation, &tx_element_pos_interp,
-                                &Vt_re, &Vt_im, &Ht_re, &Ht_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+        
+        qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
+                                tx_array->azimuth_grid, tx_array->elevation_grid, AOD_j, EOD_j,
+                                i_tx_element, tx_orientation, tx_element_pos_interp,
+                                Vt_re, Vt_im, Ht_re, Ht_im);
 
         // Calculate RX antenna response
         const arma::Mat<dtype> AOA_j(&p_aoa[o_slice], n_links, 1, false, true);
         const arma::Mat<dtype> EOA_j(&p_eoa[o_slice], n_links, 1, false, true);
-        qd_arrayant_interpolate(&rx_array->e_theta_re, &rx_array->e_theta_im, &rx_array->e_phi_re, &rx_array->e_phi_im,
-                                &rx_array->azimuth_grid, &rx_array->elevation_grid, &AOA_j, &EOA_j,
-                                &i_rx_element, &rx_orientation, &rx_element_pos_interp,
-                                &Vr_re, &Vr_im, &Hr_re, &Hr_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+
+        qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
+                                rx_array->azimuth_grid, rx_array->elevation_grid, AOA_j, EOA_j,
+                                i_rx_element, rx_orientation, rx_element_pos_interp,
+                                Vr_re, Vr_im, Hr_re, Hr_im);
 
         // Calculate the MIMO channel coefficients
         const dtype *pM = M->colptr(i);
