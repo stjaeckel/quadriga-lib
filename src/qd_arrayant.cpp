@@ -411,10 +411,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
     arma::Mat<dtype> V_re(n_elements, n_ang), V_im(n_elements, n_ang), H_re(n_elements, n_ang), H_im(n_elements, n_ang), dist(n_elements, n_ang);
     arma::Mat<dtype> EMPTY;
 
-    qd_arrayant_interpolate(&this->e_theta_re, &this->e_theta_im, &this->e_phi_re, &this->e_phi_im,
-                            &this->azimuth_grid, &this->elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, p_element_pos,
-                            &V_re, &V_im, &H_re, &H_im, &dist, &EMPTY, &EMPTY, &EMPTY);
+    qd_arrayant_interpolate(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
+                            azimuth_grid, elevation_grid, azimuth, elevation,
+                            i_element, orientation, *p_element_pos,
+                            V_re, V_im, H_re, H_im, &dist);
 
     // Apply phase shift caused by element positions
     double lambda = 299792448.0 / (double)this->center_frequency;
@@ -1223,10 +1223,10 @@ void quadriga_lib::arrayant<dtype>::interpolate(const arma::Mat<dtype> *azimuth,
     }
 
     // Call private library function
-    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                            &azimuth_grid, &elevation_grid, azimuth, elevation,
-                            &i_element_int, orientation_local, &element_pos_local,
-                            V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma);
+    qd_arrayant_interpolate<dtype>(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
+                                   azimuth_grid, elevation_grid, *azimuth, *elevation,
+                                   i_element_int, *orientation_local, element_pos_local,
+                                   *V_re, *V_im, *H_re, *H_im, dist, azimuth_loc, elevation_loc, gamma);
 }
 
 /*!MD
@@ -1685,6 +1685,14 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     else
         element_pos_update = element_pos;
 
+    // Create a view of element_pos sized [3, n_out] for the interpolator
+    // When use_all_elements is false, n_out=1 but element_pos_update is [3, n_elements]
+    arma::Mat<dtype> element_pos_interp;
+    if (use_all_elements)
+        element_pos_interp = element_pos_update;
+    else
+        element_pos_interp = element_pos_update.col(element);
+
     unsigned long long n_el = e_theta_re.n_rows;
     unsigned long long n_az = e_theta_re.n_cols;
     unsigned long long n_out = i_element.n_elem;
@@ -1863,18 +1871,18 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(dtype x_deg, dtype y_deg, dty
     else if (usage == 2)
         gamma.set_size(n_out, n_ang);
 
-    qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                            &azimuth_grid, &elevation_grid, &azimuth, &elevation,
-                            &i_element, &orientation, &element_pos_update,
-                            &V_re, &V_im, &H_re, &H_im, &EMPTY, &azimuth_loc, &elevation_loc, &gamma);
+    qd_arrayant_interpolate<dtype>(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
+                                   azimuth_grid, elevation_grid, azimuth, elevation,
+                                   i_element, orientation, element_pos_interp,
+                                   V_re, V_im, H_re, H_im, nullptr, &azimuth_loc, &elevation_loc, &gamma);
     azimuth.reset(), elevation.reset();
 
     orientation.zeros();
     if (usage == 1 || usage == 4) // Only return interpolated pattern (ignore polarization)
-        qd_arrayant_interpolate(&e_theta_re, &e_theta_im, &e_phi_re, &e_phi_im,
-                                &azimuth_grid, &elevation_grid, &azimuth_loc, &elevation_loc,
-                                &i_element, &orientation, &element_pos_update,
-                                &V_re, &V_im, &H_re, &H_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+        qd_arrayant_interpolate(e_theta_re, e_theta_im, e_phi_re, e_phi_im,
+                                azimuth_grid, elevation_grid, azimuth_loc, elevation_loc,
+                                i_element, orientation, element_pos_interp,
+                                V_re, V_im, H_re, H_im);
     azimuth_loc.reset(), elevation_loc.reset();
 
     // Adjust size of output, if needed

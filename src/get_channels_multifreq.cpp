@@ -835,7 +835,6 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             // --- Interpolate TX antenna at departure angles ---
             const arma::Mat<dtype> AOD_j(&p_aod[o_slice], n_links, 1, false, true);
             const arma::Mat<dtype> EOD_j(&p_eod[o_slice], n_links, 1, false, true);
-            arma::Mat<dtype> EMPTY;
 
             arma::Mat<dtype> Vt_re(n_links, 1), Vt_im(n_links, 1);
             arma::Mat<dtype> Ht_re(n_links, 1), Ht_im(n_links, 1);
@@ -843,10 +842,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             if (tx_exact)
             {
                 const auto &ta = tx_array[tx_lo];
-                qd_arrayant_interpolate(&ta.e_theta_re, &ta.e_theta_im, &ta.e_phi_re, &ta.e_phi_im,
-                                        &ta.azimuth_grid, &ta.elevation_grid, &AOD_j, &EOD_j,
-                                        &i_tx_element, &tx_orientation, &tx_element_pos_interp,
-                                        &Vt_re, &Vt_im, &Ht_re, &Ht_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+                qd_arrayant_interpolate(ta.e_theta_re, ta.e_theta_im, ta.e_phi_re, ta.e_phi_im,
+                                        ta.azimuth_grid, ta.elevation_grid, AOD_j, EOD_j,
+                                        i_tx_element, tx_orientation, tx_element_pos_interp,
+                                        Vt_re, Vt_im, Ht_re, Ht_im);
             }
             else
             {
@@ -856,16 +855,16 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 arma::Mat<dtype> Ht_re_hi(n_links, 1), Ht_im_hi(n_links, 1);
 
                 const auto &ta_lo = tx_array[tx_lo];
-                qd_arrayant_interpolate(&ta_lo.e_theta_re, &ta_lo.e_theta_im, &ta_lo.e_phi_re, &ta_lo.e_phi_im,
-                                        &ta_lo.azimuth_grid, &ta_lo.elevation_grid, &AOD_j, &EOD_j,
-                                        &i_tx_element, &tx_orientation, &tx_element_pos_interp,
-                                        &Vt_re_lo, &Vt_im_lo, &Ht_re_lo, &Ht_im_lo, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+                qd_arrayant_interpolate(ta_lo.e_theta_re, ta_lo.e_theta_im, ta_lo.e_phi_re, ta_lo.e_phi_im,
+                                        ta_lo.azimuth_grid, ta_lo.elevation_grid, AOD_j, EOD_j,
+                                        i_tx_element, tx_orientation, tx_element_pos_interp,
+                                        Vt_re_lo, Vt_im_lo, Ht_re_lo, Ht_im_lo);
 
                 const auto &ta_hi = tx_array[tx_hi];
-                qd_arrayant_interpolate(&ta_hi.e_theta_re, &ta_hi.e_theta_im, &ta_hi.e_phi_re, &ta_hi.e_phi_im,
-                                        &ta_hi.azimuth_grid, &ta_hi.elevation_grid, &AOD_j, &EOD_j,
-                                        &i_tx_element, &tx_orientation, &tx_element_pos_interp,
-                                        &Vt_re_hi, &Vt_im_hi, &Ht_re_hi, &Ht_im_hi, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+                qd_arrayant_interpolate(ta_hi.e_theta_re, ta_hi.e_theta_im, ta_hi.e_phi_re, ta_hi.e_phi_im,
+                                        ta_hi.azimuth_grid, ta_hi.elevation_grid, AOD_j, EOD_j,
+                                        i_tx_element, tx_orientation, tx_element_pos_interp,
+                                        Vt_re_hi, Vt_im_hi, Ht_re_hi, Ht_im_hi);
 
                 // SLERP blend between bracket entries
                 dtype *vtr = Vt_re.memptr(), *vti = Vt_im.memptr();
@@ -891,10 +890,10 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             if (rx_exact)
             {
                 const auto &ra = rx_array[rx_lo];
-                qd_arrayant_interpolate(&ra.e_theta_re, &ra.e_theta_im, &ra.e_phi_re, &ra.e_phi_im,
-                                        &ra.azimuth_grid, &ra.elevation_grid, &AOA_j, &EOA_j,
-                                        &i_rx_element, &rx_orientation, &rx_element_pos_interp,
-                                        &Vr_re, &Vr_im, &Hr_re, &Hr_im, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+                qd_arrayant_interpolate(ra.e_theta_re, ra.e_theta_im, ra.e_phi_re, ra.e_phi_im,
+                                        ra.azimuth_grid, ra.elevation_grid, AOA_j, EOA_j,
+                                        i_rx_element, rx_orientation, rx_element_pos_interp,
+                                        Vr_re, Vr_im, Hr_re, Hr_im);
             }
             else
             {
@@ -904,16 +903,18 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 arma::Mat<dtype> Hr_re_hi(n_links, 1), Hr_im_hi(n_links, 1);
 
                 const auto &ra_lo = rx_array[rx_lo];
-                qd_arrayant_interpolate(&ra_lo.e_theta_re, &ra_lo.e_theta_im, &ra_lo.e_phi_re, &ra_lo.e_phi_im,
-                                        &ra_lo.azimuth_grid, &ra_lo.elevation_grid, &AOA_j, &EOA_j,
-                                        &i_rx_element, &rx_orientation, &rx_element_pos_interp,
-                                        &Vr_re_lo, &Vr_im_lo, &Hr_re_lo, &Hr_im_lo, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+
+                qd_arrayant_interpolate(ra_lo.e_theta_re, ra_lo.e_theta_im, ra_lo.e_phi_re, ra_lo.e_phi_im,
+                                        ra_lo.azimuth_grid, ra_lo.elevation_grid, AOA_j, EOA_j,
+                                        i_rx_element, rx_orientation, rx_element_pos_interp,
+                                        Vr_re_lo, Vr_im_lo, Hr_re_lo, Hr_im_lo);
 
                 const auto &ra_hi = rx_array[rx_hi];
-                qd_arrayant_interpolate(&ra_hi.e_theta_re, &ra_hi.e_theta_im, &ra_hi.e_phi_re, &ra_hi.e_phi_im,
-                                        &ra_hi.azimuth_grid, &ra_hi.elevation_grid, &AOA_j, &EOA_j,
-                                        &i_rx_element, &rx_orientation, &rx_element_pos_interp,
-                                        &Vr_re_hi, &Vr_im_hi, &Hr_re_hi, &Hr_im_hi, &EMPTY, &EMPTY, &EMPTY, &EMPTY);
+
+                qd_arrayant_interpolate(ra_hi.e_theta_re, ra_hi.e_theta_im, ra_hi.e_phi_re, ra_hi.e_phi_im,
+                                        ra_hi.azimuth_grid, ra_hi.elevation_grid, AOA_j, EOA_j,
+                                        i_rx_element, rx_orientation, rx_element_pos_interp,
+                                        Vr_re_hi, Vr_im_hi, Hr_re_hi, Hr_im_hi);
 
                 dtype *vrr = Vr_re.memptr(), *vri = Vr_im.memptr();
                 dtype *hrr = Hr_re.memptr(), *hri = Hr_im.memptr();

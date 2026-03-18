@@ -344,13 +344,12 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<quadriga_lib::ar
         if ((arma::sword)idx_lo != cached_lo)
         {
             const auto &ant_lo = arrayant_vec[idx_lo];
-            qd_arrayant_interpolate<dtype>(&ant_lo.e_theta_re, &ant_lo.e_theta_im,
-                                           &ant_lo.e_phi_re, &ant_lo.e_phi_im,
-                                           &ant_lo.azimuth_grid, &ant_lo.elevation_grid,
-                                           azimuth, elevation,
-                                           &i_element_1based, orientation_local, &element_pos_local,
-                                           &V_re_lo, &V_im_lo, &H_re_lo, &H_im_lo,
-                                           nullptr, nullptr, nullptr, nullptr);
+            qd_arrayant_interpolate<dtype>(ant_lo.e_theta_re, ant_lo.e_theta_im,
+                                           ant_lo.e_phi_re, ant_lo.e_phi_im,
+                                           ant_lo.azimuth_grid, ant_lo.elevation_grid,
+                                           *azimuth, *elevation,
+                                           i_element_1based, *orientation_local, element_pos_local,
+                                           V_re_lo, V_im_lo, H_re_lo, H_im_lo);
             cached_lo = (arma::sword)idx_lo;
         }
 
@@ -368,13 +367,12 @@ void quadriga_lib::arrayant_interpolate_multi(const std::vector<quadriga_lib::ar
             if ((arma::sword)idx_hi != cached_hi)
             {
                 const auto &ant_hi = arrayant_vec[idx_hi];
-                qd_arrayant_interpolate<dtype>(&ant_hi.e_theta_re, &ant_hi.e_theta_im,
-                                               &ant_hi.e_phi_re, &ant_hi.e_phi_im,
-                                               &ant_hi.azimuth_grid, &ant_hi.elevation_grid,
-                                               azimuth, elevation,
-                                               &i_element_1based, orientation_local, &element_pos_local,
-                                               &V_re_hi, &V_im_hi, &H_re_hi, &H_im_hi,
-                                               nullptr, nullptr, nullptr, nullptr);
+                qd_arrayant_interpolate<dtype>(ant_hi.e_theta_re, ant_hi.e_theta_im,
+                                               ant_hi.e_phi_re, ant_hi.e_phi_im,
+                                               ant_hi.azimuth_grid, ant_hi.elevation_grid,
+                                               *azimuth, *elevation,
+                                               i_element_1based, *orientation_local, element_pos_local,
+                                               V_re_hi, V_im_hi, H_re_hi, H_im_hi);
                 cached_hi = (arma::sword)idx_hi;
             }
 

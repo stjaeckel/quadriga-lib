@@ -16,6 +16,8 @@
 // ------------------------------------------------------------------------
 
 #include "qd_arrayant_interpolate.hpp"
+#include <memory>
+#include <stdexcept>
 
 // Implements signum (-1, 0, or 1)
 template <typename dtype>
@@ -72,52 +74,80 @@ static inline void qd_rotation_matrix(const dtype *euler_angles_3xN, // Orientat
 }
 
 template <typename dtype>
-void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cube<dtype> *e_theta_im,
-                             const arma::Cube<dtype> *e_phi_re, const arma::Cube<dtype> *e_phi_im,
-                             const arma::Col<dtype> *azimuth_grid, const arma::Col<dtype> *elevation_grid,
-                             const arma::Mat<dtype> *azimuth, const arma::Mat<dtype> *elevation,
-                             const arma::Col<unsigned> *i_element, const arma::Cube<dtype> *orientation,
-                             const arma::Mat<dtype> *element_pos,
-                             arma::Mat<dtype> *V_re, arma::Mat<dtype> *V_im,
-                             arma::Mat<dtype> *H_re, arma::Mat<dtype> *H_im,
+void qd_arrayant_interpolate(const arma::Cube<dtype> &e_theta_re, const arma::Cube<dtype> &e_theta_im,
+                             const arma::Cube<dtype> &e_phi_re, const arma::Cube<dtype> &e_phi_im,
+                             const arma::Col<dtype> &azimuth_grid, const arma::Col<dtype> &elevation_grid,
+                             const arma::Mat<dtype> &azimuth, const arma::Mat<dtype> &elevation,
+                             const arma::Col<unsigned> &i_element, const arma::Cube<dtype> &orientation,
+                             const arma::Mat<dtype> &element_pos,
+                             arma::Mat<dtype> &V_re, arma::Mat<dtype> &V_im,
+                             arma::Mat<dtype> &H_re, arma::Mat<dtype> &H_im,
                              arma::Mat<dtype> *dist,
                              arma::Mat<dtype> *azimuth_loc, arma::Mat<dtype> *elevation_loc, arma::Mat<dtype> *gamma)
 {
-    // Inputs:
-    // e_theta_re       Vertical component of the electric field, real part,            Size [n_elevation, n_azimuth, n_elements]
-    // e_theta_im       Vertical component of the electric field, imaginary part,       Size [n_elevation, n_azimuth, n_elements]
-    // e_phi_re         Horizontal component of the electric field, real part,          Size [n_elevation, n_azimuth, n_elements]
-    // e_phi_im         Horizontal component of the electric field, imaginary part,     Size [n_elevation, n_azimuth, n_elements]
-    // azimuth_grid     Azimuth angles in pattern (theta) in [rad], sorted,             Vector of length "n_azimuth"
-    // elevation_grid   Elevation angles in pattern (phi) in [rad], sorted,             Vector of length "n_elevation"
-    // azimuth          Azimuth angles for interpolation in [rad],                      Size [1, n_ang] or [n_out, n_ang]
-    // elevation        Elevation angles for interpolation in [rad],                    Size [1, n_ang] or [n_out, n_ang]
-    // i_element        Element indices, 1-based                                        Vector of length "n_out"
-    // orientation      Orientation of the array antenna (bank, tilt, head) in [rad],   Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
-    // element_pos      Element positions                                               Size [3, n_out]
+    // Note: This function is the scalar reference implementation for antenna pattern interpolation.
 
-    // Outputs:
-    // V_re             Interpolated vertical field, real part,                         Size [n_out, n_ang]
-    // V_im             Interpolated vertical field, imaginary part,                    Size [n_out, n_ang]
-    // H_re             Interpolated horizontal field, real part,                       Size [n_out, n_ang]
-    // H_im             Interpolated horizontal field, imaginary part,                  Size [n_out, n_ang]
-    // dist             Effective distances, optional                                   Size [n_out, n_ang] or []
-    // azimuth_loc      Azimuth angles [rad] in local antenna coordinates, optional,    Size [n_out, n_ang] or []
-    // elevation_loc    Elevation angles [rad] in local antenna coordinates, optional,  Size [n_out, n_ang] or []
-    // gamma            Polarization rotation angles in [rad], optional,                Size [n_out, n_ang] or []
-
-    // Note: This function is not intended to be publicly accessible. There is no input validation.
-    // Incorrectly formatted arguments may lead to undefined behavior or segmentation faults.
-
-    const size_t n_elevation = (size_t)e_theta_re->n_rows;    // Number of elevation angles in the pattern
-    const size_t n_azimuth = (size_t)e_theta_re->n_cols;      // Number of azimuth angles in the pattern
+    const size_t n_elevation = (size_t)e_theta_re.n_rows;    // Number of elevation angles in the pattern
+    const size_t n_azimuth = (size_t)e_theta_re.n_cols;      // Number of azimuth angles in the pattern
     const size_t n_pattern_samples = n_azimuth * n_elevation; // Number of samples in the pattern
-    const size_t n_out = (size_t)i_element->n_elem;           // Number of elements in the output
-    const size_t n_ang = (size_t)azimuth->n_cols;             // Number of angles to be interpolated
+    const size_t n_out = (size_t)i_element.n_elem;            // Number of elements in the output
+    const size_t n_ang = (size_t)azimuth.n_cols;              // Number of angles to be interpolated
 
-    bool per_element_angles = azimuth->n_rows > 1 ? true : false;
-    bool per_element_rotation = orientation->n_cols > 1 ? true : false;
-    bool per_angle_rotation = orientation->n_slices > 1 ? true : false;
+    // Fix 1: Early return for empty inputs (avoids wraparound UB on n_azimuth-1 etc.)
+    if (n_out == 0 || n_ang == 0)
+        return;
+
+    // Fix 7: Grid must have at least one sample
+    if (n_azimuth == 0 || n_elevation == 0)
+        throw std::invalid_argument("qd_arrayant_interpolate: Grid dimensions must be >= 1.");
+
+    // Fix 5: Pattern cubes must have matching dimensions
+    const size_t n_elements = (size_t)e_theta_re.n_slices;
+    if (e_theta_im.n_rows != n_elevation || e_theta_im.n_cols != n_azimuth || e_theta_im.n_slices != n_elements ||
+        e_phi_re.n_rows != n_elevation || e_phi_re.n_cols != n_azimuth || e_phi_re.n_slices != n_elements ||
+        e_phi_im.n_rows != n_elevation || e_phi_im.n_cols != n_azimuth || e_phi_im.n_slices != n_elements)
+        throw std::invalid_argument("qd_arrayant_interpolate: Pattern cubes must have matching [n_elevation, n_azimuth, n_elements] dimensions.");
+
+    if (azimuth_grid.n_elem != n_azimuth)
+        throw std::invalid_argument("qd_arrayant_interpolate: azimuth_grid length must equal n_azimuth.");
+    if (elevation_grid.n_elem != n_elevation)
+        throw std::invalid_argument("qd_arrayant_interpolate: elevation_grid length must equal n_elevation.");
+
+    if (azimuth.n_cols != elevation.n_cols || azimuth.n_rows != elevation.n_rows)
+        throw std::invalid_argument("qd_arrayant_interpolate: azimuth and elevation must have the same size.");
+
+    if (orientation.n_rows != 3)
+        throw std::invalid_argument("qd_arrayant_interpolate: orientation must have 3 rows.");
+
+    if (element_pos.n_rows != 3 || element_pos.n_cols != n_out)
+        throw std::invalid_argument("qd_arrayant_interpolate: element_pos must be [3, n_out].");
+
+    // Fix 2: Validate i_element bounds (1-based, must be in [1, n_elements])
+    const unsigned *p_i_element = i_element.memptr();
+    for (size_t o = 0; o < n_out; ++o)
+        if (p_i_element[o] < 1 || p_i_element[o] > (unsigned)n_elements)
+            throw std::out_of_range("qd_arrayant_interpolate: i_element contains out-of-range index.");
+
+    // Fix 4: Validate mandatory output sizes (must be pre-allocated)
+    if (V_re.n_rows != n_out || V_re.n_cols != n_ang ||
+        V_im.n_rows != n_out || V_im.n_cols != n_ang ||
+        H_re.n_rows != n_out || H_re.n_cols != n_ang ||
+        H_im.n_rows != n_out || H_im.n_cols != n_ang)
+        throw std::invalid_argument("qd_arrayant_interpolate: Output matrices V_re/V_im/H_re/H_im must be pre-allocated to [n_out, n_ang].");
+
+    // Validate optional output sizes if provided and non-empty
+    if (dist != nullptr && !dist->is_empty() && (dist->n_rows != n_out || dist->n_cols != n_ang))
+        throw std::invalid_argument("qd_arrayant_interpolate: dist must be [n_out, n_ang] if provided.");
+    if (azimuth_loc != nullptr && !azimuth_loc->is_empty() && (azimuth_loc->n_rows != n_out || azimuth_loc->n_cols != n_ang))
+        throw std::invalid_argument("qd_arrayant_interpolate: azimuth_loc must be [n_out, n_ang] if provided.");
+    if (elevation_loc != nullptr && !elevation_loc->is_empty() && (elevation_loc->n_rows != n_out || elevation_loc->n_cols != n_ang))
+        throw std::invalid_argument("qd_arrayant_interpolate: elevation_loc must be [n_out, n_ang] if provided.");
+    if (gamma != nullptr && !gamma->is_empty() && (gamma->n_rows != n_out || gamma->n_cols != n_ang))
+        throw std::invalid_argument("qd_arrayant_interpolate: gamma must be [n_out, n_ang] if provided.");
+
+    bool per_element_angles = azimuth.n_rows > 1 ? true : false;
+    bool per_element_rotation = orientation.n_cols > 1 ? true : false;
+    bool per_angle_rotation = orientation.n_slices > 1 ? true : false;
 
     // Output pointers
     dtype *p_dist = (dist == nullptr || dist->is_empty()) ? nullptr : dist->memptr();
@@ -126,17 +156,16 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
     dtype *p_gamma = (gamma == nullptr || gamma->is_empty()) ? nullptr : gamma->memptr();
 
     // Rotation matrix [3,3,n_out] or [3,3,1]
-    arma::Cube<dtype> R_typed(9, orientation->n_cols, orientation->n_slices, arma::fill::none);
-    qd_rotation_matrix(orientation->memptr(), R_typed.memptr(), orientation->n_cols * orientation->n_slices, true, true);
+    arma::Cube<dtype> R_typed(9, orientation.n_cols, orientation.n_slices, arma::fill::none);
+    qd_rotation_matrix(orientation.memptr(), R_typed.memptr(), orientation.n_cols * orientation.n_slices, true, true);
 
     // Obtain pointers for direct memory access
-    const unsigned *p_i_element = i_element->memptr();                                  // Elements
-    const dtype *p_theta_re = e_theta_re->memptr(), *p_theta_im = e_theta_im->memptr(); // Vertical pattern
-    const dtype *p_phi_re = e_phi_re->memptr(), *p_phi_im = e_phi_im->memptr();         // Horizontal pattern
-    const dtype *p_az_global = azimuth->memptr(), *p_el_global = elevation->memptr();   // Angles
-    const dtype *p_azimuth_grid = azimuth_grid->memptr(), *p_elevation_grid = elevation_grid->memptr();
-    const dtype *p_element_pos = element_pos->memptr();
-    dtype *p_v_re = V_re->memptr(), *p_v_im = V_im->memptr(), *p_h_re = H_re->memptr(), *p_h_im = H_im->memptr();
+    const dtype *p_theta_re = e_theta_re.memptr(), *p_theta_im = e_theta_im.memptr(); // Vertical pattern
+    const dtype *p_phi_re = e_phi_re.memptr(), *p_phi_im = e_phi_im.memptr();         // Horizontal pattern
+    const dtype *p_az_global = azimuth.memptr(), *p_el_global = elevation.memptr();    // Angles
+    const dtype *p_azimuth_grid = azimuth_grid.memptr(), *p_elevation_grid = elevation_grid.memptr();
+    const dtype *p_element_pos = element_pos.memptr();
+    dtype *p_v_re = V_re.memptr(), *p_v_im = V_im.memptr(), *p_h_re = H_re.memptr(), *p_h_im = H_im.memptr();
 
     // Declare constants at compile time to avoid unnecessary type conversions
     const dtype pi_double = arma::Datum<dtype>::tau;
@@ -146,7 +175,9 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                     tL = dtype(-0.999), tS = dtype(-0.99), dT = one / (tS - tL);
 
     // Calculate 1/dist in the pattern sampling
-    dtype *az_diff = new dtype[n_azimuth], *el_diff = new dtype[n_elevation];
+    auto az_diff_buf = std::make_unique<dtype[]>(n_azimuth);
+    auto el_diff_buf = std::make_unique<dtype[]>(n_elevation);
+    dtype *az_diff = az_diff_buf.get(), *el_diff = el_diff_buf.get();
     *az_diff = pi_double - p_azimuth_grid[n_azimuth - 1] + *p_azimuth_grid;
     *az_diff = one / *az_diff;
     *el_diff = one;
@@ -409,30 +440,27 @@ void qd_arrayant_interpolate(const arma::Cube<dtype> *e_theta_re, const arma::Cu
                 p_gamma[ioa] = std::atan2(sin_gamma, cos_gamma);
         }
     }
-
-    delete[] az_diff;
-    delete[] el_diff;
 }
 
 // Declare templates
-template void qd_arrayant_interpolate(const arma::Cube<float> *e_theta_re, const arma::Cube<float> *e_theta_im,
-                                      const arma::Cube<float> *e_phi_re, const arma::Cube<float> *e_phi_im,
-                                      const arma::Col<float> *azimuth_grid, const arma::Col<float> *elevation_grid,
-                                      const arma::Mat<float> *azimuth, const arma::Mat<float> *elevation,
-                                      const arma::Col<unsigned> *i_element, const arma::Cube<float> *orientation,
-                                      const arma::Mat<float> *element_pos,
-                                      arma::Mat<float> *V_re, arma::Mat<float> *V_im,
-                                      arma::Mat<float> *H_re, arma::Mat<float> *H_im,
+template void qd_arrayant_interpolate(const arma::Cube<float> &e_theta_re, const arma::Cube<float> &e_theta_im,
+                                      const arma::Cube<float> &e_phi_re, const arma::Cube<float> &e_phi_im,
+                                      const arma::Col<float> &azimuth_grid, const arma::Col<float> &elevation_grid,
+                                      const arma::Mat<float> &azimuth, const arma::Mat<float> &elevation,
+                                      const arma::Col<unsigned> &i_element, const arma::Cube<float> &orientation,
+                                      const arma::Mat<float> &element_pos,
+                                      arma::Mat<float> &V_re, arma::Mat<float> &V_im,
+                                      arma::Mat<float> &H_re, arma::Mat<float> &H_im,
                                       arma::Mat<float> *dist,
                                       arma::Mat<float> *azimuth_loc, arma::Mat<float> *elevation_loc, arma::Mat<float> *gamma);
 
-template void qd_arrayant_interpolate(const arma::Cube<double> *e_theta_re, const arma::Cube<double> *e_theta_im,
-                                      const arma::Cube<double> *e_phi_re, const arma::Cube<double> *e_phi_im,
-                                      const arma::Col<double> *azimuth_grid, const arma::Col<double> *elevation_grid,
-                                      const arma::Mat<double> *azimuth, const arma::Mat<double> *elevation,
-                                      const arma::Col<unsigned> *i_element, const arma::Cube<double> *orientation,
-                                      const arma::Mat<double> *element_pos,
-                                      arma::Mat<double> *V_re, arma::Mat<double> *V_im,
-                                      arma::Mat<double> *H_re, arma::Mat<double> *H_im,
+template void qd_arrayant_interpolate(const arma::Cube<double> &e_theta_re, const arma::Cube<double> &e_theta_im,
+                                      const arma::Cube<double> &e_phi_re, const arma::Cube<double> &e_phi_im,
+                                      const arma::Col<double> &azimuth_grid, const arma::Col<double> &elevation_grid,
+                                      const arma::Mat<double> &azimuth, const arma::Mat<double> &elevation,
+                                      const arma::Col<unsigned> &i_element, const arma::Cube<double> &orientation,
+                                      const arma::Mat<double> &element_pos,
+                                      arma::Mat<double> &V_re, arma::Mat<double> &V_im,
+                                      arma::Mat<double> &H_re, arma::Mat<double> &H_im,
                                       arma::Mat<double> *dist,
                                       arma::Mat<double> *azimuth_loc, arma::Mat<double> *elevation_loc, arma::Mat<double> *gamma);
