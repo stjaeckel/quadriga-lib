@@ -39,6 +39,25 @@ static inline __m256 _fm256_clamp_pm1_ps(__m256 x)
     return _mm256_max_ps(_mm256_min_ps(x, _mm256_set1_ps(1.0f)), _mm256_set1_ps(-1.0f));
 }
 
+// Reciprocal with one Newton–Raphson refinement: r = 1/x, ~23-bit accuracy.
+// rcp gives ~12 bits; one NR step: r₁ = r₀ · (2 − x · r₀)
+// Caller must ensure x is not zero or denormal.
+static inline __m256 _fm256_rcp_nr_ps(__m256 x)
+{
+    __m256 r0 = _mm256_rcp_ps(x);
+    return _mm256_mul_ps(r0, _mm256_fnmadd_ps(x, r0, _mm256_set1_ps(2.0f)));
+}
+
+// Reciprocal square root with one Newton–Raphson refinement: r = 1/sqrt(x), ~23-bit accuracy.
+// rsqrt gives ~12 bits; one NR step: r₁ = 0.5 · r₀ · (3 − x · r₀²)
+// Caller must ensure x is not zero or denormal.
+static inline __m256 _fm256_rsqrt_nr_ps(__m256 x)
+{
+    __m256 r0 = _mm256_rsqrt_ps(x);
+    return _mm256_mul_ps(_mm256_mul_ps(_mm256_set1_ps(0.5f), r0),
+                         _mm256_fnmadd_ps(x, _mm256_mul_ps(r0, r0), _mm256_set1_ps(3.0f)));
+}
+
 // Note: A SINE / COSINE-only version provides no significant performance advantage
 // Just compute both and drop the unwanted one
 static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *__restrict c)
@@ -525,8 +544,9 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     //   When Phase ≈ 0 (A ≈ B), both numerator and denominator approach R0,
     //   giving the correct limit wp → w, wn → 1-w.
     // R1 = eps   ≈ 1.192093e-7   – amplitude threshold for "tiny" vectors
+    //   R1_sq = R1² ≈ 1.421085e-14 – squared threshold for mag_sq comparison
     const __m256 R0 = _mm256_set1_ps(1.6940659e-21f);
-    const __m256 R1 = _mm256_set1_ps(1.1920929e-7f);
+    const __m256 R1_sq = _mm256_set1_ps(1.1920929e-7f * 1.1920929e-7f);
 
     // Transition-zone boundaries: pure-linear below tL, spherical above tS
     const __m256 tL = _mm256_set1_ps(-0.999f);
@@ -537,19 +557,23 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     __m256 wB = w;
     __m256 wA = _mm256_sub_ps(one, w);
 
-    // ---- Amplitudes ----
-    __m256 ampA = _mm256_sqrt_ps(_mm256_fmadd_ps(Ar, Ar, _mm256_mul_ps(Ai, Ai)));
-    __m256 ampB = _mm256_sqrt_ps(_mm256_fmadd_ps(Br, Br, _mm256_mul_ps(Bi, Bi)));
+    // ---- Squared magnitudes ----
+    __m256 mag_sq_A = _mm256_fmadd_ps(Ar, Ar, _mm256_mul_ps(Ai, Ai));
+    __m256 mag_sq_B = _mm256_fmadd_ps(Br, Br, _mm256_mul_ps(Bi, Bi));
 
-    // ---- Tiny-amplitude masks ----
-    __m256 tinyA = _mm256_cmp_ps(ampA, R1, _CMP_LT_OQ);
-    __m256 tinyB = _mm256_cmp_ps(ampB, R1, _CMP_LT_OQ);
+    // ---- Tiny-amplitude masks (on squared magnitude to avoid sqrt before test) ----
+    __m256 tinyA = _mm256_cmp_ps(mag_sq_A, R1_sq, _CMP_LT_OQ);
+    __m256 tinyB = _mm256_cmp_ps(mag_sq_B, R1_sq, _CMP_LT_OQ);
     __m256 both_tiny = _mm256_and_ps(tinyA, tinyB);
     __m256 either_tiny = _mm256_or_ps(tinyA, tinyB);
 
-    // ---- Normalise (safe division: replace tiny amplitudes with 1 to avoid 0/0) ----
-    __m256 inv_ampA = _mm256_div_ps(one, _mm256_blendv_ps(ampA, one, tinyA));
-    __m256 inv_ampB = _mm256_div_ps(one, _mm256_blendv_ps(ampB, one, tinyB));
+    // ---- Amplitudes & inverse amplitudes via rsqrt+NR ----
+    // inv_amp = 1/sqrt(mag_sq),  amp = mag_sq * inv_amp = sqrt(mag_sq)
+    // Guard: replace tiny mag_sq with 1.0 so rsqrt doesn't see 0/denorm
+    __m256 inv_ampA = _fm256_rsqrt_nr_ps(_mm256_blendv_ps(mag_sq_A, one, tinyA));
+    __m256 inv_ampB = _fm256_rsqrt_nr_ps(_mm256_blendv_ps(mag_sq_B, one, tinyB));
+    __m256 ampA = _mm256_mul_ps(mag_sq_A, inv_ampA);
+    __m256 ampB = _mm256_mul_ps(mag_sq_B, inv_ampB);
 
     // Normalised direction; zeroed where amplitude is tiny
     __m256 gAr = _mm256_andnot_ps(tinyA, _mm256_mul_ps(Ar, inv_ampA));
@@ -572,6 +596,17 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     __m256 fXr = _mm256_fmadd_ps(wA, Ar, _mm256_mul_ps(wB, Br));
     __m256 fXi = _mm256_fmadd_ps(wA, Ai, _mm256_mul_ps(wB, Bi));
 
+    // ---- Fast path: nearly-identical directions → SLERP ≈ linear interpolation ----
+    // When cos(Φ) > 0.99995 (Φ < ~0.01 rad), sin(wΦ)/sin(Φ) → w with relative
+    // error < 1e-8. The linear fallback fXr/fXi already gives the correct result.
+    // Tiny-amplitude lanes have cPhase forced to -1, so they never enter here.
+    if (_mm256_movemask_ps(_mm256_cmp_ps(cPhase, _mm256_set1_ps(0.99998f), _CMP_GT_OQ)) == 0xFF)
+    {
+        *Xr = _mm256_andnot_ps(both_tiny, fXr);
+        *Xi = _mm256_andnot_ps(both_tiny, fXi);
+        return;
+    }
+
     // ---- Spherical path (computed for all lanes, selected by mask later) ----
     // Clamp cPhase to [-1, 1] for acos and sqrt safety.
     // Upper clamp: FMA dot product of approximately-unit vectors can exceed 1.0.
@@ -592,13 +627,16 @@ static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m2
     // R0 guard matches the one on Phase: when cPhase = 1 exactly, both Phase and
     // sinPhase are ≈ R0, keeping the ratio well-defined.
     __m256 sinPhase = _mm256_add_ps(_mm256_sqrt_ps(_mm256_fnmadd_ps(cPhase_clamped, cPhase_clamped, one)), R0);
-    __m256 sPhase = _mm256_div_ps(one, sinPhase);
+    __m256 sPhase = _fm256_rcp_nr_ps(sinPhase);
 
     // SLERP weight factors: wp = sin(wB*Phase) / sin(Phase)
     //                       wn = sin(wA*Phase) / sin(Phase)
-    __m256 sinWB, cosWB_unused, sinWA, cosWA_unused;
-    _fm256_sincos256_ps(_mm256_mul_ps(wB, Phase), &sinWB, &cosWB_unused);
-    _fm256_sincos256_ps(_mm256_mul_ps(wA, Phase), &sinWA, &cosWA_unused);
+    // Since wA = 1 - wB, we have wA*Phase = Phase - wB*Phase, so:
+    //   sin(wA*Phase) = sin(Phase)*cos(wB*Phase) - cos(Phase)*sin(wB*Phase)
+    // This eliminates one full sincos call (~28 cycles).
+    __m256 sinWB, cosWB;
+    _fm256_sincos256_ps(_mm256_mul_ps(wB, Phase), &sinWB, &cosWB);
+    __m256 sinWA = _mm256_fmsub_ps(sinPhase, cosWB, _mm256_mul_ps(cPhase_clamped, sinWB));
 
     __m256 wp = _mm256_mul_ps(sinWB, sPhase);
     __m256 wn = _mm256_mul_ps(sinWA, sPhase);
