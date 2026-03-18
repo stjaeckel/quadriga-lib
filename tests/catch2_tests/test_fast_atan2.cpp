@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <catch2/catch_test_macros.hpp>
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include <cmath>
 #include <cstdint>
 

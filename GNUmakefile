@@ -4,7 +4,7 @@
 # Internal HDF5 deactivates Python and Octave
 hdf5_internal = OFF
 arma_internal = ON
-octave = OFF
+octave = ON
 matlab = OFF
 avx2 = ON
 

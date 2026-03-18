@@ -477,12 +477,11 @@ endif()
 if (ENABLE_TESTS)
     set(CATCH2_MAIN_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tests/quadriga_lib_catch2_tests.cpp")
 
-    # Watch test files (but don't compile them)
-    file(GLOB TEST_HEADERS CONFIGURE_DEPENDS
+    file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/catch2_tests/*.cpp
     )
     
-    add_executable(test_bin ${CATCH2_MAIN_SRC})
+    add_executable(test_bin ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
 
