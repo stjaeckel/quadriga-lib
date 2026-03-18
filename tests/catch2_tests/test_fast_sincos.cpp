@@ -18,7 +18,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_approx.hpp>           // Catch::Approx (Catch2 v3)
-#include "quadriga_tools.hpp"                // declares quadriga_lib::sincos_approx
+#include "quadriga_math.hpp"                // declares quadriga_lib::sincos_approx
 #include <armadillo>
 #include <cmath>
 #include <vector>

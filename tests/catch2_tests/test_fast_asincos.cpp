@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <catch2/catch_test_macros.hpp>
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include <cmath>
 
 // Helper: compute max absolute error between fast result (float) and reference (double)
