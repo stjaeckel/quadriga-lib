@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -467,6 +467,30 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         qd_power_mat(n_rx, n_rx_ports, rx_coupling_pwr.memptr(), true, rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr());
     }
 
+    // Batch-interpolate antenna responses for all paths at once
+    // Angles are already stored as [n_links, n_out] in p_aod/p_eod/p_aoa/p_eoa — wrap zero-copy
+    const arma::Mat<dtype> AOD_all(p_aod, n_links, n_out, false, true);
+    const arma::Mat<dtype> EOD_all(p_eod, n_links, n_out, false, true);
+    const arma::Mat<dtype> AOA_all(p_aoa, n_links, n_out, false, true);
+    const arma::Mat<dtype> EOA_all(p_eoa, n_links, n_out, false, true);
+
+    arma::Mat<dtype> Vt_re(n_links, n_out, arma::fill::none), Vt_im(n_links, n_out, arma::fill::none);
+    arma::Mat<dtype> Ht_re(n_links, n_out, arma::fill::none), Ht_im(n_links, n_out, arma::fill::none);
+    arma::Mat<dtype> Vr_re(n_links, n_out, arma::fill::none), Vr_im(n_links, n_out, arma::fill::none);
+    arma::Mat<dtype> Hr_re(n_links, n_out, arma::fill::none), Hr_im(n_links, n_out, arma::fill::none);
+
+    // TX antenna response — single call, internal OMP over all n_links × n_out work items
+    qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
+                            tx_array->azimuth_grid, tx_array->elevation_grid, AOD_all, EOD_all,
+                            i_tx_element, tx_orientation, tx_element_pos_interp,
+                            Vt_re, Vt_im, Ht_re, Ht_im);
+
+    // RX antenna response — single call
+    qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
+                            rx_array->azimuth_grid, rx_array->elevation_grid, AOA_all, EOA_all,
+                            i_rx_element, rx_orientation, rx_element_pos_interp,
+                            Vr_re, Vr_im, Hr_re, Hr_im);
+
     // Calculate the MIMO channel coefficients for each path
     const int n_out_i = (int)n_out;
 #pragma omp parallel for
@@ -476,37 +500,12 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
         const arma::uword i = add_fake_los_path ? (j == 0 ? 0 : j - 1) : j;
         const arma::uword o_slice = j * n_links; // Slice offset
 
-        // Allocate memory for temporary data
-        arma::Mat<dtype> Vt_re(n_links, 1, arma::fill::none), Vt_im(n_links, 1, arma::fill::none);
-        arma::Mat<dtype> Ht_re(n_links, 1, arma::fill::none), Ht_im(n_links, 1, arma::fill::none);
-        arma::Mat<dtype> Vr_re(n_links, 1, arma::fill::none), Vr_im(n_links, 1, arma::fill::none);
-        arma::Mat<dtype> Hr_re(n_links, 1, arma::fill::none), Hr_im(n_links, 1, arma::fill::none);
-        arma::Mat<dtype> EMPTY;
-
-        // Calculate TX antenna response
-        const arma::Mat<dtype> AOD_j(&p_aod[o_slice], n_links, 1, false, true);
-        const arma::Mat<dtype> EOD_j(&p_eod[o_slice], n_links, 1, false, true);
-        
-        qd_arrayant_interpolate(tx_array->e_theta_re, tx_array->e_theta_im, tx_array->e_phi_re, tx_array->e_phi_im,
-                                tx_array->azimuth_grid, tx_array->elevation_grid, AOD_j, EOD_j,
-                                i_tx_element, tx_orientation, tx_element_pos_interp,
-                                Vt_re, Vt_im, Ht_re, Ht_im);
-
-        // Calculate RX antenna response
-        const arma::Mat<dtype> AOA_j(&p_aoa[o_slice], n_links, 1, false, true);
-        const arma::Mat<dtype> EOA_j(&p_eoa[o_slice], n_links, 1, false, true);
-
-        qd_arrayant_interpolate(rx_array->e_theta_re, rx_array->e_theta_im, rx_array->e_phi_re, rx_array->e_phi_im,
-                                rx_array->azimuth_grid, rx_array->elevation_grid, AOA_j, EOA_j,
-                                i_rx_element, rx_orientation, rx_element_pos_interp,
-                                Vr_re, Vr_im, Hr_re, Hr_im);
-
-        // Calculate the MIMO channel coefficients
+        // Get column pointers into the precomputed interpolation results
         const dtype *pM = M->colptr(i);
-        const dtype *pVrr = Vr_re.memptr(), *pVri = Vr_im.memptr(),
-                    *pHrr = Hr_re.memptr(), *pHri = Hr_im.memptr(),
-                    *pVtr = Vt_re.memptr(), *pVti = Vt_im.memptr(),
-                    *pHtr = Ht_re.memptr(), *pHti = Ht_im.memptr();
+        const dtype *pVrr = Vr_re.colptr(j), *pVri = Vr_im.colptr(j),
+                    *pHrr = Hr_re.colptr(j), *pHri = Hr_im.colptr(j),
+                    *pVtr = Vt_re.colptr(j), *pVti = Vt_im.colptr(j),
+                    *pHtr = Ht_re.colptr(j), *pHti = Ht_im.colptr(j);
         const dtype path_amplitude = (add_fake_los_path && j == 0) ? zero : std::sqrt(p_gain[i]);
 
         for (arma::uword t = 0ULL; t < n_tx; ++t)
