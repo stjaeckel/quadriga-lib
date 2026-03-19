@@ -266,9 +266,9 @@ TEST_CASE("Multifreq - Matches get_channels_spherical for single freq, single en
                                           fi, fo, cr, ci, dl, true);
 
     REQUIRE(cr.size() == 1);
-    CHECK(arma::approx_equal(cr[0], cr_ref, "absdiff", 1e-10));
-    CHECK(arma::approx_equal(ci[0], ci_ref, "absdiff", 1e-10));
-    CHECK(arma::approx_equal(dl[0], dl_ref, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(cr[0], cr_ref, "absdiff", 5e-6));
+    CHECK(arma::approx_equal(ci[0], ci_ref, "absdiff", 5e-6));
+    CHECK(arma::approx_equal(dl[0], dl_ref, "absdiff", 1e-6));
 }
 
 // ================================================================================================

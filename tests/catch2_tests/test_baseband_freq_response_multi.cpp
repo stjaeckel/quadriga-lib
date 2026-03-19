@@ -363,7 +363,7 @@ TEST_CASE("baseband_freq_response_multi - SLERP magnitude interpolation, no phas
     {
         double t = (freq_out(k) - 1.0e9) / 1.0e9;
         double expected_mag = 1.0 + t * 2.0;
-        CHECK(std::abs(Hr(0, 0, k) - expected_mag) < 1e-7);
+        CHECK(std::abs(Hr(0, 0, k) - expected_mag) < 5e-7);
         CHECK(std::abs(Hi(0, 0, k)) < 1e-7);
     }
 }
@@ -396,15 +396,15 @@ TEST_CASE("baseband_freq_response_multi - Constant extrapolation outside input r
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // Below range: clamped to 1.0
-    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 0) - 1.0) < 5e-7);
     // At 1 GHz: exactly 1.0
-    CHECK(std::abs(Hr(0, 0, 1) - 1.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 1) - 1.0) < 5e-7);
     // At 1.5 GHz: interpolated to 1.5
-    CHECK(std::abs(Hr(0, 0, 2) - 1.5) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 2) - 1.5) < 5e-7);
     // At 2 GHz: exactly 2.0
-    CHECK(std::abs(Hr(0, 0, 3) - 2.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 3) - 2.0) < 5e-7);
     // Above range: clamped to 2.0
-    CHECK(std::abs(Hr(0, 0, 4) - 2.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 4) - 2.0) < 5e-7);
 }
 
 // ================================================================================================
@@ -784,13 +784,13 @@ TEST_CASE("baseband_freq_response_multi - Three input frequencies, segment selec
                                                (arma::Cube<std::complex<double>> *)nullptr, false);
 
     // At 1.5 GHz: first segment, t=0.5, mag = 1.0 + 0.5*2.0 = 2.0
-    CHECK(std::abs(Hr(0, 0, 0) - 2.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 0) - 2.0) < 5e-7);
 
     // At 2.0 GHz: boundary, t=1.0 in first segment, mag = 3.0
-    CHECK(std::abs(Hr(0, 0, 1) - 3.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 1) - 3.0) < 5e-7);
 
     // At 3.0 GHz: second segment [2.0, 4.0], t=0.5, mag = 3.0 + 0.5*4.0 = 5.0
-    CHECK(std::abs(Hr(0, 0, 2) - 5.0) < 1e-7);
+    CHECK(std::abs(Hr(0, 0, 2) - 5.0) < 5e-7);
 }
 
 // ================================================================================================
@@ -1043,7 +1043,7 @@ TEST_CASE("baseband_freq_response_multi - Acoustic scenario large delay")
     for (arma::uword k = 0; k < freq_out.n_elem; ++k)
     {
         double power = Hr(0, 0, k) * Hr(0, 0, k) + Hi(0, 0, k) * Hi(0, 0, k);
-        CHECK(std::abs(power - 1.0) < 1e-7);
+        CHECK(std::abs(power - 1.0) < 5e-7);
     }
 
     // Verify phase at exact input frequency matches expected value

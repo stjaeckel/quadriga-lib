@@ -476,4 +476,55 @@ static inline void qd_power_mat(size_t n, size_t m,                             
     }
 }
 
+// Combine interpolated TX/RX antenna patterns with the polarization transfer
+// matrix and applies the propagation phase to produce one slice of MIMO
+// channel coefficients (one path, all TX-RX element pairs).
+//
+// For each link index R = 0 .. n_links-1 the operation is:
+//
+//   Jones product (complex multiply-accumulate across 4 polarization components):
+//     c = Vr * M_VV * Vt  +  Hr * M_HV * Vt  +  Vr * M_VH * Ht  +  Hr * M_HH * Ht
+//   where Vr, Hr, Vt, Ht and M_xx are complex, giving complex c = re + j*im.
+//
+//   Phase rotation from element-specific path delay:
+//     phase = wave_number * fmod(p_delays[R], wavelength)
+//     p_coeff_re[R] = ( re*cos(phase) + im*sin(phase)) * path_amplitude
+//     p_coeff_im[R] = (-re*sin(phase) + im*cos(phase)) * path_amplitude
+template <typename dtype>
+inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol pattern (real, imag), length n_links
+                             const dtype *pHrr, const dtype *pHri, // RX H-pol pattern (real, imag), length n_links
+                             const dtype *pVtr, const dtype *pVti, // TX V-pol pattern (real, imag), length n_links
+                             const dtype *pHtr, const dtype *pHti, // TX H-pol pattern (real, imag), length n_links
+                             const dtype *pM,                      // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}
+                             const dtype *p_delays,                // Per-link path lengths in [m], length n_links  (read-only)
+                             dtype wave_number,                    // 2*pi*f/c
+                             dtype wavelength,                     // wavelength  : c/f
+                             dtype path_amplitude,                 // sqrt(path_gain) scaling factor (set 0 for fake LOS path)
+                             dtype *p_coeff_re,                    // Output real part of coefficients, length n_links
+                             dtype *p_coeff_im,                    // Output imag part of coefficients, length n_links
+                             size_t n_links)                       // Number of TX-RX element pairs (n_tx * n_rx)
+{
+    for (size_t R = 0; R < n_links; ++R)
+    {
+        // Jones product – real part
+        dtype re = pVrr[R] * pM[0] * pVtr[R] - pVri[R] * pM[1] * pVtr[R] - pVrr[R] * pM[1] * pVti[R] - pVri[R] * pM[0] * pVti[R];
+        re += pHrr[R] * pM[2] * pVtr[R] - pHri[R] * pM[3] * pVtr[R] - pHrr[R] * pM[3] * pVti[R] - pHri[R] * pM[2] * pVti[R];
+        re += pVrr[R] * pM[4] * pHtr[R] - pVri[R] * pM[5] * pHtr[R] - pVrr[R] * pM[5] * pHti[R] - pVri[R] * pM[4] * pHti[R];
+        re += pHrr[R] * pM[6] * pHtr[R] - pHri[R] * pM[7] * pHtr[R] - pHrr[R] * pM[7] * pHti[R] - pHri[R] * pM[6] * pHti[R];
+
+        // Jones product – imaginary part
+        dtype im = pVrr[R] * pM[1] * pVtr[R] + pVri[R] * pM[0] * pVtr[R] + pVrr[R] * pM[0] * pVti[R] - pVri[R] * pM[1] * pVti[R];
+        im += pHrr[R] * pM[3] * pVtr[R] + pHri[R] * pM[2] * pVtr[R] + pHrr[R] * pM[2] * pVti[R] - pHri[R] * pM[3] * pVti[R];
+        im += pVrr[R] * pM[5] * pHtr[R] + pVri[R] * pM[4] * pHtr[R] + pVrr[R] * pM[4] * pHti[R] - pVri[R] * pM[5] * pHti[R];
+        im += pHrr[R] * pM[7] * pHtr[R] + pHri[R] * pM[6] * pHtr[R] + pHrr[R] * pM[6] * pHti[R] - pHri[R] * pM[7] * pHti[R];
+
+        // Phase rotation from element-specific propagation delay
+        dtype phase = wave_number * std::fmod(p_delays[R], wavelength);
+        dtype cp = std::cos(phase), sp = std::sin(phase);
+
+        p_coeff_re[R] = (re * cp + im * sp) * path_amplitude;
+        p_coeff_im[R] = (-re * sp + im * cp) * path_amplitude;
+    }
+}
+
 #endif

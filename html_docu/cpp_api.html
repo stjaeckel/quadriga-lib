@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.5</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.6</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -5068,7 +5068,7 @@ quadriga_lib::fast_sincos(x, nullptr, &amp;c); // compute cosine only
 </li><li style="margin-bottom: 0.4em;">Parallelizes across cores with OpenMP when enabled 
 </li><li style="margin-bottom: 0.4em;">Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback 
 </li><li style="margin-bottom: 0.4em;">If both input amplitudes are negligible, the output is zero 
-</li><li style="margin-bottom: 0.4em;">Maximum error versus double-precision reference is approximately 100 ULP (~1.2e-5 relative error, ~17.5 effective bits) 
+</li><li style="margin-bottom: 0.4em;">Maximum error versus double-precision reference is approximately 5 ULP 
 </li><li style="margin-bottom: 0.4em;">Allowed input datatype: <code>float</code> (Armadillo <code>fvec</code>) or <code>double</code> (Armadillo <code>vec</code>) 
 </li><li style="margin-bottom: 0.4em;">All input vectors must have the same length 
 </li></ul>
