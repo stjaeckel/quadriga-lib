@@ -100,29 +100,14 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
 
     // --- Compute sin/cos into Sa/Ca ---
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8; // multiple of 8
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-        {
-            if (s == nullptr)
-                qd_COS_AVX2(Xa, Ca, bulk);
-            else if (c == nullptr)
-                qd_SIN_AVX2(Xa, Sa, bulk);
-            else
-                qd_SINCOS_AVX2(Xa, Sa, Ca, bulk);
-        }
-        if (tail)
-        {
-            if (s == nullptr)
-                qd_COS_GENERIC(Xa + bulk, Ca + bulk, tail);
-            else if (c == nullptr)
-                qd_SIN_GENERIC(Xa + bulk, Sa + bulk, tail);
-            else
-                qd_SINCOS_GENERIC(Xa + bulk, Sa + bulk, Ca + bulk, tail);
-        }
+        if (s == nullptr)
+            qd_COS_AVX2(Xa, Ca, n_val);
+        else if (c == nullptr)
+            qd_SIN_AVX2(Xa, Sa, n_val);
+        else
+            qd_SINCOS_AVX2(Xa, Sa, Ca, n_val);
     }
     else
     {
@@ -199,15 +184,9 @@ void quadriga_lib::fast_asin(const arma::Col<dtype> &x, arma::fvec &s)
         throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_ASIN_AVX2(Xa, Sa, bulk);
-        if (tail)
-            qd_ASIN_GENERIC(Xa + bulk, Sa + bulk, tail);
+        qd_ASIN_AVX2(Xa, Sa, n_val);
     }
     else
     {
@@ -274,15 +253,9 @@ void quadriga_lib::fast_acos(const arma::Col<dtype> &x, arma::fvec &c)
         throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_ACOS_AVX2(Xa, Ca, bulk);
-        if (tail)
-            qd_ACOS_GENERIC(Xa + bulk, Ca + bulk, tail);
+        qd_ACOS_AVX2(Xa, Ca, n_val);
     }
     else
     {
@@ -363,15 +336,9 @@ void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> 
             throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_ATAN2_AVX2(Ya, Xa, Aa, bulk);
-        if (tail)
-            qd_ATAN2_GENERIC(Ya + bulk, Xa + bulk, Aa + bulk, tail);
+        qd_ATAN2_AVX2(Ya, Xa, Aa, n_val);
     }
     else
     {
@@ -487,16 +454,9 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype>
         throw std::invalid_argument("Output Xr and Xi cannot be the same buffer.");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_SLERP_AVX2(pAr, pAi, pBr, pBi, pw, pXr, pXi, bulk);
-        if (tail)
-            qd_SLERP_GENERIC(pAr + bulk, pAi + bulk, pBr + bulk, pBi + bulk, pw + bulk,
-                             pXr + bulk, pXi + bulk, tail);
+        qd_SLERP_AVX2(pAr, pAi, pBr, pBi, pw, pXr, pXi, n_val);
     }
     else
     {
@@ -631,19 +591,9 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
                 throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_GEO2CART_AVX2(pAZ, pEL, pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL, bulk);
-        if (tail)
-            qd_GEO2CART_GENERIC(pAZ + bulk, pEL + bulk,
-                                pX + bulk, pY + bulk, pZ + bulk,
-                                pSAZ ? pSAZ + bulk : nullptr, pCAZ ? pCAZ + bulk : nullptr,
-                                pSEL ? pSEL + bulk : nullptr, pCEL ? pCEL + bulk : nullptr,
-                                tail);
+        qd_GEO2CART_AVX2(pAZ, pEL, pX, pY, pZ, pSAZ, pCAZ, pSEL, pCEL, n_val);
     }
     else
     {
@@ -748,16 +698,9 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
         throw std::invalid_argument("Output az and el cannot be the same buffer.");
 
 #if BUILD_WITH_AVX2
-    const size_t bulk = (n_val / 8) * 8;
-    const size_t tail = n_val - bulk;
-
     if (runtime_AVX2_Check())
     {
-        if (bulk)
-            qd_CART2GEO_AVX2(pX, pY, pZ, pAZ, pEL, bulk);
-        if (tail)
-            qd_CART2GEO_GENERIC(pX + bulk, pY + bulk, pZ + bulk,
-                                pAZ + bulk, pEL + bulk, tail);
+        qd_CART2GEO_AVX2(pX, pY, pZ, pAZ, pEL, n_val);
     }
     else
     {

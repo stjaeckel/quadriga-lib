@@ -5,7 +5,7 @@
 hdf5_internal = OFF
 arma_internal = ON
 octave = ON
-matlab = OFF
+matlab = ON
 avx2 = ON
 
 CMAKE_BUILD_DIR = build_linux

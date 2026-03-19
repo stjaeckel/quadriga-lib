@@ -382,7 +382,8 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *aod = nullptr,    // Optional output: Azimuth of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
-                                arma::Cube<dtype> *eoa = nullptr);   // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                arma::Cube<dtype> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
+                                bool use_avx2 = false);               // Use AVX2 for antenna interpolation (faster, but less accurate, ignored when not supported)
 
     // Calculate channel coefficients for spherical waves across multiple frequencies
     // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices
