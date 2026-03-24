@@ -9,6 +9,7 @@ option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
 option(ENABLE_SHARED_LIB "Enable build of shared library" OFF)
 option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
+option(ENABLE_CUDA "Enable CUDA GPU Acceleration" ON)
 option(ENABLE_TESTS "Build tests" OFF)
 option(ENABLE_BIN "Build supporting binary files" OFF)
 
@@ -307,11 +308,49 @@ else()
     message(STATUS "AVX2 acceleration disabled")
 endif()
 
+# For files that require CUDA, detect nvcc and add CUDA language support.
+file(GLOB SRC_CUDA "${CMAKE_SOURCE_DIR}/src/*_cuda.cu")
+set(BUILD_WITH_CUDA 0)
+set(CUDA_LINK_LIBS "")
+set(CUDA_MEX_LINK_LIBS "")
+if(ENABLE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        # CUDA objects must be compiled with -fPIC for shared libraries (Python, shared lib)
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --compiler-options -fPIC")
+        set(BUILD_WITH_CUDA 1)
+        find_package(CUDAToolkit REQUIRED)
+        set(CUDA_LINK_LIBS CUDA::cudart_static)
+        set(CUDA_MEX_LINK_LIBS -L${CUDAToolkit_LIBRARY_DIR} -lcudart_static -ldl -lrt)
+        message(STATUS "CUDA acceleration enabled (nvcc: ${CMAKE_CUDA_COMPILER})")
+    else()
+        message(STATUS "CUDA compiler not found, CUDA acceleration disabled")
+        foreach(src ${SRC_CUDA})
+            list(REMOVE_ITEM SRC_FILES ${src})
+        endforeach()
+        set(SRC_CUDA "")
+    endif()
+else()
+    message(STATUS "CUDA acceleration disabled")
+    foreach(src ${SRC_CUDA})
+        list(REMOVE_ITEM SRC_FILES ${src})
+    endforeach()
+    set(SRC_CUDA "")
+endif()
+
 # Static library
-add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2})
+add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
 set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
 add_dependencies(quadriga_static pugixml_lib pybind11_lib)
-target_compile_definitions(quadriga_static PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2})
+target_compile_definitions(quadriga_static PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2} BUILD_WITH_CUDA=${BUILD_WITH_CUDA})
+if(BUILD_WITH_CUDA)
+    target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
+    set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+endif()
 
 if (BUILD_HDF5 AND NOT HDF5_PATH)
     add_dependencies(quadriga_static hdf5_dep)
@@ -322,10 +361,14 @@ endif()
 
 # Shared library
 if (BUILD_SHARED_LIB)
-    add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2})
+    add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
     set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
     add_dependencies(quadriga_shared pugixml_lib pybind11_lib)
-    target_compile_definitions(quadriga_shared PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2})
+    target_compile_definitions(quadriga_shared PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2} BUILD_WITH_CUDA=${BUILD_WITH_CUDA})
+    if(BUILD_WITH_CUDA)
+        target_link_libraries(quadriga_shared PUBLIC CUDA::cudart)
+        set_target_properties(quadriga_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    endif()
     if (NOT ARMADILLO_FOUND)
         add_dependencies(quadriga_shared armadillo_lib)
     endif()
@@ -360,7 +403,7 @@ if(BUILD_MATLAB)
                 OUTPUT ${mex_output}
                 COMMAND ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
                         COMPFLAGS="${MEX_CXXFLAGS}"
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} shlwapi.lib 
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} shlwapi.lib ${CUDA_MEX_LINK_LIBS}
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                 DEPENDS ${mex_deps}
                 COMMENT "Building MATLAB MEX file ${mex_output}"
@@ -372,7 +415,7 @@ if(BUILD_MATLAB)
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND env CXXFLAGS="${MEX_CXXFLAGS}" ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS}
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
                         -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
                         -lgomp
                 DEPENDS ${mex_deps}
@@ -408,7 +451,7 @@ if(BUILD_OCTAVE)
         add_custom_command(
             OUTPUT ${octave_output}
             COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
-                    ${mex_src} $<TARGET_FILE:quadriga_static>
+                    ${mex_src} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
                     -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
             DEPENDS ${mex_deps}
             COMMENT "Building Octave MEX file ${octave_output}"
@@ -463,7 +506,7 @@ if (BUILD_PYTHON)
         POSITION_INDEPENDENT_CODE ON
     )
     target_include_directories(quadriga_py PRIVATE ${Python3_INCLUDE_DIRS})
-    target_link_libraries(quadriga_py PRIVATE quadriga_static ${Python3_LIBRARIES} HDF5::HDF5)
+    target_link_libraries(quadriga_py PRIVATE quadriga_static ${Python3_LIBRARIES} HDF5::HDF5 ${CUDA_LINK_LIBS})
     target_compile_options(quadriga_py PRIVATE -Wno-unused-function)
 
     file(GLOB PYTHON_INCLUDED_FILES "api_python/*.hpp" "api_python/*.cpp")

@@ -484,7 +484,7 @@ namespace quadriga_lib
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
-    // - Uses AVX2 intrinsic functions to process 8 mesh elements in parallel
+    // - Supports three compute kernels: GENERIC (scalar), AVX2 (SIMD), and CUDA (GPU)
     // - All internal computations are done using single precision
     // - Instead of 'orig' and 'dest', rays can be provided as a combined object 'orig' with size [ n_ray, 6 ] = {xo, yo, zo, xd, yd, zd}
     //   The input 'dest' must be a nullptr in this case. This can help to optimize memory access patterns.
@@ -498,7 +498,9 @@ namespace quadriga_lib
                                 arma::u32_vec *fbs_ind = nullptr,              // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                                 arma::u32_vec *sbs_ind = nullptr,              // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                                 const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
-                                bool transpose_inputs = false);                // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
+                                bool transpose_inputs = false,                 // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
+                                int use_kernel = 0,                            // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA
+                                int gpu_id = 0);                               // GPU device ID for CUDA kernel, ignored otherwise
 
     // Subdivide rays
     // - Subdivides ray beams into 4 sub beams

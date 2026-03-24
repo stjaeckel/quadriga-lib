@@ -17,6 +17,7 @@
 
 #include "quadriga_math.hpp"
 #include "quadriga_channel.hpp"
+#include "quadriga_lib_generic_functions.hpp"
 
 #if defined(_MSC_VER) // Windows
 #include <malloc.h>   // Include for _aligned_malloc and _aligned_free
@@ -28,55 +29,6 @@
 #else // AVX2 disabled
 #define VEC_SIZE 1ULL
 #endif
-
-// Generic C++ implementation of DFT
-template <typename dtype>
-static inline void qd_DFT_GENERIC(const dtype *__restrict CFr,    // Channel coefficients, real part, Size [n_ant, n_path]
-                                  const dtype *__restrict CFi,    // Channel coefficients, imaginary part, Size [n_ant, n_path]
-                                  const dtype *__restrict DL,     // Path delays in seconds, Size [n_ant, n_path] or [1, n_path]
-                                  const size_t n_ant,             // Number of MIMO sub-links
-                                  const size_t n_path,            // Number multipath components
-                                  const bool planar_wave,         // Indicator that same delays are used for all antennas
-                                  const float *__restrict phasor, // Phasor, Length [ n_carrier ]
-                                  const size_t n_carrier,         // Number of carriers
-                                  float *__restrict Hr,           // Channel matrix, real part, Size [ n_carrier, n_ant ]
-                                  float *__restrict Hi)           // Channel matrix, imaginary part, Size [ n_carrier, n_ant ]
-{
-    std::vector<float> crf(n_path), cif(n_path), dlf(n_path);
-
-    for (size_t i_ant = 0; i_ant < n_ant; ++i_ant)
-    {
-        for (size_t i_path = 0; i_path < n_path; ++i_path)
-        {
-            const size_t idx = i_path * n_ant + i_ant;
-            crf[i_path] = (float)CFr[idx];
-            cif[i_path] = (float)CFi[idx];
-            dlf[i_path] = planar_wave ? (float)DL[i_path] : (float)DL[idx];
-        }
-
-        const size_t base = i_ant * n_carrier;
-
-        for (size_t k = 0; k < n_carrier; ++k)
-        {
-            float hr = 0.0f;
-            float hi = 0.0f;
-            const float pk = phasor[k];
-
-            for (size_t i_path = 0; i_path < n_path; ++i_path)
-            {
-                const float theta = pk * dlf[i_path];
-                const float s = std::sin(theta);
-                const float c = std::cos(theta);
-
-                hr += c * crf[i_path] - s * cif[i_path];
-                hi += c * cif[i_path] + s * crf[i_path];
-            }
-
-            Hr[base + k] = hr;
-            Hi[base + k] = hi;
-        }
-    }
-}
 
 /*!SECTION
 Channel functions
