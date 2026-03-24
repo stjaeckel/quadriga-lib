@@ -27,7 +27,7 @@
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
 
-#define QUADRIGA_LIB_VERSION v0_10_6
+#define QUADRIGA_LIB_VERSION v0_10_7
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
@@ -45,6 +45,9 @@ namespace quadriga_lib
 
     // Check if AVX2 is supported
     bool quadriga_lib_has_AVX2();
+
+    // Check if CUDA is supported
+    bool quadriga_lib_has_CUDA();
 
     // Channel generation function for IEEE TGn, TGac, TGax and TGah indoor channel models
     // - Depends on arrayant and channel classes

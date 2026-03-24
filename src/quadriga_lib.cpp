@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,11 @@
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
 #else // AVX2 disabled
+#endif
+
+#if BUILD_WITH_CUDA
+#include "quadriga_lib_cuda_functions.hpp"
+#else // CUDA disabled
 #endif
 
 // Template for time measuring:
@@ -97,6 +102,30 @@ bool quadriga_lib::quadriga_lib_has_AVX2()
 
     if (Z[0] == 2.0f && Z[7] == 107.0f)
         return true;
+
+    return false;
+}
+
+// Check if CUDA is supported
+bool quadriga_lib::quadriga_lib_has_CUDA()
+{
+#if BUILD_WITH_CUDA
+    float X[16];
+    for (size_t i = 0; i < 16; ++i)
+        X[i] = (float)i;
+
+    float Z[8];
+    for (size_t i = 0; i < 8; ++i)
+        Z[i] = 0.0f;
+
+    if (runtime_CUDA_Check()) // GPU support for CUDA
+    {
+        qd_TEST_CUDA(X, Z);
+    }
+
+    if (Z[0] == 2.0f && Z[7] == 107.0f)
+        return true;
+#endif
 
     return false;
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,14 +34,14 @@
 // } 
 
 // AVX2 accelerated implementation of RayTriangleIntersect
-void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, aligned to 32 byte, length n_mesh
-                 const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, aligned to 32 byte, length n_mesh
-                 const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, aligned to 32 byte, length n_mesh
+void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
+                 const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
+                 const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
                  const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
                  const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
+                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
+                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
+                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
                  const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
                  const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
                  const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
@@ -103,27 +103,27 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
         for (size_t i_sub = 0; i_sub < n_sub_s; i_sub += VEC_SIZE)
         {
             // Calculate the intersections of the ray with the two planes orthogonal to the i-th coordinate axis
-            __m256 T = _mm256_load_ps(&Xmin[i_sub]);
+            __m256 T = _mm256_loadu_ps(&Xmin[i_sub]);
             T = _mm256_sub_ps(T, ox);
             __m256 t0_low = _mm256_mul_ps(T, dx_i);
 
-            T = _mm256_load_ps(&Xmax[i_sub]);
+            T = _mm256_loadu_ps(&Xmax[i_sub]);
             T = _mm256_sub_ps(T, ox);
             __m256 t0_high = _mm256_mul_ps(T, dx_i);
 
-            T = _mm256_load_ps(&Ymin[i_sub]);
+            T = _mm256_loadu_ps(&Ymin[i_sub]);
             T = _mm256_sub_ps(T, oy);
             __m256 t1_low = _mm256_mul_ps(T, dy_i);
 
-            T = _mm256_load_ps(&Ymax[i_sub]);
+            T = _mm256_loadu_ps(&Ymax[i_sub]);
             T = _mm256_sub_ps(T, oy);
             __m256 t1_high = _mm256_mul_ps(T, dy_i);
 
-            T = _mm256_load_ps(&Zmin[i_sub]);
+            T = _mm256_loadu_ps(&Zmin[i_sub]);
             T = _mm256_sub_ps(T, oz);
             __m256 t2_low = _mm256_mul_ps(T, dz_i);
 
-            T = _mm256_load_ps(&Zmax[i_sub]);
+            T = _mm256_loadu_ps(&Zmax[i_sub]);
             T = _mm256_sub_ps(T, oz);
             __m256 t2_high = _mm256_mul_ps(T, dz_i);
 
@@ -181,9 +181,9 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
             for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += VEC_SIZE) // Mesh loop
             {
                 // Load first vertex coordinate into AVX2 registers
-                __m256 tx = _mm256_load_ps(&Tx[i_mesh]);
-                __m256 ty = _mm256_load_ps(&Ty[i_mesh]);
-                __m256 tz = _mm256_load_ps(&Tz[i_mesh]);
+                __m256 tx = _mm256_loadu_ps(&Tx[i_mesh]);
+                __m256 ty = _mm256_loadu_ps(&Ty[i_mesh]);
+                __m256 tz = _mm256_loadu_ps(&Tz[i_mesh]);
 
                 // Calculate vector from first vertex coordinate V1 to origin O
                 tx = _mm256_sub_ps(ox, tx);
@@ -191,9 +191,9 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
                 tz = _mm256_sub_ps(oz, tz);
 
                 // Load the two triangle edges E1 and E2 into AVX2 registers
-                __m256 e1x = _mm256_load_ps(&E1x[i_mesh]), e2x = _mm256_load_ps(&E2x[i_mesh]);
-                __m256 e1y = _mm256_load_ps(&E1y[i_mesh]), e2y = _mm256_load_ps(&E2y[i_mesh]);
-                __m256 e1z = _mm256_load_ps(&E1z[i_mesh]), e2z = _mm256_load_ps(&E2z[i_mesh]);
+                __m256 e1x = _mm256_loadu_ps(&E1x[i_mesh]), e2x = _mm256_loadu_ps(&E2x[i_mesh]);
+                __m256 e1y = _mm256_loadu_ps(&E1y[i_mesh]), e2y = _mm256_loadu_ps(&E2y[i_mesh]);
+                __m256 e1z = _mm256_loadu_ps(&E1z[i_mesh]), e2z = _mm256_loadu_ps(&E2z[i_mesh]);
 
                 // Calculate 1st barycentric coordinate U
                 __m256 PQ = _mm256_mul_ps(e2y, dz); // PQ = e2y * dz
