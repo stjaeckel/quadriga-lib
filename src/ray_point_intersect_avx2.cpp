@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,20 +24,19 @@
 
 #if defined(_MSC_VER) // Windows
 #include <intrin.h>
-#include <malloc.h> // Include for _aligned_malloc and _aligned_free
 #endif
 
 // Vector size for AVX2
 #define VEC_SIZE 8
 
 // AVX2 accelerated implementation of RayPointIntersect
-void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, aligned to 32 byte, length n_point
+void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point coordinates, length n_point (padded to multiple of 8)
                  const size_t n_point,                                 // Number of points
                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
-                 const size_t n_sub,                                   // Number of sub-clouds (not aligned, i.e. n_sub <= n_sub_s)
+                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
+                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
+                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
+                 const size_t n_sub,                                   // Number of sub-clouds (n_sub <= n_sub_s)
                  const float *T1x, const float *T1y, const float *T1z, // First ray vertex coordinate in GCS, length n_ray
                  const float *T2x, const float *T2y, const float *T2z, // Second ray vertex coordinate in GCS, length n_ray
                  const float *T3x, const float *T3y, const float *T3z, // Third ray vertex coordinate in GCS, length n_ray
@@ -65,15 +64,15 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
     const __m256 r1 = _mm256_set1_ps(1.0f);         // One (float8)
     const __m256 r_slack = _mm256_set1_ps(1.0e-5f); // Small value for numeric stability
 
-#pragma omp parallel for
-    for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
+#pragma omp parallel
     {
-        // Initialize indicator for sub-cloud hits
-#if defined(_MSC_VER) // Windows
-        int *p_sub_hit = (int *)_aligned_malloc(n_sub_s * sizeof(int), 32);
-#else // Linux
-        int *p_sub_hit = (int *)aligned_alloc(32, n_sub_s * sizeof(int));
-#endif
+        // Per-thread storage for sub-cloud hit indicators, reused across ray iterations
+        std::vector<int> sub_hit_vec(n_sub_s);
+        int *p_sub_hit = sub_hit_vec.data();
+
+#pragma omp for
+        for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
+        {
 
         // Load origin into AVX2 registers
         __m256 ox0 = _mm256_set1_ps(T1x[i_ray]);
@@ -126,12 +125,12 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
         for (size_t i_sub = 0; i_sub < n_sub_s; i_sub += VEC_SIZE)
         {
             // Load point bounding box
-            __m256 b0_low = _mm256_load_ps(&Xmin[i_sub]);
-            __m256 b0_high = _mm256_load_ps(&Xmax[i_sub]);
-            __m256 b1_low = _mm256_load_ps(&Ymin[i_sub]);
-            __m256 b1_high = _mm256_load_ps(&Ymax[i_sub]);
-            __m256 b2_low = _mm256_load_ps(&Zmin[i_sub]);
-            __m256 b2_high = _mm256_load_ps(&Zmax[i_sub]);
+            __m256 b0_low = _mm256_loadu_ps(&Xmin[i_sub]);
+            __m256 b0_high = _mm256_loadu_ps(&Xmax[i_sub]);
+            __m256 b1_low = _mm256_loadu_ps(&Ymin[i_sub]);
+            __m256 b1_high = _mm256_loadu_ps(&Ymax[i_sub]);
+            __m256 b2_low = _mm256_loadu_ps(&Zmin[i_sub]);
+            __m256 b2_high = _mm256_loadu_ps(&Zmax[i_sub]);
 
             // Add some slack for numeric stability
             b0_low = _mm256_sub_ps(b0_low, r_slack);
@@ -253,34 +252,34 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
             for (int i_point = i_point_start; i_point < i_point_end; i_point += VEC_SIZE) // Points loop
             {
                 // Load point coordinate
-                __m256 rx = _mm256_load_ps(&Px[i_point]);
-                __m256 ry = _mm256_load_ps(&Py[i_point]);
-                __m256 rz = _mm256_load_ps(&Pz[i_point]);
+                __m256 rx = _mm256_loadu_ps(&Px[i_point]);
+                __m256 ry = _mm256_loadu_ps(&Py[i_point]);
+                __m256 rz = _mm256_loadu_ps(&Pz[i_point]);
 
                 // Distance between vertex origin and wavefront at point
                 __m256 v = _mm256_fmsub_ps(rz, nz, oz0_x_nz);
-                __m256 d = _mm256_mul_ps(rdx, v);
+                __m256 d0 = _mm256_mul_ps(rdx, v);
                 v = _mm256_fmsub_ps(ry, ny, oy0_x_ny);
-                d = _mm256_fmadd_ps(rdx, v, d);
+                d0 = _mm256_fmadd_ps(rdx, v, d0);
                 v = _mm256_fmsub_ps(rx, nx, ox0_x_nx);
-                d = _mm256_fmadd_ps(rdx, v, d);
+                d0 = _mm256_fmadd_ps(rdx, v, d0);
 
                 // Vertex position at advanced wavefront
-                __m256 Vx = _mm256_fmadd_ps(d, dx0, ox0);
-                __m256 Vy = _mm256_fmadd_ps(d, dy0, oy0);
-                __m256 Vz = _mm256_fmadd_ps(d, dz0, oz0);
+                __m256 Vx = _mm256_fmadd_ps(d0, dx0, ox0);
+                __m256 Vy = _mm256_fmadd_ps(d0, dy0, oy0);
+                __m256 Vz = _mm256_fmadd_ps(d0, dz0, oz0);
 
                 // Calculate edge from W1 to W2
                 v = _mm256_fmsub_ps(rz, nz, oz1_x_nz);
-                d = _mm256_mul_ps(rdy, v);
+                __m256 d1 = _mm256_mul_ps(rdy, v);
                 v = _mm256_fmsub_ps(ry, ny, oy1_x_ny);
-                d = _mm256_fmadd_ps(rdy, v, d);
+                d1 = _mm256_fmadd_ps(rdy, v, d1);
                 v = _mm256_fmsub_ps(rx, nx, ox1_x_nx);
-                d = _mm256_fmadd_ps(rdy, v, d);
+                d1 = _mm256_fmadd_ps(rdy, v, d1);
 
-                __m256 e1x = _mm256_fmadd_ps(d, dx1, ox1);
-                __m256 e1y = _mm256_fmadd_ps(d, dy1, oy1);
-                __m256 e1z = _mm256_fmadd_ps(d, dz1, oz1);
+                __m256 e1x = _mm256_fmadd_ps(d1, dx1, ox1);
+                __m256 e1y = _mm256_fmadd_ps(d1, dy1, oy1);
+                __m256 e1z = _mm256_fmadd_ps(d1, dz1, oz1);
 
                 e1x = _mm256_sub_ps(e1x, Vx);
                 e1y = _mm256_sub_ps(e1y, Vy);
@@ -288,15 +287,15 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
 
                 // Calculate edge from W1 to W3
                 v = _mm256_fmsub_ps(rz, nz, oz2_x_nz);
-                d = _mm256_mul_ps(rdz, v);
+                __m256 d2 = _mm256_mul_ps(rdz, v);
                 v = _mm256_fmsub_ps(ry, ny, oy2_x_ny);
-                d = _mm256_fmadd_ps(rdz, v, d);
+                d2 = _mm256_fmadd_ps(rdz, v, d2);
                 v = _mm256_fmsub_ps(rx, nx, ox2_x_nx);
-                d = _mm256_fmadd_ps(rdz, v, d);
+                d2 = _mm256_fmadd_ps(rdz, v, d2);
 
-                __m256 e2x = _mm256_fmadd_ps(d, dx2, ox2);
-                __m256 e2y = _mm256_fmadd_ps(d, dy2, oy2);
-                __m256 e2z = _mm256_fmadd_ps(d, dz2, oz2);
+                __m256 e2x = _mm256_fmadd_ps(d2, dx2, ox2);
+                __m256 e2y = _mm256_fmadd_ps(d2, dy2, oy2);
+                __m256 e2z = _mm256_fmadd_ps(d2, dz2, oz2);
 
                 e2x = _mm256_sub_ps(e2x, Vx);
                 e2y = _mm256_sub_ps(e2y, Vy);
@@ -348,8 +347,12 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
                 U = _mm256_add_ps(U, V);                     // Compute U + V
                 D = _mm256_cmp_ps(U, r1, _CMP_LE_OQ);        // (U + V) <= 1
                 C = _mm256_and_ps(C, D);                     // U >= 0 & V >= 0 & (U + V) <= 1
-                D = _mm256_cmp_ps(d, r0, _CMP_GE_OQ);        // d >= 0
-                C = _mm256_and_ps(C, D);                     // U >= 0 & V >= 0 & (U + V) <= 1 & d > 0
+                D = _mm256_cmp_ps(d0, r0, _CMP_GE_OQ);       // d0 >= 0
+                C = _mm256_and_ps(C, D);
+                D = _mm256_cmp_ps(d1, r0, _CMP_GE_OQ);       // d1 >= 0
+                C = _mm256_and_ps(C, D);
+                D = _mm256_cmp_ps(d2, r0, _CMP_GE_OQ);       // d2 >= 0
+                C = _mm256_and_ps(C, D);                     // U >= 0 & V >= 0 & (U + V) <= 1 & d0 >= 0 & d1 >= 0 & d2 >= 0
 
                 // Add point to points list
                 int result[8];
@@ -361,11 +364,6 @@ void qd_RPI_AVX2(const float *Px, const float *Py, const float *Pz,    // Point 
             }
         }
 
-// Free aligned memory
-#if defined(_MSC_VER) // Windows
-        _aligned_free(p_sub_hit);
-#else // Linux
-        free(p_sub_hit);
-#endif
-    }
+        } // end ray loop
+    } // end omp parallel
 }

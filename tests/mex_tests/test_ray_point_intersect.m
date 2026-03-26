@@ -138,7 +138,7 @@ try % sub-cloud error
         error('moxunit:exceptionNotRaised', 'Expected an error!');
     end
 catch ME
-    expectedErrorMessage = 'Sub-clouds must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).';
+    expectedErrorMessage = 'Sub-clouds must be aligned with the SIMD vector size (8 for AVX2).';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
