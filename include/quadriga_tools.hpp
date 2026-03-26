@@ -480,7 +480,9 @@ namespace quadriga_lib
                                                    const arma::Mat<dtype> *trivec,                 // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [ n_ray, 9 ]
                                                    const arma::Mat<dtype> *tridir,                 // Directions of the vertex-rays; Cartesian format; Size [ n_ray, 9 ]
                                                    const arma::u32_vec *sub_cloud_index = nullptr, // Sub-cloud index, 0-based, Optional, Length: [ n_sub ]
-                                                   arma::u32_vec *hit_count = nullptr);            // Hit counter; Optional Output; Length [ n_points ]
+                                                   arma::u32_vec *hit_count = nullptr,             // Hit counter; Optional Output; Length [ n_points ]
+                                                   int use_kernel = 0,                             // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA
+                                                   int gpu_id = 0);                                // GPU device ID for CUDA kernel, ignored otherwise
 
     // Calculates the intersection of rays and triangles in three dimensions
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm

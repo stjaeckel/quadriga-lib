@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,236 +15,16 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include "quadriga_tools.hpp"
-
-#if defined(_MSC_VER) // Windows
-#include <malloc.h>   // Include for _aligned_malloc and _aligned_free
-#endif
+#include "quadriga_lib.hpp"
+#include "quadriga_lib_generic_functions.hpp"
 
 #if BUILD_WITH_AVX2
 #include "quadriga_lib_avx2_functions.hpp"
-#define VEC_SIZE 8ULL
-#else // AVX2 disabled
-#define VEC_SIZE 1ULL
 #endif
 
-// Generic C++ implementation of RayPointIntersect
-static inline void qd_RPI_GENERIC(const float *Px, const float *Py, const float *Pz,    // Point coordinates, aligned to 32 byte, length n_point
-                                  const size_t n_point,                                 // Number of points
-                                  const unsigned *SCI,                                  // List of sub-cloud indices, length n_sub
-                                  const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, aligned to 32 byte, length n_sub_s
-                                  const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, aligned to 32 byte, length n_sub_s
-                                  const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, aligned to 32 byte, length n_sub_s
-                                  const size_t n_sub,                                   // Number of sub-clouds (not aligned, i.e. n_sub <= n_sub_s)
-                                  const float *T1x, const float *T1y, const float *T1z, // First ray vertex coordinate in GCS, length n_ray
-                                  const float *T2x, const float *T2y, const float *T2z, // Second ray vertex coordinate in GCS, length n_ray
-                                  const float *T3x, const float *T3y, const float *T3z, // Third ray vertex coordinate in GCS, length n_ray
-                                  const float *Nx, const float *Ny, const float *Nz,    // Ray tube normal vector, length n_ray
-                                  const float *D1x, const float *D1y, const float *D1z, // First ray direction in GCS, length n_ray
-                                  const float *D2x, const float *D2y, const float *D2z, // Second ray direction in GCS, length n_ray
-                                  const float *D3x, const float *D3y, const float *D3z, // Third ray direction in GCS, length n_ray
-                                  const float *rD1, const float *rD2, const float *rD3, // Inverse Dot product of ray direction and normal vector
-                                  const size_t n_ray,                                   // Number of rays
-                                  std::vector<unsigned> *p_hit)                         // Output: Array of std::vector containing list of points that were hit by a ray, length n_ray
-
-{
-    if (n_point >= INT32_MAX)
-        throw std::invalid_argument("Number of points exceeds maximum supported number.");
-    if (n_ray >= INT32_MAX)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
-
-    // Constant values needed for some operations
-    const int n_point_i = (int)n_point; // Number of points as int
-    const int n_ray_i = (int)n_ray;     // Number of rays as int
-
-#pragma omp parallel for
-    for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
-    {
-        // Initialize indicator for sub-cloud hits
-        arma::s32_vec sub_hit(n_sub);
-        int *p_sub_hit = sub_hit.memptr();
-
-        // Load origin
-        float ox[3], oy[3], oz[3];
-        ox[0] = T1x[i_ray], oy[0] = T1y[i_ray], oz[0] = T1z[i_ray];
-        ox[1] = T2x[i_ray], oy[1] = T2y[i_ray], oz[1] = T2z[i_ray];
-        ox[2] = T3x[i_ray], oy[2] = T3y[i_ray], oz[2] = T3z[i_ray];
-
-        // Load direction
-        float dx[3], dy[3], dz[3];
-        dx[0] = D1x[i_ray], dy[0] = D1y[i_ray], dz[0] = D1z[i_ray];
-        dx[1] = D2x[i_ray], dy[1] = D2y[i_ray], dz[1] = D2z[i_ray];
-        dx[2] = D3x[i_ray], dy[2] = D3y[i_ray], dz[2] = D3z[i_ray];
-
-        // Load normal vector
-        float nx = Nx[i_ray], ny = Ny[i_ray], nz = Nz[i_ray];
-
-        // Load inverse dot product
-        float rdx = rD1[i_ray], rdy = rD2[i_ray], rdz = rD3[i_ray];
-
-        // Step 1 - Check for possible hits
-        // - Move the wavefront forward relative to the distance between vertex origin and AABB corner point
-        // - Construct second AABB from advanced wavefronts
-        // - If AABBs overlap, there is a potential hit and individual points must be checked in step 2
-
-        for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
-        {
-            // Load point bounding box, add some slack for numeric stability
-            float b0_low = Xmin[i_sub] - 1.0e-5f, b0_high = Xmax[i_sub] + 1.0e-5f,
-                  b1_low = Ymin[i_sub] - 1.0e-5f, b1_high = Ymax[i_sub] + 1.0e-5f,
-                  b2_low = Zmin[i_sub] - 1.0e-5f, b2_high = Zmax[i_sub] + 1.0e-5f;
-
-            // AABB corner points
-            float rx[8] = {b0_low, b0_low, b0_low, b0_low, b0_high, b0_high, b0_high, b0_high};
-            float ry[8] = {b1_low, b1_low, b1_high, b1_high, b1_low, b1_low, b1_high, b1_high};
-            float rz[8] = {b2_low, b2_high, b2_low, b2_high, b2_low, b2_high, b2_low, b2_high};
-
-            // Initialize coordinates for the vertex box
-            float a0_low = INFINITY, a0_high = -INFINITY,
-                  a1_low = INFINITY, a1_high = -INFINITY,
-                  a2_low = INFINITY, a2_high = -INFINITY;
-
-            // Calculate the vertex box at the advanced wavefront
-            for (int i = 0; i < 8; ++i)
-            {
-                // Distance between vertex origin and wavefront at corner point
-                float d = rdx * ((rx[i] - ox[0]) * nx + (ry[i] - oy[0]) * ny + (rz[i] - oz[0]) * nz);
-
-                // Update vertex box at advanced wavefront
-                float V = d * dx[0] + ox[0];
-                a0_low = (V < a0_low) ? V : a0_low;
-                a0_high = (V > a0_high) ? V : a0_high;
-
-                V = d * dy[0] + oy[0];
-                a1_low = (V < a1_low) ? V : a1_low;
-                a1_high = (V > a1_high) ? V : a1_high;
-
-                V = d * dz[0] + oz[0];
-                a2_low = (V < a2_low) ? V : a2_low;
-                a2_high = (V > a2_high) ? V : a2_high;
-
-                // 2nd vertex
-                d = rdy * ((rx[i] - ox[1]) * nx + (ry[i] - oy[1]) * ny + (rz[i] - oz[1]) * nz);
-
-                V = d * dx[1] + ox[1];
-                a0_low = (V < a0_low) ? V : a0_low;
-                a0_high = (V > a0_high) ? V : a0_high;
-
-                V = d * dy[1] + oy[1];
-                a1_low = (V < a1_low) ? V : a1_low;
-                a1_high = (V > a1_high) ? V : a1_high;
-
-                V = d * dz[1] + oz[1];
-                a2_low = (V < a2_low) ? V : a2_low;
-                a2_high = (V > a2_high) ? V : a2_high;
-
-                // 3rd vertex
-                d = rdz * ((rx[i] - ox[2]) * nx + (ry[i] - oy[2]) * ny + (rz[i] - oz[2]) * nz);
-
-                V = d * dx[2] + ox[2];
-                a0_low = (V < a0_low) ? V : a0_low;
-                a0_high = (V > a0_high) ? V : a0_high;
-
-                V = d * dy[2] + oy[2];
-                a1_low = (V < a1_low) ? V : a1_low;
-                a1_high = (V > a1_high) ? V : a1_high;
-
-                V = d * dz[2] + oz[2];
-                a2_low = (V < a2_low) ? V : a2_low;
-                a2_high = (V > a2_high) ? V : a2_high;
-            }
-
-            // Check for a potential overlap between the AABBs
-            if (a0_high >= b0_low && a0_low <= b0_high &&
-                a1_high >= b1_low && a1_low <= b1_high &&
-                a2_high >= b2_low && a2_low <= b2_high)
-                p_sub_hit[i_sub] = 1;
-        }
-
-        // Step 2 - Check intersection with points within the sub-clouds
-
-        for (size_t i_sub = 0; i_sub < n_sub; ++i_sub)
-        {
-            // Skip if sub-cloud was not hit
-            if (p_sub_hit[i_sub] == 0)
-                continue;
-
-            int i_point_start = (int)SCI[i_sub];
-            int i_point_end = (i_sub == n_sub - 1) ? n_point_i : (int)SCI[i_sub + 1];
-
-            for (int i_point = i_point_start; i_point < i_point_end; ++i_point) // Point loop
-            {
-                // Load point coordinate
-                float rx = Px[i_point];
-                float ry = Py[i_point];
-                float rz = Pz[i_point];
-
-                // Distance between vertex origin and wavefront at point
-                float d = rdx * ((rx - ox[0]) * nx + (ry - oy[0]) * ny + (rz - oz[0]) * nz);
-
-                // Vertex position at advanced wavefront
-                float Vx = d * dx[0] + ox[0],
-                      Vy = d * dy[0] + oy[0],
-                      Vz = d * dz[0] + oz[0];
-
-                // Calculate edge from W1 to W2
-                d = rdy * ((rx - ox[1]) * nx + (ry - oy[1]) * ny + (rz - oz[1]) * nz);
-
-                float e1x = d * dx[1] + ox[1] - Vx,
-                      e1y = d * dy[1] + oy[1] - Vy,
-                      e1z = d * dz[1] + oz[1] - Vz;
-
-                // Calculate edge from W1 to W3
-                d = rdz * ((rx - ox[2]) * nx + (ry - oy[2]) * ny + (rz - oz[2]) * nz);
-
-                float e2x = d * dx[2] + ox[2] - Vx,
-                      e2y = d * dy[2] + oy[2] - Vy,
-                      e2z = d * dz[2] + oz[2] - Vz;
-
-                // Calculate vector from V to R
-                float tx = rx - Vx,
-                      ty = ry - Vy,
-                      tz = rz - Vz;
-
-                // Calculate 1st barycentric coordinate
-                float PQ = e2z * ny - e2y * nz;
-                float DT = e1x * PQ;
-                float U = tx * PQ;
-
-                PQ = e2x * nz - e2z * nx;
-                DT = e1y * PQ + DT;
-                U = ty * PQ + U;
-
-                PQ = e2y * nx - e2x * ny;
-                DT = e1z * PQ + DT;
-                U = tz * PQ + U;
-
-                // Calculate 2nd barycentric coordinate
-                PQ = e1z * ty - e1y * tz;
-                float V = nx * PQ;
-
-                PQ = e1x * tz - e1z * tx,
-                V = ny * PQ + V;
-
-                PQ = e1y * tx - e1x * ty,
-                V = nz * PQ + V;
-
-                // Inverse of DT
-                DT = 1.0f / DT;
-
-                U = U * DT;
-                V = V * DT;
-
-                // Check intersect conditions
-                bool C1 = (U >= 0.0f) & (V >= 0.0f) & ((U + V) <= 1.0f) & (d >= 0.0f);
-
-                // Add point to points list
-                if (C1)
-                    p_hit[i_ray].push_back(i_point);
-            }
-        }
-    }
-}
+#if BUILD_WITH_CUDA
+#include "quadriga_lib_cuda_functions.hpp"
+#endif
 
 /*!SECTION
 Site-Specific Simulation Tools
@@ -267,10 +47,13 @@ volumetric intersection tests. <br><br>
 - This function computes whether points in 3D Cartesian space are intersected by ray beams.
 - A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors.
 - Returns a list of ray indices (0-based) that intersect with each point in the input point cloud.
+- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 points in parallel), and **CUDA** (GPU).
+- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
+- In auto mode (0), CUDA is selected only when `n_points >= 10000` and a CUDA-capable GPU is available;
+  otherwise AVX2 is preferred if available, falling back to GENERIC.
 - Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>)
   to reduce computational cost.
 - All internal computations use single precision for speed.
-- Uses Advanced Vector Extensions (AVX2) for efficient computation, if supported by the CPU
 - Recommended to use with small tube radius and well-distributed points for optimal accuracy.
 
 ## Declaration:
@@ -282,7 +65,9 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
                 const arma::Mat<dtype> *trivec,
                 const arma::Mat<dtype> *tridir,
                 const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::u32_vec *hit_count = nullptr);
+                arma::u32_vec *hit_count = nullptr,
+                int use_kernel = 0,
+                int gpu_id = 0);
 ```
 
 ## Arguments:
@@ -304,9 +89,17 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 
 - `const arma::u32_vec ***sub_cloud_index** = nullptr` (optional input)<br>
   Index vector to mark boundaries between point cloud segments (e.g. for SIMD optimization). Length: `[n_sub]`.
+  When using AVX2, sub-cloud start indices must be aligned to multiples of 8.
 
 - `arma::u32_vec ***hit_count** = nullptr` (optional output)<br>
   Output array with number of rays that intersected each point. Length: `[n_points]`.
+
+- `int **use_kernel** = 0` (optional input)<br>
+  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
+  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
+
+- `int **gpu_id** = 0` (optional input)<br>
+  GPU device ID for CUDA kernel. Ignored when not using CUDA.
 
 ## Returns:
 - `std::vector<arma::u32_vec>`<br>
@@ -326,7 +119,8 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                                                              const arma::Mat<dtype> *trivec,
                                                              const arma::Mat<dtype> *tridir,
                                                              const arma::u32_vec *sub_cloud_index,
-                                                             arma::u32_vec *hit_count)
+                                                             arma::u32_vec *hit_count,
+                                                             int use_kernel, int gpu_id)
 {
     // Input validation
     if (points == nullptr || points->n_elem == 0)
@@ -362,6 +156,38 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     if (tridir->n_rows != n_ray_t)
         throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
 
+    // Determine which compute kernel to use
+    // kernel: 1 = GENERIC, 2 = AVX2, 3 = CUDA
+    int kernel = 1;      // Default to GENERIC
+    if (use_kernel == 1) // GENERIC requested
+    {
+        kernel = 1;
+    }
+    else if (use_kernel == 2) // AVX2 requested
+    {
+        if (!quadriga_lib::quadriga_lib_has_AVX2())
+            throw std::invalid_argument("AVX2 kernel requested but not available (compile with BUILD_WITH_AVX2 and run on AVX2-capable CPU).");
+        kernel = 2;
+    }
+    else if (use_kernel == 3) // CUDA requested
+    {
+        if (!quadriga_lib::quadriga_lib_has_CUDA())
+            throw std::invalid_argument("CUDA kernel requested but not available (compile with BUILD_WITH_CUDA and run on CUDA-capable GPU).");
+        kernel = 3;
+    }
+    else // Auto-select (use_kernel == 0)
+    {
+        if (n_point_t >= 10000ULL && quadriga_lib::quadriga_lib_has_CUDA())
+            kernel = 3;
+        else if (quadriga_lib::quadriga_lib_has_AVX2())
+            kernel = 2;
+        else
+            kernel = 1;
+    }
+
+    // Determine SIMD vector size based on selected kernel
+    size_t vec_size = (kernel == 2) ? 8ULL : 1ULL;
+
     // Check if the sub-cloud indices are valid
     size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
     arma::u32_vec sci(1);                                           // Sub-cloud-index (local copy)
@@ -378,8 +204,8 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
             if (p_sub[i] <= p_sub[i - 1])
                 throw std::invalid_argument("Sub-cloud indices must be sorted in ascending order.");
 
-            if (p_sub[i] % VEC_SIZE != 0)
-                throw std::invalid_argument("Sub-clouds must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).");
+            if (vec_size > 1ULL && p_sub[i] % vec_size != 0)
+                throw std::invalid_argument("Sub-clouds must be aligned with the SIMD vector size (8 for AVX2).");
         }
 
         if (p_sub[n_sub_t - 1] >= (unsigned)n_point_t)
@@ -516,34 +342,23 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
         }
     }
 
-    // Alignment to 32 byte addresses is required when loading data into AVX2 registers
-    // Not doing this may cause segmentation faults (e.g. in MATLAB)
-    size_t n_point_s = (n_point_t % VEC_SIZE == 0) ? n_point_t : VEC_SIZE * (n_point_t / VEC_SIZE + 1);
-    size_t n_sub_s = (n_sub_t % VEC_SIZE == 0) ? n_sub_t : VEC_SIZE * (n_sub_t / VEC_SIZE + 1);
+    // Pad to multiple of vec_size for AVX2 kernel (no tail handling)
+    size_t n_point_s = (n_point_t % vec_size == 0) ? n_point_t : vec_size * (n_point_t / vec_size + 1);
+    size_t n_sub_s = (n_sub_t % vec_size == 0) ? n_sub_t : vec_size * (n_sub_t / vec_size + 1);
 
-#if defined(_MSC_VER) // Windows
-    float *Px = (float *)_aligned_malloc(n_point_s * sizeof(float), 32);
-    float *Py = (float *)_aligned_malloc(n_point_s * sizeof(float), 32);
-    float *Pz = (float *)_aligned_malloc(n_point_s * sizeof(float), 32);
-    float *Xmin = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-    float *Xmax = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-    float *Ymin = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-    float *Ymax = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-    float *Zmin = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-    float *Zmax = (float *)_aligned_malloc(n_sub_s * sizeof(float), 32);
-#else // Linux
-    float *Px = (float *)aligned_alloc(32, n_point_s * sizeof(float));
-    float *Py = (float *)aligned_alloc(32, n_point_s * sizeof(float));
-    float *Pz = (float *)aligned_alloc(32, n_point_s * sizeof(float));
-    float *Xmin = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-    float *Xmax = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-    float *Ymin = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-    float *Ymax = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-    float *Zmin = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-    float *Zmax = (float *)aligned_alloc(32, n_sub_s * sizeof(float));
-#endif
+    // Point data in SoA layout
+    arma::fvec Px_vec(n_point_s, arma::fill::none), Py_vec(n_point_s, arma::fill::none), Pz_vec(n_point_s, arma::fill::none);
+    float *Px = Px_vec.memptr(), *Py = Py_vec.memptr(), *Pz = Pz_vec.memptr();
 
-    // Convert points to float and write to aligned memory
+    // AABB data per sub-cloud
+    arma::fvec Xmin_vec(n_sub_s, arma::fill::none), Xmax_vec(n_sub_s, arma::fill::none);
+    arma::fvec Ymin_vec(n_sub_s, arma::fill::none), Ymax_vec(n_sub_s, arma::fill::none);
+    arma::fvec Zmin_vec(n_sub_s, arma::fill::none), Zmax_vec(n_sub_s, arma::fill::none);
+    float *Xmin = Xmin_vec.memptr(), *Xmax = Xmax_vec.memptr();
+    float *Ymin = Ymin_vec.memptr(), *Ymax = Ymax_vec.memptr();
+    float *Zmin = Zmin_vec.memptr(), *Zmax = Zmax_vec.memptr();
+
+    // Convert points to float and compute bounding boxes
     // Calculate bounding box for each sub-cloud
     const dtype *p_points = points->memptr();
     const unsigned *p_sub = sci.memptr();
@@ -567,13 +382,13 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
         y_min = (yf < y_min) ? yf : y_min, y_max = (yf > y_max) ? yf : y_max;
         z_min = (zf < z_min) ? zf : z_min, z_max = (zf > z_max) ? zf : z_max;
 
-        // Write to aligned memory
+        // Write to float buffer
         Px[i_point] = xf, Py[i_point] = yf, Pz[i_point] = zf;
 
         // Update sub-cloud data for the next AABB
         if (i_point == i_next)
         {
-            // Write current AABB data to aligned memory
+            // Write current AABB data
             Xmin[i_sub] = x_min, Xmax[i_sub] = x_max;
             Ymin[i_sub] = y_min, Ymax[i_sub] = y_max;
             Zmin[i_sub] = z_min, Zmax[i_sub] = z_max;
@@ -589,11 +404,11 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
         }
     }
 
-    // Add padding to the aligned point data
+    // Add padding to the point data
     for (size_t i_point = n_point_t; i_point < n_point_s; ++i_point)
         Px[i_point] = 0.0f, Py[i_point] = 0.0f, Pz[i_point] = 0.0f;
 
-    // Add padding to the aligned AABB data
+    // Add padding to the AABB data
     for (size_t i_sub = n_sub_t; i_sub < n_sub_s; ++i_sub)
     {
         Xmin[i_sub] = 0.0f, Xmax[i_sub] = 0.0f;
@@ -602,12 +417,29 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     }
 
     // Output container
-    std::vector<unsigned> *p_hit = new std::vector<unsigned>[n_ray_t];
+    std::vector<std::vector<unsigned>> hit_vec(n_ray_t);
+    std::vector<unsigned> *p_hit = hit_vec.data();
 
-    // Call intersect function
-#if BUILD_WITH_AVX2
-    if (runtime_AVX2_Check()) // CPU support for AVX2
+    // Dispatch to selected kernel
+    if (kernel == 3) // CUDA
     {
+#if BUILD_WITH_CUDA
+        qd_RPI_CUDA(Px, Py, Pz, n_point_s,
+                    sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
+                    trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
+                    trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
+                    trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),
+                    normalA.colptr(0), normalA.colptr(1), normalA.colptr(2),
+                    dirA.colptr(0), dirA.colptr(1), dirA.colptr(2),
+                    dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
+                    dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
+                    invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
+                    n_ray_t, p_hit, gpu_id);
+#endif
+    }
+    else if (kernel == 2) // AVX2
+    {
+#if BUILD_WITH_AVX2
         qd_RPI_AVX2(Px, Py, Pz, n_point_s,
                     sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
                     trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
@@ -619,8 +451,9 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                     dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
                     invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
                     n_ray_t, p_hit);
+#endif
     }
-    else
+    else // GENERIC
     {
         qd_RPI_GENERIC(Px, Py, Pz, n_point_t,
                        sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
@@ -634,35 +467,10 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                        invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
                        n_ray_t, p_hit);
     }
-#else // AVX2 disabled
-    qd_RPI_GENERIC(Px, Py, Pz, n_point_t,
-                   sci.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub_t,
-                   trivecA.colptr(0), trivecA.colptr(1), trivecA.colptr(2),
-                   trivecA.colptr(3), trivecA.colptr(4), trivecA.colptr(5),
-                   trivecA.colptr(6), trivecA.colptr(7), trivecA.colptr(8),
-                   normalA.colptr(0), normalA.colptr(1), normalA.colptr(2),
-                   dirA.colptr(0), dirA.colptr(1), dirA.colptr(2),
-                   dirA.colptr(3), dirA.colptr(4), dirA.colptr(5),
-                   dirA.colptr(6), dirA.colptr(7), dirA.colptr(8),
-                   invDotA.colptr(0), invDotA.colptr(1), invDotA.colptr(2),
-                   n_ray_t, p_hit);
-#endif
-
-// Free aligned memory
-#if defined(_MSC_VER) // Windows
-    _aligned_free(Px), _aligned_free(Py), _aligned_free(Pz);
-    _aligned_free(Xmin), _aligned_free(Xmax);
-    _aligned_free(Ymin), _aligned_free(Ymax);
-    _aligned_free(Zmin), _aligned_free(Zmax);
-#else // Linux
-    free(Px), free(Py), free(Pz);
-    free(Xmin), free(Xmax);
-    free(Ymin), free(Ymax);
-    free(Zmin), free(Zmax);
-#endif
 
     // Count hits per point
-    unsigned *p_cnt = new unsigned[n_point_s]();
+    arma::u32_vec cnt_vec(n_point_s, arma::fill::zeros);
+    unsigned *p_cnt = cnt_vec.memptr();
 
     for (size_t i_ray = 0; i_ray < n_ray_t; ++i_ray)
         for (size_t i_hit = 0; i_hit < p_hit[i_ray].size(); ++i_hit)
@@ -694,8 +502,6 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                 output[i_point].at(p_cnt[i_point]++) = (unsigned)i_ray;
         }
 
-    delete[] p_cnt;
-    delete[] p_hit;
     return output;
 }
 
@@ -704,11 +510,13 @@ template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma
                                                                       const arma::Mat<float> *trivec,
                                                                       const arma::Mat<float> *tridir,
                                                                       const arma::u32_vec *sub_cloud_index,
-                                                                      arma::u32_vec *hit_count);
+                                                                      arma::u32_vec *hit_count,
+                                                                      int use_kernel, int gpu_id);
 
 template std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<double> *points,
                                                                       const arma::Mat<double> *orig,
                                                                       const arma::Mat<double> *trivec,
                                                                       const arma::Mat<double> *tridir,
                                                                       const arma::u32_vec *sub_cloud_index,
-                                                                      arma::u32_vec *hit_count);
+                                                                      arma::u32_vec *hit_count,
+                                                                      int use_kernel, int gpu_id);
