@@ -23,693 +23,680 @@
 #include <vector>
 #include <algorithm>
 
-#include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
+#include "cuda_common.hpp" // replaces local CUDA_CHECK + cuda_runtime.h
 #include "quadriga_lib_cuda_functions.hpp"
 
-// ============================================================================
-// Configuration constants
-// ============================================================================
+namespace
+{ // ---------------------------------------------------------------
 
-#define K1_BLOCK_SIZE 256
-#define K1B_BLOCK_SIZE 256
-#define K2_BLOCK_SIZE 256
-#define RAYS_PER_BLOCK 32
-#define EST_AVG_HITS 10
-#define EST_HIT_RATE 2
-#define N_RAY_ATTRS 24
+    // ============================================================================
+    // Configuration constants
+    // ============================================================================
 
-static_assert(K1_BLOCK_SIZE % 32 == 0, "Kernel 1 block size must be a multiple of 32");
-static_assert(K2_BLOCK_SIZE % 32 == 0, "Kernel 2 block size must be a multiple of 32");
+    constexpr int K1_BLOCK_SIZE = 256;
+    constexpr int K1B_BLOCK_SIZE = 256;
+    constexpr int K2_BLOCK_SIZE = 256;
+    constexpr int RAYS_PER_BLOCK = 32;
+    constexpr int EST_AVG_HITS = 10;
+    constexpr int EST_HIT_RATE = 2;
+    constexpr int N_RAY_ATTRS = 24;
 
-// ============================================================================
-// CUDA error checking macro
-// ============================================================================
+    static_assert(K1_BLOCK_SIZE % 32 == 0, "Kernel 1 block size must be a multiple of 32");
+    static_assert(K2_BLOCK_SIZE % 32 == 0, "Kernel 2 block size must be a multiple of 32");
 
-#define CUDA_CHECK(call)                                           \
-    do                                                             \
-    {                                                              \
-        cudaError_t err = (call);                                  \
-        if (err != cudaSuccess)                                    \
-            throw std::runtime_error(std::string("CUDA error: ") + \
-                                     cudaGetErrorString(err) +     \
-                                     " at " + __FILE__ + ":" +     \
-                                     std::to_string(__LINE__));    \
-    } while (0)
+    // ============================================================================
+    // RAII cleanup struct (Section 8)
+    // Holds all device and pinned-host pointers; destructor frees non-null ones.
+    // ============================================================================
 
-// ============================================================================
-// RAII cleanup struct (Section 8)
-// Holds all device and pinned-host pointers; destructor frees non-null ones.
-// ============================================================================
-
-struct CudaBuffers
-{
-    // --- Scene data (uploaded once) ---
-    float *d_Px = nullptr, *d_Py = nullptr, *d_Pz = nullptr;
-    uint32_t *d_SCI = nullptr;
-    float *d_Xmin = nullptr, *d_Xmax = nullptr;
-    float *d_Ymin = nullptr, *d_Ymax = nullptr;
-    float *d_Zmin = nullptr, *d_Zmax = nullptr;
-
-    // --- Per-stream buffers (2 streams) ---
-
-    // Ray input (24 SoA arrays per stream)
-    float *d_ray[2][N_RAY_ATTRS] = {};
-
-    // Ray pointer table (device array of 24 float*, per stream)
-    const float **d_ray_ptrs[2] = {nullptr, nullptr};
-
-    // Work queue A/B
-    uint32_t *d_wq_ray_idx_A[2] = {}, *d_wq_ray_idx_B[2] = {};
-    uint16_t *d_wq_sub_idx_A[2] = {}, *d_wq_sub_idx_B[2] = {};
-
-    // Atomic counters (each in own cudaMalloc for cache-line isolation)
-    uint32_t *d_queue_tail[2] = {};
-    uint32_t *d_hit_count[2] = {};
-    uint32_t *d_overflow_flag[2] = {};
-
-    // CUB temp buffer
-    void *d_cub_temp[2] = {nullptr, nullptr};
-    size_t cub_temp_bytes[2] = {0, 0};
-
-    // Segment table
-    uint16_t *d_seg_sub_idx[2] = {};
-    uint32_t *d_seg_run_len[2] = {};
-    uint32_t *d_seg_num_segments[2] = {};
-    uint32_t *d_seg_offset[2] = {};
-    uint32_t *d_chunks_per_seg[2] = {};
-    uint32_t *d_seg_chunk_offset[2] = {};
-    uint32_t *d_total_chunks[2] = {};
-
-    // Hit output
-    uint32_t *d_hit_ray_idx[2] = {};
-    uint32_t *d_hit_point_idx[2] = {};
-
-    // Pinned host memory
-    float *h_ray_pinned[2] = {nullptr, nullptr}; // N_RAY_ATTRS * batch_size floats
-    uint32_t *h_hit_ray_pinned[2] = {nullptr, nullptr};
-    uint32_t *h_hit_point_pinned[2] = {nullptr, nullptr};
-
-    // Streams
-    cudaStream_t stream[2] = {nullptr, nullptr};
-
-    // Sizes for cleanup
-    size_t batch_size = 0;
-    uint32_t queue_capacity = 0;
-    uint32_t hit_capacity = 0;
-
-    ~CudaBuffers()
+    struct CudaBuffers
     {
-        // Scene data
-        if (d_Px)
-            cudaFree(d_Px);
-        if (d_Py)
-            cudaFree(d_Py);
-        if (d_Pz)
-            cudaFree(d_Pz);
-        if (d_SCI)
-            cudaFree(d_SCI);
-        if (d_Xmin)
-            cudaFree(d_Xmin);
-        if (d_Xmax)
-            cudaFree(d_Xmax);
-        if (d_Ymin)
-            cudaFree(d_Ymin);
-        if (d_Ymax)
-            cudaFree(d_Ymax);
-        if (d_Zmin)
-            cudaFree(d_Zmin);
-        if (d_Zmax)
-            cudaFree(d_Zmax);
+        // --- Scene data (uploaded once) ---
+        float *d_Px = nullptr, *d_Py = nullptr, *d_Pz = nullptr;
+        uint32_t *d_SCI = nullptr;
+        float *d_Xmin = nullptr, *d_Xmax = nullptr;
+        float *d_Ymin = nullptr, *d_Ymax = nullptr;
+        float *d_Zmin = nullptr, *d_Zmax = nullptr;
 
-        for (int s = 0; s < 2; ++s)
+        // --- Per-stream buffers (2 streams) ---
+
+        // Ray input (24 SoA arrays per stream)
+        float *d_ray[2][N_RAY_ATTRS] = {};
+
+        // Ray pointer table (device array of 24 float*, per stream)
+        const float **d_ray_ptrs[2] = {nullptr, nullptr};
+
+        // Work queue A/B
+        uint32_t *d_wq_ray_idx_A[2] = {}, *d_wq_ray_idx_B[2] = {};
+        uint16_t *d_wq_sub_idx_A[2] = {}, *d_wq_sub_idx_B[2] = {};
+
+        // Atomic counters (each in own cudaMalloc for cache-line isolation)
+        uint32_t *d_queue_tail[2] = {};
+        uint32_t *d_hit_count[2] = {};
+        uint32_t *d_overflow_flag[2] = {};
+
+        // CUB temp buffer
+        void *d_cub_temp[2] = {nullptr, nullptr};
+        size_t cub_temp_bytes[2] = {0, 0};
+
+        // Segment table
+        uint16_t *d_seg_sub_idx[2] = {};
+        uint32_t *d_seg_run_len[2] = {};
+        uint32_t *d_seg_num_segments[2] = {};
+        uint32_t *d_seg_offset[2] = {};
+        uint32_t *d_chunks_per_seg[2] = {};
+        uint32_t *d_seg_chunk_offset[2] = {};
+        uint32_t *d_total_chunks[2] = {};
+
+        // Hit output
+        uint32_t *d_hit_ray_idx[2] = {};
+        uint32_t *d_hit_point_idx[2] = {};
+
+        // Pinned host memory
+        float *h_ray_pinned[2] = {nullptr, nullptr}; // N_RAY_ATTRS * batch_size floats
+        uint32_t *h_hit_ray_pinned[2] = {nullptr, nullptr};
+        uint32_t *h_hit_point_pinned[2] = {nullptr, nullptr};
+
+        // Streams
+        cudaStream_t stream[2] = {nullptr, nullptr};
+
+        // Sizes for cleanup
+        size_t batch_size = 0;
+        uint32_t queue_capacity = 0;
+        uint32_t hit_capacity = 0;
+
+        ~CudaBuffers()
         {
-            for (int a = 0; a < N_RAY_ATTRS; ++a)
-                if (d_ray[s][a])
-                    cudaFree(d_ray[s][a]);
+            // Scene data
+            if (d_Px)
+                cudaFree(d_Px);
+            if (d_Py)
+                cudaFree(d_Py);
+            if (d_Pz)
+                cudaFree(d_Pz);
+            if (d_SCI)
+                cudaFree(d_SCI);
+            if (d_Xmin)
+                cudaFree(d_Xmin);
+            if (d_Xmax)
+                cudaFree(d_Xmax);
+            if (d_Ymin)
+                cudaFree(d_Ymin);
+            if (d_Ymax)
+                cudaFree(d_Ymax);
+            if (d_Zmin)
+                cudaFree(d_Zmin);
+            if (d_Zmax)
+                cudaFree(d_Zmax);
 
-            if (d_ray_ptrs[s])
-                cudaFree((void *)d_ray_ptrs[s]);
+            for (int s = 0; s < 2; ++s)
+            {
+                for (int a = 0; a < N_RAY_ATTRS; ++a)
+                    if (d_ray[s][a])
+                        cudaFree(d_ray[s][a]);
 
-            if (d_wq_ray_idx_A[s])
-                cudaFree(d_wq_ray_idx_A[s]);
-            if (d_wq_ray_idx_B[s])
-                cudaFree(d_wq_ray_idx_B[s]);
-            if (d_wq_sub_idx_A[s])
-                cudaFree(d_wq_sub_idx_A[s]);
-            if (d_wq_sub_idx_B[s])
-                cudaFree(d_wq_sub_idx_B[s]);
+                if (d_ray_ptrs[s])
+                    cudaFree((void *)d_ray_ptrs[s]);
 
-            if (d_queue_tail[s])
-                cudaFree(d_queue_tail[s]);
-            if (d_hit_count[s])
-                cudaFree(d_hit_count[s]);
-            if (d_overflow_flag[s])
-                cudaFree(d_overflow_flag[s]);
+                if (d_wq_ray_idx_A[s])
+                    cudaFree(d_wq_ray_idx_A[s]);
+                if (d_wq_ray_idx_B[s])
+                    cudaFree(d_wq_ray_idx_B[s]);
+                if (d_wq_sub_idx_A[s])
+                    cudaFree(d_wq_sub_idx_A[s]);
+                if (d_wq_sub_idx_B[s])
+                    cudaFree(d_wq_sub_idx_B[s]);
 
-            if (d_cub_temp[s])
-                cudaFree(d_cub_temp[s]);
+                if (d_queue_tail[s])
+                    cudaFree(d_queue_tail[s]);
+                if (d_hit_count[s])
+                    cudaFree(d_hit_count[s]);
+                if (d_overflow_flag[s])
+                    cudaFree(d_overflow_flag[s]);
 
-            if (d_seg_sub_idx[s])
-                cudaFree(d_seg_sub_idx[s]);
-            if (d_seg_run_len[s])
-                cudaFree(d_seg_run_len[s]);
-            if (d_seg_num_segments[s])
-                cudaFree(d_seg_num_segments[s]);
-            if (d_seg_offset[s])
-                cudaFree(d_seg_offset[s]);
-            if (d_chunks_per_seg[s])
-                cudaFree(d_chunks_per_seg[s]);
-            if (d_seg_chunk_offset[s])
-                cudaFree(d_seg_chunk_offset[s]);
-            if (d_total_chunks[s])
-                cudaFree(d_total_chunks[s]);
+                if (d_cub_temp[s])
+                    cudaFree(d_cub_temp[s]);
 
-            if (d_hit_ray_idx[s])
-                cudaFree(d_hit_ray_idx[s]);
-            if (d_hit_point_idx[s])
-                cudaFree(d_hit_point_idx[s]);
+                if (d_seg_sub_idx[s])
+                    cudaFree(d_seg_sub_idx[s]);
+                if (d_seg_run_len[s])
+                    cudaFree(d_seg_run_len[s]);
+                if (d_seg_num_segments[s])
+                    cudaFree(d_seg_num_segments[s]);
+                if (d_seg_offset[s])
+                    cudaFree(d_seg_offset[s]);
+                if (d_chunks_per_seg[s])
+                    cudaFree(d_chunks_per_seg[s]);
+                if (d_seg_chunk_offset[s])
+                    cudaFree(d_seg_chunk_offset[s]);
+                if (d_total_chunks[s])
+                    cudaFree(d_total_chunks[s]);
 
-            if (h_ray_pinned[s])
-                cudaFreeHost(h_ray_pinned[s]);
-            if (h_hit_ray_pinned[s])
-                cudaFreeHost(h_hit_ray_pinned[s]);
-            if (h_hit_point_pinned[s])
-                cudaFreeHost(h_hit_point_pinned[s]);
+                if (d_hit_ray_idx[s])
+                    cudaFree(d_hit_ray_idx[s]);
+                if (d_hit_point_idx[s])
+                    cudaFree(d_hit_point_idx[s]);
 
-            if (stream[s])
-                cudaStreamDestroy(stream[s]);
+                if (h_ray_pinned[s])
+                    cudaFreeHost(h_ray_pinned[s]);
+                if (h_hit_ray_pinned[s])
+                    cudaFreeHost(h_hit_ray_pinned[s]);
+                if (h_hit_point_pinned[s])
+                    cudaFreeHost(h_hit_point_pinned[s]);
+
+                if (stream[s])
+                    cudaStreamDestroy(stream[s]);
+            }
+        }
+    };
+
+    // ============================================================================
+    // Device helper: warp-level enqueue (Section 7.2)
+    // All 32 lanes in the warp MUST execute this function.
+    // Invalid threads (past batch end) must pass has_hit = false.
+    // ============================================================================
+
+    __device__ __forceinline__ void RPI_enqueue_warp(bool has_hit, uint32_t ray_idx, uint16_t sub_idx,
+                                                     uint32_t *wq_ray, uint16_t *wq_sub, uint32_t *queue_tail,
+                                                     uint32_t queue_capacity)
+    {
+        uint32_t hit_mask = __ballot_sync(0xFFFFFFFF, has_hit);
+        if (hit_mask == 0u)
+            return;
+
+        uint32_t lane = threadIdx.x & 31;
+        uint32_t count = __popc(hit_mask);
+        uint32_t warp_base;
+
+        if (lane == 0)
+            warp_base = atomicAdd(queue_tail, count);
+        warp_base = __shfl_sync(0xFFFFFFFF, warp_base, 0);
+
+        uint32_t local_offset = __popc(hit_mask & ((1u << lane) - 1u));
+        if (has_hit)
+        {
+            uint32_t pos = warp_base + local_offset;
+            if (pos < queue_capacity)
+            {
+                wq_ray[pos] = ray_idx;
+                wq_sub[pos] = sub_idx;
+            }
         }
     }
-};
 
-// ============================================================================
-// Device helper: warp-level enqueue (Section 7.2)
-// All 32 lanes in the warp MUST execute this function.
-// Invalid threads (past batch end) must pass has_hit = false.
-// ============================================================================
+    // ============================================================================
+    // Kernel 1: AABB test + enqueue (Section 4.1)
+    // Launch: <<<ceil(batch_count / K1_BLOCK_SIZE), K1_BLOCK_SIZE, 0, stream>>>
+    // Each thread = one ray. Loops over all AABBs.
+    // ============================================================================
 
-__device__ __forceinline__ void enqueue_warp(bool has_hit, uint32_t ray_idx, uint16_t sub_idx,
-                                             uint32_t *wq_ray, uint16_t *wq_sub, uint32_t *queue_tail,
-                                             uint32_t queue_capacity)
-{
-    uint32_t hit_mask = __ballot_sync(0xFFFFFFFF, has_hit);
-    if (hit_mask == 0u)
-        return;
-
-    uint32_t lane = threadIdx.x & 31;
-    uint32_t count = __popc(hit_mask);
-    uint32_t warp_base;
-
-    if (lane == 0)
-        warp_base = atomicAdd(queue_tail, count);
-    warp_base = __shfl_sync(0xFFFFFFFF, warp_base, 0);
-
-    uint32_t local_offset = __popc(hit_mask & ((1u << lane) - 1u));
-    if (has_hit)
+    __global__ void RPI_aabb_test_and_enqueue(
+        // Ray data (SoA, length >= batch_count)
+        const float *__restrict__ T1x, const float *__restrict__ T1y, const float *__restrict__ T1z,
+        const float *__restrict__ T2x, const float *__restrict__ T2y, const float *__restrict__ T2z,
+        const float *__restrict__ T3x, const float *__restrict__ T3y, const float *__restrict__ T3z,
+        const float *__restrict__ Nx, const float *__restrict__ Ny, const float *__restrict__ Nz,
+        const float *__restrict__ D1x, const float *__restrict__ D1y, const float *__restrict__ D1z,
+        const float *__restrict__ D2x, const float *__restrict__ D2y, const float *__restrict__ D2z,
+        const float *__restrict__ D3x, const float *__restrict__ D3y, const float *__restrict__ D3z,
+        const float *__restrict__ rD1, const float *__restrict__ rD2, const float *__restrict__ rD3,
+        // AABB data (SoA, length n_sub)
+        const float *__restrict__ Xmin, const float *__restrict__ Xmax,
+        const float *__restrict__ Ymin, const float *__restrict__ Ymax,
+        const float *__restrict__ Zmin, const float *__restrict__ Zmax,
+        // Dimensions
+        uint32_t batch_count,
+        uint32_t n_sub,
+        // Work queue output
+        uint32_t *wq_ray_idx,
+        uint16_t *wq_sub_idx,
+        uint32_t *queue_tail,
+        uint32_t queue_capacity)
     {
-        uint32_t pos = warp_base + local_offset;
-        if (pos < queue_capacity)
-        {
-            wq_ray[pos] = ray_idx;
-            wq_sub[pos] = sub_idx;
-        }
-    }
-}
+        uint32_t ray_idx = blockIdx.x * K1_BLOCK_SIZE + threadIdx.x;
+        bool valid = (ray_idx < batch_count);
 
-// ============================================================================
-// Kernel 1: AABB test + enqueue (Section 4.1)
-// Launch: <<<ceil(batch_count / K1_BLOCK_SIZE), K1_BLOCK_SIZE, 0, stream>>>
-// Each thread = one ray. Loops over all AABBs.
-// ============================================================================
+        // Load ray attributes (coalesced across warp)
+        float t1x, t1y, t1z, t2x, t2y, t2z, t3x, t3y, t3z;
+        float nx, ny, nz;
+        float d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z;
+        float rd1, rd2, rd3;
 
-__global__ void aabb_test_and_enqueue(
-    // Ray data (SoA, length >= batch_count)
-    const float *__restrict__ T1x, const float *__restrict__ T1y, const float *__restrict__ T1z,
-    const float *__restrict__ T2x, const float *__restrict__ T2y, const float *__restrict__ T2z,
-    const float *__restrict__ T3x, const float *__restrict__ T3y, const float *__restrict__ T3z,
-    const float *__restrict__ Nx, const float *__restrict__ Ny, const float *__restrict__ Nz,
-    const float *__restrict__ D1x, const float *__restrict__ D1y, const float *__restrict__ D1z,
-    const float *__restrict__ D2x, const float *__restrict__ D2y, const float *__restrict__ D2z,
-    const float *__restrict__ D3x, const float *__restrict__ D3y, const float *__restrict__ D3z,
-    const float *__restrict__ rD1, const float *__restrict__ rD2, const float *__restrict__ rD3,
-    // AABB data (SoA, length n_sub)
-    const float *__restrict__ Xmin, const float *__restrict__ Xmax,
-    const float *__restrict__ Ymin, const float *__restrict__ Ymax,
-    const float *__restrict__ Zmin, const float *__restrict__ Zmax,
-    // Dimensions
-    uint32_t batch_count,
-    uint32_t n_sub,
-    // Work queue output
-    uint32_t *wq_ray_idx,
-    uint16_t *wq_sub_idx,
-    uint32_t *queue_tail,
-    uint32_t queue_capacity)
-{
-    uint32_t ray_idx = blockIdx.x * K1_BLOCK_SIZE + threadIdx.x;
-    bool valid = (ray_idx < batch_count);
-
-    // Load ray attributes (coalesced across warp)
-    float t1x, t1y, t1z, t2x, t2y, t2z, t3x, t3y, t3z;
-    float nx, ny, nz;
-    float d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z;
-    float rd1, rd2, rd3;
-
-    // Precomputed origin × normal products
-    float ox0_x_nx, oy0_x_ny, oz0_x_nz;
-    float ox1_x_nx, oy1_x_ny, oz1_x_nz;
-    float ox2_x_nx, oy2_x_ny, oz2_x_nz;
-
-    if (valid)
-    {
-        t1x = T1x[ray_idx];
-        t1y = T1y[ray_idx];
-        t1z = T1z[ray_idx];
-        t2x = T2x[ray_idx];
-        t2y = T2y[ray_idx];
-        t2z = T2z[ray_idx];
-        t3x = T3x[ray_idx];
-        t3y = T3y[ray_idx];
-        t3z = T3z[ray_idx];
-        nx = Nx[ray_idx];
-        ny = Ny[ray_idx];
-        nz = Nz[ray_idx];
-        d1x = D1x[ray_idx];
-        d1y = D1y[ray_idx];
-        d1z = D1z[ray_idx];
-        d2x = D2x[ray_idx];
-        d2y = D2y[ray_idx];
-        d2z = D2z[ray_idx];
-        d3x = D3x[ray_idx];
-        d3y = D3y[ray_idx];
-        d3z = D3z[ray_idx];
-        rd1 = rD1[ray_idx];
-        rd2 = rD2[ray_idx];
-        rd3 = rD3[ray_idx];
-
-        ox0_x_nx = t1x * nx;
-        oy0_x_ny = t1y * ny;
-        oz0_x_nz = t1z * nz;
-        ox1_x_nx = t2x * nx;
-        oy1_x_ny = t2y * ny;
-        oz1_x_nz = t2z * nz;
-        ox2_x_nx = t3x * nx;
-        oy2_x_ny = t3y * ny;
-        oz2_x_nz = t3z * nz;
-    }
-
-    // Loop over all sub-clouds (AABBs)
-    for (uint32_t i_sub = 0; i_sub < n_sub; ++i_sub)
-    {
-        bool has_hit = false;
+        // Precomputed origin × normal products
+        float ox0_x_nx, oy0_x_ny, oz0_x_nz;
+        float ox1_x_nx, oy1_x_ny, oz1_x_nz;
+        float ox2_x_nx, oy2_x_ny, oz2_x_nz;
 
         if (valid)
         {
-            // Load AABB bounds with slack (Section 4.1)
-            float b0_low = Xmin[i_sub] - 1e-5f;
-            float b0_high = Xmax[i_sub] + 1e-5f;
-            float b1_low = Ymin[i_sub] - 1e-5f;
-            float b1_high = Ymax[i_sub] + 1e-5f;
-            float b2_low = Zmin[i_sub] - 1e-5f;
-            float b2_high = Zmax[i_sub] + 1e-5f;
+            t1x = T1x[ray_idx];
+            t1y = T1y[ray_idx];
+            t1z = T1z[ray_idx];
+            t2x = T2x[ray_idx];
+            t2y = T2y[ray_idx];
+            t2z = T2z[ray_idx];
+            t3x = T3x[ray_idx];
+            t3y = T3y[ray_idx];
+            t3z = T3z[ray_idx];
+            nx = Nx[ray_idx];
+            ny = Ny[ray_idx];
+            nz = Nz[ray_idx];
+            d1x = D1x[ray_idx];
+            d1y = D1y[ray_idx];
+            d1z = D1z[ray_idx];
+            d2x = D2x[ray_idx];
+            d2y = D2y[ray_idx];
+            d2z = D2z[ray_idx];
+            d3x = D3x[ray_idx];
+            d3y = D3y[ray_idx];
+            d3z = D3z[ray_idx];
+            rd1 = rD1[ray_idx];
+            rd2 = rD2[ray_idx];
+            rd3 = rD3[ray_idx];
 
-            // Enumerate 8 AABB corner points
-            float rx[8] = {b0_low, b0_low, b0_low, b0_low, b0_high, b0_high, b0_high, b0_high};
-            float ry[8] = {b1_low, b1_low, b1_high, b1_high, b1_low, b1_low, b1_high, b1_high};
-            float rz[8] = {b2_low, b2_high, b2_low, b2_high, b2_low, b2_high, b2_low, b2_high};
-
-            // Initialize advanced wavefront bounding box
-            float a0_low = INFINITY, a1_low = INFINITY, a2_low = INFINITY;
-            float a0_high = -INFINITY, a1_high = -INFINITY, a2_high = -INFINITY;
-
-            // Advance all 3 ray vertices to each of 8 AABB corners, track min/max
-            for (int c = 0; c < 8; ++c)
-            {
-                float v, d;
-
-                // Vertex 0: distance to wavefront at corner
-                v = fmaf(rz[c], nz, -oz0_x_nz);
-                d = rd1 * v;
-                v = fmaf(ry[c], ny, -oy0_x_ny);
-                d = fmaf(rd1, v, d);
-                v = fmaf(rx[c], nx, -ox0_x_nx);
-                d = fmaf(rd1, v, d);
-
-                v = fmaf(d, d1x, t1x);
-                a0_low = fminf(v, a0_low);
-                a0_high = fmaxf(v, a0_high);
-                v = fmaf(d, d1y, t1y);
-                a1_low = fminf(v, a1_low);
-                a1_high = fmaxf(v, a1_high);
-                v = fmaf(d, d1z, t1z);
-                a2_low = fminf(v, a2_low);
-                a2_high = fmaxf(v, a2_high);
-
-                // Vertex 1
-                v = fmaf(rz[c], nz, -oz1_x_nz);
-                d = rd2 * v;
-                v = fmaf(ry[c], ny, -oy1_x_ny);
-                d = fmaf(rd2, v, d);
-                v = fmaf(rx[c], nx, -ox1_x_nx);
-                d = fmaf(rd2, v, d);
-
-                v = fmaf(d, d2x, t2x);
-                a0_low = fminf(v, a0_low);
-                a0_high = fmaxf(v, a0_high);
-                v = fmaf(d, d2y, t2y);
-                a1_low = fminf(v, a1_low);
-                a1_high = fmaxf(v, a1_high);
-                v = fmaf(d, d2z, t2z);
-                a2_low = fminf(v, a2_low);
-                a2_high = fmaxf(v, a2_high);
-
-                // Vertex 2
-                v = fmaf(rz[c], nz, -oz2_x_nz);
-                d = rd3 * v;
-                v = fmaf(ry[c], ny, -oy2_x_ny);
-                d = fmaf(rd3, v, d);
-                v = fmaf(rx[c], nx, -ox2_x_nx);
-                d = fmaf(rd3, v, d);
-
-                v = fmaf(d, d3x, t3x);
-                a0_low = fminf(v, a0_low);
-                a0_high = fmaxf(v, a0_high);
-                v = fmaf(d, d3y, t3y);
-                a1_low = fminf(v, a1_low);
-                a1_high = fmaxf(v, a1_high);
-                v = fmaf(d, d3z, t3z);
-                a2_low = fminf(v, a2_low);
-                a2_high = fmaxf(v, a2_high);
-            }
-
-            // 6-way overlap test
-            has_hit = (a0_high >= b0_low) && (a0_low <= b0_high) && (a1_high >= b1_low) && (a1_low <= b1_high) && (a2_high >= b2_low) && (a2_low <= b2_high);
+            ox0_x_nx = t1x * nx;
+            oy0_x_ny = t1y * ny;
+            oz0_x_nz = t1z * nz;
+            ox1_x_nx = t2x * nx;
+            oy1_x_ny = t2y * ny;
+            oz1_x_nz = t2z * nz;
+            ox2_x_nx = t3x * nx;
+            oy2_x_ny = t3y * ny;
+            oz2_x_nz = t3z * nz;
         }
 
-        // Warp-level compaction — all 32 lanes participate (invalid threads have has_hit = false)
-        enqueue_warp(has_hit, ray_idx, (uint16_t)i_sub,
-                     wq_ray_idx, wq_sub_idx, queue_tail, queue_capacity);
-    }
-}
-
-// ============================================================================
-// Kernel 1b: Compute chunks_per_segment + write sentinels (Section 6.3)
-// Launch: <<<ceil((num_segments+1) / K1B_BLOCK_SIZE), K1B_BLOCK_SIZE, 0, stream>>>
-// ============================================================================
-
-__global__ void compute_chunks_per_segment(
-    const uint32_t *__restrict__ run_len,
-    uint32_t *chunks_per_seg,
-    uint32_t num_segments,
-    uint32_t rays_per_block)
-{
-    uint32_t i = blockIdx.x * K1B_BLOCK_SIZE + threadIdx.x;
-
-    if (i < num_segments)
-        chunks_per_seg[i] = (run_len[i] + rays_per_block - 1u) / rays_per_block;
-
-    // Write sentinel values at position [num_segments] for the ExclusiveSum calls
-    if (i == num_segments)
-    {
-        // Modifying run_len requires a non-const cast. The plan specifies this
-        // sentinel write (Section 6.3, Step 2). The array is only consumed by
-        // ExclusiveSum after this kernel completes (same-stream ordering).
-        ((uint32_t *)run_len)[num_segments] = 0u;
-        chunks_per_seg[num_segments] = 0u;
-    }
-}
-
-// ============================================================================
-// Kernel 2: Point intersection (Section 4.2)
-// Launch: <<<total_chunks, K2_BLOCK_SIZE, smem_bytes, stream>>>
-// Each block = one chunk of up to RAYS_PER_BLOCK rays within one segment.
-// 256 threads cooperatively process all points in the sub-cloud for each ray.
-// ============================================================================
-
-__global__ void __launch_bounds__(K2_BLOCK_SIZE, 4)
-    point_intersect(
-        // Point cloud (SoA)
-        const float *__restrict__ Px,
-        const float *__restrict__ Py,
-        const float *__restrict__ Pz,
-        // Sub-cloud index table (length n_sub + 1, with sentinel)
-        const uint32_t *__restrict__ SCI,
-        // Sorted work queue (CUB DoubleBuffer current)
-        const uint32_t *__restrict__ sorted_ray_idx,
-        // Segment table
-        const uint16_t *__restrict__ seg_sub_idx,
-        const uint32_t *__restrict__ seg_offset,
-        const uint32_t *__restrict__ chunk_offset,
-        uint32_t num_segments,
-        // Ray pointer table (24 float pointers, per-stream device array)
-        const float *const *__restrict__ d_ray_ptrs,
-        // Hit output
-        uint32_t *hit_ray_idx,
-        uint32_t *hit_point_idx,
-        uint32_t *hit_count,
-        uint32_t hit_capacity,
-        uint32_t *overflow_flag,
-        // Runtime tuning parameters
-        uint32_t tile_size,
-        uint32_t max_local_hits,
-        uint32_t total_chunks)
-{
-    uint32_t b = blockIdx.x;
-    if (b >= total_chunks)
-        return;
-
-    // --- Binary search: map blockIdx → (segment, chunk_within_segment) ---
-    // Find largest seg_idx such that chunk_offset[seg_idx] <= b
-    // Uses upper_bound - 1 pattern on chunk_offset[0..num_segments]
-    uint32_t lo = 0, hi = num_segments;
-    while (lo < hi)
-    {
-        uint32_t mid = (lo + hi + 1u) >> 1;
-        if (chunk_offset[mid] <= b)
-            lo = mid;
-        else
-            hi = mid - 1u;
-    }
-    uint32_t seg_idx = lo;
-    uint32_t chunk_in_seg = b - chunk_offset[seg_idx];
-
-    uint16_t sub_idx = seg_sub_idx[seg_idx];
-
-    // Ray range for this chunk within the sorted queue
-    uint32_t ray_start = seg_offset[seg_idx] + chunk_in_seg * RAYS_PER_BLOCK;
-    uint32_t ray_end = seg_offset[seg_idx + 1]; // sentinel at num_segments
-    ray_end = min(ray_start + RAYS_PER_BLOCK, ray_end);
-
-    // Point range for this sub-cloud (no branch — SCI has sentinel at n_sub)
-    uint32_t i_start = SCI[sub_idx];
-    uint32_t i_end = SCI[sub_idx + 1u];
-
-    // --- Dynamic shared memory layout ---
-    extern __shared__ uint32_t s_dyn[];
-    uint32_t *s_hit_rays = s_dyn;                    // [0 .. max_local_hits)
-    uint32_t *s_hit_points = s_dyn + max_local_hits; // [max_local_hits .. 2*max_local_hits)
-
-    // --- Static shared memory ---
-    __shared__ float s_ray[N_RAY_ATTRS]; // current ray's 24 floats
-    __shared__ uint32_t s_ray_idx;       // current ray's global index
-    __shared__ uint32_t s_hit_count;     // local hit counter
-    __shared__ uint32_t s_flush_base;    // global base for current flush
-
-    if (threadIdx.x == 0)
-        s_hit_count = 0;
-    __syncthreads();
-
-    // --- Outer loop: iterate over rays in this chunk ---
-    for (uint32_t r = ray_start; r < ray_end; ++r)
-    {
-        // Load ray into shared memory via per-stream device pointer table
-        if (threadIdx.x < N_RAY_ATTRS)
-            s_ray[threadIdx.x] = d_ray_ptrs[threadIdx.x][sorted_ray_idx[r]];
-        if (threadIdx.x == N_RAY_ATTRS)
-            s_ray_idx = sorted_ray_idx[r];
-        __syncthreads();
-
-        // Unpack from shared memory into registers
-        float t1x = s_ray[0], t1y = s_ray[1], t1z = s_ray[2];
-        float t2x = s_ray[3], t2y = s_ray[4], t2z = s_ray[5];
-        float t3x = s_ray[6], t3y = s_ray[7], t3z = s_ray[8];
-        float nx = s_ray[9], ny = s_ray[10], nz = s_ray[11];
-        float d1x = s_ray[12], d1y = s_ray[13], d1z = s_ray[14];
-        float d2x = s_ray[15], d2y = s_ray[16], d2z = s_ray[17];
-        float d3x = s_ray[18], d3y = s_ray[19], d3z = s_ray[20];
-        float rd1 = s_ray[21], rd2 = s_ray[22], rd3 = s_ray[23];
-        uint32_t ray_global = s_ray_idx;
-
-        // Precompute origin × normal products
-        float ox0_x_nx = t1x * nx, oy0_x_ny = t1y * ny, oz0_x_nz = t1z * nz;
-        float ox1_x_nx = t2x * nx, oy1_x_ny = t2y * ny, oz1_x_nz = t2z * nz;
-        float ox2_x_nx = t3x * nx, oy2_x_ny = t3y * ny, oz2_x_nz = t3z * nz;
-
-        // --- Tiled point loop: K2_BLOCK_SIZE threads cooperatively ---
-        uint32_t tile_points = (uint32_t)K2_BLOCK_SIZE * tile_size;
-        for (uint32_t tile_base = i_start; tile_base < i_end; tile_base += tile_points)
+        // Loop over all sub-clouds (AABBs)
+        for (uint32_t i_sub = 0; i_sub < n_sub; ++i_sub)
         {
-            uint32_t tile_end = min(tile_base + tile_points, i_end);
+            bool has_hit = false;
 
-            for (uint32_t ip = tile_base + threadIdx.x; ip < tile_end; ip += K2_BLOCK_SIZE)
+            if (valid)
             {
-                // Load point (coalesced across warp)
-                float px = Px[ip], py = Py[ip], pz = Pz[ip];
+                // Load AABB bounds with slack (Section 4.1)
+                float b0_low = Xmin[i_sub] - 1e-5f;
+                float b0_high = Xmax[i_sub] + 1e-5f;
+                float b1_low = Ymin[i_sub] - 1e-5f;
+                float b1_high = Ymax[i_sub] + 1e-5f;
+                float b2_low = Zmin[i_sub] - 1e-5f;
+                float b2_high = Zmax[i_sub] + 1e-5f;
 
-                // Distance from vertex 0 origin to wavefront at point
-                float v = fmaf(pz, nz, -oz0_x_nz);
-                float d0 = rd1 * v;
-                v = fmaf(py, ny, -oy0_x_ny);
-                d0 = fmaf(rd1, v, d0);
-                v = fmaf(px, nx, -ox0_x_nx);
-                d0 = fmaf(rd1, v, d0);
+                // Enumerate 8 AABB corner points
+                float rx[8] = {b0_low, b0_low, b0_low, b0_low, b0_high, b0_high, b0_high, b0_high};
+                float ry[8] = {b1_low, b1_low, b1_high, b1_high, b1_low, b1_low, b1_high, b1_high};
+                float rz[8] = {b2_low, b2_high, b2_low, b2_high, b2_low, b2_high, b2_low, b2_high};
 
-                // Advance vertex 0 → V
-                float Vx = fmaf(d0, d1x, t1x);
-                float Vy = fmaf(d0, d1y, t1y);
-                float Vz = fmaf(d0, d1z, t1z);
+                // Initialize advanced wavefront bounding box
+                float a0_low = INFINITY, a1_low = INFINITY, a2_low = INFINITY;
+                float a0_high = -INFINITY, a1_high = -INFINITY, a2_high = -INFINITY;
 
-                // Compute edge e1 = advanced_V1 - V
-                v = fmaf(pz, nz, -oz1_x_nz);
-                float d1 = rd2 * v;
-                v = fmaf(py, ny, -oy1_x_ny);
-                d1 = fmaf(rd2, v, d1);
-                v = fmaf(px, nx, -ox1_x_nx);
-                d1 = fmaf(rd2, v, d1);
-
-                float e1x = fmaf(d1, d2x, t2x) - Vx;
-                float e1y = fmaf(d1, d2y, t2y) - Vy;
-                float e1z = fmaf(d1, d2z, t2z) - Vz;
-
-                // Compute edge e2 = advanced_V2 - V
-                v = fmaf(pz, nz, -oz2_x_nz);
-                float d2 = rd3 * v;
-                v = fmaf(py, ny, -oy2_x_ny);
-                d2 = fmaf(rd3, v, d2);
-                v = fmaf(px, nx, -ox2_x_nx);
-                d2 = fmaf(rd3, v, d2);
-
-                float e2x = fmaf(d2, d3x, t3x) - Vx;
-                float e2y = fmaf(d2, d3y, t3y) - Vy;
-                float e2z = fmaf(d2, d3z, t3z) - Vz;
-
-                // Vector from V to point
-                float tx = px - Vx, ty = py - Vy, tz = pz - Vz;
-
-                // Cross products → barycentric coordinates
-                // 1st barycentric: PQ = N × e2, DT = dot(e1, PQ), U = dot(t, PQ)
-                float PQ, DT, U;
-                PQ = e2z * ny - e2y * nz;
-                DT = e1x * PQ;
-                U = tx * PQ;
-                PQ = e2x * nz - e2z * nx;
-                DT += e1y * PQ;
-                U += ty * PQ;
-                PQ = e2y * nx - e2x * ny;
-                DT += e1z * PQ;
-                U += tz * PQ;
-
-                // 2nd barycentric: PQ = e1 × t, V_bary = dot(N, PQ)
-                float V_bary;
-                PQ = e1z * ty - e1y * tz;
-                V_bary = nx * PQ;
-                PQ = e1x * tz - e1z * tx;
-                V_bary += ny * PQ;
-                PQ = e1y * tx - e1x * ty;
-                V_bary += nz * PQ;
-
-                // Normalize (fast approximate division — Section 7.1)
-                DT = __fdividef(1.0f, DT);
-                U *= DT;
-                V_bary *= DT;
-
-                // Hit condition: all 3 vertex distances checked
-                bool hit = (U >= 0.0f) && (V_bary >= 0.0f) && (U + V_bary <= 1.0f) && (d0 >= 0.0f) && (d1 >= 0.0f) && (d2 >= 0.0f);
-
-                if (hit)
+                // Advance all 3 ray vertices to each of 8 AABB corners, track min/max
+                for (int c = 0; c < 8; ++c)
                 {
-                    uint32_t slot = atomicAdd(&s_hit_count, 1u);
-                    if (slot < max_local_hits)
-                    {
-                        s_hit_rays[slot] = ray_global;
-                        s_hit_points[slot] = ip;
-                    }
+                    float v, d;
+
+                    // Vertex 0: distance to wavefront at corner
+                    v = fmaf(rz[c], nz, -oz0_x_nz);
+                    d = rd1 * v;
+                    v = fmaf(ry[c], ny, -oy0_x_ny);
+                    d = fmaf(rd1, v, d);
+                    v = fmaf(rx[c], nx, -ox0_x_nx);
+                    d = fmaf(rd1, v, d);
+
+                    v = fmaf(d, d1x, t1x);
+                    a0_low = fminf(v, a0_low);
+                    a0_high = fmaxf(v, a0_high);
+                    v = fmaf(d, d1y, t1y);
+                    a1_low = fminf(v, a1_low);
+                    a1_high = fmaxf(v, a1_high);
+                    v = fmaf(d, d1z, t1z);
+                    a2_low = fminf(v, a2_low);
+                    a2_high = fmaxf(v, a2_high);
+
+                    // Vertex 1
+                    v = fmaf(rz[c], nz, -oz1_x_nz);
+                    d = rd2 * v;
+                    v = fmaf(ry[c], ny, -oy1_x_ny);
+                    d = fmaf(rd2, v, d);
+                    v = fmaf(rx[c], nx, -ox1_x_nx);
+                    d = fmaf(rd2, v, d);
+
+                    v = fmaf(d, d2x, t2x);
+                    a0_low = fminf(v, a0_low);
+                    a0_high = fmaxf(v, a0_high);
+                    v = fmaf(d, d2y, t2y);
+                    a1_low = fminf(v, a1_low);
+                    a1_high = fmaxf(v, a1_high);
+                    v = fmaf(d, d2z, t2z);
+                    a2_low = fminf(v, a2_low);
+                    a2_high = fmaxf(v, a2_high);
+
+                    // Vertex 2
+                    v = fmaf(rz[c], nz, -oz2_x_nz);
+                    d = rd3 * v;
+                    v = fmaf(ry[c], ny, -oy2_x_ny);
+                    d = fmaf(rd3, v, d);
+                    v = fmaf(rx[c], nx, -ox2_x_nx);
+                    d = fmaf(rd3, v, d);
+
+                    v = fmaf(d, d3x, t3x);
+                    a0_low = fminf(v, a0_low);
+                    a0_high = fmaxf(v, a0_high);
+                    v = fmaf(d, d3y, t3y);
+                    a1_low = fminf(v, a1_low);
+                    a1_high = fmaxf(v, a1_high);
+                    v = fmaf(d, d3z, t3z);
+                    a2_low = fminf(v, a2_low);
+                    a2_high = fmaxf(v, a2_high);
                 }
+
+                // 6-way overlap test
+                has_hit = (a0_high >= b0_low) && (a0_low <= b0_high) && (a1_high >= b1_low) && (a1_low <= b1_high) && (a2_high >= b2_low) && (a2_low <= b2_high);
             }
 
-            // --- Tile boundary flush ---
+            // Warp-level compaction — all 32 lanes participate (invalid threads have has_hit = false)
+            RPI_enqueue_warp(has_hit, ray_idx, (uint16_t)i_sub,
+                             wq_ray_idx, wq_sub_idx, queue_tail, queue_capacity);
+        }
+    }
+
+    // ============================================================================
+    // Kernel 1b: Compute chunks_per_segment + write sentinels (Section 6.3)
+    // Launch: <<<ceil((num_segments+1) / K1B_BLOCK_SIZE), K1B_BLOCK_SIZE, 0, stream>>>
+    // ============================================================================
+
+    __global__ void RPI_compute_chunks_per_segment(
+        const uint32_t *__restrict__ run_len,
+        uint32_t *chunks_per_seg,
+        uint32_t num_segments,
+        uint32_t rays_per_block)
+    {
+        uint32_t i = blockIdx.x * K1B_BLOCK_SIZE + threadIdx.x;
+
+        if (i < num_segments)
+            chunks_per_seg[i] = (run_len[i] + rays_per_block - 1u) / rays_per_block;
+
+        // Write sentinel values at position [num_segments] for the ExclusiveSum calls
+        if (i == num_segments)
+        {
+            // Modifying run_len requires a non-const cast. The plan specifies this
+            // sentinel write (Section 6.3, Step 2). The array is only consumed by
+            // ExclusiveSum after this kernel completes (same-stream ordering).
+            ((uint32_t *)run_len)[num_segments] = 0u;
+            chunks_per_seg[num_segments] = 0u;
+        }
+    }
+
+    // ============================================================================
+    // Kernel 2: Point intersection (Section 4.2)
+    // Launch: <<<total_chunks, K2_BLOCK_SIZE, smem_bytes, stream>>>
+    // Each block = one chunk of up to RAYS_PER_BLOCK rays within one segment.
+    // 256 threads cooperatively process all points in the sub-cloud for each ray.
+    // ============================================================================
+
+    __global__ void __launch_bounds__(K2_BLOCK_SIZE, 4)
+        RPI_point_intersect(
+            // Point cloud (SoA)
+            const float *__restrict__ Px,
+            const float *__restrict__ Py,
+            const float *__restrict__ Pz,
+            // Sub-cloud index table (length n_sub + 1, with sentinel)
+            const uint32_t *__restrict__ SCI,
+            // Sorted work queue (CUB DoubleBuffer current)
+            const uint32_t *__restrict__ sorted_ray_idx,
+            // Segment table
+            const uint16_t *__restrict__ seg_sub_idx,
+            const uint32_t *__restrict__ seg_offset,
+            const uint32_t *__restrict__ chunk_offset,
+            uint32_t num_segments,
+            // Ray pointer table (24 float pointers, per-stream device array)
+            const float *const *__restrict__ d_ray_ptrs,
+            // Hit output
+            uint32_t *hit_ray_idx,
+            uint32_t *hit_point_idx,
+            uint32_t *hit_count,
+            uint32_t hit_capacity,
+            uint32_t *overflow_flag,
+            // Runtime tuning parameters
+            uint32_t tile_size,
+            uint32_t max_local_hits,
+            uint32_t total_chunks)
+    {
+        uint32_t b = blockIdx.x;
+        if (b >= total_chunks)
+            return;
+
+        // --- Binary search: map blockIdx → (segment, chunk_within_segment) ---
+        // Find largest seg_idx such that chunk_offset[seg_idx] <= b
+        // Uses upper_bound - 1 pattern on chunk_offset[0..num_segments]
+        uint32_t lo = 0, hi = num_segments;
+        while (lo < hi)
+        {
+            uint32_t mid = (lo + hi + 1u) >> 1;
+            if (chunk_offset[mid] <= b)
+                lo = mid;
+            else
+                hi = mid - 1u;
+        }
+        uint32_t seg_idx = lo;
+        uint32_t chunk_in_seg = b - chunk_offset[seg_idx];
+
+        uint16_t sub_idx = seg_sub_idx[seg_idx];
+
+        // Ray range for this chunk within the sorted queue
+        uint32_t ray_start = seg_offset[seg_idx] + chunk_in_seg * RAYS_PER_BLOCK;
+        uint32_t ray_end = seg_offset[seg_idx + 1]; // sentinel at num_segments
+        ray_end = min(ray_start + RAYS_PER_BLOCK, ray_end);
+
+        // Point range for this sub-cloud (no branch — SCI has sentinel at n_sub)
+        uint32_t i_start = SCI[sub_idx];
+        uint32_t i_end = SCI[sub_idx + 1u];
+
+        // --- Dynamic shared memory layout ---
+        extern __shared__ uint32_t s_dyn[];
+        uint32_t *s_hit_rays = s_dyn;                    // [0 .. max_local_hits)
+        uint32_t *s_hit_points = s_dyn + max_local_hits; // [max_local_hits .. 2*max_local_hits)
+
+        // --- Static shared memory ---
+        __shared__ float s_ray[N_RAY_ATTRS]; // current ray's 24 floats
+        __shared__ uint32_t s_ray_idx;       // current ray's global index
+        __shared__ uint32_t s_hit_count;     // local hit counter
+        __shared__ uint32_t s_flush_base;    // global base for current flush
+
+        if (threadIdx.x == 0)
+            s_hit_count = 0;
+        __syncthreads();
+
+        // --- Outer loop: iterate over rays in this chunk ---
+        for (uint32_t r = ray_start; r < ray_end; ++r)
+        {
+            // Load ray into shared memory via per-stream device pointer table
+            if (threadIdx.x < N_RAY_ATTRS)
+                s_ray[threadIdx.x] = d_ray_ptrs[threadIdx.x][sorted_ray_idx[r]];
+            if (threadIdx.x == N_RAY_ATTRS)
+                s_ray_idx = sorted_ray_idx[r];
             __syncthreads();
 
-            if (s_hit_count > 0u)
+            // Unpack from shared memory into registers
+            float t1x = s_ray[0], t1y = s_ray[1], t1z = s_ray[2];
+            float t2x = s_ray[3], t2y = s_ray[4], t2z = s_ray[5];
+            float t3x = s_ray[6], t3y = s_ray[7], t3z = s_ray[8];
+            float nx = s_ray[9], ny = s_ray[10], nz = s_ray[11];
+            float d1x = s_ray[12], d1y = s_ray[13], d1z = s_ray[14];
+            float d2x = s_ray[15], d2y = s_ray[16], d2z = s_ray[17];
+            float d3x = s_ray[18], d3y = s_ray[19], d3z = s_ray[20];
+            float rd1 = s_ray[21], rd2 = s_ray[22], rd3 = s_ray[23];
+            uint32_t ray_global = s_ray_idx;
+
+            // Precompute origin × normal products
+            float ox0_x_nx = t1x * nx, oy0_x_ny = t1y * ny, oz0_x_nz = t1z * nz;
+            float ox1_x_nx = t2x * nx, oy1_x_ny = t2y * ny, oz1_x_nz = t2z * nz;
+            float ox2_x_nx = t3x * nx, oy2_x_ny = t3y * ny, oz2_x_nz = t3z * nz;
+
+            // --- Tiled point loop: K2_BLOCK_SIZE threads cooperatively ---
+            uint32_t tile_points = (uint32_t)K2_BLOCK_SIZE * tile_size;
+            for (uint32_t tile_base = i_start; tile_base < i_end; tile_base += tile_points)
             {
-                uint32_t local_count = s_hit_count;
-                uint32_t flush_count = min(local_count, max_local_hits);
+                uint32_t tile_end = min(tile_base + tile_points, i_end);
 
-                if (threadIdx.x == 0)
+                for (uint32_t ip = tile_base + threadIdx.x; ip < tile_end; ip += K2_BLOCK_SIZE)
                 {
-                    // Advance global counter by TRUE hit count (not clamped)
-                    s_flush_base = atomicAdd(hit_count, local_count);
-                    if (local_count > max_local_hits)
-                        atomicOr(overflow_flag, 1u);
-                }
-                __syncthreads();
+                    // Load point (coalesced across warp)
+                    float px = Px[ip], py = Py[ip], pz = Pz[ip];
 
-                for (uint32_t i = threadIdx.x; i < flush_count; i += K2_BLOCK_SIZE)
-                {
-                    uint32_t gpos = s_flush_base + i;
-                    if (gpos < hit_capacity)
+                    // Distance from vertex 0 origin to wavefront at point
+                    float v = fmaf(pz, nz, -oz0_x_nz);
+                    float d0 = rd1 * v;
+                    v = fmaf(py, ny, -oy0_x_ny);
+                    d0 = fmaf(rd1, v, d0);
+                    v = fmaf(px, nx, -ox0_x_nx);
+                    d0 = fmaf(rd1, v, d0);
+
+                    // Advance vertex 0 → V
+                    float Vx = fmaf(d0, d1x, t1x);
+                    float Vy = fmaf(d0, d1y, t1y);
+                    float Vz = fmaf(d0, d1z, t1z);
+
+                    // Compute edge e1 = advanced_V1 - V
+                    v = fmaf(pz, nz, -oz1_x_nz);
+                    float d1 = rd2 * v;
+                    v = fmaf(py, ny, -oy1_x_ny);
+                    d1 = fmaf(rd2, v, d1);
+                    v = fmaf(px, nx, -ox1_x_nx);
+                    d1 = fmaf(rd2, v, d1);
+
+                    float e1x = fmaf(d1, d2x, t2x) - Vx;
+                    float e1y = fmaf(d1, d2y, t2y) - Vy;
+                    float e1z = fmaf(d1, d2z, t2z) - Vz;
+
+                    // Compute edge e2 = advanced_V2 - V
+                    v = fmaf(pz, nz, -oz2_x_nz);
+                    float d2 = rd3 * v;
+                    v = fmaf(py, ny, -oy2_x_ny);
+                    d2 = fmaf(rd3, v, d2);
+                    v = fmaf(px, nx, -ox2_x_nx);
+                    d2 = fmaf(rd3, v, d2);
+
+                    float e2x = fmaf(d2, d3x, t3x) - Vx;
+                    float e2y = fmaf(d2, d3y, t3y) - Vy;
+                    float e2z = fmaf(d2, d3z, t3z) - Vz;
+
+                    // Vector from V to point
+                    float tx = px - Vx, ty = py - Vy, tz = pz - Vz;
+
+                    // Cross products → barycentric coordinates
+                    // 1st barycentric: PQ = N × e2, DT = dot(e1, PQ), U = dot(t, PQ)
+                    float PQ, DT, U;
+                    PQ = e2z * ny - e2y * nz;
+                    DT = e1x * PQ;
+                    U = tx * PQ;
+                    PQ = e2x * nz - e2z * nx;
+                    DT += e1y * PQ;
+                    U += ty * PQ;
+                    PQ = e2y * nx - e2x * ny;
+                    DT += e1z * PQ;
+                    U += tz * PQ;
+
+                    // 2nd barycentric: PQ = e1 × t, V_bary = dot(N, PQ)
+                    float V_bary;
+                    PQ = e1z * ty - e1y * tz;
+                    V_bary = nx * PQ;
+                    PQ = e1x * tz - e1z * tx;
+                    V_bary += ny * PQ;
+                    PQ = e1y * tx - e1x * ty;
+                    V_bary += nz * PQ;
+
+                    // Normalize (fast approximate division — Section 7.1)
+                    DT = __fdividef(1.0f, DT);
+                    U *= DT;
+                    V_bary *= DT;
+
+                    // Hit condition: all 3 vertex distances checked
+                    bool hit = (U >= 0.0f) && (V_bary >= 0.0f) && (U + V_bary <= 1.0f) && (d0 >= 0.0f) && (d1 >= 0.0f) && (d2 >= 0.0f);
+
+                    if (hit)
                     {
-                        hit_ray_idx[gpos] = s_hit_rays[i];
-                        hit_point_idx[gpos] = s_hit_points[i];
+                        uint32_t slot = atomicAdd(&s_hit_count, 1u);
+                        if (slot < max_local_hits)
+                        {
+                            s_hit_rays[slot] = ray_global;
+                            s_hit_points[slot] = ip;
+                        }
                     }
                 }
 
-                if (threadIdx.x == 0)
-                    s_hit_count = 0;
+                // --- Tile boundary flush ---
                 __syncthreads();
+
+                if (s_hit_count > 0u)
+                {
+                    uint32_t local_count = s_hit_count;
+                    uint32_t flush_count = min(local_count, max_local_hits);
+
+                    if (threadIdx.x == 0)
+                    {
+                        // Advance global counter by TRUE hit count (not clamped)
+                        s_flush_base = atomicAdd(hit_count, local_count);
+                        if (local_count > max_local_hits)
+                            atomicOr(overflow_flag, 1u);
+                    }
+                    __syncthreads();
+
+                    for (uint32_t i = threadIdx.x; i < flush_count; i += K2_BLOCK_SIZE)
+                    {
+                        uint32_t gpos = s_flush_base + i;
+                        if (gpos < hit_capacity)
+                        {
+                            hit_ray_idx[gpos] = s_hit_rays[i];
+                            hit_point_idx[gpos] = s_hit_points[i];
+                        }
+                    }
+
+                    if (threadIdx.x == 0)
+                        s_hit_count = 0;
+                    __syncthreads();
+                }
             }
+
+            // Ensure all threads done with tiled point loop before next ray load
+            __syncthreads();
         }
-
-        // Ensure all threads done with tiled point loop before next ray load
-        __syncthreads();
     }
-}
 
-// ============================================================================
-// Host helper: stage one batch of ray data from user arrays into pinned memory
-// The 24 SoA arrays are packed contiguously:
-//   h_pinned[0 * batch_size .. 1 * batch_size) = T1x
-//   h_pinned[1 * batch_size .. 2 * batch_size) = T1y
-//   ...
-// ============================================================================
+    // ============================================================================
+    // Host helper: stage one batch of ray data from user arrays into pinned memory
+    // The 24 SoA arrays are packed contiguously:
+    //   h_pinned[0 * batch_size .. 1 * batch_size) = T1x
+    //   h_pinned[1 * batch_size .. 2 * batch_size) = T1y
+    //   ...
+    // ============================================================================
 
-static void stage_ray_batch(
-    float *h_pinned,
-    size_t batch_size,   // allocation size of pinned buffer (max batch)
-    size_t batch_offset, // start ray index within user arrays
-    size_t count,        // number of rays in this batch
-    const float *T1x, const float *T1y, const float *T1z,
-    const float *T2x, const float *T2y, const float *T2z,
-    const float *T3x, const float *T3y, const float *T3z,
-    const float *Nx, const float *Ny, const float *Nz,
-    const float *D1x, const float *D1y, const float *D1z,
-    const float *D2x, const float *D2y, const float *D2z,
-    const float *D3x, const float *D3y, const float *D3z,
-    const float *rD1, const float *rD2, const float *rD3)
-{
-    const float *src[N_RAY_ATTRS] = {
-        T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
-        Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
-        D3x, D3y, D3z, rD1, rD2, rD3};
-    for (int a = 0; a < N_RAY_ATTRS; ++a)
-        memcpy(h_pinned + (size_t)a * batch_size, src[a] + batch_offset, count * sizeof(float));
-}
+    static void RPI_stage_ray_batch(
+        float *h_pinned,
+        size_t batch_size,   // allocation size of pinned buffer (max batch)
+        size_t batch_offset, // start ray index within user arrays
+        size_t count,        // number of rays in this batch
+        const float *T1x, const float *T1y, const float *T1z,
+        const float *T2x, const float *T2y, const float *T2z,
+        const float *T3x, const float *T3y, const float *T3z,
+        const float *Nx, const float *Ny, const float *Nz,
+        const float *D1x, const float *D1y, const float *D1z,
+        const float *D2x, const float *D2y, const float *D2z,
+        const float *D3x, const float *D3y, const float *D3z,
+        const float *rD1, const float *rD2, const float *rD3)
+    {
+        const float *src[N_RAY_ATTRS] = {
+            T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
+            Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
+            D3x, D3y, D3z, rD1, rD2, rD3};
+        for (int a = 0; a < N_RAY_ATTRS; ++a)
+            memcpy(h_pinned + (size_t)a * batch_size, src[a] + batch_offset, count * sizeof(float));
+    }
 
-// ============================================================================
-// Host wrapper: qd_RPI_CUDA (Section 8 signature)
-// ============================================================================
+} // end anonymous namespace --------------------------------------------------
 
+// Public entry point — external linkage
 void qd_RPI_CUDA(
     const float *Px, const float *Py, const float *Pz,
     const size_t n_point,
@@ -961,10 +948,10 @@ void qd_RPI_CUDA(
     // --- Stage batch 0 into pinned memory BEFORE the loop ---
     {
         size_t count0 = std::min(batch_size, n_ray);
-        stage_ray_batch(buf.h_ray_pinned[0], batch_size, 0, count0,
-                        T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
-                        Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
-                        D3x, D3y, D3z, rD1, rD2, rD3);
+        RPI_stage_ray_batch(buf.h_ray_pinned[0], batch_size, 0, count0,
+                            T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
+                            Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
+                            D3x, D3y, D3z, rD1, rD2, rD3);
     }
 
     for (size_t batch_idx = 0; batch_idx < n_batches; ++batch_idx)
@@ -1016,7 +1003,7 @@ void qd_RPI_CUDA(
         // --- Kernel 1: AABB test + enqueue ---
         {
             uint32_t grid1 = ((uint32_t)batch_count + K1_BLOCK_SIZE - 1) / K1_BLOCK_SIZE;
-            aabb_test_and_enqueue<<<grid1, K1_BLOCK_SIZE, 0, buf.stream[s]>>>(
+            RPI_aabb_test_and_enqueue<<<grid1, K1_BLOCK_SIZE, 0, buf.stream[s]>>>(
                 buf.d_ray[s][0], buf.d_ray[s][1], buf.d_ray[s][2],    // T1xyz
                 buf.d_ray[s][3], buf.d_ray[s][4], buf.d_ray[s][5],    // T2xyz
                 buf.d_ray[s][6], buf.d_ray[s][7], buf.d_ray[s][8],    // T3xyz
@@ -1097,7 +1084,7 @@ void qd_RPI_CUDA(
             CUDA_CHECK(cudaMemsetAsync(buf.d_overflow_flag[s], 0, sizeof(uint32_t), buf.stream[s]));
 
             uint32_t grid1 = ((uint32_t)batch_count + K1_BLOCK_SIZE - 1) / K1_BLOCK_SIZE;
-            aabb_test_and_enqueue<<<grid1, K1_BLOCK_SIZE, 0, buf.stream[s]>>>(
+            RPI_aabb_test_and_enqueue<<<grid1, K1_BLOCK_SIZE, 0, buf.stream[s]>>>(
                 buf.d_ray[s][0], buf.d_ray[s][1], buf.d_ray[s][2],
                 buf.d_ray[s][3], buf.d_ray[s][4], buf.d_ray[s][5],
                 buf.d_ray[s][6], buf.d_ray[s][7], buf.d_ray[s][8],
@@ -1192,7 +1179,7 @@ void qd_RPI_CUDA(
                 // --- Segment table: Step 2 — Kernel 1b ---
                 {
                     uint32_t grid1b = (h_num_segments[s] + 1 + K1B_BLOCK_SIZE - 1) / K1B_BLOCK_SIZE;
-                    compute_chunks_per_segment<<<grid1b, K1B_BLOCK_SIZE, 0, buf.stream[s]>>>(
+                    RPI_compute_chunks_per_segment<<<grid1b, K1B_BLOCK_SIZE, 0, buf.stream[s]>>>(
                         buf.d_seg_run_len[s],
                         buf.d_chunks_per_seg[s],
                         h_num_segments[s],
@@ -1228,7 +1215,7 @@ void qd_RPI_CUDA(
             {
                 uint32_t smem_bytes = 2u * max_local_hits * sizeof(uint32_t);
 
-                point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
+                RPI_point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
                     buf.d_Px, buf.d_Py, buf.d_Pz,
                     buf.d_SCI,
                     sorted_ray_idx,
@@ -1254,10 +1241,10 @@ void qd_RPI_CUDA(
             int next_s = (int)((batch_idx + 1) % 2);
             size_t next_offset = (batch_idx + 1) * batch_size;
             size_t next_count = std::min(batch_size, n_ray - next_offset);
-            stage_ray_batch(buf.h_ray_pinned[next_s], batch_size, next_offset, next_count,
-                            T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
-                            Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
-                            D3x, D3y, D3z, rD1, rD2, rD3);
+            RPI_stage_ray_batch(buf.h_ray_pinned[next_s], batch_size, next_offset, next_count,
+                                T1x, T1y, T1z, T2x, T2y, T2z, T3x, T3y, T3z,
+                                Nx, Ny, Nz, D1x, D1y, D1z, D2x, D2y, D2z,
+                                D3x, D3y, D3z, rD1, rD2, rD3);
         }
 
         // --- Read hit_count and overflow_flag, then download hit buffers ---
@@ -1304,7 +1291,7 @@ void qd_RPI_CUDA(
             CUDA_CHECK(cudaMemsetAsync(buf.d_overflow_flag[s], 0, sizeof(uint32_t), buf.stream[s]));
 
             uint32_t smem_bytes = 2u * max_local_hits * sizeof(uint32_t);
-            point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
+            RPI_point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
                 buf.d_Px, buf.d_Py, buf.d_Pz,
                 buf.d_SCI,
                 sorted_ray_idx,
@@ -1358,7 +1345,7 @@ void qd_RPI_CUDA(
             CUDA_CHECK(cudaMemsetAsync(buf.d_overflow_flag[s], 0, sizeof(uint32_t), buf.stream[s]));
 
             uint32_t smem_bytes = 2u * max_local_hits * sizeof(uint32_t);
-            point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
+            RPI_point_intersect<<<h_total_chunks[s], K2_BLOCK_SIZE, smem_bytes, buf.stream[s]>>>(
                 buf.d_Px, buf.d_Py, buf.d_Pz,
                 buf.d_SCI,
                 sorted_ray_idx,
