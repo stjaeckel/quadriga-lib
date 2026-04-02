@@ -1,0 +1,35 @@
+Source: quadriga-lib
+Section: science
+Priority: optional
+Maintainer: Stephan Jaeckel <info@quadriga-lib.org>
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake (>= 3.18),
+ g++,
+ make,
+ bzip2,
+ libhdf5-dev,
+ libarmadillo-dev,
+ python3-dev,
+ python3-numpy,
+ octave-dev,
+ libgomp1,
+Standards-Version: 4.6.2
+Homepage: http://quadriga-lib.org
+Rules-Requires-Root: no
+
+Package: quadriga-lib
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, python3-numpy
+Suggests: octave, matlab-support
+Description: High-performance C++ radio channel modelling library
+ QuaDRiGa-Lib is a high-performance C++ library for radio channel modelling
+ and simulation. It provides ray-tracing based RF propagation simulation,
+ antenna pattern interpolation, and 3GPP-compatible channel generation.
+ .
+ This package includes the static library, public headers, MATLAB MEX
+ files (.mexa64), Octave MEX files (.mex), the Python module, and HTML
+ API documentation.
+ .
+ Optional AVX2 SIMD acceleration is compiled in where supported at build
+ time. CUDA GPU acceleration is provided separately.

@@ -1,0 +1,5 @@
+# MATLAB MEX files (.mexa64) are compiled with --unresolved-symbols=ignore-all
+# because MATLAB resolves its own symbols (mxGetData, mexErrMsgIdAndTxt, etc.)
+# at runtime when loading the MEX file. These are not bugs.
+quadriga-lib: shared-library-lacks-prerequisites [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
+quadriga-lib: library-not-linked-against-libc [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
