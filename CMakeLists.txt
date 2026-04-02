@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(QuadrigaLib LANGUAGES C CXX)
 
-# Option to enable MATLAB/Octace MEX compilation (default: ON)
+# Option to enable MATLAB/Octave MEX compilation (default: ON)
 # For octave, make sure that 'mkoctfile' is installed and can be called
 option(ENABLE_MATLAB "Enable MATLAB MEX API" ON)
 option(ENABLE_OCTAVE "Enable Octave MEX API" ON)
@@ -12,9 +12,6 @@ option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" ON)
 option(ENABLE_TESTS "Build tests" OFF)
 option(ENABLE_BIN "Build supporting binary files" OFF)
-
-# Option to specify MATLAB path manually (leave empty for auto-detect)
-option(MATLAB_PATH "Path to MATLAB" "")
 
 # Path to the HDF5 library for static linking (include files and .a/.lib file)
 # If left empty, HDF location is detected automatically, if not found, HDF5 is built from sources
@@ -59,11 +56,13 @@ set(PUGIXML_ZIP "${CMAKE_SOURCE_DIR}/external/pugixml-${pugixml_version}.zip")
 set(PYBIND11_ZIP "${CMAKE_SOURCE_DIR}/external/pybind11-${pybind11_version}.zip")
 set(HDF5_ZIP "${CMAKE_SOURCE_DIR}/external/hdf5-${hdf5_version}.zip")
 set(CATCH2_ZIP "${CMAKE_SOURCE_DIR}/external/Catch2-${catch2_version}.zip")
+set(MATLAB_MEX_ZIP "${CMAKE_SOURCE_DIR}/external/matlab_mex.zip")
 
 # External packages
 set(ARMADILLO_SRC_DIR "${CMAKE_BINARY_DIR}/armadillo-${armadillo_version}")
 set(PUGIXML_SRC_DIR "${CMAKE_BINARY_DIR}/pugixml-${pugixml_version}")
 set(PYBIND11_SRC_DIR "${CMAKE_BINARY_DIR}/pybind11-${pybind11_version}")
+set(MATLAB_MEX_DIR "${CMAKE_BINARY_DIR}/matlab_mex")
 
 # Unzip external packages
 add_custom_command(
@@ -85,6 +84,14 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E tar xf ${PYBIND11_ZIP}
     COMMAND ${CMAKE_COMMAND} -E touch ${PYBIND11_SRC_DIR}/.stamp
     COMMENT "Unzipping Pybind11 library to ${PYBIND11_SRC_DIR}"
+    VERBATIM
+)
+add_custom_command(
+    OUTPUT ${MATLAB_MEX_DIR}/.stamp
+    COMMAND ${CMAKE_COMMAND} -E tar xf ${MATLAB_MEX_ZIP}
+    COMMAND ${CMAKE_COMMAND} -E touch ${MATLAB_MEX_DIR}/.stamp
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Unzipping MATLAB MEX headers and libraries to ${MATLAB_MEX_DIR}"
     VERBATIM
 )
 
@@ -225,25 +232,21 @@ if (BUILD_CATCH2)
     ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS})
 endif()
 
-# Detect MATLAB
-if(BUILD_MATLAB AND MATLAB_PATH)
-    message(STATUS "Using user-specified MATLAB at: ${MATLAB_PATH}")
-    set(MEX_EXECUTABLE "${MATLAB_PATH}/bin/mex")
-    message(STATUS "Using MEX compiler at: ${MEX_EXECUTABLE}")
-elseif(BUILD_MATLAB)
-    find_package(Matlab COMPONENTS MEX_COMPILER)
-    if(Matlab_FOUND)
-        message(STATUS "Found MEX compiler at: ${Matlab_MEX_COMPILER}")
-        set(MEX_EXECUTABLE "${Matlab_MEX_COMPILER}")
+# Detect MATLAB MEX headers (vendored in external/matlab_mex.zip, no MATLAB installation needed)
+if(BUILD_MATLAB)
+    if(EXISTS ${MATLAB_MEX_ZIP})
+        add_custom_target(matlab_mex_unzip ALL DEPENDS ${MATLAB_MEX_DIR}/.stamp)
+        set(MATLAB_MEX_INCLUDE_DIR "${MATLAB_MEX_DIR}/include")
+        set(MATLAB_MEX_LIB_DIR "${MATLAB_MEX_DIR}/lib")
+        set(MATLAB_MEX_VERSION_SCRIPT "${MATLAB_MEX_DIR}/mexFunction.map")
+        message(STATUS "Using vendored MATLAB MEX headers from: ${MATLAB_MEX_ZIP}")
     else()
-        message(STATUS "MATLAB not found, MATLAB API disabled!")
+        message(STATUS "MATLAB MEX package not found (${MATLAB_MEX_ZIP}), MATLAB API disabled!")
         set(BUILD_MATLAB OFF)
     endif()
-else()
-    message(STATUS "MATLAB disabled")
 endif()
 
-# Detect Ocatve
+# Detect Octave
 if (BUILD_OCTAVE)
     find_program(MKOCTFILE_EXECUTABLE mkoctfile)
     if(MKOCTFILE_EXECUTABLE)
@@ -380,10 +383,14 @@ if (BUILD_SHARED_LIB)
 endif()
 
 # --- MATLAB API ---
+# Compiles MEX files directly with g++ (Linux) or cl.exe (Windows).
+# No MATLAB installation required — uses vendored headers and import libraries from external/matlab_mex.zip.
+# On Linux: unresolved MATLAB symbols (mxGetData, mexErrMsgIdAndTxt, etc.) are resolved at runtime by MATLAB.
+# On Windows: the vendored import libraries (libmex.lib, libmx.lib) provide link-time symbol resolution.
 if(BUILD_MATLAB)
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
 
-    if (HDF5_FOUND)
+    if(HDF5_FOUND)
         set(HDF5_MEX_LINK_LIBS ${HDF5_LIBRARIES})
     else()
         set(HDF5_MEX_LINK_LIBS "")
@@ -402,38 +409,62 @@ if(BUILD_MATLAB)
             list(APPEND mex_deps quadriga_static)
         endif()
 
-        if (MSVC)
+        if(MSVC)
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexw64")
             add_custom_command(
                 OUTPUT ${mex_output}
-                COMMAND ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
-                        COMPFLAGS="${MEX_CXXFLAGS}"
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} shlwapi.lib ${CUDA_MEX_LINK_LIBS}
-                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
+                COMMAND ${CMAKE_CXX_COMPILER}
+                        /nologo /std:c++17 /EHs /O2 /MD /LD
+                        /DMATLAB_MEX_FILE
+                        /I${MATLAB_MEX_INCLUDE_DIR}
+                        /I${CMAKE_SOURCE_DIR}/include
+                        /I${CMAKE_SOURCE_DIR}/src
+                        /I${ARMADILLO_INCLUDE_DIRS}
+                        ${mex_src}
+                        /link
+                        $<TARGET_FILE:quadriga_static>
+                        ${HDF5_LIB} ${CUDA_MEX_LINK_LIBS}
+                        shlwapi.lib
+                        "${MATLAB_MEX_LIB_DIR}/libmex.lib"
+                        "${MATLAB_MEX_LIB_DIR}/libmx.lib"
+                        /OUT:${mex_output}
+                        /DLL
+                        /EXPORT:mexFunction
                 DEPENDS ${mex_deps}
-                COMMENT "Building MATLAB MEX file ${mex_output}"
+                COMMENT "Building MATLAB MEX file ${mex_basename}.mexw64"
                 VERBATIM
             )
-            add_custom_target(mex_${mex_basename} ALL DEPENDS ${mex_output})
         else()
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexa64")
             add_custom_command(
                 OUTPUT ${mex_output}
-                COMMAND env CXXFLAGS="${MEX_CXXFLAGS}" ${MEX_EXECUTABLE} -silent -outdir ${MEX_OUTPUT_DIR} 
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
-                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
+                COMMAND ${CMAKE_CXX_COMPILER}
+                        -std=c++17 -O3 -shared -fPIC
+                        -DMATLAB_MEX_FILE
+                        -I${MATLAB_MEX_INCLUDE_DIR}
+                        -I${CMAKE_SOURCE_DIR}/include
+                        -I${CMAKE_SOURCE_DIR}/src
+                        -I${ARMADILLO_INCLUDE_DIRS}
+                        ${mex_src}
+                        $<TARGET_FILE:quadriga_static>
+                        ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
                         -lgomp
+                        -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT}
+                        -Wl,--no-undefined-version
+                        -Wl,--unresolved-symbols=ignore-all
+                        -o ${mex_output}
                 DEPENDS ${mex_deps}
-                COMMENT "Building MATLAB MEX file ${mex_output}"
+                COMMENT "Building MATLAB MEX file ${mex_basename}.mexa64"
                 VERBATIM
             )
-            list(APPEND MEX_MATLAB_TARGETS ${mex_output})
         endif()
+
+        add_custom_target(mex_${mex_basename} ALL DEPENDS ${mex_output})
+        add_dependencies(mex_${mex_basename} matlab_mex_unzip)
+        list(APPEND MEX_MATLAB_TARGETS mex_${mex_basename})
     endforeach()
 
-    if (NOT MSVC)
-        add_custom_target(mex_matlab ALL DEPENDS ${MEX_MATLAB_TARGETS})
-    endif()
+    add_custom_target(mex_matlab ALL DEPENDS ${MEX_MATLAB_TARGETS})
 endif()
 
 # --- Octave API ---
