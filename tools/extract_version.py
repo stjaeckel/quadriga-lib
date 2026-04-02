@@ -3,23 +3,32 @@ import argparse
 import subprocess
 import sys
 
-def get_quadriga_lib_version():
+def get_quadriga_lib_version(version_path=None):
     """
     Calls the 'quadriga-lib-version' command and returns its output (version string).
+    If version_path is provided, uses that path directly. Otherwise, searches common paths.
     """
-    try:
-        # Run the command and capture its output
-        output = subprocess.check_output(['build_linux/version'], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        print(f"Error: failed to run 'quadriga-lib-version': {e.output.decode().strip()}", file=sys.stderr)
-        sys.exit(1)
-    except FileNotFoundError:
-        print("Error: 'quadriga-lib-version' command not found in PATH.", file=sys.stderr)
-        sys.exit(1)
+    if version_path:
+        possible_paths = [version_path]
+    else:
+        possible_paths = ['build/version', 'build_linux/version']
+    
+    for path in possible_paths:
+        try:
+            # Run the command and capture its output
+            output = subprocess.check_output([path], stderr=subprocess.STDOUT)
+            # Decode and strip any trailing newline/whitespace
+            version = output.decode('utf-8').strip()
+            return version
+        except subprocess.CalledProcessError as e:
+            print(f"Error: failed to run '{path}': {e.output.decode().strip()}", file=sys.stderr)
+        except FileNotFoundError:
+            continue
+    
+    # If we get here, no paths worked
+    print("Error: 'quadriga-lib-version' command not found in any expected path.", file=sys.stderr)
+    sys.exit(1)
 
-    # Decode and strip any trailing newline/whitespace
-    version = output.decode('utf-8').strip()
-    return version
 
 def update_html_first_line(html_path, heading):
     """
@@ -65,11 +74,16 @@ def main():
         'headline',
         help="Base headline string (e.g. 'MALAB / Octave API Documentation for Quadriga-Lib')."
     )
+    parser.add_argument(
+        '--version-path',
+        help="Path to the quadriga-lib version executable. If not provided, searches common paths.",
+        default=None
+    )
 
     args = parser.parse_args()
 
     # 1. Get version from 'quadriga-lib-version'
-    version = get_quadriga_lib_version()
+    version = get_quadriga_lib_version(args.version_path)
 
     # 2. Append version to the provided headline
     full_heading = f"{args.headline} v{version}"

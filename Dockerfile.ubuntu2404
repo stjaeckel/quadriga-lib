@@ -1,0 +1,73 @@
+# =============================================================================
+# Dockerfile.ubuntu2404 — Build quadriga-lib .deb for Ubuntu 24.04 (Noble)
+# =============================================================================
+# Usage:
+#   docker build -f Dockerfile.ubuntu2404 -t quadriga-deb-noble .
+#   docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
+#
+# The .deb (and related files) will appear in ./out/
+# =============================================================================
+
+FROM ubuntu:24.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# ---- 1. Install build dependencies ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core build tools
+    build-essential \
+    cmake \
+    debhelper \
+    devscripts \
+    fakeroot \
+    lintian \
+    bzip2 \
+    # Library dev packages
+    libhdf5-dev \
+    libarmadillo-dev \
+    # Python
+    python3-dev \
+    python3-numpy \
+    # Octave
+    octave-dev \
+    # Needed by stamp-changelog.sh for codename detection
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---- 2. Copy source tree into the container ----
+# Build context = repo root (directory containing CMakeLists.txt + debian/)
+WORKDIR /build/quadriga-lib
+COPY . .
+
+# ---- 3. Stamp version from include/quadriga_lib.hpp into debian/changelog ----
+RUN debian/stamp-changelog.sh noble
+RUN echo "=== debian/changelog ===" && cat debian/changelog
+
+# ---- 4. Build the .deb ----
+# -us -uc : skip GPG signing (not needed for local/CI builds)
+# -b      : binary-only build
+# -j$(nproc): parallel make
+RUN dpkg-buildpackage -us -uc -b -j$(nproc)
+
+RUN for f in /build/quadriga-lib_*_amd64.deb; do \
+      mv "$f" "${f%_amd64.deb}+noble_amd64.deb"; \
+    done
+
+# ---- 5. Inspect the result ----
+RUN echo "=== Package contents ===" && \
+    dpkg-deb -c /build/quadriga-lib_*.deb | head -80 && \
+    echo "" && \
+    echo "=== Package info (incl. auto-detected runtime deps) ===" && \
+    dpkg-deb -I /build/quadriga-lib_*.deb && \
+    echo "" && \
+    echo "=== Lintian ===" && \
+    lintian /build/quadriga-lib_*.deb || true
+
+# ---- 6. Copy artifacts out ----
+# docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
+CMD mkdir -p /out && rm /out/* && \
+    cp /build/quadriga-lib_*.deb \
+       /build/quadriga-lib_*.buildinfo \
+       /build/quadriga-lib_*.changes \
+       /out/ 2>/dev/null; \
+    echo ""; echo "=== Output files ==="; ls -lh /out/quadriga-lib_*

@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.6</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.10.9</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -7780,10 +7780,13 @@ volumetric intersection tests. <br><br>
 <ul><li style="margin-bottom: 0.4em;">This function computes whether points in 3D Cartesian space are intersected by ray beams. 
 </li><li style="margin-bottom: 0.4em;">A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors. 
 </li><li style="margin-bottom: 0.4em;">Returns a list of ray indices (0-based) that intersect with each point in the input point cloud. 
+</li><li style="margin-bottom: 0.4em;">Supports three compute kernels: <b>GENERIC</b> (scalar), <b>AVX2</b> (SIMD, 8 points in parallel), and <b>CUDA</b> (GPU). 
+</li><li style="margin-bottom: 0.4em;">The <code>use_kernel</code> parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. 
+</li><li style="margin-bottom: 0.4em;">In auto mode (0), CUDA is selected only when <code>n_points &gt;= 10000</code> and a CUDA-capable GPU is available; 
+   otherwise AVX2 is preferred if available, falling back to GENERIC. 
 </li><li style="margin-bottom: 0.4em;">Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>) 
    to reduce computational cost. 
 </li><li style="margin-bottom: 0.4em;">All internal computations use single precision for speed. 
-</li><li style="margin-bottom: 0.4em;">Uses Advanced Vector Extensions (AVX2) for efficient computation, if supported by the CPU 
 </li><li style="margin-bottom: 0.4em;">Recommended to use with small tube radius and well-distributed points for optimal accuracy. 
 </li></ul>
 </li>
@@ -7796,7 +7799,9 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
                 const arma::Mat&lt;dtype&gt; *trivec,
                 const arma::Mat&lt;dtype&gt; *tridir,
                 const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::u32_vec *hit_count = nullptr);
+                arma::u32_vec *hit_count = nullptr,
+                int use_kernel = 0,
+                int gpu_id = 0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -7822,10 +7827,20 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*sub_cloud_index</b> = nullptr</code> (optional input)<br> 
    Index vector to mark boundaries between point cloud segments (e.g. for SIMD optimization). Length: <code>[n_sub]</code>. 
+   When using AVX2, sub-cloud start indices must be aligned to multiples of 8. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*hit_count</b> = nullptr</code> (optional output)<br> 
    Output array with number of rays that intersected each point. Length: <code>[n_points]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>use_kernel</b> = 0</code> (optional input)<br> 
+   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD), 
+   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>gpu_id</b> = 0</code> (optional input)<br> 
+   GPU device ID for CUDA kernel. Ignored when not using CUDA. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -7848,7 +7863,10 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D. 
-</li><li style="margin-bottom: 0.4em;">Efficient SIMD acceleration using AVX2 intrinsics to process 8 mesh triangles in parallel. 
+</li><li style="margin-bottom: 0.4em;">Supports three compute kernels: <b>GENERIC</b> (scalar), <b>AVX2</b> (SIMD, 8 triangles in parallel), and <b>CUDA</b> (GPU). 
+</li><li style="margin-bottom: 0.4em;">The <code>use_kernel</code> parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. 
+</li><li style="margin-bottom: 0.4em;">In auto mode (0), CUDA is selected only when <code>n_ray &gt;= 10000</code> and a CUDA-capable GPU is available; 
+   otherwise AVX2 is preferred if available, falling back to GENERIC. 
 </li><li style="margin-bottom: 0.4em;">Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices. 
 </li><li style="margin-bottom: 0.4em;">Supports a compact input format where origin and destination coordinates are stored together. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
@@ -7867,7 +7885,9 @@ void quadriga_lib::ray_triangle_intersect(
                 arma::u32_vec *fbs_ind = nullptr,
                 arma::u32_vec *sbs_ind = nullptr,
                 const arma::u32_vec *sub_mesh_index = nullptr,
-                bool transpose_inputs = false);
+                bool transpose_inputs = false,
+                int use_kernel = 0,
+                int gpu_id = 0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -7908,10 +7928,20 @@ void quadriga_lib::ray_triangle_intersect(
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*sub_mesh_index</b></code> (optional input)<br> 
    Indexes indicating start of sub-meshes in <code>mesh</code>. Size: <code>[n_sub]</code>. Enables faster processing via segmentation. 
+   When using AVX2, sub-mesh start indices must be aligned to multiples of 8. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>bool <b>transpose_inputs</b> = false</code> (optional input)<br> 
    If <code>true</code>, treats <code>orig</code>/<code>dest</code> as <code>[3, n_ray]</code> and <code>mesh</code> as <code>[9, n_mesh]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>use_kernel</b> = 0</code> (optional input)<br> 
+   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD), 
+   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>int <b>gpu_id</b> = 0</code> (optional input)<br> 
+   GPU device ID for CUDA kernel. Ignored when not using CUDA. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">

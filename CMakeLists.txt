@@ -141,10 +141,6 @@ if (MSVC)
     set(BUILD_OCTAVE OFF)
 endif()
 
-if (NOT BUILD_HDF5 AND NOT HDF5_PATH)
-    set(BUILD_SHARED_LIB OFF)
-endif()
-
 # Build instructions for HDF5 library
 if (NOT HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
     find_package(HDF5 MODULE COMPONENTS C HL)
@@ -379,6 +375,9 @@ if (BUILD_SHARED_LIB)
     endif()
     if (NOT ARMADILLO_FOUND)
         add_dependencies(quadriga_shared armadillo_lib)
+    endif()
+    if (HDF5_FOUND)
+        target_link_libraries(quadriga_shared PUBLIC HDF5::HDF5)
     endif()
 endif()
 
