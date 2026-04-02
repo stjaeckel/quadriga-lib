@@ -112,7 +112,7 @@ if strcmp( x(end-3:end), 'AVX2' )
         [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,5]));
         error('moxunit:exceptionNotRaised', 'Expected an error!');
     catch ME
-        expectedErrorMessage = 'Sub-meshes must be aligned with the SIMD vector size (8 for AVX2, 32 for CUDA).';
+        expectedErrorMessage = 'Sub-meshes must be aligned with the SIMD vector size (8 for AVX2).';
         if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
             error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
         end
