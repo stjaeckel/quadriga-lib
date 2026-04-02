@@ -82,19 +82,19 @@ void qd_DFT_AVX2(const dtype *CFr,       // Channel coefficients, real part, Siz
 // matrix and applies the propagation phase to produce one slice of MIMO
 // channel coefficients (one path, all TX-RX element pairs).
 template <typename dtype>
-void qd_coeff_combine_avx2(const dtype *pVrr, const dtype *pVri, // RX V-pol pattern (real, imag), length n_links
-                           const dtype *pHrr, const dtype *pHri, // RX H-pol pattern (real, imag), length n_links
-                           const dtype *pVtr, const dtype *pVti, // TX V-pol pattern (real, imag), length n_links
-                           const dtype *pHtr, const dtype *pHti, // TX H-pol pattern (real, imag), length n_links
-                           const dtype *pM,                      // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}
-                           const dtype *p_delays,                // Per-link path lengths in [m], length n_links  (read-only)
-                           dtype wave_number,                    // 2*pi*f/c
-                           dtype wavelength,                     // wavelength  : c/f
-                           dtype path_amplitude,                 // sqrt(path_gain) scaling factor (set 0 for fake LOS path)
-                           dtype *p_coeff_re,                    // Output real part of coefficients, length n_links
-                           dtype *p_coeff_im,                    // Output imag part of coefficients, length n_links
-                           size_t n_links);                      // Number of TX-RX element pairs (n_tx * n_rx)
-
+void qd_coeff_combine_avx2(const dtype *__restrict pVrr, const dtype *__restrict pVri, // RX V-pol pattern (real, imag), length n_links
+                           const dtype *__restrict pHrr, const dtype *__restrict pHri, // RX H-pol pattern (real, imag), length n_links
+                           const dtype *__restrict pVtr, const dtype *__restrict pVti, // TX V-pol pattern (real, imag), length n_links
+                           const dtype *__restrict pHtr, const dtype *__restrict pHti, // TX H-pol pattern (real, imag), length n_links
+                           const dtype *__restrict pM,                                 // Polarization transfer matrix, 8 values broadcast over all links: {Re_VV, Im_VV, Re_HV, Im_HV, Re_VH, Im_VH, Re_HH, Im_HH}
+                           const dtype *__restrict p_delays,                           // Per-link path lengths in [m], length n_links  (read-only)
+                           dtype wave_number,                                          // 2*pi*f/c
+                           dtype wavelength,                                           // wavelength  : c/f
+                           dtype path_amplitude,                                       // sqrt(path_gain) scaling factor (set 0 for fake LOS path)
+                           dtype *__restrict p_coeff_re,                               // Output real part of coefficients, length n_links
+                           dtype *__restrict p_coeff_im,                               // Output imag part of coefficients, length n_links
+                           size_t n_links);                                            // Number of TX-RX element pairs (n_tx * n_rx)
+                           
 // Check for AVX2 availability at runtime
 bool runtime_AVX2_Check();
 
