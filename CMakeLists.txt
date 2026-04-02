@@ -346,7 +346,12 @@ endif()
 add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
 set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
 add_dependencies(quadriga_static pugixml_lib pybind11_lib)
-target_compile_definitions(quadriga_static PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2} BUILD_WITH_CUDA=${BUILD_WITH_CUDA})
+target_compile_definitions(quadriga_static PRIVATE
+    BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
+    BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
+    ARMA_DONT_USE_BLAS
+    ARMA_DONT_USE_LAPACK
+)
 if(BUILD_WITH_CUDA)
     target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
     set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
@@ -539,6 +544,7 @@ if (ENABLE_TESTS)
     if(MSVC)
         target_link_libraries(test_bin PRIVATE shlwapi.lib)
         target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /openmp /MP)
+        target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
     else()
         target_compile_options(test_bin PRIVATE -O3 -fPIC -fopenmp -w)
     endif()
