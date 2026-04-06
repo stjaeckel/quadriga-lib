@@ -4,6 +4,7 @@ lib/*
 .vscode/*
 +quadriga_lib/*.mex*
 +quadriga_lib/*.m
++quadriga_lib/*.so
 external/armadillo-*/
 external/MOxUnit-master/
 external/pugixml-*/

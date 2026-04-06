@@ -7,7 +7,8 @@ option(ENABLE_MATLAB "Enable MATLAB MEX API" ON)
 option(ENABLE_OCTAVE "Enable Octave MEX API" ON)
 option(ENABLE_MEX_DOC "Enable MEX Documentation" ON)
 option(ENABLE_PYTHON "Enable Python API" ON)
-option(ENABLE_SHARED_LIB "Enable build of shared library" OFF)
+option(ENABLE_STATIC_LIB "Build the static library" ON)
+option(ENABLE_SHARED_LIB "Build the shared library (Linux only)" OFF)
 option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" ON)
 option(ENABLE_TESTS "Build tests" OFF)
@@ -24,6 +25,25 @@ option(HDF5_STATIC "Link HDF5 statically" OFF)
 # Cmake tries to detect Armadillo include files on the system and link to these files.
 # If Armadillo is not found, the version provided in the "external" folder is used instead.
 option(ARMA_EXT "Use armadillo headers provided with quadriga-lib" OFF)
+
+# --- Validation Rules ---
+if(NOT ENABLE_STATIC_LIB AND NOT ENABLE_SHARED_LIB)
+    message(FATAL_ERROR "At least one of ENABLE_STATIC_LIB or ENABLE_SHARED_LIB must be ON")
+endif()
+
+# --- Platform Guards ---
+if(MSVC)
+    if(ENABLE_SHARED_LIB)
+        message(WARNING "Shared library not supported on Windows, forcing ENABLE_SHARED_LIB=OFF")
+        set(ENABLE_SHARED_LIB OFF)
+    endif()
+    if(ENABLE_CUDA)
+        message(WARNING "CUDA not supported on Windows, forcing ENABLE_CUDA=OFF")
+        set(ENABLE_CUDA OFF)
+    endif()
+    set(BUILD_PYTHON OFF)
+    set(BUILD_OCTAVE OFF)
+endif()
 
 # Versions for external libraries (adjust as needed)
 set(armadillo_version "14.2.2")
@@ -125,9 +145,13 @@ message(STATUS "Armadillo Include dir: ${ARMADILLO_INCLUDE_DIRS}")
 # Components to build
 set(BUILD_HDF5 ${HDF5_STATIC})
 set(BUILD_MATLAB ${ENABLE_MATLAB})
-set(BUILD_OCTAVE ${ENABLE_OCTAVE})
+if(NOT MSVC)
+    set(BUILD_OCTAVE ${ENABLE_OCTAVE})
+endif()
 set(BUILD_MEX_DOC ${ENABLE_MEX_DOC})
-set(BUILD_PYTHON ${ENABLE_PYTHON})
+if(NOT MSVC)
+    set(BUILD_PYTHON ${ENABLE_PYTHON})
+endif()
 set(BUILD_SHARED_LIB ${ENABLE_SHARED_LIB})
 set(BUILD_CATCH2 ${ENABLE_TESTS})
 
@@ -136,9 +160,7 @@ if (NOT ENABLE_PYTHON)
 endif()
 
 if (MSVC)
-    set(BUILD_PYTHON OFF)
     set(BUILD_MEX_DOC OFF)
-    set(BUILD_OCTAVE OFF)
 endif()
 
 # Build instructions for HDF5 library
@@ -190,6 +212,7 @@ if (BUILD_HDF5)
             -DHDF5_BUILD_TOOLS=OFF
             -DHDF5_BUILD_EXAMPLES=OFF
             -DHDF5_BUILD_HL_LIB=OFF
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
     )
     if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
         list(APPEND HDF5_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
@@ -342,25 +365,27 @@ else()
 endif()
 
 # Static library
-add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
-set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
-add_dependencies(quadriga_static pugixml_lib pybind11_lib)
-target_compile_definitions(quadriga_static PRIVATE
-    BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
-    BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
-    ARMA_DONT_USE_BLAS
-    ARMA_DONT_USE_LAPACK
-)
-if(BUILD_WITH_CUDA)
-    target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
-    set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-endif()
+if(ENABLE_STATIC_LIB)
+    add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
+    set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
+    add_dependencies(quadriga_static pugixml_lib pybind11_lib)
+    target_compile_definitions(quadriga_static PRIVATE
+        BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
+        BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
+        ARMA_DONT_USE_BLAS
+        ARMA_DONT_USE_LAPACK
+    )
+    if(BUILD_WITH_CUDA)
+        target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
+        set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    endif()
 
-if (BUILD_HDF5 AND NOT HDF5_PATH)
-    add_dependencies(quadriga_static hdf5_dep)
-endif()
-if (NOT ARMADILLO_FOUND)
-    add_dependencies(quadriga_static armadillo_lib)
+    if (BUILD_HDF5 AND NOT HDF5_PATH)
+        add_dependencies(quadriga_static hdf5_dep)
+    endif()
+    if (NOT ARMADILLO_FOUND)
+        add_dependencies(quadriga_static armadillo_lib)
+    endif()
 endif()
 
 # Shared library
@@ -368,7 +393,12 @@ if (BUILD_SHARED_LIB)
     add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
     set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
     add_dependencies(quadriga_shared pugixml_lib pybind11_lib)
-    target_compile_definitions(quadriga_shared PRIVATE BUILD_WITH_AVX2=${BUILD_WITH_AVX2} BUILD_WITH_CUDA=${BUILD_WITH_CUDA})
+    target_compile_definitions(quadriga_shared PRIVATE
+        BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
+        BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
+        ARMA_DONT_USE_BLAS
+        ARMA_DONT_USE_LAPACK
+    )
     if(BUILD_WITH_CUDA)
         target_link_libraries(quadriga_shared PUBLIC CUDA::cudart)
         set_target_properties(quadriga_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
@@ -376,9 +406,33 @@ if (BUILD_SHARED_LIB)
     if (NOT ARMADILLO_FOUND)
         add_dependencies(quadriga_shared armadillo_lib)
     endif()
-    if (HDF5_FOUND)
+    # HDF5 handling: link directly into shared lib
+    if (BUILD_HDF5 AND NOT HDF5_PATH)
+        add_dependencies(quadriga_shared hdf5_dep)
+        target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
+    elseif(HDF5_PATH)
+        target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
+    elseif(HDF5_FOUND)
         target_link_libraries(quadriga_shared PUBLIC HDF5::HDF5)
     endif()
+endif()
+
+# --- Link Target Selection ---
+if(ENABLE_SHARED_LIB)
+    set(QUADRIGA_LINK_TARGET quadriga_shared)
+else()
+    set(QUADRIGA_LINK_TARGET quadriga_static)
+endif()
+
+# --- Conditional transitive dependency variables ---
+if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+    set(MEX_HDF5_LINK_LIBS "")
+    set(MEX_CUDA_LINK_LIBS "")
+    set(MEX_RPATH_FLAGS "-Wl,-rpath,$ORIGIN")
+else()
+    set(MEX_HDF5_LINK_LIBS ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS})
+    set(MEX_CUDA_LINK_LIBS ${CUDA_MEX_LINK_LIBS})
+    set(MEX_RPATH_FLAGS "")
 endif()
 
 # --- MATLAB API ---
@@ -395,17 +449,28 @@ if(BUILD_MATLAB)
         set(HDF5_MEX_LINK_LIBS "")
     endif()
 
+    # Recompute conditional variables now that HDF5_MEX_LINK_LIBS is set
+    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+        set(MEX_HDF5_LINK_LIBS "")
+        set(MEX_CUDA_LINK_LIBS "")
+        set(MEX_RPATH_FLAGS "-Wl,-rpath,$ORIGIN")
+    else()
+        set(MEX_HDF5_LINK_LIBS ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS})
+        set(MEX_CUDA_LINK_LIBS ${CUDA_MEX_LINK_LIBS})
+        set(MEX_RPATH_FLAGS "")
+    endif()
+
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_MATLAB_TARGETS "")
 
     foreach(mex_src ${API_MEX_FILES})
         get_filename_component(mex_basename ${mex_src} NAME_WE)
 
+        # Uniform dependency: all MEX files depend on the link target
         set(mex_deps ${mex_src})
+        list(APPEND mex_deps ${QUADRIGA_LINK_TARGET})
         if(mex_basename STREQUAL "ieee_chan_indoor")
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
-        else()
-            list(APPEND mex_deps quadriga_static)
         endif()
 
         if(MSVC)
@@ -421,8 +486,8 @@ if(BUILD_MATLAB)
                         /I${ARMADILLO_INCLUDE_DIRS}
                         ${mex_src}
                         /link
-                        $<TARGET_FILE:quadriga_static>
-                        ${HDF5_LIB} ${CUDA_MEX_LINK_LIBS}
+                        $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
+                        ${MEX_HDF5_LINK_LIBS} ${MEX_CUDA_LINK_LIBS}
                         shlwapi.lib
                         "${MATLAB_MEX_LIB_DIR}/libmex.lib"
                         "${MATLAB_MEX_LIB_DIR}/libmx.lib"
@@ -445,9 +510,10 @@ if(BUILD_MATLAB)
                         -I${CMAKE_SOURCE_DIR}/src
                         -I${ARMADILLO_INCLUDE_DIRS}
                         ${mex_src}
-                        $<TARGET_FILE:quadriga_static>
-                        ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
+                        $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
+                        ${MEX_HDF5_LINK_LIBS} ${MEX_CUDA_LINK_LIBS}
                         -lgomp
+                        ${MEX_RPATH_FLAGS}
                         -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT}
                         -Wl,--no-undefined-version
                         -Wl,--unresolved-symbols=ignore-all
@@ -469,25 +535,42 @@ endif()
 # --- Octave API ---
 if(BUILD_OCTAVE)
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
+
+    # Get Octave compiler flags from mkoctfile
+    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p INCFLAGS OUTPUT_VARIABLE OCTAVE_INCFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTINCLUDEDIR OUTPUT_VARIABLE OCTAVE_OCTINCLUDEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTLIBDIR OUTPUT_VARIABLE OCTAVE_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_OCTAVE_TARGETS "")
 
     foreach(mex_src ${API_MEX_FILES})
         get_filename_component(mex_basename ${mex_src} NAME_WE)
         set(octave_output "${MEX_OUTPUT_DIR}/${mex_basename}.mex")
-        
+
         set(mex_deps ${mex_src})
+        list(APPEND mex_deps ${QUADRIGA_LINK_TARGET})
         if(mex_basename STREQUAL "ieee_chan_indoor")
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
-        else()
-            list(APPEND mex_deps quadriga_static)
         endif()
 
         add_custom_command(
             OUTPUT ${octave_output}
-            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
-                    ${mex_src} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
-                    -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
+            COMMAND ${CMAKE_CXX_COMPILER}
+                    -std=c++17 -O3 -shared -fPIC
+                    -DMATLAB_MEX_FILE
+                    ${OCTAVE_INCFLAGS}
+                    -I${OCTAVE_OCTINCLUDEDIR}
+                    -I${CMAKE_SOURCE_DIR}/include
+                    -I${CMAKE_SOURCE_DIR}/src
+                    -I${ARMADILLO_INCLUDE_DIRS}
+                    ${mex_src}
+                    $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
+                    ${MEX_HDF5_LINK_LIBS} ${MEX_CUDA_LINK_LIBS}
+                    -L${OCTAVE_LIBDIR} -loctinterp -loctave
+                    -lgomp
+                    ${MEX_RPATH_FLAGS}
+                    -o ${octave_output}
             DEPENDS ${mex_deps}
             COMMENT "Building Octave MEX file ${octave_output}"
             VERBATIM
@@ -539,9 +622,16 @@ if (BUILD_PYTHON)
         OUTPUT_NAME "quadriga_lib"
         SUFFIX "${PYTHON_EXTENSION_SUFFIX}"
         POSITION_INDEPENDENT_CODE ON
+        INSTALL_RPATH "$ORIGIN"
+        BUILD_RPATH "$ORIGIN"
     )
     target_include_directories(quadriga_py PRIVATE ${Python3_INCLUDE_DIRS})
-    target_link_libraries(quadriga_py PRIVATE quadriga_static ${Python3_LIBRARIES} HDF5::HDF5 ${CUDA_LINK_LIBS})
+
+    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
+    else()
+        target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} HDF5::HDF5 ${CUDA_LINK_LIBS})
+    endif()
     target_compile_options(quadriga_py PRIVATE -Wno-unused-function)
 
     file(GLOB PYTHON_INCLUDED_FILES "api_python/*.hpp" "api_python/*.cpp")
@@ -563,12 +653,13 @@ if (ENABLE_TESTS)
     add_dependencies(test_bin catch2_dep)
     target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
 
-    target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB})
-
-    if (BUILD_HDF5)
-        target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} ${HDF5_LIB})
-    else()
-        target_link_libraries(test_bin PRIVATE quadriga_static ${CATCH2_LIB} HDF5::HDF5)
+    target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
+    if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
+        if (BUILD_HDF5)
+            target_link_libraries(test_bin PRIVATE ${HDF5_LIB})
+        else()
+            target_link_libraries(test_bin PRIVATE HDF5::HDF5)
+        endif()
     endif()
     
     if(MSVC)
@@ -587,12 +678,15 @@ if (ENABLE_BIN)
         get_filename_component(exeName ${source} NAME_WE)
 
         add_executable(${exeName} ${source})
-        add_dependencies(${exeName} quadriga_static)
+        add_dependencies(${exeName} ${QUADRIGA_LINK_TARGET})
         
-        if (BUILD_HDF5)
-            target_link_libraries(${exeName} PRIVATE quadriga_static ${HDF5_LIB})
-        else()
-            target_link_libraries(${exeName} PRIVATE quadriga_static HDF5::HDF5)
+        target_link_libraries(${exeName} PRIVATE ${QUADRIGA_LINK_TARGET})
+        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
+            if (BUILD_HDF5)
+                target_link_libraries(${exeName} PRIVATE ${HDF5_LIB})
+            else()
+                target_link_libraries(${exeName} PRIVATE HDF5::HDF5)
+            endif()
         endif()
     endforeach()
 endif()
@@ -632,16 +726,22 @@ else()
     install(FILES LICENSE DESTINATION ${INSTALL_LICENSEDIR})
 endif()
 
-install(TARGETS quadriga_static
-        ARCHIVE DESTINATION ${INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${INSTALL_BINDIR})
+if(ENABLE_STATIC_LIB)
+    install(TARGETS quadriga_static
+            ARCHIVE DESTINATION ${INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${INSTALL_BINDIR})
+endif()
 
 if (BUILD_SHARED_LIB)
     install(TARGETS quadriga_shared
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR}
             RUNTIME DESTINATION ${INSTALL_BINDIR})
+    # For local installs, copy shared lib into MEX directory so MATLAB/Octave find it
+    if(INSTALL_IS_LOCAL)
+        install(FILES $<TARGET_FILE:quadriga_shared> DESTINATION ${INSTALL_MEX_DIR}/+quadriga_lib)
+    endif()
 endif()
 
 if(BUILD_MATLAB OR BUILD_OCTAVE)
