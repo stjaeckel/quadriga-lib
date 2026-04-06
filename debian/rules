@@ -3,9 +3,6 @@
 # Uncomment for verbose build output:
 # export DH_VERBOSE=1
 
-# Get Python3 dist-packages path (e.g. /usr/lib/python3/dist-packages)
-PYTHON3_DIST := $(shell python3 -c "import sysconfig; print(sysconfig.get_path('platlib', 'deb_system'))")
-
 # Destination root inside the build
 DESTDIR := $(CURDIR)/debian/quadriga-lib
 
@@ -41,69 +38,31 @@ override_dh_auto_configure:
 override_dh_auto_build:
 	dh_auto_build --buildsystem=cmake
 
-	# --- Build HTML documentation ---
-	# Mirrors the GNUmakefile "documentation" target.
-	# extract_version.py stamps the version into the HTML part files;
-	# extract_html.py assembles final pages from sources + parts.
+# 	# --- Build HTML documentation ---
+# 	# Mirrors the GNUmakefile "documentation" target.
+# 	# extract_version.py stamps the version into the HTML part files;
+# 	# extract_html.py assembles final pages from sources + parts.
 
-	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
-	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
-	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
+# 	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
+# 	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
+# 	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib" --version-path $(BUILDDIR)/version
 
-	python3 tools/extract_html.py -o html_docu/index.html -p tools/html_parts/index.html.part
-	python3 tools/extract_html.py -o html_docu/mex_api.html -p tools/html_parts/mex_api.html.part -d api_mex/
-	python3 tools/extract_html.py -o html_docu/cpp_api.html -p tools/html_parts/cpp_api.html.part -d src/
-	python3 tools/extract_html.py -o html_docu/python_api.html -p tools/html_parts/python_api.html.part -d api_python/
-	python3 tools/extract_html.py -o html_docu/formats.html -p tools/html_parts/formats.html.part -d tools/data_formats_md/
-	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
-	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
+# 	python3 tools/extract_html.py -o html_docu/index.html -p tools/html_parts/index.html.part
+# 	python3 tools/extract_html.py -o html_docu/mex_api.html -p tools/html_parts/mex_api.html.part -d api_mex/
+# 	python3 tools/extract_html.py -o html_docu/cpp_api.html -p tools/html_parts/cpp_api.html.part -d src/
+# 	python3 tools/extract_html.py -o html_docu/python_api.html -p tools/html_parts/python_api.html.part -d api_python/
+# 	python3 tools/extract_html.py -o html_docu/formats.html -p tools/html_parts/formats.html.part -d tools/data_formats_md/
+# 	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
+# 	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
 
 # ---------------------------------------------------------------------------
-# Install: run cmake install, then relocate files to Debian-standard paths
+# Install: run cmake install (paths are already Debian-standard via CMakeLists.txt)
 # ---------------------------------------------------------------------------
 override_dh_auto_install:
 	dh_auto_install --buildsystem=cmake
 
-	# --- Relocate MEX files and documentation ---
-	# cmake installs them to $(DESTDIR)/usr/+quadriga_lib/ (when prefix=/usr
-	# and prefix != /usr/local, the CMakeLists.txt uses DESTINATION ".")
-	# Move to /usr/share/quadriga-lib/+quadriga_lib/ which is FHS-compliant.
-	
-	mkdir -p $(DESTDIR)/usr/share/quadriga-lib
-	if [ -d "$(DESTDIR)/usr/+quadriga_lib" ]; then \
-		mv $(DESTDIR)/usr/+quadriga_lib $(DESTDIR)/usr/share/quadriga-lib/+quadriga_lib; \
-	elif [ -d "$(DESTDIR)/usr/MATLAB_quadriga-lib" ]; then \
-		mv $(DESTDIR)/usr/MATLAB_quadriga-lib/+quadriga_lib $(DESTDIR)/usr/share/quadriga-lib/+quadriga_lib; \
-		rmdir --ignore-fail-on-non-empty $(DESTDIR)/usr/MATLAB_quadriga-lib; \
-	fi
-
-	# --- Install HTML documentation ---
-	mkdir -p $(DESTDIR)/usr/share/doc/quadriga-lib/html
-	mv $(DESTDIR)/usr/html_docu/* $(DESTDIR)/usr/share/doc/quadriga-lib/html/
-	mv $(DESTDIR)/usr/LICENSE $(DESTDIR)/usr/share/doc/quadriga-lib/
-	rm -rf $(DESTDIR)/usr/html_docu/
-
-	# --- Relocate Python module ---
-	# cmake installs quadriga_lib.cpython-3XX-*.so to $(DESTDIR)/usr/lib/
-	# Move to the correct dist-packages directory.
-	mkdir -p $(DESTDIR)$(PYTHON3_DIST)
-	mv $(DESTDIR)/usr/lib/quadriga_lib.cpython-*.so \
-	   $(DESTDIR)$(PYTHON3_DIST)/ 2>/dev/null || true
-
-	# --- Relocate static library to multiarch path ---
-	mkdir -p $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)
-	mv $(DESTDIR)/usr/lib/libquadriga.a \
-	   $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/ 2>/dev/null || true
-
-	# --- Relocate shared library to multiarch path ---
-	mv $(DESTDIR)/usr/lib/libquadriga.so \
-	   $(DESTDIR)/usr/lib/$(DEB_HOST_MULTIARCH)/ 2>/dev/null || true
-
 	# --- Remove the version binary (build-time tool, not an installed artifact) ---
 	rm -f $(DESTDIR)/usr/bin/version
-
-	# --- Remove the Licence file ---
-	rm -f $(DESTDIR)/usr/LICENSE
 
 
 # ---------------------------------------------------------------------------

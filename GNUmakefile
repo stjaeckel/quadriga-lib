@@ -166,6 +166,7 @@ package:  cpp  bin
 	- rm -rf release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)
 
 deb:
+	mkdir -p release
 	docker build -f Dockerfile.ubuntu2404 -t quadriga-deb-noble .
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
