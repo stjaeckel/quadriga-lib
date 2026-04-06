@@ -65,7 +65,7 @@ RUN echo "=== Package contents ===" && \
 
 # ---- 6. Copy artifacts out ----
 # docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
-CMD mkdir -p /out && rm /out/* && \
+CMD mkdir -p /out && rm -f /out/* 2>/dev/null; \
     cp /build/quadriga-lib_*.deb \
        /build/quadriga-lib_*.buildinfo \
        /build/quadriga-lib_*.changes \

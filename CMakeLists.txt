@@ -599,48 +599,85 @@ endif()
 
 # Install options
 if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
+    # Default: install to source directory (local / development layout)
     message(STATUS "Using source dir as install dir")
-else()    
+
+    set(INSTALL_LIBDIR lib)
+    set(INSTALL_BINDIR bin)
+    set(INSTALL_INCLUDEDIR include)
+    set(INSTALL_MEX_DIR .)
+    set(INSTALL_DOCDIR html_docu)
+    set(INSTALL_LICENSEDIR .)
+    set(INSTALL_ARMADIR .)
+    set(INSTALL_IS_LOCAL TRUE)
+else()
+    # System install: use GNUInstallDirs for Debian/FHS-standard paths
+    include(GNUInstallDirs)
     message(STATUS "Installing to: ${CMAKE_INSTALL_PREFIX}")
-    install(DIRECTORY include/ DESTINATION include)
+
+    set(INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    set(INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
+    set(INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(INSTALL_MEX_DIR share/quadriga-lib)
+    set(INSTALL_DOCDIR share/doc/quadriga-lib/html)
+    set(INSTALL_LICENSEDIR share/doc/quadriga-lib)
+    set(INSTALL_ARMADIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(INSTALL_IS_LOCAL FALSE)
+
+    install(DIRECTORY include/ DESTINATION ${INSTALL_INCLUDEDIR})
     if (NOT ARMADILLO_FOUND)
-        install(DIRECTORY ${ARMADILLO_INCLUDE_DIRS} DESTINATION .)
+        install(DIRECTORY ${ARMADILLO_INCLUDE_DIRS} DESTINATION ${INSTALL_ARMADIR})
     endif()
-    if(NOT CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
-        install(DIRECTORY html_docu/ DESTINATION html_docu)
-        install(FILES LICENSE DESTINATION .)
-    endif()
+    install(DIRECTORY html_docu/ DESTINATION ${INSTALL_DOCDIR})
+    install(FILES LICENSE DESTINATION ${INSTALL_LICENSEDIR})
 endif()
 
 install(TARGETS quadriga_static
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
+        ARCHIVE DESTINATION ${INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${INSTALL_BINDIR})
 
 if (BUILD_SHARED_LIB)
     install(TARGETS quadriga_shared
-            ARCHIVE DESTINATION lib
-            LIBRARY DESTINATION lib
-            RUNTIME DESTINATION bin) 
+            ARCHIVE DESTINATION ${INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${INSTALL_BINDIR})
 endif()
 
-if(NOT CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
-    if(BUILD_MATLAB OR BUILD_OCTAVE)
-        install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION .)
-    endif()
-else()
-    if(BUILD_MATLAB OR BUILD_OCTAVE)
-        install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION MATLAB_quadriga-lib)
-    endif()
+if(BUILD_MATLAB OR BUILD_OCTAVE)
+    install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION ${INSTALL_MEX_DIR})
 endif()
 
 if (BUILD_PYTHON)
-    install(TARGETS quadriga_py
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
+    if(INSTALL_IS_LOCAL)
+        install(TARGETS quadriga_py
+            ARCHIVE DESTINATION ${INSTALL_LIBDIR}
+            LIBRARY DESTINATION ${INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${INSTALL_BINDIR})
+    else()
+        # Install to Python dist-packages for system installs
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('platlib', 'deb_system'))"
+            OUTPUT_VARIABLE PYTHON3_DIST_PACKAGES
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _py_dist_result
+        )
+        if(_py_dist_result OR NOT PYTHON3_DIST_PACKAGES)
+            # Fallback if deb_system scheme is not available
+            execute_process(
+                COMMAND ${Python3_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('platlib'))"
+                OUTPUT_VARIABLE PYTHON3_DIST_PACKAGES
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+        endif()
+        # Strip the leading prefix to get a relative path for install(TARGETS)
+        string(REGEX REPLACE "^${CMAKE_INSTALL_PREFIX}/?" "" PYTHON3_DIST_REL "${PYTHON3_DIST_PACKAGES}")
+        message(STATUS "Python install dir: ${PYTHON3_DIST_REL}")
+        install(TARGETS quadriga_py
+            LIBRARY DESTINATION ${PYTHON3_DIST_REL})
+    endif()
 endif()
 
 if (BUILD_HDF5 OR HDF5_PATH)
-    install(FILES ${HDF5_LIB} DESTINATION lib)
+    install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
 endif()
