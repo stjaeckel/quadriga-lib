@@ -10,7 +10,7 @@ option(ENABLE_PYTHON "Enable Python API" ON)
 option(ENABLE_STATIC_LIB "Build the static library" ON)
 option(ENABLE_SHARED_LIB "Build the shared library (Linux only)" OFF)
 option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
-option(ENABLE_CUDA "Enable CUDA GPU Acceleration" ON)
+option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 option(ENABLE_BIN "Build supporting binary files" OFF)
 
@@ -41,8 +41,6 @@ if(MSVC)
         message(WARNING "CUDA not supported on Windows, forcing ENABLE_CUDA=OFF")
         set(ENABLE_CUDA OFF)
     endif()
-    set(BUILD_PYTHON OFF)
-    set(BUILD_OCTAVE OFF)
 endif()
 
 # Versions for external libraries (adjust as needed)
@@ -58,17 +56,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(MEX_OUTPUT_DIR "${CMAKE_BINARY_DIR}/+quadriga_lib")
 
 if(MSVC)
-    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2 /EHsc /Zc:__cplusplus /nologo /openmp /MP /FS")
-    set(CMAKE_CXX_FLAGS "/EHsc /Zc:__cplusplus /nologo /openmp /MP")
-    set(CMAKE_CXX_FLAGS_RELEASE "")
+    add_compile_options(/EHsc /Zc:__cplusplus /nologo /MP)
     set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MDd> $<$<CONFIG:Release>:/MD>")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
-    set(MEX_CXXFLAGS "-std=c++17 ${CMAKE_CXX_FLAGS}")
+    add_compile_options(-O3 -fPIC -Wall -Wpedantic -Wextra)
+    set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
 endif()
 
 include(ExternalProject)
 include(CheckCXXCompilerFlag)
+
+# Check for OpenMP support
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    message(STATUS "OpenMP found, multi-threading enabled")
+else()
+    message(STATUS "OpenMP not found, falling back to single-threaded")
+endif()
 
 # External library files
 set(ARMADILLO_ZIP "${CMAKE_SOURCE_DIR}/external/armadillo-${armadillo_version}.zip")
@@ -117,7 +121,7 @@ add_custom_command(
 
 # Create a custom target for the unzip step.
 add_custom_target(pugixml_lib ALL DEPENDS ${PUGIXML_SRC_DIR}/.stamp)
-add_custom_target(pybind11_lib ALL DEPENDS ${PYBIND11_SRC_DIR}/.stamp)
+add_custom_target(pybind11_lib DEPENDS ${PYBIND11_SRC_DIR}/.stamp)
 
 set(PUGIXML_H   "${PUGIXML_SRC_DIR}/src")
 set(PYBIND11_H  "${PYBIND11_SRC_DIR}/include")
@@ -137,10 +141,6 @@ endif()
 
 # External include directories
 message(STATUS "Armadillo Include dir: ${ARMADILLO_INCLUDE_DIRS}")
-
-# Numeric subroutines
-# find_package(BLAS REQUIRED)
-# find_package(LAPACK REQUIRED)
 
 # Components to build
 set(BUILD_HDF5 ${HDF5_STATIC})
@@ -287,19 +287,19 @@ if (BUILD_PYTHON OR BUILD_MEX_DOC)
     endif()
 endif()
 
-# Add include directories common to all targets
-include_directories(
+# Core includes needed by all library targets
+set(QUADRIGA_CORE_INCLUDES
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
     ${ARMADILLO_INCLUDE_DIRS}
     ${PUGIXML_H}
-    ${PYBIND11_H}
-    ${HDF5_INCLUDE_DIRS}
 )
 
 # Locate all core source files
-file(GLOB SRC_FILES "${CMAKE_SOURCE_DIR}/src/*.cpp")
-file(GLOB SRC_AVX2 "${CMAKE_SOURCE_DIR}/src/*_avx2.cpp")
+file(GLOB SRC_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*.cpp")
+file(GLOB SRC_AVX2 CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*_avx2.cpp")
+file(GLOB SRC_CUDA CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/src/*_cuda.cu")
+list(REMOVE_ITEM SRC_FILES ${SRC_AVX2})
 
 # For files that require AVX2/FMA, add the extra flags.
 set(BUILD_WITH_AVX2 1)
@@ -320,18 +320,10 @@ if(ENABLE_AVX2 AND COMPILER_SUPPORTS_AVX2)
     endforeach()
     message(STATUS "AVX2 acceleration enabled")
 else()
-    foreach(src ${SRC_AVX2})
-        # This does not work. Please fix
-        list(REMOVE_ITEM SRC_FILES ${src})
-        list(REMOVE_ITEM SRC_AVX2 ${src})
-        #message(STATUS ${src})
-    endforeach()
-    set(BUILD_WITH_AVX2 0)
-    message(STATUS "AVX2 acceleration disabled")
+    set(SRC_AVX2 "")
 endif()
 
 # For files that require CUDA, detect nvcc and add CUDA language support.
-file(GLOB SRC_CUDA "${CMAKE_SOURCE_DIR}/src/*_cuda.cu")
 set(BUILD_WITH_CUDA 0)
 set(CUDA_LINK_LIBS "")
 set(CUDA_MEX_LINK_LIBS "")
@@ -342,8 +334,9 @@ if(ENABLE_CUDA)
         enable_language(CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-        # CUDA objects must be compiled with -fPIC for shared libraries (Python, shared lib)
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --compiler-options -fPIC")
+        if(NOT MSVC)
+            set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --compiler-options -fPIC")
+        endif()
         set(BUILD_WITH_CUDA 1)
         find_package(CUDAToolkit REQUIRED)
         set(CUDA_LINK_LIBS CUDA::cudart_static)
@@ -367,19 +360,26 @@ endif()
 # Static library
 if(ENABLE_STATIC_LIB)
     add_library(quadriga_static STATIC ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
+    target_include_directories(quadriga_static PRIVATE
+        ${QUADRIGA_CORE_INCLUDES}
+        ${HDF5_INCLUDE_DIRS}
+    )
     set_target_properties(quadriga_static PROPERTIES OUTPUT_NAME quadriga)
-    add_dependencies(quadriga_static pugixml_lib pybind11_lib)
+    add_dependencies(quadriga_static pugixml_lib)
     target_compile_definitions(quadriga_static PRIVATE
         BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
         BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
         ARMA_DONT_USE_BLAS
         ARMA_DONT_USE_LAPACK
+        _USE_MATH_DEFINES
     )
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(quadriga_static PUBLIC OpenMP::OpenMP_CXX)
+    endif()
     if(BUILD_WITH_CUDA)
         target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
         set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     endif()
-
     if (BUILD_HDF5 AND NOT HDF5_PATH)
         add_dependencies(quadriga_static hdf5_dep)
     endif()
@@ -391,14 +391,22 @@ endif()
 # Shared library
 if (BUILD_SHARED_LIB)
     add_library(quadriga_shared SHARED ${SRC_FILES} ${SRC_AVX2} ${SRC_CUDA})
+    target_include_directories(quadriga_shared PRIVATE
+        ${QUADRIGA_CORE_INCLUDES}
+        ${HDF5_INCLUDE_DIRS}
+    )
     set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
-    add_dependencies(quadriga_shared pugixml_lib pybind11_lib)
+    add_dependencies(quadriga_shared pugixml_lib)
     target_compile_definitions(quadriga_shared PRIVATE
         BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
         BUILD_WITH_CUDA=${BUILD_WITH_CUDA}
         ARMA_DONT_USE_BLAS
         ARMA_DONT_USE_LAPACK
+        _USE_MATH_DEFINES
     )
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(quadriga_shared PUBLIC OpenMP::OpenMP_CXX)
+    endif()
     if(BUILD_WITH_CUDA)
         target_link_libraries(quadriga_shared PUBLIC CUDA::cudart)
         set_target_properties(quadriga_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
@@ -424,32 +432,14 @@ else()
     set(QUADRIGA_LINK_TARGET quadriga_static)
 endif()
 
-# --- Conditional transitive dependency variables ---
-if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
-    set(MEX_HDF5_LINK_LIBS "")
-    set(MEX_CUDA_LINK_LIBS "")
-    set(MEX_RPATH_FLAGS "-Wl,-rpath,$ORIGIN")
-else()
-    set(MEX_HDF5_LINK_LIBS ${HDF5_LIB} ${HDF5_MEX_LINK_LIBS})
-    set(MEX_CUDA_LINK_LIBS ${CUDA_MEX_LINK_LIBS})
-    set(MEX_RPATH_FLAGS "")
-endif()
-
-# --- MATLAB API ---
-# Compiles MEX files directly with g++ (Linux) or cl.exe (Windows).
-# No MATLAB installation required — uses vendored headers and import libraries from external/matlab_mex.zip.
-# On Linux: unresolved MATLAB symbols (mxGetData, mexErrMsgIdAndTxt, etc.) are resolved at runtime by MATLAB.
-# On Windows: the vendored import libraries (libmex.lib, libmx.lib) provide link-time symbol resolution.
-if(BUILD_MATLAB)
-    file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
-
+# --- MEX link variables (shared by MATLAB and Octave sections) ---
+if(BUILD_MATLAB OR BUILD_OCTAVE)
     if(HDF5_FOUND)
         set(HDF5_MEX_LINK_LIBS ${HDF5_LIBRARIES})
     else()
         set(HDF5_MEX_LINK_LIBS "")
     endif()
 
-    # Recompute conditional variables now that HDF5_MEX_LINK_LIBS is set
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
         set(MEX_HDF5_LINK_LIBS "")
         set(MEX_CUDA_LINK_LIBS "")
@@ -459,7 +449,12 @@ if(BUILD_MATLAB)
         set(MEX_CUDA_LINK_LIBS ${CUDA_MEX_LINK_LIBS})
         set(MEX_RPATH_FLAGS "")
     endif()
+endif()
 
+# --- MATLAB API ---
+# Compiles MEX files directly with g++ (Linux) or cl.exe (Windows). No MATLAB installation required
+if(BUILD_MATLAB)
+    file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_MATLAB_TARGETS "")
 
@@ -617,6 +612,12 @@ if (BUILD_PYTHON)
         api_python/python_tools.cpp
     )
     add_library(quadriga_py MODULE ${PYTHON_SOURCES})
+    target_include_directories(quadriga_py PRIVATE
+        ${QUADRIGA_CORE_INCLUDES}
+        ${PYBIND11_H}
+        ${Python3_INCLUDE_DIRS}
+    )
+    add_dependencies(quadriga_py pybind11_lib pugixml_lib)
     set_target_properties(quadriga_py PROPERTIES
         PREFIX ""
         OUTPUT_NAME "quadriga_lib"
@@ -625,8 +626,6 @@ if (BUILD_PYTHON)
         INSTALL_RPATH "$ORIGIN"
         BUILD_RPATH "$ORIGIN"
     )
-    target_include_directories(quadriga_py PRIVATE ${Python3_INCLUDE_DIRS})
-
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
         target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
     else()
@@ -651,7 +650,10 @@ if (ENABLE_TESTS)
     
     add_executable(test_bin ${CATCH2_MAIN_SRC} ${TEST_SOURCES})
     add_dependencies(test_bin catch2_dep)
-    target_include_directories(test_bin PRIVATE ${CATCH2_INCLUDE_DIR})
+    target_include_directories(test_bin PRIVATE
+        ${QUADRIGA_CORE_INCLUDES}
+        ${CATCH2_INCLUDE_DIR}
+    )
 
     target_link_libraries(test_bin PRIVATE ${QUADRIGA_LINK_TARGET} ${CATCH2_LIB})
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
@@ -664,10 +666,10 @@ if (ENABLE_TESTS)
     
     if(MSVC)
         target_link_libraries(test_bin PRIVATE shlwapi.lib)
-        target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /openmp /MP)
+        target_compile_options(test_bin PRIVATE /EHsc /Zc:__cplusplus /nologo /MP)
         target_compile_definitions(test_bin PRIVATE _USE_MATH_DEFINES ARMA_DONT_USE_BLAS ARMA_DONT_USE_LAPACK)
     else()
-        target_compile_options(test_bin PRIVATE -O3 -fPIC -fopenmp -w)
+        target_compile_options(test_bin PRIVATE -O3 -fPIC -w)
     endif()
 endif()
 
@@ -679,6 +681,7 @@ if (ENABLE_BIN)
 
         add_executable(${exeName} ${source})
         add_dependencies(${exeName} ${QUADRIGA_LINK_TARGET})
+        target_include_directories(${exeName} PRIVATE ${QUADRIGA_CORE_INCLUDES})
         
         target_link_libraries(${exeName} PRIVATE ${QUADRIGA_LINK_TARGET})
         if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")

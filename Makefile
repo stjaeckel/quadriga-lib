@@ -17,7 +17,7 @@ all:
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
-test:   all   moxunit-lib
+test:   moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	$(CMAKE_BUILD_DIR)\Release\test_bin.exe
