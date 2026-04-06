@@ -4,8 +4,8 @@
 # Internal HDF5 deactivates Python and Octave
 hdf5_internal = OFF
 arma_internal = ON
-static_lib = OFF
-shared_lib = ON
+static_lib = ON
+shared_lib = OFF
 octave = ON
 matlab = ON
 avx2 = ON
@@ -17,7 +17,7 @@ CMAKE_BUILD_DIR = build_linux
 PYTHON_SITE_PACKAGES := $(shell python3 -c "import sysconfig, pathlib, json; print(sysconfig.get_paths()['purelib'])")
 
 # The compiled extension that CMake puts into ./lib
-PYTHON_SHARED_OBJ    := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
+PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 
 # Autodetect Octave
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
@@ -28,6 +28,8 @@ all:
 		-D ENABLE_OCTAVE=$(octave) \
 		-D ENABLE_MEX_DOC=ON \
 		-D ENABLE_PYTHON=ON \
+		-D ENABLE_BIN=OFF \
+		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
 		-D HDF5_STATIC=$(hdf5_internal) \
 		-D ENABLE_AVX2=$(avx2) \
@@ -37,28 +39,15 @@ all:
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
-cpp:
+bin:
 	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
 		-D ENABLE_MATLAB=OFF \
 		-D ENABLE_OCTAVE=OFF \
 		-D ENABLE_MEX_DOC=OFF \
 		-D ENABLE_PYTHON=OFF \
-		-D ARMA_EXT=$(arma_internal) \
-		-D HDF5_STATIC=$(hdf5_internal) \
-		-D ENABLE_AVX2=$(avx2) \
-		-D ENABLE_CUDA=$(cuda) \
-		-D ENABLE_SHARED_LIB=$(shared_lib) \
-		-D ENABLE_SHARED_LIB=$(shared_lib)
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
-	cmake --install $(CMAKE_BUILD_DIR)
-
-bin:   cpp
-	cmake -B $(CMAKE_BUILD_DIR) \
 		-D ENABLE_BIN=ON \
-		-D ARMA_EXT=$(arma_internal) \
-		-D HDF5_STATIC=$(hdf5_internal) \
-		-D ENABLE_AVX2=$(avx2) \
-		-D ENABLE_CUDA=$(cuda)
+		-D ENABLE_TESTS=OFF \
+		-D ARMA_EXT=$(arma_internal)
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 
 python:
@@ -67,9 +56,14 @@ python:
 		-D ENABLE_OCTAVE=OFF \
 		-D ENABLE_MEX_DOC=OFF \
 		-D ENABLE_PYTHON=ON \
+		-D ENABLE_BIN=OFF \
+		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
+		-D HDF5_STATIC=OFF \
 		-D ENABLE_AVX2=$(avx2) \
-		-D ENABLE_CUDA=$(cuda)
+		-D ENABLE_CUDA=OFF \
+		-D ENABLE_STATIC_LIB=ON \
+		-D ENABLE_SHARED_LIB=OFF
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
@@ -81,28 +75,22 @@ python_install: python
 	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
 	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
 
+python_test: 
+	python3 -m pytest tests/python_tests -x -s
+
 # Tests
-test:   all   moxunit-lib
+test:   moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	$(CMAKE_BUILD_DIR)/test_bin
 ifeq ($(octave),ON)
 ifneq ($(OCTAVE_VERSION),)
-
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 endif
 endif
 ifneq ($(PYTHON_SHARED_OBJ),)
 	python3 -m pytest tests/python_tests -x -s
 endif
-
-cpp_test:   cpp
-	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
-	$(CMAKE_BUILD_DIR)/test_bin
-
-python_test: 
-	python3 -m pytest tests/python_tests -x -s
 
 # Documentation
 documentation:   bin
