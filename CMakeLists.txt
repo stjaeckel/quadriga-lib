@@ -530,12 +530,6 @@ endif()
 # --- Octave API ---
 if(BUILD_OCTAVE)
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
-
-    # Get Octave compiler flags from mkoctfile
-    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p INCFLAGS OUTPUT_VARIABLE OCTAVE_INCFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTINCLUDEDIR OUTPUT_VARIABLE OCTAVE_OCTINCLUDEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-    execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTLIBDIR OUTPUT_VARIABLE OCTAVE_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
-
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_OCTAVE_TARGETS "")
 
@@ -549,27 +543,37 @@ if(BUILD_OCTAVE)
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
         endif()
 
-        add_custom_command(
-            OUTPUT ${octave_output}
-            COMMAND ${CMAKE_CXX_COMPILER}
-                    -std=c++17 -O3 -shared -fPIC
-                    -DMATLAB_MEX_FILE
-                    ${OCTAVE_INCFLAGS}
-                    -I${OCTAVE_OCTINCLUDEDIR}
-                    -I${CMAKE_SOURCE_DIR}/include
-                    -I${CMAKE_SOURCE_DIR}/src
-                    -I${ARMADILLO_INCLUDE_DIRS}
-                    ${mex_src}
-                    $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
-                    ${MEX_HDF5_LINK_LIBS} ${MEX_CUDA_LINK_LIBS}
-                    -L${OCTAVE_LIBDIR} -loctinterp -loctave
-                    -lgomp
-                    ${MEX_RPATH_FLAGS}
-                    -o ${octave_output}
-            DEPENDS ${mex_deps}
-            COMMENT "Building Octave MEX file ${octave_output}"
-            VERBATIM
-        )
+        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+            execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p INCFLAGS OUTPUT_VARIABLE OCTAVE_INCFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)
+            execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTINCLUDEDIR OUTPUT_VARIABLE OCTAVE_OCTINCLUDEDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+            execute_process(COMMAND ${MKOCTFILE_EXECUTABLE} -p OCTLIBDIR OUTPUT_VARIABLE OCTAVE_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+            # Shared lib: use direct g++ (CUDA already resolved inside the .so)
+            add_custom_command(
+                OUTPUT ${octave_output}
+                COMMAND ${CMAKE_CXX_COMPILER}
+                        -std=c++17 -O3 -shared -fPIC -DMATLAB_MEX_FILE ${OCTAVE_INCFLAGS}
+                        -I${OCTAVE_OCTINCLUDEDIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
+                        ${mex_src} $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
+                        ${MEX_HDF5_LINK_LIBS} ${MEX_CUDA_LINK_LIBS} -L${OCTAVE_LIBDIR} -loctinterp -loctave -lgomp
+                        ${MEX_RPATH_FLAGS} -o ${octave_output}
+                DEPENDS ${mex_deps}
+                COMMENT "Building Octave MEX file ${octave_output}"
+                VERBATIM
+            )
+        else()
+            # Static lib: must use mkoctfile to handle CUDA correctly
+            add_custom_command(
+                OUTPUT ${octave_output}
+                COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
+                        ${mex_src} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
+                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
+                DEPENDS ${mex_deps}
+                COMMENT "Building Octave MEX file ${octave_output}"
+                VERBATIM
+            )
+        endif()
+
         list(APPEND MEX_OCTAVE_TARGETS ${octave_output})
     endforeach()
     add_custom_target(mex_octave ALL DEPENDS ${MEX_OCTAVE_TARGETS})
