@@ -2,6 +2,7 @@
 
 # Uncomment for verbose build output:
 # export DH_VERBOSE=1
+export DEB_BUILD_MAINT_OPTIONS = optimize=-lto
 
 # Destination root inside the build
 DESTDIR := $(CURDIR)/debian/quadriga-lib
@@ -16,7 +17,7 @@ BUILDDIR2 := obj-$(DEB_HOST_GNU_TYPE)-matlab
 STAGEDIR2 := $(CURDIR)/debian/quadriga-lib-matlab-stage
 
 %:
-	dh $@
+	dh $@ --with python3
 
 # ---------------------------------------------------------------------------
 # Configure: two separate CMake configurations
@@ -36,7 +37,7 @@ override_dh_auto_configure:
 		-DENABLE_STATIC_LIB=ON \
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
-		-DENABLE_TESTS=OFF \
+		-DENABLE_TESTS=ON \
 		-DENABLE_BIN=ON \
 		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
@@ -105,8 +106,7 @@ override_dh_strip:
 	dh_strip -Xmexa64 -Xmex
 
 # ---------------------------------------------------------------------------
-# Skip dh_auto_test — tests require the Catch2 test suite which is not
-# built in the package. Run tests separately in CI if desired.
+# Skip dh_auto_test — tests run in Docker
 # ---------------------------------------------------------------------------
 override_dh_auto_test:
 	@echo "Skipping tests during package build"

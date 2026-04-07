@@ -30,10 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libhdf5-dev \
     libarmadillo-dev \
     # Python
+    dh-python \
     python3-dev \
     python3-numpy \
+    python3-pytest \
     # Octave
     octave-dev \
+    octave \
     # Needed by stamp-changelog.sh for codename detection
     lsb-release \
     && rm -rf /var/lib/apt/lists/*
@@ -47,10 +50,7 @@ COPY . .
 RUN debian/stamp-changelog.sh noble
 RUN echo "=== debian/changelog ===" && cat debian/changelog
 
-# ---- 4. Build the .deb ----
-# -us -uc : skip GPG signing (not needed for local/CI builds)
-# -b      : binary-only build
-# -j$(nproc): parallel make
+# ---- 4. Build the .deb (tests disabled in rules) ----
 RUN dpkg-buildpackage -us -uc -b -j$(nproc)
 
 RUN for f in /build/quadriga-lib_*_amd64.deb; do \
@@ -67,7 +67,36 @@ RUN echo "=== Package contents ===" && \
     echo "=== Lintian ===" && \
     lintian /build/quadriga-lib_*.deb || true
 
-# ---- 6. Copy artifacts out ----
+# ---- 6. Install the package ----
+RUN dpkg -i /build/quadriga-lib_*.deb || apt-get install -f -y
+
+# ---- 7. Run tests against the installed package ----
+RUN /build/quadriga-lib/obj-x86_64-linux-gnu/test_bin
+RUN unzip /build/quadriga-lib/external/MOxUnit.zip -d /build/quadriga-lib/external/
+RUN octave --no-gui --eval "cd /build/quadriga-lib/tests; quadriga_lib_mex_tests;"
+RUN python3 -m pytest /build/quadriga-lib/tests/python_tests -x -s
+
+# ---- 8. Test postrm: verify uninstall cleans up correctly ----
+RUN echo "=== postrm test ===" && \
+    \
+    # Verify octaverc exists before removal
+    test -f /usr/share/octave/site/m/startup/octaverc || \
+        (echo "FAIL: octaverc missing before removal" && exit 1) && \
+    \
+    # Remove the package
+    dpkg --purge quadriga-lib && \
+    \
+    # Verify octaverc is gone (was the only content)
+    test ! -f /usr/share/octave/site/m/startup/octaverc || \
+        (echo "FAIL: octaverc still exists after purge" && exit 1) && \
+    \
+    # Verify the addpath line is really gone (belt-and-suspenders)
+    ! grep -r "quadriga-lib" /usr/share/octave/site/ 2>/dev/null || \
+        (echo "FAIL: quadriga-lib reference found in octave site dir" && exit 1) && \
+    \
+    echo "PASS: postrm cleaned up correctly"
+
+# ---- 9. Copy artifacts out ----
 # docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
 CMD mkdir -p /out && rm -f /out/* 2>/dev/null; \
     cp /build/quadriga-lib_*.deb \

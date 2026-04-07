@@ -110,29 +110,6 @@ moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
 
-catch2_version = 3.8.1
-catch2-lib:
-	- rm -rf external/build
-	- rm -rf external/Catch2-$(catch2_version)
-	- rm -rf external/Catch2-$(catch2_version)-Linux
-	unzip external/Catch2-$(catch2_version).zip -d external/
-	mkdir external/build
-	cmake -S external/Catch2-$(catch2_version) -B external/build
-	( cd external/build && make -j8 && make package )
-	tar -xzf external/build/Catch2-$(catch2_version)-Linux.tar.gz -C external/
-	- rm -rf external/build
-	- rm -rf external/Catch2-$(catch2_version)
-
-armadillo_version = 14.2.2
-armadillo-lib:
-	- rm -rf external/armadillo-$(armadillo_version)
-	unzip external/armadillo-$(armadillo_version).zip -d external/
-
-pybind11_version = 3.0.0
-pybind11-lib:
-	- rm -rf external/pybind11-$(pybind11_version)
-	unzip external/pybind11-$(pybind11_version).zip -d external/
-
 clean:
 	- rm -rf external/build
 	- rm -rf +quadriga_lib
@@ -154,12 +131,7 @@ clean:
 tidy:   clean
 	- rm -rf build*
 
-release:  all  bin
-	- mkdir release
-	tar czf release/quadrigalib-v$(shell $(CMAKE_BUILD_DIR)/version)-Ubuntu-$(shell lsb_release -r -s)-amd64.tar.gz \
-		+quadriga_lib/*.mex +quadriga_lib/*.mexa64 +quadriga_lib/*.m include lib/*.a
-
-package:  cpp  bin
+package:  bin
 	- mkdir release
 	- rm -rf release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)
 	- rm release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version).zip
@@ -189,6 +161,6 @@ package:  cpp  bin
 
 deb:
 	mkdir -p release
-	docker build -f Dockerfile.ubuntu2404 -t quadriga-deb-noble .
+	docker build --progress=plain -f Dockerfile.ubuntu2404 -t quadriga-deb-noble . 2>&1 | tee build.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
