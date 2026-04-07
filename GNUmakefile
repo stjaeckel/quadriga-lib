@@ -161,6 +161,21 @@ package:  bin
 
 deb:
 	mkdir -p release
-	docker build --progress=plain -f Dockerfile.ubuntu2404 -t quadriga-deb-noble . 2>&1 | tee build.log
+
+	docker build --build-arg UBUNTU_VERSION=22.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-jammy . 2>&1 | tee build_jammy.log
+	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-jammy
+	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+
+	docker build --build-arg UBUNTU_VERSION=24.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-noble . 2>&1 | tee build_noble.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+
+	docker build --build-arg UBUNTU_VERSION=25.10 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-plucky . 2>&1 | tee build_plucky.log
+	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-plucky
+	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+
+# 	docker build --build-arg UBUNTU_VERSION=26.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-resolute . 2>&1 | tee build_resolute.log
+# 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-resolute
+# 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+
+

@@ -1,16 +1,34 @@
 # =============================================================================
-# Dockerfile.ubuntu2404 — Build quadriga-lib .deb for Ubuntu 24.04 (Noble)
+# Dockerfile — Build quadriga-lib .deb for Ubuntu
 # =============================================================================
-# Usage:
-#   docker build -f Dockerfile.ubuntu2404 -t quadriga-deb-noble .
-#   docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
+# Usage examples:
+#   # Ubuntu 24.04 (default):
+#   docker build --build-arg UBUNTU_VERSION=24.04 -t quadriga-deb .
+#   docker run --rm -v $(pwd)/out:/out quadriga-deb
+#
+#   # Ubuntu 22.04:
+#   docker build --build-arg UBUNTU_VERSION=22.04 -t quadriga-deb .
+#   docker run --rm -v $(pwd)/out:/out quadriga-deb
 #
 # The .deb (and related files) will appear in ./out/
 # =============================================================================
 
-FROM ubuntu:24.04
+ARG UBUNTU_VERSION=24.04
+FROM ubuntu:${UBUNTU_VERSION}
 
+# Re-declare after FROM so it's available in subsequent RUN steps
+ARG UBUNTU_VERSION=24.04
 ARG DEBIAN_FRONTEND=noninteractive
+
+# Derive the Ubuntu codename from the version number.
+# Extend this list as new LTS releases are supported.
+RUN case "${UBUNTU_VERSION}" in \
+        22.04) echo "jammy"  > /etc/build-codename ;; \
+        24.04) echo "noble"  > /etc/build-codename ;; \
+        25.10) echo "plucky" > /etc/build-codename ;; \
+        26.04) echo "resolute" > /etc/build-codename ;; \
+        *) echo "ERROR: unsupported UBUNTU_VERSION '${UBUNTU_VERSION}'" >&2; exit 1 ;; \
+    esac
 
 # ---- 1. Install build dependencies ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -47,14 +65,16 @@ WORKDIR /build/quadriga-lib
 COPY . .
 
 # ---- 3. Stamp version from include/quadriga_lib.hpp into debian/changelog ----
-RUN debian/stamp-changelog.sh noble
+RUN CODENAME=$(cat /etc/build-codename) && \
+    debian/stamp-changelog.sh ${CODENAME}
 RUN echo "=== debian/changelog ===" && cat debian/changelog
 
 # ---- 4. Build the .deb (tests disabled in rules) ----
 RUN dpkg-buildpackage -us -uc -b -j$(nproc)
 
-RUN for f in /build/quadriga-lib_*_amd64.deb; do \
-      mv "$f" "${f%_amd64.deb}+noble_amd64.deb"; \
+RUN CODENAME=$(cat /etc/build-codename) && \
+    for f in /build/quadriga-lib_*_amd64.deb; do \
+        mv "$f" "${f%_amd64.deb}+${CODENAME}_amd64.deb"; \
     done
 
 # ---- 5. Inspect the result ----
@@ -97,8 +117,9 @@ RUN echo "=== postrm test ===" && \
     echo "PASS: postrm cleaned up correctly"
 
 # ---- 9. Copy artifacts out ----
-# docker run --rm -v $(pwd)/out:/out quadriga-deb-noble
-CMD mkdir -p /out && rm -f /out/* 2>/dev/null; \
+# docker run --rm -v $(pwd)/out:/out <image-name>
+CMD CODENAME=$(cat /etc/build-codename) && \
+    mkdir -p /out && rm -f /out/* 2>/dev/null; \
     cp /build/quadriga-lib_*.deb \
        /build/quadriga-lib_*.buildinfo \
        /build/quadriga-lib_*.changes \
