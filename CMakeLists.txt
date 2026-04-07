@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.18)
 project(QuadrigaLib LANGUAGES C CXX)
 
+# ---------------------------------------------------------------------------
+# Version — single source of truth: include/quadriga_lib.hpp
+# Parses: #define QUADRIGA_LIB_VERSION v0_10_9  →  0.10.9
+# ---------------------------------------------------------------------------
+file(STRINGS "${CMAKE_SOURCE_DIR}/include/quadriga_lib.hpp" _ver_line
+     REGEX "#define QUADRIGA_LIB_VERSION")
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+       "\\1" QUADRIGA_VERSION_MAJOR "${_ver_line}")
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+       "\\2" QUADRIGA_VERSION_MINOR "${_ver_line}")
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+       "\\3" QUADRIGA_VERSION_PATCH "${_ver_line}")
+set(QUADRIGA_VERSION
+    "${QUADRIGA_VERSION_MAJOR}.${QUADRIGA_VERSION_MINOR}.${QUADRIGA_VERSION_PATCH}")
+message(STATUS "quadriga-lib version: ${QUADRIGA_VERSION}")
+
 # Option to enable MATLAB/Octave MEX compilation (default: ON)
 # For octave, make sure that 'mkoctfile' is installed and can be called
 option(ENABLE_MATLAB "Enable MATLAB MEX API" ON)
@@ -402,7 +418,11 @@ if (BUILD_SHARED_LIB)
         ${QUADRIGA_CORE_INCLUDES}
         ${HDF5_INCLUDE_DIRS}
     )
-    set_target_properties(quadriga_shared PROPERTIES OUTPUT_NAME quadriga)
+    set_target_properties(quadriga_shared PROPERTIES
+        OUTPUT_NAME quadriga
+        VERSION ${QUADRIGA_VERSION}
+        SOVERSION ${QUADRIGA_VERSION_MAJOR}
+    )
     add_dependencies(quadriga_shared pugixml_lib)
     target_compile_definitions(quadriga_shared PRIVATE
         BUILD_WITH_AVX2=${BUILD_WITH_AVX2}
@@ -705,9 +725,12 @@ if (BUILD_SHARED_LIB)
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR}
             RUNTIME DESTINATION ${INSTALL_BINDIR})
-    # For local installs, copy shared lib into MEX directory so MATLAB/Octave find it
+    # For local installs, copy shared lib into MEX directory so Octave find it
     if(INSTALL_IS_LOCAL)
-        install(FILES $<TARGET_FILE:quadriga_shared> DESTINATION ${INSTALL_MEX_DIR}/+quadriga_lib)
+        install(FILES
+            $<TARGET_FILE:quadriga_shared>
+            $<TARGET_SONAME_FILE:quadriga_shared>
+            DESTINATION ${INSTALL_MEX_DIR}/+quadriga_lib)
     endif()
 endif()
 

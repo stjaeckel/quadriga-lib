@@ -6,25 +6,34 @@
 # Destination root inside the build
 DESTDIR := $(CURDIR)/debian/quadriga-lib
 
-# CMake build directory (debhelper default for out-of-tree builds)
-BUILDDIR := obj-$(DEB_HOST_GNU_TYPE)
+# CMake build directories
+# Build 1 (gcc13): .so / Octave MEX / Python  — debhelper default name
+BUILDDIR  := obj-$(DEB_HOST_GNU_TYPE)
+# Build 2 (gcc11): quadriga.a / MATLAB MEX only
+BUILDDIR2 := obj-$(DEB_HOST_GNU_TYPE)-matlab
+
+# Staging dir for build 2 install output (merged into DESTDIR afterwards)
+STAGEDIR2 := $(CURDIR)/debian/quadriga-lib-matlab-stage
 
 %:
 	dh $@
 
 # ---------------------------------------------------------------------------
-# Configure: invoke cmake with correct options for the .deb
-# ENABLE_BIN=ON builds the 'version' helper needed for documentation
+# Configure: two separate CMake configurations
+#   Build 1 — system gcc13: shared lib, Octave, Python, docs (no MATLAB)
+#   Build 2 — gcc11:        static lib + MATLAB MEX only
 # ---------------------------------------------------------------------------
 override_dh_auto_configure:
-	dh_auto_configure --buildsystem=cmake -- \
+	# --- Build 1: gcc13 ---
+	dh_auto_configure --buildsystem=cmake --builddir=$(BUILDDIR) -- \
 		-DCMAKE_INSTALL_PREFIX=/usr \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DENABLE_MATLAB=ON \
+		-DENABLE_MATLAB=OFF \
 		-DENABLE_OCTAVE=ON \
 		-DENABLE_MEX_DOC=ON \
 		-DENABLE_PYTHON=ON \
 		-DENABLE_SHARED_LIB=ON \
+		-DENABLE_STATIC_LIB=ON \
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
 		-DENABLE_TESTS=OFF \
@@ -32,38 +41,68 @@ override_dh_auto_configure:
 		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
 
-# ---------------------------------------------------------------------------
-# Build: compile everything, then generate HTML documentation
-# ---------------------------------------------------------------------------
-override_dh_auto_build:
-	dh_auto_build --buildsystem=cmake
+	# --- Build 2: gcc11 (MATLAB MEX + static lib only) ---
+	cmake -S . -B $(BUILDDIR2) \
+		-DCMAKE_CXX_COMPILER=/usr/bin/g++-11 \
+		-DCMAKE_C_COMPILER=/usr/bin/gcc-11 \
+		-DCMAKE_INSTALL_PREFIX=/usr \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DENABLE_MATLAB=ON \
+		-DENABLE_OCTAVE=OFF \
+		-DENABLE_MEX_DOC=OFF \
+		-DENABLE_PYTHON=OFF \
+		-DENABLE_SHARED_LIB=OFF \
+		-DENABLE_STATIC_LIB=ON \
+		-DENABLE_AVX2=ON \
+		-DENABLE_CUDA=OFF \
+		-DENABLE_TESTS=OFF \
+		-DENABLE_BIN=OFF \
+		-DHDF5_STATIC=OFF \
+		-DARMA_EXT=OFF
 
 # ---------------------------------------------------------------------------
-# Install: run cmake install (paths are already Debian-standard via CMakeLists.txt)
+# Build: compile both trees in parallel
+# ---------------------------------------------------------------------------
+override_dh_auto_build:
+	# --- Build 1: gcc13 ---
+	dh_auto_build --buildsystem=cmake --builddir=$(BUILDDIR)
+
+	# --- Build 2: gcc11 ---
+	cmake --build $(BUILDDIR2) -- -j$(shell nproc)
+
+# ---------------------------------------------------------------------------
+# Install: install build 1 normally, then overlay MATLAB artifacts from build 2
 # ---------------------------------------------------------------------------
 override_dh_auto_install:
-	dh_auto_install --buildsystem=cmake
+	# --- Build 1: install into DESTDIR as usual ---
+	dh_auto_install --buildsystem=cmake --builddir=$(BUILDDIR)
 
 	# --- Remove the version binary (build-time tool, not an installed artifact) ---
 	rm -f $(DESTDIR)/usr/bin/version
 
+	# --- Build 2: install into staging dir, then copy only the MEX output dir ---
+	cmake --install $(BUILDDIR2) --prefix $(STAGEDIR2)/usr
+	cp -a $(STAGEDIR2)/usr/share/quadriga-lib/+quadriga_lib/*.mexa64 \
+	      $(DESTDIR)/usr/share/quadriga-lib/+quadriga_lib/
 
 # ---------------------------------------------------------------------------
 # shlibdeps: auto-detect runtime shared-library dependencies
 # ---------------------------------------------------------------------------
-# Exclude MATLAB .mexa64 files — they are compiled with
-# --unresolved-symbols=ignore-all so dpkg-shlibdeps would error on the
-# dangling MATLAB runtime symbols (mxGetData, mexErrMsgIdAndTxt, …).
-# Their actual runtime deps (libgomp, libstdc++, libhdf5) are already
-# pulled in by the Python module and Octave MEX files.
+# Exclude MATLAB .mexa64 files — compiled with --unresolved-symbols=ignore-all,
+# dpkg-shlibdeps would error on dangling MATLAB runtime symbols.
+# Exclude Octave .mex files — liboctinterp.so lives in a non-standard path
+# that dpkg-shlibdeps cannot find, and octave is Suggests (not Depends) so
+# we don't want a hard runtime dep generated anyway.
+# All real runtime deps (libgomp, libhdf5, libstdc++) are covered by the
+# Python module and libquadriga.so which are scanned normally.
 override_dh_shlibdeps:
-	dh_shlibdeps -Xmexa64
+	dh_shlibdeps -Xmexa64 -Xmex
 
 # ---------------------------------------------------------------------------
 # Strip: exclude MEX files from debug symbol stripping
 # ---------------------------------------------------------------------------
 override_dh_strip:
-	dh_strip -Xmexa64
+	dh_strip -Xmexa64 -Xmex
 
 # ---------------------------------------------------------------------------
 # Skip dh_auto_test — tests require the Catch2 test suite which is not
