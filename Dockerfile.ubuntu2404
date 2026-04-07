@@ -22,6 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fakeroot \
     lintian \
     bzip2 \
+    # gcc11 for MATLAB MEX (avoids GLIBCXX version mismatch with MATLAB's bundled libstdc++)
+    # gcc13 (build-essential) remains the system default for all other targets
+    gcc-11 \
+    g++-11 \
     # Library dev packages
     libhdf5-dev \
     libarmadillo-dev \

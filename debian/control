@@ -6,6 +6,8 @@ Build-Depends:
  debhelper-compat (= 13),
  cmake (>= 3.18),
  g++,
+ g++-11,
+ gcc-11,
  make,
  bzip2,
  libhdf5-dev,
@@ -21,6 +23,7 @@ Rules-Requires-Root: no
 Package: quadriga-lib
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, python3-numpy
+Recommends: libarmadillo-dev
 Suggests: octave, matlab-support
 Description: High-performance C++ radio channel modelling library
  QuaDRiGa-Lib is a high-performance C++ library for radio channel modelling

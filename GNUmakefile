@@ -5,7 +5,7 @@
 hdf5_internal = OFF
 arma_internal = ON
 static_lib = ON
-shared_lib = OFF
+shared_lib = ON
 octave = ON
 matlab = ON
 avx2 = ON

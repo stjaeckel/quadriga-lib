@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge)
+        rm -f /etc/octave/pkg-init.d/quadriga-lib.m
+        ;;
+esac
+
+#DEBHELPER#
+exit 0
