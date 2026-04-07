@@ -423,7 +423,10 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_elem,
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
-        *wrapper = arma::Col<dtype>((dtype *)output.data(), n_elem, false, true);
+    {
+        wrapper->~Col<dtype>();
+        ::new (wrapper) arma::Col<dtype>((dtype *)output.data(), n_elem, false, true);
+    }
 
     return output;
 }
@@ -439,7 +442,10 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
-        *wrapper = arma::Mat<dtype>((dtype *)output.data(), n_rows, n_cols, false, true);
+    {
+        wrapper->~Mat<dtype>();
+        ::new (wrapper) arma::Mat<dtype>((dtype *)output.data(), n_rows, n_cols, false, true);
+    }
 
     return output;
 }
@@ -455,7 +461,10 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
-        *wrapper = arma::Cube<dtype>((dtype *)output.data(), n_rows, n_cols, n_slices, false, true);
+    {
+        wrapper->~Cube<dtype>();
+        ::new (wrapper) arma::Cube<dtype>((dtype *)output.data(), n_rows, n_cols, n_slices, false, true);
+    }
 
     return output;
 }
@@ -476,7 +485,10 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
         dtype *base = (dtype *)output.mutable_data();
         size_t frame_stride = (size_t)n_rows * (size_t)n_cols * (size_t)n_slices;
         for (arma::uword i = 0; i < n_frames; ++i)
-            (*cubes)[i] = arma::Cube<dtype>(base + i * frame_stride, n_rows, n_cols, n_slices, false, true);
+        {
+            (*cubes)[i].~Cube<dtype>();
+            ::new (&(*cubes)[i]) arma::Cube<dtype>(base + i * frame_stride, n_rows, n_cols, n_slices, false, true);
+        }
     }
 
     return output;
@@ -492,7 +504,7 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
 // Optional: n_frames (4th dim, 1 if input is 1D-3D), stride_frames (stride of 4th dim in elements)
 template <typename dtype>
 static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input, bool shape_only = false,
-                                                  size_t *n_frames = nullptr, size_t *stride_frames = nullptr)
+                                                 size_t *n_frames = nullptr, size_t *stride_frames = nullptr)
 {
     auto buf = input.request();
     int nd = (int)buf.ndim;
@@ -777,7 +789,7 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool v
 // 3D input → vector with 1 entry, 4D input → vector with n_frames entries
 template <typename dtype>
 static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::array_t<dtype> &input,
-                                                                    bool view = false, bool strict = false)
+                                                                   bool view = false, bool strict = false)
 {
     size_t n_frames, stride_frames;
     // Always compute full strides (shape_only=false): the copy path below passes shape
@@ -811,7 +823,7 @@ static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::arr
 // py::handle overload for qd_python_numpy2arma_vecCube
 template <typename dtype>
 static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::handle &obj,
-                                                                    bool view = false, bool strict = false)
+                                                                   bool view = false, bool strict = false)
 {
     py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
