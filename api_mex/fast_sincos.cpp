@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -100,9 +100,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool use_double_input = mxIsDouble(prhs[0]);
 
     if (use_double_input)
-        Xd = qd_mex_reinterpret_Cube<double>(prhs[0]); // No copy
+    {
+        Xd.~Cube<double>();
+        ::new (&Xd) arma::cube(qd_mex_reinterpret_Cube<double>(prhs[0]));
+    }
     else if (mxIsSingle(prhs[0]))
-        Xs = qd_mex_reinterpret_Cube<float>(prhs[0]); // No copy
+    {
+        Xs.~Cube<float>();
+        ::new (&Xs) arma::fcube(qd_mex_reinterpret_Cube<float>(prhs[0]));
+    }
     else
         Xs = qd_mex_typecast_Cube<float>(prhs[0]);
 
@@ -132,15 +138,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::fvec xs;
     arma::vec xd;
     if (use_double_input)
-        xd = arma::vec(Xd.memptr(), n_elem, false, true);
+    {
+        xd.~Col<double>();
+        ::new (&xd) arma::vec(Xd.memptr(), n_elem, false, true);
+    }
     else
-        xs = arma::fvec(Xs.memptr(), n_elem, false, true);
+    {
+        xs.~Col<float>();
+        ::new (&xs) arma::fvec(Xs.memptr(), n_elem, false, true);
+    }
 
     arma::fvec p = arma::fvec(P.memptr(), n_elem, false, true);
 
     arma::fvec q;
     if (n_elem != 0)
-        q = arma::fvec(Q.memptr(), n_elem, false, true);
+    {
+        q.~Col<float>();
+        ::new (&q) arma::fvec(Q.memptr(), n_elem, false, true);
+    }
 
     // Call Quadriga-Lib C++ API
     if (use_double_input)

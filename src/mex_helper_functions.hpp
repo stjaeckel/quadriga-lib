@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -868,7 +868,6 @@ inline mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools)
     return out;
 }
 
-
 // Creates an mxArray based on a vector of armadillo input types
 // - adds one additional dimension, e.g. arma::Cube --> MATLAB 4D
 // - optional input: reading order of vector elements
@@ -1662,79 +1661,91 @@ std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input)
 inline mxArray *qd_mex_init_output(arma::Row<float> *input, size_t n_elem) // 1D-Single Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL);
-    *input = arma::Row<float>((float *)mxGetData(output), n_elem, false, true);
+    input->~Row<float>();
+    ::new (input) arma::Row<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Col<float> *input, size_t n_elem, bool transpose = false) // 1D-Single Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxSINGLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxSINGLE_CLASS, mxREAL);
-    *input = arma::Col<float>((float *)mxGetData(output), n_elem, false, true);
+    input->~Col<float>();
+    ::new (input) arma::Col<float>((float *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Mat<float> *input, size_t n_rows, size_t n_cols) // 2D-Single
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxSINGLE_CLASS, mxREAL);
-    *input = arma::Mat<float>((float *)mxGetData(output), n_rows, n_cols, false, true);
+    input->~Mat<float>();
+    ::new (input) arma::Mat<float>((float *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Cube<float> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-Single
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxSINGLE_CLASS, mxREAL);
-    *input = arma::Cube<float>((float *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
+    input->~Cube<float>();
+    ::new (input) arma::Cube<float>((float *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Row<double> *input, size_t n_elem) // 1D-Double Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL);
-    *input = arma::Row<double>((double *)mxGetData(output), n_elem, false, true);
+    input->~Row<double>();
+    ::new (input) arma::Row<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Col<double> *input, size_t n_elem, bool transpose = false) // 1D-Double Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxDOUBLE_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxDOUBLE_CLASS, mxREAL);
-    *input = arma::Col<double>((double *)mxGetData(output), n_elem, false, true);
+    input->~Col<double>();
+    ::new (input) arma::Col<double>((double *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Mat<double> *input, size_t n_rows, size_t n_cols) // 2D-Double
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxDOUBLE_CLASS, mxREAL);
-    *input = arma::Mat<double>((double *)mxGetData(output), n_rows, n_cols, false, true);
+    input->~Mat<double>();
+    ::new (input) arma::Mat<double>((double *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Cube<double> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-Double
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxDOUBLE_CLASS, mxREAL);
-    *input = arma::Cube<double>((double *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
+    input->~Cube<double>();
+    ::new (input) arma::Cube<double>((double *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Row<unsigned> *input, size_t n_elem) // 1D-UINT32 Row Vector
 {
     mxArray *output = mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL);
-    *input = arma::Row<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
+    input->~Row<unsigned>();
+    ::new (input) arma::Row<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Col<unsigned> *input, size_t n_elem, bool transpose = false) // 1D-UINT32 Column Vector
 {
     mxArray *output = transpose ? mxCreateNumericMatrix(1, n_elem, mxUINT32_CLASS, mxREAL)
                                 : mxCreateNumericMatrix(n_elem, 1, mxUINT32_CLASS, mxREAL);
-    *input = arma::Col<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
+    input->~Col<unsigned>();
+    ::new (input) arma::Col<unsigned>((unsigned *)mxGetData(output), n_elem, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Mat<unsigned> *input, size_t n_rows, size_t n_cols) // 2D-UINT32
 {
     mxArray *output = mxCreateNumericMatrix(n_rows, n_cols, mxUINT32_CLASS, mxREAL);
-    *input = arma::Mat<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, false, true);
+    input->~Mat<unsigned>();
+    ::new (input) arma::Mat<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, false, true);
     return output;
 }
 inline mxArray *qd_mex_init_output(arma::Cube<unsigned> *input, size_t n_rows, size_t n_cols, size_t n_slices) // 3D-UINT32
 {
     mwSize dims[3] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices};
     mxArray *output = mxCreateNumericArray(3, dims, mxUINT32_CLASS, mxREAL);
-    *input = arma::Cube<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
+    input->~Cube<unsigned>();
+    ::new (input) arma::Cube<unsigned>((unsigned *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
     return output;
 }
 
