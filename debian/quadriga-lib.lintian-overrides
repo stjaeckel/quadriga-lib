@@ -3,3 +3,15 @@
 # at runtime when loading the MEX file. These are not bugs.
 quadriga-lib: shared-library-lacks-prerequisites [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
 quadriga-lib: library-not-linked-against-libc [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
+
+# MEX files (.mex = Octave, .mexa64 = MATLAB) are architecture-dependent shared
+# libraries but must live in usr/share/ alongside their .m documentation files
+# so that Octave/MATLAB can find them via a single addpath() call. This is the
+# standard layout for MEX-based packages and cannot be split by architecture.
+quadriga-lib: arch-dependent-file-in-usr-share [usr/share/quadriga-lib/+quadriga_lib/*.mex]
+quadriga-lib: arch-dependent-file-in-usr-share [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
+
+# MEX files are excluded from dh_strip (via -Xmex -Xmexa64 in debian/rules)
+# because stripping breaks the MEX ABI. Lintian cannot see the exclusion.
+quadriga-lib: unstripped-binary-or-object [usr/share/quadriga-lib/+quadriga_lib/*.mex]
+quadriga-lib: unstripped-binary-or-object [usr/share/quadriga-lib/+quadriga_lib/*.mexa64]
