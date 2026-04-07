@@ -23,6 +23,7 @@
 #include <string>
 #include <cstring>
 #include <stdexcept>
+#include <memory>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
@@ -424,7 +425,7 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_elem,
 
     if (wrapper != nullptr)
     {
-        wrapper->~Col<dtype>();
+        std::destroy_at(wrapper);
         ::new (wrapper) arma::Col<dtype>((dtype *)output.data(), n_elem, false, true);
     }
 
@@ -443,7 +444,7 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
 
     if (wrapper != nullptr)
     {
-        wrapper->~Mat<dtype>();
+        std::destroy_at(wrapper);
         ::new (wrapper) arma::Mat<dtype>((dtype *)output.data(), n_rows, n_cols, false, true);
     }
 
@@ -462,7 +463,7 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
 
     if (wrapper != nullptr)
     {
-        wrapper->~Cube<dtype>();
+        std::destroy_at(wrapper);
         ::new (wrapper) arma::Cube<dtype>((dtype *)output.data(), n_rows, n_cols, n_slices, false, true);
     }
 
@@ -486,7 +487,7 @@ static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword 
         size_t frame_stride = (size_t)n_rows * (size_t)n_cols * (size_t)n_slices;
         for (arma::uword i = 0; i < n_frames; ++i)
         {
-            (*cubes)[i].~Cube<dtype>();
+            std::destroy_at(&(*cubes)[i]);
             ::new (&(*cubes)[i]) arma::Cube<dtype>(base + i * frame_stride, n_rows, n_cols, n_slices, false, true);
         }
     }
