@@ -1,34 +1,31 @@
 #!/usr/bin/env python3
 import argparse
-import subprocess
+import re
 import sys
 
-def get_quadriga_lib_version(version_path=None):
+def get_quadriga_lib_version(hpp_path=None):
     """
-    Calls the 'quadriga-lib-version' command and returns its output (version string).
-    If version_path is provided, uses that path directly. Otherwise, searches common paths.
+    Reads the version string directly from quadriga_lib.hpp.
+    Parses: #define QUADRIGA_LIB_VERSION_STR "x.y.z"
     """
-    if version_path:
-        possible_paths = [version_path]
-    else:
-        possible_paths = ['build/version', 'build_linux/version']
-    
-    for path in possible_paths:
+    search_paths = [hpp_path] if hpp_path else [
+        'include/quadriga_lib.hpp',
+    ]
+
+    for path in search_paths:
         try:
-            # Run the command and capture its output
-            output = subprocess.check_output([path], stderr=subprocess.STDOUT)
-            # Decode and strip any trailing newline/whitespace
-            version = output.decode('utf-8').strip()
-            return version
-        except subprocess.CalledProcessError as e:
-            print(f"Error: failed to run '{path}': {e.output.decode().strip()}", file=sys.stderr)
+            with open(path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    m = re.search(r'#define\s+QUADRIGA_LIB_VERSION_STR\s+"([^"]+)"', line)
+                    if m:
+                        return m.group(1)
+            print(f"Error: QUADRIGA_LIB_VERSION_STR not found in '{path}'.", file=sys.stderr)
+            sys.exit(1)
         except FileNotFoundError:
             continue
-    
-    # If we get here, no paths worked
-    print("Error: 'quadriga-lib-version' command not found in any expected path.", file=sys.stderr)
-    sys.exit(1)
 
+    print("Error: quadriga_lib.hpp not found in any expected path.", file=sys.stderr)
+    sys.exit(1)
 
 def update_html_first_line(html_path, heading):
     """

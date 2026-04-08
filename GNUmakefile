@@ -22,13 +22,15 @@ PYTHON_SHARED_OBJ := $(wildcard lib/quadriga_lib.cpython*linux-gnu.so)
 # Autodetect Octave
 OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
+# Get Quadriga-Lib version
+QUADRIGA_VERSION := $(shell grep -oP '(?<=#define QUADRIGA_LIB_VERSION_STR ")[^"]+' include/quadriga_lib.hpp)
+
 all:
 	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
 		-D ENABLE_MATLAB=$(matlab) \
 		-D ENABLE_OCTAVE=$(octave) \
 		-D ENABLE_MEX_DOC=ON \
 		-D ENABLE_PYTHON=ON \
-		-D ENABLE_BIN=OFF \
 		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
 		-D HDF5_STATIC=$(hdf5_internal) \
@@ -39,24 +41,12 @@ all:
 	cmake --build $(CMAKE_BUILD_DIR) --parallel
 	cmake --install $(CMAKE_BUILD_DIR)
 
-bin:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
-		-D ENABLE_MATLAB=OFF \
-		-D ENABLE_OCTAVE=OFF \
-		-D ENABLE_MEX_DOC=OFF \
-		-D ENABLE_PYTHON=OFF \
-		-D ENABLE_BIN=ON \
-		-D ENABLE_TESTS=OFF \
-		-D ARMA_EXT=$(arma_internal)
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
-
 python:
 	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
 		-D ENABLE_MATLAB=OFF \
 		-D ENABLE_OCTAVE=OFF \
 		-D ENABLE_MEX_DOC=OFF \
 		-D ENABLE_PYTHON=ON \
-		-D ENABLE_BIN=OFF \
 		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
 		-D HDF5_STATIC=OFF \
@@ -93,7 +83,7 @@ ifneq ($(PYTHON_SHARED_OBJ),)
 endif
 
 # Documentation
-documentation:   bin
+documentation:
 	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
@@ -133,33 +123,33 @@ clean:
 tidy:   clean
 	- rm -rf build*
 
-package:  bin
+package:
 	- mkdir release
-	- rm -rf release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)
-	- rm release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version).zip
-	mkdir release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)
-	mkdir release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external
-	cp external/armadillo-*.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp external/pugixml-*.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp external/Catch2-*.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp external/hdf5-*.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp external/pybind11-*.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp external/MOxUnit.zip release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/external/
-	cp -R include release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R api_mex release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R src release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R tests release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R tools release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R html_docu release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp -R api_python release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp CMakeLists.txt release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp GNUmakefile release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp LICENSE release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp Makefile release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	cp README.md release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/
-	- rm -rf release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/tests/afl
-	( cd release && zip -r quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version).zip quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)/ )
-	- rm -rf release/quadriga_lib-$(shell $(CMAKE_BUILD_DIR)/version)
+	- rm -rf release/quadriga_lib-$(QUADRIGA_VERSION)
+	- rm release/quadriga_lib-$(QUADRIGA_VERSION).zip
+	mkdir release/quadriga_lib-$(QUADRIGA_VERSION)
+	mkdir release/quadriga_lib-$(QUADRIGA_VERSION)/external
+	cp external/armadillo-*.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp external/pugixml-*.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp external/Catch2-*.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp external/hdf5-*.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp external/pybind11-*.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp external/MOxUnit.zip release/quadriga_lib-$(QUADRIGA_VERSION)/external/
+	cp -R include release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R api_mex release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R src release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R tests release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R tools release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R html_docu release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp -R api_python release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp CMakeLists.txt release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp GNUmakefile release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp LICENSE release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp Makefile release/quadriga_lib-$(QUADRIGA_VERSION)/
+	cp README.md release/quadriga_lib-$(QUADRIGA_VERSION)/
+	- rm -rf release/quadriga_lib-$(QUADRIGA_VERSION)/tests/afl
+	( cd release && zip -r quadriga_lib-$(QUADRIGA_VERSION).zip quadriga_lib-$(QUADRIGA_VERSION)/ )
+	- rm -rf release/quadriga_lib-$(QUADRIGA_VERSION)
 
 deb:
 	mkdir -p release
@@ -201,13 +191,16 @@ pip:
 	python3 -m pytest tests/python_tests -x -s
 	pip uninstall -y quadriga-lib
 
-	cibuildwheel --platform linux
+	cibuildwheel --platform linux 2>&1 | tee build_pip_x86.log
 	@echo "Wheels for x86_64 created in wheelhouse/"
 
 	CIBW_ARCHS="aarch64" \
 		CIBW_BUILD="cp39-manylinux_aarch64 cp310-manylinux_aarch64 cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64" \
 		CIBW_ENVIRONMENT='CMAKE_GENERATOR="Unix Makefiles" CMAKE_BUILD_PARALLEL_LEVEL="32"' \
-		cibuildwheel --platform linux
+		cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64.log
 	@echo "Wheels for aarch64 created in wheelhouse/"
 
-
+# --- Release build ---
+# Requires conda env "quadriga-pip": 
+# 	conda activate quadriga-pip
+release: clean documentation package deb pip

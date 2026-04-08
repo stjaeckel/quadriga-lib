@@ -44,18 +44,10 @@
 // ts = te;
 // std::cout << "A = " << 1.0e-9 * double(dur) << std::endl;
 
-// Returns the arrayant_lib version number as a string
-#define AUX(x) #x
-#define STRINGIFY(x) AUX(x)
+// Returns the quadriga-lib version number as a string
 std::string quadriga_lib::quadriga_lib_version()
 {
-    std::string str = STRINGIFY(QUADRIGA_LIB_VERSION);
-    std::size_t found = str.find_first_of("_");
-    str.replace(found, 1, ".");
-    found = str.find_first_of("_");
-    str.replace(found, 1, ".");
-    str = str.substr(1, str.length());
-    return str;
+    return QUADRIGA_LIB_VERSION_STR;
 }
 
 std::string quadriga_lib::quadriga_lib_armadillo_version()

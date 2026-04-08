@@ -22,8 +22,7 @@ if [ ! -f "$HEADER" ]; then
     exit 1
 fi
 
-RAW=$(grep '#define QUADRIGA_LIB_VERSION' "$HEADER" \
-      | sed 's/.*VERSION v//; s/_/./g; s/[[:space:]]*$//')
+RAW=$(grep '#define QUADRIGA_LIB_VERSION_STR' "$HEADER" | sed 's/.*VERSION_STR "//; s/".*//')
 
 if [ -z "$RAW" ]; then
     echo "Error: could not parse QUADRIGA_LIB_VERSION from $HEADER" >&2

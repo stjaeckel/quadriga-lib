@@ -38,7 +38,6 @@ override_dh_auto_configure:
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
 		-DENABLE_TESTS=ON \
-		-DENABLE_BIN=ON \
 		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
 
@@ -57,7 +56,6 @@ override_dh_auto_configure:
 		-DENABLE_AVX2=ON \
 		-DENABLE_CUDA=OFF \
 		-DENABLE_TESTS=OFF \
-		-DENABLE_BIN=OFF \
 		-DHDF5_STATIC=OFF \
 		-DARMA_EXT=OFF
 
@@ -77,9 +75,6 @@ override_dh_auto_build:
 override_dh_auto_install:
 	# --- Build 1: install into DESTDIR as usual ---
 	dh_auto_install --buildsystem=cmake --builddir=$(BUILDDIR)
-
-	# --- Remove the version binary (build-time tool, not an installed artifact) ---
-	rm -f $(DESTDIR)/usr/bin/version
 
 	# --- Build 2: install into staging dir, then copy only the MEX output dir ---
 	cmake --install $(BUILDDIR2) --prefix $(STAGEDIR2)/usr

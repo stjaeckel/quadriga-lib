@@ -37,7 +37,6 @@ cmake.args = [
     "-DENABLE_AVX2=ON",
     "-DENABLE_CUDA=OFF",
     "-DENABLE_TESTS=OFF",
-    "-DENABLE_BIN=OFF",
 ]
 sdist.exclude = ["tools/**","lib/**","references/**","md/**","debian/**","api_mex/**",
     "tests/mex_tests/**","tests/catch2_tests/**","tests/benchmarks/**","tests/afl/**","tests/*.m*","tests/*.cpp*",
