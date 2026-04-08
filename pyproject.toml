@@ -1,0 +1,55 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "quadriga-lib"
+dependencies = ["numpy"]
+dynamic = ["version"]
+description = "C++/MEX/Python Utility library for radio channel modelling and simulations"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9"
+readme = "README_pip.md"
+authors = [{name = "Stephan Jaeckel"}]
+urls.Homepage = "https://quadriga-lib.org"
+urls.Repository = "https://github.com/stjaeckel/quadriga-lib"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: C++",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+cmake.args = [
+    "-DARMA_EXT=ON",
+    "-DENABLE_MATLAB=OFF",
+    "-DENABLE_OCTAVE=OFF",
+    "-DENABLE_MEX_DOC=OFF",
+    "-DENABLE_PYTHON=ON",
+    "-DENABLE_STATIC_LIB=ON",
+    "-DENABLE_SHARED_LIB=OFF",
+    "-DENABLE_AVX2=ON",
+    "-DENABLE_CUDA=OFF",
+    "-DENABLE_TESTS=OFF",
+    "-DENABLE_BIN=OFF",
+]
+sdist.exclude = ["tools/**","lib/**","references/**","md/**","debian/**","api_mex/**",
+    "tests/mex_tests/**","tests/catch2_tests/**","tests/benchmarks/**","tests/afl/**","tests/*.m*","tests/*.cpp*",
+    "external/MOxUnit.zip", "external/matlab_mex.zip",  "external/Catch2-3.8.1.zip",
+    "Makefile", "GNUmakefile","Dockerfile.ubuntu",".gitignore","README.md"]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "include/quadriga_lib.hpp"
+regex = '#define QUADRIGA_LIB_VERSION_STR "(?P<value>[^"]+)"'
+
+[tool.cibuildwheel]
+build = "cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64"
+test-requires = ["pytest", "numpy"]
+test-command = "python -m pytest {project}/tests/python_tests -x -s"

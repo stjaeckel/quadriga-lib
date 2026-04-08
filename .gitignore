@@ -1,5 +1,7 @@
 build/*
 build_*/*
+build.log
+build*.log
 lib/*
 .vscode/*
 +quadriga_lib/
@@ -10,6 +12,8 @@ external/Catch2-*/
 external/hdf5-*/
 external/pybind11-*/
 release/
+dist/
+wheelhouse/
 tests/test*
 tests/afl/afl_out/*
 tests/afl/bin/*
@@ -17,4 +21,3 @@ tests/python_tests/__pycache__/
 tools/extract_html_mex_api.py
 deploy.py
 include/quadriga_lib_config.hpp
-build.log

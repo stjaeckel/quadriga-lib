@@ -127,6 +127,8 @@ clean:
 	- rm *.hdf5
 	- rm -rf external/MOxUnit-master
 	- rm include/quadriga_lib_config.hpp
+	- rm -rf dist wheelhouse *.egg-info
+	- rm build*.log	
 
 tidy:   clean
 	- rm -rf build*
@@ -177,5 +179,35 @@ deb:
 # 	docker build --build-arg UBUNTU_VERSION=26.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-resolute . 2>&1 | tee build_resolute.log
 # 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-resolute
 # 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+
+
+# --- pip / PyPI packaging ---
+# Requires conda env "quadriga-pip": 
+#   sudo apt install qemu-user-static binfmt-support
+#   conda create --name quadriga-pip -c conda-forge python=3.13 numpy cmake compilers make pytest
+#   conda activate quadriga-pip
+#   pip install scikit-build-core build twine cibuildwheel
+#
+# Publishing:
+#   twine upload --repository testpypi dist/*.tar.gz wheelhouse/*.whl
+#   twine upload dist/*.tar.gz wheelhouse/*.whl
+pip:
+	python3 -m build --sdist
+	@echo "sdist created in dist/"
+
+	@echo "Testing sdist install..."
+	pip install dist/quadriga_lib-*.tar.gz
+	python3 -c "import quadriga_lib; print(quadriga_lib.components())"
+	python3 -m pytest tests/python_tests -x -s
+	pip uninstall -y quadriga-lib
+
+	cibuildwheel --platform linux
+	@echo "Wheels for x86_64 created in wheelhouse/"
+
+	CIBW_ARCHS="aarch64" \
+		CIBW_BUILD="cp39-manylinux_aarch64 cp310-manylinux_aarch64 cp311-manylinux_aarch64 cp312-manylinux_aarch64 cp313-manylinux_aarch64" \
+		CIBW_ENVIRONMENT='CMAKE_GENERATOR="Unix Makefiles" CMAKE_BUILD_PARALLEL_LEVEL="32"' \
+		cibuildwheel --platform linux
+	@echo "Wheels for aarch64 created in wheelhouse/"
 
 

@@ -156,11 +156,6 @@ if(MSVC) # Platform Overwrites for MSVC / Windows
         message(WARNING "Octave not supported on Windows")
         set(BUILD_OCTAVE OFF)
     endif()
-    if(BUILD_PYTHON)
-        message(WARNING "Python not supported on Windows")
-        set(BUILD_PYTHON OFF)
-        set(BUILD_MEX_DOC OFF)
-    endif()
     if(BUILD_SHARED_LIB)
         message(WARNING "Shared library not supported on Windows")
         set(BUILD_SHARED_LIB OFF)
@@ -172,7 +167,7 @@ if(MSVC) # Platform Overwrites for MSVC / Windows
 endif()
 
 if (BUILD_PYTHON OR BUILD_MEX_DOC) # Detect python
-    find_package(Python3 COMPONENTS Interpreter Development)
+    find_package(Python3 COMPONENTS Interpreter Development.Module)
     if (NOT Python3_FOUND)
         set(BUILD_PYTHON OFF)
     endif()
@@ -229,12 +224,8 @@ else()
     set(HDF5_FOUND OFF)
 endif()
 
-# Python and Octave do not support static linking HDF5 library (version clash, undefined behavior)
-if (HDF5_PATH OR BUILD_HDF5) # Disable Python and Octave
-    if (BUILD_PYTHON)
-        message(STATUS "Python API does not support static linking HDF5 library. Python disabled!")
-        set(BUILD_PYTHON OFF)
-    endif()
+# Octave does not support static linking HDF5 library (version clash, undefined behavior)
+if (HDF5_PATH OR BUILD_HDF5)
     if (BUILD_OCTAVE)
         message(STATUS "Octave does not support static linking HDF5 library. Octave disabled!")
         set(BUILD_OCTAVE OFF)
@@ -278,7 +269,7 @@ if (BUILD_HDF5) # Compile HDF5 library
     endif()
     set(HDF5_INCLUDE_DIRS "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/include")
 
-    ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS})
+    ExternalProject_Add(hdf5_dep ${HDF5_EP_ARGS} BUILD_BYPRODUCTS ${HDF5_LIB})
 endif()
 
 if(HDF5_FOUND)
@@ -307,7 +298,7 @@ if (ENABLE_TESTS)
     endif()
     set(CATCH2_INCLUDE_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/include")
 
-    ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS})
+    ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS} BUILD_BYPRODUCTS ${CATCH2_LIB})
 endif()
 
 # Core includes needed by all library targets
@@ -343,7 +334,9 @@ if(ENABLE_AVX2 AND COMPILER_SUPPORTS_AVX2)
     endforeach()
     message(STATUS "AVX2 acceleration enabled")
 else()
+    set(BUILD_WITH_AVX2 0)
     set(SRC_AVX2 "")
+    message(STATUS "AVX2 acceleration disabled")
 endif()
 
 # For files that require CUDA, detect nvcc and add CUDA language support.
@@ -578,8 +571,7 @@ if(BUILD_MEX_DOC AND (BUILD_MATLAB OR BUILD_OCTAVE))
         set(m_file_output "${MEX_OUTPUT_DIR}/${mex_basename}.m")
         add_custom_command(
             OUTPUT ${m_file_output}
-            COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/extract_matlab_comments.py 
-                    ${mex_src} ${m_file_output}
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/extract_matlab_comments.py ${mex_src} ${m_file_output}
             COMMENT "Building MEX Documentation ${m_file_output}"
             VERBATIM
         )
@@ -595,7 +587,6 @@ if (BUILD_PYTHON)
         OUTPUT_VARIABLE PYTHON_EXTENSION_SUFFIX
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
-
     set(PYTHON_SOURCES 
         api_python/python_main.cpp
         api_python/python_arrayant.cpp
@@ -610,25 +601,21 @@ if (BUILD_PYTHON)
         ${Python3_INCLUDE_DIRS}
     )
     add_dependencies(quadriga_py pybind11_lib pugixml_lib)
-    set_target_properties(quadriga_py PROPERTIES
-        PREFIX ""
-        OUTPUT_NAME "quadriga_lib"
-        SUFFIX "${PYTHON_EXTENSION_SUFFIX}"
-        POSITION_INDEPENDENT_CODE ON
-        INSTALL_RPATH "$ORIGIN"
-        BUILD_RPATH "$ORIGIN"
-    )
+    if(BUILD_HDF5)
+        add_dependencies(quadriga_py hdf5_dep)
+    endif()
     if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
         target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES})
     else()
         target_link_libraries(quadriga_py PRIVATE ${QUADRIGA_LINK_TARGET} ${Python3_LIBRARIES} ${HDF5_LINK_LIBS} ${CUDA_LINK_LIBS})
     endif()
-    target_compile_options(quadriga_py PRIVATE -Wno-unused-function)
-
+    set_target_properties(quadriga_py PROPERTIES PREFIX "" OUTPUT_NAME "quadriga_lib" SUFFIX "${PYTHON_EXTENSION_SUFFIX}" POSITION_INDEPENDENT_CODE ON)
+    if(NOT MSVC)
+        set_target_properties(quadriga_py PROPERTIES INSTALL_RPATH "$ORIGIN" BUILD_RPATH "$ORIGIN")
+        target_compile_options(quadriga_py PRIVATE -Wno-unused-function)
+    endif()
     file(GLOB PYTHON_INCLUDED_FILES "api_python/*.hpp" "api_python/*.cpp")
-    set_source_files_properties(${PYTHON_SOURCES} PROPERTIES
-        OBJECT_DEPENDS "${PYTHON_INCLUDED_FILES}"
-    )
+    set_source_files_properties(${PYTHON_SOURCES} PROPERTIES OBJECT_DEPENDS "${PYTHON_INCLUDED_FILES}")
     message(STATUS "Building Python module: quadriga_lib${PYTHON_EXTENSION_SUFFIX}")
 endif()
 
@@ -691,7 +678,7 @@ if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     set(INSTALL_LICENSEDIR .)
     set(INSTALL_ARMADIR .)
     set(INSTALL_IS_LOCAL TRUE)
-else()
+elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     # System install: use GNUInstallDirs for Debian/FHS-standard paths
     include(GNUInstallDirs)
     message(STATUS "Installing to: ${CMAKE_INSTALL_PREFIX}")
@@ -713,14 +700,14 @@ else()
     install(FILES LICENSE DESTINATION ${INSTALL_LICENSEDIR})
 endif()
 
-if(BUILD_STATIC_LIB)
+if(BUILD_STATIC_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(TARGETS quadriga_static
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR}
             RUNTIME DESTINATION ${INSTALL_BINDIR})
 endif()
 
-if (BUILD_SHARED_LIB)
+if (BUILD_SHARED_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(TARGETS quadriga_shared
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR}
@@ -734,12 +721,19 @@ if (BUILD_SHARED_LIB)
     endif()
 endif()
 
-if(BUILD_MATLAB OR BUILD_OCTAVE)
+if((BUILD_MATLAB OR BUILD_OCTAVE) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION ${INSTALL_MEX_DIR})
 endif()
 
+if ((BUILD_HDF5 OR HDF5_PATH) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
+    install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
+endif()
+
 if (BUILD_PYTHON)
-    if(INSTALL_IS_LOCAL)
+    if(DEFINED SKBUILD_PLATLIB_DIR) # pip / scikit-build-core install
+        message(STATUS "SKBUILD_PLATLIB_DIR = '${SKBUILD_PLATLIB_DIR}'")
+        install(TARGETS quadriga_py LIBRARY DESTINATION ${SKBUILD_PLATLIB_DIR})
+    elseif(INSTALL_IS_LOCAL)
         install(TARGETS quadriga_py
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR}
@@ -766,8 +760,4 @@ if (BUILD_PYTHON)
         install(TARGETS quadriga_py
             LIBRARY DESTINATION ${PYTHON3_DIST_REL})
     endif()
-endif()
-
-if (BUILD_HDF5 OR HDF5_PATH)
-    install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
 endif()
