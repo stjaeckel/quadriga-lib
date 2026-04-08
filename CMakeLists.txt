@@ -57,7 +57,7 @@ if(MSVC)
     add_compile_options(/EHsc /Zc:__cplusplus /nologo /MP)
     set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MDd> $<$<CONFIG:Release>:/MD>")
 else()
-    add_compile_options(-O3 -fPIC -Wall -Wpedantic -Wextra)
+    add_compile_options(-O3 -fPIC -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
     set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
 endif()
 
