@@ -3,15 +3,15 @@ project(QuadrigaLib LANGUAGES C CXX)
 
 # ---------------------------------------------------------------------------
 # Version — single source of truth: include/quadriga_lib.hpp
-# Parses: #define QUADRIGA_LIB_VERSION v0_10_9  →  0.10.9
+# Parses: #define QUADRIGA_LIB_VERSION_STR "0.10.9"
 # ---------------------------------------------------------------------------
 file(STRINGS "${CMAKE_SOURCE_DIR}/include/quadriga_lib.hpp" _ver_line
-     REGEX "#define QUADRIGA_LIB_VERSION")
-string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+     REGEX "#define QUADRIGA_LIB_VERSION_STR")
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION_STR \"([0-9]+)\\.([0-9]+)\\.([0-9]+)\".*"
        "\\1" QUADRIGA_VERSION_MAJOR "${_ver_line}")
-string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION_STR \"([0-9]+)\\.([0-9]+)\\.([0-9]+)\".*"
        "\\2" QUADRIGA_VERSION_MINOR "${_ver_line}")
-string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION v([0-9]+)_([0-9]+)_([0-9]+).*"
+string(REGEX REPLACE ".*QUADRIGA_LIB_VERSION_STR \"([0-9]+)\\.([0-9]+)\\.([0-9]+)\".*"
        "\\3" QUADRIGA_VERSION_PATCH "${_ver_line}")
 set(QUADRIGA_VERSION
     "${QUADRIGA_VERSION_MAJOR}.${QUADRIGA_VERSION_MINOR}.${QUADRIGA_VERSION_PATCH}")
@@ -28,7 +28,6 @@ option(ENABLE_SHARED_LIB "Build the shared library (Linux only)" OFF)
 option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
-option(ENABLE_BIN "Build supporting binary files" OFF)
 
 # Path to the HDF5 library for static linking (include files and .a/.lib file)
 # If left empty, HDF location is detected automatically, if not found, HDF5 is built from sources
@@ -648,30 +647,12 @@ if (ENABLE_TESTS)
     endif()
 endif()
 
-# --- Binaries ---
-if (ENABLE_BIN)
-    file(GLOB SRC_BIN "${CMAKE_SOURCE_DIR}/src/bin/*.cpp")
-    foreach(source IN LISTS SRC_BIN)
-        get_filename_component(exeName ${source} NAME_WE)
-
-        add_executable(${exeName} ${source})
-        add_dependencies(${exeName} ${QUADRIGA_LINK_TARGET})
-        target_include_directories(${exeName} PRIVATE ${QUADRIGA_CORE_INCLUDES})
-        
-        target_link_libraries(${exeName} PRIVATE ${QUADRIGA_LINK_TARGET})
-        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_static")
-            target_link_libraries(${exeName} PRIVATE ${HDF5_LINK_LIBS})
-        endif()
-    endforeach()
-endif()
-
 # --- Install options ---
 if(CMAKE_INSTALL_PREFIX STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     # Default: install to source directory (local / development layout)
     message(STATUS "Using source dir as install dir")
 
     set(INSTALL_LIBDIR lib)
-    set(INSTALL_BINDIR bin)
     set(INSTALL_INCLUDEDIR include)
     set(INSTALL_MEX_DIR .)
     set(INSTALL_DOCDIR html_docu)
@@ -684,7 +665,6 @@ elseif(NOT DEFINED SKBUILD_PLATLIB_DIR)
     message(STATUS "Installing to: ${CMAKE_INSTALL_PREFIX}")
 
     set(INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
-    set(INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
     set(INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
     set(INSTALL_MEX_DIR share/quadriga-lib)
     set(INSTALL_DOCDIR share/doc/quadriga-lib/html)
@@ -703,15 +683,13 @@ endif()
 if(BUILD_STATIC_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(TARGETS quadriga_static
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
-            LIBRARY DESTINATION ${INSTALL_LIBDIR}
-            RUNTIME DESTINATION ${INSTALL_BINDIR})
+            LIBRARY DESTINATION ${INSTALL_LIBDIR})
 endif()
 
 if (BUILD_SHARED_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(TARGETS quadriga_shared
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
-            LIBRARY DESTINATION ${INSTALL_LIBDIR}
-            RUNTIME DESTINATION ${INSTALL_BINDIR})
+            LIBRARY DESTINATION ${INSTALL_LIBDIR})
     # For local installs, copy shared lib into MEX directory so Octave find it
     if(INSTALL_IS_LOCAL)
         install(FILES
@@ -736,8 +714,7 @@ if (BUILD_PYTHON)
     elseif(INSTALL_IS_LOCAL)
         install(TARGETS quadriga_py
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
-            LIBRARY DESTINATION ${INSTALL_LIBDIR}
-            RUNTIME DESTINATION ${INSTALL_BINDIR})
+            LIBRARY DESTINATION ${INSTALL_LIBDIR})
     else()
         # Install to Python dist-packages for system installs
         execute_process(
