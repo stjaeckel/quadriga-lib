@@ -1,0 +1,1 @@
+# This file is not imported — it's only used by scikit-build-core for version extraction
