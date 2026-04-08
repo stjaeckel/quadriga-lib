@@ -119,6 +119,11 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
                                           const arma::u32_vec *sub_mesh_index, bool transpose_inputs,
                                           int use_kernel, int gpu_id)
 {
+    // Suppress unused-parameter warning when CUDA support is disabled at compile time
+#if !BUILD_WITH_CUDA
+    (void)gpu_id;
+#endif
+
     // Input validation
     if (orig == nullptr)
         throw std::invalid_argument("Input 'orig' cannot be NULL.");

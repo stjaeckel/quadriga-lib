@@ -149,6 +149,11 @@ void quadriga_lib::get_channels_spherical(const quadriga_lib::arrayant<dtype> *t
                                           arma::Cube<dtype> *aod, arma::Cube<dtype> *eod, arma::Cube<dtype> *aoa, arma::Cube<dtype> *eoa,
                                           bool use_avx2)
 {
+    // Suppress unused-parameter warning when AVX2 support is disabled at compile time
+#if !BUILD_WITH_AVX2
+    (void)use_avx2;
+#endif
+
     // Constants
     constexpr dtype los_limit = (dtype)1.0e-4;
     constexpr dtype zero = (dtype)0.0;

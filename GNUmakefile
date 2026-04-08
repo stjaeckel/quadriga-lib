@@ -38,7 +38,7 @@ all:
 		-D ENABLE_CUDA=$(cuda) \
 		-D ENABLE_STATIC_LIB=$(static_lib) \
 		-D ENABLE_SHARED_LIB=$(shared_lib)
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
+	cmake --build $(CMAKE_BUILD_DIR) --parallel -- --no-print-directory
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python:
@@ -54,7 +54,7 @@ python:
 		-D ENABLE_CUDA=OFF \
 		-D ENABLE_STATIC_LIB=ON \
 		-D ENABLE_SHARED_LIB=OFF
-	cmake --build $(CMAKE_BUILD_DIR) --parallel
+	cmake --build $(CMAKE_BUILD_DIR) --parallel -- --no-print-directory
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python_install: python

@@ -122,6 +122,11 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
                                                              arma::u32_vec *hit_count,
                                                              int use_kernel, int gpu_id)
 {
+    // Suppress unused-parameter warning when CUDA support is disabled at compile time
+#if !BUILD_WITH_CUDA
+    (void)gpu_id;
+#endif
+
     // Input validation
     if (points == nullptr || points->n_elem == 0)
         throw std::invalid_argument("Input 'points' cannot be NULL.");
