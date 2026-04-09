@@ -518,7 +518,7 @@ if(BUILD_MATLAB)
         endif()
 
         add_custom_target(mex_${mex_basename} ALL DEPENDS ${mex_output})
-        add_dependencies(mex_${mex_basename} matlab_mex_unzip)
+        list(APPEND mex_deps ${MATLAB_MEX_DIR}/.stamp)
         list(APPEND MEX_MATLAB_TARGETS mex_${mex_basename})
     endforeach()
 
@@ -719,12 +719,12 @@ if (BUILD_SHARED_LIB AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     endif()
 endif()
 
-if((BUILD_MATLAB OR BUILD_OCTAVE) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
-    install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION ${INSTALL_MEX_DIR})
-endif()
-
 if ((BUILD_HDF5 OR _HDF5_PATH) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
+endif()
+
+if((BUILD_MATLAB OR BUILD_OCTAVE) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
+    install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION ${INSTALL_MEX_DIR})
 endif()
 
 if (BUILD_PYTHON)
