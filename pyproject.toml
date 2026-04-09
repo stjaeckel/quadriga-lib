@@ -38,10 +38,6 @@ cmake.args = [
     "-DENABLE_CUDA=OFF",
     "-DENABLE_TESTS=OFF",
 ]
-sdist.exclude = ["tools/**","lib/**","references/**","md/**","debian/**","api_mex/**",
-    "tests/mex_tests/**","tests/catch2_tests/**","tests/benchmarks/**","tests/afl/**","tests/*.m*","tests/*.cpp*",
-    "external/MOxUnit.zip", "external/matlab_mex.zip",  "external/Catch2-3.8.1.zip",
-    "Makefile", "GNUmakefile","Dockerfile.ubuntu",".gitignore","README.md"]
 
 [tool.scikit-build.metadata.version]
 provider = "scikit_build_core.metadata.regex"
