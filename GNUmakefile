@@ -65,9 +65,6 @@ python_install: python
 	@echo "Installing $(notdir $(PYTHON_SHARED_OBJ)) into $(PYTHON_SITE_PACKAGES)"
 	cp  $(PYTHON_SHARED_OBJ)  $(PYTHON_SITE_PACKAGES)/
 
-python_test: 
-	python3 -m pytest tests/python_tests -x -s
-
 # Tests
 test:   moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
@@ -81,6 +78,9 @@ endif
 ifneq ($(PYTHON_SHARED_OBJ),)
 	python3 -m pytest tests/python_tests -x -s
 endif
+
+python_test: 
+	python3 -m pytest tests/python_tests -x -s
 
 # Documentation
 documentation:
@@ -100,36 +100,12 @@ moxunit-lib:
 	- rm -rf external/MOxUnit-master
 	unzip external/MOxUnit.zip -d external/
 
-clean:
-	- rm -rf external/build
-	- rm -rf +quadriga_lib
-	- rm -rf release
-	- rm -rf lib
-	- rm *.obj
-	- rm tests/test_bin
-	- rm tests/test_cmake
-	- rm tests/test_static_bin
-	- rm tests/test.exe
-	- rm -rf $(CMAKE_BUILD_DIR)
-	- rm -rf tests/python_tests/__pycache__
-	- rm -rf .pytest_cache
-	- rm -rf tests/.pytest_cache
-	- rm *.hdf5
-	- rm -rf external/MOxUnit-master
-	- rm include/quadriga_lib_config.hpp
-	- rm -rf dist wheelhouse *.egg-info
-	- rm build*.log	
-
-tidy:   clean
-	- rm -rf build*
-
 package:
 	mkdir -p release
 	git archive --format=zip --prefix=quadriga_lib-$(QUADRIGA_VERSION)/ -o release/quadriga_lib-$(QUADRIGA_VERSION).zip HEAD
 
-# --------------------------------------------------------------------------
-# Fine-grained pip/deb sub-targets
-# --------------------------------------------------------------------------
+# pip/deb targets:
+#
 # PyPI packaging requires conda env "quadriga-pip": 
 #   sudo apt install qemu-user-static binfmt-support
 #   conda create --name quadriga-pip -c conda-forge python=3.13 numpy cmake compilers make pytest
@@ -197,12 +173,33 @@ deb-plucky:
 
 deb: deb-jammy deb-noble deb-plucky
 
-# --------------------------------------------------------------------------
-# Release build  —  documentation is the only strict sequencing point
-# --------------------------------------------------------------------------
+# Release
 release: clean
 	$(MAKE) documentation
 	$(MAKE) -j package \
 	         deb-jammy deb-noble deb-plucky \
 	         pip-sdist pip-x86 \
 	         pip-aarch64-cp39 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313
+
+clean:
+	- rm -rf external/build
+	- rm -rf +quadriga_lib
+	- rm -rf release
+	- rm -rf lib
+	- rm *.obj
+	- rm tests/test_bin
+	- rm tests/test_cmake
+	- rm tests/test_static_bin
+	- rm tests/test.exe
+	- rm -rf $(CMAKE_BUILD_DIR)
+	- rm -rf tests/python_tests/__pycache__
+	- rm -rf .pytest_cache
+	- rm -rf tests/.pytest_cache
+	- rm *.hdf5
+	- rm -rf external/MOxUnit-master
+	- rm include/quadriga_lib_config.hpp
+	- rm -rf dist wheelhouse *.egg-info
+	- rm build*.log	
+
+tidy:   clean
+	- rm -rf build*
