@@ -41,8 +41,8 @@ auto pyarray = qd_python_copy2numpy(Cube, i_slice);                 // Copy cube
 auto pyarray = qd_python_copy2numpy(MatRe, MatIm, i_col);           // Copy Re/Im matrices to complex
 auto pyarray = qd_python_copy2numpy(CubeRe, CubeIm, i_slice);       // Copy Re/Im cubes to complex
 
-auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Col);        // Cast column vector from u32 to int
-auto pyarray = qd_python_copy2numpy<unsigned, ssize_t>(Mat);        // Cast matrix from u32 to int
+auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(Col);    // Cast column vector from u32 to int
+auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(Mat);    // Cast matrix from u32 to int
 
 auto pyarray = qd_python_copy2numpy_4d(vecCubes);                   // Stack vector of Cubes into 4D Numpy array
 
@@ -113,10 +113,10 @@ static py::array_t<dtype> qd_python_copy2numpy(const arma::Col<dtype> &input,  /
                                                bool transpose = false,         // Transpose output
                                                const arma::uvec &indices = {}) // Optional indices to copy
 {
-    const ssize_t n_bytes = sizeof(dtype);
-    const ssize_t n_elements = indices.empty() ? (ssize_t)input.n_elem : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(dtype);
+    const py::ssize_t n_elements = indices.empty() ? (py::ssize_t)input.n_elem : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape, strides;
+    std::vector<py::ssize_t> shape, strides;
     if (transpose)
         shape = {1, n_elements}, strides = {n_elements * n_bytes, n_bytes};
     else
@@ -129,7 +129,7 @@ static py::array_t<dtype> qd_python_copy2numpy(const arma::Col<dtype> &input,  /
     if (indices.empty())
         std::memcpy(output.mutable_data(), input.memptr(), n_elements * n_bytes);
     else
-        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+        for (py::ssize_t i_el = 0; i_el < n_elements; ++i_el)
         {
             if (indices[i_el] >= input.n_elem)
                 throw std::out_of_range("Index out of bound.");
@@ -144,10 +144,10 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtype_arma>
                                                      bool transpose = false,             // Transpose output
                                                      const arma::uvec &indices = {})     // Optional indices to copy
 {
-    const ssize_t n_bytes = sizeof(dtype_numpy);
-    const ssize_t n_elements = indices.empty() ? (ssize_t)input.n_elem : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(dtype_numpy);
+    const py::ssize_t n_elements = indices.empty() ? (py::ssize_t)input.n_elem : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape, strides;
+    std::vector<py::ssize_t> shape, strides;
     if (transpose)
         shape = {1, n_elements}, strides = {n_elements * n_bytes, n_bytes};
     else
@@ -158,10 +158,10 @@ static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Col<dtype_arma>
     const dtype_arma *p_in = input.memptr();
 
     if (indices.empty())
-        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+        for (py::ssize_t i_el = 0; i_el < n_elements; ++i_el)
             p_out[i_el] = (dtype_numpy)p_in[i_el];
     else
-        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+        for (py::ssize_t i_el = 0; i_el < n_elements; ++i_el)
         {
             if (indices[i_el] >= input.n_elem)
                 throw std::out_of_range("Index out of bound.");
@@ -175,18 +175,18 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_copy2numpy(const arma::Mat<dtype> &input,  // Matrix
                                                const arma::uvec &indices = {}) // Optional columns to copy
 {
-    const ssize_t n_bytes = sizeof(dtype);
-    const ssize_t n_rows = (ssize_t)input.n_rows;
-    const ssize_t n_cols = indices.empty() ? (ssize_t)input.n_cols : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(dtype);
+    const py::ssize_t n_rows = (py::ssize_t)input.n_rows;
+    const py::ssize_t n_cols = indices.empty() ? (py::ssize_t)input.n_cols : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
+    std::vector<py::ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
     py::array_t<dtype> output(shape, strides);
     dtype *p_out = output.mutable_data();
 
     if (indices.empty())
         std::memcpy(p_out, input.memptr(), n_rows * n_cols * n_bytes);
     else
-        for (ssize_t i_col = 0; i_col < n_cols; ++i_col)
+        for (py::ssize_t i_col = 0; i_col < n_cols; ++i_col)
         {
             if (indices[i_col] >= input.n_cols)
                 throw std::out_of_range("Index out of bound.");
@@ -200,25 +200,25 @@ template <typename dtype_arma, typename dtype_numpy>
 static py::array_t<dtype_numpy> qd_python_copy2numpy(const arma::Mat<dtype_arma> &input, // Matrix
                                                      const arma::uvec &indices = {})     // Optional columns to copy
 {
-    const ssize_t n_bytes = sizeof(dtype_numpy);
-    const ssize_t n_rows = (ssize_t)input.n_rows;
-    const ssize_t n_cols = indices.empty() ? (ssize_t)input.n_cols : (ssize_t)indices.n_elem;
-    const ssize_t n_elements = n_rows * n_cols;
+    const py::ssize_t n_bytes = sizeof(dtype_numpy);
+    const py::ssize_t n_rows = (py::ssize_t)input.n_rows;
+    const py::ssize_t n_cols = indices.empty() ? (py::ssize_t)input.n_cols : (py::ssize_t)indices.n_elem;
+    const py::ssize_t n_elements = n_rows * n_cols;
 
-    std::vector<ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
+    std::vector<py::ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
     py::array_t<dtype_numpy> output(shape, strides);
     dtype_numpy *p_out = output.mutable_data();
     const dtype_arma *p_in = input.memptr();
 
     if (indices.empty())
-        for (ssize_t i_el = 0; i_el < n_elements; ++i_el)
+        for (py::ssize_t i_el = 0; i_el < n_elements; ++i_el)
             p_out[i_el] = (dtype_numpy)p_in[i_el];
     else
-        for (ssize_t i_col = 0; i_col < n_cols; ++i_col)
+        for (py::ssize_t i_col = 0; i_col < n_cols; ++i_col)
         {
             if (indices[i_col] >= input.n_cols)
                 throw std::out_of_range("Index out of bound.");
-            for (ssize_t i_row = 0; i_row < n_rows; ++i_row)
+            for (py::ssize_t i_row = 0; i_row < n_rows; ++i_row)
                 p_out[i_col * n_rows + i_row] = (dtype_numpy)p_in[indices[i_col] * n_rows + i_row];
         }
 
@@ -233,23 +233,23 @@ static py::array_t<std::complex<dtype>> qd_python_copy2numpy(const arma::Mat<dty
     if (imag.n_rows != real.n_rows || imag.n_cols != real.n_cols)
         throw std::invalid_argument("Sizes of real and imaginary parts dont match.");
 
-    const ssize_t n_bytes = sizeof(std::complex<dtype>);
-    const ssize_t n_rows = (ssize_t)real.n_rows;
-    const ssize_t n_cols = indices.empty() ? (ssize_t)real.n_cols : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(std::complex<dtype>);
+    const py::ssize_t n_rows = (py::ssize_t)real.n_rows;
+    const py::ssize_t n_cols = indices.empty() ? (py::ssize_t)real.n_cols : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
+    std::vector<py::ssize_t> shape = {n_rows, n_cols}, strides = {n_bytes, n_rows * n_bytes};
     py::array_t<std::complex<dtype>> output(shape, strides);
     std::complex<dtype> *p_out = output.mutable_data();
 
     if (indices.empty())
     {
         const dtype *p_real = real.memptr(), *p_imag = imag.memptr();
-        for (ssize_t i = 0; i < n_rows * n_cols; ++i)
+        for (py::ssize_t i = 0; i < n_rows * n_cols; ++i)
             p_out[i] = {p_real[i], p_imag[i]};
     }
     else
 
-        for (ssize_t i_col = 0; i_col < n_cols; ++i_col)
+        for (py::ssize_t i_col = 0; i_col < n_cols; ++i_col)
         {
             if (indices[i_col] >= real.n_cols)
                 throw std::out_of_range("Index out of bound.");
@@ -257,7 +257,7 @@ static py::array_t<std::complex<dtype>> qd_python_copy2numpy(const arma::Mat<dty
             std::complex<dtype> *p_col = &p_out[i_col * n_rows];
             const dtype *p_real = real.colptr(indices[i_col]), *p_imag = imag.colptr(indices[i_col]);
 
-            for (ssize_t i_row = 0; i_row < n_rows; ++i_row)
+            for (py::ssize_t i_row = 0; i_row < n_rows; ++i_row)
                 p_col[i_row] = {p_real[i_row], p_imag[i_row]};
         }
 
@@ -268,19 +268,19 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_copy2numpy(const arma::Cube<dtype> &input, // Cube
                                                const arma::uvec &indices = {}) // Optional slices to copy
 {
-    const ssize_t n_bytes = sizeof(dtype);
-    const ssize_t n_rows = (ssize_t)input.n_rows;
-    const ssize_t n_cols = (ssize_t)input.n_cols;
-    const ssize_t n_slices = indices.empty() ? (ssize_t)input.n_slices : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(dtype);
+    const py::ssize_t n_rows = (py::ssize_t)input.n_rows;
+    const py::ssize_t n_cols = (py::ssize_t)input.n_cols;
+    const py::ssize_t n_slices = indices.empty() ? (py::ssize_t)input.n_slices : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape = {n_rows, n_cols, n_slices}, strides = {n_bytes, n_rows * n_bytes, n_rows * n_cols * n_bytes};
+    std::vector<py::ssize_t> shape = {n_rows, n_cols, n_slices}, strides = {n_bytes, n_rows * n_bytes, n_rows * n_cols * n_bytes};
     py::array_t<dtype> output(shape, strides);
     dtype *p_out = output.mutable_data();
 
     if (indices.empty())
         std::memcpy(p_out, input.memptr(), n_rows * n_cols * n_slices * n_bytes);
     else
-        for (ssize_t i = 0; i < n_slices; ++i)
+        for (py::ssize_t i = 0; i < n_slices; ++i)
         {
             if (indices[i] >= input.n_slices)
                 throw std::out_of_range("Index out of bound.");
@@ -298,23 +298,23 @@ static py::array_t<std::complex<dtype>> qd_python_copy2numpy(const arma::Cube<dt
     if (imag.n_rows != real.n_rows || imag.n_cols != real.n_cols || imag.n_slices != real.n_slices)
         throw std::invalid_argument("Sizes of real and imaginary parts dont match.");
 
-    const ssize_t n_bytes = sizeof(std::complex<dtype>);
-    const ssize_t n_rows = (ssize_t)real.n_rows;
-    const ssize_t n_cols = (ssize_t)real.n_cols;
-    const ssize_t n_slices = indices.empty() ? (ssize_t)real.n_slices : (ssize_t)indices.n_elem;
+    const py::ssize_t n_bytes = sizeof(std::complex<dtype>);
+    const py::ssize_t n_rows = (py::ssize_t)real.n_rows;
+    const py::ssize_t n_cols = (py::ssize_t)real.n_cols;
+    const py::ssize_t n_slices = indices.empty() ? (py::ssize_t)real.n_slices : (py::ssize_t)indices.n_elem;
 
-    std::vector<ssize_t> shape = {n_rows, n_cols, n_slices}, strides = {n_bytes, n_rows * n_bytes, n_rows * n_cols * n_bytes};
+    std::vector<py::ssize_t> shape = {n_rows, n_cols, n_slices}, strides = {n_bytes, n_rows * n_bytes, n_rows * n_cols * n_bytes};
     py::array_t<std::complex<dtype>> output(shape, strides);
     std::complex<dtype> *p_out = output.mutable_data();
 
     if (indices.empty())
     {
         const dtype *p_real = real.memptr(), *p_imag = imag.memptr();
-        for (ssize_t i = 0; i < n_rows * n_cols * n_slices; ++i)
+        for (py::ssize_t i = 0; i < n_rows * n_cols * n_slices; ++i)
             p_out[i] = {p_real[i], p_imag[i]};
     }
     else
-        for (ssize_t i_slice = 0; i_slice < n_slices; ++i_slice)
+        for (py::ssize_t i_slice = 0; i_slice < n_slices; ++i_slice)
         {
             if (indices[i_slice] >= real.n_slices)
                 throw std::out_of_range("Index out of bound.");
@@ -322,7 +322,7 @@ static py::array_t<std::complex<dtype>> qd_python_copy2numpy(const arma::Cube<dt
             std::complex<dtype> *p_slice = &p_out[i_slice * n_rows * n_cols];
             const dtype *p_real = real.slice_memptr(indices[i_slice]), *p_imag = imag.slice_memptr(indices[i_slice]);
 
-            for (ssize_t i_mat = 0; i_mat < n_rows * n_cols; ++i_mat)
+            for (py::ssize_t i_mat = 0; i_mat < n_rows * n_cols; ++i_mat)
                 p_slice[i_mat] = {p_real[i_mat], p_imag[i_mat]};
         }
 
@@ -336,19 +336,19 @@ static py::array_t<dtype> qd_python_copy2numpy_4d(const std::vector<arma::Cube<d
     if (input.empty())
         return py::array_t<dtype>();
 
-    const ssize_t n_bytes = sizeof(dtype);
-    const ssize_t n_rows = (ssize_t)input[0].n_rows;
-    const ssize_t n_cols = (ssize_t)input[0].n_cols;
-    const ssize_t n_slices = (ssize_t)input[0].n_slices;
-    const ssize_t n_frames = (ssize_t)input.size();
+    const py::ssize_t n_bytes = sizeof(dtype);
+    const py::ssize_t n_rows = (py::ssize_t)input[0].n_rows;
+    const py::ssize_t n_cols = (py::ssize_t)input[0].n_cols;
+    const py::ssize_t n_slices = (py::ssize_t)input[0].n_slices;
+    const py::ssize_t n_frames = (py::ssize_t)input.size();
     const size_t frame_size = (size_t)n_rows * (size_t)n_cols * (size_t)n_slices;
 
-    std::array<ssize_t, 4> shape = {n_rows, n_cols, n_slices, n_frames};
-    std::array<ssize_t, 4> strides = {n_bytes, n_rows * n_bytes, ssize_t(n_rows * n_cols) * n_bytes, ssize_t(frame_size) * n_bytes};
+    std::array<py::ssize_t, 4> shape = {n_rows, n_cols, n_slices, n_frames};
+    std::array<py::ssize_t, 4> strides = {n_bytes, n_rows * n_bytes, py::ssize_t(n_rows * n_cols) * n_bytes, py::ssize_t(frame_size) * n_bytes};
     py::array_t<dtype> output(shape, strides);
     dtype *p_out = output.mutable_data();
 
-    for (ssize_t f = 0; f < n_frames; ++f)
+    for (py::ssize_t f = 0; f < n_frames; ++f)
         std::memcpy(p_out + f * frame_size, input[f].memptr(), frame_size * n_bytes);
 
     return output;
@@ -417,10 +417,10 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_elem,
                                                 arma::Col<dtype> *wrapper = nullptr)
 {
-    const ssize_t n_bytes = (ssize_t)sizeof(dtype);
+    const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
-    std::array<ssize_t, 1> shape = {(ssize_t)n_elem};
-    std::array<ssize_t, 1> strides = {n_bytes};
+    std::array<py::ssize_t, 1> shape = {(py::ssize_t)n_elem};
+    std::array<py::ssize_t, 1> strides = {n_bytes};
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
@@ -436,10 +436,10 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols,
                                                 arma::Mat<dtype> *wrapper = nullptr)
 {
-    const ssize_t n_bytes = (ssize_t)sizeof(dtype);
+    const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
-    std::array<ssize_t, 2> shape = {(ssize_t)n_rows, (ssize_t)n_cols};
-    std::array<ssize_t, 2> strides = {n_bytes, (ssize_t)n_rows * n_bytes};
+    std::array<py::ssize_t, 2> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols};
+    std::array<py::ssize_t, 2> strides = {n_bytes, (py::ssize_t)n_rows * n_bytes};
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
@@ -455,10 +455,10 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices,
                                                 arma::Cube<dtype> *wrapper = nullptr)
 {
-    const ssize_t n_bytes = (ssize_t)sizeof(dtype);
+    const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
-    std::array<ssize_t, 3> shape = {(ssize_t)n_rows, (ssize_t)n_cols, (ssize_t)n_slices};
-    std::array<ssize_t, 3> strides = {n_bytes, (ssize_t)n_rows * n_bytes, ssize_t(n_rows * n_cols) * n_bytes};
+    std::array<py::ssize_t, 3> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols, (py::ssize_t)n_slices};
+    std::array<py::ssize_t, 3> strides = {n_bytes, (py::ssize_t)n_rows * n_bytes, py::ssize_t(n_rows * n_cols) * n_bytes};
     py::array_t<dtype> output(shape, strides);
 
     if (wrapper != nullptr)
@@ -474,10 +474,10 @@ template <typename dtype>
 static py::array_t<dtype> qd_python_init_output(arma::uword n_rows, arma::uword n_cols, arma::uword n_slices, arma::uword n_frames,
                                                 std::vector<arma::Cube<dtype>> *cubes = nullptr)
 {
-    const ssize_t n_bytes = (ssize_t)sizeof(dtype);
+    const py::ssize_t n_bytes = (py::ssize_t)sizeof(dtype);
 
-    std::array<ssize_t, 4> shape = {(ssize_t)n_rows, (ssize_t)n_cols, (ssize_t)n_slices, (ssize_t)n_frames};
-    std::array<ssize_t, 4> strides = {n_bytes, (ssize_t)n_rows * n_bytes, ssize_t(n_rows * n_cols) * n_bytes, ssize_t(n_rows * n_cols * n_slices) * n_bytes};
+    std::array<py::ssize_t, 4> shape = {(py::ssize_t)n_rows, (py::ssize_t)n_cols, (py::ssize_t)n_slices, (py::ssize_t)n_frames};
+    std::array<py::ssize_t, 4> strides = {n_bytes, (py::ssize_t)n_rows * n_bytes, py::ssize_t(n_rows * n_cols) * n_bytes, py::ssize_t(n_rows * n_cols * n_slices) * n_bytes};
     py::array_t<dtype> output(shape, strides);
 
     if (cubes != nullptr)
@@ -544,7 +544,7 @@ static std::array<size_t, 9> qd_python_get_shape(const py::array_t<dtype> &input
         return shape;
     }
 
-    if (buf.itemsize != (ssize_t)n_bytes)
+    if (buf.itemsize != (py::ssize_t)n_bytes)
         throw std::invalid_argument("Dtype size mismatch");
 
     shape[3] = (size_t)buf.strides[0] / n_bytes;

@@ -155,9 +155,6 @@ pip-x86:
 
 CIBW_AARCH64_COMMON = CIBW_ARCHS="aarch64" CIBW_ENVIRONMENT='CMAKE_GENERATOR="Unix Makefiles" CMAKE_BUILD_PARALLEL_LEVEL="32"'
 
-pip-aarch64-cp39:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp39-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp39.log
-
 pip-aarch64-cp310:
 	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp310-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp310.log
 
@@ -169,6 +166,9 @@ pip-aarch64-cp312:
 
 pip-aarch64-cp313:
 	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp313-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp313.log
+
+pip-aarch64-cp314:
+	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp314-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp314.log
 
 pip-aarch64: pip-aarch64-cp39 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313
 

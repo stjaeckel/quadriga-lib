@@ -184,9 +184,9 @@ py::tuple obj_file_read(const std::string &fn, const std::string &materials_csv)
     auto mesh_p = qd_python_copy2numpy(mesh);
     auto mtl_prop_p = qd_python_copy2numpy(mtl_prop);
     auto vert_list_p = qd_python_copy2numpy(vert_list);
-    auto face_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(face_ind);
-    auto obj_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(obj_ind);
-    auto mtl_ind_p = qd_python_copy2numpy<arma::uword, ssize_t>(mtl_ind);
+    auto face_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(face_ind);
+    auto obj_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(obj_ind);
+    auto mtl_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(mtl_ind);
     auto obj_names_p = qd_python_copy2python(obj_names);
     auto mtl_names_p = qd_python_copy2python(mtl_names);
     auto bsdf_p = qd_python_copy2numpy(bsdf);

@@ -22,7 +22,7 @@ def markdown_converter(content_md):
     return '\n'.join(content_mat)
 
 def extract_matlab_comments(mex_filename, m_filename):
-    with open(mex_filename, 'r') as file:
+    with open(mex_filename, 'r', encoding='utf-8') as file:
         content = file.read()
     
     # Find comment block
@@ -43,7 +43,7 @@ def extract_matlab_comments(mex_filename, m_filename):
 %
 %
 % quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-% Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+% Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 % All rights reserved.
 %
 % e-mail: info@quadriga-lib.org
@@ -60,7 +60,7 @@ def extract_matlab_comments(mex_filename, m_filename):
     matlab_comments = matlab_comments + disclaimer
 
     # Write to .m file
-    with open(m_filename, 'w') as file:
+    with open(m_filename, 'w', encoding='utf-8') as file:
         file.write(matlab_comments)
 
 if __name__ == "__main__":

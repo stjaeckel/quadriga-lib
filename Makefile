@@ -1,6 +1,6 @@
 # This Makefile is for Windows / MSVC environments
 
-# Set Armadillo and HDF5 sources
+# Components to build
 matlab = ON
 python = ON
 avx2 = ON
@@ -23,6 +23,8 @@ all:
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
 	cmake --install $(CMAKE_BUILD_DIR) --config Release
 
+# Requires pytest and numpy:
+#	pip install pytest numpy
 test: all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --target test_bin
@@ -30,8 +32,12 @@ test: all moxunit-lib
 !IF "$(matlab)" == "ON"
 	matlab -batch "run('tests\quadriga_lib_mex_tests.m');"
 !ENDIF
+!IF "$(python)" == "ON"
+	set PYTHONPATH=%CD%\lib
+	python -m pytest tests/python_tests -x -s
+!ENDIF
 
-# Prebuild Libraries
+# Prebuild libraries
 hdf5: $(HDF5_LIB_CHECK)
 
 $(HDF5_LIB_CHECK):

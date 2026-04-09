@@ -92,9 +92,9 @@ py::tuple point_cloud_segmentation(const py::array_t<double> &points, // Points 
                                                    target_size, vec_size, &forward_ind, &reverse_ind);
 
     auto points_out_p = qd_python_copy2numpy(points_out);
-    auto sub_cloud_ind_p = qd_python_copy2numpy<arma::u32, ssize_t>(sub_cloud_ind);
-    auto forward_ind_p = qd_python_copy2numpy<arma::u32, ssize_t>(forward_ind);
-    auto reverse_ind_p = qd_python_copy2numpy<arma::u32, ssize_t>(reverse_ind);
+    auto sub_cloud_ind_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(sub_cloud_ind);
+    auto forward_ind_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(forward_ind);
+    auto reverse_ind_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(reverse_ind);
 
     return py::make_tuple(points_out_p, sub_cloud_ind_p, forward_ind_p, reverse_ind_p);
 }

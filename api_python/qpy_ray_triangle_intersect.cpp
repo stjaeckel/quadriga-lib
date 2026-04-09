@@ -115,9 +115,9 @@ py::tuple ray_triangle_intersect(const py::array_t<double> &orig,             //
 
     auto fbs_p = qd_python_copy2numpy(fbs);
     auto sbs_p = qd_python_copy2numpy(sbs);
-    auto no_interact_p = qd_python_copy2numpy<arma::u32, ssize_t>(no_interact);
-    auto fbs_ind_p = qd_python_copy2numpy<arma::u32, ssize_t>(fbs_ind);
-    auto sbs_ind_p = qd_python_copy2numpy<arma::u32, ssize_t>(sbs_ind);
+    auto no_interact_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(no_interact);
+    auto fbs_ind_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(fbs_ind);
+    auto sbs_ind_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(sbs_ind);
 
     return py::make_tuple(fbs_p, sbs_p, no_interact_p, fbs_ind_p, sbs_ind_p);
 }

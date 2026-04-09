@@ -62,7 +62,7 @@ result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
   if `obj_ind` is provided. Size: `[n_points]`
 MD!*/
 
-py::array_t<ssize_t> point_inside_mesh(const py::array_t<double> &points,
+py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
                                        const py::array_t<double> &mesh,
                                        const py::array_t<unsigned> &obj_ind,
                                        double distance)
@@ -73,5 +73,5 @@ py::array_t<ssize_t> point_inside_mesh(const py::array_t<double> &points,
 
     auto res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, &obj_ind_arma, distance);
 
-    return qd_python_copy2numpy<unsigned, ssize_t>(res);
+    return qd_python_copy2numpy<unsigned, py::ssize_t>(res);
 }
