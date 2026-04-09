@@ -1,27 +1,56 @@
 # This Makefile is for Windows / MSVC environments
 
 # Set Armadillo and HDF5 sources
-hdf5_internal = ON
-arma_internal = ON
+matlab = ON
+python = ON
 avx2 = ON
 
 CMAKE_BUILD_DIR = build_windows
 
-# Binary distribution for Windows
-DIST_DIR = release\quadriga_lib-win64
-VERSION = 0.10.3
-ARMA_VERSION = 14.2.2
+# Options for prebuilding the HDF5 and Catch2 libraries to speed up build time
+hdf5_version   = 1.14.6
+HDF5_PREBUILT  = external\hdf5-prebuilt
+HDF5_SRC_DIR   = hdf5-hdf5_$(hdf5_version)
+HDF5_LIB_CHECK = $(HDF5_PREBUILT)\lib\libhdf5.lib
 
-all:   
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. -D ARMA_EXT=$(arma_internal) -D HDF5_STATIC=$(hdf5_internal) -D ENABLE_AVX2=$(avx2) 
+catch2_version   = 3.8.1
+CATCH2_PREBUILT  = external\Catch2-prebuilt
+CATCH2_SRC_DIR   = Catch2-$(catch2_version)
+CATCH2_LIB_CHECK = $(CATCH2_PREBUILT)\lib\Catch2.lib
+
+all:
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=%CD% -D ENABLE_AVX2=$(avx2) -D ENABLE_MATLAB=$(matlab) -D ENABLE_PYTHON=$(python) -D ENABLE_TESTS=OFF
 	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
-	cmake --install $(CMAKE_BUILD_DIR)
+	cmake --install $(CMAKE_BUILD_DIR) --config Release
 
-test:   moxunit-lib
+test: all moxunit-lib
 	cmake -B $(CMAKE_BUILD_DIR) -D ENABLE_TESTS=ON
-	cmake --build $(CMAKE_BUILD_DIR) --config Release --parallel
+	cmake --build $(CMAKE_BUILD_DIR) --config Release --target test_bin
 	$(CMAKE_BUILD_DIR)\Release\test_bin.exe
+!IF "$(matlab)" == "ON"
 	matlab -batch "run('tests\quadriga_lib_mex_tests.m');"
+!ENDIF
+
+# Prebuild Libraries
+hdf5: $(HDF5_LIB_CHECK)
+
+$(HDF5_LIB_CHECK):
+	tar -xf external\hdf5-$(hdf5_version).zip -C external
+	cmake -B external\hdf5-build -S external\$(HDF5_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(HDF5_PREBUILT) -DBUILD_SHARED_LIBS=OFF -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF -DBUILD_TESTING=OFF -DHDF5_BUILD_TOOLS=OFF -DHDF5_BUILD_EXAMPLES=OFF -DHDF5_BUILD_HL_LIB=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+	cmake --build external\hdf5-build --config Release
+	cmake --install external\hdf5-build --config Release
+	- rmdir /s /q external\$(HDF5_SRC_DIR)
+	- rmdir /s /q external\hdf5-build
+
+catch2: $(CATCH2_LIB_CHECK)
+
+$(CATCH2_LIB_CHECK):
+	tar -xf external\Catch2-$(catch2_version).zip -C external
+	cmake -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF
+	cmake --build external\catch2-build --config Release
+	cmake --install external\catch2-build --config Release
+	- rmdir /s /q external\$(CATCH2_SRC_DIR)
+	- rmdir /s /q external\catch2-build
 
 moxunit-lib:
 	- rmdir /s /q external\MOxUnit-master
@@ -32,32 +61,8 @@ clean:
 	- rmdir /s /q $(CMAKE_BUILD_DIR)
 	- rmdir /s /q "+quadriga_lib"
 	- rmdir /s /q lib
+
+tidy: clean
 	- rmdir /s /q external\MOxUnit-master
-
-binaries: all
-	- mkdir release
-	@echo Creating binary distribution...
-	- rmdir /s /q $(DIST_DIR)
-	mkdir $(DIST_DIR)
-	mkdir $(DIST_DIR)\+quadriga_lib
-	mkdir $(DIST_DIR)\lib
-	mkdir $(DIST_DIR)\include
-	@REM Copy MEX files
-	copy "+quadriga_lib\*.mexw64" "$(DIST_DIR)\+quadriga_lib\"
-	copy "+quadriga_lib\*.m" "$(DIST_DIR)\+quadriga_lib\"
-	@REM Copy static libraries
-	copy "lib\*.lib" "$(DIST_DIR)\lib\"
-	@REM Copy public headers
-	xcopy /E /I "include" "$(DIST_DIR)\include"
-	xcopy /E /I "$(CMAKE_BUILD_DIR)\armadillo-$(ARMA_VERSION)\include" "$(DIST_DIR)\include"
-	@REM Copy license and documentation
-	copy LICENSE "$(DIST_DIR)\" 2>nul || echo No LICENSE file
-	copy README.md "$(DIST_DIR)\" 2>nul || echo No README file
-	@REM Optional: Copy HTML documentation
-	if exist html_docu xcopy /E /I "html_docu" "$(DIST_DIR)\html_docu"
-	@echo Binary distribution created in $(DIST_DIR)/
-	@echo Creating ZIP archive...
-	powershell -Command "Compress-Archive -Path '$(DIST_DIR)\*' -DestinationPath 'release\quadriga_lib_v$(VERSION)_win64.zip' -Force"
-	@echo Created quadriga_lib-win64-$(VERSION).zip
-	- rmdir /s /q $(DIST_DIR)
-
+	- rmdir /s /q $(HDF5_PREBUILT)
+	- rmdir /s /q $(CATCH2_PREBUILT)

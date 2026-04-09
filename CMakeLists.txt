@@ -29,9 +29,12 @@ option(ENABLE_AVX2 "Enable AVX2 Acceleration" ON)
 option(ENABLE_CUDA "Enable CUDA GPU Acceleration" OFF)
 option(ENABLE_TESTS "Build tests" OFF)
 
-# Path to the HDF5 library for static linking (include files and .a/.lib file)
-# If left empty, HDF location is detected automatically, if not found, HDF5 is built from sources
-option(HDF5_PATH "Location of the HDF5 library" "")
+set(HDF5_PATH "" CACHE PATH "Location of the HDF5 library (include files and .a/.lib file).
+    If left empty, HDF5 location is detected automatically; if not found, HDF5 is built from sources.")
+set(_HDF5_PATH ${HDF5_PATH}) # For internal use
+
+set(CATCH2_PATH "" CACHE PATH "Location of the Catch2 library. If left empty, Catch2 is built from sources.")
+set(_CATCH2_PATH ${CATCH2_PATH}) # For internal use
 
 # If HDF5_STATIC is ON, HDF5 is build from sources and statically linked
 # Static linking the HDF5 library may cause Octave to crash but usually works fine with MATLAB
@@ -152,15 +155,15 @@ set(BUILD_HDF5 ${HDF5_STATIC})
 
 if(MSVC) # Platform Overwrites for MSVC / Windows
     if(BUILD_OCTAVE)
-        message(WARNING "Octave not supported on Windows")
+        message(STATUS "Octave not supported on Windows. Octave API disabled!")
         set(BUILD_OCTAVE OFF)
     endif()
     if(BUILD_SHARED_LIB)
-        message(WARNING "Shared library not supported on Windows")
+        message(STATUS "Shared library not supported on Windows.")
         set(BUILD_SHARED_LIB OFF)
     endif()
     if(BUILD_CUDA)
-        message(WARNING "CUDA not supported on Windows")
+        message(STATUS "CUDA not supported on Windows.")
         set(BUILD_CUDA OFF)
     endif()
 endif()
@@ -199,18 +202,26 @@ if (BUILD_OCTAVE) # Detect Octave
     if(MKOCTFILE_EXECUTABLE)
         message(STATUS "Found mkoctfile: ${MKOCTFILE_EXECUTABLE}")
     else()
-        message(STATUS "Octave not found, Octave API disabled!")
+        message(STATUS "Octave not found. Octave API disabled!")
         set(BUILD_OCTAVE OFF)
     endif()
 endif()
-
 
 if(NOT BUILD_STATIC_LIB AND NOT BUILD_SHARED_LIB) # Validation Rules
     message(FATAL_ERROR "At least one of STATIC_LIB or SHARED_LIB must be ON")
 endif()
 
+# Auto-detect pre-built HDF5 in external/hdf5-prebuilt
+if (MSVC AND NOT _HDF5_PATH AND NOT BUILD_HDF5)
+    set(_HDF5_PREBUILT_LIB "${CMAKE_SOURCE_DIR}/external/hdf5-prebuilt/lib/libhdf5.lib")
+    if (EXISTS "${_HDF5_PREBUILT_LIB}")
+        set(_HDF5_PATH "${CMAKE_SOURCE_DIR}/external/hdf5-prebuilt")
+        message(STATUS "Auto-detected pre-built HDF5: ${_HDF5_PATH}")
+    endif()
+endif()
+
 # Build instructions for HDF5 library
-if (NOT HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
+if (NOT _HDF5_PATH AND NOT BUILD_HDF5) # Detect HDF5 automatically
     find_package(HDF5 MODULE COMPONENTS C HL)
     if(HDF5_FOUND)
         get_filename_component(HDF5_LIB_DIR "${HDF5_LIBRARIES}" DIRECTORY)
@@ -224,17 +235,17 @@ else()
 endif()
 
 # Octave does not support static linking HDF5 library (version clash, undefined behavior)
-if (HDF5_PATH OR BUILD_HDF5)
+if (_HDF5_PATH OR BUILD_HDF5)
     if (BUILD_OCTAVE)
         message(STATUS "Octave does not support static linking HDF5 library. Octave disabled!")
         set(BUILD_OCTAVE OFF)
     endif()
 endif()
 
-if (HDF5_PATH) # Use given HDF5 location before building it
+if (_HDF5_PATH) # Use given HDF5 location before building it
     set(BUILD_HDF5 OFF)
-    get_filename_component(HDF5_PATH_ABSOLUTE "${HDF5_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
-    set(HDF5_INCLUDE_DIRS "${HDF5_PATH}/include")
+    get_filename_component(HDF5_PATH_ABSOLUTE "${_HDF5_PATH}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
+    set(HDF5_INCLUDE_DIRS "${_HDF5_PATH}/include")
     if (MSVC)
         set(HDF5_LIB "${HDF5_PATH_ABSOLUTE}/lib/libhdf5.lib")
     else()
@@ -279,25 +290,32 @@ endif()
 
 # Build instructions for CATCH2 library
 if (ENABLE_TESTS)
-    set(CATCH2_EP_ARGS
-        URL ${CATCH2_ZIP}
-        BINARY_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_build"
-        INSTALL_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin"
-        CMAKE_ARGS
-            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-    )
-    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
-        list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    if (MSVC AND NOT _CATCH2_PATH AND EXISTS "${CMAKE_SOURCE_DIR}/external/Catch2-prebuilt/lib/Catch2.lib")
+        set(_CATCH2_PATH "${CMAKE_SOURCE_DIR}/external/Catch2-prebuilt")
+        message(STATUS "Auto-detected pre-built Catch2: ${_CATCH2_PATH}")
     endif()
-
-    if (MSVC) 
-        set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/Catch2.lib")
+    if (_CATCH2_PATH)
+        set(CATCH2_LIB "${_CATCH2_PATH}/lib/Catch2.lib")
+        set(CATCH2_INCLUDE_DIR "${_CATCH2_PATH}/include")
+        add_custom_target(catch2_dep)
     else()
-        set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/libCatch2.a")
+        set(CATCH2_EP_ARGS
+            URL ${CATCH2_ZIP}
+            BINARY_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_build"
+            INSTALL_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin"
+            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+        )
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+            list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+        endif()
+        if (MSVC)
+            set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/Catch2.lib")
+        else()
+            set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/libCatch2.a")
+        endif()
+        set(CATCH2_INCLUDE_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/include")
+        ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS} BUILD_BYPRODUCTS ${CATCH2_LIB})
     endif()
-    set(CATCH2_INCLUDE_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/include")
-
-    ExternalProject_Add(catch2_dep ${CATCH2_EP_ARGS} BUILD_BYPRODUCTS ${CATCH2_LIB})
 endif()
 
 # Core includes needed by all library targets
@@ -437,7 +455,7 @@ if (BUILD_SHARED_LIB)
     if (BUILD_HDF5)
         add_dependencies(quadriga_shared hdf5_dep)
         target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
-    elseif(HDF5_PATH)
+    elseif(_HDF5_PATH)
         target_link_libraries(quadriga_shared PUBLIC ${HDF5_LIB})
     elseif(HDF5_FOUND)
         target_link_libraries(quadriga_shared PUBLIC HDF5::HDF5)
@@ -703,7 +721,7 @@ if((BUILD_MATLAB OR BUILD_OCTAVE) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(DIRECTORY ${MEX_OUTPUT_DIR} DESTINATION ${INSTALL_MEX_DIR})
 endif()
 
-if ((BUILD_HDF5 OR HDF5_PATH) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
+if ((BUILD_HDF5 OR _HDF5_PATH) AND NOT DEFINED SKBUILD_PLATLIB_DIR)
     install(FILES ${HDF5_LIB} DESTINATION ${INSTALL_LIBDIR})
 endif()
 
