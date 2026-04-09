@@ -282,9 +282,9 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,                // Array
                                                  element_ind, &ori, &elpos, false);
 
         // Assemble output
-        ssize_t output_size = complex ? 2 : 4;
+        py::ssize_t output_size = complex ? 2 : 4;
         py::tuple output(output_size);
-        ssize_t ind = 0;
+        py::ssize_t ind = 0;
 
         if (complex)
         {
@@ -356,7 +356,7 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,                // Array
             }
 
             py::tuple output(complex ? 2 : 4);
-            ssize_t ind = 0;
+            py::ssize_t ind = 0;
             if (complex)
             {
                 output[ind++] = qd_python_copy2numpy(V_re_3d, V_im_3d);
@@ -399,13 +399,13 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,                // Array
         else
             ant.interpolate(&az, &el, &V_re, &V_im, &H_re, &H_im, element_ind, &ori, &elpos);
 
-        ssize_t output_size = 0;
+        py::ssize_t output_size = 0;
         output_size += complex ? 2 : 4;
         output_size += dist ? 1 : 0;
         output_size += local_angles ? 3 : 0;
 
         py::tuple output(output_size);
-        ssize_t ind = 0;
+        py::ssize_t ind = 0;
         if (complex)
         {
             output[ind++] = qd_python_copy2numpy(V_re, V_im);

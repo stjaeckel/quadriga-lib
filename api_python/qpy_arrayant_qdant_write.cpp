@@ -88,7 +88,7 @@ arrayant.qdant_write('speaker.qdant', speaker)
 - QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
-ssize_t arrayant_qdant_write(const std::string &fn,
+py::ssize_t arrayant_qdant_write(const std::string &fn,
                              const py::dict &arrayant,
                              const unsigned id,
                              const py::array_t<unsigned> &layout)
@@ -107,6 +107,6 @@ ssize_t arrayant_qdant_write(const std::string &fn,
     {
         const auto ant = qd_python_dict2arrayant(arrayant, true);
         const auto layout_a = qd_python_numpy2arma_Mat(layout, true);
-        return (ssize_t)ant.qdant_write(fn, id, layout_a);
+        return (py::ssize_t)ant.qdant_write(fn, id, layout_a);
     }
 }

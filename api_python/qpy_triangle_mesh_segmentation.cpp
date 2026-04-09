@@ -104,8 +104,8 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles, // Fa
                                              &mtl_prop_arma, &mtl_prop_out_arma, &mesh_index);
 
     auto triangles_p = qd_python_copy2numpy(triangles_out_arma);
-    auto sub_mesh_index_p = qd_python_copy2numpy<arma::u32, ssize_t>(sub_mesh_index);
-    auto mesh_index_p = qd_python_copy2numpy<arma::u32, ssize_t>(mesh_index);
+    auto sub_mesh_index_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(sub_mesh_index);
+    auto mesh_index_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(mesh_index);
     auto mtl_prop_p = qd_python_copy2numpy(mtl_prop_out_arma);
 
     return py::make_tuple(triangles_p, sub_mesh_index_p, mesh_index_p, mtl_prop_p);

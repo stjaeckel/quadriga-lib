@@ -8,7 +8,7 @@ dependencies = ["numpy"]
 dynamic = ["version"]
 description = "C++/MEX/Python Utility library for radio channel modelling and simulations"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 readme = "README_pip.md"
 authors = [{name = "Stephan Jaeckel"}]
 urls.Homepage = "https://quadriga-lib.org"
@@ -45,6 +45,6 @@ input = "include/quadriga_lib.hpp"
 regex = '#define QUADRIGA_LIB_VERSION_STR "(?P<value>[^"]+)"'
 
 [tool.cibuildwheel]
-build = "cp39-manylinux_x86_64 cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64"
+build = "cp310-manylinux_x86_64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp314-manylinux_x86_64"
 test-requires = ["pytest", "numpy"]
 test-command = "python -m pytest {project}/tests/python_tests -x -s"

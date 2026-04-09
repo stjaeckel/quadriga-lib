@@ -59,13 +59,13 @@ py::tuple hdf5_read_layout(std::string fn)
     arma::Col<unsigned> channelID;
     arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
 
-    auto nx = (ssize_t)storage_space.at(0);
-    auto ny = (ssize_t)storage_space.at(1);
-    auto nz = (ssize_t)storage_space.at(2);
-    auto nw = (ssize_t)storage_space.at(3);
+    auto nx = (py::ssize_t)storage_space.at(0);
+    auto ny = (py::ssize_t)storage_space.at(1);
+    auto nz = (py::ssize_t)storage_space.at(2);
+    auto nw = (py::ssize_t)storage_space.at(3);
 
-    auto n_bytes = (ssize_t)sizeof(unsigned);
-    ssize_t strides[4] = {n_bytes, ny * n_bytes, nx * ny * n_bytes, nx * ny * nz * n_bytes};
+    auto n_bytes = (py::ssize_t)sizeof(unsigned);
+    py::ssize_t strides[4] = {n_bytes, ny * n_bytes, nx * ny * n_bytes, nx * ny * nz * n_bytes};
     auto has_data = py::array_t<unsigned>({nx, ny, nz, nw}, strides, channelID.memptr());
 
     return py::make_tuple(py::array_t<unsigned>(4ULL, storage_space.memptr()), has_data);

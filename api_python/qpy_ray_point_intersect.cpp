@@ -147,7 +147,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &orig,            // Ray
     }
 
     // Copy to python
-    auto hit_count_p = qd_python_copy2numpy<arma::u32, ssize_t>(hit_count);
+    auto hit_count_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(hit_count);
     auto index_p = qd_python_copy2numpy(index);
 
     return py::make_tuple(hit_count_p, index_p);
