@@ -28,7 +28,6 @@ test = ["pytest"]
 cmake.build-type = "Release"
 cmake.args = [
     "-DARMA_EXT=ON",
-    "-DHDF5_STATIC=ON",
     "-DENABLE_MATLAB=OFF",
     "-DENABLE_OCTAVE=OFF",
     "-DENABLE_MEX_DOC=OFF",
