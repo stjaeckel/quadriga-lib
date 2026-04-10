@@ -58,7 +58,8 @@ set(MEX_OUTPUT_DIR "${CMAKE_BINARY_DIR}/+quadriga_lib")
 
 if(MSVC)
     add_compile_options(/EHsc /Zc:__cplusplus /nologo /MP)
-    set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MDd> $<$<CONFIG:Release>:/MD>")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set(MEX_CXXFLAGS "/std:c++17 /nologo $<$<CONFIG:Debug>:/MTd> $<$<CONFIG:Release>:/MT>")
 else()
     add_compile_options(-O3 -fPIC -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>)
     set(MEX_CXXFLAGS "-std=c++17 -O3 -fPIC -fopenmp -Wall -Wpedantic -Wextra")
@@ -260,6 +261,7 @@ if (BUILD_HDF5) # Compile HDF5 library
         INSTALL_DIR "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin"
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_BUILD_TYPE=Release
             -DBUILD_SHARED_LIBS=OFF
             -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF
             -DBUILD_TESTING=OFF
@@ -273,6 +275,7 @@ if (BUILD_HDF5) # Compile HDF5 library
     endif()
 
     if (MSVC)
+        list(APPEND HDF5_EP_ARGS CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
         set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.lib")
     else()
         set(HDF5_LIB "${CMAKE_BINARY_DIR}/hdf5-${hdf5_version}_bin/lib/libhdf5.a")
@@ -303,12 +306,13 @@ if (ENABLE_TESTS)
             URL ${CATCH2_ZIP}
             BINARY_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_build"
             INSTALL_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin"
-            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_BUILD_TYPE=Release
         )
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
             list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
         endif()
         if (MSVC)
+            list(APPEND CATCH2_EP_ARGS CMAKE_ARGS -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
             set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/Catch2.lib")
         else()
             set(CATCH2_LIB "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin/lib/libCatch2.a")
@@ -492,7 +496,7 @@ if(BUILD_MATLAB)
             add_custom_command(
                 OUTPUT ${mex_output}
                 COMMAND ${CMAKE_CXX_COMPILER}
-                        /nologo /std:c++17 /EHs /O2 /MD /LD /DMATLAB_MEX_FILE
+                        /nologo /std:c++17 /EHs /O2 /MT /LD /DMATLAB_MEX_FILE
                         /I${MATLAB_MEX_INCLUDE_DIR} /I${CMAKE_SOURCE_DIR}/include /I${CMAKE_SOURCE_DIR}/src /I${ARMADILLO_INCLUDE_DIRS}
                         ${mex_src} /link $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
                         shlwapi.lib "${MATLAB_MEX_LIB_DIR}/libmex.lib" "${MATLAB_MEX_LIB_DIR}/libmx.lib"

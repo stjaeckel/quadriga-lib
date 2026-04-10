@@ -26,7 +26,7 @@ CATCH2_LIB_CHECK = $(CATCH2_PREBUILT)\lib\Catch2.lib
 !IF [cmd /c tools\get_version.cmd] == 0
 !INCLUDE version.tmp
 !ENDIF
-DIST_DIR = release\quadriga_lib-$(QUADRIGA_VERSION)-win_amd64
+DIST_DIR = release\quadriga_lib_$(QUADRIGA_VERSION)_win64
 
 # Select generator (Ninja vs Visual Studio)
 !IF "$(USE_NINJA)" == "1"
@@ -57,21 +57,21 @@ test: all moxunit-lib
 !ENDIF
 
 # Prebuild libraries
-hdf5: $(HDF5_LIB_CHECK)
+external: hdf5 catch2 moxunit-lib
 
+hdf5: $(HDF5_LIB_CHECK)
 $(HDF5_LIB_CHECK):
 	tar -xf external\hdf5-$(hdf5_version).zip -C external
-	cmake -B external\hdf5-build -S external\$(HDF5_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(HDF5_PREBUILT) -DBUILD_SHARED_LIBS=OFF -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF -DBUILD_TESTING=OFF -DHDF5_BUILD_TOOLS=OFF -DHDF5_BUILD_EXAMPLES=OFF -DHDF5_BUILD_HL_LIB=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\hdf5-build -S external\$(HDF5_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(HDF5_PREBUILT) -DBUILD_SHARED_LIBS=OFF -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF -DBUILD_TESTING=OFF -DHDF5_BUILD_TOOLS=OFF -DHDF5_BUILD_EXAMPLES=OFF -DHDF5_BUILD_HL_LIB=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 	cmake --build external\hdf5-build --config Release
 	cmake --install external\hdf5-build --config Release
 	- rmdir /s /q external\$(HDF5_SRC_DIR)
 	- rmdir /s /q external\hdf5-build
 
 catch2: $(CATCH2_LIB_CHECK)
-
 $(CATCH2_LIB_CHECK):
 	tar -xf external\Catch2-$(catch2_version).zip -C external
-	cmake -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF
+	cmake $(GENERATOR) -D CMAKE_BUILD_TYPE=Release -B external\catch2-build -S external\$(CATCH2_SRC_DIR) -DCMAKE_INSTALL_PREFIX=%CD%\$(CATCH2_PREBUILT) -DBUILD_TESTING=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
 	cmake --build external\catch2-build --config Release
 	cmake --install external\catch2-build --config Release
 	- rmdir /s /q external\$(CATCH2_SRC_DIR)
@@ -111,7 +111,7 @@ pip-win-cp314: wheelhouse\quadriga_lib-$(QUADRIGA_VERSION)-cp314-cp314-win_amd64
 pip-win: pip-win-cp310 pip-win-cp311 pip-win-cp312 pip-win-cp313 pip-win-cp314
 
 # Release
-release: all pip-win
+release: external all pip-win
 	- rmdir /s /q $(DIST_DIR)
 	cmake --install $(CMAKE_BUILD_DIR) --config Release --prefix $(DIST_DIR)
 	mkdir $(DIST_DIR)\wheels
@@ -126,12 +126,16 @@ release: all pip-win
 
 clean:
 	- rmdir /s /q $(CMAKE_BUILD_DIR)
-	- rmdir /s /q "+quadriga_lib"
-	- rmdir /s /q lib
 	- del version.tmp
 	- del wheelhouse\*-win_amd64.whl
+	- del $(DIST_DIR).zip
+	- del "+quadriga_lib\*.mexw64"
+	- del lib\*.lib
+	- del lib\*.pyd
 
 tidy: clean
-	- rmdir /s /q external\MOxUnit-master
 	- rmdir /s /q $(HDF5_PREBUILT)
 	- rmdir /s /q $(CATCH2_PREBUILT)
+	- rmdir /s /q external\MOxUnit-master
+	- rmdir /s /q "+quadriga_lib"
+	- rmdir /s /q lib

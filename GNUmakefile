@@ -118,8 +118,6 @@ package:
 
 pip-sdist:
 	python3 -m build --sdist
-	@echo "sdist created in dist/"
-	@echo "Testing sdist install..."
 	pip install dist/quadriga_lib-*.tar.gz
 	python3 -c "import quadriga_lib; print(quadriga_lib.components())"
 	python3 -m pytest tests/python_tests -x -s
@@ -127,7 +125,6 @@ pip-sdist:
 
 pip-x86:
 	cibuildwheel --platform linux 2>&1 | tee build_pip_x86.log
-	@echo "Wheels for x86_64 created in wheelhouse/"
 
 CIBW_AARCH64_COMMON = CIBW_ARCHS="aarch64" CIBW_ENVIRONMENT='CMAKE_GENERATOR="Unix Makefiles" CMAKE_BUILD_PARALLEL_LEVEL="32"'
 
@@ -152,22 +149,19 @@ pip: pip-sdist pip-x86 pip-aarch64
 
 deb-jammy:
 	mkdir -p release
-	docker build --build-arg UBUNTU_VERSION=22.04 --progress=plain \
-		-f Dockerfile.ubuntu -t quadriga-deb-jammy . 2>&1 | tee build_jammy.log
+	docker build --build-arg UBUNTU_VERSION=22.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-jammy . 2>&1 | tee build_jammy.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-jammy
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
 
 deb-noble:
 	mkdir -p release
-	docker build --build-arg UBUNTU_VERSION=24.04 --progress=plain \
-		-f Dockerfile.ubuntu -t quadriga-deb-noble . 2>&1 | tee build_noble.log
+	docker build --build-arg UBUNTU_VERSION=24.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-noble . 2>&1 | tee build_noble.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
 
 deb-plucky:
 	mkdir -p release
-	docker build --build-arg UBUNTU_VERSION=25.10 --progress=plain \
-		-f Dockerfile.ubuntu -t quadriga-deb-plucky . 2>&1 | tee build_plucky.log
+	docker build --build-arg UBUNTU_VERSION=25.10 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-plucky . 2>&1 | tee build_plucky.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-plucky
 	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
 
@@ -182,24 +176,34 @@ release: clean
 	         pip-aarch64-cp39 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313
 
 clean:
-	- rm -rf external/build
-	- rm -rf +quadriga_lib
-	- rm -rf release
-	- rm -rf lib
+	- rm -rf $(CMAKE_BUILD_DIR)
+	- rm +quadriga_lib/*.mex
+	- rm +quadriga_lib/*.mexa64
+	- rm release/*.deb
+	- rm release/quadriga_lib-$(QUADRIGA_VERSION).zip
+	- rm wheelhouse/*x86_64.whl
+	- rm wheelhouse/*aarch64.whl
+	- rm lib/*.a
+	- rm lib/*.so
 	- rm *.obj
 	- rm tests/test_bin
-	- rm tests/test_cmake
-	- rm tests/test_static_bin
 	- rm tests/test.exe
-	- rm -rf $(CMAKE_BUILD_DIR)
 	- rm -rf tests/python_tests/__pycache__
 	- rm -rf .pytest_cache
 	- rm -rf tests/.pytest_cache
 	- rm *.hdf5
-	- rm -rf external/MOxUnit-master
-	- rm include/quadriga_lib_config.hpp
-	- rm -rf dist wheelhouse *.egg-info
+	- rm *.egg-info
 	- rm build*.log	
+	- rm -rf dist
 
 tidy:   clean
 	- rm -rf build*
+	- rm version.tmp
+	- rm -rf +quadriga_lib
+	- rm -rf release
+	- rm -rf lib
+	- rm -rf wheelhouse 
+	- rm -rf external/MOxUnit-master
+	- rm -rf external/hdf5-prebuilt
+	- rm -rf external/Catch2-prebuilt
+	
