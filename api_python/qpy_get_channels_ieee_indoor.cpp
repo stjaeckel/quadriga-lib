@@ -44,7 +44,7 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m );
 ```
 
-## ap_array:
+## Input Arguments:
 - **`ap_array`**<br>
   Dictionary containing the access point array antenna with `n_tx` elements (= ports after element coupling)
   `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_ap, n_azimuth_ap, n_elements_ap)`
@@ -139,7 +139,7 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
   Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative,
   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
 
-## Returns:
+## Output Argument:
 - **`chan`**<br>
   List of length `n_users` containing dictionaries of channel data with the following keys.
   `name`           | Channel name                                                             | String

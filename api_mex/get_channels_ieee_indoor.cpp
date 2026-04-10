@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
 ```
 
-## ap_array:
+## Input Arguments:
 - **`ap_array`** [1]<br>
   Struct containing the access point array antenna with `n_tx` elements (= ports after element coupling)
   `e_theta_re`     | Real part of e-theta field component             | Size: `[n_elevation_ap, n_azimuth_ap, n_elements_ap]`
@@ -133,7 +133,7 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
   Overwrites the model-specific breakpoint distance. If this parameter is empty (default), NAN or negative,
   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
 
-## Returns:
+## Output Argument:
 - **`chan`**<br>
   Struct array of length `n_users` containing the channel data with the following fields.
   `name`           | Channel name                                                             | String
