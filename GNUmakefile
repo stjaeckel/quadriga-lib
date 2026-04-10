@@ -85,7 +85,7 @@ python_test:
 # Documentation
 documentation:
 	sed 's/__VERSION__/$(QUADRIGA_VERSION)/g' tools/download_md/download.md.in > tools/download_md/download.md
-	
+
 	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
@@ -115,7 +115,7 @@ package:
 #   pip install scikit-build-core build twine cibuildwheel
 #
 # Publishing:
-#   twine upload --repository testpypi dist/*.tar.gz wheelhouse/*.whl
+#   twine upload --repository testpypi --skip-existing dist/*.tar.gz wheelhouse/*.whl
 #   twine upload dist/*.tar.gz wheelhouse/*.whl
 
 pip-sdist:
