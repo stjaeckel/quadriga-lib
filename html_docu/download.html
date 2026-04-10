@@ -50,7 +50,8 @@
 <b>Overview</b>
 <ul>
 <li><a href="#7c9ba8cc">Download</a></li>
-<li><a href="#c3101bae">Installation</a></li>
+<li><a href="#7fc9f392">Installation from Binaries</a></li>
+<li><a href="#904e3979">Installation from Source</a></li>
 </ul>
 <br>
 <hr class="greyline">
@@ -59,12 +60,76 @@
 <font size=+1><b>Download</b></font>
 <br>
 <ul><li style="margin-bottom: 0.4em;"><b>Latest Version (Source Code)</b><br> 
-   <a href="download/quadriga_lib-0.10.1.zip">quadriga_lib-0.10.1.zip</a> 
+   <a href="download/quadriga_lib_0.10.9.zip">quadriga_lib_0.10.9.zip</a> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Windows Binary Package</b><br> 
+   <a href="download/quadriga_lib_0.10.9_win64.zip">quadriga_lib_0.10.9_win64.zip</a> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Ubuntu 22.04 (Jammy)</b><br> 
+   <a href="download/quadriga-lib_0.10.9-1+jammy_amd64.deb">quadriga-lib_0.10.9-1+jammy_amd64.deb</a> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Ubuntu 24.04 (Noble)</b><br> 
+   <a href="download/quadriga-lib_0.10.9-1+noble_amd64.deb">quadriga-lib_0.10.9-1+noble_amd64.deb</a> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Ubuntu 25.10 (Plucky)</b><br> 
+   <a href="download/quadriga-lib_0.10.9-1+plucky_amd64.deb">quadriga-lib_0.10.9-1+plucky_amd64.deb</a> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>Python</b><br> 
+   <code>pip install quadriga-lib</code> 
 </li></ul>
 <hr class="greyline">
 <br>
-<a name="c3101bae"></a>
-<font size=+1><b>Installation</b></font>
+<a name="7fc9f392"></a>
+<font size=+1><b>Installation from Binaries</b></font>
+<br>
+<br><br> 
+ 
+<b>Ubuntu</b><br> 
+<ul><li style="margin-bottom: 0.4em;">Download the appropriate binary package for your distribution (see above) 
+</li><li style="margin-bottom: 0.4em;">Install the package using <code>dpkg</code> (replace <code>&lt;version&gt;</code> and <code>&lt;distro&gt;</code> with the appropriate values): 
+</li></ul>
+<pre>
+sudo dpkg -i quadriga-lib-&lt;version&gt;+&lt;distro&gt;_amd64.deb
+</pre>
+<ul><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Add the library to your MATLAB path by running <code>addpath('/usr/share/quadriga-lib')</code> in the MATLAB command window or by adding it to your <code>startup.m</code> file. 
+</li></ul>
+ 
+<br> 
+ 
+<b>Windows</b><br> 
+<ul><li style="margin-bottom: 0.4em;">Extract the downloaded ZIP file to a location of your choice, e.g. <code>C:\quadriga-lib</code> 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Add the library to your MATLAB path by running <code>addpath('C:\quadriga-lib')</code> in the MATLAB command window or by adding it to your <code>startup.m</code> file. 
+</li><li style="margin-bottom: 0.4em;">[<b>OPTIONAL</b>]: Install the Python wheel matching your Python version (3.10–3.14) (Replace <code>cp312</code> with your Python version (<code>cp310</code>, <code>cp311</code>, <code>cp312</code>, <code>cp313</code>, or <code>cp314</code>). To check your Python version run <code>python --version</code>) 
+</li></ul>
+<pre>
+pip install wheels\quadriga_lib-&lt;version&gt;-cp312-cp312-win_amd64.whl
+</pre>
+ 
+<br> 
+ 
+<b>Python</b><br> 
+<ul><li style="margin-bottom: 0.4em;">Available via PyPI, install using pip: 
+</li></ul>
+<pre>
+pip install quadriga-lib
+</pre>
+<ul><li style="margin-bottom: 0.4em;">Prebuilt wheels are available for Linux x86_64, Linux aarch64, and Windows x86_64 (Python 3.10–3.14). On other platforms, pip will attempt to build from source (requires CMake and a C++17 compiler; may not work on all platforms). 
+</li></ul>
+ 
+<br> 
+ 
+<b>C++ Integration</b><br> 
+<ul><li style="margin-bottom: 0.4em;">The binary packages include public header files (in <code>include/</code>) and static libraries (in <code>lib/</code>). Link against <code>quadriga.lib</code> (or <code>libquadriga.a</code> on Linux) and <code>libhdf5</code> in your build system of choice. The bundled <a target="_blank" rel="noopener noreferrer" href="https://arma.sourceforge.net">Armadillo</a> headers are included. 
+</li></ul>
+<hr class="greyline">
+<br>
+<a name="904e3979"></a>
+<font size=+1><b>Installation from Source</b></font>
 <br>
 <br><br> 
  
@@ -74,9 +139,9 @@
 </li><li style="margin-bottom: 0.4em;">Install the required packages (octave-dev is only needed if you want to use Octave): 
 </li></ul>
 <pre>
-sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy octave-dev python3-pip python3-venv octave-dev
+sudo apt install bzip2 gcc git make cmake g++ libhdf5-dev python3-dev python3-pytest python3-numpy python3-pip python3-venv octave-dev
 </pre>
-<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or <a target="_blank" rel="noopener noreferrer" href="http://quadriga-lib.org">quadriga-lib.org</a>  
+<ul><li style="margin-bottom: 0.4em;">Get Quadriga-Lib either from Github or <a target="_blank" rel="noopener noreferrer" href="http://quadriga-lib.org">quadriga-lib.org</a> 
 </li></ul>
 <pre>
 git clone https://github.com/stjaeckel/quadriga-lib
@@ -135,11 +200,9 @@ cd quadriga-lib
 <br><br> 
  
 <b>Windows</b><br> 
-<ul><li style="margin-bottom: 0.4em;">Octave and Python are not supported yet (only MATLAB is) 
+<ul><li style="margin-bottom: 0.4em;">Octave is not supported yet 
 </li><li style="margin-bottom: 0.4em;">Install Build Tools for Visual Studio 2022 from <a target="_blank" rel="noopener noreferrer" href="https://visualstudio.microsoft.com">visualstudio.microsoft.com</a> 
 </li><li style="margin-bottom: 0.4em;">Install Matlab from <a target="_blank" rel="noopener noreferrer" href="https://www.mathworks.com">mathworks.com</a> - you need to obtain a licence 
-</li><li style="margin-bottom: 0.4em;">From MATLAB Shell run "mex -setup -v" and select compiler MSVC Compiler 
-</li><li style="margin-bottom: 0.4em;">If error: <a target="_blank" rel="noopener noreferrer" href="https://yingzhouli.com/posts/2020-06/mex-msvc.html">use this tutorial</a> 
 </li><li style="margin-bottom: 0.4em;">Open "x64 Native Tools Command Prompt" from start menu 
 </li><li style="margin-bottom: 0.4em;">Navigate to library path, e.g. <code>cd Z:\quadriga-lib</code> 
 </li><li style="margin-bottom: 0.4em;">Run <code>nmake</code> to compile <code>quadriga-lib</code> and the MEX Matlab interface 

@@ -84,6 +84,8 @@ python_test:
 
 # Documentation
 documentation:
+	sed 's/__VERSION__/$(QUADRIGA_VERSION)/g' tools/download_md/download.md.in > tools/download_md/download.md
+	
 	python3 tools/extract_version.py tools/html_parts/mex_api.html.part "MALAB / Octave API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/python_api.html.part "Python API Documentation for Quadriga-Lib"
 	python3 tools/extract_version.py tools/html_parts/cpp_api.html.part "C++ API Documentation for Quadriga-Lib"
@@ -102,7 +104,7 @@ moxunit-lib:
 
 package:
 	mkdir -p release
-	git archive --format=zip --prefix=quadriga_lib-$(QUADRIGA_VERSION)/ -o release/quadriga_lib-$(QUADRIGA_VERSION).zip HEAD
+	git archive --format=zip --prefix=quadriga_lib_$(QUADRIGA_VERSION)/ -o release/quadriga_lib_$(QUADRIGA_VERSION).zip HEAD
 
 # Python targets:
 #
