@@ -104,7 +104,7 @@ package:
 	mkdir -p release
 	git archive --format=zip --prefix=quadriga_lib-$(QUADRIGA_VERSION)/ -o release/quadriga_lib-$(QUADRIGA_VERSION).zip HEAD
 
-# pip/deb targets:
+# Python targets:
 #
 # PyPI packaging requires conda env "quadriga-pip": 
 #   sudo apt install qemu-user-static binfmt-support
@@ -124,56 +124,67 @@ pip-sdist:
 	pip uninstall -y quadriga-lib
 
 pip-x86:
-	cibuildwheel --platform linux 2>&1 | tee build_pip_x86.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-*x86_64.whl 1>/dev/null 2>&1 || \
+		cibuildwheel --platform linux 2>&1 | tee build_pip_x86.log
 
 CIBW_AARCH64_COMMON = CIBW_ARCHS="aarch64" CIBW_ENVIRONMENT='CMAKE_GENERATOR="Unix Makefiles" CMAKE_BUILD_PARALLEL_LEVEL="32"'
 
 pip-aarch64-cp310:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp310-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp310.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-cp310-*aarch64.whl 1>/dev/null 2>&1 || \
+		$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp310-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp310.log
 
 pip-aarch64-cp311:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp311-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp311.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-cp311-*aarch64.whl 1>/dev/null 2>&1 || \
+		$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp311-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp311.log
 
 pip-aarch64-cp312:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp312-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp312.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-cp312-*aarch64.whl 1>/dev/null 2>&1 || \
+		$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp312-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp312.log
 
 pip-aarch64-cp313:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp313-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp313.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-cp313-*aarch64.whl 1>/dev/null 2>&1 || \
+		$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp313-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp313.log
 
 pip-aarch64-cp314:
-	$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp314-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp314.log
+	@ls wheelhouse/quadriga_lib-$(QUADRIGA_VERSION)-cp314-*aarch64.whl 1>/dev/null 2>&1 || \
+		$(CIBW_AARCH64_COMMON) CIBW_BUILD="cp314-manylinux_aarch64" cibuildwheel --platform linux 2>&1 | tee build_pip_aarch64_cp314.log
 
-pip-aarch64: pip-aarch64-cp39 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313
+pip: pip-sdist 
+	$(MAKE) -j pip-x86 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313 pip-aarch64-cp314
 
-pip: pip-sdist pip-x86 pip-aarch64
-
-deb-jammy:
+# Ubuntu targets:
+DEB_JAMMY := quadriga-lib_$(QUADRIGA_VERSION)-1+jammy_amd64.deb
+release/$(DEB_JAMMY):
 	mkdir -p release
 	docker build --build-arg UBUNTU_VERSION=22.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-jammy . 2>&1 | tee build_jammy.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-jammy
-	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+	cp /tmp/quadriga_docker_out/$(DEB_JAMMY) release/
 
-deb-noble:
+DEB_NOBLE := quadriga-lib_$(QUADRIGA_VERSION)-1+noble_amd64.deb
+release/$(DEB_NOBLE):
 	mkdir -p release
 	docker build --build-arg UBUNTU_VERSION=24.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-noble . 2>&1 | tee build_noble.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-noble
-	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+	cp /tmp/quadriga_docker_out/$(DEB_NOBLE) release/
 
-deb-plucky:
+DEB_PLUCKY := quadriga-lib_$(QUADRIGA_VERSION)-1+plucky_amd64.deb
+release/$(DEB_PLUCKY):
 	mkdir -p release
 	docker build --build-arg UBUNTU_VERSION=25.10 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-plucky . 2>&1 | tee build_plucky.log
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-plucky
-	cp /tmp/quadriga_docker_out/quadriga-lib_*_amd64.deb release/
+	cp /tmp/quadriga_docker_out/$(DEB_PLUCKY) release/
 
-deb: deb-jammy deb-noble deb-plucky
+deb-jammy:  release/$(DEB_JAMMY)
+deb-noble:  release/$(DEB_NOBLE)
+deb-plucky: release/$(DEB_PLUCKY)
+
+deb: 
+	$(MAKE) -j deb-jammy deb-noble deb-plucky
 
 # Release
-release: clean
-	$(MAKE) documentation
-	$(MAKE) -j package \
-	         deb-jammy deb-noble deb-plucky \
-	         pip-sdist pip-x86 \
-	         pip-aarch64-cp39 pip-aarch64-cp310 pip-aarch64-cp311 pip-aarch64-cp312 pip-aarch64-cp313
+release: documentation package
+	$(MAKE) deb
+	$(MAKE) pip
 
 clean:
 	- rm -rf $(CMAKE_BUILD_DIR)
