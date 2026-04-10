@@ -20,8 +20,8 @@ print(quadriga_lib.components())
 
 ## Documentation
 
-Full documentation is available at [quadriga-lib.org](https://quadriga-lib.org).
-The Python API reference is at [quadriga-lib.org/python_api.html](https://quadriga-lib.org/python_api.html).
+Full documentation is available at [quadriga-lib.org](http://quadriga-lib.org).
+The Python API reference is at [quadriga-lib.org/python_api.html](http://quadriga-lib.org/python_api.html).
 
 ## Building from Source
 

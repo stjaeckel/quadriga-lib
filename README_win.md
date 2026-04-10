@@ -2,20 +2,20 @@
 
 **Quadriga-Lib** is an open-source utility library for radio channel modelling and simulation. It generates realistic channel impulse responses for system-level studies of mobile radio networks and provides a rich toolset for antenna arrays, channel data handling, and site-specific ray-tracing simulations.
 
-Full documentation is available at [quadriga-lib.org](https://quadriga-lib.org).
+Full documentation is available at [quadriga-lib.org](http://quadriga-lib.org).
 
 ---
 
 ## Package Contents
 
-| Folder / File | Content |
-|:---|:---|
-| `include/` | Public C++ header files (quadriga-lib and Armadillo) |
-| `lib/` | Static library (`quadriga.lib`) and HDF5 library (`libhdf5.lib`) |
-| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB |
-| `wheels/` | Prebuilt Python wheels for Windows (cp310–cp314) |
-| `html_docu/` | Full offline API documentation |
-| `LICENSE` | Apache License, Version 2.0 |
+| Folder / File    | Content                                                          |
+| :--------------- | :--------------------------------------------------------------- |
+| `include/`       | Public C++ header files (quadriga-lib and Armadillo)             |
+| `lib/`           | Static library (`quadriga.lib`) and HDF5 library (`libhdf5.lib`) |
+| `+quadriga_lib/` | Compiled MEX files and `.m` documentation for MATLAB             |
+| `wheels/`        | Prebuilt Python wheels for Windows (cp310–cp314)                 |
+| `html_docu/`     | Full offline API documentation                                   |
+| `LICENSE`        | Apache License, Version 2.0                                      |
 
 ---
 
