@@ -489,6 +489,19 @@ namespace
     }
 
     // ============================================================================
+    // Kernel 6: subtract_inplace for dest-orig and edge computing
+    // ============================================================================
+
+    __global__ void RTI_subtract_inplace(float *__restrict__ a,
+                                         const float *__restrict__ b,
+                                         uint32_t n)
+    {
+        uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < n)
+            a[i] -= b[i];
+    }
+
+    // ============================================================================
     // RAII cleanup struct
     // Holds all device and pinned-host pointers. Destructor frees everything.
     // ============================================================================
@@ -708,8 +721,8 @@ namespace
 // Public entry point — external linkage
 template <typename dtype>
 void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
-                 const dtype *E1x, const dtype *E1y, const dtype *E1z,
-                 const dtype *E2x, const dtype *E2y, const dtype *E2z,
+                 const dtype *Ux, const dtype *Uy, const dtype *Uz,
+                 const dtype *Vx, const dtype *Vy, const dtype *Vz,
                  const size_t n_mesh,
                  const unsigned *SMI,
                  const dtype *Xmin, const dtype *Xmax,
@@ -764,12 +777,25 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
     RTI_upload_scene(buf.d_Tx, Tx, n_mesh);
     RTI_upload_scene(buf.d_Ty, Ty, n_mesh);
     RTI_upload_scene(buf.d_Tz, Tz, n_mesh);
-    RTI_upload_scene(buf.d_E1x, E1x, n_mesh);
-    RTI_upload_scene(buf.d_E1y, E1y, n_mesh);
-    RTI_upload_scene(buf.d_E1z, E1z, n_mesh);
-    RTI_upload_scene(buf.d_E2x, E2x, n_mesh);
-    RTI_upload_scene(buf.d_E2y, E2y, n_mesh);
-    RTI_upload_scene(buf.d_E2z, E2z, n_mesh);
+
+    RTI_upload_scene(buf.d_E1x, Ux, n_mesh);
+    RTI_upload_scene(buf.d_E1y, Uy, n_mesh);
+    RTI_upload_scene(buf.d_E1z, Uz, n_mesh);
+    RTI_upload_scene(buf.d_E2x, Vx, n_mesh);
+    RTI_upload_scene(buf.d_E2y, Vy, n_mesh);
+    RTI_upload_scene(buf.d_E2z, Vz, n_mesh);
+
+    // Compute edges on device: E1 = U - T, E2 = V - T
+    {
+        uint32_t grid_mesh = ((uint32_t)n_mesh + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E1x, buf.d_Tx, (uint32_t)n_mesh);
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E1y, buf.d_Ty, (uint32_t)n_mesh);
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E1z, buf.d_Tz, (uint32_t)n_mesh);
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E2x, buf.d_Tx, (uint32_t)n_mesh);
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E2y, buf.d_Ty, (uint32_t)n_mesh);
+        RTI_subtract_inplace<<<grid_mesh, BLOCK_SIZE>>>(buf.d_E2z, buf.d_Tz, (uint32_t)n_mesh);
+        CUDA_CHECK(cudaDeviceSynchronize());
+    }
 
     // SMI sentinel: allocate n_sub+1 entries, set SMI[n_sub] = n_mesh
     {
@@ -1012,6 +1038,14 @@ void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
             CUDA_CHECK(cudaMemcpyAsync(buf.d_Dz[s], buf.h_ray_input_pinned[s] + 5 * batch_size,
                                        n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+        }
+
+        // Compute direction on device: D = Dest - Orig
+        {
+            uint32_t grid_dir = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            RTI_subtract_inplace<<<grid_dir, BLOCK_SIZE, 0, cs>>>(buf.d_Dx[s], buf.d_Ox[s], n_ray_batch_u);
+            RTI_subtract_inplace<<<grid_dir, BLOCK_SIZE, 0, cs>>>(buf.d_Dy[s], buf.d_Oy[s], n_ray_batch_u);
+            RTI_subtract_inplace<<<grid_dir, BLOCK_SIZE, 0, cs>>>(buf.d_Dz[s], buf.d_Oz[s], n_ray_batch_u);
         }
 
         // --- Kernel 0: init per-ray state ---

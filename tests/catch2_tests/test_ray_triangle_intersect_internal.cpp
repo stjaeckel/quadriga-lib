@@ -43,40 +43,37 @@ static const double cube_raw[12][9] = {
     {1, 1, 1, 1, -1, 1, 1, -1, -1},     // 10 East Upper
     {-1, 1, 1, 1, 1, 1, 1, 1, -1}};     // 11 North Upper
 
-// Helper: convert row-format triangles to SoA (Tx,Ty,Tz,E1x,...,E2z)
+// Helper: convert row-format triangles to SoA (Tx,Ty,Tz,Ux,Uy,Uz,Vx,Vy,Vz)
 // Fills the first 12 entries; zero-fills indices [12, n_alloc)
 template <typename T>
 static void fill_cube_soa(T *Tx, T *Ty, T *Tz,
-                          T *E1x, T *E1y, T *E1z,
-                          T *E2x, T *E2y, T *E2z,
+                          T *Ux, T *Uy, T *Uz,
+                          T *Vx, T *Vy, T *Vz,
                           size_t n_alloc)
 {
     for (size_t i = 0; i < 12; ++i)
     {
-        T v1x = (T)cube_raw[i][0], v1y = (T)cube_raw[i][1], v1z = (T)cube_raw[i][2];
-        T v2x = (T)cube_raw[i][3], v2y = (T)cube_raw[i][4], v2z = (T)cube_raw[i][5];
-        T v3x = (T)cube_raw[i][6], v3y = (T)cube_raw[i][7], v3z = (T)cube_raw[i][8];
-        Tx[i] = v1x;
-        Ty[i] = v1y;
-        Tz[i] = v1z;
-        E1x[i] = v2x - v1x;
-        E1y[i] = v2y - v1y;
-        E1z[i] = v2z - v1z;
-        E2x[i] = v3x - v1x;
-        E2y[i] = v3y - v1y;
-        E2z[i] = v3z - v1z;
+        Tx[i] = (T)cube_raw[i][0];
+        Ty[i] = (T)cube_raw[i][1];
+        Tz[i] = (T)cube_raw[i][2];
+        Ux[i] = (T)cube_raw[i][3];
+        Uy[i] = (T)cube_raw[i][4];
+        Uz[i] = (T)cube_raw[i][5];
+        Vx[i] = (T)cube_raw[i][6];
+        Vy[i] = (T)cube_raw[i][7];
+        Vz[i] = (T)cube_raw[i][8];
     }
     for (size_t i = 12; i < n_alloc; ++i)
     {
         Tx[i] = T(0);
         Ty[i] = T(0);
         Tz[i] = T(0);
-        E1x[i] = T(0);
-        E1y[i] = T(0);
-        E1z[i] = T(0);
-        E2x[i] = T(0);
-        E2y[i] = T(0);
-        E2z[i] = T(0);
+        Ux[i] = T(0);
+        Uy[i] = T(0);
+        Uz[i] = T(0);
+        Vx[i] = T(0);
+        Vy[i] = T(0);
+        Vz[i] = T(0);
     }
 }
 
@@ -84,22 +81,22 @@ static void fill_cube_soa(T *Tx, T *Ty, T *Tz,
 TEST_CASE("RTI Internal - Cube west-east hit")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     unsigned SMI[1] = {0};
     double Xmin[1] = {-1.0}, Xmax[1] = {1.0};
     double Ymin[1] = {-1.0}, Ymax[1] = {1.0};
     double Zmin[1] = {-1.0}, Zmax[1] = {1.0};
 
-    // Ray: origin=(-10,0,0.5), dest=(10,0,0.5) → D=(20,0,0)
+    // Ray: origin=(-10,0,0.5), dest=(10,0,0.5)
     double Ox[1] = {-10.0}, Oy[1] = {0.0}, Oz[1] = {0.5};
-    double Dx[1] = {20.0}, Dy[1] = {0.0}, Dz[1] = {0.0};
+    double Dx[1] = {10.0}, Dy[1] = {0.0}, Dz[1] = {0.5};
 
     double Wf[1], Ws[1];
     unsigned If[1], Is[1], hit_cnt[1];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf, Ws, If, Is, hit_cnt);
@@ -119,8 +116,8 @@ TEST_CASE("RTI Internal - Cube west-east hit")
 TEST_CASE("RTI Internal - Miss")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     unsigned SMI[1] = {0};
     double Xmin[1] = {-1.0}, Xmax[1] = {1.0};
@@ -129,12 +126,12 @@ TEST_CASE("RTI Internal - Miss")
 
     // Ray passes above and beside the cube
     double Ox[1] = {-10.0}, Oy[1] = {5.0}, Oz[1] = {5.0};
-    double Dx[1] = {20.0}, Dy[1] = {0.0}, Dz[1] = {0.0};
+    double Dx[1] = {10.0}, Dy[1] = {5.0}, Dz[1] = {5.0};
 
     double Wf[1], Ws[1];
     unsigned If[1], Is[1], hit_cnt[1];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf, Ws, If, Is, hit_cnt);
@@ -150,22 +147,22 @@ TEST_CASE("RTI Internal - Miss")
 TEST_CASE("RTI Internal - Ray starting inside cube")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     unsigned SMI[1] = {0};
     double Xmin[1] = {-1.0}, Xmax[1] = {1.0};
     double Ymin[1] = {-1.0}, Ymax[1] = {1.0};
     double Zmin[1] = {-1.0}, Zmax[1] = {1.0};
 
-    // Origin inside cube, heading east: O=(0,0,0.5), dest=(10,0,0.5), D=(10,0,0)
+    // Origin inside cube, heading east: O=(0,0,0.5), dest=(10,0,0.5)
     double Ox[1] = {0.0}, Oy[1] = {0.0}, Oz[1] = {0.5};
-    double Dx[1] = {10.0}, Dy[1] = {0.0}, Dz[1] = {0.0};
+    double Dx[1] = {10.0}, Dy[1] = {0.0}, Dz[1] = {0.5};
 
     double Wf[1], Ws[1];
     unsigned If[1], Is[1], hit_cnt[1];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf, Ws, If, Is, hit_cnt);
@@ -184,8 +181,8 @@ TEST_CASE("RTI Internal - Ray starting inside cube")
 TEST_CASE("RTI Internal - Multiple rays")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 4;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     unsigned SMI[1] = {0};
     double Xmin[1] = {-1.0}, Xmax[1] = {1.0};
@@ -199,14 +196,14 @@ TEST_CASE("RTI Internal - Multiple rays")
     double Ox[4] = {-10.0, -10.0, 0.0, 1.0};
     double Oy[4] = {0.0, 5.0, 0.0, -10.0};
     double Oz[4] = {0.5, 5.0, 0.5, 0.5};
-    double Dx[4] = {20.0, 20.0, 10.0, 0.0};
-    double Dy[4] = {0.0, 0.0, 0.0, 20.0};
-    double Dz[4] = {0.0, 0.0, 0.0, 0.0};
+    double Dx[4] = {10.0, 10.0, 10.0, 1.0};
+    double Dy[4] = {0.0, 5.0, 0.0, 10.0};
+    double Dz[4] = {0.5, 5.0, 0.5, 0.5};
 
     double Wf[4], Ws[4];
     unsigned If[4], Is[4], hit_cnt[4];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf, Ws, If, Is, hit_cnt);
@@ -244,8 +241,8 @@ TEST_CASE("RTI Internal - Multiple rays")
 TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
 {
     const size_t n_mesh = 12, n_ray = 1;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     // Two sub-meshes: sub 0 = tris 0-5, sub 1 = tris 6-11
     const size_t n_sub = 2;
@@ -253,7 +250,7 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
 
     // West→east ray (hits tris 8 and 10, both in sub 1)
     double Ox[1] = {-10.0}, Oy[1] = {0.0}, Oz[1] = {0.5};
-    double Dx[1] = {20.0}, Dy[1] = {0.0}, Dz[1] = {0.0};
+    double Dx[1] = {10.0}, Dy[1] = {0.0}, Dz[1] = {0.5};
     double Wf[1], Ws[1];
     unsigned If[1], Is[1], hit_cnt[1];
 
@@ -263,7 +260,7 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
         double Ymin[2] = {-1.0, 100.0}, Ymax[2] = {1.0, 200.0};
         double Zmin[2] = {-1.0, 100.0}, Zmax[2] = {1.0, 200.0};
 
-        qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+        qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                        SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                        Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                        Wf, Ws, If, Is, hit_cnt);
@@ -282,7 +279,7 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
         double Ymin[2] = {-1.0, -1.0}, Ymax[2] = {1.0, 1.0};
         double Zmin[2] = {-1.0, -1.0}, Zmax[2] = {1.0, 1.0};
 
-        qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+        qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                        SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                        Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                        Wf, Ws, If, Is, hit_cnt);
@@ -299,8 +296,8 @@ TEST_CASE("RTI Internal - Sub-mesh AABB filtering")
 TEST_CASE("RTI Internal - hit_cnt nullptr")
 {
     const size_t n_mesh = 12, n_sub = 1, n_ray = 1;
-    double Tx[12], Ty[12], Tz[12], E1x[12], E1y[12], E1z[12], E2x[12], E2y[12], E2z[12];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh);
+    double Tx[12], Ty[12], Tz[12], Ux[12], Uy[12], Uz[12], Vx[12], Vy[12], Vz[12];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh);
 
     unsigned SMI[1] = {0};
     double Xmin[1] = {-1.0}, Xmax[1] = {1.0};
@@ -308,12 +305,12 @@ TEST_CASE("RTI Internal - hit_cnt nullptr")
     double Zmin[1] = {-1.0}, Zmax[1] = {1.0};
 
     double Ox[1] = {-10.0}, Oy[1] = {0.0}, Oz[1] = {0.5};
-    double Dx[1] = {20.0}, Dy[1] = {0.0}, Dz[1] = {0.0};
+    double Dx[1] = {10.0}, Dy[1] = {0.0}, Dz[1] = {0.5};
 
     double Wf[1], Ws[1];
     unsigned If[1], Is[1];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf, Ws, If, Is, (unsigned *)nullptr);
@@ -330,12 +327,12 @@ TEST_CASE("RTI Internal - Float vs Double")
     const size_t n_mesh = 12, n_sub = 1, n_ray = 4;
 
     // Double-precision data
-    double Txd[12], Tyd[12], Tzd[12], E1xd[12], E1yd[12], E1zd[12], E2xd[12], E2yd[12], E2zd[12];
-    fill_cube_soa(Txd, Tyd, Tzd, E1xd, E1yd, E1zd, E2xd, E2yd, E2zd, n_mesh);
+    double Txd[12], Tyd[12], Tzd[12], Uxd[12], Uyd[12], Uzd[12], Vxd[12], Vyd[12], Vzd[12];
+    fill_cube_soa(Txd, Tyd, Tzd, Uxd, Uyd, Uzd, Vxd, Vyd, Vzd, n_mesh);
 
     // Single-precision data
-    float Txf[12], Tyf[12], Tzf[12], E1xf[12], E1yf[12], E1zf[12], E2xf[12], E2yf[12], E2zf[12];
-    fill_cube_soa(Txf, Tyf, Tzf, E1xf, E1yf, E1zf, E2xf, E2yf, E2zf, n_mesh);
+    float Txf[12], Tyf[12], Tzf[12], Uxf[12], Uyf[12], Uzf[12], Vxf[12], Vyf[12], Vzf[12];
+    fill_cube_soa(Txf, Tyf, Tzf, Uxf, Uyf, Uzf, Vxf, Vyf, Vzf, n_mesh);
 
     unsigned SMId[1] = {0}, SMIf[1] = {0};
 
@@ -346,28 +343,28 @@ TEST_CASE("RTI Internal - Float vs Double")
     double Oxd[4] = {-10.0, -10.0, 0.0, 1.0};
     double Oyd[4] = {0.0, 5.0, 0.0, -10.0};
     double Ozd[4] = {0.5, 5.0, 0.5, 0.5};
-    double Dxd[4] = {20.0, 20.0, 10.0, 0.0};
-    double Dyd[4] = {0.0, 0.0, 0.0, 20.0};
-    double Dzd[4] = {0.0, 0.0, 0.0, 0.0};
+    double Dxd[4] = {10.0, 10.0, 10.0, 1.0};
+    double Dyd[4] = {0.0, 5.0, 0.0, 10.0};
+    double Dzd[4] = {0.5, 5.0, 0.5, 0.5};
 
     float Oxf[4] = {-10.0f, -10.0f, 0.0f, 1.0f};
     float Oyf[4] = {0.0f, 5.0f, 0.0f, -10.0f};
     float Ozf[4] = {0.5f, 5.0f, 0.5f, 0.5f};
-    float Dxf[4] = {20.0f, 20.0f, 10.0f, 0.0f};
-    float Dyf[4] = {0.0f, 0.0f, 0.0f, 20.0f};
-    float Dzf[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float Dxf[4] = {10.0f, 10.0f, 10.0f, 1.0f};
+    float Dyf[4] = {0.0f, 5.0f, 0.0f, 10.0f};
+    float Dzf[4] = {0.5f, 5.0f, 0.5f, 0.5f};
 
     double Wfd[4], Wsd[4];
     unsigned Ifd[4], Isd[4], hit_cntd[4];
     float Wff[4], Wsf[4];
     unsigned Iff[4], Isf[4], hit_cntf[4];
 
-    qd_RTI_GENERIC(Txd, Tyd, Tzd, E1xd, E1yd, E1zd, E2xd, E2yd, E2zd, n_mesh,
+    qd_RTI_GENERIC(Txd, Tyd, Tzd, Uxd, Uyd, Uzd, Vxd, Vyd, Vzd, n_mesh,
                    SMId, Xmind, Xmaxd, Ymind, Ymaxd, Zmind, Zmaxd, n_sub,
                    Oxd, Oyd, Ozd, Dxd, Dyd, Dzd, n_ray,
                    Wfd, Wsd, Ifd, Isd, hit_cntd);
 
-    qd_RTI_GENERIC(Txf, Tyf, Tzf, E1xf, E1yf, E1zf, E2xf, E2yf, E2zf, n_mesh,
+    qd_RTI_GENERIC(Txf, Tyf, Tzf, Uxf, Uyf, Uzf, Vxf, Vyf, Vzf, n_mesh,
                    SMIf, Xminf, Xmaxf, Yminf, Ymaxf, Zminf, Zmaxf, n_sub,
                    Oxf, Oyf, Ozf, Dxf, Dyf, Dzf, n_ray,
                    Wff, Wsf, Iff, Isf, hit_cntf);
@@ -396,8 +393,8 @@ TEST_CASE("RTI Internal - AVX2 comparison")
     const size_t n_ray = 4;
 
     // Mesh data, padded to 16 (extra entries are degenerate zero-area triangles)
-    float Tx[16], Ty[16], Tz[16], E1x[16], E1y[16], E1z[16], E2x[16], E2y[16], E2z[16];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded);
+    float Tx[16], Ty[16], Tz[16], Ux[16], Uy[16], Uz[16], Vx[16], Vy[16], Vz[16];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded);
 
     // Sub-mesh index
     unsigned SMI[1] = {0};
@@ -424,15 +421,15 @@ TEST_CASE("RTI Internal - AVX2 comparison")
     float Ox[4] = {-10.0f, -10.0f, 0.0f, 1.0f};
     float Oy[4] = {0.0f, 5.0f, 0.0f, -10.0f};
     float Oz[4] = {0.5f, 5.0f, 0.5f, 0.5f};
-    float Dx[4] = {20.0f, 20.0f, 10.0f, 0.0f};
-    float Dy[4] = {0.0f, 0.0f, 0.0f, 20.0f};
-    float Dz[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float Dx[4] = {10.0f, 10.0f, 10.0f, 1.0f};
+    float Dy[4] = {0.0f, 5.0f, 0.0f, 10.0f};
+    float Dz[4] = {0.5f, 5.0f, 0.5f, 0.5f};
 
     // Generic float reference
     float Wf_ref[4], Ws_ref[4];
     unsigned If_ref[4], Is_ref[4], hit_cnt_ref[4];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf_ref, Ws_ref, If_ref, Is_ref, hit_cnt_ref);
@@ -441,7 +438,7 @@ TEST_CASE("RTI Internal - AVX2 comparison")
     float Wf_avx[4], Ws_avx[4];
     unsigned If_avx[4], Is_avx[4], hit_cnt_avx[4];
 
-    qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded,
+    qd_RTI_AVX2(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded,
                 SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                 Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                 Wf_avx, Ws_avx, If_avx, Is_avx, hit_cnt_avx);
@@ -469,8 +466,8 @@ TEST_CASE("RTI Internal - CUDA comparison")
     const size_t n_sub_s = 8;
     const size_t n_ray = 4;
 
-    float Tx[16], Ty[16], Tz[16], E1x[16], E1y[16], E1z[16], E2x[16], E2y[16], E2z[16];
-    fill_cube_soa(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded);
+    float Tx[16], Ty[16], Tz[16], Ux[16], Uy[16], Uz[16], Vx[16], Vy[16], Vz[16];
+    fill_cube_soa(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded);
 
     unsigned SMI[1] = {0};
     float Xmin[8], Xmax[8], Ymin[8], Ymax[8], Zmin[8], Zmax[8];
@@ -493,15 +490,15 @@ TEST_CASE("RTI Internal - CUDA comparison")
     float Ox[4] = {-10.0f, -10.0f, 0.0f, 1.0f};
     float Oy[4] = {0.0f, 5.0f, 0.0f, -10.0f};
     float Oz[4] = {0.5f, 5.0f, 0.5f, 0.5f};
-    float Dx[4] = {20.0f, 20.0f, 10.0f, 0.0f};
-    float Dy[4] = {0.0f, 0.0f, 0.0f, 20.0f};
-    float Dz[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float Dx[4] = {10.0f, 10.0f, 10.0f, 1.0f};
+    float Dy[4] = {0.0f, 5.0f, 0.0f, 10.0f};
+    float Dz[4] = {0.5f, 5.0f, 0.5f, 0.5f};
 
     // Generic float reference
     float Wf_ref[4], Ws_ref[4];
     unsigned If_ref[4], Is_ref[4], hit_cnt_ref[4];
 
-    qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded,
+    qd_RTI_GENERIC(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded,
                    SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                    Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                    Wf_ref, Ws_ref, If_ref, Is_ref, hit_cnt_ref);
@@ -510,7 +507,7 @@ TEST_CASE("RTI Internal - CUDA comparison")
     float Wf_cuda[4], Ws_cuda[4];
     unsigned If_cuda[4], Is_cuda[4], hit_cnt_cuda[4];
 
-    qd_RTI_CUDA(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_padded,
+    qd_RTI_CUDA(Tx, Ty, Tz, Ux, Uy, Uz, Vx, Vy, Vz, n_mesh_padded,
                 SMI, Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                 Ox, Oy, Oz, Dx, Dy, Dz, n_ray,
                 Wf_cuda, Ws_cuda, If_cuda, Is_cuda, hit_cnt_cuda);
