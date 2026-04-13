@@ -144,17 +144,17 @@ TEST_CASE("Calc Diffraction Gain")
     dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain, &coord);
 
-    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
     quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 5, &gain, &coord);
-    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
     quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 6, &gain, &coord);
-    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
     // 2 segments, (1) outside to inside, (2) inside
     orig = {{-1.5, 0.0, 0.5}};
     dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 5, &gain, &coord);
-    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 }

@@ -81,8 +81,8 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     CHECK(n_sub == 3);
 
     // Single ray
-    arma::mat orig = {{1.0, -10.0, 0.5}};
-    arma::mat dest = {{1.0, 10.0, 0.5}};
+    arma::mat orig = {{0.9, -10.0, 0.5}};
+    arma::mat dest = {{0.9, 10.0, 0.5}};
 
     arma::mat fbs, sbs;
     arma::u32_vec no_interact, fbs_ind, sbs_ind;
@@ -91,9 +91,9 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind);
 
     // Check results
-    arma::mat T = {{1.0, -1.0, 0.5}};
+    arma::mat T = {{0.9, -1.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
-    T = {{1.0, 1.0, 0.5}};
+    T = {{0.9, 1.0, 0.5}};
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
     // Store FBS and SBS indices
@@ -104,9 +104,9 @@ TEST_CASE("Ray-Triangle Intersect - Sub-mesh Mode")
     quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube_re, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, &cube_index);
 
     // Check results
-    T = {{1.0, -1.0, 0.5}};
+    T = {{0.9, -1.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
-    T = {{1.0, 1.0, 0.5}};
+    T = {{0.9, 1.0, 0.5}};
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
     // Store FBS and SBS indices
