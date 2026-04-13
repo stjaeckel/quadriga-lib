@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-// CUDA variant of qd_RTI_AVX2 — Möller–Trumbore ray-triangle intersection
+// CUDA variant of qd_RTI — Möller–Trumbore ray-triangle intersection
 
 #include <cstdint>
 #include <cstdlib>
@@ -23,6 +23,8 @@
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include <type_traits>
+#include <vector>
 
 #include <cub/cub.cuh>
 
@@ -47,7 +49,6 @@ namespace
 
     // ============================================================================
     // Device helper: pack/unpack float+face into uint64 for atomicMin
-    // Section 7.1
     // ============================================================================
 
     __device__ __forceinline__
@@ -72,7 +73,7 @@ namespace
     }
 
     // ============================================================================
-    // Device helper: warp-level queue compaction (Section 7.2)
+    // Device helper: warp-level queue compaction
     // ============================================================================
 
     __device__ __forceinline__ void RTI_enqueue_warp(bool has_hit, uint32_t ray_idx, uint16_t aabb_idx,
@@ -105,7 +106,7 @@ namespace
     }
 
     // ============================================================================
-    // Kernel 0: RTI_init_per_ray_state (Section 4.0)
+    // Kernel 0: RTI_init_per_ray_state
     // ============================================================================
 
     __global__ void RTI_init_per_ray_state(
@@ -128,7 +129,7 @@ namespace
     }
 
     // ============================================================================
-    // Kernel 1: RTI_aabb_test_and_enqueue (Section 4.1)
+    // Kernel 1: RTI_aabb_test_and_enqueue
     // Slab test with NaN-safe ordered comparisons (no fminf/fmaxf).
     // ============================================================================
 
@@ -218,7 +219,7 @@ namespace
     }
 
     // ============================================================================
-    // Kernel 2: RTI_moller_trumbore_fbs (Section 4.2)
+    // Kernel 2: RTI_moller_trumbore_fbs
     // First-bounce scatter — finds closest hit per ray via 64-bit atomicMin.
     // ============================================================================
 
@@ -331,7 +332,7 @@ namespace
     }
 
     // ============================================================================
-    // Kernel 3: RTI_moller_trumbore_sbs (Section 4.3)
+    // Kernel 3: RTI_moller_trumbore_sbs
     // Second-bounce scatter — processes only compacted work items (had hit).
     // Skips the FBS face.
     // ============================================================================
@@ -432,7 +433,7 @@ namespace
     }
 
     // ============================================================================
-    // Kernel 4: RTI_finalize_outputs (Section 4.4)
+    // Kernel 4: RTI_finalize_outputs
     // Unpacks packed FBS/SBS into user-facing Wf, Ws, If, Is, hit_cnt.
     // ============================================================================
 
@@ -470,7 +471,25 @@ namespace
     }
 
     // ============================================================================
-    // RAII cleanup struct (Section 8)
+    // Kernel 5a/5b: double ↔ float conversion (one element per thread)
+    // ============================================================================
+
+    __global__ void RTI_d2f(const double *__restrict__ in, float *__restrict__ out, uint32_t n)
+    {
+        uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < n)
+            out[i] = __double2float_rn(in[i]);
+    }
+
+    __global__ void RTI_f2d(const float *__restrict__ in, double *__restrict__ out, uint32_t n)
+    {
+        uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < n)
+            out[i] = (double)in[i];
+    }
+
+    // ============================================================================
+    // RAII cleanup struct
     // Holds all device and pinned-host pointers. Destructor frees everything.
     // ============================================================================
 
@@ -516,6 +535,17 @@ namespace
         float *h_ray_input_pinned[2] = {};
         // Output: 2 floats + 3 uints interleaved into one flat buffer
         char *h_ray_output_pinned[2] = {};
+
+        // Double-precision staging (allocated only by double specialization)
+        double *d_ray_input_d[2] = {}; // flat SoA: 6 * batch_size doubles
+        double *d_Wf_d[2] = {};        // batch_size doubles
+        double *d_Ws_d[2] = {};
+
+        // Pinned host for double I/O
+        double *h_ray_input_pinned_d[2] = {};
+        char *h_ray_output_pinned_d[2] = {};
+        size_t pinned_input_bytes_d = 0;
+        size_t pinned_output_bytes_d = 0;
 
         // CUDA streams
         cudaStream_t stream[2] = {};
@@ -570,11 +600,18 @@ namespace
                 cudaFree(d_compact_indices[s]);
                 cudaFree(d_num_selected[s]);
                 cudaFree(d_cub_temp[s]);
+                cudaFree(d_ray_input_d[s]);
+                cudaFree(d_Wf_d[s]);
+                cudaFree(d_Ws_d[s]);
 
                 if (h_ray_input_pinned[s])
                     cudaFreeHost(h_ray_input_pinned[s]);
                 if (h_ray_output_pinned[s])
                     cudaFreeHost(h_ray_output_pinned[s]);
+                if (h_ray_input_pinned_d[s])
+                    cudaFreeHost(h_ray_input_pinned_d[s]);
+                if (h_ray_output_pinned_d[s])
+                    cudaFreeHost(h_ray_output_pinned_d[s]);
             }
 
             if (streams_created)
@@ -604,13 +641,24 @@ namespace
     }
 
     // ============================================================================
-    // Helper: upload a float array host → device
+    // Helper: upload scene host → device
     // ============================================================================
 
-    static inline void RTI_upload_float(float *&d_ptr, const float *h_ptr, size_t count)
+    template <typename dtype>
+    static inline void RTI_upload_scene(float *&d_ptr, const dtype *h_ptr, size_t count)
     {
         CUDA_CHECK(cudaMalloc(&d_ptr, count * sizeof(float)));
-        CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, count * sizeof(float), cudaMemcpyHostToDevice));
+        if constexpr (std::is_same_v<dtype, float>)
+        {
+            CUDA_CHECK(cudaMemcpy(d_ptr, h_ptr, count * sizeof(float), cudaMemcpyHostToDevice));
+        }
+        else
+        {
+            std::vector<float> tmp(count);
+            for (size_t i = 0; i < count; ++i)
+                tmp[i] = static_cast<float>(h_ptr[i]);
+            CUDA_CHECK(cudaMemcpy(d_ptr, tmp.data(), count * sizeof(float), cudaMemcpyHostToDevice));
+        }
     }
 
     // ============================================================================
@@ -618,17 +666,18 @@ namespace
     // Layout in pinned buffer: [Ox ... | Oy ... | Oz ... | Dx ... | Dy ... | Dz ...]
     // ============================================================================
 
-    static inline void RTI_stage_ray_input(float *pinned, size_t batch_size,
-                                           const float *Ox, const float *Oy, const float *Oz,
-                                           const float *Dx, const float *Dy, const float *Dz,
+    template <typename dtype>
+    static inline void RTI_stage_ray_input(dtype *pinned, size_t batch_size,
+                                           const dtype *Ox, const dtype *Oy, const dtype *Oz,
+                                           const dtype *Dx, const dtype *Dy, const dtype *Dz,
                                            size_t offset, size_t count)
     {
-        memcpy(pinned + 0 * batch_size, Ox + offset, count * sizeof(float));
-        memcpy(pinned + 1 * batch_size, Oy + offset, count * sizeof(float));
-        memcpy(pinned + 2 * batch_size, Oz + offset, count * sizeof(float));
-        memcpy(pinned + 3 * batch_size, Dx + offset, count * sizeof(float));
-        memcpy(pinned + 4 * batch_size, Dy + offset, count * sizeof(float));
-        memcpy(pinned + 5 * batch_size, Dz + offset, count * sizeof(float));
+        memcpy(pinned + 0 * batch_size, Ox + offset, count * sizeof(dtype));
+        memcpy(pinned + 1 * batch_size, Oy + offset, count * sizeof(dtype));
+        memcpy(pinned + 2 * batch_size, Oz + offset, count * sizeof(dtype));
+        memcpy(pinned + 3 * batch_size, Dx + offset, count * sizeof(dtype));
+        memcpy(pinned + 4 * batch_size, Dy + offset, count * sizeof(dtype));
+        memcpy(pinned + 5 * batch_size, Dz + offset, count * sizeof(dtype));
     }
 
     // ============================================================================
@@ -636,44 +685,47 @@ namespace
     // Layout: [Wf ... | Ws ... | If ... | Is ... | hit_cnt ...]
     // ============================================================================
 
+    template <typename dtype>
     static inline void RTI_unstage_ray_output(const char *pinned, size_t batch_size,
-                                              float *Wf, float *Ws,
+                                              dtype *Wf, dtype *Ws,
                                               unsigned *If, unsigned *Is,
                                               unsigned *hit_cnt, bool count_hits,
                                               size_t offset, size_t count)
     {
-        size_t f4 = batch_size * sizeof(float);
-        size_t u4 = batch_size * sizeof(uint32_t);
+        size_t tW = batch_size * sizeof(dtype);    // Wf/Ws stride
+        size_t u4 = batch_size * sizeof(uint32_t); // If/Is/hit_cnt stride
 
-        memcpy(Wf + offset, pinned, count * sizeof(float));
-        memcpy(Ws + offset, pinned + f4, count * sizeof(float));
-        memcpy(If + offset, pinned + 2 * f4, count * sizeof(uint32_t));
-        memcpy(Is + offset, pinned + 2 * f4 + u4, count * sizeof(uint32_t));
+        memcpy(Wf + offset, pinned, count * sizeof(dtype));
+        memcpy(Ws + offset, pinned + tW, count * sizeof(dtype));
+        memcpy(If + offset, pinned + 2 * tW, count * sizeof(uint32_t));
+        memcpy(Is + offset, pinned + 2 * tW + u4, count * sizeof(uint32_t));
         if (count_hits)
-            memcpy(hit_cnt + offset, pinned + 2 * f4 + 2 * u4, count * sizeof(uint32_t));
+            memcpy(hit_cnt + offset, pinned + 2 * tW + 2 * u4, count * sizeof(uint32_t));
     }
 
 } // end anonymous namespace --------------------------------------------------
 
 // Public entry point — external linkage
-void qd_RTI_CUDA(
-    const float *Tx, const float *Ty, const float *Tz,
-    const float *E1x, const float *E1y, const float *E1z,
-    const float *E2x, const float *E2y, const float *E2z,
-    const size_t n_mesh,
-    const unsigned *SMI,
-    const float *Xmin, const float *Xmax,
-    const float *Ymin, const float *Ymax,
-    const float *Zmin, const float *Zmax,
-    const size_t n_sub,
-    const float *Ox, const float *Oy, const float *Oz,
-    const float *Dx, const float *Dy, const float *Dz,
-    const size_t n_ray,
-    float *Wf, float *Ws,
-    unsigned *If, unsigned *Is,
-    unsigned *hit_cnt,
-    int gpu_id)
+template <typename dtype>
+void qd_RTI_CUDA(const dtype *Tx, const dtype *Ty, const dtype *Tz,
+                 const dtype *E1x, const dtype *E1y, const dtype *E1z,
+                 const dtype *E2x, const dtype *E2y, const dtype *E2z,
+                 const size_t n_mesh,
+                 const unsigned *SMI,
+                 const dtype *Xmin, const dtype *Xmax,
+                 const dtype *Ymin, const dtype *Ymax,
+                 const dtype *Zmin, const dtype *Zmax,
+                 const size_t n_sub,
+                 const dtype *Ox, const dtype *Oy, const dtype *Oz,
+                 const dtype *Dx, const dtype *Dy, const dtype *Dz,
+                 const size_t n_ray,
+                 dtype *Wf, dtype *Ws,
+                 unsigned *If, unsigned *Is,
+                 unsigned *hit_cnt,
+                 int gpu_id)
 {
+    constexpr bool is_double = std::is_same_v<dtype, double>;
+
     // --- Early returns (Section 8) ---
     if (n_ray == 0)
         return;
@@ -683,8 +735,8 @@ void qd_RTI_CUDA(
         // Zero-fill all outputs on host — no GPU work needed
         for (size_t i = 0; i < n_ray; ++i)
         {
-            Wf[i] = 1.0f;
-            Ws[i] = 1.0f;
+            Wf[i] = dtype(1.0);
+            Ws[i] = dtype(1.0);
             If[i] = 0;
             Is[i] = 0;
         }
@@ -709,15 +761,15 @@ void qd_RTI_CUDA(
     // Upload scene data (resident for the entire run)
     // =====================================================================
 
-    RTI_upload_float(buf.d_Tx, Tx, n_mesh);
-    RTI_upload_float(buf.d_Ty, Ty, n_mesh);
-    RTI_upload_float(buf.d_Tz, Tz, n_mesh);
-    RTI_upload_float(buf.d_E1x, E1x, n_mesh);
-    RTI_upload_float(buf.d_E1y, E1y, n_mesh);
-    RTI_upload_float(buf.d_E1z, E1z, n_mesh);
-    RTI_upload_float(buf.d_E2x, E2x, n_mesh);
-    RTI_upload_float(buf.d_E2y, E2y, n_mesh);
-    RTI_upload_float(buf.d_E2z, E2z, n_mesh);
+    RTI_upload_scene(buf.d_Tx, Tx, n_mesh);
+    RTI_upload_scene(buf.d_Ty, Ty, n_mesh);
+    RTI_upload_scene(buf.d_Tz, Tz, n_mesh);
+    RTI_upload_scene(buf.d_E1x, E1x, n_mesh);
+    RTI_upload_scene(buf.d_E1y, E1y, n_mesh);
+    RTI_upload_scene(buf.d_E1z, E1z, n_mesh);
+    RTI_upload_scene(buf.d_E2x, E2x, n_mesh);
+    RTI_upload_scene(buf.d_E2y, E2y, n_mesh);
+    RTI_upload_scene(buf.d_E2z, E2z, n_mesh);
 
     // SMI sentinel: allocate n_sub+1 entries, set SMI[n_sub] = n_mesh
     {
@@ -732,12 +784,12 @@ void qd_RTI_CUDA(
     }
 
     // AABB bounds
-    RTI_upload_float(buf.d_Xmin, Xmin, n_sub);
-    RTI_upload_float(buf.d_Xmax, Xmax, n_sub);
-    RTI_upload_float(buf.d_Ymin, Ymin, n_sub);
-    RTI_upload_float(buf.d_Ymax, Ymax, n_sub);
-    RTI_upload_float(buf.d_Zmin, Zmin, n_sub);
-    RTI_upload_float(buf.d_Zmax, Zmax, n_sub);
+    RTI_upload_scene(buf.d_Xmin, Xmin, n_sub);
+    RTI_upload_scene(buf.d_Xmax, Xmax, n_sub);
+    RTI_upload_scene(buf.d_Ymin, Ymin, n_sub);
+    RTI_upload_scene(buf.d_Ymax, Ymax, n_sub);
+    RTI_upload_scene(buf.d_Zmin, Zmin, n_sub);
+    RTI_upload_scene(buf.d_Zmax, Zmax, n_sub);
 
     // =====================================================================
     // Batch size calculation (Section 5.1)
@@ -755,6 +807,10 @@ void qd_RTI_CUDA(
                            + E * (4 + 2) // work queue B: sort output
                            + E * 1       // had_hit flags
                            + E * 4;      // compact_indices
+
+    if constexpr (is_double)
+        per_ray_bytes += 6 * sizeof(double)    // d_ray_input_d
+                         + 2 * sizeof(double); // d_Wf_d + d_Ws_d
 
     // Query CUB temp requirements at runtime
     size_t max_queue_estimate = (n_ray < 10000000) ? n_ray * E : 10000000ULL * E;
@@ -848,8 +904,23 @@ void qd_RTI_CUDA(
         CUDA_CHECK(cudaMalloc(&buf.d_cub_temp[s], cub_temp_per_stream));
 
         // Pinned host memory
-        CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned[s], buf.pinned_input_bytes));
-        CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned[s], buf.pinned_output_bytes));
+        if constexpr (is_double)
+        {
+            CUDA_CHECK(cudaMalloc(&buf.d_ray_input_d[s], 6 * batch_size * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Wf_d[s], batch_size * sizeof(double)));
+            CUDA_CHECK(cudaMalloc(&buf.d_Ws_d[s], batch_size * sizeof(double)));
+
+            buf.pinned_input_bytes_d = 6 * batch_size * sizeof(double);
+            buf.pinned_output_bytes_d = 2 * batch_size * sizeof(double) + 3 * ray_u_bytes;
+
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned_d[s], buf.pinned_input_bytes_d));
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned_d[s], buf.pinned_output_bytes_d));
+        }
+        else
+        {
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_input_pinned[s], buf.pinned_input_bytes));
+            CUDA_CHECK(cudaMallocHost(&buf.h_ray_output_pinned[s], buf.pinned_output_bytes));
+        }
     }
 
     // =====================================================================
@@ -873,8 +944,10 @@ void qd_RTI_CUDA(
     // Stage batch 0 into pinned memory BEFORE the loop
     {
         size_t count0 = std::min(batch_size, n_ray);
-        RTI_stage_ray_input(buf.h_ray_input_pinned[0], batch_size,
-                            Ox, Oy, Oz, Dx, Dy, Dz, 0, count0);
+        if constexpr (is_double)
+            RTI_stage_ray_input(buf.h_ray_input_pinned_d[0], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, 0, count0);
+        else
+            RTI_stage_ray_input(buf.h_ray_input_pinned[0], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, 0, count0);
     }
 
     for (size_t batch_idx = 0; batch_idx < n_batches; ++batch_idx)
@@ -894,27 +967,52 @@ void qd_RTI_CUDA(
             size_t prev_offset = (batch_idx - 1) * batch_size;
             size_t prev_count = std::min(batch_size, n_ray - prev_offset);
 
-            RTI_unstage_ray_output(buf.h_ray_output_pinned[sp], batch_size,
-                                   Wf, Ws, If, Is, hit_cnt, count_hits,
-                                   prev_offset, prev_count);
+            if constexpr (is_double)
+                RTI_unstage_ray_output(buf.h_ray_output_pinned_d[sp], batch_size,
+                                       Wf, Ws, If, Is, hit_cnt, count_hits,
+                                       prev_offset, prev_count);
+            else
+                RTI_unstage_ray_output(buf.h_ray_output_pinned[sp], batch_size,
+                                       Wf, Ws, If, Is, hit_cnt, count_hits,
+                                       prev_offset, prev_count);
         }
 
         // --- H→D: upload ray data for this batch ---
         // Layout in pinned: [Ox | Oy | Oz | Dx | Dy | Dz], each batch_size floats
         cudaStream_t cs = buf.stream[s];
 
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Ox[s], buf.h_ray_input_pinned[s] + 0 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Oy[s], buf.h_ray_input_pinned[s] + 1 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Oz[s], buf.h_ray_input_pinned[s] + 2 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Dx[s], buf.h_ray_input_pinned[s] + 3 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Dy[s], buf.h_ray_input_pinned[s] + 4 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
-        CUDA_CHECK(cudaMemcpyAsync(buf.d_Dz[s], buf.h_ray_input_pinned[s] + 5 * batch_size,
-                                   n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+        if constexpr (is_double)
+        {
+            // Upload doubles to device staging buffer
+            double *d_in = buf.d_ray_input_d[s];
+            double *h_in = buf.h_ray_input_pinned_d[s];
+            for (int k = 0; k < 6; ++k)
+                CUDA_CHECK(cudaMemcpyAsync(d_in + k * batch_size,
+                                           h_in + k * batch_size,
+                                           n_ray_batch * sizeof(double),
+                                           cudaMemcpyHostToDevice, cs));
+
+            // d2f conversion → fills existing float device arrays
+            uint32_t grid_cvt = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            float *d_float[6] = {buf.d_Ox[s], buf.d_Oy[s], buf.d_Oz[s], buf.d_Dx[s], buf.d_Dy[s], buf.d_Dz[s]};
+            for (int k = 0; k < 6; ++k)
+                RTI_d2f<<<grid_cvt, BLOCK_SIZE, 0, cs>>>(d_in + k * batch_size, d_float[k], n_ray_batch_u);
+        }
+        else
+        {
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Ox[s], buf.h_ray_input_pinned[s] + 0 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oy[s], buf.h_ray_input_pinned[s] + 1 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Oz[s], buf.h_ray_input_pinned[s] + 2 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dx[s], buf.h_ray_input_pinned[s] + 3 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dy[s], buf.h_ray_input_pinned[s] + 4 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+            CUDA_CHECK(cudaMemcpyAsync(buf.d_Dz[s], buf.h_ray_input_pinned[s] + 5 * batch_size,
+                                       n_ray_batch * sizeof(float), cudaMemcpyHostToDevice, cs));
+        }
 
         // --- Kernel 0: init per-ray state ---
         uint32_t grid0 = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -1103,8 +1201,10 @@ void qd_RTI_CUDA(
             int next_s = (int)((batch_idx + 1) % 2);
             size_t next_offset = (batch_idx + 1) * batch_size;
             size_t next_count = std::min(batch_size, n_ray - next_offset);
-            RTI_stage_ray_input(buf.h_ray_input_pinned[next_s], batch_size,
-                                Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
+            if constexpr (is_double)
+                RTI_stage_ray_input(buf.h_ray_input_pinned_d[next_s], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
+            else
+                RTI_stage_ray_input(buf.h_ray_input_pinned[next_s], batch_size, Ox, Oy, Oz, Dx, Dy, Dz, next_offset, next_count);
         }
 
         CUDA_CHECK(cudaStreamSynchronize(cs)); // need num_compact for K3 grid
@@ -1141,32 +1241,48 @@ void qd_RTI_CUDA(
 
         // --- D→H: download results ---
         // Layout in pinned output: [Wf | Ws | If | Is | hit_cnt]
-        size_t out_off = 0;
-        CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
-                                   buf.d_Wf[s], n_ray_batch * sizeof(float),
-                                   cudaMemcpyDeviceToHost, cs));
-        out_off += batch_size * sizeof(float);
-
-        CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
-                                   buf.d_Ws[s], n_ray_batch * sizeof(float),
-                                   cudaMemcpyDeviceToHost, cs));
-        out_off += batch_size * sizeof(float);
-
-        CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
-                                   buf.d_If[s], n_ray_batch * sizeof(uint32_t),
-                                   cudaMemcpyDeviceToHost, cs));
-        out_off += batch_size * sizeof(uint32_t);
-
-        CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
-                                   buf.d_Is[s], n_ray_batch * sizeof(uint32_t),
-                                   cudaMemcpyDeviceToHost, cs));
-        out_off += batch_size * sizeof(uint32_t);
-
-        if (count_hits)
+        if constexpr (is_double)
         {
+            // Convert Wf, Ws float → double on device
+            uint32_t grid_cvt = (n_ray_batch_u + BLOCK_SIZE - 1) / BLOCK_SIZE;
+            RTI_f2d<<<grid_cvt, BLOCK_SIZE, 0, cs>>>(buf.d_Wf[s], buf.d_Wf_d[s], n_ray_batch_u);
+            RTI_f2d<<<grid_cvt, BLOCK_SIZE, 0, cs>>>(buf.d_Ws[s], buf.d_Ws_d[s], n_ray_batch_u);
+
+            // D→H into double-typed pinned output: [Wf_d | Ws_d | If | Is | hit_cnt]
+            char *out = buf.h_ray_output_pinned_d[s];
+            size_t dW = batch_size * sizeof(double);
+            size_t u4 = batch_size * sizeof(uint32_t);
+            size_t off = 0;
+            CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_Wf_d[s], n_ray_batch * sizeof(double), cudaMemcpyDeviceToHost, cs));
+            off += dW;
+            CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_Ws_d[s], n_ray_batch * sizeof(double), cudaMemcpyDeviceToHost, cs));
+            off += dW;
+            CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_If[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
+            off += u4;
+            CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_Is[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
+            off += u4;
+            if (count_hits)
+                CUDA_CHECK(cudaMemcpyAsync(out + off, buf.d_hit_cnt[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
+        }
+        else
+        {
+            // Original float download (unchanged)
+            size_t out_off = 0;
             CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
-                                       buf.d_hit_cnt[s], n_ray_batch * sizeof(uint32_t),
-                                       cudaMemcpyDeviceToHost, cs));
+                                       buf.d_Wf[s], n_ray_batch * sizeof(float), cudaMemcpyDeviceToHost, cs));
+            out_off += batch_size * sizeof(float);
+            CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
+                                       buf.d_Ws[s], n_ray_batch * sizeof(float), cudaMemcpyDeviceToHost, cs));
+            out_off += batch_size * sizeof(float);
+            CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
+                                       buf.d_If[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
+            out_off += batch_size * sizeof(uint32_t);
+            CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
+                                       buf.d_Is[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
+            out_off += batch_size * sizeof(uint32_t);
+            if (count_hits)
+                CUDA_CHECK(cudaMemcpyAsync(buf.h_ray_output_pinned[s] + out_off,
+                                           buf.d_hit_cnt[s], n_ray_batch * sizeof(uint32_t), cudaMemcpyDeviceToHost, cs));
         }
     }
 
@@ -1178,10 +1294,29 @@ void qd_RTI_CUDA(
         size_t last_offset = (n_batches - 1) * batch_size;
         size_t last_count = n_ray - last_offset;
 
-        RTI_unstage_ray_output(buf.h_ray_output_pinned[last_s], batch_size,
-                               Wf, Ws, If, Is, hit_cnt, count_hits,
-                               last_offset, last_count);
+        if constexpr (is_double)
+            RTI_unstage_ray_output(buf.h_ray_output_pinned_d[last_s], batch_size,
+                                   Wf, Ws, If, Is, hit_cnt, count_hits,
+                                   last_offset, last_count);
+        else
+            RTI_unstage_ray_output(buf.h_ray_output_pinned[last_s], batch_size,
+                                   Wf, Ws, If, Is, hit_cnt, count_hits,
+                                   last_offset, last_count);
     }
 
     // RAII destructor handles all cleanup
 }
+
+template void qd_RTI_CUDA<float>(const float *, const float *, const float *,
+                                 const float *, const float *, const float *, const float *, const float *, const float *,
+                                 size_t, const unsigned *,
+                                 const float *, const float *, const float *, const float *, const float *, const float *, size_t,
+                                 const float *, const float *, const float *, const float *, const float *, const float *, size_t,
+                                 float *, float *, unsigned *, unsigned *, unsigned *, int);
+
+template void qd_RTI_CUDA<double>(const double *, const double *, const double *,
+                                  const double *, const double *, const double *, const double *, const double *, const double *,
+                                  size_t, const unsigned *,
+                                  const double *, const double *, const double *, const double *, const double *, const double *, size_t,
+                                  const double *, const double *, const double *, const double *, const double *, const double *, size_t,
+                                  double *, double *, unsigned *, unsigned *, unsigned *, int);
