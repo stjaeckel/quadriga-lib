@@ -7868,7 +7868,6 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 </li><li style="margin-bottom: 0.4em;">In auto mode (0), CUDA is selected only when <code>n_ray &gt;= 10000</code> and a CUDA-capable GPU is available; 
    otherwise AVX2 is preferred if available, falling back to GENERIC. 
 </li><li style="margin-bottom: 0.4em;">Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices. 
-</li><li style="margin-bottom: 0.4em;">Supports a compact input format where origin and destination coordinates are stored together. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li><li style="margin-bottom: 0.4em;">Internal computations are carried out in <b>single precision</b> regardless of <code>dtype</code>. 
 </li></ul>
@@ -7885,20 +7884,18 @@ void quadriga_lib::ray_triangle_intersect(
                 arma::u32_vec *fbs_ind = nullptr,
                 arma::u32_vec *sbs_ind = nullptr,
                 const arma::u32_vec *sub_mesh_index = nullptr,
-                bool transpose_inputs = false,
+                const arma::Mat&lt;dtype&gt; *aabb = nullptr,
                 int use_kernel = 0,
                 int gpu_id = 0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*orig</b></code> (input)<br> 
-   Ray origins in global coordinate system (GCS). Size: <code>[n_ray, 3]</code>, or <code>[n_ray, 6]</code> if <code>dest == nullptr</code>. 
-   In the latter case, columns must be ordered as <code>{xo, yo, zo, xd, yd, zd}</code>. 
+   Ray origins in global coordinate system (GCS). Size: <code>[n_ray, 3]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*dest</b></code> (input)<br> 
-   Ray destinations in GCS. Size: <code>[n_ray, 3]</code>. Set to <code>nullptr</code> if <code>orig</code> has 6 columns and contains 
-   both origin and destination. 
+   Ray destinations in GCS. Size: <code>[n_ray, 3]</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mesh</b></code> (input)<br> 
@@ -7928,7 +7925,11 @@ void quadriga_lib::ray_triangle_intersect(
  
 <ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*sub_mesh_index</b></code> (optional input)<br> 
    Indexes indicating start of sub-meshes in <code>mesh</code>. Size: <code>[n_sub]</code>. Enables faster processing via segmentation. 
-   When using AVX2, sub-mesh start indices must be aligned to multiples of 8. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*aabb</b></code> (optional input)<br> 
+   Pre-computed axis-aligned bounding boxes per sub-mesh. Size: <code>[n_sub, 6]</code>, where each row contains 
+   <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>. If <code>nullptr</code>, AABBs are computed internally from <code>mesh</code>. 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><code>bool <b>transpose_inputs</b> = false</code> (optional input)<br> 
