@@ -624,8 +624,11 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
             arma::Mat<dtype> *edge_faces = &obj_faces[i_obj_2];
 
             // Test if edges intersect with faces (3D test)
-            arma::u32_vec hit; // Face hit indicator, 1-based, 0 = no hit
-            quadriga_lib::ray_triangle_intersect<dtype>(edges, nullptr, faces, nullptr, nullptr, nullptr, &hit, nullptr, nullptr, true);
+            arma::u32_vec hit;                                    // Face hit indicator, 1-based, 0 = no hit
+            arma::Mat<dtype> edge_orig_t = edges->rows(0, 2).t(); // [3, n_edges].t() → [n_edges, 3]
+            arma::Mat<dtype> edge_dest_t = edges->rows(3, 5).t(); // [3, n_edges].t() → [n_edges, 3]
+            arma::Mat<dtype> faces_t = faces->rows(0, 8).t();     // [9, n_faces].t() → [n_faces, 9]
+            quadriga_lib::ray_triangle_intersect<dtype>(&edge_orig_t, &edge_dest_t, &faces_t, nullptr, nullptr, nullptr, &hit);
 
             // False positives:
             // - Edge lies in the face plane (and hits at a random place due to numeric instabilities)

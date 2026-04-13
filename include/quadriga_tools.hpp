@@ -488,8 +488,6 @@ namespace quadriga_lib
     // - Implements the Möller–Trumbore ray-triangle intersection algorithm
     // - Supports three compute kernels: GENERIC (scalar), AVX2 (SIMD), and CUDA (GPU)
     // - All internal computations are done using single precision
-    // - Instead of 'orig' and 'dest', rays can be provided as a combined object 'orig' with size [ n_ray, 6 ] = {xo, yo, zo, xd, yd, zd}
-    //   The input 'dest' must be a nullptr in this case. This can help to optimize memory access patterns.
     template <typename dtype>
     void ray_triangle_intersect(const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
                                 const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
@@ -500,7 +498,7 @@ namespace quadriga_lib
                                 arma::u32_vec *fbs_ind = nullptr,              // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                                 arma::u32_vec *sbs_ind = nullptr,              // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
                                 const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
-                                bool transpose_inputs = false,                 // Option to transpose inputs orig, dest to [ 3, n_ray ] and mesh to [ 9, n_mesh ]
+                                const arma::Mat<dtype> *aabb = nullptr,        // Axis-aligned bounding boxes for the sub-meshes, Size [ n_sub, 6 ]
                                 int use_kernel = 0,                            // Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA
                                 int gpu_id = 0);                               // GPU device ID for CUDA kernel, ignored otherwise
 
@@ -542,7 +540,7 @@ namespace quadriga_lib
     template <typename dtype>
     arma::Mat<dtype> triangle_mesh_aabb(const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
                                         const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, Length: [ n_sub ]
-                                        arma::uword vec_size = 1);                     // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+                                        arma::uword vec_size = 1);                     // Vector size for SIMD processing (e.g. 8 for AVX2)
 
     // Reorganize a 3D mesh into smaller sub-meshes for faster processing
     // - Recursively calls "mesh_split" until number of elements per sub-mesh is below a target size
