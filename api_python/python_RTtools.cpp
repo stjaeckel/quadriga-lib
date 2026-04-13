@@ -48,9 +48,9 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("bsdf") = py::array_t<double>(),
           py::arg("map_to_itu") = false);
 
-    m.def("obj_file_read", &obj_file_read, 
-        py::arg("fn"),
-        py::arg("materials_csv") = "");
+    m.def("obj_file_read", &obj_file_read,
+          py::arg("fn"),
+          py::arg("materials_csv") = "");
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),
@@ -80,7 +80,10 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("orig") = py::array_t<double>(),
           py::arg("dest") = py::array_t<double>(),
           py::arg("mesh") = py::array_t<double>(),
-          py::arg("sub_mesh_index") = py::array_t<unsigned>());
+          py::arg("sub_mesh_index") = py::array_t<unsigned>(),
+          py::arg("aabb") = py::array_t<double>(),
+          py::arg("use_kernel") = 0,
+          py::arg("gpu_id") = 0);
 
     m.def("triangle_mesh_aabb", &triangle_mesh_aabb,
           py::arg("triangles") = py::array_t<double>(),

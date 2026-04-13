@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.11.0</b></big>
+      <!-- CONTENT BEGIN --><big><b>Python API Documentation for Quadriga-Lib v0.11.1</b></big>
 <br><br><br>
 
 <b>Notes</b>
@@ -5222,21 +5222,12 @@ hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, 
 <b>ray_triangle_intersect</b> - Calculates the intersection of rays and triangles in three dimensions
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function implements the Möller–Trumbore ray-triangle intersection algorithm, known for its 
-   efficiency in calculating the intersection of a ray and a triangle in three-dimensional space. 
-   This method achieves its speed by eliminating the need for precomputed plane equations of the plane 
-   containing the triangle. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">For further information, refer to [Wikipedia: <a href="https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm">Möller–Trumbore intersection algorithm</a>]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle 
-   is specified by its three vertices. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
-   available, to speed up the computational process. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D. 
+</li><li style="margin-bottom: 0.4em;">Supports three compute kernels: <b>GENERIC</b> (scalar), <b>AVX2</b> (SIMD, 8 triangles in parallel), and <b>CUDA</b> (GPU). 
+</li><li style="margin-bottom: 0.4em;">The <code>use_kernel</code> parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. 
+</li><li style="margin-bottom: 0.4em;">In auto mode (0), CUDA is selected only when <code>n_ray &gt;= 10000</code> and a CUDA-capable GPU is available; 
+   otherwise AVX2 is preferred if available, falling back to GENERIC. 
+</li><li style="margin-bottom: 0.4em;">Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
@@ -5244,65 +5235,82 @@ hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, 
 from quadriga_lib import RTtools
 
 # Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index )
+data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 
 # Unpacked outputs
-fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index )
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>orig</code></b><br> 
-   Ray origins in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;">ndarray <b><code>orig</code></b><br> 
+   Ray origins in global coordinate system (GCS); dtype: float64; shape: <code>(n_ray, 3)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>dest</code></b><br> 
-   Ray destinations in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>dest</code></b><br> 
+   Ray destinations in GCS; dtype: float64; shape: <code>(n_ray, 3)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>mesh</code></b><br> 
-   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
-   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ];  
-   Size: <code>[ no_mesh, 9 ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>mesh</code></b><br> 
+   Triangular surface mesh. Each row contains the 3 vertices 
+   <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; dtype: float64; shape: <code>(n_mesh, 9)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b> (optional)<br> 
-   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections 
-   are calculated for each mesh element, leading to poor performance for large meshes. 
-   Vector of length <code>[ n_sub_mesh ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>sub_mesh_index</code></b> (optional)<br> 
+   Indexes indicating start of sub-meshes in <code>mesh</code>. Enables faster processing via segmentation. 
+   0-based; dtype: uint32; shape: <code>(n_sub,)</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>aabb</code></b> (optional)<br> 
+   Pre-computed axis-aligned bounding boxes per sub-mesh. Each row contains 
+   <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>; dtype: float64; shape: <code>(n_sub, 6)</code>. 
+   If not provided, AABBs are computed internally from <code>mesh</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>use_kernel</code></b> (optional)<br> 
+   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD), 
+   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>gpu_id</code></b> (optional)<br> 
+   GPU device ID for CUDA kernel (default: 0). Ignored when not using CUDA. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fbs</code></b>, <code>data[0]</code><br> 
-   First interaction point between the rays and the triangular mesh. If no interaction was found, the 
-   FBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;">ndarray <b><code>fbs</code></b>, <code>data[0]</code><br> 
+   First-bounce surface intersection points (FBS); dtype: float64; shape: <code>(n_ray, 3)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>sbs</code></b>, <code>data[1]</code><br> 
-   Second interaction point between the rays and the triangular mesh. If no interaction was found, the 
-   SBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>sbs</code></b>, <code>data[1]</code><br> 
+   Second-bounce surface intersection points (SBS); dtype: float64; shape: <code>(n_ray, 3)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>no_interact</code></b>, <code>data[2]</code><br> 
-   Total number of interactions between the origin point and the destination; uint32; Length: <code>[ no_ray ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>no_interact</code></b>, <code>data[2]</code><br> 
+   Number of intersections per ray (0, 1, or 2); dtype: uint32; shape: <code>(n_ray,)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>fbs_ind</code></b>, <code>data[3]</code><br> 
-   Index of the triangle that was hit by the ray at the FBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>fbs_ind</code></b>, <code>data[3]</code><br> 
+   Index of the triangle that was hit by the ray at the FBS location; 1-based; 0 = no intersection; 
+   dtype: uint32; shape: <code>(n_ray,)</code> 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><b><code>sbs_ind</code></b>, <code>data[4]</code><br> 
-   Index of the triangle that was hit by the ray at the SBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>sbs_ind</code></b>, <code>data[4]</code><br> 
+   Index of the triangle that was hit by the ray at the SBS location; 1-based; 0 = no second 
+   intersection; dtype: uint32; shape: <code>(n_ray,)</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">All internal computation are done in single precision to achieve an additional 2x improvement in 
-   speed compared to double precision when using AVX2 intrinsic instructions 
+<b><i>Caveats:</i></b><br><ul><li style="margin-bottom: 0.4em;">The AVX2 and CUDA kernels always compute in single precision. Only the GENERIC kernel has full 
+   double precision support. 
+</li><li style="margin-bottom: 0.4em;">Zero-copy input mapping (no data duplication) is only used for Fortran-contiguous (column-major) 
+   NumPy arrays. C-contiguous inputs are silently copied and transposed. 
+</li><li style="margin-bottom: 0.4em;">All outputs are Fortran-contiguous 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> (for loading mesh from an OBJ file) 
 </li><li style="margin-bottom: 0.4em;"><a href="#icosphere">icosphere</a> (for generating beams) 
 </li><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes) 
+</li><li style="margin-bottom: 0.4em;"><a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points) 
 </li></ul>
 </li>
 </ul>
