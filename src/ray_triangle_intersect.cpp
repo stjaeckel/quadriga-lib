@@ -150,20 +150,15 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
     arma::uword n_mesh = mesh->n_rows;
 
-    // Convert orig and dest to float and calculate (dest - orig)
-    arma::fmat origA = arma::fmat(n_ray, 3ULL, arma::fill::none);
-    arma::fmat dest_minus_origA = arma::fmat(n_ray, 3ULL, arma::fill::none);
+    // Calculate (dest - orig)
+    arma::Mat<dtype> dest_minus_orig(n_ray, 3ULL, arma::fill::none);
     {
         const dtype *p_orig = orig->memptr();
         const dtype *p_dest = dest->memptr();
-        float *p_origA = origA.memptr(), *p_dest_minus_origA = dest_minus_origA.memptr();
+        dtype *p_dmo = dest_minus_orig.memptr();
 
         for (arma::uword i_elem = 0; i_elem < 3 * n_ray; ++i_elem)
-        {
-            dtype v_orig = p_orig[i_elem];                               // Load orig
-            p_origA[i_elem] = (float)v_orig;                             // Cast to float
-            p_dest_minus_origA[i_elem] = float(p_dest[i_elem] - v_orig); // Calculate dest - orig
-        }
+            p_dmo[i_elem] = p_dest[i_elem] - p_orig[i_elem];
     }
 
     // Determine which compute kernel to use
@@ -233,57 +228,43 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
             throw std::invalid_argument("Input 'aabb' must have at least 6 columns [x_min, x_max, y_min, y_max, z_min, z_max].");
     }
 
-    // AABB data per sub-mesh - convert from dtype to float
-    arma::fvec Xmin_vec(n_sub, arma::fill::none), Xmax_vec(n_sub, arma::fill::none);
-    arma::fvec Ymin_vec(n_sub, arma::fill::none), Ymax_vec(n_sub, arma::fill::none);
-    arma::fvec Zmin_vec(n_sub, arma::fill::none), Zmax_vec(n_sub, arma::fill::none);
-    float *Xmin = Xmin_vec.memptr(), *Xmax = Xmax_vec.memptr();
-    float *Ymin = Ymin_vec.memptr(), *Ymax = Ymax_vec.memptr();
-    float *Zmin = Zmin_vec.memptr(), *Zmax = Zmax_vec.memptr();
+    // AABB data per sub-mesh
+    const dtype *Xmin = aabb->colptr(0), *Xmax = aabb->colptr(1);
+    const dtype *Ymin = aabb->colptr(2), *Ymax = aabb->colptr(3);
+    const dtype *Zmin = aabb->colptr(4), *Zmax = aabb->colptr(5);
 
-    const dtype *p_aabb = aabb->memptr();
-    for (arma::uword i = 0; i < n_sub; ++i)
-    {
-        Xmin[i] = (float)p_aabb[i];
-        Xmax[i] = (float)p_aabb[i + n_sub];
-        Ymin[i] = (float)p_aabb[i + 2 * n_sub];
-        Ymax[i] = (float)p_aabb[i + 3 * n_sub];
-        Zmin[i] = (float)p_aabb[i + 4 * n_sub];
-        Zmax[i] = (float)p_aabb[i + 5 * n_sub];
-    }
+    // Convert mesh (first vertex + two edges)
+    const dtype *Tx = mesh->colptr(0), *Ty = mesh->colptr(1), *Tz = mesh->colptr(2);
 
-    // Convert mesh to float SoA layout (first vertex + two edges)
-    arma::fvec Tx_vec(n_mesh, arma::fill::none), Ty_vec(n_mesh, arma::fill::none), Tz_vec(n_mesh, arma::fill::none);
-    arma::fvec E1x_vec(n_mesh, arma::fill::none), E1y_vec(n_mesh, arma::fill::none), E1z_vec(n_mesh, arma::fill::none);
-    arma::fvec E2x_vec(n_mesh, arma::fill::none), E2y_vec(n_mesh, arma::fill::none), E2z_vec(n_mesh, arma::fill::none);
-    float *Tx = Tx_vec.memptr(), *Ty = Ty_vec.memptr(), *Tz = Tz_vec.memptr();
-    float *E1x = E1x_vec.memptr(), *E1y = E1y_vec.memptr(), *E1z = E1z_vec.memptr();
-    float *E2x = E2x_vec.memptr(), *E2y = E2y_vec.memptr(), *E2z = E2z_vec.memptr();
+    arma::Col<dtype> E1x_vec(n_mesh, arma::fill::none), E1y_vec(n_mesh, arma::fill::none), E1z_vec(n_mesh, arma::fill::none);
+    arma::Col<dtype> E2x_vec(n_mesh, arma::fill::none), E2y_vec(n_mesh, arma::fill::none), E2z_vec(n_mesh, arma::fill::none);
+
+    dtype *E1x = E1x_vec.memptr(), *E1y = E1y_vec.memptr(), *E1z = E1z_vec.memptr();
+    dtype *E2x = E2x_vec.memptr(), *E2y = E2y_vec.memptr(), *E2z = E2z_vec.memptr();
 
     const dtype *p_mesh = mesh->memptr();
     for (arma::uword i_mesh = 0; i_mesh < n_mesh; ++i_mesh)
     {
-        float x1 = (float)p_mesh[i_mesh];
-        float y1 = (float)p_mesh[i_mesh + n_mesh];
-        float z1 = (float)p_mesh[i_mesh + 2 * n_mesh];
+        dtype x1 = Tx[i_mesh];
+        dtype y1 = Ty[i_mesh];
+        dtype z1 = Tz[i_mesh];
 
-        float x2 = (float)p_mesh[i_mesh + 3 * n_mesh];
-        float y2 = (float)p_mesh[i_mesh + 4 * n_mesh];
-        float z2 = (float)p_mesh[i_mesh + 5 * n_mesh];
+        dtype x2 = p_mesh[i_mesh + 3 * n_mesh];
+        dtype y2 = p_mesh[i_mesh + 4 * n_mesh];
+        dtype z2 = p_mesh[i_mesh + 5 * n_mesh];
 
-        float x3 = (float)p_mesh[i_mesh + 6 * n_mesh];
-        float y3 = (float)p_mesh[i_mesh + 7 * n_mesh];
-        float z3 = (float)p_mesh[i_mesh + 8 * n_mesh];
+        dtype x3 = p_mesh[i_mesh + 6 * n_mesh];
+        dtype y3 = p_mesh[i_mesh + 7 * n_mesh];
+        dtype z3 = p_mesh[i_mesh + 8 * n_mesh];
 
-        Tx[i_mesh] = x1, Ty[i_mesh] = y1, Tz[i_mesh] = z1;
         E1x[i_mesh] = x2 - x1, E1y[i_mesh] = y2 - y1, E1z[i_mesh] = z2 - z1;
         E2x[i_mesh] = x3 - x1, E2y[i_mesh] = y3 - y1, E2z[i_mesh] = z3 - z1;
     }
 
     // Define and initialize temporary variables
-    arma::fvec Wf(n_ray), Ws(n_ray);    // Normalized FBS and SBS hit distances, initialized to 0
-    arma::u32_vec If(n_ray), Is(n_ray); // Index of mesh element hit at FBS/SBS, initialized to 0
-    arma::u32_vec hit_cnt(n_ray);       // Hit counter
+    arma::Col<dtype> Wf(n_ray), Ws(n_ray); // Normalized FBS and SBS hit distances, initialized to 0
+    arma::u32_vec If(n_ray), Is(n_ray);    // Index of mesh element hit at FBS/SBS, initialized to 0
+    arma::u32_vec hit_cnt(n_ray);          // Hit counter
 
     // Pointer to hit counter
     unsigned *p_hit_cnt = (no_interact == nullptr) ? nullptr : hit_cnt.memptr();
@@ -292,37 +273,37 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     if (kernel == 3) // CUDA
     {
 #if BUILD_WITH_CUDA
-        qd_RTI_CUDA(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
-                    smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
-                    origA.colptr(0), origA.colptr(1), origA.colptr(2),
-                    dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                    n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt, gpu_id);
+        qd_RTI_CUDA<dtype>(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+                           smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                           orig->colptr(0), orig->colptr(1), orig->colptr(2),
+                           dest_minus_orig.colptr(0), dest_minus_orig.colptr(1), dest_minus_orig.colptr(2),
+                           n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt, gpu_id);
 #endif
     }
     else if (kernel == 2) // AVX2
     {
 #if BUILD_WITH_AVX2
-        qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
-                    smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
-                    origA.colptr(0), origA.colptr(1), origA.colptr(2),
-                    dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                    n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+        qd_RTI_AVX2<dtype>(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+                           smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                           orig->colptr(0), orig->colptr(1), orig->colptr(2),
+                           dest_minus_orig.colptr(0), dest_minus_orig.colptr(1), dest_minus_orig.colptr(2),
+                           n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
 #endif
     }
     else // GENERIC
     {
-        qd_RTI_GENERIC(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
-                       smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
-                       origA.colptr(0), origA.colptr(1), origA.colptr(2),
-                       dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
-                       n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
+        qd_RTI_GENERIC<dtype>(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
+                              smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
+                              orig->colptr(0), orig->colptr(1), orig->colptr(2),
+                              dest_minus_orig.colptr(0), dest_minus_orig.colptr(1), dest_minus_orig.colptr(2),
+                              n_ray, Wf.memptr(), Ws.memptr(), If.memptr(), Is.memptr(), p_hit_cnt);
     }
 
     // Pointer to origin coordinates
     const dtype *ox = orig->colptr(0), *oy = orig->colptr(1), *oz = orig->colptr(2);
 
     // Pointer to dest_minus_origA
-    float *dx = dest_minus_origA.colptr(0), *dy = dest_minus_origA.colptr(1), *dz = dest_minus_origA.colptr(2);
+    dtype *dx = dest_minus_orig.colptr(0), *dy = dest_minus_orig.colptr(1), *dz = dest_minus_orig.colptr(2);
 
     // Compute FBS location in GCS
     if (fbs != nullptr)
@@ -331,13 +312,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
             fbs->set_size(n_ray, 3);
 
         dtype *px = fbs->colptr(0), *py = fbs->colptr(1), *pz = fbs->colptr(2);
-        float *w = Wf.memptr();
+        dtype *w = Wf.memptr();
 
         for (arma::uword i = 0; i < n_ray; ++i)
         {
-            px[i] = ox[i] + dtype(w[i] * dx[i]);
-            py[i] = oy[i] + dtype(w[i] * dy[i]);
-            pz[i] = oz[i] + dtype(w[i] * dz[i]);
+            px[i] = ox[i] + w[i] * dx[i];
+            py[i] = oy[i] + w[i] * dy[i];
+            pz[i] = oz[i] + w[i] * dz[i];
         }
     }
 
@@ -348,13 +329,13 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
             sbs->set_size(n_ray, 3);
 
         dtype *px = sbs->colptr(0), *py = sbs->colptr(1), *pz = sbs->colptr(2);
-        float *w = Ws.memptr();
+        dtype *w = Ws.memptr();
 
         for (arma::uword i = 0; i < n_ray; ++i)
         {
-            px[i] = ox[i] + dtype(w[i] * dx[i]);
-            py[i] = oy[i] + dtype(w[i] * dy[i]);
-            pz[i] = oz[i] + dtype(w[i] * dz[i]);
+            px[i] = ox[i] + w[i] * dx[i];
+            py[i] = oy[i] + w[i] * dy[i];
+            pz[i] = oz[i] + w[i] * dz[i];
         }
     }
 

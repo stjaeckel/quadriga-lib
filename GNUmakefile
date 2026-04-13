@@ -9,7 +9,7 @@ shared_lib = OFF
 octave = ON
 matlab = OFF
 avx2 = ON
-cuda = ON
+cuda = OFF
 
 CMAKE_BUILD_DIR = build_linux
 
