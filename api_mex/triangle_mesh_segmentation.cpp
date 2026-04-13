@@ -90,8 +90,6 @@ and complex simulation environments.
   Material properties for the sub-divided triangle mesh elements. The values for the new faces are 
   copied from `mtl_prop_in`; Size: `[ n_triangles_out, 5 ]`; For `vec_size > 1`, the added elements
   will contain the vacuum / air material.
-
-
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

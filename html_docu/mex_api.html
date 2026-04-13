@@ -2502,7 +2502,7 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>ap_array:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ap_array</code></b> [1]<br> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ap_array</code></b> [1]<br> 
    Struct containing the access point array antenna with <code>n_tx</code> elements (= ports after element coupling) 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -2665,7 +2665,7 @@ chan = quadriga_lib.get_channels_ieee_indoor(ap_array, sta_array, ChannelType, C
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>chan</code></b><br> 
+<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>chan</code></b><br> 
    Struct array of length <code>n_users</code> containing the channel data with the following fields. 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
@@ -5445,77 +5445,79 @@ the vertices.
 <b>ray_triangle_intersect</b> - Calculates the intersection of rays and triangles in three dimensions
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function implements the Möller–Trumbore ray-triangle intersection algorithm, known for its 
-   efficiency in calculating the intersection of a ray and a triangle in three-dimensional space. 
-   This method achieves its speed by eliminating the need for precomputed plane equations of the plane 
-   containing the triangle. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">For further information, refer to [Wikipedia: <a href="https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm">Möller–Trumbore intersection algorithm</a>]. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">The algorithm defines the ray using two points: an origin and a destination. Similarly, the triangle 
-   is specified by its three vertices. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;">To enhance performance, this implementation leverages AVX2 intrinsic functions and OpenMP, when 
-   available, to speed up the computational process. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D. 
+</li><li style="margin-bottom: 0.4em;">Supports three compute kernels: <b>GENERIC</b> (scalar), <b>AVX2</b> (SIMD, 8 triangles in parallel), and <b>CUDA</b> (GPU). 
+</li><li style="margin-bottom: 0.4em;">The <code>use_kernel</code> parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. 
+</li><li style="margin-bottom: 0.4em;">In auto mode (0), CUDA is selected only when <code>n_ray &gt;= 10000</code> and a CUDA-capable GPU is available; 
+   otherwise AVX2 is preferred if available, falling back to GENERIC. 
+</li><li style="margin-bottom: 0.4em;">Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index );
+[ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( ...
+    orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>orig</code></b><br> 
-   Ray origins in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+   Ray origins in global coordinate system (GCS). Size: <code>[ n_ray, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>dest</code></b><br> 
-   Ray destinations in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code> 
+   Ray destinations in GCS. Size: <code>[ n_ray, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>mesh</code></b><br> 
-   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points 
-   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br> 
-   Size: <code>[ no_mesh, 9 ]</code> 
+   Triangular surface mesh. Each row contains the 3 vertices 
+   <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>. Size: <code>[ n_mesh, 9 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sub_mesh_index</code></b> (optional)<br> 
-   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, intersections 
-   are calculated for each mesh element, leading to poor performance for large meshes.  
-   Type: uint32; Vector of length <code>[ n_sub_mesh ]</code> 
+   Indexes indicating start of sub-meshes in <code>mesh</code>. Enables faster processing via segmentation. 
+   0-based; Type: uint32; Length: <code>[ n_sub ]</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>aabb</code></b> (optional)<br> 
+   Pre-computed axis-aligned bounding boxes per sub-mesh. Each row contains 
+   <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>. Size: <code>[ n_sub, 6 ]</code>. 
+   If not provided, AABBs are computed internally from <code>mesh</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>use_kernel</code></b> (optional)<br> 
+   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD), 
+   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b><code>gpu_id</code></b> (optional)<br> 
+   GPU device ID for CUDA kernel (default: 0). Ignored when not using CUDA. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fbs</code></b><br> 
-   First interaction point between the rays and the triangular mesh. If no interaction was found, the 
-   FBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+   First-bounce surface intersection points (FBS). Size: <code>[ n_ray, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sbs</code></b><br> 
-   Second interaction point between the rays and the triangular mesh. If no interaction was found, the 
-   SBS location is equal to <code>dest</code>. Size: <code>[ no_ray, 3 ]</code> 
+   Second-bounce surface intersection points (SBS). Size: <code>[ n_ray, 3 ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>no_interact</code></b><br> 
-   Total number of interactions between the origin point and the destination; uint32; Length: <code>[ no_ray ]</code> 
+   Number of intersections per ray (0, 1, or 2); uint32; Length: <code>[ n_ray ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>fbs_ind</code></b><br> 
-   Index of the triangle that was hit by the ray at the FBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+   1-based index of the first intersected mesh element, 0 = no intersection; uint32; Length: <code>[ n_ray ]</code> 
 </li></ul>
  
 <ul><li style="margin-bottom: 0.4em;"><b><code>sbs_ind</code></b><br> 
-   Index of the triangle that was hit by the ray at the SBS location; 1-based; uint32; Length: <code>[ no_ray ]</code> 
+   1-based index of the second intersected mesh element, 0 = no second intersection; uint32; Length: <code>[ n_ray ]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>orig</code>, <code>dest</code>, and <code>mesh</code> can be provided in single or double precision; <code>fbs</code> and <code>lbs</code> will have 
-   the same type. 
-</li><li style="margin-bottom: 0.4em;">All internal computation are done in single precision to achieve an additional 2x improvement in 
-   speed compared to double precision when using AVX2 intrinsic instructions 
+<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">Inputs can be provided in any numeric type; they are converted to double precision internally. 
+</li><li style="margin-bottom: 0.4em;">The AVX2 and CUDA kernels always compute in single precision. Only the GENERIC kernel has full 
+   double precision support. 
 </li></ul>
 </li>
 </ul>
