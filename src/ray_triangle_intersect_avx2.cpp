@@ -287,23 +287,23 @@ static inline void rti_moller_trumbore_update(__m256 tx, __m256 ty, __m256 tz,
 // ---- Float specialization --------------------------------------------------
 
 template <>
-void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
-                        const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
-                        const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
-                        const size_t n_mesh,                                  // Number of triangles
-                        const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                        const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub
-                        const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub
-                        const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub
-                        const size_t n_sub,                                   // Number of sub-meshes
-                        const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
-                        const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
-                        const size_t n_ray,                                   // Number of rays
-                        float *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                        float *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                        unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                        unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                        unsigned *hit_cnt)                                    // Number of hits between orig and dest, length n_ray, uninitialized, optional
+void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz, // First vertex coordinate in GCS, length n_mesh
+                        const float *Ux, const float *Uy, const float *Uz, // Second vertex coordinate in GCS, length n_mesh
+                        const float *Vx, const float *Vy, const float *Vz, // Third vertex coordinate in GCS, length n_mesh
+                        const size_t n_mesh,                               // Number of triangles
+                        const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
+                        const float *Xmin, const float *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub
+                        const float *Ymin, const float *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub
+                        const float *Zmin, const float *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub
+                        const size_t n_sub,                                // Number of sub-meshes
+                        const float *Ox, const float *Oy, const float *Oz, // Ray origin in GCS, length n_ray
+                        const float *Dx, const float *Dy, const float *Dz, // Ray destination in GCS, length n_ray
+                        const size_t n_ray,                                // Number of rays
+                        float *Wf,                                         // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                        float *Ws,                                         // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                        unsigned *If,                                      // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                        unsigned *Is,                                      // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                        unsigned *hit_cnt)                                 // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
         throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
@@ -335,9 +335,10 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz,    //
             __m256 ox = _mm256_set1_ps(Ox[i_ray]);
             __m256 oy = _mm256_set1_ps(Oy[i_ray]);
             __m256 oz = _mm256_set1_ps(Oz[i_ray]);
-            __m256 dx = _mm256_set1_ps(Dx[i_ray]);
-            __m256 dy = _mm256_set1_ps(Dy[i_ray]);
-            __m256 dz = _mm256_set1_ps(Dz[i_ray]);
+
+            __m256 dx = _mm256_set1_ps(Dx[i_ray] - Ox[i_ray]);
+            __m256 dy = _mm256_set1_ps(Dy[i_ray] - Oy[i_ray]);
+            __m256 dz = _mm256_set1_ps(Dz[i_ray] - Oz[i_ray]);
 
             // Initialize local variables
             __m256 W_fbs = _mm256_set1_ps(1.0f);
@@ -403,25 +404,33 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz,    //
                         tx = _mm256_loadu_ps(&Tx[i_mesh]);
                         ty = _mm256_loadu_ps(&Ty[i_mesh]);
                         tz = _mm256_loadu_ps(&Tz[i_mesh]);
-                        e1x = _mm256_loadu_ps(&E1x[i_mesh]);
-                        e2x = _mm256_loadu_ps(&E2x[i_mesh]);
-                        e1y = _mm256_loadu_ps(&E1y[i_mesh]);
-                        e2y = _mm256_loadu_ps(&E2y[i_mesh]);
-                        e1z = _mm256_loadu_ps(&E1z[i_mesh]);
-                        e2z = _mm256_loadu_ps(&E2z[i_mesh]);
+                        e1x = _mm256_loadu_ps(&Ux[i_mesh]);
+                        e1y = _mm256_loadu_ps(&Uy[i_mesh]);
+                        e1z = _mm256_loadu_ps(&Uz[i_mesh]);
+                        e2x = _mm256_loadu_ps(&Vx[i_mesh]);
+                        e2y = _mm256_loadu_ps(&Vy[i_mesh]);
+                        e2z = _mm256_loadu_ps(&Vz[i_mesh]);
                     }
                     else
                     {
                         tx = _mm256_maskload_ps(&Tx[i_mesh], tail_mask);
                         ty = _mm256_maskload_ps(&Ty[i_mesh], tail_mask);
                         tz = _mm256_maskload_ps(&Tz[i_mesh], tail_mask);
-                        e1x = _mm256_maskload_ps(&E1x[i_mesh], tail_mask);
-                        e2x = _mm256_maskload_ps(&E2x[i_mesh], tail_mask);
-                        e1y = _mm256_maskload_ps(&E1y[i_mesh], tail_mask);
-                        e2y = _mm256_maskload_ps(&E2y[i_mesh], tail_mask);
-                        e1z = _mm256_maskload_ps(&E1z[i_mesh], tail_mask);
-                        e2z = _mm256_maskload_ps(&E2z[i_mesh], tail_mask);
+                        e1x = _mm256_maskload_ps(&Ux[i_mesh], tail_mask);
+                        e1y = _mm256_maskload_ps(&Uy[i_mesh], tail_mask);
+                        e1z = _mm256_maskload_ps(&Uz[i_mesh], tail_mask);
+                        e2x = _mm256_maskload_ps(&Vx[i_mesh], tail_mask);
+                        e2y = _mm256_maskload_ps(&Vy[i_mesh], tail_mask);
+                        e2z = _mm256_maskload_ps(&Vz[i_mesh], tail_mask);
                     }
+
+                    // Compute edges inline
+                    e1x = _mm256_sub_ps(e1x, tx);
+                    e1y = _mm256_sub_ps(e1y, ty);
+                    e1z = _mm256_sub_ps(e1z, tz);
+                    e2x = _mm256_sub_ps(e2x, tx);
+                    e2y = _mm256_sub_ps(e2y, ty);
+                    e2z = _mm256_sub_ps(e2z, tz);
 
                     // Calculate vector from first vertex coordinate V1 to origin O
                     tx = _mm256_sub_ps(ox, tx);
@@ -448,23 +457,23 @@ void qd_RTI_AVX2<float>(const float *Tx, const float *Ty, const float *Tz,    //
 // ---- Double specialization -------------------------------------------------
 
 template <>
-void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz,    // First vertex coordinate in GCS, length n_mesh
-                         const double *E1x, const double *E1y, const double *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
-                         const double *E2x, const double *E2y, const double *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
-                         const size_t n_mesh,                                     // Number of triangles
-                         const unsigned *SMI,                                     // List of sub-mesh indices, length n_sub
-                         const double *Xmin, const double *Xmax,                  // Minimum and maximum x-values of the AABB, length n_sub
-                         const double *Ymin, const double *Ymax,                  // Minimum and maximum y-values of the AABB, length n_sub
-                         const double *Zmin, const double *Zmax,                  // Minimum and maximum z-values of the AABB, length n_sub
-                         const size_t n_sub,                                      // Number of sub-meshes
-                         const double *Ox, const double *Oy, const double *Oz,    // Ray origin in GCS, length n_ray
-                         const double *Dx, const double *Dy, const double *Dz,    // Vector from ray origin to ray destination, length n_ray
-                         const size_t n_ray,                                      // Number of rays
-                         double *Wf,                                              // Normalized distance (0-1) of FBS hit, length n_ray, uninitialized
-                         double *Ws,                                              // Normalized distance (0-1) of SBS hit, length n_ray, uninitialized
-                         unsigned *If,                                            // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                         unsigned *Is,                                            // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                         unsigned *hit_cnt)                                       // Number of hits between orig and dest, length n_ray, uninitialized, optional
+void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz, // First vertex coordinate in GCS, length n_mesh
+                         const double *Ux, const double *Uy, const double *Uz, // Second vertex coordinate in GCS, length n_mesh
+                         const double *Vx, const double *Vy, const double *Vz, // Third vertex coordinate in GCS, length n_mesh
+                         const size_t n_mesh,                                  // Number of triangles
+                         const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
+                         const double *Xmin, const double *Xmax,               // Minimum and maximum x-values of the AABB, length n_sub
+                         const double *Ymin, const double *Ymax,               // Minimum and maximum y-values of the AABB, length n_sub
+                         const double *Zmin, const double *Zmax,               // Minimum and maximum z-values of the AABB, length n_sub
+                         const size_t n_sub,                                   // Number of sub-meshes
+                         const double *Ox, const double *Oy, const double *Oz, // Ray origin in GCS, length n_ray
+                         const double *Dx, const double *Dy, const double *Dz, // Ray destination in GCS, length n_ray
+                         const size_t n_ray,                                   // Number of rays
+                         double *Wf,                                           // Normalized distance (0-1) of FBS hit, length n_ray, uninitialized
+                         double *Ws,                                           // Normalized distance (0-1) of SBS hit, length n_ray, uninitialized
+                         unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                         unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                         unsigned *hit_cnt)                                    // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
         throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
@@ -495,9 +504,10 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz,  
             __m256 ox = _mm256_set1_ps((float)Ox[i_ray]);
             __m256 oy = _mm256_set1_ps((float)Oy[i_ray]);
             __m256 oz = _mm256_set1_ps((float)Oz[i_ray]);
-            __m256 dx = _mm256_set1_ps((float)Dx[i_ray]);
-            __m256 dy = _mm256_set1_ps((float)Dy[i_ray]);
-            __m256 dz = _mm256_set1_ps((float)Dz[i_ray]);
+
+            __m256 dx = _mm256_set1_ps(float(Dx[i_ray] - Ox[i_ray]));
+            __m256 dy = _mm256_set1_ps(float(Dy[i_ray] - Oy[i_ray]));
+            __m256 dz = _mm256_set1_ps(float(Dz[i_ray] - Oz[i_ray]));
 
             // Initialize local variables
             __m256 W_fbs = _mm256_set1_ps(1.0f);
@@ -563,25 +573,33 @@ void qd_RTI_AVX2<double>(const double *Tx, const double *Ty, const double *Tz,  
                         tx = _load8_cvt_pd_ps(&Tx[i_mesh]);
                         ty = _load8_cvt_pd_ps(&Ty[i_mesh]);
                         tz = _load8_cvt_pd_ps(&Tz[i_mesh]);
-                        e1x = _load8_cvt_pd_ps(&E1x[i_mesh]);
-                        e2x = _load8_cvt_pd_ps(&E2x[i_mesh]);
-                        e1y = _load8_cvt_pd_ps(&E1y[i_mesh]);
-                        e2y = _load8_cvt_pd_ps(&E2y[i_mesh]);
-                        e1z = _load8_cvt_pd_ps(&E1z[i_mesh]);
-                        e2z = _load8_cvt_pd_ps(&E2z[i_mesh]);
+                        e1x = _load8_cvt_pd_ps(&Ux[i_mesh]);
+                        e1y = _load8_cvt_pd_ps(&Uy[i_mesh]);
+                        e1z = _load8_cvt_pd_ps(&Uz[i_mesh]);
+                        e2x = _load8_cvt_pd_ps(&Vx[i_mesh]);
+                        e2y = _load8_cvt_pd_ps(&Vy[i_mesh]);
+                        e2z = _load8_cvt_pd_ps(&Vz[i_mesh]);
                     }
                     else
                     {
                         tx = _maskload8_cvt_pd_ps(&Tx[i_mesh], tail_mask);
                         ty = _maskload8_cvt_pd_ps(&Ty[i_mesh], tail_mask);
                         tz = _maskload8_cvt_pd_ps(&Tz[i_mesh], tail_mask);
-                        e1x = _maskload8_cvt_pd_ps(&E1x[i_mesh], tail_mask);
-                        e2x = _maskload8_cvt_pd_ps(&E2x[i_mesh], tail_mask);
-                        e1y = _maskload8_cvt_pd_ps(&E1y[i_mesh], tail_mask);
-                        e2y = _maskload8_cvt_pd_ps(&E2y[i_mesh], tail_mask);
-                        e1z = _maskload8_cvt_pd_ps(&E1z[i_mesh], tail_mask);
-                        e2z = _maskload8_cvt_pd_ps(&E2z[i_mesh], tail_mask);
+                        e1x = _maskload8_cvt_pd_ps(&Ux[i_mesh], tail_mask);
+                        e1y = _maskload8_cvt_pd_ps(&Uy[i_mesh], tail_mask);
+                        e1z = _maskload8_cvt_pd_ps(&Uz[i_mesh], tail_mask);
+                        e2x = _maskload8_cvt_pd_ps(&Vx[i_mesh], tail_mask);
+                        e2y = _maskload8_cvt_pd_ps(&Vy[i_mesh], tail_mask);
+                        e2z = _maskload8_cvt_pd_ps(&Vz[i_mesh], tail_mask);
                     }
+
+                    // Compute edges inline
+                    e1x = _mm256_sub_ps(e1x, tx);
+                    e1y = _mm256_sub_ps(e1y, ty);
+                    e1z = _mm256_sub_ps(e1z, tz);
+                    e2x = _mm256_sub_ps(e2x, tx);
+                    e2y = _mm256_sub_ps(e2y, ty);
+                    e2z = _mm256_sub_ps(e2z, tz);
 
                     // Calculate vector from first vertex coordinate V1 to origin O
                     tx = _mm256_sub_ps(ox, tx);

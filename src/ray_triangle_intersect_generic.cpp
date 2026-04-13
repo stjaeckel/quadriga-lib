@@ -19,23 +19,23 @@
 
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
-void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz,    // First vertex coordinate in GCS, length n_mesh
-                    const dtype *E1x, const dtype *E1y, const dtype *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
-                    const dtype *E2x, const dtype *E2y, const dtype *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
-                    const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
-                    const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                    const dtype *Xmin, const dtype *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
-                    const dtype *Ymin, const dtype *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
-                    const dtype *Zmin, const dtype *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                    const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
-                    const dtype *Ox, const dtype *Oy, const dtype *Oz,    // Ray origin in GCS, length n_ray
-                    const dtype *Dx, const dtype *Dy, const dtype *Dz,    // Vector from ray origin to ray destination, length n_ray
-                    const size_t n_ray,                                   // Number of rays
-                    dtype *Wf,                                            // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                    dtype *Ws,                                            // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
-                    unsigned *If,                                         // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                    unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
-                    unsigned *hit_cnt)                                    // Number of hits between orig and dest, length n_ray, uninitialized, optional
+void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz, // First vertex coordinate in GCS, length n_mesh
+                    const dtype *Ux, const dtype *Uy, const dtype *Uz, // Second vertex coordinate in GCS, length n_mesh
+                    const dtype *Vx, const dtype *Vy, const dtype *Vz, // Third vertex coordinate in GCS, length n_mesh
+                    const size_t n_mesh,                               // Number of triangles (multiple of VEC_SIZE)
+                    const unsigned *SMI,                               // List of sub-mesh indices, length n_sub
+                    const dtype *Xmin, const dtype *Xmax,              // Minimum and maximum x-values of the AABB, length n_sub_s
+                    const dtype *Ymin, const dtype *Ymax,              // Minimum and maximum y-values of the AABB, length n_sub_s
+                    const dtype *Zmin, const dtype *Zmax,              // Minimum and maximum z-values of the AABB, length n_sub_s
+                    const size_t n_sub,                                // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                    const dtype *Ox, const dtype *Oy, const dtype *Oz, // Ray origin in GCS, length n_ray
+                    const dtype *Dx, const dtype *Dy, const dtype *Dz, // Ray destination in GCS, length n_ray
+                    const size_t n_ray,                                // Number of rays
+                    dtype *Wf,                                         // Normalized distance (0-1) of FBS hit, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                    dtype *Ws,                                         // Normalized distance (0-1) of SBS hit, must be >= Wf, 0 = orig, 1 = dest (no hit), length n_ray, uninitialized
+                    unsigned *If,                                      // Index of mesh element hit at FBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                    unsigned *Is,                                      // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
+                    unsigned *hit_cnt)                                 // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
     if (n_mesh >= INT32_MAX)
         throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
@@ -56,9 +56,9 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz,    // Fir
         dtype oz = Oz[i_ray];
 
         // Load vector from ray origin to ray destination
-        dtype dx = Dx[i_ray];
-        dtype dy = Dy[i_ray];
-        dtype dz = Dz[i_ray];
+        dtype dx = Dx[i_ray] - ox;
+        dtype dy = Dy[i_ray] - oy;
+        dtype dz = Dz[i_ray] - oz;
 
         // Initialize local variables
         dtype W_fbs = dtype(1.0);        // Set FBS location equal to dest
@@ -127,13 +127,13 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz,    // Fir
                 dtype ty = Ty[i_mesh];
                 dtype tz = Tz[i_mesh];
 
+                dtype e1x = Ux[i_mesh] - tx, e2x = Vx[i_mesh] - tx;
+                dtype e1y = Uy[i_mesh] - ty, e2y = Vy[i_mesh] - ty;
+                dtype e1z = Uz[i_mesh] - tz, e2z = Vz[i_mesh] - tz;
+
                 tx = ox - tx;
                 ty = oy - ty;
                 tz = oz - tz;
-
-                dtype e1x = E1x[i_mesh], e2x = E2x[i_mesh];
-                dtype e1y = E1y[i_mesh], e2y = E2y[i_mesh];
-                dtype e1z = E1z[i_mesh], e2z = E2z[i_mesh];
 
                 // Calculate 1st barycentric coordinate U
                 dtype PQ = e2z * dy - e2y * dz;
@@ -202,14 +202,14 @@ void qd_RTI_GENERIC(const dtype *Tx, const dtype *Ty, const dtype *Tz,    // Fir
 }
 
 template void qd_RTI_GENERIC<float>(const float *Tx, const float *Ty, const float *Tz,
-                                    const float *E1x, const float *E1y, const float *E1z, const float *E2x, const float *E2y, const float *E2z,
+                                    const float *Ux, const float *Uy, const float *Uz, const float *Vx, const float *Vy, const float *Vz,
                                     size_t n_mesh, const unsigned *SMI, const float *Xmin, const float *Xmax, const float *Ymin, const float *Ymax,
                                     const float *Zmin, const float *Zmax, size_t n_sub, const float *Ox, const float *Oy, const float *Oz,
                                     const float *Dx, const float *Dy, const float *Dz, size_t n_ray, float *Wf, float *Ws, unsigned *If,
                                     unsigned *Is, unsigned *hit_cnt);
 
 template void qd_RTI_GENERIC<double>(const double *Tx, const double *Ty, const double *Tz,
-                                     const double *E1x, const double *E1y, const double *E1z, const double *E2x, const double *E2y, const double *E2z,
+                                     const double *Ux, const double *Uy, const double *Uz, const double *Vx, const double *Vy, const double *Vz,
                                      size_t n_mesh, const unsigned *SMI, const double *Xmin, const double *Xmax, const double *Ymin, const double *Ymax,
                                      const double *Zmin, const double *Zmax, size_t n_sub, const double *Ox, const double *Oy, const double *Oz,
                                      const double *Dx, const double *Dy, const double *Dz, size_t n_ray, double *Wf, double *Ws, unsigned *If,
