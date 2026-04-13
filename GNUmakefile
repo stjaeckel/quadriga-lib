@@ -3,11 +3,11 @@
 # Set Armadillo and HDF5 sources
 # Internal HDF5 deactivates Python and Octave
 hdf5_internal = OFF
-arma_internal = ON
+arma_internal = OFF
 static_lib = ON
-shared_lib = ON
+shared_lib = OFF
 octave = ON
-matlab = ON
+matlab = OFF
 avx2 = ON
 cuda = ON
 
