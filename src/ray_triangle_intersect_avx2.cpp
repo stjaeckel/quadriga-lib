@@ -31,18 +31,18 @@
 // { // Display the elements of a __m256i
 //     unsigned *f = (unsigned *)&I;
 //     printf("I = %d %d %d %d %d %d %d %d\n", f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]);
-// } 
+// }
 
 // AVX2 accelerated implementation of RayTriangleIntersect
 void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First vertex coordinate in GCS, length n_mesh
                  const float *E1x, const float *E1y, const float *E1z, // Edge 1 from first vertex to second vertex, length n_mesh
                  const float *E2x, const float *E2y, const float *E2z, // Edge 2 from first vertex to third vertex, length n_mesh
-                 const size_t n_mesh,                                  // Number of triangles (multiple of VEC_SIZE)
+                 const size_t n_mesh,                                  // Number of triangles
                  const unsigned *SMI,                                  // List of sub-mesh indices, length n_sub
-                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub_s
-                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub_s
-                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub_s
-                 const size_t n_sub,                                   // Number of sub-meshes (not aligned, i.e. n_sub <= n_sub_s)
+                 const float *Xmin, const float *Xmax,                 // Minimum and maximum x-values of the AABB, length n_sub
+                 const float *Ymin, const float *Ymax,                 // Minimum and maximum y-values of the AABB, length n_sub
+                 const float *Zmin, const float *Zmax,                 // Minimum and maximum z-values of the AABB, length n_sub
+                 const size_t n_sub,                                   // Number of sub-meshes
                  const float *Ox, const float *Oy, const float *Oz,    // Ray origin in GCS, length n_ray
                  const float *Dx, const float *Dy, const float *Dz,    // Vector from ray origin to ray destination, length n_ray
                  const size_t n_ray,                                   // Number of rays
@@ -52,8 +52,6 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
                  unsigned *Is,                                         // Index of mesh element hit at SBS location, 1-based, 0 = no hit, length n_ray, uninitialized
                  unsigned *hit_cnt)                                    // Number of hits between orig and dest, length n_ray, uninitialized, optional
 {
-    if (n_mesh % VEC_SIZE != 0) // Check alignment
-        throw std::invalid_argument("Number of triangles must be a multiple of 8.");
     if (n_mesh >= INT32_MAX)
         throw std::invalid_argument("Number of triangles exceeds maximum supported number.");
     if (n_ray >= INT32_MAX)
@@ -62,7 +60,7 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
     bool count_hits = hit_cnt != nullptr;
 
     // Constant values needed for some operations
-    const size_t n_sub_s = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
+    const size_t n_sub_pad = (n_sub % VEC_SIZE == 0) ? n_sub : VEC_SIZE * (n_sub / VEC_SIZE + 1);
     const int n_ray_int = (int)n_ray;                              // Number of rays as int
     const int n_mesh_int = (int)n_mesh;                            // Number of mesh elements as int
     const __m256 r0 = _mm256_set1_ps(0.0f);                        // Zero (float8)
@@ -98,39 +96,57 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
         __m256 dy_i = _mm256_div_ps(r1, dy);
         __m256 dz_i = _mm256_div_ps(r1, dz);
 
-        arma::s32_vec sub_mesh_hit(n_sub_s, arma::fill::none);
+        arma::s32_vec sub_mesh_hit(n_sub_pad, arma::fill::zeros); // zero-init so padding = "not hit"
         int *p_sub_mesh_hit = sub_mesh_hit.memptr();
-        for (size_t i_sub = 0; i_sub < n_sub_s; i_sub += VEC_SIZE)
+        for (size_t i_sub = 0; i_sub < n_sub; i_sub += VEC_SIZE)
         {
-            // Calculate the intersections of the ray with the two planes orthogonal to the i-th coordinate axis
-            __m256 T = _mm256_loadu_ps(&Xmin[i_sub]);
-            T = _mm256_sub_ps(T, ox);
+            int remaining = (int)(n_sub - i_sub);
+            __m256i aabb_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
+
+            // Load AABB bounds
+            __m256 xmin_v, xmax_v, ymin_v, ymax_v, zmin_v, zmax_v;
+            if (remaining >= VEC_SIZE)
+            {
+                xmin_v = _mm256_loadu_ps(&Xmin[i_sub]);
+                xmax_v = _mm256_loadu_ps(&Xmax[i_sub]);
+                ymin_v = _mm256_loadu_ps(&Ymin[i_sub]);
+                ymax_v = _mm256_loadu_ps(&Ymax[i_sub]);
+                zmin_v = _mm256_loadu_ps(&Zmin[i_sub]);
+                zmax_v = _mm256_loadu_ps(&Zmax[i_sub]);
+            }
+            else
+            {
+                xmin_v = _mm256_maskload_ps(&Xmin[i_sub], aabb_mask);
+                xmax_v = _mm256_maskload_ps(&Xmax[i_sub], aabb_mask);
+                ymin_v = _mm256_maskload_ps(&Ymin[i_sub], aabb_mask);
+                ymax_v = _mm256_maskload_ps(&Ymax[i_sub], aabb_mask);
+                zmin_v = _mm256_maskload_ps(&Zmin[i_sub], aabb_mask);
+                zmax_v = _mm256_maskload_ps(&Zmax[i_sub], aabb_mask);
+            }
+
+            // Calculate the intersections of the ray with the two planes orthogonal to each coordinate axis
+            __m256 T = _mm256_sub_ps(xmin_v, ox);
             __m256 t0_low = _mm256_mul_ps(T, dx_i);
 
-            T = _mm256_loadu_ps(&Xmax[i_sub]);
-            T = _mm256_sub_ps(T, ox);
+            T = _mm256_sub_ps(xmax_v, ox);
             __m256 t0_high = _mm256_mul_ps(T, dx_i);
 
-            T = _mm256_loadu_ps(&Ymin[i_sub]);
-            T = _mm256_sub_ps(T, oy);
+            T = _mm256_sub_ps(ymin_v, oy);
             __m256 t1_low = _mm256_mul_ps(T, dy_i);
 
-            T = _mm256_loadu_ps(&Ymax[i_sub]);
-            T = _mm256_sub_ps(T, oy);
+            T = _mm256_sub_ps(ymax_v, oy);
             __m256 t1_high = _mm256_mul_ps(T, dy_i);
 
-            T = _mm256_loadu_ps(&Zmin[i_sub]);
-            T = _mm256_sub_ps(T, oz);
+            T = _mm256_sub_ps(zmin_v, oz);
             __m256 t2_low = _mm256_mul_ps(T, dz_i);
 
-            T = _mm256_loadu_ps(&Zmax[i_sub]);
-            T = _mm256_sub_ps(T, oz);
+            T = _mm256_sub_ps(zmax_v, oz);
             __m256 t2_high = _mm256_mul_ps(T, dz_i);
 
-            // Calculate the close and far extrema of the segment within the i-th slab
-            __m256 M = _mm256_cmp_ps(t0_low, t0_high, _CMP_GE_OQ); // t_low >= t_high ?
-            T = _mm256_blendv_ps(t0_low, t0_high, M);              // t_low = min( t_low, t_high )
-            t0_high = _mm256_blendv_ps(t0_high, t0_low, M);        // t_high = max( t_low, t_high )
+            // Calculate the close and far extrema of the segment within each slab
+            __m256 M = _mm256_cmp_ps(t0_low, t0_high, _CMP_GE_OQ);
+            T = _mm256_blendv_ps(t0_low, t0_high, M);
+            t0_high = _mm256_blendv_ps(t0_high, t0_low, M);
             t0_low = T;
 
             M = _mm256_cmp_ps(t1_low, t1_high, _CMP_GE_OQ);
@@ -144,27 +160,31 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
             t2_low = T;
 
             // Calculate the intersection of all segments
-            M = _mm256_cmp_ps(t0_low, t1_low, _CMP_GE_OQ); // t0_low >= t1_low ?
-            t0_low = _mm256_blendv_ps(t1_low, t0_low, M);  // t0_low = max( t0_low, t1_low )
-            M = _mm256_cmp_ps(t0_low, t2_low, _CMP_GE_OQ); // t0_low >= t2_low
-            t0_low = _mm256_blendv_ps(t2_low, t0_low, M);  // t0_low = max( t0_low, t2_low ) = t_min
+            M = _mm256_cmp_ps(t0_low, t1_low, _CMP_GE_OQ);
+            t0_low = _mm256_blendv_ps(t1_low, t0_low, M);
+            M = _mm256_cmp_ps(t0_low, t2_low, _CMP_GE_OQ);
+            t0_low = _mm256_blendv_ps(t2_low, t0_low, M);
 
-            M = _mm256_cmp_ps(t0_high, t1_high, _CMP_LE_OQ); // t0_high <= t1_high ?
-            t0_high = _mm256_blendv_ps(t1_high, t0_high, M); // t0_high = min( t0_high, t1_high )
-            M = _mm256_cmp_ps(t0_high, t2_high, _CMP_LE_OQ); // t0_high <= t2_high
-            t0_high = _mm256_blendv_ps(t2_high, t0_high, M); // t0_high = min( t0_high, t2_high ) = t_max
+            M = _mm256_cmp_ps(t0_high, t1_high, _CMP_LE_OQ);
+            t0_high = _mm256_blendv_ps(t1_high, t0_high, M);
+            M = _mm256_cmp_ps(t0_high, t2_high, _CMP_LE_OQ);
+            t0_high = _mm256_blendv_ps(t2_high, t0_high, M);
 
             // If t0_high < 0, the ray is intersecting AABB, but the whole AABB is behind us
             // If t0_low >= t0_high, ray doesn't intersect AABB
-            M = _mm256_cmp_ps(t0_high, r0, _CMP_GT_OQ);     // t0_high > 0 ?
-            T = _mm256_cmp_ps(t0_high, t0_low, _CMP_GE_OQ); // t0_high >= t0_low ?
-            M = _mm256_and_ps(M, T);                        // AND
-            T = _mm256_cmp_ps(t0_low, r1, _CMP_LE_OQ);      // t0_low <= 1
-            M = _mm256_and_ps(M, T);                        // AND
+            M = _mm256_cmp_ps(t0_high, r0, _CMP_GT_OQ);           // t0_high > 0 ?
+            T = _mm256_cmp_ps(t0_high, t0_low, _CMP_GE_OQ);       // t0_high >= t0_low ?
+            M = _mm256_and_ps(M, T);                              // AND
+            T = _mm256_cmp_ps(t0_low, r1, _CMP_LE_OQ);            // t0_low <= 1
+            M = _mm256_and_ps(M, T);                              // AND
+            M = _mm256_and_ps(M, _mm256_castsi256_ps(aabb_mask)); // Kill invalid lanes
 
             // Read output
             // The resulting integer vector will contain -1 if the AABB was hit and 0 otherwise
-            _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
+            if (remaining >= VEC_SIZE)
+                _mm256_storeu_ps((float *)&p_sub_mesh_hit[i_sub], M);
+            else
+                _mm256_maskstore_ps((float *)&p_sub_mesh_hit[i_sub], aabb_mask, M);
         }
 
         // Step 2 - Check intersection with triangles within the sub-meshes
@@ -180,20 +200,38 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
 
             for (int i_mesh = i_mesh_start; i_mesh < i_mesh_end; i_mesh += VEC_SIZE) // Mesh loop
             {
-                // Load first vertex coordinate into AVX2 registers
-                __m256 tx = _mm256_loadu_ps(&Tx[i_mesh]);
-                __m256 ty = _mm256_loadu_ps(&Ty[i_mesh]);
-                __m256 tz = _mm256_loadu_ps(&Tz[i_mesh]);
+                int remaining = i_mesh_end - i_mesh;
+                __m256i tail_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(remaining), i0);
+                __m256 tx, ty, tz, e1x, e1y, e1z, e2x, e2y, e2z;
+                if (remaining >= VEC_SIZE)
+                {
+                    tx = _mm256_loadu_ps(&Tx[i_mesh]);
+                    ty = _mm256_loadu_ps(&Ty[i_mesh]);
+                    tz = _mm256_loadu_ps(&Tz[i_mesh]);
+                    e1x = _mm256_loadu_ps(&E1x[i_mesh]);
+                    e2x = _mm256_loadu_ps(&E2x[i_mesh]);
+                    e1y = _mm256_loadu_ps(&E1y[i_mesh]);
+                    e2y = _mm256_loadu_ps(&E2y[i_mesh]);
+                    e1z = _mm256_loadu_ps(&E1z[i_mesh]);
+                    e2z = _mm256_loadu_ps(&E2z[i_mesh]);
+                }
+                else
+                {
+                    tx = _mm256_maskload_ps(&Tx[i_mesh], tail_mask);
+                    ty = _mm256_maskload_ps(&Ty[i_mesh], tail_mask);
+                    tz = _mm256_maskload_ps(&Tz[i_mesh], tail_mask);
+                    e1x = _mm256_maskload_ps(&E1x[i_mesh], tail_mask);
+                    e2x = _mm256_maskload_ps(&E2x[i_mesh], tail_mask);
+                    e1y = _mm256_maskload_ps(&E1y[i_mesh], tail_mask);
+                    e2y = _mm256_maskload_ps(&E2y[i_mesh], tail_mask);
+                    e1z = _mm256_maskload_ps(&E1z[i_mesh], tail_mask);
+                    e2z = _mm256_maskload_ps(&E2z[i_mesh], tail_mask);
+                }
 
                 // Calculate vector from first vertex coordinate V1 to origin O
                 tx = _mm256_sub_ps(ox, tx);
                 ty = _mm256_sub_ps(oy, ty);
                 tz = _mm256_sub_ps(oz, tz);
-
-                // Load the two triangle edges E1 and E2 into AVX2 registers
-                __m256 e1x = _mm256_loadu_ps(&E1x[i_mesh]), e2x = _mm256_loadu_ps(&E2x[i_mesh]);
-                __m256 e1y = _mm256_loadu_ps(&E1y[i_mesh]), e2y = _mm256_loadu_ps(&E2y[i_mesh]);
-                __m256 e1z = _mm256_loadu_ps(&E1z[i_mesh]), e2z = _mm256_loadu_ps(&E2z[i_mesh]);
 
                 // Calculate 1st barycentric coordinate U
                 __m256 PQ = _mm256_mul_ps(e2y, dz); // PQ = e2y * dz
@@ -243,16 +281,17 @@ void qd_RTI_AVX2(const float *Tx, const float *Ty, const float *Tz,    // First 
 
                 // Check intersect conditions, output is a bitwise mask
                 // https://stackoverflow.com/questions/16988199/how-to-choose-avx-compare-predicate-variants
-                __m256 C1 = _mm256_cmp_ps(U, r0, _CMP_GE_OQ); // U >= 0
-                __m256 C2 = _mm256_cmp_ps(V, r0, _CMP_GE_OQ); // V >= 0
-                C1 = _mm256_and_ps(C1, C2);                   // U >= 0 & V >= 0
-                U = _mm256_add_ps(U, V);                      // Compute U + V
-                C2 = _mm256_cmp_ps(U, r1, _CMP_LE_OQ);        // (U + V) <= 1
-                C1 = _mm256_and_ps(C1, C2);                   // U >= 0 & V >= 0 & (U + V) <= 1
-                C2 = _mm256_cmp_ps(W, r0, _CMP_GE_OQ);        // W >= 0
-                C1 = _mm256_and_ps(C1, C2);                   // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0
-                C2 = _mm256_cmp_ps(W, r1, _CMP_LT_OQ);        // W < 1
-                C1 = _mm256_and_ps(C1, C2);                   // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0 & W < 1
+                __m256 C1 = _mm256_cmp_ps(U, r0, _CMP_GE_OQ);           // U >= 0
+                __m256 C2 = _mm256_cmp_ps(V, r0, _CMP_GE_OQ);           // V >= 0
+                C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0
+                U = _mm256_add_ps(U, V);                                // Compute U + V
+                C2 = _mm256_cmp_ps(U, r1, _CMP_LE_OQ);                  // (U + V) <= 1
+                C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1
+                C2 = _mm256_cmp_ps(W, r0, _CMP_GE_OQ);                  // W >= 0
+                C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0
+                C2 = _mm256_cmp_ps(W, r1, _CMP_LT_OQ);                  // W < 1
+                C1 = _mm256_and_ps(C1, C2);                             // U >= 0 & V >= 0 & (U + V) <= 1 & W > 0 & W < 1
+                C1 = _mm256_and_ps(C1, _mm256_castsi256_ps(tail_mask)); // kill invalid lanes
 
                 // Fast exit if no hit was detected
                 // this should be the case in 99.9% of the time

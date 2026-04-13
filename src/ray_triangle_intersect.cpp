@@ -89,7 +89,6 @@ void quadriga_lib::ray_triangle_intersect(
 
 - `const arma::u32_vec ***sub_mesh_index**` (optional input)<br>
   Indexes indicating start of sub-meshes in `mesh`. Size: `[n_sub]`. Enables faster processing via segmentation.
-  When using AVX2, sub-mesh start indices must be aligned to multiples of 8.
 
 - `const arma::Mat<dtype> ***aabb**` (optional input)<br>
   Pre-computed axis-aligned bounding boxes per sub-mesh. Size: `[n_sub, 6]`, where each row contains
@@ -196,9 +195,6 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
             kernel = 1;
     }
 
-    // Determine SIMD vector size based on selected kernel
-    arma::uword vec_size = (kernel == 2) ? 8ULL : 1ULL;
-
     // Check if the sub-mesh indices are valid
     arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
     arma::u32_vec smi(1);                                         // Sub-mesh-index (local copy)
@@ -214,9 +210,6 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
         {
             if (p_sub[i] <= p_sub[i - 1ULL])
                 throw std::invalid_argument("Sub-mesh indices must be sorted in ascending order.");
-
-            if (vec_size > 1ULL && p_sub[i] % vec_size != 0ULL)
-                throw std::invalid_argument("Sub-meshes must be aligned with the SIMD vector size (8 for AVX2).");
         }
 
         if (p_sub[n_sub - 1ULL] >= (unsigned)n_mesh)
@@ -229,7 +222,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     arma::Mat<dtype> aabb_computed;
     if (aabb == nullptr)
     {
-        aabb_computed = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_index, vec_size);
+        aabb_computed = quadriga_lib::triangle_mesh_aabb(mesh, sub_mesh_index);
         aabb = &aabb_computed;
     }
     else
@@ -240,14 +233,10 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
             throw std::invalid_argument("Input 'aabb' must have at least 6 columns [x_min, x_max, y_min, y_max, z_min, z_max].");
     }
 
-    // Pad mesh and sub-mesh counts to multiples of vec_size for SIMD processing
-    arma::uword n_mesh_s = (n_mesh % vec_size == 0ULL) ? n_mesh : vec_size * (n_mesh / vec_size + 1ULL);
-    arma::uword n_sub_s = (n_sub % vec_size == 0ULL) ? n_sub : vec_size * (n_sub / vec_size + 1ULL);
-
     // AABB data per sub-mesh - convert from dtype to float
-    arma::fvec Xmin_vec(n_sub_s, arma::fill::zeros), Xmax_vec(n_sub_s, arma::fill::zeros);
-    arma::fvec Ymin_vec(n_sub_s, arma::fill::zeros), Ymax_vec(n_sub_s, arma::fill::zeros);
-    arma::fvec Zmin_vec(n_sub_s, arma::fill::zeros), Zmax_vec(n_sub_s, arma::fill::zeros);
+    arma::fvec Xmin_vec(n_sub, arma::fill::none), Xmax_vec(n_sub, arma::fill::none);
+    arma::fvec Ymin_vec(n_sub, arma::fill::none), Ymax_vec(n_sub, arma::fill::none);
+    arma::fvec Zmin_vec(n_sub, arma::fill::none), Zmax_vec(n_sub, arma::fill::none);
     float *Xmin = Xmin_vec.memptr(), *Xmax = Xmax_vec.memptr();
     float *Ymin = Ymin_vec.memptr(), *Ymax = Ymax_vec.memptr();
     float *Zmin = Zmin_vec.memptr(), *Zmax = Zmax_vec.memptr();
@@ -264,9 +253,9 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
 
     // Convert mesh to float SoA layout (first vertex + two edges)
-    arma::fvec Tx_vec(n_mesh_s, arma::fill::zeros), Ty_vec(n_mesh_s, arma::fill::zeros), Tz_vec(n_mesh_s, arma::fill::zeros);
-    arma::fvec E1x_vec(n_mesh_s, arma::fill::zeros), E1y_vec(n_mesh_s, arma::fill::zeros), E1z_vec(n_mesh_s, arma::fill::zeros);
-    arma::fvec E2x_vec(n_mesh_s, arma::fill::zeros), E2y_vec(n_mesh_s, arma::fill::zeros), E2z_vec(n_mesh_s, arma::fill::zeros);
+    arma::fvec Tx_vec(n_mesh, arma::fill::none), Ty_vec(n_mesh, arma::fill::none), Tz_vec(n_mesh, arma::fill::none);
+    arma::fvec E1x_vec(n_mesh, arma::fill::none), E1y_vec(n_mesh, arma::fill::none), E1z_vec(n_mesh, arma::fill::none);
+    arma::fvec E2x_vec(n_mesh, arma::fill::none), E2y_vec(n_mesh, arma::fill::none), E2z_vec(n_mesh, arma::fill::none);
     float *Tx = Tx_vec.memptr(), *Ty = Ty_vec.memptr(), *Tz = Tz_vec.memptr();
     float *E1x = E1x_vec.memptr(), *E1y = E1y_vec.memptr(), *E1z = E1z_vec.memptr();
     float *E2x = E2x_vec.memptr(), *E2y = E2y_vec.memptr(), *E2z = E2z_vec.memptr();
@@ -303,7 +292,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     if (kernel == 3) // CUDA
     {
 #if BUILD_WITH_CUDA
-        qd_RTI_CUDA(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_s,
+        qd_RTI_CUDA(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
                     smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                     origA.colptr(0), origA.colptr(1), origA.colptr(2),
                     dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
@@ -313,7 +302,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     else if (kernel == 2) // AVX2
     {
 #if BUILD_WITH_AVX2
-        qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh_s,
+        qd_RTI_AVX2(Tx, Ty, Tz, E1x, E1y, E1z, E2x, E2y, E2z, n_mesh,
                     smi.memptr(), Xmin, Xmax, Ymin, Ymax, Zmin, Zmax, n_sub,
                     origA.colptr(0), origA.colptr(1), origA.colptr(2),
                     dest_minus_origA.colptr(0), dest_minus_origA.colptr(1), dest_minus_origA.colptr(2),
