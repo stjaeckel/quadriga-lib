@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,140 +25,65 @@ SECTION!*/
 
 /*!MD
 # ray_mesh_interact
-Calculates interactions (reflection, transmission, refraction) of radio waves with objects
+Calculates reflection, transmission, or refraction of radio waves at mesh surfaces per ITU-R P.2040-1
 
 ## Description:
-- Radio waves that interact with a building, or other objects in the environment, will produce losses
-  that depend on the electrical properties of the materials and material structure.
-- This function calculates the interactions of radio-waves with objects in a 3D environment.
-- It considers a plane wave incident upon a planar interface between two homogeneous and isotropic
-  media of differing electric properties. The media extend sufficiently far from the interface such
-  that the effect of any other interface is negligible.
-- Supports beam-based modeling using triangular ray tubes defined by `trivec` and `tridir`.
-- Air to media transition is assumed if front side of a face is hit and FBS != SBS
-- Media to air transition is assumed if back side of a face is hit and FBS != SBS
-- Media to media transition is assumed if FBS = SBS with opposing face orientations
-- Order of the vertices determines side (front or back) of a mesh element
-- Overlapping geometry in the triangle mesh must be avoided, since materials are transparent to radio
-  waves.
-- Implementation is done according to ITU-R P.2040-1.
-- Rays that do not interact with the environment (i.e. for which `fbs_ind = 0`) are omitted from the output.
-- Maintains consistency of input and output ray formats, including direction encoding (spherical or Cartesian).
-- Assigns interaction type codes to output rays, allowing classification (e.g., single hit, total 
-  reflection, material-to-material).
+- Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
+- Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
+- Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit 
+  with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.
+- Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
+- Output direction encoding (spherical/Cartesian) matches input `tridir` format.
+- Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
 - Allowed datatypes (`dtype`): `float` or `double`.
 
 ## Declaration:
 ```
 void quadriga_lib::ray_mesh_interact(
-                int interaction_type,
-                dtype center_frequency,
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                const arma::Mat<dtype> *fbs,
-                const arma::Mat<dtype> *sbs,
-                const arma::Mat<dtype> *mesh,
-                const arma::Mat<dtype> *mtl_prop,
-                const arma::u32_vec *fbs_ind,
-                const arma::u32_vec *sbs_ind,
-                const arma::Mat<dtype> *trivec = nullptr,
-                const arma::Mat<dtype> *tridir = nullptr,
-                const arma::Col<dtype> *orig_length = nullptr,
-                arma::Mat<dtype> *origN = nullptr,
-                arma::Mat<dtype> *destN = nullptr,
-                arma::Col<dtype> *gainN = nullptr,
-                arma::Mat<dtype> *xprmatN = nullptr,
-                arma::Mat<dtype> *trivecN = nullptr,
-                arma::Mat<dtype> *tridirN = nullptr,
-                arma::Col<dtype> *orig_lengthN = nullptr,
-                arma::Col<dtype> *fbs_angleN = nullptr,
-                arma::Col<dtype> *thicknessN = nullptr,
-                arma::Col<dtype> *edge_lengthN = nullptr,
-                arma::Mat<dtype> *normal_vecN = nullptr,
-                arma::s32_vec *out_typeN = nullptr);
+    int interaction_type, dtype center_frequency,
+    const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *fbs, const arma::Mat<dtype> *sbs,
+    const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
+    const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
+    const arma::Mat<dtype> *trivec = nullptr,
+    const arma::Mat<dtype> *tridir = nullptr,
+    const arma::Col<dtype> *orig_length = nullptr,
+    arma::Mat<dtype> *origN = nullptr, arma::Mat<dtype> *destN = nullptr,
+    arma::Col<dtype> *gainN = nullptr, arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *trivecN = nullptr, arma::Mat<dtype> *tridirN = nullptr,
+    arma::Col<dtype> *orig_lengthN = nullptr,
+    arma::Col<dtype> *fbs_angleN = nullptr,
+    arma::Col<dtype> *thicknessN = nullptr,
+    arma::Col<dtype> *edge_lengthN = nullptr,
+    arma::Mat<dtype> *normal_vecN = nullptr,
+    arma::s32_vec *out_typeN = nullptr);
 ```
 
-## Arguments:
-- `int **interaction_type**` (input)<br>
-  Type of interaction: 0 = reflection, 1 = transmission, 2 = refraction.
+## Input Arguments:
+- **`interaction_type`** — 0 = reflection, 1 = transmission, 2 = refraction
+- **`center_frequency`** — Center frequency in Hz
+- **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
+- **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
+- **`mesh`** — Triangle mesh faces; `[n_mesh, 9]` (see `obj_file_read`)
+- **`mtl_prop`** — Material properties per face; `[n_mesh, 5]` (see `obj_file_read`)
+- **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
+- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
+- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
+- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
 
-- `dtype **center_frequency**` (input)<br>
-  Center frequency in Hz.
+## Output Arguments:
+- **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
+- **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
+- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL), averaged over polarizations; `[n_rayN]`
+- **`xprmatN`** — Polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`
+- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
+- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
+- **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
+- **`thicknessN`** — Material thickness (FBS-to-SBS distance) in meters; `[n_rayN]`
+- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN, 3]`
+- **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
+- **`out_typeN`** — Interaction type code; `[n_rayN]`<br><br>
 
-- `const arma::Mat<dtype> ***orig**, ***dest**` (input)<br>
-  Ray origin and destination points in global Cartesian space. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***fbs**, ***sbs**` (input)<br>
-  First and second interaction points. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangle mesh faces. Size: `[n_mesh, 9]`, See <a href="#obj_file_read">obj_file_read</a> for details
-
-- `const arma::Mat<dtype> ***mtl_prop**` (input)<br>
-  Material properties per face. Size: `[n_mesh, 5]`, See <a href="#obj_file_read">obj_file_read</a> for details
-
-- `const arma::u32_vec ***fbs_ind**, ***sbs_ind**` (input)<br>
-  Mesh indices of interaction points (1-based). Size: `[n_ray]`.
-
-- `const arma::Mat<dtype> ***trivec**` (optional input)<br>
-  The 3 vectors pointing from the center point of the ray at the `origin` to the vertices of a triangular
-  propagation tube (=beam wavefront), the values are in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`;
-  Size: `[no_ray, 9]`
-
-- `const arma::Mat<dtype> ***tridir**` (optional input)<br>
-  The directions of the vertex-rays. Size: `[ n_ray, 6 ]` or `[ n_ray, 9 ]`,
-  For 6 columns, values are in geographic coordinates (azimuth and elevation angle in rad); the 
-  values are in the order `[ v1az, v1el, v2az, v2el, v3az, v3el ]`;
-  For 9 columns, the input is in Cartesian coordinates and the values are in the  order 
-  `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`
-
-- `const arma::Col<dtype> ***orig_length**` (optional input)<br>
-  Path length at origin. Size: `[n_ray]`. Default is 0
-
-- `arma::Mat<dtype> ***origN**` (output)<br>
-  New ray origins after the interaction with the medium, usually placed close to the FBS location.
-  A small offset of 0.001 m in the direction of travel after the interaction with the medium is added
-  to avoid getting stuct inside a mesh element. Size: `[ no_rayN, 3 ]`
-
-- `arma::Mat<dtype> ***destN**` (output)<br>
-  New ray destinaion after the interaction with the medium, taking the change of direction into account;
-  Size: `[no_rayN, 3]`
-
-- `arma::Col<dtype> ***gainN**` (output)<br>
-  Gain (negative loss) caused by the interaction with the medium, averaged over both polarization
-  directions. This value includes the in-medium attenuation, but does not account for FSPL. 
-  Values are in linear scale (not dB); Size: `[no_rayN]`
-
-- `arma::Mat<dtype> ***xprmatN**` (output)<br>
-  Polarization transfer matrix; Interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH);
-  The values account for the following effects: (1) gain caused by the interaction with the medium,
-  (2) different reflection/transmission coefficients for transverse electric (TE) and transverse
-  magnetic (TM) polarisation, (3) orientation of the incidence plane, (4) in-medium attenuation.
-  FSPL is excluded, Size: `[ no_rayN, 8 ]`
-
-- `arma::Mat<dtype> ***trivecN**, ***tridirN**` (output)<br>
-  New ray tube geometry and direction. Format matches input.
-
-- `arma::Col<dtype> ***orig_lengthN**` (output)<br>
-  Length of the ray from `orig` to `origN`. If `orig_length` is given as input, its value is added.
-  Size: `[ no_rayN ]`
-
-- `arma::Col<dtype> ***fbs_angleN**` (output)<br>
-  Angle between incoming ray and FBS in [rad], Size `[ n_rayN ]`
-
-- `arma::Col<dtype> ***thicknessN**` (output)<br>
-  Material thickness in meters calculated from the difference between FBS and SBS, Size `[ n_rayN ]`
-
-- `arma::Col<dtype> ***edge_lengthN**` (output)<br>
-  Max. edge length of the ray tube triangle at the new origin. A value of infinity indicates that only
-  a part of the ray tube hits the object. Size `[ n_rayN, 3 ]`
-
-- `arma::Mat<dtype> ***normal_vecN**` (output)<br>
-  Normal vector of FBS and SBS, Size `[ n_rayN, 6 ]`
-
-- `arma::s32_vec ***out_typeN**` (output)<br>
-  A numeric indicator describing the type of the interaction. The total refection indicator is only 
-  set in refraction mode. Size `[ n_rayN ]`<br><br>
   No | θF<0 | θS<0 | dFS=0 | TotRef | iSBS=0 | NF=-NS | NF=NS | startIn | endIn | Meaning
   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
    0 |      |      |       |        |        |        |       |         |       | Undefined
@@ -182,10 +107,10 @@ void quadriga_lib::ray_mesh_interact(
   15 |  yes |  yes |   yes |    yes |     no |     no |    no |     yes |    no | Edge Hit, i-o, TR
 
 ## See also:
-- <a href="#obj_file_read">obj_file_read</a> (for loading `mesh` and `mtl_prop` from OBJ file)
-- <a href="#icosphere">icosphere</a> (for generating beams)
-- <a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for computing FBS and SBS positions)
-- <a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
+- [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
+- [[icosphere]] (for generating beams)
+- [[ray_triangle_intersect]] (for computing FBS and SBS positions)
+- [[ray_point_intersect]] (for calculating beam interactions with sampling points)
 MD!*/
 
 template <typename dtype>
