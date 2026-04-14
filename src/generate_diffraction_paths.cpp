@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,12 +45,12 @@ calculation of the diffraction gain in <a href="#calc_diffraction_gain">calc_dif
 ## Declaration:
 ```
 void generate_diffraction_paths(
-                const arma::Mat<dtype> *orig, 
+                const arma::Mat<dtype> *orig,
                 const arma::Mat<dtype> *dest,
-                dtype center_frequency, 
+                dtype center_frequency,
                 int lod,
-                arma::Cube<dtype> *ray_x, 
-                arma::Cube<dtype> *ray_y, 
+                arma::Cube<dtype> *ray_x,
+                arma::Cube<dtype> *ray_y,
                 arma::Cube<dtype> *ray_z,
                 arma::Cube<dtype> *weight);
 ```
@@ -97,8 +97,14 @@ void generate_diffraction_paths(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, dtype center_frequency, int lod,
-                                              arma::Cube<dtype> *ray_x, arma::Cube<dtype> *ray_y, arma::Cube<dtype> *ray_z, arma::Cube<dtype> *weight)
+void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig,
+                                              const arma::Mat<dtype> *dest,
+                                              dtype center_frequency,
+                                              int lod,
+                                              arma::Cube<dtype> *ray_x,
+                                              arma::Cube<dtype> *ray_y,
+                                              arma::Cube<dtype> *ray_z,
+                                              arma::Cube<dtype> *weight)
 {
     // Check data validity
     if (orig == nullptr || orig->n_rows == 0ULL)
@@ -274,6 +280,7 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig, cons
         }
     }
 }
+
 template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> *orig, const arma::Mat<float> *dest, float center_frequency, int lod,
                                                        arma::Cube<float> *ray_x, arma::Cube<float> *ray_y, arma::Cube<float> *ray_z, arma::Cube<float> *weight);
 

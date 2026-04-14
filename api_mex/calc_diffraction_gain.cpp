@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,77 +19,108 @@
 #include "quadriga_tools.hpp"
 #include "mex_helper_functions.hpp"
 
+/*!SECTION
+Site-Specific Simulation Tools
+SECTION!*/
+
+/*!MD
+# CALC_DIFFRACTION_GAIN
+Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
+
+## Description:
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave
+  propagation between each TX-RX pair is divided into `n_path` elliptic-arc paths (controlled by `lod`),
+  each approximated by `n_seg` line segments. 
+- Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
+  generalized to arbitrary 3D shapes.
+- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
+  geometry whose bounding box does not intersect the TX-RX path.
+- All inputs are cast to double precision internally.
+
+## Usage:
+```
+[ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_prop, ...
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
+```
+
+## Input Arguments:
+- `**orig**` (input)<br>
+  TX positions, size `[n_pos, 3]`, numeric.
+
+- `**dest**` (input)<br>
+  RX positions, size `[n_pos, 3]`, numeric.
+
+- `**mesh**` (input)<br>
+  Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, size `[n_mesh, 9]`, numeric.
+
+- `**mtl_prop**` (input)<br>
+  Material properties per triangle, size `[n_mesh, 5]`, numeric. See [[obj_file_read]].
+
+- `**center_frequency**` (input)<br>
+  Center frequency in Hz, scalar.
+
+- `**lod**` (optional input)<br>
+  Level of detail (0–6), scalar. Default: `2`. See [[generate_diffraction_paths]].
+
+- `**verbose**` (optional input)<br>
+  Verbosity level, scalar. Default: `0`.
+
+- `**sub_mesh_index**` (optional input)<br>
+  Sub-mesh index for acceleration, 0-based, `uint32` vector of length `[n_mesh]`. Pass `[]` to skip.
+  See [[triangle_mesh_segmentation]].
+
+- `**use_kernel**` (optional input)<br>
+  Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Default: `0`. Error if unavailable.
+
+- `**gpu_id**` (optional input)<br>
+  CUDA device ID (0-based). Default: `0`. Ignored for non-CUDA kernels.
+
+## Output Arguments:
+- `**gain**`<br>
+  Diffraction gain per TX-RX pair, linear scale, size `[n_pos, 1]`.
+
+- `**coord**`<br>
+  Diffracted path coordinates (excluding endpoints), size `[3, n_seg-1, n_pos]`.
+
+## See also:
+- [[generate_diffraction_paths]]
+- [[triangle_mesh_segmentation]]
+- [[obj_file_read]]
+MD!*/
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - orig            Ray origin points in GCS, Size [ n_pos, 3 ]
-    //  1 - dest            Ray destination points in GCS, Size [ n_pos, 3 ]
-    //  2 - mesh            Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-    //  3 - mtl_prop        Material properties, Size: [ n_mesh, 5 ]
-    //  4 - center_freq     Center frequency in [Hz]
-    //  5 - lod             Level of detail, scalar value 0-6
-    //  6 - verbose         Verbosity level 0-2, default = 0
-    //  7 - sub_mesh_index  Sub-mesh index, 0-based, uint32, Length: [ n_sub ], optional
-
-    // Outputs:
-    //  0 - gain            Diffraction gain; linear scale; Size: [ n_pos ]
-    //  1 - coord           Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
-
-    if (nrhs < 4)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Need at least 4 input arguments.");
-
-    if (nrhs > 8)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Too many input arguments.");
+    if (nrhs < 5 || nrhs > 10)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 2)
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Inputs must be provided in 'single' or 'double' precision of matching type.");
+    // Load inputs (cast to double if needed)
+    arma::mat orig = qd_mex_get_double_Mat(prhs[0]);
+    arma::mat dest = qd_mex_get_double_Mat(prhs[1]);
+    arma::mat mesh = qd_mex_get_double_Mat(prhs[2]);
+    arma::mat mtl_prop = qd_mex_get_double_Mat(prhs[3]);
 
-    for (int i = 1; i < 4; ++i)
-        if (nrhs > i)
-            if ((use_single && !mxIsSingle(prhs[i])) || (!use_single && !mxIsDouble(prhs[i])))
-                mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "All floating-point inputs must have the same type: 'single' or 'double' precision");
-
-    // Read inputs
-    arma::fmat orig_single, dest_single, mesh_single, mtl_prop_single;
-    arma::mat orig_double, dest_double, mesh_double, mtl_prop_double;
-
-    if (use_single)
-    {
-        orig_single = qd_mex_reinterpret_Mat<float>(prhs[0]);
-        dest_single = qd_mex_reinterpret_Mat<float>(prhs[1]);
-        mesh_single = qd_mex_reinterpret_Mat<float>(prhs[2]);
-        mtl_prop_single = qd_mex_reinterpret_Mat<float>(prhs[3]);
-    }
-    else
-    {
-        orig_double = qd_mex_reinterpret_Mat<double>(prhs[0]);
-        dest_double = qd_mex_reinterpret_Mat<double>(prhs[1]);
-        mesh_double = qd_mex_reinterpret_Mat<double>(prhs[2]);
-        mtl_prop_double = qd_mex_reinterpret_Mat<double>(prhs[3]);
-    }
-
-    double center_freq = (nrhs < 5) ? 1.0e9 : qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
+    double center_freq = qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
     int lod = (nrhs < 6) ? 2 : qd_mex_get_scalar<int>(prhs[5], "lod", 2);
     int verbose = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "verbose", 0);
 
+    // Optional: sub_mesh_index
     arma::u32_vec sub_mesh_index;
     if (nrhs > 7 && !mxIsEmpty(prhs[7]))
     {
-        if (!mxIsUint32(prhs[7]))
-            mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:IO_error", "Input 'sub_mesh_index' must be provided as 'uint32'.");
-
-        sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[7]);
+        if (mxIsUint32(prhs[7]))
+            sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[7]);
+        else
+            sub_mesh_index = qd_mex_typecast_Col<unsigned>(prhs[7]);
     }
 
-    unsigned long long n_pos = use_single ? orig_single.n_rows : orig_double.n_rows;
-    unsigned long long n_seg = 0;
+    int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
+    int gpu_id = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "gpu_id", 0);
+
+    arma::uword n_pos = orig.n_rows;
+    arma::uword n_seg = 0;
     if (lod == 1 || lod == 2)
         n_seg = 2;
     else if (lod == 3)
@@ -100,54 +131,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         n_seg = 1;
 
     // Initialize output containers
-    arma::fvec gain_single;
-    arma::vec gain_double;
-    arma::fcube coord_single;
-    arma::cube coord_double;
+    arma::vec gain;
+    arma::cube coord;
 
-    // Get pointers
-    arma::fvec *p_gain_single = &gain_single;
-    arma::vec *p_gain_double = &gain_double;
-    arma::fcube *p_coord_single = &coord_single;
-    arma::cube *p_coord_double = &coord_double;
+    if (nlhs > 0)
+        plhs[0] = qd_mex_init_output(&gain, n_pos);
 
-    // Allocate memory
-    if (nlhs > 0 && use_single)
-        plhs[0] = qd_mex_init_output(p_gain_single, n_pos);
-    else if (nlhs > 0) // double
-        plhs[0] = qd_mex_init_output(p_gain_double, n_pos);
-    else
-        p_gain_single = nullptr, p_gain_double = nullptr;
+    if (nlhs > 1)
+        plhs[1] = qd_mex_init_output(&coord, 3, n_seg, n_pos);
 
-    if (nlhs > 1 && use_single)
-        plhs[1] = qd_mex_init_output(p_coord_single, 3, n_seg, n_pos);
-    else if (nlhs > 1) // double
-        plhs[1] = qd_mex_init_output(p_coord_double, 3, n_seg, n_pos);
-    else
-        p_coord_single = nullptr, p_coord_double = nullptr;
+    arma::vec *p_gain = gain.empty() ? nullptr : &gain;
+    arma::cube *p_coord = coord.empty() ? nullptr : &coord;
+    arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
-    // Call library function
-    try
-    {
-        if (use_single)
-        {
-            quadriga_lib::calc_diffraction_gain<float>(&orig_single, &dest_single, &mesh_single, &mtl_prop_single,
-                                                       (float)center_freq, lod, p_gain_single, p_coord_single, verbose,
-                                                       &sub_mesh_index);
-        }
-        else // double
-        {
-            quadriga_lib::calc_diffraction_gain<double>(&orig_double, &dest_double, &mesh_double, &mtl_prop_double,
-                                                        center_freq, lod, p_gain_double, p_coord_double, verbose,
-                                                        &sub_mesh_index);
-        }
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:calc_diffraction_gain:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    CALL_QD(quadriga_lib::calc_diffraction_gain(&orig, &dest, &mesh, &mtl_prop,
+                                                center_freq, lod, p_gain, p_coord, verbose,
+                                                p_sub_mesh_index, use_kernel, gpu_id));
 }

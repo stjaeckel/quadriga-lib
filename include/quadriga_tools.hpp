@@ -224,22 +224,19 @@ namespace quadriga_lib
     // ---- Site-Specific Simulation Tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
-    // - For faster processing, the mesh can be split into sub-meshes. In this case, the algorithm can
-    //   efficiently skip entire sub-meshed if no interaction with any of its componenets is possible
-    //   (i.e. the path does not insect its bounding-box).
-    // - The function "quadriga_lib::triangle_mesh_segmentation" can be used to split the mesh and
-    //   calculate the optional "sub_mesh_index".
-    template <typename dtype>                                                  // Supported types: float or double
-    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                   // Origin points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *dest,                   // Destination points, Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *mesh,                   // Vertices of the triangular mesh; Size: [ no_mesh, 9 ]
-                               const arma::Mat<dtype> *mtl_prop,               // Material properties; Size: [ no_mesh, 5 ]
-                               dtype center_frequency,                         // Center frequency in [Hz]
-                               int lod = 2,                                    // Level of detail, scalar values 0-6
-                               arma::Col<dtype> *gain = nullptr,               // Diffraction gain; linear scale; Size: [ n_pos ]
-                               arma::Cube<dtype> *coord = nullptr,             // Approximate coordinates of the diffracted path; [ 3, n_seg-1, n_pos ]
-                               int verbose = 0,                                // Verbosity level
-                               const arma::u32_vec *sub_mesh_index = nullptr); // Sub-mesh index, 0-based, (optional input), Length: [ n_sub ]
+    template <typename dtype>                                                 // Supported types: float or double
+    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                  // TX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *dest,                  // RX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *mesh,                  // Triangle vertices; Size: [ no_mesh, 9 ]
+                               const arma::Mat<dtype> *mtl_prop,              // Material properties; Size: [ no_mesh, 5 ]
+                               dtype center_frequency,                        // Center frequency in [Hz]
+                               int lod = 2,                                   // Level of detail, 0-6
+                               arma::Col<dtype> *gain = nullptr,              // Diffraction gain, linear scale; Size: [ n_pos ]
+                               arma::Cube<dtype> *coord = nullptr,            // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
+                               int verbose = 0,                               // Verbosity level
+                               const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based; Length: [ no_mesh ]
+                               int use_kernel = 0,                            // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
+                               int gpu_id = 0);                               // CUDA device ID, ignored otherwise
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX

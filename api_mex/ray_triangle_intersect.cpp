@@ -36,7 +36,6 @@ Calculates the intersection of rays and triangles in three dimensions
 - Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
 
 ## Usage:
-
 ```
 [ fbs, sbs, no_interact, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( ...
     orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id );
@@ -94,10 +93,10 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     if (nrhs < 3 || nrhs > 7)
-        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Wrong number of input arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 5)
-        mexErrMsgIdAndTxt("quadriga_lib:ray_triangle_intersect:IO_error", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
     // Load inputs (cast to double if needed)
     arma::mat orig = qd_mex_get_double_Mat(prhs[0]);

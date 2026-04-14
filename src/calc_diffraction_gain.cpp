@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -207,39 +207,22 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
     return dtype(transition_gain * (1.0 - reflection_gain));
 }
 
-
 /*!SECTION
 Site-Specific Simulation Tools
 SECTION!*/
 
 /*!MD
 # calc_diffraction_gain
-Calculate diffraction gain for multiple transmit and receive positions
+Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
 
 ## Description:
-Diffraction refers to the phenomenon where waves bend or interfere around the edges of an obstacle,
-extending into the region that would otherwise be in the obstacle's geometrical shadow. The object
-causing the diffraction acts as a secondary source for the wave's propagation. A specific example of
-this is the knife-edge effect, or knife-edge diffraction, where a sharp, well-defined obstacle—like
-a mountain range or a building wall—partially truncates the incident radiation.<br><br>
-
-To estimate the diffraction gain in a three-dimensional space, one can assess the extent to which the
-Fresnel ellipsoid is obstructed by objects, and then evaluate the impact of this obstruction on the
-received power. This method presupposes that diffracted waves travel along slightly varied paths
-before arriving at a receiver. These waves may reach the receiver out of phase with the primary wave
-due to their different travel lengths, leading to either constructive or destructive interference.<br><br>
-
-The process of estimating the gain involves dividing the wave propagation from a transmitter to a
-receiver into `n_path` paths. These paths are represented by elliptic arcs, which are further
-approximated using `n_seg` line segments. Each segment can be individually blocked or attenuated
-by environmental objects. To determine the overall diffraction gain, a weighted sum of these
-individual path contributions is calculated. The weighting is adjusted to align with the uniform
-theory of diffraction (UTD) coefficients in two dimensions, but the methodology is adapted for
-any 3D object shape. <br><br>
-
-- This function computes the diffraction gain between multiple transmit and receive positions using a 3D triangular mesh.
-- Supports accelerated computation via mesh segmentation: large meshes can be split into smaller sub-meshes to skip irrelevant geometry.
-- Optionally returns the gain per link and the coordinates along the diffracted path.
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave
+  propagation between each TX-RX pair is divided into `n_path` elliptic-arc paths (controlled by `lod`),
+  each approximated by `n_seg` line segments. 
+- Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
+  generalized to arbitrary 3D shapes.
+- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
+  geometry whose bounding box does not intersect the TX-RX path.
 - Allowed datatypes (`dtype`): `float` or `double`.
 
 ## Declaration:
@@ -254,62 +237,49 @@ void quadriga_lib::calc_diffraction_gain(
                 arma::Col<dtype> *gain = nullptr,
                 arma::Cube<dtype> *coord = nullptr,
                 int verbose = 0,
-                const arma::u32_vec *sub_mesh_index = nullptr);
+                const arma::u32_vec *sub_mesh_index = nullptr,
+                int use_kernel = 0,
+                int gpu_id = 0);
 ```
 
 ## Arguments:
 - `const arma::Mat<dtype> ***orig**` (input)<br>
-  Matrix of origin (transmitter) points, size `[n_pos, 3]`.
-
+  TX positions, size `[n_pos, 3]`.
 - `const arma::Mat<dtype> ***dest**` (input)<br>
-  Matrix of destination (receiver) points, size `[n_pos, 3]`.
-
+  RX positions, size `[n_pos, 3]`.
 - `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangular mesh geometry. Each row contains 3 vertices, flattened as `[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]`, size `[no_mesh, 9]`.
-
+  Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, size `[n_mesh, 9]`.
 - `const arma::Mat<dtype> ***mtl_prop**` (input)<br>
-  Material properties per triangle, size `[no_mesh, 5]`, See [[obj_file_read]] for details
-
+  Material properties per triangle, size `[n_mesh, 5]`. See [[obj_file_read]].
 - `dtype **center_frequency**` (input)<br>
-  Center frequency in Hz used for diffraction calculations.
-
+  Center frequency in Hz.
 - `int **lod** = 2` (optional input)<br>
-  Level of detail for diffraction approximation. See [[generate_diffraction_paths]]
-
+  Level of detail (0–6). Controls `n_path` and `n_seg`. See [[generate_diffraction_paths]].
 - `arma::Col<dtype> ***gain**` (output, optional)<br>
-  Calculated diffraction gain in linear scale, vector of size `[n_pos]`.
-
+  Diffraction gain per TX-RX pair, linear scale, size `[n_pos]`.
 - `arma::Cube<dtype> ***coord**` (output, optional)<br>
-  Coordinates of the diffracted path, size `[3, n_seg-1, n_pos]`. Includes one point per segment excluding endpoints.
-
+  Diffracted path coordinates (excluding endpoints), size `[3, n_seg-1, n_pos]`.
 - `int **verbose** = 0` (optional input)<br>
-  Verbosity level for debug and diagnostic output. Higher values enable more log messages. Default: `0`.
-
+  Verbosity level. Default: `0`.
 - `const arma::u32_vec ***sub_mesh_index**` (input, optional)<br>
-  Optional sub-mesh indexing for acceleration. Vector mapping triangles to sub-meshes, length `[no_mesh]`.
-
-## Technical Notes:
-- If `sub_mesh_index` is provided, spatial bounding boxes for each sub-mesh are automatically computed. 
-  Any TX-RX path not intersecting a bounding box is excluded from detailed edge evaluation.
-- The diffraction algorithm supports multiple edges and considers the geometric configuration and material properties of each triangle.
-- The LOD parameter controls both accuracy and computational cost. Lower values use simplified heuristics; 
-  higher values may result in significantly more computation time.
-- Each ellipsoid consists of `n_path` diffraction paths. The number of paths is determined by the
-  level of detail (`lod`). See [[generate_diffraction_paths]] for details 
+  Sub-mesh index for acceleration, 0-based, length `[n_mesh]`. See [[triangle_mesh_segmentation]].
+- `int **use_kernel** = 0` (optional input)<br>
+  Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Error if unavailable.
+- `int **gpu_id** = 0` (optional input)<br>
+  CUDA device ID. Ignored for non-CUDA kernels.
 
 ## See also:
-- [[generate_diffraction_paths]] (for generating propagation paths for estimating the diffraction gain)
-- [[triangle_mesh_segmentation]] (for calculating the sub-meshes for acceleration)
-- [[obj_file_read]] (for reading 3D geometry and material data from an .obj file)
+- [[generate_diffraction_paths]]
+- [[triangle_mesh_segmentation]]
+- [[obj_file_read]]
 MD!*/
-
 
 template <typename dtype>
 void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
                                          const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
                                          dtype center_frequency, int lod,
                                          arma::Col<dtype> *gain, arma::Cube<dtype> *coord, int verbose,
-                                         const arma::u32_vec *sub_mesh_index)
+                                         const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id)
 {
     // Ray offset is used to detect co-location of points, value in meters
     const dtype ray_offset = (dtype)0.001;
@@ -378,6 +348,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
     if (verbose)
         std::cout << "Estimating diffraction gain with " << n_path_t << " paths * "
                   << n_seg_t << " segments for " << MioNum(n_pos_t) << " positions." << std::endl;
+
+    // Pre-compute the AABB of the mesh
+    arma::Mat<dtype> aabb = quadriga_lib::triangle_mesh_aabb<dtype>(mesh, sub_mesh_index);
 
     // Test if diffraction paths are blocked - segment by segment
     for (size_t iS = 0; iS < n_seg_t; ++iS)
@@ -460,7 +433,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
             // Calculate interaction points of rays and 3D mesh
             arma::Mat<dtype> fbs, sbs;
             arma::Col<unsigned> no_interact, fbs_ind, sbs_ind;
-            quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, mesh, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, sub_mesh_index);
+            quadriga_lib::ray_triangle_intersect<dtype>(&s_orig, &s_dest, mesh, &fbs, &sbs,
+                                                        &no_interact, &fbs_ind, &sbs_ind,
+                                                        sub_mesh_index, &aabb, use_kernel, gpu_id);
 
             // Pointers
             unsigned *p_no_interact = no_interact.memptr(); // Pointer to 'no_interact'
@@ -1030,10 +1005,10 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> *orig, 
                                                   const arma::Mat<float> *mesh, const arma::Mat<float> *mtl_prop,
                                                   float center_frequency, int lod,
                                                   arma::Col<float> *gain, arma::Cube<float> *coord, int verbose,
-                                                  const arma::u32_vec *sub_mesh_index);
+                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id);
 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                                   const arma::Mat<double> *mesh, const arma::Mat<double> *mtl_prop,
                                                   double center_frequency, int lod,
                                                   arma::Col<double> *gain, arma::Cube<double> *coord, int verbose,
-                                                  const arma::u32_vec *sub_mesh_index);
+                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id);
