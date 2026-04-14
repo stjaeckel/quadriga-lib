@@ -429,42 +429,32 @@ namespace quadriga_lib
                                     dtype distance = 0.0);                  // Optional minimum distance from objects in [m]
 
     // Calculate the interaction of rays (beams) with a triangle mesh
-    // - A ray beam is defined by its origin, destination and a triangular wavefront (trivec and tridir)
-    // - The first and second interaction point of the ray (FBS, SBS) are required (computed by ray_triangle_intersect function)
-    // - Number of input rays: n_ray
-    // - Only returns rays that interact with the mesh, i.e. n_rayN <= n_ray
-    // - Outputs {trivecN, tridirN, orig_lengthN} will be empty if inputs {trivec, tridir, orig_length} are not provided
-    // - In refraction mode, paths exhibiting 'total reflection' will have zero-power, but will be included in the output
-    // - The optional input "tridir" can have 2 Formats: Spherical or Cartesian
-    // - For spherical directions, the values of "tridir" are in the order [ v1az, v1el, v2az, v2el, v3az, v3el ]
-    // - For Cartesian directions, the order is [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]
-    // - The output "tridirN" will have the same format as the input
     template <typename dtype>
-    void ray_mesh_interact(int interaction_type,                          // Interaction type: (0) Reflection, (1) Transmission, (2) Refraction
+    void ray_mesh_interact(int interaction_type,                          // 0 = reflection, 1 = transmission, 2 = refraction
                            dtype center_frequency,                        // Center frequency in [Hz]
-                           const arma::Mat<dtype> *orig,                  // Ray origin points in GCS, Size [ n_ray, 3 ]
-                           const arma::Mat<dtype> *dest,                  // Ray destination points in GCS, Size [ n_ray, 3 ]
-                           const arma::Mat<dtype> *fbs,                   // First interaction points in GCS, Size [ n_ray, 3 ]
-                           const arma::Mat<dtype> *sbs,                   // Second interaction points in GCS, Size [ n_ray, 3 ]
-                           const arma::Mat<dtype> *mesh,                  // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                           const arma::Mat<dtype> *mtl_prop,              // Material properties, Size: [ n_mesh, 5 ]
-                           const arma::u32_vec *fbs_ind,                  // Index of first hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                           const arma::u32_vec *sbs_ind,                  // Index of second hit mesh element, 1-based, 0 = no hit, Size [ n_ray ]
-                           const arma::Mat<dtype> *trivec = nullptr,      // Vectors pointing from the origin to the vertices of the triangular propagation tube, Size [n_ray, 9], [x1 y1 z1 x2 y2 z3 x3 y3 z3]
-                           const arma::Mat<dtype> *tridir = nullptr,      // Directions of the vertex-rays; Size Spherical [n_ray, 6], Size Cartesian [n_ray, 9]
-                           const arma::Col<dtype> *orig_length = nullptr, // Path length at origin point, Size [ n_ray ]
-                           arma::Mat<dtype> *origN = nullptr,             // New ray origin points in GCS, Size [ n_rayN, 3 ]
-                           arma::Mat<dtype> *destN = nullptr,             // New ray destination points in GCS, Size [ n_rayN, 3 ]
-                           arma::Col<dtype> *gainN = nullptr,             // Average interaction gain, Size [ n_rayN ]
-                           arma::Mat<dtype> *xprmatN = nullptr,           // Polarization transfer matrix, Size [n_rayN, 8], Columns: [Re(VV), Im(VV), Re(HV), Im(HV), Re(VH), Im(VH), Re(HH), Im(HH) ]
-                           arma::Mat<dtype> *trivecN = nullptr,           // Vectors pointing from the new origin to the vertices of the triangular propagation tube, Size [ n_rayN, 9 ]
-                           arma::Mat<dtype> *tridirN = nullptr,           // The new directions of the vertex-rays, Size [ n_rayN, 6 ]
-                           arma::Col<dtype> *orig_lengthN = nullptr,      // Path length at the new origin point, Size [ n_rayN ]
-                           arma::Col<dtype> *fbs_angleN = nullptr,        // Angle between incoming ray and FBS in [rad], Size [ n_rayN ]
-                           arma::Col<dtype> *thicknessN = nullptr,        // Material thickness in meters calculated from the difference between FBS and SBS, Size [ n_rayN ]
-                           arma::Col<dtype> *edge_lengthN = nullptr,      // Max. edge length of the ray tube triangle at the new origin, Size [ n_rayN, 3 ]
-                           arma::Mat<dtype> *normal_vecN = nullptr,       // Normal vector of FBS and SBS, Size [ n_rayN, 6 ],  order [ Nx_FBS, Ny_FBS, Nz_FBS, Nx_SBS, Ny_SBS, Nz_SBS ]
-                           arma::s32_vec *out_typeN = nullptr);           // Output type code, Length [ n_rayN ]
+                           const arma::Mat<dtype> *orig,                  // Ray origins in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *dest,                  // Ray destinations in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *fbs,                   // First interaction points in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *sbs,                   // Second interaction points in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *mesh,                  // Triangle mesh faces, [n_mesh, 9]
+                           const arma::Mat<dtype> *mtl_prop,              // Material properties, [n_mesh, 5]
+                           const arma::u32_vec *fbs_ind,                  // 1-based FBS mesh index (0 = no hit), [n_ray]
+                           const arma::u32_vec *sbs_ind,                  // 1-based SBS mesh index (0 = no hit), [n_ray]
+                           const arma::Mat<dtype> *trivec = nullptr,      // Beam wavefront vertices relative to origin, [n_ray, 9]
+                           const arma::Mat<dtype> *tridir = nullptr,      // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
+                           const arma::Col<dtype> *orig_length = nullptr, // Accumulated path length at origin, [n_ray]
+                           arma::Mat<dtype> *origN = nullptr,             // New origins after interaction, [n_rayN, 3]
+                           arma::Mat<dtype> *destN = nullptr,             // New destinations after interaction, [n_rayN, 3]
+                           arma::Col<dtype> *gainN = nullptr,             // Interaction gain (linear, excl. FSPL), [n_rayN]
+                           arma::Mat<dtype> *xprmatN = nullptr,           // Polarization transfer matrix [ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH], [n_rayN, 8]
+                           arma::Mat<dtype> *trivecN = nullptr,           // Updated beam wavefront vertices, [n_rayN, 9]
+                           arma::Mat<dtype> *tridirN = nullptr,           // Updated vertex-ray directions, format matches input
+                           arma::Col<dtype> *orig_lengthN = nullptr,      // Accumulated path length at new origin, [n_rayN]
+                           arma::Col<dtype> *fbs_angleN = nullptr,        // Incidence angle at FBS in [rad], [n_rayN]
+                           arma::Col<dtype> *thicknessN = nullptr,        // Material thickness (FBS-SBS distance) in [m], [n_rayN]
+                           arma::Col<dtype> *edge_lengthN = nullptr,      // Max beam triangle edge length at new origin, [n_rayN, 3]
+                           arma::Mat<dtype> *normal_vecN = nullptr,       // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
+                           arma::s32_vec *out_typeN = nullptr);           // Interaction type code, [n_rayN]
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
