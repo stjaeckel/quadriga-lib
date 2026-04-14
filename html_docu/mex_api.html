@@ -129,6 +129,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
@@ -4180,6 +4181,85 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 <font size=+1><b>Site-Specific Simulation Tools</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_diffraction_gain"></a>
+<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave 
+   propagation between each TX-RX pair is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), 
+   each approximated by <code>n_seg</code> line segments.  
+</li><li style="margin-bottom: 0.4em;">Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,  
+   generalized to arbitrary 3D shapes. 
+</li><li style="margin-bottom: 0.4em;">Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping 
+   geometry whose bounding box does not intersect the TX-RX path. 
+</li><li style="margin-bottom: 0.4em;">All inputs are cast to double precision internally. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+[ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_prop, ...
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>orig</b></code> (input)<br> 
+   TX positions, size <code>[n_pos, 3]</code>, numeric. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>dest</b></code> (input)<br> 
+   RX positions, size <code>[n_pos, 3]</code>, numeric. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>mesh</b></code> (input)<br> 
+   Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>, size <code>[n_mesh, 9]</code>, numeric. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>mtl_prop</b></code> (input)<br> 
+   Material properties per triangle, size <code>[n_mesh, 5]</code>, numeric. See <a href="#obj_file_read">obj_file_read</a>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>center_frequency</b></code> (input)<br> 
+   Center frequency in Hz, scalar. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>lod</b></code> (optional input)<br> 
+   Level of detail (0–6), scalar. Default: <code>2</code>. See <a href="#generate_diffraction_paths">generate_diffraction_paths</a>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>verbose</b></code> (optional input)<br> 
+   Verbosity level, scalar. Default: <code>0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>sub_mesh_index</b></code> (optional input)<br> 
+   Sub-mesh index for acceleration, 0-based, <code>uint32</code> vector of length <code>[n_mesh]</code>. Pass <code>[]</code> to skip. 
+   See <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>use_kernel</b></code> (optional input)<br> 
+   Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Default: <code>0</code>. Error if unavailable. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>gpu_id</b></code> (optional input)<br> 
+   CUDA device ID (0-based). Default: <code>0</code>. Ignored for non-CUDA kernels. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>gain</b></code><br> 
+   Diffraction gain per TX-RX pair, linear scale, size <code>[n_pos, 1]</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><code><b>coord</b></code><br> 
+   Diffracted path coordinates (excluding endpoints), size <code>[3, n_seg-1, n_pos]</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#generate_diffraction_paths">generate_diffraction_paths</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> 
+</li></ul>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_diffraction_paths"></a>
 <b>generate_diffraction_paths</b> - Generate propagation paths for estimating the diffraction gain

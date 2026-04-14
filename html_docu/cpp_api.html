@@ -192,7 +192,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions</td></tr>
+<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh</td></tr>
 <tr><td><a href="#combine_irs_coord">combine_irs_coord</a></td><td>Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS)</td></tr>
 <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length and angles</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
@@ -5952,32 +5952,16 @@ void write_png( const arma::Mat&lt;dtype&gt; &amp;data,
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_diffraction_gain"></a>
-<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions
+<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>Diffraction refers to the phenomenon where waves bend or interfere around the edges of an obstacle, 
-extending into the region that would otherwise be in the obstacle's geometrical shadow. The object 
-causing the diffraction acts as a secondary source for the wave's propagation. A specific example of 
-this is the knife-edge effect, or knife-edge diffraction, where a sharp, well-defined obstacle—like 
-a mountain range or a building wall—partially truncates the incident radiation.<br><br> 
- 
-To estimate the diffraction gain in a three-dimensional space, one can assess the extent to which the 
-Fresnel ellipsoid is obstructed by objects, and then evaluate the impact of this obstruction on the 
-received power. This method presupposes that diffracted waves travel along slightly varied paths 
-before arriving at a receiver. These waves may reach the receiver out of phase with the primary wave 
-due to their different travel lengths, leading to either constructive or destructive interference.<br><br> 
- 
-The process of estimating the gain involves dividing the wave propagation from a transmitter to a 
-receiver into <code>n_path</code> paths. These paths are represented by elliptic arcs, which are further 
-approximated using <code>n_seg</code> line segments. Each segment can be individually blocked or attenuated 
-by environmental objects. To determine the overall diffraction gain, a weighted sum of these 
-individual path contributions is calculated. The weighting is adjusted to align with the uniform 
-theory of diffraction (UTD) coefficients in two dimensions, but the methodology is adapted for 
-any 3D object shape. <br><br> 
- 
-<ul><li style="margin-bottom: 0.4em;">This function computes the diffraction gain between multiple transmit and receive positions using a 3D triangular mesh. 
-</li><li style="margin-bottom: 0.4em;">Supports accelerated computation via mesh segmentation: large meshes can be split into smaller sub-meshes to skip irrelevant geometry. 
-</li><li style="margin-bottom: 0.4em;">Optionally returns the gain per link and the coordinates along the diffracted path. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave 
+   propagation between each TX-RX pair is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), 
+   each approximated by <code>n_seg</code> line segments.  
+</li><li style="margin-bottom: 0.4em;">Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,  
+   generalized to arbitrary 3D shapes. 
+</li><li style="margin-bottom: 0.4em;">Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping 
+   geometry whose bounding box does not intersect the TX-RX path. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code>. 
 </li></ul>
 </li>
@@ -5993,64 +5977,42 @@ void quadriga_lib::calc_diffraction_gain(
                 arma::Col&lt;dtype&gt; *gain = nullptr,
                 arma::Cube&lt;dtype&gt; *coord = nullptr,
                 int verbose = 0,
-                const arma::u32_vec *sub_mesh_index = nullptr);
+                const arma::u32_vec *sub_mesh_index = nullptr,
+                int use_kernel = 0,
+                int gpu_id = 0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*orig</b></code> (input)<br> 
-   Matrix of origin (transmitter) points, size <code>[n_pos, 3]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*dest</b></code> (input)<br> 
-   Matrix of destination (receiver) points, size <code>[n_pos, 3]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mesh</b></code> (input)<br> 
-   Triangular mesh geometry. Each row contains 3 vertices, flattened as <code>[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]</code>, size <code>[no_mesh, 9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mtl_prop</b></code> (input)<br> 
-   Material properties per triangle, size <code>[no_mesh, 5]</code>, See <a href="#obj_file_read">obj_file_read</a> for details 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b></code> (input)<br> 
-   Center frequency in Hz used for diffraction calculations. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>int <b>lod</b> = 2</code> (optional input)<br> 
-   Level of detail for diffraction approximation. See <a href="#generate_diffraction_paths">generate_diffraction_paths</a> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*gain</b></code> (output, optional)<br> 
-   Calculated diffraction gain in linear scale, vector of size <code>[n_pos]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coord</b></code> (output, optional)<br> 
-   Coordinates of the diffracted path, size <code>[3, n_seg-1, n_pos]</code>. Includes one point per segment excluding endpoints. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>int <b>verbose</b> = 0</code> (optional input)<br> 
-   Verbosity level for debug and diagnostic output. Higher values enable more log messages. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*sub_mesh_index</b></code> (input, optional)<br> 
-   Optional sub-mesh indexing for acceleration. Vector mapping triangles to sub-meshes, length <code>[no_mesh]</code>. 
+   TX positions, size <code>[n_pos, 3]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*dest</b></code> (input)<br> 
+   RX positions, size <code>[n_pos, 3]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mesh</b></code> (input)<br> 
+   Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>, size <code>[n_mesh, 9]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*mtl_prop</b></code> (input)<br> 
+   Material properties per triangle, size <code>[n_mesh, 5]</code>. See <a href="#obj_file_read">obj_file_read</a>. 
+</li><li style="margin-bottom: 0.4em;"><code>dtype <b>center_frequency</b></code> (input)<br> 
+   Center frequency in Hz. 
+</li><li style="margin-bottom: 0.4em;"><code>int <b>lod</b> = 2</code> (optional input)<br> 
+   Level of detail (0–6). Controls <code>n_path</code> and <code>n_seg</code>. See <a href="#generate_diffraction_paths">generate_diffraction_paths</a>. 
+</li><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*gain</b></code> (output, optional)<br> 
+   Diffraction gain per TX-RX pair, linear scale, size <code>[n_pos]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*coord</b></code> (output, optional)<br> 
+   Diffracted path coordinates (excluding endpoints), size <code>[3, n_seg-1, n_pos]</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>int <b>verbose</b> = 0</code> (optional input)<br> 
+   Verbosity level. Default: <code>0</code>. 
+</li><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*sub_mesh_index</b></code> (input, optional)<br> 
+   Sub-mesh index for acceleration, 0-based, length <code>[n_mesh]</code>. See <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>. 
+</li><li style="margin-bottom: 0.4em;"><code>int <b>use_kernel</b> = 0</code> (optional input)<br> 
+   Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Error if unavailable. 
+</li><li style="margin-bottom: 0.4em;"><code>int <b>gpu_id</b> = 0</code> (optional input)<br> 
+   CUDA device ID. Ignored for non-CUDA kernels. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Technical Notes:</i></b><br><ul><li style="margin-bottom: 0.4em;">If <code>sub_mesh_index</code> is provided, spatial bounding boxes for each sub-mesh are automatically computed.  
-   Any TX-RX path not intersecting a bounding box is excluded from detailed edge evaluation. 
-</li><li style="margin-bottom: 0.4em;">The diffraction algorithm supports multiple edges and considers the geometric configuration and material properties of each triangle. 
-</li><li style="margin-bottom: 0.4em;">The LOD parameter controls both accuracy and computational cost. Lower values use simplified heuristics;  
-   higher values may result in significantly more computation time. 
-</li><li style="margin-bottom: 0.4em;">Each ellipsoid consists of <code>n_path</code> diffraction paths. The number of paths is determined by the 
-   level of detail (<code>lod</code>). See <a href="#generate_diffraction_paths">generate_diffraction_paths</a> for details  
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (for generating propagation paths for estimating the diffraction gain) 
-</li><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating the sub-meshes for acceleration) 
-</li><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> (for reading 3D geometry and material data from an .obj file) 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#generate_diffraction_paths">generate_diffraction_paths</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> 
 </li></ul>
 </li>
 </ul>
@@ -6267,12 +6229,12 @@ calculation of the diffraction gain in <a href="#calc_diffraction_gain">calc_dif
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void generate_diffraction_paths(
-                const arma::Mat&lt;dtype&gt; *orig, 
+                const arma::Mat&lt;dtype&gt; *orig,
                 const arma::Mat&lt;dtype&gt; *dest,
-                dtype center_frequency, 
+                dtype center_frequency,
                 int lod,
-                arma::Cube&lt;dtype&gt; *ray_x, 
-                arma::Cube&lt;dtype&gt; *ray_y, 
+                arma::Cube&lt;dtype&gt; *ray_x,
+                arma::Cube&lt;dtype&gt; *ray_y,
                 arma::Cube&lt;dtype&gt; *ray_z,
                 arma::Cube&lt;dtype&gt; *weight);
 </pre>

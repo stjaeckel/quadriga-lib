@@ -147,6 +147,7 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
@@ -4371,6 +4372,89 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 <font size=+1><b>Site-Specific Simulation Tools</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_diffraction_gain"></a>
+<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
+<ul>
+<li style="margin-bottom: 1.5em;">
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave 
+   propagation between each TX-RX pair is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), 
+   each approximated by <code>n_seg</code> line segments. 
+</li><li style="margin-bottom: 0.4em;">Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
+   generalized to arbitrary 3D shapes. 
+</li><li style="margin-bottom: 0.4em;">Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping 
+   geometry whose bounding box does not intersect the TX-RX path. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Usage:</i></b><br><pre>
+from quadriga_lib import RTtools
+
+# Output as tuple
+data = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id )
+
+# Unpacked outputs
+gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id )
+</pre>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;">ndarray <b><code>orig</code></b><br> 
+   TX positions in global coordinate system (GCS); dtype: float64; shape: <code>(n_pos, 3)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>dest</code></b><br> 
+   RX positions in global coordinate system (GCS); dtype: float64; shape: <code>(n_pos, 3)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>mesh</code></b><br> 
+   Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; dtype: float64; shape: <code>(n_mesh, 9)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>mtl_prop</code></b><br> 
+   Material properties per triangle; dtype: float64; shape: <code>(n_mesh, 5)</code>. See <a href="#obj_file_read">obj_file_read</a>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">float <b><code>center_frequency</code></b> (optional)<br> 
+   Center frequency in Hz. Default: <code>1e9</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>lod</code></b> (optional)<br> 
+   Level of detail (0–6). Controls <code>n_path</code> and <code>n_seg</code>. Default: <code>2</code> 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>verbose</code></b> (optional)<br> 
+   Verbosity level. Default: <code>0</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>sub_mesh_index</code></b> (optional)<br> 
+   Sub-mesh index for acceleration, 0-based; dtype: uint32; shape: <code>(n_mesh,)</code>. Pass empty array to skip. 
+   See <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>use_kernel</code></b> (optional)<br> 
+   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD), 
+   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">int <b><code>gpu_id</code></b> (optional)<br> 
+   GPU device ID for CUDA kernel (0-based). Default: <code>0</code>. Ignored for non-CUDA kernels. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments (tuple):</i></b><br><ul><li style="margin-bottom: 0.4em;">ndarray <b><code>gain</code></b><br> 
+   Diffraction gain per TX-RX pair, linear scale; dtype: float64; shape: <code>(n_pos,)</code>. 
+</li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;">ndarray <b><code>coord</code></b><br> 
+   Diffracted path coordinates (excluding endpoints); dtype: float64; shape: <code>(3, n_seg-1, n_pos)</code>. 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> 
+</li><li style="margin-bottom: 0.4em;"><a href="#obj_file_read">obj_file_read</a> 
+</li></ul>
+</li>
+</ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="icosphere"></a>
 <b>icosphere</b> - Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
