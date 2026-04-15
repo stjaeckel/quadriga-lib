@@ -124,15 +124,15 @@
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the baseband frequency response of a MIMO channel</td></tr>
 <tr><td><a href="#baseband_freq_response_multi">baseband_freq_response_multi</a></td><td>Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients</td></tr>
 <tr><td><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a></td><td>Compute the baseband frequency response of multiple MIMO channels</td></tr>
-<tr><td><a href="#get_HDF5_version">get_HDF5_version</a></td><td>Get the version of the linked HDF5 library</td></tr>
+<tr><td><a href="#get_HDF5_version">get_HDF5_version</a></td><td>Return the version string of the linked HDF5 library</td></tr>
 <tr><td><a href="#hdf5_create">hdf5_create</a></td><td>Create a new HDF5 channel file with a defined storage layout</td></tr>
-<tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read a channel object from an HDF5 file</td></tr>
-<tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file</td></tr>
-<tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets from an HDF5 file</td></tr>
-<tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the HDF5 channel storage layout</td></tr>
-<tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshape the storage layout of an HDF5 channel file</td></tr>
-<tr><td><a href="#hdf5_write">hdf5_write</a></td><td>Write channel data to HDF5 file</td></tr>
-<tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read a channel object from an HDF5 file at a specified 4D index</td></tr>
+<tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file at a specified 4D index</td></tr>
+<tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets stored at a 4D slot in an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of an HDF5 channel file</td></tr>
+<tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshape the 4D storage layout of an existing HDF5 channel file</td></tr>
+<tr><td><a href="#hdf5_write">hdf5_write</a></td><td>Write a channel object to an HDF5 file at a specified 4D index</td></tr>
+<tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file at a specified 4D index</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
 <tr><td><a href="#qrt_read_cache_init">qrt_read_cache_init</a></td><td>Initialize a QRT read cache for fast repeated access</td></tr>
@@ -2195,29 +2195,16 @@ void quadriga_lib::baseband_freq_response_vec(
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="get_HDF5_version"></a>
-<b>get_HDF5_version</b> - Get the version of the linked HDF5 library
+<b>get_HDF5_version</b> - Return the version string of the linked HDF5 library
 <ul>
-<li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns the version string of the HDF5 library used during linking. 
-</li><li style="margin-bottom: 0.4em;">This function is useful for diagnostics, compatibility checks, or logging. 
-</li><li style="margin-bottom: 0.4em;">The function reflects the version of the compiled HDF5 library, not necessarily the version of the header used at compile time. 
-</li></ul>
-</li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 std::string quadriga_lib::get_HDF5_version();
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string</code><br> 
-   HDF5 version string in the format <code>"x.y.z"</code>, e.g., <code>"1.12.2"</code> 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Version string in the format <code>"x.y.z"</code>, e.g., <code>"1.12.2"</code> 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-std::string hdf5_ver = quadriga_lib::get_HDF5_version();
-std::cout &lt;&lt; "Using HDF5 version: " &lt;&lt; hdf5_ver &lt;&lt; std::endl;
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -2225,425 +2212,307 @@ std::cout &lt;&lt; "Using HDF5 version: " &lt;&lt; hdf5_ver &lt;&lt; std::endl;
 <b>hdf5_create</b> - Create a new HDF5 channel file with a defined storage layout
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this 
-   library is its ability to organize multiple channels within a single HDF5 file while enabling access 
-   to individual data sets without the need to read the entire file. 
-</li><li style="margin-bottom: 0.4em;">This function initializes a new HDF5 file for storing wireless channel data. 
-</li><li style="margin-bottom: 0.4em;">Defines a multi-dimensional array layout for organizing channels (up to 4 dimensions). 
-</li><li style="margin-bottom: 0.4em;">Typical usage: map base stations (BS), user equipment (UE), and frequencies to dimensions. 
-</li><li style="margin-bottom: 0.4em;">The layout can later be reshaped using <code>hdf5_reshape_layout</code>, provided the total number of entries remains constant. 
-</li><li style="margin-bottom: 0.4em;">Each combination of indices corresponds to a storage slot that can hold a channel object. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Initializes a new HDF5 file for storing wireless channel data; overwrites existing files. 
+</li><li style="margin-bottom: 0.4em;">Defines a 4D layout (x, y, z, w) where each index combination maps to one channel storage slot. 
+</li><li style="margin-bottom: 0.4em;">Typical dimension mapping: x = BS, y = UE, z = frequency, w = scenario/repetition. 
+</li><li style="margin-bottom: 0.4em;">Layout can be reshaped later with <a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> if the total slot count stays constant. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::hdf5_create(
-                std::string fn,
-                unsigned nx = 65536,
-                unsigned ny = 1,
-                unsigned nz = 1,
-                unsigned nw = 1);
+    std::string fn,
+    unsigned nx = 65536,
+    unsigned ny = 1,
+    unsigned nz = 1,
+    unsigned nw = 1);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename (including path) of the HDF5 file to be created. If the file exists, it will be overwritten. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nx</b> = 65536</code> (input)<br> 
-   Number of entries in the <b>x-dimension</b>, e.g., for base stations (BSs). Default: <code>65536</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ny</b> = 1</code> (input)<br> 
-   Number of entries in the <b>y-dimension</b>, e.g., for user equipment (UEs). Default: <code>1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nz</b> = 1</code> (input)<br> 
-   Number of entries in the <b>z-dimension</b>, e.g., for frequency points. Default: <code>1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nw</b> = 1</code> (input)<br> 
-   Number of entries in the <b>w-dimension</b>, e.g., for repetitions, scenarios, or configurations. Default: <code>1</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path and filename of the HDF5 file to create 
+</li><li style="margin-bottom: 0.4em;"><b><code>nx</code></b> <i>(optional)</i> — Size of x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>ny</code></b> <i>(optional)</i> — Size of y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>nz</code></b> <i>(optional)</i> — Size of z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>nw</code></b> <i>(optional)</i> — Size of w-dimension 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-// Create a file with layout: [10 BSs, 4 UEs, 2 frequencies]
-quadriga_lib::hdf5_create("channels.hdf5", 10, 4, 2);
-</pre>
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> (change layout dimensions of an existing file) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_write_channel">hdf5_write_channel</a> (write channel data into a slot) 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_channel"></a>
-<b>hdf5_read_channel</b> - Read a channel object from an HDF5 file
+<b>hdf5_read_channel</b> - Read a channel object from an HDF5 file at a specified 4D index
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Loads a <code>quadriga_lib::channel&lt;dtype&gt;</code> object from the specified index in a previously created HDF5 file. 
-</li><li style="margin-bottom: 0.4em;">If the selected index does not contain a valid channel, an empty channel object is returned (with <code>no_snapshots == 0</code>). 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li><li style="margin-bottom: 0.4em;">All structured data (e.g., channel coefficients, delays, positions) is stored in <b>single precision</b> in the 
-   file but will be <b>converted</b> to the appropriate precision (<code>float</code> or <code>double</code>) depending on the provided template parameter. 
-</li><li style="margin-bottom: 0.4em;">Unstructured or user-defined fields stored in <code>std::any</code> containers are not converted and retain their original type 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns an empty channel object (<code>no_snapshots == 0</code>) if the slot contains no valid data. 
+</li><li style="margin-bottom: 0.4em;">Structured data is stored in single precision in the file and converted to <code>dtype</code> on read. 
+</li><li style="margin-bottom: 0.4em;">Unstructured fields (<code>std::any</code>) retain their original stored type without conversion. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes: <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 quadriga_lib::channel&lt;dtype&gt; quadriga_lib::hdf5_read_channel(
-                std::string fn,
-                unsigned ix = 0,
-                unsigned iy = 0,
-                unsigned iz = 0,
-                unsigned iw = 0);
+    std::string fn,
+    unsigned ix = 0,
+    unsigned iy = 0,
+    unsigned iz = 0,
+    unsigned iw = 0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the HDF5 file containing the channel data. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ix</b> = 0</code> (input)<br> 
-   x-Index in the file's 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iy</b> = 0</code> (input)<br> 
-   y-Index in the file's 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iz</b> = 0</code> (input)<br> 
-   z-Index in the file's 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iw</b> = 0</code> (input)<br> 
-   w-Index in the file's 4D storage layout. Default: <code>0</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>ix</code></b> <i>(optional)</i> — Slot index in x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iy</code></b> <i>(optional)</i> — Slot index in y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iz</code></b> <i>(optional)</i> — Slot index in z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iw</code></b> <i>(optional)</i> — Slot index in w-dimension 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::channel&lt;dtype&gt;</code> 
-   A channel object containing the channel data at the specified index. If no data is found, an empty channel object is returned. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Channel object at the specified slot; empty if no data is present 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_write">hdf5_write</a> (write a channel object to a slot) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_layout">hdf5_read_layout</a> (inspect slot occupancy before reading) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_dset"></a>
-<b>hdf5_read_dset</b> - Read an unstructured dataset from an HDF5 file
+<b>hdf5_read_dset</b> - Read an unstructured dataset from an HDF5 file at a specified 4D index
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads a user-defined, unstructured dataset stored in an HDF5 file at the specified index. 
-</li><li style="margin-bottom: 0.4em;">Unstructured datasets are typically used to store additional parameters or metadata and are stored under a <b>name prefix</b> (e.g. <code>"par_"</code>) followed by the dataset name. 
-</li><li style="margin-bottom: 0.4em;">Returns the dataset as a <code>std::any</code> object, which can hold any supported type (e.g., scalar values, vectors, matrices, cubes). 
-</li><li style="margin-bottom: 0.4em;">Use <code>quadriga_lib::any_type_id</code> to determine the contained type and obtain a raw pointer for direct access. 
-</li><li style="margin-bottom: 0.4em;">If the dataset does not exist at the specified index or name, an empty <code>std::any</code> object is returned. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads a user-defined dataset stored under <code>prefix + par_name</code> (e.g., <code>"par_carrier_frequency"</code>). 
+</li><li style="margin-bottom: 0.4em;">Returns an empty <code>std::any</code> if the dataset does not exist at the specified slot or name. 
+</li><li style="margin-bottom: 0.4em;">Use <a href="#any_type_id">any_type_id</a> to determine the contained type and obtain a raw pointer. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 std::any quadriga_lib::hdf5_read_dset(
-                std::string fn,
-                std::string par_name,
-                unsigned ix = 0,
-                unsigned iy = 0,
-                unsigned iz = 0,
-                unsigned iw = 0,
-                std::string prefix = "par_");
+    std::string fn,
+    std::string par_name,
+    unsigned ix = 0,
+    unsigned iy = 0,
+    unsigned iz = 0,
+    unsigned iw = 0,
+    std::string prefix = "par_");
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the HDF5 file containing the dataset. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>par_name</b></code> (input)<br> 
-   Name of the dataset, <b>without</b> the prefix (e.g., <code>"carrier_frequency"</code>). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ix</b> = 0</code> (input)<br> 
-   x-Index in the HDF5 file’s 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iy</b> = 0</code> (input)<br> 
-   y-Index in the HDF5 file’s 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iz</b> = 0</code> (input)<br> 
-   z-Index in the HDF5 file’s 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iw</b> = 0</code> (input)<br> 
-   w-Index in the HDF5 file’s 4D storage layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>prefix</b> = "par_"</code> (input)<br> 
-   Optional dataset name prefix. Default is <code>"par_"</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>par_name</code></b> — Dataset name without prefix, e.g., <code>"carrier_frequency"</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>ix</code></b> <i>(optional)</i> — Slot index in x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iy</code></b> <i>(optional)</i> — Slot index in y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iz</code></b> <i>(optional)</i> — Slot index in z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iw</code></b> <i>(optional)</i> — Slot index in w-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>prefix</code></b> <i>(optional)</i> — Dataset name prefix prepended before <code>par_name</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">A <code>std::any</code> object containing the dataset. If the dataset is not present, the return value is an empty <code>std::any</code>. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::any</code> containing the dataset, or empty <code>std::any</code> if not found 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_write_dset">hdf5_write_dset</a> (write an unstructured dataset) 
+</li><li style="margin-bottom: 0.4em;"><a href="#any_type_id">any_type_id</a> (inspect the type held in a <code>std::any</code>) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_dset_names"></a>
-<b>hdf5_read_dset_names</b> - Read names of unstructured datasets from an HDF5 file
+<b>hdf5_read_dset_names</b> - Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Retrieves the names of all unstructured datasets stored at a specified 4D index in an HDF5 file. 
-</li><li style="margin-bottom: 0.4em;">Dataset names are identified by a common prefix (default: <code>"par_"</code>) and the actual parameter name follows the prefix. 
-</li><li style="margin-bottom: 0.4em;">The returned names in <code>par_names</code> exclude the prefix for convenience. 
-</li><li style="margin-bottom: 0.4em;">Returns the number of datasets found at the given index. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Finds all datasets whose HDF5 name starts with <code>prefix</code> at slot <code>(ix, iy, iz, iw)</code>; returned names exclude the prefix. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 arma::uword quadriga_lib::hdf5_read_dset_names(
-                std::string fn,
-                std::vector&lt;std::string&gt; *par_names,
-                unsigned ix = 0,
-                unsigned iy = 0,
-                unsigned iz = 0,
-                unsigned iw = 0,
-                std::string prefix = "par_");
+    std::string fn,
+    std::vector&lt;std::string&gt; *par_names,
+    unsigned ix = 0,
+    unsigned iy = 0,
+    unsigned iz = 0,
+    unsigned iw = 0,
+    std::string prefix = "par_");
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the HDF5 file containing the datasets. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;std::string&gt; <b>*par_names</b></code> (output)<br> 
-   Pointer to a vector that will be filled with all dataset names found at the specified index (excluding the prefix). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ix</b> = 0</code> (input)<br> 
-   x-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iy</b> = 0</code> (input)<br> 
-   y-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iz</b> = 0</code> (input)<br> 
-   z-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iw</b> = 0</code> (input)<br> 
-   w-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>prefix</b> = "par_"</code> (input)<br> 
-   Optional prefix string used to identify unstructured datasets. Default: <code>"par_"</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>par_names</code></b> — Pointer to vector receiving dataset names (without prefix) 
+</li><li style="margin-bottom: 0.4em;"><b><code>ix</code></b> <i>(optional)</i> — Slot index in x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iy</code></b> <i>(optional)</i> — Slot index in y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iz</code></b> <i>(optional)</i> — Slot index in z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iw</code></b> <i>(optional)</i> — Slot index in w-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>prefix</code></b> <i>(optional)</i> — Prefix used to identify unstructured datasets 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">The number of unstructured datasets found at the specified location with the given prefix. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Number of datasets found at the specified slot 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_dset">hdf5_read_dset</a> (read a dataset by name) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_write_dset">hdf5_write_dset</a> (write an unstructured dataset) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_layout"></a>
-<b>hdf5_read_layout</b> - Read the HDF5 channel storage layout
+<b>hdf5_read_layout</b> - Read the storage layout of an HDF5 channel file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Reads the structure of the storage layout in an HDF5 file created for channel data. 
-</li><li style="margin-bottom: 0.4em;">Returns the size of each of the four dimensions: <code>{nx, ny, nz, nw}</code>. 
-</li><li style="margin-bottom: 0.4em;">Can optionally return a serialized list of channel IDs to indicate which entries contain data. 
-</li><li style="margin-bottom: 0.4em;">If the file does not exist or is not a valid channel HDF5 file, the returned layout is <code>{0, 0, 0, 0}</code>. 
-</li><li style="margin-bottom: 0.4em;">Entries in <code>channelID</code> are set to <code>0</code> if no data is present at that index. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns <code>{nx, ny, nz, nw}</code> describing the 4D slot grid of the file. 
+</li><li style="margin-bottom: 0.4em;">Returns <code>{0, 0, 0, 0}</code> if the file does not exist or is not a valid channel HDF5 file. 
+</li><li style="margin-bottom: 0.4em;"><code>channelID</code> entries are <code>0</code> for empty slots; length equals <code>nx × ny × nz × nw</code> (serialized linear index). 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 arma::u32_vec quadriga_lib::hdf5_read_layout(
-                std::string fn,
-                arma::u32_vec *channelID = nullptr);
+    std::string fn,
+    arma::u32_vec *channelID = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Path to the HDF5 file. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec <b>*channelID</b> = nullptr</code> (optional output)<br> 
-   Pointer to a vector receiving the serialized channel index contents.<br> 
-   Length: <code>nx × ny × nz × nw</code>, where <code>channelID[i] == 0</code> indicates an empty slot. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>channelID</code></b> <i>(optional)</i> — Pointer to vector receiving the serialized slot occupancy list; <code>[nx·ny·nz·nw]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::u32_vec</code><br> 
-   Containing four elements: <code>{nx, ny, nz, nw}</code>, the layout of the storage grid. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Four-element vector <code>{nx, ny, nz, nw}</code> describing the layout dimensions 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_create">hdf5_create</a> (create a file with a defined layout) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> (change layout dimensions of an existing file) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_reshape_layout"></a>
-<b>hdf5_reshape_layout</b> - Reshape the storage layout of an HDF5 channel file
+<b>hdf5_reshape_layout</b> - Reshape the 4D storage layout of an existing HDF5 channel file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Updates the multi-dimensional storage layout of an existing HDF5 file that contains channel data. 
-</li><li style="margin-bottom: 0.4em;">The layout consists of up to four dimensions: <code>{nx, ny, nz, nw}</code>. 
-</li><li style="margin-bottom: 0.4em;">This is useful for reorganizing data after initial creation (e.g., grouping entries by BS/UE/frequency). 
-</li><li style="margin-bottom: 0.4em;">The total number of entries must remain unchanged, i.e., <code>nx × ny × nz × nw</code> must equal the original layout. 
-</li><li style="margin-bottom: 0.4em;">Throws an error if the reshaped layout violates this constraint. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Updates <code>{nx, ny, nz, nw}</code> of an existing file; total slot count <code>nx × ny × nz × nw</code> must remain unchanged. 
+</li><li style="margin-bottom: 0.4em;">Throws if the new layout violates the total-count constraint. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::hdf5_reshape_layout(
-                std::string fn,
-                unsigned nx,
-                unsigned ny = 1,
-                unsigned nz = 1,
-                unsigned nw = 1);
+    std::string fn,
+    unsigned nx,
+    unsigned ny = 1,
+    unsigned nz = 1,
+    unsigned nw = 1);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the HDF5 file to reshape. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>nx</code></b> — New size of x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>ny</code></b> <i>(optional)</i> — New size of y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>nz</code></b> <i>(optional)</i> — New size of z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>nw</code></b> <i>(optional)</i> — New size of w-dimension 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nx</b></code> (input)<br> 
-   Number of entries in the first dimension (e.g., base stations). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ny</b> = 1</code> (input)<br> 
-   Number of entries in the second dimension (e.g., user equipment). Default: <code>1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nz</b> = 1</code> (input)<br> 
-   Number of entries in the third dimension (e.g., carrier frequency). Default: <code>1</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>nw</b> = 1</code> (input)<br> 
-   Number of entries in the fourth dimension. Default: <code>1</code>. 
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_create">hdf5_create</a> (set initial layout at file creation) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_layout">hdf5_read_layout</a> (query current layout) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_write"></a>
-<b>hdf5_write</b> - Write channel data to HDF5 file
+<b>hdf5_write</b> - Write a channel object to an HDF5 file at a specified 4D index
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. 
-</li><li style="margin-bottom: 0.4em;">This function rites a <code>channel</code> object to a specified HDF5 file at the given 4D index location. 
-</li><li style="margin-bottom: 0.4em;">If the file does not exist, a new file is created with default layout <code>(65535 × 1 × 1 × 1)</code>. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Writes a <code>quadriga_lib::channel&lt;dtype&gt;</code> object to slot <code>(ix, iy, iz, iw)</code> in the HDF5 file. 
+</li><li style="margin-bottom: 0.4em;">Creates the file with default layout <code>(65536 × 1 × 1 × 1)</code> if it does not exist; appends to existing files. 
+</li><li style="margin-bottom: 0.4em;">Overwrites slot content if the index already contains data. 
+</li><li style="margin-bottom: 0.4em;">Throws if the index was not reserved during <a href="#hdf5_create">hdf5_create</a>. 
+</li><li style="margin-bottom: 0.4em;">Structured data is always stored in single precision; input may be float or double. 
+</li><li style="margin-bottom: 0.4em;">Unstructured data: supported types are string, double, float, (u)int32, (u)int64; up to 3D; storage order preserved. 
+</li><li style="margin-bottom: 0.4em;">Set <code>assume_valid = true</code> to skip integrity validation (faster but unsafe for potentially corrupted data). 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 int quadriga_lib::hdf5_write(
-                const quadriga_lib::channel&lt;dtype&gt; *ch,
-                std::string fn,
-                unsigned ix = 0,
-                unsigned iy = 0,
-                unsigned iz = 0,
-                unsigned iw = 0,
-                bool assume_valid = false);
+    const quadriga_lib::channel&lt;dtype&gt; *ch,
+    std::string fn,
+    unsigned ix = 0,
+    unsigned iy = 0,
+    unsigned iz = 0,
+    unsigned iw = 0,
+    bool assume_valid = false);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const channel&lt;dtype&gt; <b>*ch</b></code> (input)<br> 
-   Pointer to the channel object to be stored. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Path to the HDF5 file. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ix</b> = 0</code> (input)<br> 
-   Index in the x-dimension (e.g., Base Station ID). Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iy</b> = 0</code> (input)<br> 
-   Index in the y-dimension (e.g., User Equipment ID). Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iz</b> = 0</code> (input)<br> 
-   Index in the z-dimension (e.g., Frequency point). Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iw</b> = 0</code> (input)<br> 
-   Index in the w-dimension (e.g., Repetition/Scenario). Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>assume_valid</b> = false</code> (input)<br> 
-   If <code>true</code>, skips channel integrity validation before writing. Default: <code>false</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>ch</code></b> — Pointer to the channel object to write 
+</li><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>ix</code></b> <i>(optional)</i> — Slot index in x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iy</code></b> <i>(optional)</i> — Slot index in y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iz</code></b> <i>(optional)</i> — Slot index in z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iw</code></b> <i>(optional)</i> — Slot index in w-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>assume_valid</code></b> <i>(optional)</i> — Skip channel integrity validation before writing 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>0</code> if a new dataset was created. 
-</li><li style="margin-bottom: 0.4em;"><code>1</code> if an existing dataset was overwritten or extended. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>0</code> if a new dataset was created, <code>1</code> if an existing dataset was overwritten or extended 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Caveat:</i></b><br><ul><li style="margin-bottom: 0.4em;">If the file exists already, the new data is added to the exisiting file 
-</li><li style="margin-bottom: 0.4em;">If the index already contains data, it will be overwritten 
-</li><li style="margin-bottom: 0.4em;">Use <code>assume_valid = true</code> to skip internal validation (faster, but unsafe if data may be corrupted). 
-</li><li style="margin-bottom: 0.4em;">Throws an error if the index was not reserved during <code>hdf5_create</code>. 
-</li><li style="margin-bottom: 0.4em;">All structured data is written in single precision (but can can be provided as float or double) 
-</li><li style="margin-bottom: 0.4em;">Unstructured datatypes are maintained in the HDF file 
-</li><li style="margin-bottom: 0.4em;">Supported unstructured types: string, double, float, (u)int32, (u)int64 
-</li><li style="margin-bottom: 0.4em;">Supported unstructured size: up to 3 dimensions 
-</li><li style="margin-bottom: 0.4em;">Storage order of the unstructured data is maintained 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_create">hdf5_create</a> (create file and reserve layout) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_channel">hdf5_read_channel</a> (read channel data from a slot) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_write_dset"></a>
-<b>hdf5_write_dset</b> - Write a single unstructured dataset to an HDF5 file
+<b>hdf5_write_dset</b> - Write a single unstructured dataset to an HDF5 file at a specified 4D index
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Writes a single unstructured data field to an HDF5 file at the specified 4D index. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Dataset is stored under <code>prefix + par_name</code>; name must contain only alphanumeric characters and underscores. 
 </li><li style="margin-bottom: 0.4em;">Supported scalar types: <code>std::string</code>, <code>unsigned</code>, <code>int</code>, <code>long long</code>, <code>unsigned long long</code>, <code>float</code>, <code>double</code> 
-</li><li style="margin-bottom: 0.4em;">Supported Armadillo types: <code>arma::Col</code>, <code>arma::Row</code>, <code>arma::Mat</code>, and <code>arma::Cube</code> with <code>float</code>, <code>double</code>, <code>int</code>, <code>unsigned</code>, <code>sword</code>, <code>uword</code>, <code>unsigned long long</code> 
-</li><li style="margin-bottom: 0.4em;"><code>arma::Row</code> vectors are converted to column vectors (<code>arma::Col</code>) before writing. 
-</li><li style="margin-bottom: 0.4em;">The dataset name is prefixed with <code>"par_"</code> (default) unless another prefix is specified. 
-</li><li style="margin-bottom: 0.4em;">Throws an error for unsupported types. 
-</li><li style="margin-bottom: 0.4em;">Dataset names may only include alphanumeric characters and underscores. 
+</li><li style="margin-bottom: 0.4em;">Supported Armadillo types: <code>arma::Col</code>, <code>arma::Row</code>, <code>arma::Mat</code>, <code>arma::Cube</code> with element types <code>float</code>, <code>double</code>, <code>int</code>, <code>unsigned</code>, <code>sword</code>, <code>uword</code>, <code>unsigned long long</code> 
+</li><li style="margin-bottom: 0.4em;"><code>arma::Row</code> is converted to <code>arma::Col</code> before writing. 
+</li><li style="margin-bottom: 0.4em;">Throws for unsupported types. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::hdf5_write_dset(
-                std::string fn,
-                std::string par_name,
-                const std::any \*par_data,
-                unsigned ix = 0,
-                unsigned iy = 0,
-                unsigned iz = 0,
-                unsigned iw = 0,
-                std::string prefix = "par_");
+    std::string fn,
+    std::string par_name,
+    const std::any *par_data,
+    unsigned ix = 0,
+    unsigned iy = 0,
+    unsigned iz = 0,
+    unsigned iw = 0,
+    std::string prefix = "par_");
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the HDF5 file to which the dataset will be written. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Path to the HDF5 file 
+</li><li style="margin-bottom: 0.4em;"><b><code>par_name</code></b> — Dataset name without prefix; alphanumeric and underscores only 
+</li><li style="margin-bottom: 0.4em;"><b><code>par_data</code></b> — Pointer to the data to write; type must be supported (see above) 
+</li><li style="margin-bottom: 0.4em;"><b><code>ix</code></b> <i>(optional)</i> — Slot index in x-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iy</code></b> <i>(optional)</i> — Slot index in y-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iz</code></b> <i>(optional)</i> — Slot index in z-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>iw</code></b> <i>(optional)</i> — Slot index in w-dimension 
+</li><li style="margin-bottom: 0.4em;"><b><code>prefix</code></b> <i>(optional)</i> — Prefix prepended to <code>par_name</code> in the HDF5 file 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>par_name</b></code> (input)<br> 
-   Name of the parameter to store (without prefix). Must contain only letters, digits, and underscores. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::any <b>*par_data</b></code> (input)<br> 
-   Pointer to the data to be written. Type must be supported (see above). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>ix</b> = 0</code> (input)<br> 
-   x-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iy</b> = 0</code> (input)<br> 
-   y-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iz</b> = 0</code> (input)<br> 
-   z-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>iw</b> = 0</code> (input)<br> 
-   w-Index in the HDF5 file’s 4D layout. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>prefix</b> = "par_"</code> (input)<br> 
-   Optional prefix for the dataset name. Default: <code>"par_"</code>. 
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_dset">hdf5_read_dset</a> (read an unstructured dataset by name) 
+</li><li style="margin-bottom: 0.4em;"><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a> (list available dataset names at a slot) 
 </li></ul>
 </li>
 </ul>
