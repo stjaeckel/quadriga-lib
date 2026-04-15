@@ -27,7 +27,7 @@ lang: en-EN
 | --- | --- |
 | [arrayant](#arrayant) | Class for storing and manipulating array antenna models |
 | [.append](#append) | Append elements of another arrayant to the current one |
-| [.calc_directivity_dbi](#calc_directivity_dbi) | Calculate the directivity in dBi of a single array element |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Calculate the directivity in dBi of a single array element |
 | [.combine_pattern](#combine_pattern) | Combine element patterns, positions, and coupling weights into effective radiation patterns |
 | [.copy_element](#copy_element) | Copy a single antenna element to one or more destination slots |
 | [.export_obj_file](#export_obj_file) | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
@@ -38,6 +38,7 @@ lang: en-EN
 | [.rotate_pattern](#rotate_pattern) | Rotate antenna radiation patterns around the principal axes using Euler rotations |
 | [.set_size](#set_size) | Resize an arrayant object to new dimensions |
 
+---
 ## arrayant
 Class for storing and manipulating array antenna models
 
@@ -88,6 +89,7 @@ Class for storing and manipulating array antenna models
 | [.set_size](#.set_size) | Resize the arrayant to new dimensions |
 | [.is_valid](#.is_valid) | Validate arrayant integrity |
 
+---
 ## .append
 Append elements of another arrayant to the current one
 
@@ -108,7 +110,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(
 ### Returns:
 - New `arrayant` containing all elements from both arrays
 
-## .calc_directivity_dbi
+---
+## .calc_directivity_dBi
 Calculate the directivity in dBi of a single array element
 
 ### Description:
@@ -127,6 +130,7 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 ### Returns:
 - Directivity of the specified element in dBi
 
+---
 ## .combine_pattern
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
@@ -150,6 +154,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 ### Returns:
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
 
+---
 ## .copy_element
 Copy a single antenna element to one or more destination slots
 
@@ -168,6 +173,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec 
 - **`source`** — Index of the element to copy, 0-based
 - **`destination`** — Target index or indices, 0-based; array resizes to fit the maximum index
 
+---
 ## .export_obj_file
 Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
@@ -195,6 +201,7 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
 - **`i_element`** *(optional)* — 0-based element indices to export; `{}` exports all elements
 
+---
 ## .interpolate
 Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
 
@@ -247,6 +254,7 @@ arma::mat V_re, V_im, H_re, H_im;
 ant.interpolate(&azimuth, &elevation, &V_re, &V_im, &H_re, &H_im);
 ```
 
+---
 ## .is_valid
 Validate the integrity of an arrayant object
 
@@ -267,6 +275,7 @@ std::string quadriga_lib::arrayant<dtype>::is_valid(bool quick_check = true) con
 ### Returns:
 - Empty string if valid; error message string if invalid
 
+---
 ## .qdant_write
 Write arrayant data to a QDANT (XML) file
 
@@ -295,6 +304,7 @@ ID assigned to the written antenna within the file
 ### See also:
 - [qdant_read](#qdant_read) (read back QDANT files)
 
+---
 ## .remove_zeros
 Remove zero-valued entries from antenna pattern data, reducing its size
 
@@ -311,6 +321,7 @@ void quadriga_lib::arrayant<dtype>::remove_zeros(arrayant<dtype> *output = nullp
 ### Input Arguments:
 - **`output`** *(optional)* — Target arrayant to write result to; `nullptr` modifies in-place
 
+---
 ## .rotate_pattern
 Rotate antenna radiation patterns around the principal axes using Euler rotations
 
@@ -350,6 +361,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
 - **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 
+---
 ## .set_size
 Resize an arrayant object to new dimensions
 
@@ -386,19 +398,20 @@ void quadriga_lib::arrayant<dtype>::set_size(
 | [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Validate a vector of arrayant objects for multi-frequency consistency |
 | [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Apply Euler rotations to all entries in a multi-frequency arrayant vector |
 | [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Set element positions for all entries in a multi-frequency arrayant vector |
-| [generate_arrayant_3gpp](#generate_arrayant_3gpp) | Generate 3GPP-NR compliant antenna model |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Generate antenna with custom 3dB beamwidth |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Generate short dipole with vertical polarization |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Generate half-wave dipole with vertical polarization |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Generate a planar multi-element antenna with support for multiple beam directions. |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Generate isotropic radiator with vertical polarization |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Generate an unified linear array |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Generate cross-polarized isotropic radiator |
-| [generate_speaker](#generate_speaker) | Generate a parametric loudspeaker directivity model |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Generate a 3GPP-NR compliant antenna array model |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Generate an antenna with custom 3dB beamwidth |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Generate a short dipole antenna with vertical polarization |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Generate a half-wave dipole antenna with vertical polarization |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Generate a planar multi-element antenna array with multiple beam directions |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Generate an isotropic radiator with vertical polarization |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Generate a uniform linear array (ULA) |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Generate a cross-polarized isotropic radiator |
+| [generate_speaker](#generate_speaker) | Generate a parametric frequency-dependent loudspeaker directivity model |
 | [qdant_read](#qdant_read) | Read an arrayant object from a QDANT file |
 | [qdant_read_multi](#qdant_read_multi) | Read all arrayant objects from a QDANT file into a vector |
 | [qdant_write_multi](#qdant_write_multi) | Write a vector of arrayant objects to a single QDANT file |
 
+---
 ## arrayant_concat_multi
 Concatenate two multi-frequency arrayant vectors into a single multi-element model
 
@@ -434,6 +447,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
 - [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) (rotate elements after concatenating)
 - [qdant_write_multi](#qdant_write_multi) (persist the combined model)
 
+---
 ## arrayant_copy_element_multi
 Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
 
@@ -475,6 +489,7 @@ quadriga_lib::arrayant_copy_element_multi(driver, 0, arma::uvec{1, 2, 3});
 - [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) (set element positions after copying)
 - [arrayant_concat_multi](#arrayant_concat_multi) (combine multiple arrayant vectors)
 
+---
 ## arrayant_interpolate_multi
 Interpolate multi-frequency array antenna patterns at arbitrary frequencies
 
@@ -605,12 +620,13 @@ quadriga_lib::arrayant_interpolate_multi(speaker, &azimuth, &elevation, &query_f
 - [generate_speaker](#generate_speaker)
 - [arrayant_is_valid_multi](#arrayant_is_valid_multi)
 
+---
 ## arrayant_is_valid_multi
 Validate a vector of arrayant objects for multi-frequency consistency
 
 ### Description:
 - Each entry is validated individually via its `is_valid` member; `quick_check` is forwarded to that call.
-- Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling matrix shape.
+- Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
 - Stops at first error and returns a message identifying the failing entry and property.
 - Allowed datatypes: `float` or `double`
@@ -633,6 +649,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - [.is_valid](#.is_valid) (per-entry validation called internally)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
 
+---
 ## arrayant_rotate_pattern_multi
 Apply Euler rotations to all entries in a multi-frequency arrayant vector
 
@@ -666,6 +683,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 - [arrayant_concat_multi](#arrayant_concat_multi) (combine multi-frequency vectors before rotating)
 - [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) (set element positions in multi-frequency vectors)
 
+---
 ## arrayant_set_element_pos_multi
 Set element positions for all entries in a multi-frequency arrayant vector
 
@@ -693,181 +711,135 @@ void quadriga_lib::arrayant_set_element_pos_multi(
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
 - [generate_speaker](#generate_speaker) (typical source of multi-frequency arrayant vectors)
 
-## generate_arrayant_3gpp
-Generate 3GPP-NR compliant antenna model
+---
+## generate_arrayant_3GPP
+Generate a 3GPP-NR compliant antenna array model
 
 ### Description:
-- Generates an antenna array based on the 3GPP-NR channel model specification.
-- Supports vertical and horizontal stacking of elements and panels with a range of polarization configurations.
-- Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored).
+- Supports vertical (M) and horizontal (N) element stacking within panels, and multi-panel arrays (Mg × Ng).
+- If `pattern` is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from `pattern` are ignored.
+- Electrical downtilt (`tilt`) applies only to `pol` modes 4, 5, and 6.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
                 arma::uword M = 1, arma::uword N = 1, dtype center_freq = 299792458.0,
                 unsigned pol = 1, dtype tilt = 0.0, dtype spacing = 0.5, arma::uword Mg = 1,
                 arma::uword Ng = 1, dtype dgv = 0.5, dtype dgh = 0.5,
-                const arrayant<dtype> *pattern = nullptr, dtype res = 1.0)
+                const quadriga_lib::arrayant<dtype> *pattern = nullptr, dtype res = 1.0);
 ```
 
-### Arguments:
-- `arma::uword **M** = 1` (optional input)
-  Number of vertical elements in the array. Default: `1`
+### Input Arguments:
+- **`M`** *(optional)* — Number of vertical elements per panel
+- **`N`** *(optional)* — Number of horizontal elements per panel
+- **`center_freq`** *(optional)* — Center frequency in Hz
+- **`pol`** *(optional)* — Polarization mode:
 
-- `arma::uword **N** = 1` (optional input)
-  Number of horizontal elements in the array. Default: `1`
+  | `pol` | Description | Elements |
+  |-------|-------------|----------|
+  | 1 | Vertical polarization | NM |
+  | 2 | H/V polarization | 2NM |
+  | 3 | ±45° polarization | 2NM |
+  | 4 | Vertical, vertical elements combined | N |
+  | 5 | H/V, vertical elements combined | 2N |
+  | 6 | ±45°, vertical elements combined | 2N |
 
-- `dtype **center_freq** = 299792458.0` (optional input)
-  Center frequency of the antenna array in Hz. Default: `299792458.0`
-
-- `unsigned **pol** = 1` (optional input)
-  Polarization configuration:
-  `pol = 1` | vertical polarization (default value)
-  `pol = 2` | H/V polarized elements, results in 2NM elements
-  `pol = 3` | +/-45° polarized elements, results in 2NM elements
-  `pol = 4` | vertical polarization, combines elements in vertical direction, results in N elements
-  `pol = 5` | H/V polarization, combines elements in vertical direction, results in 2N elements
-  `pol = 6` | +/-45° polarization, combines elements in vertical direction, results in 2N elements
-
-- `dtype **tilt** = 0.0` (optional input)
-  Electrical downtilt angle in degrees. Used for `pol` values 4, 5, and 6. Default: `0.0`
-
-- `dtype **spacing** = 0.5` (optional input)
-  Spacing between elements in wavelengths (λ). Default: `0.5`
-
-- `arma::uword **Mg** = 1` (optional input)
-  Number of vertically stacked panels (columns). Default: `1`
-
-- `arma::uword **Ng** = 1` (optional input)
-  Number of horizontally stacked panels (rows). Default: `1`
-
-- `dtype **dgv** = 0.5` (optional input)
-  Panel spacing in vertical direction in wavelengths (λ). Default: `0.5`
-
-- `dtype **dgh** = 0.5` (optional input)
-  Panel spacing in horizontal direction in wavelengths (λ). Default: `0.5`
-
-- `const arrayant<dtype> **pattern** = nullptr` (optional input)
-  Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored.
-
-- `dtype **res** = 1.0` (optional input)
-  Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: `1.0`
+- **`tilt`** *(optional)* — Electrical downtilt in degrees; applies to `pol` 4–6
+- **`spacing`** *(optional)* — Inter-element spacing within a panel in wavelengths
+- **`Mg`** *(optional)* — Number of vertically stacked panels
+- **`Ng`** *(optional)* — Number of horizontally stacked panels
+- **`dgv`** *(optional)* — Panel spacing in vertical direction in wavelengths
+- **`dgh`** *(optional)* — Panel spacing in horizontal direction in wavelengths
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default 3GPP element pattern
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
 
 ### Returns:
-- `arrayant<dtype>`
-  Generated antenna array object according to 3GPP-NR specifications.
+- `quadriga_lib::arrayant<dtype>` — 3GPP-NR antenna array object
 
 ### Example:
 ```
-// Generate 3GPP antenna array with 4x4 elements, H/V polarization
 auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 4, 3e9, 2);
 ```
 
+---
 ## generate_arrayant_custom
-Generate antenna with custom 3dB beamwidth
+Generate an antenna with custom 3dB beamwidth
 
 ### Description:
-- Generates an antenna array object with a custom-defined 3dB beamwidth (FWHM) in azimuth and elevation.
-- Allows control over the rear-side attenuation using a front-to-back gain ratio.
-- Supports specification of the pattern sampling resolution.
+- Returns a single-element antenna with independently configurable azimuth and elevation 3dB (FWHM) beamwidths.
+- Rear-side gain is controlled by a linear front-to-back ratio; `0.0` means no rear radiation.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
-                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
+                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0);
 ```
 
-### Arguments:
-- `dtype **az_3dB** = 90.0` (optional input)
-  3dB beamwidth in azimuth, specified in degrees. Default: `90.0`
-
-- `dtype **el_3db** = 90.0` (optional input)
-  3dB beamwidth in elevation, specified in degrees. Default: `90.0`
-
-- `dtype **rear_gain_lin** = 0.0` (optional input)
-  Front-to-back gain ratio as a linear value. Default: `0.0` (no rear gain)
-
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+### Input Arguments:
+- **`az_3dB`** *(optional)* — Azimuth 3dB beamwidth in degrees
+- **`el_3db`** *(optional)* — Elevation 3dB beamwidth in degrees
+- **`rear_gain_lin`** *(optional)* — Front-to-back gain ratio (linear)
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ### Returns:
-- `arrayant<dtype>`
-  Antenna array object with the specified 3dB beamwidth and rear gain.
+- `quadriga_lib::arrayant<dtype>` — Antenna object with specified beamwidth and rear gain
 
-### Example:
-```
-auto ant = quadriga_lib::generate_arrayant_custom<double>(60.0, 45.0, 0.01, 1.0);
-```
-
+---
 ## generate_arrayant_dipole
-Generate short dipole with vertical polarization
+Generate a short dipole antenna with vertical polarization
 
 ### Description:
-- Generates a short dipole antenna pattern with vertical polarization.
-- Allows specification of the resolution of the antenna pattern sampling grid.
+- Returns a single-element short dipole antenna pattern with vertical polarization.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
 ```
 
-### Arguments:
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+### Input Arguments:
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ### Returns:
-- `arrayant<dtype>`
-  Antenna array object representing a vertically polarized short dipole.
+- `quadriga_lib::arrayant<dtype>` — Vertically polarized short dipole antenna object
 
-### Example:
-```
-auto ant = quadriga_lib::generate_arrayant_dipole<float>();
-```
-
+---
 ## generate_arrayant_half_wave_dipole
-Generate half-wave dipole with vertical polarization
+Generate a half-wave dipole antenna with vertical polarization
 
 ### Description:
-- Generates a vertically polarized half-wave dipole antenna pattern.
-- Allows specification of the resolution of the antenna pattern sampling grid.
+- Returns a single-element half-wave dipole antenna pattern with vertical polarization.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
 ```
 
-### Arguments:
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+### Input Arguments:
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ### Returns:
-- `arrayant<dtype>`
-  Antenna array object representing a vertically polarized half-wave dipole.
+- `quadriga_lib::arrayant<dtype>` — Vertically polarized half-wave dipole antenna object
 
-### Example:
-```
-auto ant = quadriga_lib::generate_arrayant_half_wave_dipole<float>();
-```
-
+---
 ## generate_arrayant_multibeam
-Generate a planar multi-element antenna with support for multiple beam directions.
+Generate a planar multi-element antenna array with multiple beam directions
 
 ### Description:
-This function generates a planar array antenna with **M** rows and **N** columns.
-It allows customization of the per-element radiation pattern, polarization, and spacing.
-Multiple beam directions can be specified via azimuth and elevation angles.
-Beamforming uses **maximum-ratio transmission (MRT)**, which is optimal for a single
-beam and approximate when multiple beams are specified.
-
-Supported data types for `dtype`: `float` or `double`.
+- Returns an M×N planar array with beamforming weights computed via maximum-ratio transmission (MRT).
+- MRT is optimal for a single beam; approximate when multiple beams are specified.
+- Weights control relative beam contribution; only their ratios matter, not absolute values.
+- If `separate_beams = true`, each angle pair produces an independent beam (weights ignored).
+- If `apply_weights = true`, beamforming weights are baked into the element coupling matrix.
+- Per-element pattern shape is controlled by `az_3dB`, `el_3dB`, and `rear_gain_lin`; see [generate_arrayant_custom](#generate_arrayant_custom).
+- Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
                 arma::uword M = 1,
                 arma::uword N = 1,
                 arma::Col<dtype> az = {0.0},
@@ -881,213 +853,125 @@ arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
                 dtype rear_gain_lin = 0.0,
                 dtype res = 1.0,
                 bool separate_beams = false,
-                bool apply_weights = false );
+                bool apply_weights = false);
 ```
 
-### Arguments:
-- `arma::uword **M** = 1` (optional input)
-  Number of vertical (rows) elements in the array. Default: `1`
+### Input Arguments:
+- **`M`** *(optional)* — Number of vertical (row) elements
+- **`N`** *(optional)* — Number of horizontal (column) elements
+- **`az`** *(optional)* — Azimuth beam angles in degrees, `[n_beams]`
+- **`el`** *(optional)* — Elevation beam angles in degrees, `[n_beams]`
+- **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1), `[n_beams]`
+- **`center_freq`** *(optional)* — Center frequency in Hz
+- **`pol`** *(optional)* — Polarization mode:
 
-- `arma::uword **N** = 1` (optional input)
-  Number of horizontal (columns) elements in the array. Default: `1`
+  | `pol` | Description | Elements |
+  |-------|-------------|----------|
+  | 1 | Vertical polarization | NM |
+  | 2 | H/V polarization | 2NM |
+  | 3 | ±45° polarization | 2NM |
 
-- `arma::Col<dtype> **az** = {0.0}` (optional input)
-  Azimuth beam angles (degrees). Vector of length `n_beams`. Default: `{0.0}`
-
-- `arma::Col<dtype> **el** = {0.0}` (optional input)
-  Elevation beam angles (degrees). Vector of length `n_beams`. Default: `{0.0}`
-
-- `arma::Col<dtype> **weight** = {1.0}` (optional input)
-  Scaling factors for each beam. The vector must have the same length as `az` and `el`.
-  Values are normalized so that their sum equals 1. Can be used to prioritize beams.
-  Default: `{1.0}`
-
-- `dtype **center_freq** = 299792458.0` (optional input)
-  Center frequency of the antenna array in Hz. Default: `299792458.0`
-
-- `unsigned **pol** = 1` (optional input)
-  Polarization configuration:
-  `pol = 1` | vertical polarization (default value)
-  `pol = 2` | H/V polarized elements, results in 2NM elements
-  `pol = 3` | +/-45° polarized elements, results in 2NM elements
-
-- `dtype **spacing** = 0.5` (optional input)
-  Spacing between elements in wavelengths (λ). Default: `0.5`
-
-- `dtype **az_3dB** = 120.0` (optional input)
-  3dB beamwidth in azimuth, specified in degrees. Default: `120.0`
-
-- `dtype **el_3db** = 120.0` (optional input)
-  3dB beamwidth in elevation, specified in degrees. Default: `120.0`
-
-- `dtype **rear_gain_lin** = 0.0` (optional input)
-  Front-to-back gain ratio as a linear value. Default: `0.0` (no rear gain)
-
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
-
-- `bool **separate_beams** = false` (optional input)
-  If set to true, create a separate beam for each angle pair (ignores weights)
-
-- `bool **apply_weights** = false` (optional input)
-  Switch to apply the beam-forming weights
+- **`spacing`** *(optional)* — Inter-element spacing in wavelengths
+- **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
+- **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees
+- **`rear_gain_lin`** *(optional)* — Per-element front-to-back gain ratio (linear)
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
+- **`separate_beams`** *(optional)* — If `true`, generate one independent beam per angle pair
+- **`apply_weights`** *(optional)* — If `true`, bake beamforming weights into the coupling matrix
 
 ### Returns:
-- `arrayant<dtype>`
-  Array antenna object containing the generated multibeam pattern.
+- `quadriga_lib::arrayant<dtype>` — Multibeam planar array antenna object
 
 ### Example:
 ```
-// Generate a pattern with 2 weighted beams
-double freq = 3.75e9;
-arma::vec az = {20.0, 0.0};
-arma::vec el = {-7.0, 30.0};
-arma::vec weight = {2.0, 1.0};
-
-auto ant = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, weight, freq);
+arma::vec az = {20.0, 0.0}, el = {-7.0, 30.0}, weight = {2.0, 1.0};
+auto ant = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, weight, 3.75e9);
 ```
 
+---
 ## generate_arrayant_omni
-Generate isotropic radiator with vertical polarization
+Generate an isotropic radiator with vertical polarization
 
 ### Description:
-- Generates an isotropic antenna radiator pattern with vertical polarization.
-- Allows specification of the resolution of the antenna pattern sampling grid.
+- Returns a single-element antenna array with omnidirectional pattern and vertical polarization.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
 ```
 
-### Arguments:
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+### Input Arguments:
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ### Returns:
-- `arrayant<dtype>`
-  Antenna array object representing an isotropic radiator with vertical polarization.
+- `quadriga_lib::arrayant<dtype>` — Isotropic radiator antenna object
 
-### Example:
-```
-auto ant = quadriga_lib::generate_arrayant_omni<float>(10.0f);
-```
-
+---
 ## generate_arrayant_ula
-Generate an unified linear array
+Generate a uniform linear array (ULA)
 
 ### Description:
-- Supports horizontal stacking of elements
-- Default pattern: Isotropic omnidirectional radiator, v-polarized
-- Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored).
+- Returns a horizontally stacked linear array of N elements with half-wavelength spacing by default.
+- Default per-element pattern is a vertically polarized isotropic radiator.
+- If `pattern` is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from `pattern` are ignored.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_ula(
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
                 arma::uword N = 1, dtype center_freq = 299792458.0, dtype spacing = 0.5,
-                const arrayant<dtype> *pattern = nullptr, dtype res = 1.0)
+                const quadriga_lib::arrayant<dtype> *pattern = nullptr, dtype res = 1.0);
 ```
 
-### Arguments:
-- `arma::uword **N** = 1` (optional input)
-  Number of horizontal elements in the array. Default: `1`
-
-- `dtype **center_freq** = 299792458.0` (optional input)
-  Center frequency of the antenna array in Hz. Default: `299792458.0`
-
-- `dtype **spacing** = 0.5` (optional input)
-  Spacing between elements in wavelengths (λ). Default: `0.5`
-
-- `const arrayant<dtype> **pattern** = nullptr` (optional input)
-  Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored.
-
-- `dtype **res** = 1.0` (optional input)
-  Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: `1.0`
+### Input Arguments:
+- **`N`** *(optional)* — Number of elements
+- **`center_freq`** *(optional)* — Center frequency in Hz
+- **`spacing`** *(optional)* — Inter-element spacing in wavelengths
+- **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
 
 ### Returns:
-- `arrayant<dtype>`
-  Generated antenna array object according to 3GPP-NR specifications.
+- `quadriga_lib::arrayant<dtype>` — ULA antenna array object
 
+---
 ## generate_arrayant_xpol
-Generate cross-polarized isotropic radiator
+Generate a cross-polarized isotropic radiator
 
 ### Description:
-- Generates a cross-polarized isotropic antenna radiator pattern.
-- Allows specification of the resolution of the antenna pattern sampling grid.
+- Returns a two-element antenna array with omnidirectional patterns in vertical and horizontal polarization.
 - Allowed datatypes (`dtype`): `float` or `double`
 
 ### Declaration:
 ```
-arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
 ```
 
-### Arguments:
-- `dtype **res** = 1.0` (optional input)
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
+### Input Arguments:
+- **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ### Returns:
-- `arrayant<dtype>`
-  Antenna array object representing a cross-polarized isotropic radiator.
+- `quadriga_lib::arrayant<dtype>` — Cross-polarized isotropic radiator antenna object
 
-### Example:
-```
-auto ant = quadriga_lib::generate_arrayant_xpol<float>(10.0f);
-```
-
+---
 ## generate_speaker
-Generate a parametric loudspeaker directivity model
+Generate a parametric frequency-dependent loudspeaker directivity model
 
 ### Description:
-- Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model 
-  with an enclosure radiation modifier and a Butterworth-style bandpass frequency response.
-- Returns a vector of `arrayant` objects, one per frequency sample, where each contains the complex-valued 
-  directivity balloon at that frequency stored in `e_theta_re`. The `center_frequency` field of each 
-  arrayant is set to the corresponding frequency in Hz.
-- Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and 
-  combining them via `append` and `element_pos`. Crossover behavior emerges naturally from overlapping 
-  bandpass responses.
-- The frequency response follows a Butterworth-style bandpass filter: 
-  H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order 
-  n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies.
-- Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL: 
-  sens_lin = 10^((sensitivity - 85) / 20).
-- If no frequency vector is provided, third-octave band center frequencies are auto-generated 
-  covering the range from one band below the lower cutoff to one band above the upper cutoff, 
-  clipped to 20-20000 Hz.
-- The speed of sound is assumed to be 344 m/s.
+- Returns one `quadriga_lib::arrayant` per frequency sample; each has a single element with the real-valued directivity balloon in `e_theta_re` and `center_frequency` set to the corresponding frequency in Hz.
+- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
+- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))`, where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
+- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
+- Speed of sound assumed to be 344 m/s.
+- **Driver models** (`driver_type`): `"piston"` — circular piston in baffle, `D(θ) = 2*J1(ka*sinθ)/(ka*sinθ)`, rotationally symmetric, narrows with increasing `ka`; `"horn"` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`; `"omni"` — frequency-independent omnidirectional pattern.
+- **Enclosure models** (`radiation_type`): `"monopole"` — no modification; `"hemisphere"` — sealed box with baffle-step transition, `f_baffle = c/(π*sqrt(W*H))`; `"dipole"` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere; `"cardioid"` — `R = 0.5*(1+cos(θ_off))`.
+- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π*radius)`.
 - Allowed datatypes (`dtype`): `float` or `double`
-
-Three driver directivity models are supported:
-- **Piston**: Circular piston in a baffle, using the classical formula 
-  D(theta) = 2*J1(ka*sin(theta)) / (ka*sin(theta)), where k = 2*pi*f/c is the wavenumber and a is 
-  the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional 
-  at low ka to progressively narrower beaming at high ka. Uses C++17 `std::cyl_bessel_j` for the Bessel f
-  unction J1.
-- **Horn**: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal 
-  and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived 
-  from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency, 
-  the pattern blends toward omnidirectional using a second-order transition: 
-  blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius.
-- **Omni**: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for 
-  subwoofers at frequencies where the driver is small relative to the wavelength.
-
-Four enclosure radiation types modify the base driver pattern:
-- **Monopole**: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space.
-- **Hemisphere**: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional 
-  to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2), 
-  where f_baffle = c / (pi * sqrt(W*H)) is derived from the baffle dimensions. The radiation modifier is 
-  R = (1-alpha) + alpha * 0.5 * (1 + cos(theta_off)). At low frequencies the pattern is nearly 
-  omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately
-  6 dB front-to-back ratio.
-- **Dipole**: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree 
-  phase inversion (negative sign in `e_theta_re`) in the rear hemisphere. Nulls occur at 90 degrees off-axis.
-- **Cardioid**: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear, 
-  half-amplitude at the sides. No phase inversion.
 
 ### Declaration:
 ```
-std::vector<arrayant<dtype>> quadriga_lib::generate_speaker(
+std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         std::string driver_type = "piston",
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
@@ -1102,88 +986,40 @@ std::vector<arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col<dtype> frequencies = arma::Col<dtype>(),
-        dtype angular_resolution = 5.0)
+        dtype angular_resolution = 5.0);
 ```
 
-### Arguments:
-- `std::string **driver_type** = "piston"` (optional input)
-  Driver directivity model. Supported values: `"piston"` (cone/dome via Bessel function), `"horn"` 
-  (cosine-power with frequency-dependent pattern control), `"omni"` (omnidirectional subwoofer).
-
-- `dtype **radius** = 0.05` (optional input)
-  Effective radiating radius in meters. For `"piston"`: the cone or dome radius. For `"horn"`: the horn 
-  mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m 
-  (approximately a 4-inch driver).
-
-- `dtype **lower_cutoff** = 80.0` (optional input)
-  Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz.
-
-- `dtype **upper_cutoff** = 12000.0` (optional input)
-  Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz.
-
-- `dtype **lower_rolloff_slope** = 12.0` (optional input)
-  Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order 
-  n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0.
-
-- `dtype **upper_rolloff_slope** = 12.0` (optional input)
-  High-frequency rolloff slope in dB per octave. Default: 12.0.
-
-- `dtype **sensitivity** = 85.0` (optional input)
-  On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as 
-  reference (i.e. 85 dB gives unity amplitude). Default: 85.0.
-
-- `std::string **radiation_type** = "hemisphere"` (optional input)
-  Enclosure radiation model. Supported values: `"monopole"` (4*pi, no modification), `"hemisphere"` 
-  (sealed box with frequency-dependent baffle step), `"dipole"` (open baffle, figure-8), `"cardioid"` 
-  (monopole + dipole combination).
-
-- `dtype **hor_coverage** = 0.0` (optional input)
-  Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0.
-
-- `dtype **ver_coverage** = 0.0` (optional input)
-  Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0.
-
-- `dtype **horn_control_freq** = 0.0` (optional input)
-  Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the 
-  mouth radius as f_ctrl = c / (2*pi*radius). Default: 0.0.
-
-- `dtype **baffle_width** = 0.15` (optional input)
-  Enclosure baffle width in meters. Used by the `"hemisphere"` radiation model to compute the baffle 
-  step frequency. Default: 0.15 m.
-
-- `dtype **baffle_height** = 0.25` (optional input)
-  Enclosure baffle height in meters. Used by the `"hemisphere"` radiation model to compute the baffle 
-  step frequency. Default: 0.25 m.
-
-- `arma::Col<dtype> **frequencies** = arma::Col<dtype>()` (optional input)
-  Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated 
-  overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range.
-
-- `dtype **angular_resolution** = 5.0` (optional input)
-  Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0.
+### Input Arguments:
+- **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
+- **`radius`** *(optional)* — Effective radiating radius in meters; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz
+- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
+- **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
+- **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
+- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
+- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency in Hz; `0` auto-derives from `radius`
+- **`baffle_width`** *(optional)* — Baffle width in meters; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height in meters; used by `"hemisphere"` model
+- **`frequencies`** *(optional)* — Frequency sample points in Hz; auto-generated third-octave bands if empty, `[n_freq]`
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees
 
 ### Returns:
-- `std::vector<arrayant<dtype>>`
-  Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity 
-  pattern stored in `e_theta_re` (real-valued except for dipole rear hemisphere where negative values encode 
-  180-degree phase inversion). The `center_frequency` field is set to the corresponding frequency in Hz.
+- `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
 
 ### Example:
 ```
-// Generate a default cheap piston speaker at specific frequencies
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
-
-// Generate a horn driver with auto-derived parameters at third-octave bands
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
-
-// Generate a subwoofer
-arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
 ```
 
+---
 ## qdant_read
 Read an arrayant object from a QDANT file
 
@@ -1205,12 +1041,13 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
 - **`layout`** *(optional)* — Output pointer filled with the file's layout matrix of element IDs
 
 ### Returns:
-- `arrayant<dtype>` constructed from the specified entry in the file
+- `quadriga_lib::arrayant<dtype>` constructed from the specified entry in the file
 
 ### See also:
-- [arrayant.qdant_write](#arrayant.qdant_write) (write a single arrayant)
+- [.qdant_write](#.qdant_write) (write a single arrayant)
 - [qdant_write_multi](#qdant_write_multi) (write multiple arrayants with sequential IDs)
 
+---
 ## qdant_read_multi
 Read all arrayant objects from a QDANT file into a vector
 
@@ -1239,6 +1076,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(
 - [qdant_write_multi](#qdant_write_multi) (write a vector of arrayants)
 - [generate_speaker](#generate_speaker) (typical source of frequency-dependent arrayant vectors)
 
+---
 ## qdant_write_multi
 Write a vector of arrayant objects to a single QDANT file
 
@@ -1285,6 +1123,7 @@ auto ant = quadriga_lib::qdant_read<double>("speaker.qdant", 3); // read 3rd ent
 | [.calc_effective_path_gain](#calc_effective_path_gain) | Calculate the effective path gain for each snapshot (in linear scale) |
 | [.write_paths_to_obj_file](#write_paths_to_obj_file) | Export propagation paths to a Wavefront OBJ file |
 
+---
 ## channel
 Class for storing and managing MIMO channel data and associated metadata
 
@@ -1330,6 +1169,7 @@ Class for storing and managing MIMO channel data and associated metadata
 - [.calc_effective_path_gain](#.calc_effective_path_gain)
 - [.write_paths_to_obj_file](#.write_paths_to_obj_file)
 
+---
 ## .add_paths
 Append new propagation paths to an existing channel snapshot
 
@@ -1399,6 +1239,7 @@ void quadriga_lib::channel<dtype>::add_paths(
 - Any provided input must match the snapshot structure and existing fields of the `channel` object.
 - This method does not update `tx_pos`, `rx_pos`, or orientation fields.
 
+---
 ## .calc_effective_path_gain
 Calculate the effective path gain for each snapshot (in linear scale)
 
@@ -1424,6 +1265,7 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool ass
 - `arma::Col<dtype>`
   Column vector of effective path gains (linear scale), one entry per snapshot (length `n_snap`).
 
+---
 ## .write_paths_to_obj_file
 Export propagation paths to a Wavefront OBJ file
 
@@ -1494,7 +1336,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
-| [get_hdf5_version](#get_hdf5_version) | Get the version of the linked HDF5 library |
+| [get_HDF5_version](#get_hdf5_version) | Get the version of the linked HDF5 library |
 | [hdf5_create](#hdf5_create) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file |
 | [hdf5_read_dset](#hdf5_read_dset) | Read an unstructured dataset from an HDF5 file |
@@ -1508,6 +1350,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 | [qrt_read_cache_init](#qrt_read_cache_init) | Initialize a QRT read cache for fast repeated access |
 | [quantize_delays](#quantize_delays) | Fixes the path delays to a grid of delay bins |
 
+---
 ## any_type_id
 Get type ID and raw access from a 'std::any' object
 
@@ -1554,6 +1397,7 @@ int quadriga_lib::any_type_id(
     50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
     53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
 
+---
 ## baseband_freq_response
 Compute the baseband frequency response of a MIMO channel
 
@@ -1600,6 +1444,7 @@ void quadriga_lib::baseband_freq_response(
 - `arma::Cube<dtype> ***hmat_im**` (output)
   Output: Imaginary part of the frequency-domain channel matrix, Size `[n_rx, n_tx, n_carriers]`.
 
+---
 ## baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
@@ -1704,6 +1549,7 @@ quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays,
 - [baseband_freq_response_vec](#baseband_freq_response_vec) (for batched narrowband channels)
 - [get_channels_multifreq](#get_channels_multifreq) (produces the multi-frequency coefficients consumed by this function)
 
+---
 ## baseband_freq_response_vec
 Compute the baseband frequency response of multiple MIMO channels
 
@@ -1757,7 +1603,8 @@ void quadriga_lib::baseband_freq_response_vec(
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (for processing a single snapshot)
 
-## get_hdf5_version
+---
+## get_HDF5_version
 Get the version of the linked HDF5 library
 
 ### Description:
@@ -1780,6 +1627,7 @@ std::string hdf5_ver = quadriga_lib::get_HDF5_version();
 std::cout << "Using HDF5 version: " << hdf5_ver << std::endl;
 ```
 
+---
 ## hdf5_create
 Create a new HDF5 channel file with a defined storage layout
 
@@ -1825,6 +1673,7 @@ void quadriga_lib::hdf5_create(
 quadriga_lib::hdf5_create("channels.hdf5", 10, 4, 2);
 ```
 
+---
 ## hdf5_read_channel
 Read a channel object from an HDF5 file
 
@@ -1866,6 +1715,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
 - `quadriga_lib::channel<dtype>`
   A channel object containing the channel data at the specified index. If no data is found, an empty channel object is returned.
 
+---
 ## hdf5_read_dset
 Read an unstructured dataset from an HDF5 file
 
@@ -1913,6 +1763,7 @@ std::any quadriga_lib::hdf5_read_dset(
 ### Returns:
 - A `std::any` object containing the dataset. If the dataset is not present, the return value is an empty `std::any`.
 
+---
 ## hdf5_read_dset_names
 Read names of unstructured datasets from an HDF5 file
 
@@ -1959,6 +1810,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
 ### Returns:
 - The number of unstructured datasets found at the specified location with the given prefix.
 
+---
 ## hdf5_read_layout
 Read the HDF5 channel storage layout
 
@@ -1988,6 +1840,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
 - `arma::u32_vec`
   Containing four elements: `{nx, ny, nz, nw}`, the layout of the storage grid.
 
+---
 ## hdf5_reshape_layout
 Reshape the storage layout of an HDF5 channel file
 
@@ -2024,6 +1877,7 @@ void quadriga_lib::hdf5_reshape_layout(
 - `unsigned **nw** = 1` (input)
   Number of entries in the fourth dimension. Default: `1`.
 
+---
 ## hdf5_write
 Write channel data to HDF5 file
 
@@ -2081,6 +1935,7 @@ int quadriga_lib::hdf5_write(
 - Supported unstructured size: up to 3 dimensions
 - Storage order of the unstructured data is maintained
 
+---
 ## hdf5_write_dset
 Write a single unstructured dataset to an HDF5 file
 
@@ -2131,6 +1986,7 @@ void quadriga_lib::hdf5_write_dset(
 - `std::string **prefix** = "par_"` (input)
   Optional prefix for the dataset name. Default: `"par_"`.
 
+---
 ## qrt_file_parse
 Read metadata from a QRT file
 
@@ -2184,6 +2040,7 @@ quadriga_lib::qrt_file_parse("scene.qrt", &no_cir, &no_orig, &no_dest, &no_freq,
                               &cir_offset, &orig_names, &dest_names, &version);
 ```
 
+---
 ## qrt_file_read
 Read ray-tracing data from a QRT file
 
@@ -2329,6 +2186,7 @@ for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
             nullptr, nullptr, &stream, &cache);
 ```
 
+---
 ## qrt_read_cache_init
 Initialize a QRT read cache for fast repeated access
 
@@ -2376,6 +2234,7 @@ for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
             nullptr, nullptr, &stream, &cache);
 ```
 
+---
 ## quantize_delays
 Fixes the path delays to a grid of delay bins
 
@@ -2478,6 +2337,7 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 | [get_channels_planar](#get_channels_planar) | Calculate channel coefficients for planar waves |
 | [get_channels_spherical](#get_channels_spherical) | Calculate channel coefficients for spherical waves |
 
+---
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
@@ -2600,6 +2460,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
   Vector of channel objects with length `n_users`. Each entry contains the generated indoor channel
   realization for one user (including direction determined by `uplink`).
 
+---
 ## get_channels_irs
 Calculate channel coefficients for intelligent reflective surfaces (IRS)
 
@@ -2756,6 +2617,7 @@ std::vector<bool> quadriga_lib::get_channels_irs(
 - [get_channels_spherical](#get_channels_spherical)
 - [get_channels_planar](#get_channels_planar)
 
+---
 ## get_channels_multifreq
 Calculate channel coefficients for spherical waves across multiple frequencies
 
@@ -2915,6 +2777,7 @@ quadriga_lib::get_channels_multifreq(tx, rx,
 - [arrayant_concat_multi](#arrayant_concat_multi)
 - [generate_speaker](#generate_speaker)
 
+---
 ## get_channels_planar
 Calculate channel coefficients for planar waves
 
@@ -3013,6 +2876,7 @@ void quadriga_lib::get_channels_planar(
 - `arma::Col<dtype> ***rx_Doppler** = nullptr` (optional output)
   Doppler weights for moving RX, Length `n_path(+1)`. Positive = towards path, Negative = away.
 
+---
 ## get_channels_spherical
 Calculate channel coefficients for spherical waves
 
@@ -3128,6 +2992,7 @@ void quadriga_lib::get_channels_spherical(
 | [fast_sincos](#fast_sincos) | Fast, approximate sine/cosine |
 | [fast_slerp](#fast_slerp) | Fast, approximate spherical interpolation (SLERP) for complex value pairs |
 
+---
 ## fast_acos
 Fast, approximate arc-cosine
 
@@ -3161,6 +3026,7 @@ arma::fvec c;
 quadriga_lib::fast_acos(x, c);
 ```
 
+---
 ## fast_asin
 Fast, approximate arc-sine
 
@@ -3194,6 +3060,7 @@ arma::fvec s;
 quadriga_lib::fast_asin(x, s);
 ```
 
+---
 ## fast_atan2
 Fast, approximate two-argument arc-tangent
 
@@ -3234,6 +3101,7 @@ quadriga_lib::fast_atan2(y, x, a);
 // a ≈ {0.7854, -0.7854, 3.1416, 1.5708}
 ```
 
+---
 ## fast_cart2geo
 Fast, approximate Cartesian-to-geographic conversion
 
@@ -3283,6 +3151,7 @@ quadriga_lib::fast_cart2geo(x, y, z, az, el);
 // az ≈ {0.0, 1.5708, 3.1416},  el ≈ {0.0, 0.0, 0.0}
 ```
 
+---
 ## fast_geo2cart
 Fast, approximate geographic-to-Cartesian conversion
 
@@ -3345,6 +3214,7 @@ arma::fvec x, y, z, sAZ, cEL;
 quadriga_lib::fast_geo2cart(az, el, x, y, z, &sAZ, nullptr, nullptr, &cEL);
 ```
 
+---
 ## fast_sincos
 Fast, approximate sine/cosine
 
@@ -3388,6 +3258,7 @@ quadriga_lib::fast_sincos(x, &s, nullptr); // compute sine only
 quadriga_lib::fast_sincos(x, nullptr, &c); // compute cosine only
 ```
 
+---
 ## fast_slerp
 Fast, approximate spherical interpolation (SLERP) for complex value pairs
 
@@ -3465,9 +3336,10 @@ quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
 | [cart2geo](#cart2geo) | Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance) |
 | [colormap](#colormap) | Generate colormap |
 | [geo2cart](#geo2cart) | Transform geographic (azimuth, elevation, length) to Cartesian coordinates |
-| [interp_1d / interp_2d](#interp_1d-interp_2d) | Perform linear interpolation (1D or 2D) on single or multiple data sets. |
+| [interp_1D / interp_2D](#interp_1d-interp_2d) | Perform linear interpolation (1D or 2D) on single or multiple data sets. |
 | [write_png](#write_png) | Write data to a PNG file |
 
+---
 ## acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
 
@@ -3538,6 +3410,7 @@ quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
 // bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
 ```
 
+---
 ## calc_angular_spreads_sphere
 Calculate azimuth and elevation angular spreads with spherical wrapping
 
@@ -3636,6 +3509,7 @@ quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
 // as(0), as(1) contain the azimuth spreads for each CIR
 ```
 
+---
 ## calc_cross_polarization_ratio
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
@@ -3740,6 +3614,7 @@ quadriga_lib::calc_cross_polarization_ratio(powers_vec, M_vec, pl_vec, tx, rx, &
 // xpr has size [1, 6], pg has size [1]
 ```
 
+---
 ## calc_delay_spread
 Calculate the RMS delay spread in [s]
 
@@ -3798,6 +3673,7 @@ arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean
 // ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
 ```
 
+---
 ## calc_rician_k_factor
 Calculate the Rician K-Factor from channel impulse response data
 
@@ -3872,6 +3748,7 @@ quadriga_lib::calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, &kf, &pg
 // pg[0] = 1.0 + 0.5 + 0.25 = 1.75
 ```
 
+---
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
@@ -3917,6 +3794,7 @@ ori(2, 0, 0) = 1.5708;      // head
 auto R = quadriga_lib::calc_rotation_matrix(ori);
 ```
 
+---
 ## cart2geo
 Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)
 
@@ -3951,6 +3829,7 @@ arma::vec cart = {1.0, 1.0, 1.0};
 auto geo = quadriga_lib::cart2geo(cart);
 ```
 
+---
 ## colormap
 Generate colormap
 
@@ -3982,6 +3861,7 @@ arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false)
 arma::uchar_mat cm = quadriga_lib::colormap("turbo");
 ```
 
+---
 ## geo2cart
 Transform geographic (azimuth, elevation, length) to Cartesian coordinates
 
@@ -4019,7 +3899,8 @@ arma::mat az(2, 2), el(2, 2), len(2, 2, arma::fill::ones);
 auto cart = quadriga_lib::geo2cart(az, el, len);
 ```
 
-## interp_1d / interp_2d
+---
+## interp_1D / interp_2D
 Perform linear interpolation (1D or 2D) on single or multiple data sets.
 
 ### Description:
@@ -4086,6 +3967,7 @@ arma::vec xo = arma::linspace(0, 4, 10);
 auto output = quadriga_lib::interp_1D(input, xi, xo);
 ```
 
+---
 ## write_png
 Write data to a PNG file
 
@@ -4159,6 +4041,7 @@ void write_png( const arma::Mat<dtype> &data,
 | [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D mesh into smaller sub-meshes for faster processing |
 | [triangle_mesh_split](#triangle_mesh_split) | Split a 3D mesh into two sub-meshes along a given axis |
 
+---
 ## calc_diffraction_gain
 Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
 
@@ -4220,6 +4103,7 @@ void quadriga_lib::calc_diffraction_gain(
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation)
 - [obj_file_read](#obj_file_read)
 
+---
 ## combine_irs_coord
 Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS)
 
@@ -4292,6 +4176,7 @@ void quadriga_lib::combine_irs_coord(
 - [get_channels_irs](#get_channels_irs) (for computing IRS channels)
 - [coord2path](#coord2path) (for processing coordinates, calculating departure and arrival angels, etc.)
 
+---
 ## coord2path
 Convert path interaction coordinates into FBS/LBS positions, path length and angles
 
@@ -4381,6 +4266,7 @@ quadriga_lib::coord2path<double>(
 // coords[1]: [ [0,0,0], [5,0,2], [10,0,0] ]
 ```
 
+---
 ## generate_diffraction_paths
 Generate propagation paths for estimating the diffraction gain
 
@@ -4453,6 +4339,7 @@ void generate_diffraction_paths(
 ### See also:
 - [calc_diffraction_gain](#calc_diffraction_gain)
 
+---
 ## icosphere
 Construct a geodesic polyhedron from recursive icosahedron subdivision
 
@@ -4488,6 +4375,7 @@ arma::uword quadriga_lib::icosphere(
 ### Returns:
 Number of generated triangular faces (20 × n_div²)
 
+---
 ## mitsuba_xml_file_write
 Write geometry and material data to a Mitsuba 3 XML scene file.
 
@@ -4553,6 +4441,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 ### See also:
 - [obj_file_read](#obj_file_read)
 
+---
 ## obj_file_read
 Read Wavefront `.obj` file and extract geometry and material information
 
@@ -4710,6 +4599,7 @@ std::vector<std::string> obj_names, mtl_names;
 quadriga_lib::obj_file_read<double>("cube.obj", &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
 ```
 
+---
 ## obj_overlap_test
 Detect overlapping 3D objects in a triangular mesh
 
@@ -4755,6 +4645,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ### See also:
 - [obj_file_read](#obj_file_read)
 
+---
 ## path_to_tube
 Convert a 3D path into a tube surface for visualization
 
@@ -4797,6 +4688,7 @@ void quadriga_lib::path_to_tube(
 - Quad faces are generated by connecting adjacent rings along the path.
 - Output `faces` can be directly exported to formats like `.obj` or `.ply`.
 
+---
 ## point_cloud_aabb
 Compute the Axis-Aligned Bounding Boxes (AABB) of a 3D point cloud
 
@@ -4843,6 +4735,7 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
 - [point_cloud_split](#point_cloud_split)
 - [ray_point_intersect](#ray_point_intersect)
 
+---
 ## point_cloud_segmentation
 Reorganize a point cloud into spatial sub-clouds for efficient processing
 
@@ -4903,6 +4796,7 @@ arma::uword quadriga_lib::point_cloud_segmentation(
 - [point_cloud_split](#point_cloud_split)
 - [ray_point_intersect](#ray_point_intersect)
 
+---
 ## point_cloud_split
 Split a point cloud into two sub-clouds along a spatial axis
 
@@ -4955,6 +4849,7 @@ int quadriga_lib::point_cloud_split(
 - [point_cloud_segmentation](#point_cloud_segmentation)
 - [ray_point_intersect](#ray_point_intersect)
 
+---
 ## point_inside_mesh
 Test whether 3D points are inside a triangle mesh using raycasting
 
@@ -4994,6 +4889,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
   For each point: Returns `0` if the point is outside the mesh (or all objects), `1` if inside (or close to) any mesh object
   (if `obj_ind` not given), or returns the **1-based object index** if `obj_ind` is provided.
 
+---
 ## ray_mesh_interact
 Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
@@ -5080,6 +4976,7 @@ void quadriga_lib::ray_mesh_interact(
 - [ray_triangle_intersect](#ray_triangle_intersect) (for computing FBS and SBS positions)
 - [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
 
+---
 ## ray_point_intersect
 Calculates the intersection of ray beams with points in three dimensions
 
@@ -5161,6 +5058,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 - [ray_triangle_intersect](#ray_triangle_intersect) (for calculating intersection of rays and triangles)
 - [ray_mesh_interact](#ray_mesh_interact) (for calculating interactions of beams and a 3D model)
 
+---
 ## ray_triangle_intersect
 Calculates the intersection of rays and triangles in three dimensions
 
@@ -5241,6 +5139,7 @@ void quadriga_lib::ray_triangle_intersect(
 - [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
 - [subdivide_rays](#subdivide_rays) (for subdivides ray beams into sub beams)
 
+---
 ## subdivide_rays
 Subdivide ray beams into four smaller sub-beams
 
@@ -5317,6 +5216,7 @@ arma::uword quadriga_lib::subdivide_rays(
 - [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
 - [ray_triangle_intersect](#ray_triangle_intersect) (for calculating beam interactions with triangles)
 
+---
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
@@ -5359,6 +5259,7 @@ arma::uword quadriga_lib::subdivide_triangles(
 - `arma::uword **n_triangles_out**`
   Number of generated triangles (equals `n_triangles_in × n_div × n_div`).
 
+---
 ## triangle_mesh_aabb
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
@@ -5403,6 +5304,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 - `arma::Mat<dtype>` 
   A matrix of shape `[n_sub_aligned, 6]`, where each row is `[x_min, x_max, y_min, y_max, z_min, z_max]`.
 
+---
 ## triangle_mesh_segmentation
 Reorganize a 3D mesh into smaller sub-meshes for faster processing
 
@@ -5466,6 +5368,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(
 - `arma::uword **n_sub**`
   The number of created sub-meshes. Output matrices are resized accordingly.
 
+---
 ## triangle_mesh_split
 Split a 3D mesh into two sub-meshes along a given axis
 

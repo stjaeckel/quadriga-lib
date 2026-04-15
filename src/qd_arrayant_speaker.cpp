@@ -32,58 +32,23 @@ SECTION!*/
 
 /*!MD
 # generate_speaker
-Generate a parametric loudspeaker directivity model
+Generate a parametric frequency-dependent loudspeaker directivity model
 
 ## Description:
-- Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model 
-  with an enclosure radiation modifier and a Butterworth-style bandpass frequency response.
-- Returns a vector of `arrayant` objects, one per frequency sample, where each contains the complex-valued 
-  directivity balloon at that frequency stored in `e_theta_re`. The `center_frequency` field of each 
-  arrayant is set to the corresponding frequency in Hz.
-- Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and 
-  combining them via `append` and `element_pos`. Crossover behavior emerges naturally from overlapping 
-  bandpass responses.
-- The frequency response follows a Butterworth-style bandpass filter: 
-  H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order 
-  n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies.
-- Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL: 
-  sens_lin = 10^((sensitivity - 85) / 20).
-- If no frequency vector is provided, third-octave band center frequencies are auto-generated 
-  covering the range from one band below the lower cutoff to one band above the upper cutoff, 
-  clipped to 20-20000 Hz.
-- The speed of sound is assumed to be 344 m/s.
+- Returns one `quadriga_lib::arrayant` per frequency sample; each has a single element with the real-valued directivity balloon in `e_theta_re` and `center_frequency` set to the corresponding frequency in Hz.
+- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
+- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))`, where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
+- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
+- Speed of sound assumed to be 344 m/s.
+- **Driver models** (`driver_type`): `"piston"` — circular piston in baffle, `D(θ) = 2*J1(ka*sinθ)/(ka*sinθ)`, rotationally symmetric, narrows with increasing `ka`; `"horn"` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`; `"omni"` — frequency-independent omnidirectional pattern.
+- **Enclosure models** (`radiation_type`): `"monopole"` — no modification; `"hemisphere"` — sealed box with baffle-step transition, `f_baffle = c/(π*sqrt(W*H))`; `"dipole"` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere; `"cardioid"` — `R = 0.5*(1+cos(θ_off))`.
+- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π*radius)`.
 - Allowed datatypes (`dtype`): `float` or `double`
-
-Three driver directivity models are supported:
-- **Piston**: Circular piston in a baffle, using the classical formula 
-  D(theta) = 2*J1(ka*sin(theta)) / (ka*sin(theta)), where k = 2*pi*f/c is the wavenumber and a is 
-  the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional 
-  at low ka to progressively narrower beaming at high ka. Uses C++17 `std::cyl_bessel_j` for the Bessel f
-  unction J1.
-- **Horn**: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal 
-  and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived 
-  from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency, 
-  the pattern blends toward omnidirectional using a second-order transition: 
-  blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius.
-- **Omni**: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for 
-  subwoofers at frequencies where the driver is small relative to the wavelength.
-
-Four enclosure radiation types modify the base driver pattern:
-- **Monopole**: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space.
-- **Hemisphere**: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional 
-  to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2), 
-  where f_baffle = c / (pi * sqrt(W*H)) is derived from the baffle dimensions. The radiation modifier is 
-  R = (1-alpha) + alpha * 0.5 * (1 + cos(theta_off)). At low frequencies the pattern is nearly 
-  omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately
-  6 dB front-to-back ratio.
-- **Dipole**: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree 
-  phase inversion (negative sign in `e_theta_re`) in the rear hemisphere. Nulls occur at 90 degrees off-axis.
-- **Cardioid**: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear, 
-  half-amplitude at the sides. No phase inversion.
 
 ## Declaration:
 ```
-std::vector<arrayant<dtype>> quadriga_lib::generate_speaker(
+std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         std::string driver_type = "piston",
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
@@ -98,86 +63,37 @@ std::vector<arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col<dtype> frequencies = arma::Col<dtype>(),
-        dtype angular_resolution = 5.0)
+        dtype angular_resolution = 5.0);
 ```
 
-## Arguments:
-- `std::string **driver_type** = "piston"` (optional input)<br>
-  Driver directivity model. Supported values: `"piston"` (cone/dome via Bessel function), `"horn"` 
-  (cosine-power with frequency-dependent pattern control), `"omni"` (omnidirectional subwoofer).
-
-- `dtype **radius** = 0.05` (optional input)<br>
-  Effective radiating radius in meters. For `"piston"`: the cone or dome radius. For `"horn"`: the horn 
-  mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m 
-  (approximately a 4-inch driver).
-
-- `dtype **lower_cutoff** = 80.0` (optional input)<br>
-  Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz.
-
-- `dtype **upper_cutoff** = 12000.0` (optional input)<br>
-  Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz.
-
-- `dtype **lower_rolloff_slope** = 12.0` (optional input)<br>
-  Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order 
-  n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0.
-
-- `dtype **upper_rolloff_slope** = 12.0` (optional input)<br>
-  High-frequency rolloff slope in dB per octave. Default: 12.0.
-
-- `dtype **sensitivity** = 85.0` (optional input)<br>
-  On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as 
-  reference (i.e. 85 dB gives unity amplitude). Default: 85.0.
-
-- `std::string **radiation_type** = "hemisphere"` (optional input)<br>
-  Enclosure radiation model. Supported values: `"monopole"` (4*pi, no modification), `"hemisphere"` 
-  (sealed box with frequency-dependent baffle step), `"dipole"` (open baffle, figure-8), `"cardioid"` 
-  (monopole + dipole combination).
-
-- `dtype **hor_coverage** = 0.0` (optional input)<br>
-  Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0.
-
-- `dtype **ver_coverage** = 0.0` (optional input)<br>
-  Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0.
-
-- `dtype **horn_control_freq** = 0.0` (optional input)<br>
-  Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the 
-  mouth radius as f_ctrl = c / (2*pi*radius). Default: 0.0.
-
-- `dtype **baffle_width** = 0.15` (optional input)<br>
-  Enclosure baffle width in meters. Used by the `"hemisphere"` radiation model to compute the baffle 
-  step frequency. Default: 0.15 m.
-
-- `dtype **baffle_height** = 0.25` (optional input)<br>
-  Enclosure baffle height in meters. Used by the `"hemisphere"` radiation model to compute the baffle 
-  step frequency. Default: 0.25 m.
-
-- `arma::Col<dtype> **frequencies** = arma::Col<dtype>()` (optional input)<br>
-  Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated 
-  overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range.
-
-- `dtype **angular_resolution** = 5.0` (optional input)<br>
-  Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0.
+## Input Arguments:
+- **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
+- **`radius`** *(optional)* — Effective radiating radius in meters; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz
+- **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
+- **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
+- **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
+- **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
+- **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
+- **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency in Hz; `0` auto-derives from `radius`
+- **`baffle_width`** *(optional)* — Baffle width in meters; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height in meters; used by `"hemisphere"` model
+- **`frequencies`** *(optional)* — Frequency sample points in Hz; auto-generated third-octave bands if empty, `[n_freq]`
+- **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees
 
 ## Returns:
-- `std::vector<arrayant<dtype>>`<br>
-  Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity 
-  pattern stored in `e_theta_re` (real-valued except for dipole rear hemisphere where negative values encode 
-  180-degree phase inversion). The `center_frequency` field is set to the corresponding frequency in Hz.
+- `std::vector<quadriga_lib::arrayant<dtype>>` — One arrayant per frequency sample with directivity in `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180° phase inversion
 
 ## Example:
 ```
-// Generate a default cheap piston speaker at specific frequencies
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
-
-// Generate a horn driver with auto-derived parameters at third-octave bands
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker<double>("horn");
-
-// Generate a subwoofer
-arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
-                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
 ```
 MD!*/
 

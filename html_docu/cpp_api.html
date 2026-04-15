@@ -64,7 +64,7 @@
 <tbody>
 <tr><td style="padding-bottom: 10px;"><a href="#arrayant">arrayant</a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
 <tr><td><a href="#.append">.append</a></td><td>Append elements of another arrayant to the current one</td></tr>
-<tr><td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td><td>Calculate the directivity in dBi of a single array element</td></tr>
+<tr><td><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a></td><td>Calculate the directivity in dBi of a single array element</td></tr>
 <tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
 <tr><td><a href="#.copy_element">.copy_element</a></td><td>Copy a single antenna element to one or more destination slots</td></tr>
 <tr><td><a href="#.export_obj_file">.export_obj_file</a></td><td>Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization</td></tr>
@@ -88,15 +88,15 @@
 <tr><td><a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a></td><td>Validate a vector of arrayant objects for multi-frequency consistency</td></tr>
 <tr><td><a href="#arrayant_rotate_pattern_multi">arrayant_rotate_pattern_multi</a></td><td>Apply Euler rotations to all entries in a multi-frequency arrayant vector</td></tr>
 <tr><td><a href="#arrayant_set_element_pos_multi">arrayant_set_element_pos_multi</a></td><td>Set element positions for all entries in a multi-frequency arrayant vector</td></tr>
-<tr><td><a href="#generate_arrayant_3gpp">generate_arrayant_3gpp</a></td><td>Generate 3GPP-NR compliant antenna model</td></tr>
-<tr><td><a href="#generate_arrayant_custom">generate_arrayant_custom</a></td><td>Generate antenna with custom 3dB beamwidth</td></tr>
-<tr><td><a href="#generate_arrayant_dipole">generate_arrayant_dipole</a></td><td>Generate short dipole with vertical polarization</td></tr>
-<tr><td><a href="#generate_arrayant_half_wave_dipole">generate_arrayant_half_wave_dipole</a></td><td>Generate half-wave dipole with vertical polarization</td></tr>
-<tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna with support for multiple beam directions.</td></tr>
-<tr><td><a href="#generate_arrayant_omni">generate_arrayant_omni</a></td><td>Generate isotropic radiator with vertical polarization</td></tr>
-<tr><td><a href="#generate_arrayant_ula">generate_arrayant_ula</a></td><td>Generate an unified linear array</td></tr>
-<tr><td><a href="#generate_arrayant_xpol">generate_arrayant_xpol</a></td><td>Generate cross-polarized isotropic radiator</td></tr>
-<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric loudspeaker directivity model</td></tr>
+<tr><td><a href="#generate_arrayant_3GPP">generate_arrayant_3GPP</a></td><td>Generate a 3GPP-NR compliant antenna array model</td></tr>
+<tr><td><a href="#generate_arrayant_custom">generate_arrayant_custom</a></td><td>Generate an antenna with custom 3dB beamwidth</td></tr>
+<tr><td><a href="#generate_arrayant_dipole">generate_arrayant_dipole</a></td><td>Generate a short dipole antenna with vertical polarization</td></tr>
+<tr><td><a href="#generate_arrayant_half_wave_dipole">generate_arrayant_half_wave_dipole</a></td><td>Generate a half-wave dipole antenna with vertical polarization</td></tr>
+<tr><td><a href="#generate_arrayant_multibeam">generate_arrayant_multibeam</a></td><td>Generate a planar multi-element antenna array with multiple beam directions</td></tr>
+<tr><td><a href="#generate_arrayant_omni">generate_arrayant_omni</a></td><td>Generate an isotropic radiator with vertical polarization</td></tr>
+<tr><td><a href="#generate_arrayant_ula">generate_arrayant_ula</a></td><td>Generate a uniform linear array (ULA)</td></tr>
+<tr><td><a href="#generate_arrayant_xpol">generate_arrayant_xpol</a></td><td>Generate a cross-polarized isotropic radiator</td></tr>
+<tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric frequency-dependent loudspeaker directivity model</td></tr>
 <tr><td><a href="#qdant_read">qdant_read</a></td><td>Read an arrayant object from a QDANT file</td></tr>
 <tr><td><a href="#qdant_read_multi">qdant_read_multi</a></td><td>Read all arrayant objects from a QDANT file into a vector</td></tr>
 <tr><td><a href="#qdant_write_multi">qdant_write_multi</a></td><td>Write a vector of arrayant objects to a single QDANT file</td></tr>
@@ -124,7 +124,7 @@
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the baseband frequency response of a MIMO channel</td></tr>
 <tr><td><a href="#baseband_freq_response_multi">baseband_freq_response_multi</a></td><td>Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients</td></tr>
 <tr><td><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a></td><td>Compute the baseband frequency response of multiple MIMO channels</td></tr>
-<tr><td><a href="#get_hdf5_version">get_hdf5_version</a></td><td>Get the version of the linked HDF5 library</td></tr>
+<tr><td><a href="#get_HDF5_version">get_HDF5_version</a></td><td>Get the version of the linked HDF5 library</td></tr>
 <tr><td><a href="#hdf5_create">hdf5_create</a></td><td>Create a new HDF5 channel file with a defined storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read a channel object from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read an unstructured dataset from an HDF5 file</td></tr>
@@ -182,7 +182,7 @@
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)</td></tr>
 <tr><td><a href="#colormap">colormap</a></td><td>Generate colormap</td></tr>
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform geographic (azimuth, elevation, length) to Cartesian coordinates</td></tr>
-<tr><td><a href="#interp_1d / interp_2d">interp_1d / interp_2d</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
+<tr><td><a href="#interp_1D / interp_2D">interp_1D / interp_2D</a></td><td>Perform linear interpolation (1D or 2D) on single or multiple data sets.</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
@@ -443,8 +443,8 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::append(
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name=".calc_directivity_dbi"></a>
-<b>.calc_directivity_dbi</b> - Calculate the directivity in dBi of a single array element
+<a name=".calc_directivity_dBi"></a>
+<b>.calc_directivity_dBi</b> - Calculate the directivity in dBi of a single array element
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
@@ -1065,7 +1065,7 @@ quadriga_lib::arrayant_interpolate_multi(speaker, &amp;azimuth, &amp;elevation, 
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Each entry is validated individually via its <code>is_valid</code> member; <code>quick_check</code> is forwarded to that call. 
-</li><li style="margin-bottom: 0.4em;">Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling matrix shape. 
+</li><li style="margin-bottom: 0.4em;">Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size. 
 </li><li style="margin-bottom: 0.4em;">Pattern data, <code>center_frequency</code>, and coupling matrix values are not compared (expected to vary). 
 </li><li style="margin-bottom: 0.4em;">Stops at first error and returns a message identifying the failing entry and property. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes: <code>float</code> or <code>double</code> 
@@ -1164,235 +1164,195 @@ void quadriga_lib::arrayant_set_element_pos_multi(
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="generate_arrayant_3gpp"></a>
-<b>generate_arrayant_3gpp</b> - Generate 3GPP-NR compliant antenna model
+<a name="generate_arrayant_3GPP"></a>
+<b>generate_arrayant_3GPP</b> - Generate a 3GPP-NR compliant antenna array model
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates an antenna array based on the 3GPP-NR channel model specification. 
-</li><li style="margin-bottom: 0.4em;">Supports vertical and horizontal stacking of elements and panels with a range of polarization configurations. 
-</li><li style="margin-bottom: 0.4em;">Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored). 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Supports vertical (M) and horizontal (N) element stacking within panels, and multi-panel arrays (Mg × Ng). 
+</li><li style="margin-bottom: 0.4em;">If <code>pattern</code> is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from <code>pattern</code> are ignored. 
+</li><li style="margin-bottom: 0.4em;">Electrical downtilt (<code>tilt</code>) applies only to <code>pol</code> modes 4, 5, and 6. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_3GPP(
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_3GPP(
                 arma::uword M = 1, arma::uword N = 1, dtype center_freq = 299792458.0,
                 unsigned pol = 1, dtype tilt = 0.0, dtype spacing = 0.5, arma::uword Mg = 1,
                 arma::uword Ng = 1, dtype dgv = 0.5, dtype dgh = 0.5,
-                const arrayant&lt;dtype&gt; *pattern = nullptr, dtype res = 1.0)
+                const quadriga_lib::arrayant&lt;dtype&gt; *pattern = nullptr, dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>M</b> = 1</code> (optional input)<br> 
-   Number of vertical elements in the array. Default: <code>1</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> <i>(optional)</i> — Number of vertical elements per panel 
+</li><li style="margin-bottom: 0.4em;"><b><code>N</code></b> <i>(optional)</i> — Number of horizontal elements per panel 
+</li><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> <i>(optional)</i> — Center frequency in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>pol</code></b> <i>(optional)</i> — Polarization mode: 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>N</b> = 1</code> (optional input)<br> 
-   Number of horizontal elements in the array. Default: <code>1</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_freq</b> = 299792458.0</code> (optional input)<br> 
-   Center frequency of the antenna array in Hz. Default: <code>299792458.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>pol</b> = 1</code> (optional input)<br> 
-   Polarization configuration: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>pol = 1</code></td>
-  <td>vertical polarization (default value)</td>
+  <th></th>
+  <th><code>pol</code></th>
+  <th>Description</th>
+  <th>Elements</th>
+  <th></th>
 </tr>
 <tr>
-  <td><code>pol = 2</code></td>
-  <td>H/V polarized elements, results in 2NM elements</td>
+  <td></td>
+  <td>1</td>
+  <td>Vertical polarization</td>
+  <td>NM</td>
+  <td></td>
 </tr>
 <tr>
-  <td><code>pol = 3</code></td>
-  <td>+/-45° polarized elements, results in 2NM elements</td>
+  <td></td>
+  <td>2</td>
+  <td>H/V polarization</td>
+  <td>2NM</td>
+  <td></td>
 </tr>
 <tr>
-  <td><code>pol = 4</code></td>
-  <td>vertical polarization, combines elements in vertical direction, results in N elements</td>
+  <td></td>
+  <td>3</td>
+  <td>±45° polarization</td>
+  <td>2NM</td>
+  <td></td>
 </tr>
 <tr>
-  <td><code>pol = 5</code></td>
-  <td>H/V polarization, combines elements in vertical direction, results in 2N elements</td>
+  <td></td>
+  <td>4</td>
+  <td>Vertical, vertical elements combined</td>
+  <td>N</td>
+  <td></td>
 </tr>
 <tr>
-  <td><code>pol = 6</code></td>
-  <td>+/-45° polarization, combines elements in vertical direction, results in 2N elements</td>
+  <td></td>
+  <td>5</td>
+  <td>H/V, vertical elements combined</td>
+  <td>2N</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>±45°, vertical elements combined</td>
+  <td>2N</td>
+  <td></td>
 </tr>
 </table><br>
-</li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>tilt</b> = 0.0</code> (optional input)<br> 
-   Electrical downtilt angle in degrees. Used for <code>pol</code> values 4, 5, and 6. Default: <code>0.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
-   Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>Mg</b> = 1</code> (optional input)<br> 
-   Number of vertically stacked panels (columns). Default: <code>1</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>Ng</b> = 1</code> (optional input)<br> 
-   Number of horizontally stacked panels (rows). Default: <code>1</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>dgv</b> = 0.5</code> (optional input)<br> 
-   Panel spacing in vertical direction in wavelengths (λ). Default: <code>0.5</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>dgh</b> = 0.5</code> (optional input)<br> 
-   Panel spacing in horizontal direction in wavelengths (λ). Default: <code>0.5</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>pattern</b> = nullptr</code> (optional input)<br> 
-   Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: <code>1.0</code> 
+<ul><li style="margin-bottom: 0.4em;"><b><code>tilt</code></b> <i>(optional)</i> — Electrical downtilt in degrees; applies to <code>pol</code> 4–6 
+</li><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing within a panel in wavelengths 
+</li><li style="margin-bottom: 0.4em;"><b><code>Mg</code></b> <i>(optional)</i> — Number of vertically stacked panels 
+</li><li style="margin-bottom: 0.4em;"><b><code>Ng</code></b> <i>(optional)</i> — Number of horizontally stacked panels 
+</li><li style="margin-bottom: 0.4em;"><b><code>dgv</code></b> <i>(optional)</i> — Panel spacing in vertical direction in wavelengths 
+</li><li style="margin-bottom: 0.4em;"><b><code>dgh</code></b> <i>(optional)</i> — Panel spacing in horizontal direction in wavelengths 
+</li><li style="margin-bottom: 0.4em;"><b><code>pattern</code></b> <i>(optional)</i> — Custom per-element antenna pattern; overrides default 3GPP element pattern 
+</li><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees; ignored if <code>pattern</code> is provided 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Generated antenna array object according to 3GPP-NR specifications. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — 3GPP-NR antenna array object 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-// Generate 3GPP antenna array with 4x4 elements, H/V polarization
 auto ant = quadriga_lib::generate_arrayant_3GPP&lt;double&gt;(4, 4, 3e9, 2);
 </pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_custom"></a>
-<b>generate_arrayant_custom</b> - Generate antenna with custom 3dB beamwidth
+<b>generate_arrayant_custom</b> - Generate an antenna with custom 3dB beamwidth
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates an antenna array object with a custom-defined 3dB beamwidth (FWHM) in azimuth and elevation. 
-</li><li style="margin-bottom: 0.4em;">Allows control over the rear-side attenuation using a front-to-back gain ratio. 
-</li><li style="margin-bottom: 0.4em;">Supports specification of the pattern sampling resolution. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a single-element antenna with independently configurable azimuth and elevation 3dB (FWHM) beamwidths. 
+</li><li style="margin-bottom: 0.4em;">Rear-side gain is controlled by a linear front-to-back ratio; <code>0.0</code> means no rear radiation. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
-                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0)
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
+                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>az_3dB</b> = 90.0</code> (optional input)<br> 
-   3dB beamwidth in azimuth, specified in degrees. Default: <code>90.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>el_3db</b> = 90.0</code> (optional input)<br> 
-   3dB beamwidth in elevation, specified in degrees. Default: <code>90.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>rear_gain_lin</b> = 0.0</code> (optional input)<br> 
-   Front-to-back gain ratio as a linear value. Default: <code>0.0</code> (no rear gain) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b> <i>(optional)</i> — Azimuth 3dB beamwidth in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>el_3db</code></b> <i>(optional)</i> — Elevation 3dB beamwidth in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b> <i>(optional)</i> — Front-to-back gain ratio (linear) 
+</li><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object with the specified 3dB beamwidth and rear gain. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Antenna object with specified beamwidth and rear gain 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(60.0, 45.0, 0.01, 1.0);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_dipole"></a>
-<b>generate_arrayant_dipole</b> - Generate short dipole with vertical polarization
+<b>generate_arrayant_dipole</b> - Generate a short dipole antenna with vertical polarization
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates a short dipole antenna pattern with vertical polarization. 
-</li><li style="margin-bottom: 0.4em;">Allows specification of the resolution of the antenna pattern sampling grid. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a single-element short dipole antenna pattern with vertical polarization. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_dipole(dtype res = 1.0)
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object representing a vertically polarized short dipole. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Vertically polarized short dipole antenna object 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_dipole&lt;float&gt;();
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_half_wave_dipole"></a>
-<b>generate_arrayant_half_wave_dipole</b> - Generate half-wave dipole with vertical polarization
+<b>generate_arrayant_half_wave_dipole</b> - Generate a half-wave dipole antenna with vertical polarization
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates a vertically polarized half-wave dipole antenna pattern. 
-</li><li style="margin-bottom: 0.4em;">Allows specification of the resolution of the antenna pattern sampling grid. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a single-element half-wave dipole antenna pattern with vertical polarization. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0)
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object representing a vertically polarized half-wave dipole. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Vertically polarized half-wave dipole antenna object 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_half_wave_dipole&lt;float&gt;();
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_multibeam"></a>
-<b>generate_arrayant_multibeam</b> - Generate a planar multi-element antenna with support for multiple beam directions.
+<b>generate_arrayant_multibeam</b> - Generate a planar multi-element antenna array with multiple beam directions
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function generates a planar array antenna with <b>M</b> rows and <b>N</b> columns. 
-It allows customization of the per-element radiation pattern, polarization, and spacing. 
-Multiple beam directions can be specified via azimuth and elevation angles. 
-Beamforming uses <b>maximum-ratio transmission (MRT)</b>, which is optimal for a single 
-beam and approximate when multiple beams are specified. 
- 
-Supported data types for <code>dtype</code>: <code>float</code> or <code>double</code>.
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns an M×N planar array with beamforming weights computed via maximum-ratio transmission (MRT). 
+</li><li style="margin-bottom: 0.4em;">MRT is optimal for a single beam; approximate when multiple beams are specified. 
+</li><li style="margin-bottom: 0.4em;">Weights control relative beam contribution; only their ratios matter, not absolute values. 
+</li><li style="margin-bottom: 0.4em;">If <code>separate_beams = true</code>, each angle pair produces an independent beam (weights ignored). 
+</li><li style="margin-bottom: 0.4em;">If <code>apply_weights = true</code>, beamforming weights are baked into the element coupling matrix. 
+</li><li style="margin-bottom: 0.4em;">Per-element pattern shape is controlled by <code>az_3dB</code>, <code>el_3dB</code>, and <code>rear_gain_lin</code>; see <a href="#generate_arrayant_custom">generate_arrayant_custom</a>. 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
                 arma::uword M = 1,
                 arma::uword N = 1,
                 arma::Col&lt;dtype&gt; az = {0.0},
@@ -1406,263 +1366,167 @@ arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
                 dtype rear_gain_lin = 0.0,
                 dtype res = 1.0,
                 bool separate_beams = false,
-                bool apply_weights = false );
+                bool apply_weights = false);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>M</b> = 1</code> (optional input)<br> 
-   Number of vertical (rows) elements in the array. Default: <code>1</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>M</code></b> <i>(optional)</i> — Number of vertical (row) elements 
+</li><li style="margin-bottom: 0.4em;"><b><code>N</code></b> <i>(optional)</i> — Number of horizontal (column) elements 
+</li><li style="margin-bottom: 0.4em;"><b><code>az</code></b> <i>(optional)</i> — Azimuth beam angles in degrees, <code>[n_beams]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>el</code></b> <i>(optional)</i> — Elevation beam angles in degrees, <code>[n_beams]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>weight</code></b> <i>(optional)</i> — Per-beam scaling factors (normalized to sum = 1), <code>[n_beams]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> <i>(optional)</i> — Center frequency in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>pol</code></b> <i>(optional)</i> — Polarization mode: 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>N</b> = 1</code> (optional input)<br> 
-   Number of horizontal (columns) elements in the array. Default: <code>1</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>az</b> = {0.0}</code> (optional input)<br> 
-   Azimuth beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>el</b> = {0.0}</code> (optional input)<br> 
-   Elevation beam angles (degrees). Vector of length <code>n_beams</code>. Default: <code>{0.0}</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>weight</b> = {1.0}</code> (optional input)<br> 
-   Scaling factors for each beam. The vector must have the same length as <code>az</code> and <code>el</code>. 
-   Values are normalized so that their sum equals 1. Can be used to prioritize beams. 
-   Default: <code>{1.0}</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_freq</b> = 299792458.0</code> (optional input)<br> 
-   Center frequency of the antenna array in Hz. Default: <code>299792458.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>pol</b> = 1</code> (optional input)<br> 
-   Polarization configuration: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>pol = 1</code></td>
-  <td>vertical polarization (default value)</td>
+  <th></th>
+  <th><code>pol</code></th>
+  <th>Description</th>
+  <th>Elements</th>
+  <th></th>
 </tr>
 <tr>
-  <td><code>pol = 2</code></td>
-  <td>H/V polarized elements, results in 2NM elements</td>
+  <td></td>
+  <td>1</td>
+  <td>Vertical polarization</td>
+  <td>NM</td>
+  <td></td>
 </tr>
 <tr>
-  <td><code>pol = 3</code></td>
-  <td>+/-45° polarized elements, results in 2NM elements</td>
+  <td></td>
+  <td>2</td>
+  <td>H/V polarization</td>
+  <td>2NM</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>±45° polarization</td>
+  <td>2NM</td>
+  <td></td>
 </tr>
 </table><br>
-</li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
-   Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>az_3dB</b> = 120.0</code> (optional input)<br> 
-   3dB beamwidth in azimuth, specified in degrees. Default: <code>120.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>el_3db</b> = 120.0</code> (optional input)<br> 
-   3dB beamwidth in elevation, specified in degrees. Default: <code>120.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>rear_gain_lin</b> = 0.0</code> (optional input)<br> 
-   Front-to-back gain ratio as a linear value. Default: <code>0.0</code> (no rear gain) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>separate_beams</b> = false</code> (optional input)<br> 
-   If set to true, create a separate beam for each angle pair (ignores weights) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>apply_weights</b> = false</code> (optional input)<br> 
-   Switch to apply the beam-forming weights 
+<ul><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing in wavelengths 
+</li><li style="margin-bottom: 0.4em;"><b><code>az_3dB</code></b> <i>(optional)</i> — Per-element azimuth 3dB beamwidth in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>el_3dB</code></b> <i>(optional)</i> — Per-element elevation 3dB beamwidth in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>rear_gain_lin</code></b> <i>(optional)</i> — Per-element front-to-back gain ratio (linear) 
+</li><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>separate_beams</code></b> <i>(optional)</i> — If <code>true</code>, generate one independent beam per angle pair 
+</li><li style="margin-bottom: 0.4em;"><b><code>apply_weights</code></b> <i>(optional)</i> — If <code>true</code>, bake beamforming weights into the coupling matrix 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Array antenna object containing the generated multibeam pattern. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Multibeam planar array antenna object 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-// Generate a pattern with 2 weighted beams
-double freq = 3.75e9;
-arma::vec az = {20.0, 0.0};
-arma::vec el = {-7.0, 30.0};
-arma::vec weight = {2.0, 1.0};
-
-auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el, weight, freq);
+arma::vec az = {20.0, 0.0}, el = {-7.0, 30.0}, weight = {2.0, 1.0};
+auto ant = quadriga_lib::generate_arrayant_multibeam&lt;double&gt;(6, 6, az, el, weight, 3.75e9);
 </pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_omni"></a>
-<b>generate_arrayant_omni</b> - Generate isotropic radiator with vertical polarization
+<b>generate_arrayant_omni</b> - Generate an isotropic radiator with vertical polarization
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates an isotropic antenna radiator pattern with vertical polarization. 
-</li><li style="margin-bottom: 0.4em;">Allows specification of the resolution of the antenna pattern sampling grid. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a single-element antenna array with omnidirectional pattern and vertical polarization. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_omni(dtype res = 1.0)
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object representing an isotropic radiator with vertical polarization. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Isotropic radiator antenna object 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_omni&lt;float&gt;(10.0f);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_ula"></a>
-<b>generate_arrayant_ula</b> - Generate an unified linear array
+<b>generate_arrayant_ula</b> - Generate a uniform linear array (ULA)
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Supports horizontal stacking of elements 
-</li><li style="margin-bottom: 0.4em;">Default pattern: Isotropic omnidirectional radiator, v-polarized 
-</li><li style="margin-bottom: 0.4em;">Optionally, a custom per-element pattern can be provided (element positions, coupling, and center frequency are ignored). 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a horizontally stacked linear array of N elements with half-wavelength spacing by default. 
+</li><li style="margin-bottom: 0.4em;">Default per-element pattern is a vertically polarized isotropic radiator. 
+</li><li style="margin-bottom: 0.4em;">If <code>pattern</code> is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from <code>pattern</code> are ignored. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_ula(
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_ula(
                 arma::uword N = 1, dtype center_freq = 299792458.0, dtype spacing = 0.5,
-                const arrayant&lt;dtype&gt; *pattern = nullptr, dtype res = 1.0)
+                const quadriga_lib::arrayant&lt;dtype&gt; *pattern = nullptr, dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>N</b> = 1</code> (optional input)<br> 
-   Number of horizontal elements in the array. Default: <code>1</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>center_freq</b> = 299792458.0</code> (optional input)<br> 
-   Center frequency of the antenna array in Hz. Default: <code>299792458.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>spacing</b> = 0.5</code> (optional input)<br> 
-   Spacing between elements in wavelengths (λ). Default: <code>0.5</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; <b>pattern</b> = nullptr</code> (optional input)<br> 
-   Optional pointer to a custom per-element antenna pattern. If provided, it overrides default generation. Only the shape of the pattern is used; element positions, coupling, and frequency are ignored. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Pattern resolution in degrees. Ignored if a custom pattern is provided. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>N</code></b> <i>(optional)</i> — Number of elements 
+</li><li style="margin-bottom: 0.4em;"><b><code>center_freq</code></b> <i>(optional)</i> — Center frequency in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing in wavelengths 
+</li><li style="margin-bottom: 0.4em;"><b><code>pattern</code></b> <i>(optional)</i> — Custom per-element antenna pattern; overrides default isotropic pattern 
+</li><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees; ignored if <code>pattern</code> is provided 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Generated antenna array object according to 3GPP-NR specifications. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — ULA antenna array object 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_arrayant_xpol"></a>
-<b>generate_arrayant_xpol</b> - Generate cross-polarized isotropic radiator
+<b>generate_arrayant_xpol</b> - Generate a cross-polarized isotropic radiator
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates a cross-polarized isotropic antenna radiator pattern. 
-</li><li style="margin-bottom: 0.4em;">Allows specification of the resolution of the antenna pattern sampling grid. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns a two-element antenna array with omnidirectional patterns in vertical and horizontal polarization. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_xpol(dtype res = 1.0)
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>res</b> = 1.0</code> (optional input)<br> 
-   Resolution of the antenna pattern sampling grid, specified in degrees. Default: <code>1.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>res</code></b> <i>(optional)</i> — Antenna pattern sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code><br> 
-   Antenna array object representing a cross-polarized isotropic radiator. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> — Cross-polarized isotropic radiator antenna object 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_xpol&lt;float&gt;(10.0f);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_speaker"></a>
-<b>generate_speaker</b> - Generate a parametric loudspeaker directivity model
+<b>generate_speaker</b> - Generate a parametric frequency-dependent loudspeaker directivity model
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates frequency-dependent loudspeaker radiation patterns by combining a driver directivity model  
-   with an enclosure radiation modifier and a Butterworth-style bandpass frequency response. 
-</li><li style="margin-bottom: 0.4em;">Returns a vector of <code>arrayant</code> objects, one per frequency sample, where each contains the complex-valued  
-   directivity balloon at that frequency stored in <code>e_theta_re</code>. The <code>center_frequency</code> field of each  
-   arrayant is set to the corresponding frequency in Hz. 
-</li><li style="margin-bottom: 0.4em;">Multi-driver speakers (e.g. two-way systems) are modelled by generating each driver separately and  
-   combining them via <code>append</code> and <code>element_pos</code>. Crossover behavior emerges naturally from overlapping  
-   bandpass responses. 
-</li><li style="margin-bottom: 0.4em;">The frequency response follows a Butterworth-style bandpass filter:  
-   H(f) = 1/sqrt(1 + (f_low/f)^(2n_low)) * 1/sqrt(1 + (f/f_high)^(2n_high)), where the filter order  
-   n = slope_dB_per_octave / 6. The response is -3 dB at the specified cutoff frequencies. 
-</li><li style="margin-bottom: 0.4em;">Sensitivity is applied as a linear amplitude scaling relative to 85 dB SPL:  
-   sens_lin = 10^((sensitivity - 85) / 20). 
-</li><li style="margin-bottom: 0.4em;">If no frequency vector is provided, third-octave band center frequencies are auto-generated  
-   covering the range from one band below the lower cutoff to one band above the upper cutoff,  
-   clipped to 20-20000 Hz. 
-</li><li style="margin-bottom: 0.4em;">The speed of sound is assumed to be 344 m/s. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns one <code>quadriga_lib::arrayant</code> per frequency sample; each has a single element with the real-valued directivity balloon in <code>e_theta_re</code> and <code>center_frequency</code> set to the corresponding frequency in Hz. 
+</li><li style="margin-bottom: 0.4em;">Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results via <code>append</code> and <code>element_pos</code>; crossover behavior emerges from overlapping bandpass responses. 
+</li><li style="margin-bottom: 0.4em;">Frequency response is a Butterworth-style bandpass: <code>H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))</code>, where <code>n = slope_dB_per_octave / 6</code>; −3 dB at the cutoff frequencies. 
+</li><li style="margin-bottom: 0.4em;">Sensitivity scales amplitude linearly relative to 85 dB SPL: <code>sens_lin = 10^((sensitivity − 85) / 20)</code>. 
+</li><li style="margin-bottom: 0.4em;">If <code>frequencies</code> is empty, third-octave band center frequencies are auto-generated from one band below <code>lower_cutoff</code> to one band above <code>upper_cutoff</code>, clipped to 20–20000 Hz. 
+</li><li style="margin-bottom: 0.4em;">Speed of sound assumed to be 344 m/s. 
+</li><li style="margin-bottom: 0.4em;"><b>Driver models</b> (<code>driver_type</code>): <code>"piston"</code> — circular piston in baffle, <code>D(θ) = 2<i>J1(ka</i>sinθ)/(ka*sinθ)</code>, rotationally symmetric, narrows with increasing <code>ka</code>; <code>"horn"</code> — separable cosine-power <code>cos^n(angle)</code> with frequency-dependent blend toward omni below <code>horn_control_freq</code>; <code>"omni"</code> — frequency-independent omnidirectional pattern. 
+</li><li style="margin-bottom: 0.4em;"><b>Enclosure models</b> (<code>radiation_type</code>): <code>"monopole"</code> — no modification; <code>"hemisphere"</code> — sealed box with baffle-step transition, <code>f_baffle = c/(π<i>sqrt(W</i>H))</code>; <code>"dipole"</code> — figure-8, <code>R = abs(cos(θ_off))</code> with sign inversion in rear hemisphere; <code>"cardioid"</code> — <code>R = 0.5*(1+cos(θ_off))</code>. 
+</li><li style="margin-bottom: 0.4em;">For <code>"horn"</code>, if <code>horn_control_freq = 0</code>, it is auto-derived as <code>f_ctrl = c/(2π*radius)</code>. 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
-</li></ul>
- 
-Three driver directivity models are supported: 
-<ul><li style="margin-bottom: 0.4em;"><b>Piston</b>: Circular piston in a baffle, using the classical formula  
-   D(theta) = 2<i>J1(ka</i>sin(theta)) / (ka<i>sin(theta)), where k = 2</i>pi*f/c is the wavenumber and a is  
-   the driver radius. Rotationally symmetric around the forward axis (+x). Transitions from omnidirectional  
-   at low ka to progressively narrower beaming at high ka. Uses C++17 <code>std::cyl_bessel_j</code> for the Bessel f 
-   unction J1. 
-</li><li style="margin-bottom: 0.4em;"><b>Horn</b>: Separable cosine-power directivity with frequency-dependent pattern control. Horizontal  
-   and vertical coverage are modelled independently as cos^n(angle), where the exponent n is derived  
-   from the coverage angle: n = log(0.5) / log(cos(theta_3dB/2)). Below the horn control frequency,  
-   the pattern blends toward omnidirectional using a second-order transition:  
-   blend = (f/f_ctrl)^2 / (1 + (f/f_ctrl)^2). Horn parameters can be auto-derived from the mouth radius. 
-</li><li style="margin-bottom: 0.4em;"><b>Omni</b>: Frequency-independent omnidirectional pattern (D = 1 at all angles). Suitable for  
-   subwoofers at frequencies where the driver is small relative to the wavelength. 
-</li></ul>
- 
-Four enclosure radiation types modify the base driver pattern: 
-<ul><li style="margin-bottom: 0.4em;"><b>Monopole</b>: No modification (4*pi radiation, R = 1 everywhere). Appropriate for subwoofers in free space. 
-</li><li style="margin-bottom: 0.4em;"><b>Hemisphere</b>: Sealed box on a finite baffle with frequency-dependent transition from omnidirectional  
-   to forward-weighted radiation. Uses a baffle step model: alpha = (f/f_baffle)^2 / (1 + (f/f_baffle)^2),  
-   where f_baffle = c / (pi <i> sqrt(W</i>H)) is derived from the baffle dimensions. The radiation modifier is  
-   R = (1-alpha) + alpha <i> 0.5 </i> (1 + cos(theta_off)). At low frequencies the pattern is nearly  
-   omnidirectional; at high frequencies it approaches a cardioid-like front weighting with approximately 
-   6 dB front-to-back ratio. 
-</li><li style="margin-bottom: 0.4em;"><b>Dipole</b>: Open baffle / planar speaker with figure-8 pattern. R = abs(cos(theta_off)) with a 180-degree  
-   phase inversion (negative sign in <code>e_theta_re</code>) in the rear hemisphere. Nulls occur at 90 degrees off-axis. 
-</li><li style="margin-bottom: 0.4em;"><b>Cardioid</b>: Monopole + dipole combination, R = 0.5 * (1 + cos(theta_off)). Null at the rear,  
-   half-amplitude at the sides. No phase inversion. 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
+std::vector&lt;quadriga_lib::arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
         std::string driver_type = "piston",
         dtype radius = 0.05,
         dtype lower_cutoff = 80.0,
@@ -1677,102 +1541,39 @@ std::vector&lt;arrayant&lt;dtype&gt;&gt; quadriga_lib::generate_speaker(
         dtype baffle_width = 0.15,
         dtype baffle_height = 0.25,
         arma::Col&lt;dtype&gt; frequencies = arma::Col&lt;dtype&gt;(),
-        dtype angular_resolution = 5.0)
+        dtype angular_resolution = 5.0);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>driver_type</b> = "piston"</code> (optional input)<br> 
-   Driver directivity model. Supported values: <code>"piston"</code> (cone/dome via Bessel function), <code>"horn"</code>  
-   (cosine-power with frequency-dependent pattern control), <code>"omni"</code> (omnidirectional subwoofer). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>radius</b> = 0.05</code> (optional input)<br> 
-   Effective radiating radius in meters. For <code>"piston"</code>: the cone or dome radius. For <code>"horn"</code>: the horn  
-   mouth radius, from which the pattern control frequency is derived if not specified. Default: 0.05 m  
-   (approximately a 4-inch driver). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_cutoff</b> = 80.0</code> (optional input)<br> 
-   Lower -3 dB frequency of the bandpass response in Hz. Default: 80 Hz. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_cutoff</b> = 12000.0</code> (optional input)<br> 
-   Upper -3 dB frequency of the bandpass response in Hz. Default: 12000 Hz. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>lower_rolloff_slope</b> = 12.0</code> (optional input)<br> 
-   Low-frequency rolloff slope in dB per octave. Corresponds to a Butterworth filter of order  
-   n = slope/6 (e.g. 12 dB/oct = 2nd order). Default: 12.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>upper_rolloff_slope</b> = 12.0</code> (optional input)<br> 
-   High-frequency rolloff slope in dB per octave. Default: 12.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>sensitivity</b> = 85.0</code> (optional input)<br> 
-   On-axis sensitivity in dB SPL at 1W/1m. Scales the pattern amplitude linearly relative to 85 dB as  
-   reference (i.e. 85 dB gives unity amplitude). Default: 85.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>radiation_type</b> = "hemisphere"</code> (optional input)<br> 
-   Enclosure radiation model. Supported values: <code>"monopole"</code> (4*pi, no modification), <code>"hemisphere"</code>  
-   (sealed box with frequency-dependent baffle step), <code>"dipole"</code> (open baffle, figure-8), <code>"cardioid"</code>  
-   (monopole + dipole combination). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>hor_coverage</b> = 0.0</code> (optional input)<br> 
-   Horizontal coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 90 degrees. Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>ver_coverage</b> = 0.0</code> (optional input)<br> 
-   Vertical coverage angle in degrees. Horn driver only. A value of 0 auto-defaults to 60 degrees. Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>horn_control_freq</b> = 0.0</code> (optional input)<br> 
-   Frequency in Hz above which the horn maintains pattern control. A value of 0 auto-derives from the  
-   mouth radius as f_ctrl = c / (2<i>pi</i>radius). Default: 0.0. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_width</b> = 0.15</code> (optional input)<br> 
-   Enclosure baffle width in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
-   step frequency. Default: 0.15 m. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>baffle_height</b> = 0.25</code> (optional input)<br> 
-   Enclosure baffle height in meters. Used by the <code>"hemisphere"</code> radiation model to compute the baffle  
-   step frequency. Default: 0.25 m. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>frequencies</b> = arma::Col&lt;dtype&gt;()</code> (optional input)<br> 
-   Frequency sample points in Hz. If empty, third-octave band center frequencies are auto-generated  
-   overing one band beyond each cutoff frequency, clipped to the 20-20000 Hz audible range. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>angular_resolution</b> = 5.0</code> (optional input)<br> 
-   Resolution of the azimuth and elevation sampling grids in degrees. Default: 5.0. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>driver_type</code></b> <i>(optional)</i> — Driver directivity model: <code>"piston"</code>, <code>"horn"</code>, or <code>"omni"</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>radius</code></b> <i>(optional)</i> — Effective radiating radius in meters; cone/dome radius for piston, mouth radius for horn 
+</li><li style="margin-bottom: 0.4em;"><b><code>lower_cutoff</code></b> <i>(optional)</i> — Lower −3 dB bandpass frequency in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>upper_cutoff</code></b> <i>(optional)</i> — Upper −3 dB bandpass frequency in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>lower_rolloff_slope</code></b> <i>(optional)</i> — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth) 
+</li><li style="margin-bottom: 0.4em;"><b><code>upper_rolloff_slope</code></b> <i>(optional)</i> — High-frequency rolloff in dB/octave 
+</li><li style="margin-bottom: 0.4em;"><b><code>sensitivity</code></b> <i>(optional)</i> — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude 
+</li><li style="margin-bottom: 0.4em;"><b><code>radiation_type</code></b> <i>(optional)</i> — Enclosure radiation model: <code>"monopole"</code>, <code>"hemisphere"</code>, <code>"dipole"</code>, or <code>"cardioid"</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hor_coverage</code></b> <i>(optional)</i> — Horn horizontal coverage angle in degrees; <code>0</code> defaults to 90° 
+</li><li style="margin-bottom: 0.4em;"><b><code>ver_coverage</code></b> <i>(optional)</i> — Horn vertical coverage angle in degrees; <code>0</code> defaults to 60° 
+</li><li style="margin-bottom: 0.4em;"><b><code>horn_control_freq</code></b> <i>(optional)</i> — Horn pattern control frequency in Hz; <code>0</code> auto-derives from <code>radius</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>baffle_width</code></b> <i>(optional)</i> — Baffle width in meters; used by <code>"hemisphere"</code> model 
+</li><li style="margin-bottom: 0.4em;"><b><code>baffle_height</code></b> <i>(optional)</i> — Baffle height in meters; used by <code>"hemisphere"</code> model 
+</li><li style="margin-bottom: 0.4em;"><b><code>frequencies</code></b> <i>(optional)</i> — Frequency sample points in Hz; auto-generated third-octave bands if empty, <code>[n_freq]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>angular_resolution</code></b> <i>(optional)</i> — Azimuth and elevation sampling grid resolution in degrees 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arrayant&lt;dtype&gt;&gt;</code><br> 
-   Vector of arrayant objects, one per frequency sample. Each arrayant has one element with the directivity  
-   pattern stored in <code>e_theta_re</code> (real-valued except for dipole rear hemisphere where negative values encode  
-   180-degree phase inversion). The <code>center_frequency</code> field is set to the corresponding frequency in Hz. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;quadriga_lib::arrayant&lt;dtype&gt;&gt;</code> — One arrayant per frequency sample with directivity in <code>e_theta_re</code>; dipole rear hemisphere encoded with negative sign for 180° phase inversion 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-// Generate a default cheap piston speaker at specific frequencies
 arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
 auto spk = quadriga_lib::generate_speaker&lt;double&gt;("piston", 0.05, 80.0, 12000.0,
-                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
-
-// Generate a horn driver with auto-derived parameters at third-octave bands
+               12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
 auto horn = quadriga_lib::generate_speaker&lt;double&gt;("horn");
-
-// Generate a subwoofer
-arma::vec sub_freqs = {30.0, 50.0, 80.0, 120.0, 200.0};
 auto sub = quadriga_lib::generate_speaker&lt;double&gt;("omni", 0.13, 30.0, 200.0,
-                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, sub_freqs, 10.0);
+               12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
 </pre>
 </li>
 </ul>
@@ -1800,11 +1601,11 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::qdant_read(
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt;</code> constructed from the specified entry in the file 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code> constructed from the specified entry in the file 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant.qdant_write">arrayant.qdant_write</a> (write a single arrayant) 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#.qdant_write">.qdant_write</a> (write a single arrayant) 
 </li><li style="margin-bottom: 0.4em;"><a href="#qdant_write_multi">qdant_write_multi</a> (write multiple arrayants with sequential IDs) 
 </li></ul>
 </li>
@@ -2597,8 +2398,8 @@ void quadriga_lib::baseband_freq_response_vec(
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="get_hdf5_version"></a>
-<b>get_hdf5_version</b> - Get the version of the linked HDF5 library
+<a name="get_HDF5_version"></a>
+<b>get_HDF5_version</b> - Get the version of the linked HDF5 library
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Returns the version string of the HDF5 library used during linking. 
@@ -5302,8 +5103,8 @@ auto cart = quadriga_lib::geo2cart(az, el, len);
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="interp_1d / interp_2d"></a>
-<b>interp_1d / interp_2d</b> - Perform linear interpolation (1D or 2D) on single or multiple data sets.
+<a name="interp_1D / interp_2D"></a>
+<b>interp_1D / interp_2D</b> - Perform linear interpolation (1D or 2D) on single or multiple data sets.
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Interpolates given input data at specified output points. 
