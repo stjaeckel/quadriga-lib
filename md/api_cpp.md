@@ -1048,51 +1048,54 @@ auto ant = quadriga_lib::qdant_read<double>("speaker.qdant", 3); // read 3rd ent
 
 | Function | Description |
 | --- | --- |
-| [channel](#channel) | Class for storing and managing MIMO channel data and associated metadata |
+| [channel](#channel) | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
 | [.add_paths](#add_paths) | Append new propagation paths to an existing channel snapshot |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Calculate the effective path gain for each snapshot (in linear scale) |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Export propagation paths to a Wavefront OBJ file |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
 
 ---
 ## channel
-Class for storing and managing MIMO channel data and associated metadata
+Class for storing and managing MIMO channel data and metadata across multiple snapshots
 
 ### Description:
-- A channel object represents MIMO path-level channel data between antenna arrays over multiple time snapshots.
-- Each snapshot may have a different number of propagation paths.
-- Contains structured fields for positions, delays, gains, angles, coefficients, and more.
-- Supports optional metadata via `par_names` and `par_data`.
-- Allowed datatypes (`dtype`): `float` and `double`
+- Represents path-level MIMO channel data between antenna arrays over multiple time snapshots
+- Each snapshot may have a different number of propagation paths `n_path`
+- Unstructured metadata supported via `par_names` / `par_data`
+- Allowed datatypes: `float` or `double`
 
 ### Attributes:
-`std::string name`                                | Name of the channel object
-`arma::Col<dtype> center_frequency`               | Center frequency in [Hz], size `[1]` or `[n_snap]` or `[]`
-`arma::Mat<dtype> tx_pos`                         | Transmitter positions, size `[3, n_snap]` or `[3, 1]`
-`arma::Mat<dtype> rx_pos`                         | Receiver positions, size `[3, n_snap]` or `[3, 1]`
-`arma::Mat<dtype> tx_orientation`                 | Transmitter orientation (Euler), size `[3, n_snap]`, `[3, 1]`, or `[]`
-`arma::Mat<dtype> rx_orientation`                 | Receiver orientation (Euler), size `[3, n_snap]`, `[3, 1]`, or `[]`
-`std::vector<arma::Cube<dtype>> coeff_re`         | Channel coefficients, real part, size `[n_rx, n_tx, n_path]` per snapshot
-`std::vector<arma::Cube<dtype>> coeff_im`         | Channel coefficients, imaginary part, same size as `coeff_re`
-`std::vector<arma::Cube<dtype>> delay`            | Path delays [s], size `[n_rx, n_tx, n_path]` or `[1,1,n_path]` per snapshot
-`std::vector<arma::Col<dtype>> path_gain`         | Path gains (pre-pattern), length `[n_path]` per snapshot
-`std::vector<arma::Col<dtype>> path_length`       | Path lengths TX→RX [m], length `[n_path]` per snapshot
-`std::vector<arma::Mat<dtype>> path_polarization` | Polarization matrix, size `[8, n_path]` per snapshot
-`std::vector<arma::Mat<dtype>> path_angles`       | Departure/arrival angles, size `[n_path, 4]`, columns: AOD, EOD, AOA, EOA
-`std::vector<arma::Mat<dtype>> path_fbs_pos`      | First-bounce scatterer positions, size `[3, n_path]`
-`std::vector<arma::Mat<dtype>> path_lbs_pos`      | Last-bounce scatterer positions, size `[3, n_path]`
-`std::vector<arma::Col<unsigned>> no_interact`    | Number of interactions per path, length `[n_path]` per snapshot
-`std::vector<arma::Mat<dtype>> interact_coord`    | Coordinates of all interactions, size `[3, sum(no_interact)]` per snapshot
-`std::vector<std::string> par_names`              | Names of unstructured parameters
-`std::vector<std::any> par_data`                  | Unstructured metadata fields (e.g., string, scalar, matrix)
-`int initial_position`                            | Index of reference snapshot (0-based)
+| Attribute | Size | Description |
+|-----------|------|-------------|
+| `std::string name` | — | Name of the channel object |
+| `arma::Col<dtype> center_frequency` | `[1]`, `[n_snap]`, or `[]` | Center frequency in Hz |
+| `arma::Mat<dtype> tx_pos` | `[3, n_snap]` or `[3, 1]` | Transmitter positions |
+| `arma::Mat<dtype> rx_pos` | `[3, n_snap]` or `[3, 1]` | Receiver positions |
+| `arma::Mat<dtype> tx_orientation` | `[3, n_snap]`, `[3, 1]`, or `[]` | Transmitter orientation (Euler angles) |
+| `arma::Mat<dtype> rx_orientation` | `[3, n_snap]`, `[3, 1]`, or `[]` | Receiver orientation (Euler angles) |
+| `std::vector<arma::Cube<dtype>> coeff_re` | `[n_rx, n_tx, n_path]` per snap | Channel coefficients, real part |
+| `std::vector<arma::Cube<dtype>> coeff_im` | `[n_rx, n_tx, n_path]` per snap | Channel coefficients, imaginary part |
+| `std::vector<arma::Cube<dtype>> delay` | `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` per snap | Path delays in seconds |
+| `std::vector<arma::Col<dtype>> path_gain` | `[n_path]` per snap | Path gains before antenna pattern |
+| `std::vector<arma::Col<dtype>> path_length` | `[n_path]` per snap | Path lengths TX to RX in meters |
+| `std::vector<arma::Mat<dtype>> path_polarization` | `[8, n_path]` per snap | Interleaved polarization transfer matrices |
+| `std::vector<arma::Mat<dtype>> path_angles` | `[n_path, 4]` per snap | Angles {AOD, EOD, AOA, EOA} in rad |
+| `std::vector<arma::Mat<dtype>> path_fbs_pos` | `[3, n_path]` per snap | First-bounce scatterer positions |
+| `std::vector<arma::Mat<dtype>> path_lbs_pos` | `[3, n_path]` per snap | Last-bounce scatterer positions |
+| `std::vector<arma::Col<unsigned>> no_interact` | `[n_path]` per snap | Number of interactions per path |
+| `std::vector<arma::Mat<dtype>> interact_coord` | `[3, sum(no_interact)]` per snap | Interaction point coordinates |
+| `std::vector<std::string> par_names` | — | Names of unstructured metadata fields |
+| `std::vector<std::any> par_data` | — | Unstructured metadata values (string, scalar, matrix, etc.) |
+| `int initial_position` | scalar | 0-based index of the reference snapshot |
 
 ### Simple member functions:
-`.n_snap()`     | Returns the number of snapshots
-`.n_rx()`       | Returns the number of receive antennas (0 if coeffs not present)
-`.n_tx()`       | Returns the number of transmit antennas (0 if coeffs not present)
-`.n_path()`     | Returns the number of paths per snapshot as vector
-`.empty()`      | Returns true if the object has no channel data
-`.is_valid()`   | Returns an empty string if object is valid, else an error message
+| Method | Description |
+|---|---|
+| `.n_snap()` | Returns the number of snapshots |
+| `.n_rx()` | Returns number of receive antennas; 0 if coefficients absent |
+| `.n_tx()` | Returns number of transmit antennas; 0 if coefficients absent |
+| `.n_path()` | Returns number of paths per snapshot as a vector |
+| `.empty()` | Returns true if the object contains no channel data |
+| `.is_valid()` | Returns empty string if valid, otherwise an error message |
 
 ### Complex member functions:
 - [.add_paths](#.add_paths)
@@ -1104,157 +1107,103 @@ Class for storing and managing MIMO channel data and associated metadata
 Append new propagation paths to an existing channel snapshot
 
 ### Description:
-- Adds path-level channel data to a specific snapshot (`i_snap`) in a `channel` object.
-- All fields provided must be consistent in length (`n_path_add`) and structure.
-- The number of antennas must match existing entries for the snapshot.
-- Existing fields in the channel object must also be provided to this method if relevant.
+- Adds path-level data to snapshot `i_snap` in a `channel` object; does not modify `tx_pos`, `rx_pos`, or orientation fields
+- All provided fields must have consistent length `n_path_add` and match existing snapshot structure
 - Member function of [channel](#channel)
-- Allowed datatypes (`dtype`): `float` or `double`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::channel<dtype>::add_paths(
-                arma::uword i_snap,
-                const arma::Cube<dtype> *coeff_re_add = nullptr,
-                const arma::Cube<dtype> *coeff_im_add = nullptr,
-                const arma::Cube<dtype> *delay_add = nullptr,
-                const arma::u32_vec *no_interact_add = nullptr,
-                const arma::Mat<dtype> *interact_coord_add = nullptr,
-                const arma::Col<dtype> *path_gain_add = nullptr,
-                const arma::Col<dtype> *path_length_add = nullptr,
-                const arma::Mat<dtype> *path_polarization_add = nullptr,
-                const arma::Mat<dtype> *path_angles_add = nullptr,
-                const arma::Mat<dtype> *path_fbs_pos_add = nullptr,
-                const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
+    arma::uword i_snap,
+    const arma::Cube<dtype> *coeff_re_add = nullptr,
+    const arma::Cube<dtype> *coeff_im_add = nullptr,
+    const arma::Cube<dtype> *delay_add = nullptr,
+    const arma::u32_vec *no_interact_add = nullptr,
+    const arma::Mat<dtype> *interact_coord_add = nullptr,
+    const arma::Col<dtype> *path_gain_add = nullptr,
+    const arma::Col<dtype> *path_length_add = nullptr,
+    const arma::Mat<dtype> *path_polarization_add = nullptr,
+    const arma::Mat<dtype> *path_angles_add = nullptr,
+    const arma::Mat<dtype> *path_fbs_pos_add = nullptr,
+    const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
 ```
 
-### Arguments:
-- `arma::uword **i_snap**` (input)
-  Index of the snapshot to which the new paths should be added (0-based).
-
-- `const arma::Cube<dtype> ***coeff_re_add**` (optional input)
-  Real part of channel coefficients. Size: `[n_rx, n_tx, n_path_add]`.
-
-- `const arma::Cube<dtype> ***coeff_im_add**` (optional input)
-  Imaginary part of channel coefficients. Size: `[n_rx, n_tx, n_path_add]`.
-
-- `const arma::Cube<dtype> ***delay_add**` (optional input)
-  Propagation delay in seconds. Size: `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`.
-
-- `const arma::u32_vec ***no_interact_add**` (optional input)
-  Number of interaction points per path. Length: `[n_path_add]`.
-
-- `const arma::Mat<dtype> ***interact_coord_add**` (optional input)
-  Coordinates of interaction points. Size: `[3, sum(no_interact)]`.
-
-- `const arma::Col<dtype> ***path_gain_add**` (optional input)
-  Path gains before antenna effects. Length: `[n_path_add]`.
-
-- `const arma::Col<dtype> ***path_length_add**` (optional input)
-  Path lengths from TX to RX phase center. Length: `[n_path_add]`.
-
-- `const arma::Mat<dtype> ***path_polarization_add**` (optional input)
-  Polarization transfer matrices (interleaved). Size: `[8, n_path_add]`.
-
-- `const arma::Mat<dtype> ***path_angles_add**` (optional input)
-  Departure and arrival angles. Size: `[n_path_add, 4]`, format: `{AOD, EOD, AOA, EOA}`.
-
-- `const arma::Mat<dtype> ***path_fbs_pos_add**` (optional input)
-  First-bounce scatterer positions. Size: `[3, n_path_add]`.
-
-- `const arma::Mat<dtype> ***path_lbs_pos_add**` (optional input)
-  Last-bounce scatterer positions. Size: `[3, n_path_add]`.
-
-### Notes:
-- Any provided input must match the snapshot structure and existing fields of the `channel` object.
-- This method does not update `tx_pos`, `rx_pos`, or orientation fields.
+### Input Arguments:
+- **`i_snap`** — 0-based snapshot index to append paths to
+- **`coeff_re_add`** *(optional)* — Real part of channel coefficients, `[n_rx, n_tx, n_path_add]`
+- **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path_add]`
+- **`delay_add`** *(optional)* — Propagation delays in seconds, `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
+- **`no_interact_add`** *(optional)* — Number of interaction points per path, `[n_path_add]`
+- **`interact_coord_add`** *(optional)* — Interaction point coordinates, `[3, sum(no_interact)]`
+- **`path_gain_add`** *(optional)* — Path gains before antenna effects, `[n_path_add]`
+- **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center in meters, `[n_path_add]`
+- **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices, `[8, n_path_add]`
+- **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad, `[n_path_add, 4]`
+- **`path_fbs_pos_add`** *(optional)* — First-bounce scatterer positions, `[3, n_path_add]`
+- **`path_lbs_pos_add`** *(optional)* — Last-bounce scatterer positions, `[3, n_path_add]`
 
 ---
 ## .calc_effective_path_gain
-Calculate the effective path gain for each snapshot (in linear scale)
+Calculate the effective path gain per snapshot in linear scale
 
 ### Description:
-- Computes the effective channel gain by summing the power of all paths and averaging over all transmit and receive antennas.
-- If channel coefficients (`coeff_re`, `coeff_im`) are available, the result is based on the actual MIMO channel.
-- If channel coefficients are unavailable but `path_polarization` exists, the gain is estimated assuming ideal dual-polarized (XPOL) antennas.
-- Throws an exception if neither of these datasets is available.
-- Returns one gain value per snapshot.
+- Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
+- Uses `coeff_re`/`coeff_im` if available; falls back to `path_polarization` assuming ideal XPOL antennas
+- Throws if neither coefficients nor polarization data are present
 - Member function of [channel](#channel)
-- Allowed datatypes (`dtype`): `float` or `double`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
 ```
 
-### Arguments:
-- `bool **assume_valid*- = false` (optional input)
-  Skip internal consistency checks if set to `true` (for performance in trusted contexts). Default: `false`.
+### Input Arguments:
+- **`assume_valid`** *(optional)* — Skip internal consistency checks for performance in trusted contexts
 
 ### Returns:
-- `arma::Col<dtype>`
-  Column vector of effective path gains (linear scale), one entry per snapshot (length `n_snap`).
+- Effective path gains in linear scale, one entry per snapshot, `[n_snap]`
 
 ---
 ## .write_paths_to_obj_file
-Export propagation paths to a Wavefront OBJ file
+Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 ### Description:
-- Writes ray-traced propagation paths to a `.obj` file for 3D visualization (e.g., in Blender).
-- Each path is represented as a tube, optionally colored by path gain using a selected colormap.
-- The function supports filtering by path gain, maximum number of paths, and snapshot index.
-- Tube radius and detail can be customized.
+- Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
+- Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
+- Paths below `gain_min` are excluded; `max_no_paths` limits total count
 - Member function of [channel](#channel)
-- Allowed datatypes (`dtype`): `float` or `double`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
-                std::string fn,
-                arma::uword max_no_paths = 0,
-                dtype gain_max = -60.0,
-                dtype gain_min = -140.0,
-                std::string colormap = "jet",
-                arma::uvec i_snap = {},
-                dtype radius_max = 0.05,
-                dtype radius_min = 0.01,
-                arma::uword n_edges = 5) const;
+    std::string fn,
+    arma::uword max_no_paths = 0,
+    dtype gain_max = -60.0,
+    dtype gain_min = -140.0,
+    std::string colormap = "jet",
+    arma::uvec i_snap = {},
+    dtype radius_max = 0.05,
+    dtype radius_min = 0.01,
+    arma::uword n_edges = 5) const;
 ```
 
-### Arguments:
-- `std::string **fn**` (input)
-  Path to the output `.obj` file.
-
-- `arma::uword **max_no_paths** = 0` (optional input)
-  Maximum number of paths to be visualized. A value of `0` includes all available paths above `gain_min`. 
-  Default: `0`.
-
-- `dtype **gain_max** = -60.0` (optional input)
-  Maximum path gain (in dB) used for color-coding. Paths with higher gain are clipped. Default: `-60.0`.
-
-- `dtype **gain_min** = -140.0` (optional input)
-  Minimum path gain (in dB) for color-coding and optional path filtering. Default: `-140.0`.
-
-- `std::string **colormap** = "jet"` (optional input)
-  Name of the colormap to be used for path coloring. 
-  Supported maps: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`, 
-  `autumn`, `summer`. Default: `"jet"`.
-
-- `arma::uvec **i_snap** = {}` (optional input)
-  Indices of the snapshots to be included (0-based). Empty vector exports all snapshots. Default: `{}`.
-
-- `dtype **radius_max** = 0.05` (optional input)
-  Maximum radius (in meters) of the visualized tube geometry. Default: `0.05`.
-
-- `dtype **radius_min** = 0.01` (optional input)
-  Minimum radius (in meters) of the visualized tube geometry. Default: `0.01`.
-
-- `arma::uword **n_edges** = 5` (optional input)
-  Number of vertices used to create each tube cross-section. Must be ≥ 3. Default: `5`.
+### Input Arguments:
+- **`fn`** — Output `.obj` file path
+- **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
+- **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
+- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded
+- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for supported options
+- **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
+- **`radius_max`** *(optional)* — Tube radius in meters at maximum gain
+- **`radius_min`** *(optional)* — Tube radius in meters at minimum gain
+- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
 
 ### See also:
-- [path_to_tube](#path_to_tube)
-- [colormap](#colormap)
+- [path_to_tube](#path_to_tube) (generates tube geometry from path data)
+- [colormap](#colormap) (colormap lookup used for coloring)
 
 ---
 
