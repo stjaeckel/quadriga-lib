@@ -53,6 +53,8 @@ COMPRESSION GUIDELINES:
 - Tables always must have a header row
 - Never use language specifier in clode blocks, e.g. ```cpp, just use triple backticks without language specifier.
 - Internal types must include namespace, e.g. `quadriga_lib::arrayant` instead of just `arrayant`
+- Links to class member functions should be in the format class_name[[.function_name]], otherwise the link will not work in the generated documentation. 
+- Link to the class itself should be [[class_name]]
 
 Here is the old documentation block to compress:
 
