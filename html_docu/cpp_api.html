@@ -205,7 +205,7 @@
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
 <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
-<tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of radio waves at mesh surfaces per ITU-R P.2040-1</td></tr>
+<tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
 <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates the intersection of ray beams with points in three dimensions</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#subdivide_rays">subdivide_rays</a></td><td>Subdivide ray beams into four smaller sub-beams</td></tr>
@@ -7298,16 +7298,18 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="ray_mesh_interact"></a>
-<b>ray_mesh_interact</b> - Calculates reflection, transmission, or refraction of radio waves at mesh surfaces per ITU-R P.2040-1
+<b>ray_mesh_interact</b> - Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes interaction of plane waves with planar interfaces between homogeneous isotropic media. 
 </li><li style="margin-bottom: 0.4em;">Supports beam-based modeling via triangular ray tubes (<code>trivec</code>, <code>tridir</code>). 
-</li><li style="margin-bottom: 0.4em;">Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit  
+</li><li style="margin-bottom: 0.4em;">Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit 
    with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media. 
 </li><li style="margin-bottom: 0.4em;">Rays with <code>fbs_ind = 0</code> (no interaction) are omitted from output, so <code>n_rayN ≤ n_ray</code>. 
 </li><li style="margin-bottom: 0.4em;">Output direction encoding (spherical/Cartesian) matches input <code>tridir</code> format. 
 </li><li style="margin-bottom: 0.4em;">Overlapping mesh geometry must be avoided (materials are transparent to radio waves). 
+</li><li style="margin-bottom: 0.4em;">Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic 
+   simulation with impedance-mapped material parameters (ε derived from Z). 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code>. 
 </li></ul>
 </li>
@@ -7334,7 +7336,7 @@ void quadriga_lib::ray_mesh_interact(
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>interaction_type</code></b> — 0 = reflection, 1 = transmission, 2 = refraction 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>interaction_type</code></b> — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission 
 </li><li style="margin-bottom: 0.4em;"><b><code>center_frequency</code></b> — Center frequency in Hz 
 </li><li style="margin-bottom: 0.4em;"><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code> 
 </li><li style="margin-bottom: 0.4em;"><b><code>fbs</code></b>, <b><code>sbs</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code> 
@@ -7349,8 +7351,8 @@ void quadriga_lib::ray_mesh_interact(
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>origN</code></b> — New origins after interaction (offset 0.001 m along travel direction); <code>[n_rayN, 3]</code> 
 </li><li style="margin-bottom: 0.4em;"><b><code>destN</code></b> — New destinations accounting for direction change; <code>[n_rayN, 3]</code> 
-</li><li style="margin-bottom: 0.4em;"><b><code>gainN</code></b> — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL), averaged over polarizations; <code>[n_rayN]</code> 
-</li><li style="margin-bottom: 0.4em;"><b><code>xprmatN</code></b> — Polarization transfer matrix, interleaved complex <code>[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]</code>; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); <code>[n_rayN, 8]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>gainN</code></b> — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; <code>[n_rayN]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>xprmatN</code></b> — For types 0–2: polarization transfer matrix, interleaved complex <code>[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]</code>; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); <code>[n_rayN, 8]</code>. For types 3–4 (scalar): <code>[Re Im 0 0 0 0 0 0]</code> where Re+jIm is the scalar pressure coefficient including in-medium attenuation; <code>[n_rayN, 8]</code>. 
 </li><li style="margin-bottom: 0.4em;"><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if inputs not provided 
 </li><li style="margin-bottom: 0.4em;"><b><code>orig_lengthN</code></b> — Path length from <code>orig</code> to <code>origN</code>, added to input <code>orig_length</code> if given; <code>[n_rayN]</code> 
 </li><li style="margin-bottom: 0.4em;"><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad; <code>[n_rayN]</code> 
@@ -7362,264 +7364,100 @@ void quadriga_lib::ray_mesh_interact(
  
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <th>No</th>
-  <th>θF<0</th>
-  <th>θS<0</th>
-  <th>dFS=0</th>
-  <th>TotRef</th>
-  <th>iSBS=0</th>
-  <th>NF=-NS</th>
-  <th>NF=NS</th>
-  <th>startIn</th>
-  <th>endIn</th>
-  <th>Meaning</th>
+  <th></th>
+  <th>Code</th>
+  <th>Description</th>
+  <th></th>
 </tr>
 <tr>
-  <td>0</td>
   <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td>Undefined</td>
-</tr>
-<tr>
   <td>1</td>
-  <td>no</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Single Hit o-i</td>
+  <td>Single hit, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Single Hit i-o</td>
+  <td>Single hit, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Single Hit i-o, TR</td>
+  <td>Single hit, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>4</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M2 hit first</td>
+  <td>Media-to-media, M2 hit first</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M1 hit first</td>
+  <td>Media-to-media, M1 hit first</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M1 hit first, TR</td>
+  <td>Media-to-media, M1 hit first, total reflection</td>
+  <td></td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>7</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Overlapping Faces, o-i</td>
+  <td>Overlapping faces, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>8</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Overlapping Faces, i-o</td>
+  <td>Overlapping faces, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>9</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Overlapping Faces, i-o, TR</td>
+  <td>Overlapping faces, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>10</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>Edge Hit, o-i-o</td>
+  <td>Edge hit, outside→inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>11</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>Edge Hit, i-o-i</td>
+  <td>Edge hit, inside→outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>12</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>Edge Hit, i-o-i, TR</td>
+  <td>Edge hit, inside→outside→inside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>13</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Edge Hit, o-i</td>
+  <td>Edge hit, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>14</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Edge Hit, i-o</td>
+  <td>Edge hit, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>15</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Edge Hit, i-o, TR</td>
+  <td>Edge hit, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 </table><br>
 </li>
