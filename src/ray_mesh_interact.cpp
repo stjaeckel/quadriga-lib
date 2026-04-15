@@ -25,16 +25,18 @@ SECTION!*/
 
 /*!MD
 # ray_mesh_interact
-Calculates reflection, transmission, or refraction of radio waves at mesh surfaces per ITU-R P.2040-1
+Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 ## Description:
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
-- Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit 
+- Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit
   with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.
 - Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format.
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
+- Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
+  simulation with impedance-mapped material parameters (ε derived from Z).
 - Allowed datatypes (`dtype`): `float` or `double`.
 
 ## Declaration:
@@ -60,7 +62,7 @@ void quadriga_lib::ray_mesh_interact(
 ```
 
 ## Input Arguments:
-- **`interaction_type`** — 0 = reflection, 1 = transmission, 2 = refraction
+- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
 - **`center_frequency`** — Center frequency in Hz
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
@@ -74,8 +76,8 @@ void quadriga_lib::ray_mesh_interact(
 ## Output Arguments:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL), averaged over polarizations; `[n_rayN]`
-- **`xprmatN`** — Polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`
+- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including in-medium attenuation; `[n_rayN, 8]`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
@@ -84,27 +86,23 @@ void quadriga_lib::ray_mesh_interact(
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code; `[n_rayN]`<br><br>
 
-  No | θF<0 | θS<0 | dFS=0 | TotRef | iSBS=0 | NF=-NS | NF=NS | startIn | endIn | Meaning
-  ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-   0 |      |      |       |        |        |        |       |         |       | Undefined
-   1 |   no |  N/A |    no |    N/A |    yes |    N/A |   N/A |      no |   yes | Single Hit o-i
-   2 |  yes |  N/A |    no |     no |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o
-   3 |  yes |  N/A |    no |    yes |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o, TR
-  ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-   4 |   no |  yes |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M2 hit first
-   5 |  yes |   no |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M1 hit first
-   6 |  yes |   no |   yes |    yes |     no |    yes |    no |     yes |   yes | M2M, M1 hit first, TR
-  ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-   7 |   no |   no |   yes |    N/A |     no |     no |   yes |      no |   yes | Overlapping Faces, o-i
-   8 |  yes |  yes |   yes |     no |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o
-   9 |  yes |  yes |   yes |    yes |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o, TR
-  ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-  10 |   no |  yes |   yes |    N/A |     no |     no |    no |      no |    no | Edge Hit, o-i-o
-  11 |  yes |   no |   yes |     no |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i
-  12 |  yes |   no |   yes |    yes |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i, TR
-  13 |   no |   no |   yes |    N/A |     no |     no |    no |      no |   yes | Edge Hit, o-i
-  14 |  yes |  yes |   yes |     no |     no |     no |    no |     yes |    no | Edge Hit, i-o
-  15 |  yes |  yes |   yes |    yes |     no |     no |    no |     yes |    no | Edge Hit, i-o, TR
+  | Code | Description                                          |
+  |------|------------------------------------------------------|
+  |    1 | Single hit, outside→inside                           |
+  |    2 | Single hit, inside→outside                           |
+  |    3 | Single hit, inside→outside, total reflection         |
+  |    4 | Media-to-media, M2 hit first                         |
+  |    5 | Media-to-media, M1 hit first                         |
+  |    6 | Media-to-media, M1 hit first, total reflection       |
+  |    7 | Overlapping faces, outside→inside                    |
+  |    8 | Overlapping faces, inside→outside                    |
+  |    9 | Overlapping faces, inside→outside, total reflection  |
+  |   10 | Edge hit, outside→inside→outside                     |
+  |   11 | Edge hit, inside→outside→inside                      |
+  |   12 | Edge hit, inside→outside→inside, total reflection    |
+  |   13 | Edge hit, outside→inside                             |
+  |   14 | Edge hit, inside→outside                             |
+  |   15 | Edge hit, inside→outside, total reflection           |
 
 ## See also:
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
@@ -124,12 +122,44 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                                      arma::Col<dtype> *fbs_angleN, arma::Col<dtype> *thicknessN, arma::Col<dtype> *edge_lengthN,
                                      arma::Mat<dtype> *normal_vecN, arma::s32_vec *out_typeN)
 {
+
+    // Internal documentation: out_typeN mapping logic
+    //   No | θF<0 | θS<0 | dFS=0 | TotRef | iSBS=0 | NF=-NS | NF=NS | startIn | endIn | Meaning
+    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
+    //    0 |      |      |       |        |        |        |       |         |       | Undefined
+    //    1 |   no |  N/A |    no |    N/A |    yes |    N/A |   N/A |      no |   yes | Single Hit o-i
+    //    2 |  yes |  N/A |    no |     no |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o
+    //    3 |  yes |  N/A |    no |    yes |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o, TR
+    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
+    //    4 |   no |  yes |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M2 hit first
+    //    5 |  yes |   no |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M1 hit first
+    //    6 |  yes |   no |   yes |    yes |     no |    yes |    no |     yes |   yes | M2M, M1 hit first, TR
+    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
+    //    7 |   no |   no |   yes |    N/A |     no |     no |   yes |      no |   yes | Overlapping Faces, o-i
+    //    8 |  yes |  yes |   yes |     no |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o
+    //    9 |  yes |  yes |   yes |    yes |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o, TR
+    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
+    //   10 |   no |  yes |   yes |    N/A |     no |     no |    no |      no |    no | Edge Hit, o-i-o
+    //   11 |  yes |   no |   yes |     no |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i
+    //   12 |  yes |   no |   yes |    yes |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i, TR
+    //   13 |   no |   no |   yes |    N/A |     no |     no |    no |      no |   yes | Edge Hit, o-i
+    //   14 |  yes |  yes |   yes |     no |     no |     no |    no |     yes |    no | Edge Hit, i-o
+    //   15 |  yes |  yes |   yes |    yes |     no |     no |    no |     yes |    no | Edge Hit, i-o, TR
+
     // Ray offset is used to detect co-location of points, value in meters
     const double ray_offset = 0.001;
 
     // Check interaction_type
-    if (interaction_type != 0 && interaction_type != 1 && interaction_type != 2)
-        throw std::invalid_argument("Interaction type must be either (0) Reflection, (1) Transmission or (2) Refraction.");
+    if (interaction_type < 0 || interaction_type > 4)
+        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission");
+
+    bool is_scalar = interaction_type >= 3;
+
+    int geometry_type = interaction_type;
+    if (interaction_type == 3) // scalar reflection → reflection geometry
+        geometry_type = 0;
+    if (interaction_type == 4) // scalar transmission → transmission geometry
+        geometry_type = 1;
 
     // Frequency in GHz
     if (center_frequency <= (dtype)0.0)
@@ -461,10 +491,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         bool dense_to_light = std::real(eta1) > std::real(eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
-        double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
-        std::complex<double> eta1_div_eta2 = eta1 / eta2;                  // Complex division
-        double eta = std::sqrt(std::abs(eta1_div_eta2));                   // sgrt( abs( eta1 / eta2 ) )
-        bool total_reflection = eta * sin_theta >= 1.0;                    // Total reflection condition
+        double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);  // Trigonometric identity
+        std::complex<double> eta1_div_eta2 = eta1 / eta2;                   // Complex division
+        double eta = std::sqrt(std::abs(eta1_div_eta2));                    // sgrt( abs( eta1 / eta2 ) )
+        bool total_reflection = is_scalar ? false : eta * sin_theta >= 1.0; // Total reflection condition
 
         // Calculate cos_theta2 from Rec. ITU-R P.2040-1, eq. (33)
         std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
@@ -473,11 +503,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz;              // Vector from FBS to destination
         double FD_length = std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz); // Length of path from FBS to destination
 
-        if (interaction_type == 0) // Reflection, normalized by default
+        if (geometry_type == 0) // Reflection, normalized by default
             FDx = OFx - 2.0 * cos_theta * Nx,
             FDy = OFy - 2.0 * cos_theta * Ny,
             FDz = OFz - 2.0 * cos_theta * Nz;
-        else if (interaction_type == 1)      // Transmission without refraction
+        else if (geometry_type == 1)         // Transmission without refraction
             FDx = OFx, FDy = OFy, FDz = OFz; // New path direction = same as incoming ray, already normalized
         else                                 // Refraction
         {
@@ -545,7 +575,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                 if (d < 0.0 || d > 1.0e5) // Vertex ray does not hit face
                     edge_length_tmp = INFINITY;
 
-                if (interaction_type == 0) // Reflection
+                if (geometry_type == 0) // Reflection
                 {
                     if (d < 0.0 || d > 1.0e5) // Ray does not hit face - use orthogonal projection on ray
                     {
@@ -586,7 +616,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                     Tz = Wz - Fz - ray_offset * FDz;
 
                     // Vertex ray directions remains the same for Transmission
-                    if (interaction_type == 2) // Refraction
+                    if (geometry_type == 2) // Refraction
                     {
                         double cos_thetaV = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);       // Cosine of incidence angle
                         double sin_thetaV = std::sqrt(1.0 - cos_thetaV * cos_thetaV);    // Sine of incidence angle
@@ -656,7 +686,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         {
             // First medium attenuation, from origin to FBS
             // in case of reflection, ray continues in the same medium (account for ray offset)
-            double thickness = (interaction_type == 0) ? OF_length + ray_offset : OF_length;
+            double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
             scl = std::real(eta1);
             double tan_delta = std::imag(eta1) / scl;                        // Loss tangent
             double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
@@ -664,7 +694,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));  // Attenuation distance (2)
             gain *= std::pow(10.0, -0.1 * thickness * 8.686 / Delta);        // Gain update
         }
-        if (interaction_type != 0) // Attenuation caused by the medium after transition
+        if (geometry_type != 0) // Attenuation caused by the medium after transition
         {
             scl = std::real(eta2);
             double tan_delta = std::imag(eta2) / scl;                        // Loss tangent
@@ -675,7 +705,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         }
 
         // Add additional transition gain
-        if (interaction_type != 0) // Only for transmission and refraction
+        if (geometry_type != 0) // Only for transmission and refraction
             gain *= transition_gain;
 
         // Calculate sqrt(eta1) and sqrt(eta2) needed for ITU-R P.2040-1, eq. (31) and (32)
@@ -686,31 +716,54 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;
         std::complex<double> R_eTM = total_reflection ? 1.0 : 0.0;
         double reflection_gain = total_reflection ? 1.0 : 0.0;
-        if (interaction_type == 1 || (interaction_type == 0 && !total_reflection)) // Reflection and Transmission
-            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
-            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
+
+        if (is_scalar)
+        {
+            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
+            R_eTM = R_eTE;                      // not used, but keeps downstream code safe
+            reflection_gain = std::norm(R_eTE); // no 0.5 factor
+        }
+        else if (interaction_type == 1 || (interaction_type == 0 && !total_reflection)) // Reflection and Transmission
+        {
+            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
+            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
             reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
+        }
 
         // Calculate Transmission coefficients  ITU-R P.2040-1, eq. (32)
         std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
         double refraction_gain = 0.0;
-        if (!total_reflection && interaction_type != 0) // Transmission and Refraction
-            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
-            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
+
+        if (!total_reflection && !is_scalar && interaction_type != 0) // Transmission and Refraction
+        {
+            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
+            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
             refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
+        }
+
+        if (interaction_type == 4) // Energy-conservation based transmission for scalar transmission
+        {
+            double T_mag = std::sqrt(1.0 - std::norm(R_eTE)); // sqrt(1 - |R_TE|²)
+            // Use phase from TE transmission coefficient
+            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
+            double T_phase = std::arg(T_eTE);
+            T_eTE = std::complex<double>(T_mag * std::cos(T_phase), T_mag * std::sin(T_phase));
+            T_eTM = T_eTE;
+            refraction_gain = 1.0 - reflection_gain; // energy conservation
+        }
 
         // Special Case: Transmission from a dense medium (such as glass) to a light medium (e.g. air)
         // Transmission mode assumed no change of direction (unlike refraction) and no total reflection is possible.
         // This may violate the conservation of energy principle (e.g. cause false amplification).
         // To obtain meaningful results, we ignore the losses in this case.
-        if (interaction_type == 1 && dense_to_light)
+        if (geometry_type == 1 && dense_to_light)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type
-        double eTE_Re = (interaction_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
-               eTE_Im = (interaction_type == 0) ? std::imag(R_eTE) : std::imag(T_eTE),
-               eTM_Re = (interaction_type == 0) ? std::real(R_eTM) : std::real(T_eTM),
-               eTM_Im = (interaction_type == 0) ? std::imag(R_eTM) : std::imag(T_eTM);
+        double eTE_Re = (geometry_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
+               eTE_Im = (geometry_type == 0) ? std::imag(R_eTE) : std::imag(T_eTE),
+               eTM_Re = (geometry_type == 0) ? std::real(R_eTM) : std::real(T_eTM),
+               eTM_Im = (geometry_type == 0) ? std::imag(R_eTM) : std::imag(T_eTM);
 
         // Read the output ray index
         size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
@@ -738,9 +791,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         if (p_gainN != nullptr)
         {
             // Include average medium transition gain
-            if (interaction_type == 0)
+            if (geometry_type == 0)
                 scl = gain * reflection_gain;
-            else if (interaction_type == 1)
+            else if (geometry_type == 1)
                 scl = gain * (1.0 - reflection_gain);
             else
                 scl = gain * refraction_gain;
@@ -750,61 +803,79 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
         if (p_xprmatN != nullptr)
         {
-            // Calculate vectors for the polarization base transformation (incoming path)
-            double Hx = -OFy + 3.0e-20, Hy = OFx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
-            scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                                // Normalize
-            double Vx = -OFz * Hy, Vy = OFz * Hx, Vz = OFx * Hy - OFy * Hx;                                // Polarization base in eTheta direction (vertical)
-            double Qx = OFy * Nz - OFz * Ny + 3.0e-20, Qy = OFz * Nx - OFx * Nz, Qz = OFx * Ny - OFy * Nx; // Base vector perpendicular to plane normal (eQ)
-            scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;           // Normalize
-            double Px = Qy * OFz - Qz * OFy, Py = Qz * OFx - Qx * OFz, Pz = Qx * OFy - Qy * OFx;           // Base vector parallel to plane normal (eP)
+            if (is_scalar)
+            {
+                double amplitude = std::sqrt(gain);
+                double coeff_Re = amplitude * eTE_Re;
+                double coeff_Im = amplitude * eTE_Im;
 
-            // Calculate polarization base transformation matrix from global coordinates to local coordinates
-            bool do_base_transform = scl < 1.0e19;
-            double Q1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
-            double Q2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
-            double Q3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
-            double Q4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
+                p_xprmatN[i_rayN] = (dtype)coeff_Re;
+                p_xprmatN[i_rayN + n_rayN_t] = (dtype)coeff_Im;
+                p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)0.0;
+                p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)0.0;
+                p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)0.0;
+                p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)0.0;
+                p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)0.0;
+                p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)0.0;
+            }
+            else
+            {
+                // Calculate vectors for the polarization base transformation (incoming path)
+                double Hx = -OFy + 3.0e-20, Hy = OFx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
+                scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                                // Normalize
+                double Vx = -OFz * Hy, Vy = OFz * Hx, Vz = OFx * Hy - OFy * Hx;                                // Polarization base in eTheta direction (vertical)
+                double Qx = OFy * Nz - OFz * Ny + 3.0e-20, Qy = OFz * Nx - OFx * Nz, Qz = OFx * Ny - OFy * Nx; // Base vector perpendicular to plane normal (eQ)
+                scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;           // Normalize
+                double Px = Qy * OFz - Qz * OFy, Py = Qz * OFx - Qx * OFz, Pz = Qx * OFy - Qy * OFx;           // Base vector parallel to plane normal (eP)
 
-            // Calculate vectors for the polarization base transformation (outgoing path)
-            Hx = -FDy + 3.0e-20, Hy = FDx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
-            scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                         // Normalize
-            Vx = -FDz * Hy, Vy = FDz * Hx, Vz = FDx * Hy - FDy * Hx;                                // Polarization base in eTheta direction (vertical)
-            Qx = FDy * Nz - FDz * Ny + 3.0e-20, Qy = FDz * Nx - FDx * Nz, Qz = FDx * Ny - FDy * Nx; // Base vector perpendicular to plane normal (eQ)
-            scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;    // Normalize
-            Px = Qy * FDz - Qz * FDy, Py = Qz * FDx - Qx * FDz, Pz = Qx * FDy - Qy * FDx;           // Base vector parallel to plane normal (eP)
+                // Calculate polarization base transformation matrix from global coordinates to local coordinates
+                bool do_base_transform = scl < 1.0e19;
+                double Q1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
+                double Q2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
+                double Q3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
+                double Q4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
 
-            // Calculate polarization base transformation matrix from global coordinates to local coordinates
-            do_base_transform = scl < 1.0e19;
-            double U1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
-            double U2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
-            double U3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
-            double U4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
+                // Calculate vectors for the polarization base transformation (outgoing path)
+                Hx = -FDy + 3.0e-20, Hy = FDx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
+                scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                         // Normalize
+                Vx = -FDz * Hy, Vy = FDz * Hx, Vz = FDx * Hy - FDy * Hx;                                // Polarization base in eTheta direction (vertical)
+                Qx = FDy * Nz - FDz * Ny + 3.0e-20, Qy = FDz * Nx - FDx * Nz, Qz = FDx * Ny - FDy * Nx; // Base vector perpendicular to plane normal (eQ)
+                scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;    // Normalize
+                Px = Qy * FDz - Qz * FDy, Py = Qz * FDx - Qx * FDz, Pz = Qx * FDy - Qy * FDx;           // Base vector parallel to plane normal (eP)
 
-            // Calculate polarization transfer matrix
-            // Note: eTE = perpendicular to face normal vector = Horizontal polarization
-            //       eTM = parallel to face normal vector = Vertical polarization
-            double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
-            if (interaction_type == 1)          // Scale amplitude in case of transmission
-                amplitude *= std::sqrt((1.0 - reflection_gain) / refraction_gain);
+                // Calculate polarization base transformation matrix from global coordinates to local coordinates
+                do_base_transform = scl < 1.0e19;
+                double U1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
+                double U2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
+                double U3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
+                double U4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
 
-            double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
-                   VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
-                   HV_Re = amplitude * (U2 * Q1 * eTM_Re + U4 * Q2 * eTE_Re),
-                   HV_Im = amplitude * (U2 * Q1 * eTM_Im + U4 * Q2 * eTE_Im),
-                   VH_Re = amplitude * (U1 * Q3 * eTM_Re + U3 * Q4 * eTE_Re),
-                   VH_Im = amplitude * (U1 * Q3 * eTM_Im + U3 * Q4 * eTE_Im),
-                   HH_Re = amplitude * (U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re),
-                   HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
+                // Calculate polarization transfer matrix
+                // Note: eTE = perpendicular to face normal vector = Horizontal polarization
+                //       eTM = parallel to face normal vector = Vertical polarization
+                double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
+                if (interaction_type == 1)          // Scale amplitude in case of transmission
+                    amplitude *= std::sqrt((1.0 - reflection_gain) / refraction_gain);
 
-            // Write XPRMAT
-            p_xprmatN[i_rayN] = (dtype)VV_Re;
-            p_xprmatN[i_rayN + n_rayN_t] = (dtype)VV_Im;
-            p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)HV_Re;
-            p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)HV_Im;
-            p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)VH_Re;
-            p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)VH_Im;
-            p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)HH_Re;
-            p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)HH_Im;
+                double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
+                       VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
+                       HV_Re = amplitude * (U2 * Q1 * eTM_Re + U4 * Q2 * eTE_Re),
+                       HV_Im = amplitude * (U2 * Q1 * eTM_Im + U4 * Q2 * eTE_Im),
+                       VH_Re = amplitude * (U1 * Q3 * eTM_Re + U3 * Q4 * eTE_Re),
+                       VH_Im = amplitude * (U1 * Q3 * eTM_Im + U3 * Q4 * eTE_Im),
+                       HH_Re = amplitude * (U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re),
+                       HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
+
+                // Write XPRMAT
+                p_xprmatN[i_rayN] = (dtype)VV_Re;
+                p_xprmatN[i_rayN + n_rayN_t] = (dtype)VV_Im;
+                p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)HV_Re;
+                p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)HV_Im;
+                p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)VH_Re;
+                p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)VH_Im;
+                p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)HH_Re;
+                p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)HH_Im;
+            }
         }
 
         // Write trivecN
@@ -875,7 +946,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
         // Write out_typeN
         if (p_out_typeN != nullptr)
-            p_out_typeN[i_rayN] = (out_type != 0 && interaction_type == 2 && total_reflection) ? out_type + 1 : out_type;
+            p_out_typeN[i_rayN] = (out_type != 0 && geometry_type == 2 && total_reflection) ? out_type + 1 : out_type;
     }
 
     // Delete ray index
