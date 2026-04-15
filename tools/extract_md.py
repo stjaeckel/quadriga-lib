@@ -183,7 +183,7 @@ def generate_markdown(folder_name, api_type, version_path):
 
             for md_block in file_md_sections:
                 lines = md_block.split("\n")
-                func_name = lines[0].replace("# ", "").lower()
+                func_name = lines[0].replace("# ", "")
                 add_space = "<++>" in func_name
                 func_name = func_name.replace("<++>", "")
                 if func_name not in [f[0] for f in section_dict[section]]:
@@ -237,9 +237,9 @@ def generate_markdown(folder_name, api_type, version_path):
             short_desc = lines[1] if len(lines) > 1 else ""
 
             if short_desc:
-                md += f"## {func_name}\n{short_desc}\n\n"
+                md += f"---\n## {func_name}\n{short_desc}\n\n"
             else:
-                md += f"## {func_name}\n\n"
+                md += f"---\n## {func_name}\n\n"
 
             # Parse ## subsections and emit them as ### headings
             i = 2  # skip function name line and short description

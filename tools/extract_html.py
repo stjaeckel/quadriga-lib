@@ -25,6 +25,7 @@ def get_parser():
         help="Optional path to folder containing source files."
     )
     parser.add_argument("-c", action="store_true", help="Compact format")
+    parser.add_argument("-l", action="store_true", help="Lower-case function names")
     return parser
 
 
@@ -165,7 +166,7 @@ def format_tables(text):
     return html_content
 
 
-def generate_html(folder_name, html_output_file, html_preamble, compact):
+def generate_html(folder_name, html_output_file, html_preamble, compact, lower_case):
 
     # Read the content of the file 'tools/html_parts/html_head.html.part'
     with open("tools/html_parts/html_head.html.part", "r") as head_file:
@@ -212,7 +213,9 @@ def generate_html(folder_name, html_output_file, html_preamble, compact):
                         
                         for md_section in file_md_sections:
                             lines = md_section.split('\n')
-                            function_name = lines[0].replace("# ", "").lower()
+                            function_name = lines[0].replace("# ", "")
+                            if lower_case:
+                                function_name = function_name.lower()
                             if "<++>" in function_name:
                                 add_space = 1;
                             else:
@@ -358,7 +361,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    html_output = generate_html(args.directory, args.output, args.preamble, args.c)
+    html_output = generate_html(args.directory, args.output, args.preamble, args.c, args.l)
 
     with open(args.output, "w") as f:
         f.write(html_output)
