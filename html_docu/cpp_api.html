@@ -120,7 +120,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#any_type_id">any_type_id</a></td><td>Get type ID and raw access from a 'std::any' object</td></tr>
+<tr><td><a href="#any_type_id">any_type_id</a></td><td>Get type ID and raw access from a `std::any` object</td></tr>
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the baseband frequency response of a MIMO channel</td></tr>
 <tr><td><a href="#baseband_freq_response_multi">baseband_freq_response_multi</a></td><td>Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients</td></tr>
 <tr><td><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a></td><td>Compute the baseband frequency response of multiple MIMO channels</td></tr>
@@ -1924,41 +1924,34 @@ void quadriga_lib::channel&lt;dtype&gt;::write_paths_to_obj_file(
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="any_type_id"></a>
-<b>any_type_id</b> - Get type ID and raw access from a 'std::any' object
+<b>any_type_id</b> - Get type ID and raw access from a `std::any` object
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Inspects a <code>std::any</code> object and returns a type identifier for its contents. 
-</li><li style="margin-bottom: 0.4em;">Optionally retrieves the dimensions of the object (if it is a matrix, vector, or cube). 
-</li><li style="margin-bottom: 0.4em;">Optionally retrieves a raw pointer to the internal data. 
-</li><li style="margin-bottom: 0.4em;"><b>Warning:</b> Accessing data through <code>dataptr</code> is not type-safe and bypasses <code>const</code> protection. Use with extreme caution. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Inspects a <code>std::any</code> object and returns an integer type identifier for its contents 
+</li><li style="margin-bottom: 0.4em;">Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for <code>std::string</code>, <code>dims[0]</code> is the string length, <code>dims[1]</code>/<code>dims[2]</code> are zero 
+</li><li style="margin-bottom: 0.4em;">Optionally retrieves a raw <code>void*</code> to the internal data — not type-safe, bypasses <code>const</code> protection; use with caution 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 int quadriga_lib::any_type_id(
-                const std::any *data,
-                unsigned long long *dims = nullptr,
-                void **dataptr = nullptr);
+    const std::any *data,
+    unsigned long long *dims = nullptr,
+    void **dataptr = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::any <b>*data</b></code> (input)<br> 
-   Pointer to the <code>std::any</code> object to inspect. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned long long <b>*dims</b> = nullptr</code> (optional output)<br> 
-   Pointer to an array of 3 integers that will hold the dimensions of the object:<br> 
-   <code>dims[0]</code>, <code>dims[1]</code>, <code>dims[2]</code>: Number of rows, columns, slices (for Armadillo types).<br> 
-   For <code>std::string</code>, <code>dims[0]</code> contains the string length, <code>dims[1]</code> and <code>dims[2]</code> are zero. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>void <b>&#42;&#42;dataptr</b> = nullptr</code> (optional output)<br> 
-   If not <code>nullptr</code>, returns a raw pointer to the object's internal data.  This allows direct access, <b>without</b> type safety or <code>const</code> protection. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b> — Pointer to the <code>std::any</code> object to inspect 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>int</code><br> 
-   Type ID corresponding to the content of the <code>std::any</code> object. Values are:<br><br> 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>dims</code></b> <i>(optional)</i> — Array of 3 values filled with <code>[rows, cols, slices]</code> of the contained Armadillo object 
+</li><li style="margin-bottom: 0.4em;"><b><code>dataptr</code></b> <i>(optional)</i> — Receives a raw pointer to the object's internal data 
+</li></ul>
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Returns:</i></b><br>Integer type ID of the contained value: 
+ 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th>ID</th>
@@ -2057,7 +2050,6 @@ int quadriga_lib::any_type_id(
   <td><code>arma::Row&lt;int&gt;</code></td>
 </tr>
 </table><br>
-</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -2065,54 +2057,39 @@ int quadriga_lib::any_type_id(
 <b>baseband_freq_response</b> - Compute the baseband frequency response of a MIMO channel
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the frequency-domain response of a time-domain MIMO channel using a discrete Fourier transform (DFT). 
-</li><li style="margin-bottom: 0.4em;">Input consists of real and imaginary channel coefficients and corresponding delays for each MIMO sub-link. 
-</li><li style="margin-bottom: 0.4em;">Outputs the complex channel response matrix <code>H</code> at given sub-carrier frequency positions. 
-</li><li style="margin-bottom: 0.4em;">Internally uses AVX2 instructions for fast parallel computation of 8 carriers at once. 
-</li><li style="margin-bottom: 0.4em;">Can be efficiently called in a loop (e.g., over snapshots) and parallelized with OpenMP. 
-</li><li style="margin-bottom: 0.4em;">Internal arithmetic is performed in single precision for speed. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the frequency-domain channel matrix <code>H</code> at given sub-carrier positions via DFT over time-domain path coefficients and delays 
+</li><li style="margin-bottom: 0.4em;"><code>delay</code> supports broadcasting: shape <code>[1, 1, n_path]</code> applies the same delays to all RX/TX pairs 
+</li><li style="margin-bottom: 0.4em;"><code>pilot_grid</code> values are normalized to bandwidth: <code>0.0</code> = center frequency, <code>1.0</code> = center + bandwidth 
+</li><li style="margin-bottom: 0.4em;">Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation 
+</li><li style="margin-bottom: 0.4em;">Safe to call in a loop over snapshots and parallelize with OpenMP 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes: <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::baseband_freq_response(
-                const arma::Cube&lt;dtype&gt; *coeff_re,
-                const arma::Cube&lt;dtype&gt; *coeff_im,
-                const arma::Cube&lt;dtype&gt; *delay,
-                const arma::Col&lt;dtype&gt; *pilot_grid,
-                const double bandwidth,
-                arma::Cube&lt;dtype&gt; *hmat_re,
-                arma::Cube&lt;dtype&gt; *hmat_im);
+    const arma::Cube&lt;dtype&gt; *coeff_re,
+    const arma::Cube&lt;dtype&gt; *coeff_im,
+    const arma::Cube&lt;dtype&gt; *delay,
+    const arma::Col&lt;dtype&gt; *pilot_grid,
+    const double bandwidth,
+    arma::Cube&lt;dtype&gt; *hmat_re,
+    arma::Cube&lt;dtype&gt; *hmat_im,
+    arma::Cube&lt;std::complex&lt;dtype&gt;&gt; *hmat = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; <b>*coeff_re</b></code> (input)<br> 
-   Real part of channel coefficients in time domain, Size <code>[n_rx, n_tx, n_path]</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b> — Real part of time-domain channel coefficients, <code>[n_rx, n_tx, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b> — Imaginary part of time-domain channel coefficients, <code>[n_rx, n_tx, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>delay</code></b> — Path delays in seconds, <code>[n_rx, n_tx, n_path]</code> or <code>[1, 1, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>pilot_grid</code></b> — Normalized sub-carrier positions in range <code>[0.0, 1.0]</code>, <code>[n_carriers]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>bandwidth</code></b> — Total baseband bandwidth in Hz 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; <b>*coeff_im</b></code> (input)<br> 
-   Imaginary part of channel coefficients in time domain, Size <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; <b>*delay</b></code> (input)<br> 
-   Path delays in seconds. Size <code>[n_rx, n_tx, n_path]</code> or broadcastable shape <code>[1, 1, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*pilot_grid</b></code> (input)<br> 
-   Normalized sub-carrier positions relative to bandwidth. Range: <code>0.0</code> (center freq) to <code>1.0</code> (center + bandwidth). Length: <code>n_carriers</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const double <b>bandwidth</b></code> (input)<br> 
-   Total baseband bandwidth in Hz (defines absolute frequency spacing of the pilot grid). 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*hmat_re</b></code> (output)<br> 
-   Output: Real part of the frequency-domain channel matrix, Size <code>[n_rx, n_tx, n_carriers]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*hmat_im</b></code> (output)<br> 
-   Output: Imaginary part of the frequency-domain channel matrix, Size <code>[n_rx, n_tx, n_carriers]</code>. 
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat_re</code></b> <i>(optional)</i> — Real part of the frequency-domain channel matrix, <code>[n_rx, n_tx, n_carriers]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hmat_im</code></b> <i>(optional)</i> — Imaginary part of the frequency-domain channel matrix, <code>[n_rx, n_tx, n_carriers]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hmat</code></b> <i>(optional)</i> — Complex-valued frequency-domain channel matrix, <code>[n_rx, n_tx, n_carriers]</code> 
 </li></ul>
 </li>
 </ul>
@@ -2121,115 +2098,58 @@ void quadriga_lib::baseband_freq_response(
 <b>baseband_freq_response_multi</b> - Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the frequency-domain channel transfer function H(f) from multi-frequency channel coefficients 
-   obtained by sampling the channel at a coarse set of carrier frequencies (e.g., every 500 MHz). 
-</li><li style="margin-bottom: 0.4em;">Designed for ultra-wideband (UWB) channels where antenna patterns, path gains, and polarization transfer 
-   matrices vary across a large bandwidth (e.g., 500 MHz to 20 GHz). 
-</li><li style="margin-bottom: 0.4em;">For each multipath component (MPC), the complex coefficient envelope is interpolated from the coarse 
-   input frequency grid <code>freq_in</code> to the dense output frequency grid <code>freq_out</code> using SLERP (Spherical 
-   Linear Interpolation): magnitude is interpolated linearly, phase is unwrapped and interpolated linearly 
-   along the shortest arc. 
-</li><li style="margin-bottom: 0.4em;">The delay-induced phase rotation <code>exp(-j <i> 2 </i> pi <i> freq_out </i> delay)</code> is applied per output carrier. 
-   Since the output frequencies are absolute (not baseband offsets), the phase computation uses double 
-   precision internally to avoid loss of accuracy at high carrier frequencies. 
-</li><li style="margin-bottom: 0.4em;"><b>Delay phase removal</b> (<code>remove_delay_phase = true</code>, default): Channel generation functions such as 
-   <code>get_channels_multifreq</code> bake the delay-induced phase <code>exp(-j <i> 2 </i> pi <i> freq_in[f] </i> delay)</code> into 
-   the output coefficients at each input frequency. This means the coefficient phase rotates rapidly across 
-   the input frequency grid (e.g., 50 full cycles per 500 MHz step for a 100 ns excess delay), which 
-   prevents meaningful SLERP interpolation. When <code>remove_delay_phase</code> is enabled, this function undoes the 
-   baked-in delay phase by multiplying each coefficient by <code>exp(+j <i> 2 </i> pi <i> freq_in[f] </i> delay)</code> before 
-   extracting the slowly-varying envelope for interpolation. The full delay phase at the output frequency 
-   is then re-applied analytically. This must be enabled when consuming output from <code>get_channels_multifreq</code> 
-   or <code>get_channels_spherical</code>. Set to <code>false</code> only if the input coefficients are already pure envelopes 
-   without baked-in delay phase (e.g., from manual construction or external sources). 
-</li><li style="margin-bottom: 0.4em;">Delays are taken from <code>delay[0]</code> only, since path geometry (and thus propagation delay) is 
-   frequency-independent. All entries in the <code>delay</code> vector should contain identical values. 
-</li><li style="margin-bottom: 0.4em;">The delay cube supports broadcastable shape <code>[1, 1, n_path]</code> (planar wave, same delay for all antenna 
-   pairs) or full shape <code>[n_rx, n_tx, n_path]</code> (spherical wave, per-antenna-pair delays). 
-</li><li style="margin-bottom: 0.4em;">For output frequencies outside the range of <code>freq_in</code>, the nearest endpoint coefficient is used 
-   (constant extrapolation in magnitude/phase domain). 
-</li><li style="margin-bottom: 0.4em;">The Nyquist condition for the coarse sampling grid applies to the coefficient envelope only (magnitude 
-   and phase of antenna patterns, path gains, and Jones matrix elements). The fast-rotating delay phase is 
-   handled analytically and does not require dense sampling. Adjacent envelope phase differences should stay 
-   well below pi to avoid interpolation artifacts. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Interpolates complex channel coefficients from a coarse input frequency grid (<code>freq_in</code>) to a dense output grid (<code>freq_out</code>) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc 
+</li><li style="margin-bottom: 0.4em;">Applies delay-induced phase rotation <code>exp(-j <i> 2 </i> pi <i> freq_out </i> delay)</code> per output carrier in double precision to preserve accuracy at high carrier frequencies 
+</li><li style="margin-bottom: 0.4em;">Only <code>delay[0]</code> is used; all entries in the <code>delay</code> vector should be identical (path geometry is frequency-independent) 
+</li><li style="margin-bottom: 0.4em;"><code>delay</code> cube supports <code>[1, 1, n_path]</code> (planar wave) or <code>[n_rx, n_tx, n_path]</code> (spherical wave) 
+</li><li style="margin-bottom: 0.4em;">Output frequencies outside the range of <code>freq_in</code> use constant extrapolation from the nearest endpoint 
+</li><li style="margin-bottom: 0.4em;"><b><code>remove_delay_phase = true</code> (default):</b> removes the baked-in phase <code>exp(-j <i> 2 </i> pi <i> freq_in[f] </i> delay)</code> before SLERP, then re-applies the full delay phase at each output frequency; required when input comes from <a href="#get_channels_multifreq">get_channels_multifreq</a> or <a href="#get_channels_spherical">get_channels_spherical</a>, which bake the delay phase into coefficients at each input frequency; set to <code>false</code> only when input coefficients are pure slowly-varying envelopes without baked-in delay phase 
+</li><li style="margin-bottom: 0.4em;">At least one of <code>hmat_re</code>/<code>hmat_im</code> or <code>hmat</code> must be non-null 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes: <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::baseband_freq_response_multi(
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_re,
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_im,
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;delay,
-                const arma::Col&lt;dtype&gt; &amp;freq_in,
-                const arma::Col&lt;dtype&gt; &amp;freq_out,
-                arma::Cube&lt;dtype&gt; *hmat_re = nullptr,
-                arma::Cube&lt;dtype&gt; *hmat_im = nullptr,
-                arma::Cube&lt;std::complex&lt;dtype&gt;&gt; *hmat = nullptr,
-                bool remove_delay_phase = true);
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_re,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;coeff_im,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;delay,
+    const arma::Col&lt;dtype&gt; &amp;freq_in,
+    const arma::Col&lt;dtype&gt; &amp;freq_out,
+    arma::Cube&lt;dtype&gt; *hmat_re = nullptr,
+    arma::Cube&lt;dtype&gt; *hmat_im = nullptr,
+    arma::Cube&lt;std::complex&lt;dtype&gt;&gt; *hmat = nullptr,
+    bool remove_delay_phase = true);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>coeff_re</b></code> (input)<br> 
-   Real part of channel coefficients at each input frequency. Vector of length <code>n_freq_in</code>, each cube 
-   has shape <code>[n_rx, n_tx, n_path]</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b> — Real part of channel coefficients at each input frequency, vector of <code>n_freq_in</code> cubes <code>[n_rx, n_tx, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b> — Imaginary part of channel coefficients at each input frequency, same structure as <code>coeff_re</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>delay</code></b> — Path delays in seconds, vector of <code>n_freq_in</code> cubes; only <code>delay[0]</code> is used; shape <code>[n_rx, n_tx, n_path]</code> or <code>[1, 1, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>freq_in</code></b> — Input sample frequencies in Hz, sorted ascending, <code>[n_freq_in]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>freq_out</code></b> — Output carrier frequencies in Hz (absolute), <code>[n_carrier]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>remove_delay_phase</code></b> <i>(optional)</i> — Remove baked-in delay phase before interpolation and re-apply analytically; must be <code>true</code> for output from <a href="#get_channels_multifreq">get_channels_multifreq</a> or <a href="#get_channels_spherical">get_channels_spherical</a> 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>coeff_im</b></code> (input)<br> 
-   Imaginary part of channel coefficients at each input frequency. Same structure as <code>coeff_re</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; &amp;<b>delay</b></code> (input)<br> 
-   Path delays in seconds. Vector of length <code>n_freq_in</code>. Only <code>delay[0]</code> is used (delays are 
-   frequency-independent). Shape <code>[n_rx, n_tx, n_path]</code> or <code>[1, 1, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; &amp;<b>freq_in</b></code> (input)<br> 
-   Input sample frequencies in Hz, sorted in ascending order. Length <code>[n_freq_in]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; &amp;<b>freq_out</b></code> (input)<br> 
-   Output carrier frequencies in Hz (absolute, not baseband offsets). Length <code>[n_carrier]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*hmat_re</b> = nullptr</code> (optional output)<br> 
-   Real part of the frequency-domain channel matrix. Size <code>[n_rx, n_tx, n_carrier]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;dtype&gt; <b>*hmat_im</b> = nullptr</code> (optional output)<br> 
-   Imaginary part of the frequency-domain channel matrix. Size <code>[n_rx, n_tx, n_carrier]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Cube&lt;std::complex&lt;dtype&gt;&gt; <b>*hmat</b> = nullptr</code> (optional output)<br> 
-   Complex-valued frequency-domain channel matrix. Size <code>[n_rx, n_tx, n_carrier]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>remove_delay_phase</b> = true</code> (optional input)<br> 
-   If <code>true</code> (default), the delay-induced phase <code>exp(-j <i> 2 </i> pi <i> freq_in[f] </i> delay)</code> that is baked 
-   into the input coefficients by channel generation functions (e.g., <code>get_channels_multifreq</code>) is removed 
-   before SLERP interpolation and re-applied at each output frequency. Must be enabled when the input 
-   comes from <code>get_channels_multifreq</code> or <code>get_channels_spherical</code>. Set to <code>false</code> only when the input 
-   coefficients contain pure slowly-varying envelopes without delay phase. 
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat_re</code></b> <i>(optional)</i> — Real part of the frequency-domain channel matrix, <code>[n_rx, n_tx, n_carrier]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hmat_im</code></b> <i>(optional)</i> — Imaginary part of the frequency-domain channel matrix, <code>[n_rx, n_tx, n_carrier]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hmat</code></b> <i>(optional)</i> — Complex-valued frequency-domain channel matrix, <code>[n_rx, n_tx, n_carrier]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-// Using output from get_channels_multifreq (delay phase is baked in)
-std::vector&lt;arma::Cube&lt;double&gt;&gt; coeff_re, coeff_im, delays;
 arma::Col&lt;double&gt; freq_in = {0.5e9, 1.0e9, 1.5e9, 2.0e9};
 arma::Col&lt;double&gt; freq_out = arma::linspace&lt;arma::Col&lt;double&gt;&gt;(0.5e9, 2.0e9, 2048);
-
-// ... call get_channels_multifreq to populate coeff_re, coeff_im, delays ...
-
+// populate coeff_re, coeff_im, delays via get_channels_multifreq ...
 arma::Cube&lt;double&gt; Hr, Hi;
-quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays,
-    freq_in, freq_out, &amp;Hr, &amp;Hi, nullptr, true);  // remove_delay_phase = true (default)
+quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays, freq_in, freq_out, &amp;Hr, &amp;Hi);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#baseband_freq_response">baseband_freq_response</a> (for single-frequency narrowband channels) 
-</li><li style="margin-bottom: 0.4em;"><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a> (for batched narrowband channels) 
-</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_multifreq">get_channels_multifreq</a> (produces the multi-frequency coefficients consumed by this function) 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#baseband_freq_response">baseband_freq_response</a> (single-snapshot narrowband version) 
+</li><li style="margin-bottom: 0.4em;"><a href="#baseband_freq_response_vec">baseband_freq_response_vec</a> (batched narrowband version) 
+</li><li style="margin-bottom: 0.4em;"><a href="#get_channels_multifreq">get_channels_multifreq</a> (produces the multi-frequency input coefficients) 
 </li></ul>
 </li>
 </ul>
@@ -2238,63 +2158,38 @@ quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays,
 <b>baseband_freq_response_vec</b> - Compute the baseband frequency response of multiple MIMO channels
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes the frequency-domain response of a batch of time-domain MIMO channels using a discrete Fourier transform (DFT). 
-</li><li style="margin-bottom: 0.4em;">This function wraps <code>quadriga_lib::baseband_freq_response</code> and applies it across multiple snapshots in parallel using OpenMP. 
-</li><li style="margin-bottom: 0.4em;">Input consists of vectors of real/imaginary coefficients and delay Cubes for each snapshot. 
-</li><li style="margin-bottom: 0.4em;">Output is a vector of frequency-domain channel matrices <code>H</code> (one per snapshot). 
-</li><li style="margin-bottom: 0.4em;">Can optionally compute a selected subset of snapshots using <code>i_snap</code>. 
-</li><li style="margin-bottom: 0.4em;">Internal arithmetic is performed in single precision for performance. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Batch wrapper around <a href="#baseband_freq_response">baseband_freq_response</a>, applying it across snapshots in parallel via OpenMP 
+</li><li style="margin-bottom: 0.4em;">Each element of the input vectors is a cube of shape <code>[n_rx, n_tx, n_path]</code>; <code>delay</code> supports broadcasting to <code>[1, 1, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;">Output vectors have length <code>n_out</code>: either <code>n_snap</code> (all snapshots) or <code>length(i_snap)</code> (subset) 
+</li><li style="margin-bottom: 0.4em;">Internal arithmetic is single-precision 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes: <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::baseband_freq_response_vec(
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_re,
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_im,
-                const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *delay,
-                const arma::Col&lt;dtype&gt; *pilot_grid,
-                const double bandwidth,
-                std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_re,
-                std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_im,
-                const arma::u32_vec *i_snap = nullptr);
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_re,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *coeff_im,
+    const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *delay,
+    const arma::Col&lt;dtype&gt; *pilot_grid,
+    const double bandwidth,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_re,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_im,
+    const arma::u32_vec *i_snap = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_re</b></code> (input)<br> 
-   Real part of channel coefficients, vector of length <code>n_snap</code>. Each cube has shape <code>[n_rx, n_tx, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*coeff_im</b></code> (input)<br> 
-   Imaginary part of channel coefficients, same structure as <code>coeff_re</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*delay</b></code> (input)<br> 
-   Path delays in seconds, same structure as <code>coeff_re</code>, shape can be broadcasted <code>[1, 1, n_path]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Col&lt;dtype&gt; <b>*pilot_grid</b></code> (input)<br> 
-   Normalized sub-carrier positions relative to bandwidth. Range: <code>0.0</code> (center freq) to <code>1.0</code> (center + bandwidth). Length: <code>n_carriers</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const double <b>bandwidth</b></code> (input)<br> 
-   Total baseband bandwidth in Hz, used to compute sub-carrier frequencies. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*hmat_re</b></code> (output)<br> 
-   Output: Real part of the frequency-domain channel matrices. Vector of length <code>n_out</code>. Each cube is <code>[n_rx, n_tx, n_carriers]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::vector&lt;arma::Cube&lt;dtype&gt;&gt; <b>*hmat_im</b></code> (output)<br> 
-   Output: Imaginary part of the frequency-domain channel matrices. Same structure as <code>hmat_re</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::u32_vec <b>*i_snap</b> = nullptr</code> (optional input)<br> 
-   Optional subset of snapshot indices to process. If omitted, all <code>n_snap</code> snapshots are processed. Length: <code>n_out</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>coeff_re</code></b> — Real part of time-domain channel coefficients, vector of <code>n_snap</code> cubes <code>[n_rx, n_tx, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>coeff_im</code></b> — Imaginary part of time-domain channel coefficients, same structure as <code>coeff_re</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>delay</code></b> — Path delays in seconds, same structure as <code>coeff_re</code>; each cube broadcastable to <code>[1, 1, n_path]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>pilot_grid</code></b> — Normalized sub-carrier positions in range <code>[0.0, 1.0]</code>, <code>[n_carriers]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>bandwidth</code></b> — Total baseband bandwidth in Hz 
+</li><li style="margin-bottom: 0.4em;"><b><code>i_snap</code></b> <i>(optional)</i> — Snapshot indices to process; if omitted, all <code>n_snap</code> snapshots are processed, <code>[n_out]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#baseband_freq_response">baseband_freq_response</a> (for processing a single snapshot) 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>hmat_re</code></b> — Real part of frequency-domain channel matrices, vector of <code>n_out</code> cubes <code>[n_rx, n_tx, n_carriers]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>hmat_im</code></b> — Imaginary part of frequency-domain channel matrices, same structure as <code>hmat_re</code> 
 </li></ul>
 </li>
 </ul>

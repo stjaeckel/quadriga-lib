@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,50 +23,45 @@ SECTION!*/
 
 /*!MD
 # any_type_id
-Get type ID and raw access from a 'std::any' object
+Get type ID and raw access from a `std::any` object
 
 ## Description:
-- Inspects a `std::any` object and returns a type identifier for its contents.
-- Optionally retrieves the dimensions of the object (if it is a matrix, vector, or cube).
-- Optionally retrieves a raw pointer to the internal data.
-- **Warning:** Accessing data through `dataptr` is not type-safe and bypasses `const` protection. Use with extreme caution.
+- Inspects a `std::any` object and returns an integer type identifier for its contents
+- Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for `std::string`, `dims[0]` is the string length, `dims[1]`/`dims[2]` are zero
+- Optionally retrieves a raw `void*` to the internal data — not type-safe, bypasses `const` protection; use with caution
 
 ## Declaration:
 ```
 int quadriga_lib::any_type_id(
-                const std::any *data,
-                unsigned long long *dims = nullptr,
-                void **dataptr = nullptr);
+    const std::any *data,
+    unsigned long long *dims = nullptr,
+    void **dataptr = nullptr);
 ```
 
-## Arguments:
-- `const std::any ***data**` (input)<br>
-  Pointer to the `std::any` object to inspect.
+## Input Arguments:
+- **`data`** — Pointer to the `std::any` object to inspect
 
-- `unsigned long long ***dims** = nullptr` (optional output)<br>
-  Pointer to an array of 3 integers that will hold the dimensions of the object:<br>
-  `dims[0]`, `dims[1]`, `dims[2]`: Number of rows, columns, slices (for Armadillo types).<br>
-  For `std::string`, `dims[0]` contains the string length, `dims[1]` and `dims[2]` are zero.
-
-- `void ****dataptr** = nullptr` (optional output)<br>
-  If not `nullptr`, returns a raw pointer to the object's internal data.  This allows direct access, **without** type safety or `const` protection.
+## Output Arguments:
+- **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
+- **`dataptr`** *(optional)* — Receives a raw pointer to the object's internal data
 
 ## Returns:
-- `int`<br>
-  Type ID corresponding to the content of the `std::any` object. Values are:<br><br>
-    ID | Type                       | ID | Type                       | ID | Type
-    ---|----------------------------|----|----------------------------|----|------------------------
-    -2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
-    10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
-    13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
-    20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
-    23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
-    30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
-    33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
-    40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
-    43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
-    50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
-    53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
+Integer type ID of the contained value:
+
+ID | Type                       | ID | Type                       | ID | Type
+---|----------------------------|----|----------------------------|----|------------------------
+-2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
+10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
+13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
+20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
+23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
+30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
+33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
+40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
+43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
+50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
+53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
+
 MD!*/
 
 // Returns type ID of a std::any field:
@@ -84,7 +79,7 @@ int quadriga_lib::any_type_id(const std::any *par_data, unsigned long long *dims
         {
             auto *data = std::any_cast<std::string>(par_data);
             if (dims != nullptr)
-                *dims = (unsigned long long)data->length();
+                dims[0] = (unsigned long long)data->length(), dims[1] = 0ULL, dims[2] = 0ULL;
             if (dataptr != nullptr)
                 *dataptr = (void *)data->c_str();
         }
