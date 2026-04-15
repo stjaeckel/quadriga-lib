@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,68 +23,39 @@ SECTION!*/
 
 /*!MD
 # icosphere
-Construct a geodesic polyhedron (icosphere) from triangles
+Construct a geodesic polyhedron from recursive icosahedron subdivision
 
 ## Description:
-- Generates a convex polyhedral surface (icosphere) made entirely of triangles, based on recursive subdivision of an icosahedron.
-- Useful for sampling directions uniformly on a sphere, for applications like ray tracing, antenna pattern evaluation, or spatial grids.
-- Each triangular face points outward from the center and has an associated normal.
-- Optionally returns vertex directions and vector lengths in either Cartesian or spherical coordinates.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Produces 20 × n_div² triangular faces, each pointing outward from origin
+- All vertices lie on a sphere of specified radius
+- Suitable for uniform angular sampling (ray tracing, antenna patterns, spatial grids)
+- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 arma::uword quadriga_lib::icosphere(
-                arma::uword n_div,
-                dtype radius,
-                arma::Mat<dtype> *center,
-                arma::Col<dtype> *length = nullptr,
-                arma::Mat<dtype> *vert = nullptr,
-                arma::Mat<dtype> *direction = nullptr,
-                bool direction_xyz = false);
+    arma::uword n_div,
+    dtype radius,
+    arma::Mat<dtype> *center,
+    arma::Col<dtype> *length = nullptr,
+    arma::Mat<dtype> *vert = nullptr,
+    arma::Mat<dtype> *direction = nullptr,
+    bool direction_xyz = false);
 ```
 
-## Arguments:
-- `arma::uword **n_div**` (input)<br>
-  Number of subdivisions per triangle edge. The total number of faces will be `n_faces = 20 × n_div²`.
+## Input Arguments:
+- **`n_div`** — Number of subdivisions; generates 20 × n_div² faces
+- **`radius`** — Radius of icosphere in meters
+- **`direction_xyz`** (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
 
-- `dtype **radius**` (input)<br>
-  Radius of the icosphere in meters. All triangle vertices lie on this sphere.
-
-- `arma::Mat<dtype> ***center**` (output)<br>
-  Unit vectors pointing from the origin to the center of each triangle face. Usually a bit shorter than `radius`, Size `[n_faces, 3]`.
-
-- `arma::Col<dtype> ***length** = nullptr` (optional output)<br>
-  Vector magnitudes of each `center` vector (usually slightly less than `radius`). Vector size `[n_faces]`.
-
-- `arma::Mat<dtype> ***vert** = nullptr` (optional output)<br>
-  Vertex vectors from each triangle’s center to its three vertices, flattened as `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`. Size `[n_faces, 9]`.
-
-- `arma::Mat<dtype> ***direction** = nullptr` (optional output)<br>
-  Direction vectors of the three triangle edges. Format depends on `direction_xyz`: If `false` 
-  (spherical): `[v1az, v1el, v2az, v2el, v3az, v3el]`, If `true` (Cartesian): `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`,
-  Size `[n_faces, 6]` or `[n_faces, 9]`.
-
-- `bool **direction_xyz** = false` (optional input)<br>
-  If `true`, output directions in Cartesian coordinates. If `false`, output in spherical azimuth/elevation. Default: `false`.
+## Output Arguments:
+- **`center`** — Unit vectors to triangle face centers, `[n_faces, 3]`
+- **`length`** (optional) — Magnitude of each `center` vector, `[n_faces]`
+- **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3], `[n_faces, 9]`
+- **`direction`** (optional) — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag, `[n_faces, 6]` or `[n_faces, 9]`
 
 ## Returns:
-- `arma::uword`<br>
-  The number of triangular faces generated: `n_faces = 20 × n_div²`.
-
-## Technical Notes:
-- The generated mesh is well-suited for uniform angular sampling on a sphere.
-- Triangle vertices are calculated relative to the center to ensure they lie on the desired sphere.
-- The radius parameter scales the final structure without changing angular spacing.
-
-## Example:
-```
-arma::fmat center, vert, direction;
-arma::fvec length;
-
-// 4 subdivisions → 320 faces, map to unit sphere, output Cartesian directions
-auto n = quadriga_lib::icosphere<float>(4, 1.0, &center, &length, &vert, &direction, true);
-```
+Number of generated triangular faces (20 × n_div²)
 MD!*/
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles

@@ -430,7 +430,7 @@ namespace quadriga_lib
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
-    void ray_mesh_interact(int interaction_type,                          // 0 = reflection, 1 = transmission, 2 = refraction
+    void ray_mesh_interact(int interaction_type,                          // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
                            dtype center_frequency,                        // Center frequency in [Hz]
                            const arma::Mat<dtype> *orig,                  // Ray origins in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *dest,                  // Ray destinations in GCS, [n_ray, 3]

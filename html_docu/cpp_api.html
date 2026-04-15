@@ -63,17 +63,17 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td style="padding-bottom: 10px;"><a href="#arrayant">arrayant</a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
-<tr><td><a href="#.append">.append</a></td><td>Append elements of another antenna array</td></tr>
-<tr><td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td><td>Calculate the directivity (in dBi) of array antenna elements</td></tr>
-<tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
-<tr><td><a href="#.copy_element">.copy_element</a></td><td>Creates a copy of a single array antenna element</td></tr>
-<tr><td><a href="#.export_obj_file">.export_obj_file</a></td><td>Export antenna pattern geometry to Wavefront OBJ file</td></tr>
-<tr><td><a href="#.interpolate">.interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
-<tr><td><a href="#.is_valid">.is_valid</a></td><td>Validate integrity of antenna array object</td></tr>
-<tr><td><a href="#.qdant_write">.qdant_write</a></td><td>Write array antenna object and layout to QDANT file</td></tr>
-<tr><td><a href="#.remove_zeros">.remove_zeros</a></td><td>Remove zeros from antenna pattern data</td></tr>
-<tr><td><a href="#.rotate_pattern">.rotate_pattern</a></td><td>Adjust orientation of antenna patterns</td></tr>
-<tr><td><a href="#.set_size">.set_size</a></td><td>Change size of antenna array object</td></tr>
+<tr><td><a href="#.append">.append</a></td><td>Append elements of another arrayant to the current one</td></tr>
+<tr><td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td><td>Calculate the directivity in dBi of a single array element</td></tr>
+<tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
+<tr><td><a href="#.copy_element">.copy_element</a></td><td>Copy a single antenna element to one or more destination slots</td></tr>
+<tr><td><a href="#.export_obj_file">.export_obj_file</a></td><td>Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization</td></tr>
+<tr><td><a href="#.interpolate">.interpolate</a></td><td>Interpolate polarimetric antenna field patterns for given azimuth/elevation angles</td></tr>
+<tr><td><a href="#.is_valid">.is_valid</a></td><td>Validate the integrity of an arrayant object</td></tr>
+<tr><td><a href="#.qdant_write">.qdant_write</a></td><td>Write arrayant data to a QDANT (XML) file</td></tr>
+<tr><td><a href="#.remove_zeros">.remove_zeros</a></td><td>Remove zero-valued entries from antenna pattern data, reducing its size</td></tr>
+<tr><td><a href="#.rotate_pattern">.rotate_pattern</a></td><td>Rotate antenna radiation patterns around the principal axes using Euler rotations</td></tr>
+<tr><td><a href="#.set_size">.set_size</a></td><td>Resize an arrayant object to new dimensions</td></tr>
 </tbody>
 </table>
 </ul>
@@ -196,7 +196,7 @@
 <tr><td><a href="#combine_irs_coord">combine_irs_coord</a></td><td>Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS)</td></tr>
 <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length and angles</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
-<tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere) from triangles</td></tr>
+<tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read Wavefront `.obj` file and extract geometry and material information</td></tr>
 <tr><td><a href="#obj_overlap_test">obj_overlap_test</a></td><td>Detect overlapping 3D objects in a triangular mesh</td></tr>
@@ -231,214 +231,224 @@
 <b>arrayant</b> - Class for storing and manipulating array antenna models
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">An array antenna consists of multiple individual elements. 
-</li><li style="margin-bottom: 0.4em;">Each element occupies a specific position relative to the array's phase-center, its local origin. 
-</li><li style="margin-bottom: 0.4em;">Elements can also be inter-coupled, represented by a coupling matrix. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Represents a multi-element antenna array; each element has a position relative to the array phase-center 
+</li><li style="margin-bottom: 0.4em;">Elements may be inter-coupled via a complex coupling matrix 
+</li><li style="margin-bottom: 0.4em;">Field pattern cubes <code>e_theta_re/im</code>, <code>e_phi_re/im</code> must all be <code>[n_elevation, n_azimuth, n_elements]</code> 
+</li><li style="margin-bottom: 0.4em;"><code>element_pos</code> is optional (empty = all elements at origin); <code>coupling_re/im</code> are optional (empty = identity) 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Attributes:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th>Attribute</th>
+  <th>Size</th>
+  <th>Description</th>
+  <th></th>
+</tr>
+<tr>
   <td><code>arma::Cube&lt;dtype&gt; e_theta_re</code></td>
-  <td>Vertical component of the electric field, real part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>E-theta (vertical) field, real part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Cube&lt;dtype&gt; e_theta_im</code></td>
-  <td>Vertical component of the electric field, imaginary part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>E-theta (vertical) field, imaginary part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Cube&lt;dtype&gt; e_phi_re</code></td>
-  <td>Horizontal component of the electric field, real part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>E-phi (horizontal) field, real part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Cube&lt;dtype&gt; e_phi_im</code></td>
-  <td>Horizontal component of the electric field, imaginary part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+  <td>E-phi (horizontal) field, imaginary part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Col&lt;dtype&gt; azimuth_grid</code></td>
-  <td>Azimuth angles in pattern (theta) in [rad], between -pi and pi, sorted</td>
+  <td><code>[n_azimuth]</code></td>
+  <td>Azimuth angles in rad, in [-pi, pi], sorted</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Col&lt;dtype&gt; elevation_grid</code></td>
-  <td>Elevation angles in pattern (phi) in [rad], between -pi/2 and pi/2, sorted</td>
+  <td><code>[n_elevation]</code></td>
+  <td>Elevation angles in rad, in [-pi/2, pi/2], sorted</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Mat&lt;dtype&gt; element_pos</code></td>
-  <td>Element positions (optional), Size: Empty or [3, n_elements]</td>
+  <td><code>[3, n_elements]</code> or empty</td>
+  <td>Element positions in local Cartesian coords</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Mat&lt;dtype&gt; coupling_re</code></td>
-  <td>Coupling matrix, real part (optional), Size: [n_elements, n_ports]</td>
+  <td><code>[n_elements, n_ports]</code></td>
+  <td>Coupling matrix, real part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>arma::Mat&lt;dtype&gt; coupling_im</code></td>
-  <td>Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]</td>
+  <td><code>[n_elements, n_ports]</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>dtype center_frequency</code></td>
-  <td>Center frequency in [Hz]</td>
+  <td>scalar</td>
+  <td>Center frequency in Hz</td>
+  <td></td>
 </tr>
 </table><br>
- 
-<ul><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
-</li><li style="margin-bottom: 0.4em;"><code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code> must have size <code>[n_elevation, n_azimuth, n_elements]</code> 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-float pi = arma::datum::pi;
-
-quadriga_lib::arrayant&lt;float&gt; ant;
-ant.azimuth_grid = {-0.75f * pi, 0.0f, 0.75f * pi, pi};
-ant.elevation_grid = {-0.45f * pi, 0.0f, 0.45f * pi};
-
-arma::mat A = arma::linspace(1.0, 12.0, 12);
-A.reshape(3, 4);
-
-arma::fcube B;
-B.zeros(3, 4, 1);
-B.slice(0) = arma::conv_to&lt;arma::fmat&gt;::from(A);
-
-ant.e_theta_re = B * 0.5f;
-ant.e_theta_im = B * 0.002f;
-ant.e_phi_re = -B;
-ant.e_phi_im = -B * 0.001f;
-
-arma::fmat C = {1.0f, 2.0f, 4.0f};
-ant.element_pos = C.t();
-
-ant.coupling_re = {1.0f};
-ant.coupling_im = {0.1f};
-ant.center_frequency = 2.0e9f;
-ant.name = "name";
-</pre>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Simple member functions:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th>Function</th>
+  <th>Description</th>
+  <th></th>
+</tr>
+<tr>
   <td><code>.n_elevation()</code></td>
-  <td>Returns number of elevation angles as 64bit integer</td>
+  <td>Number of elevation angles</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.n_azimuth()</code></td>
-  <td>Returns number of azimuth angles as 64bit integer</td>
+  <td>Number of azimuth angles</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.n_elements()</code></td>
-  <td>Returns number of antenna elements as 64bit integer</td>
+  <td>Number of antenna elements</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.n_ports()</code></td>
-  <td>Returns number of ports (after coupling) as 64bit integer</td>
+  <td>Number of ports (columns of coupling matrix)</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.copy()</code></td>
-  <td>Creates a copy of the array antenna object</td>
+  <td>Returns a deep copy of the arrayant object</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.reset()</code></td>
-  <td>Reset the size to zero (the arrayant object will contain no data)</td>
+  <td>Clears all data, resetting size to zero</td>
+  <td></td>
 </tr>
 <tr>
   <td><code>.is_valid()</code></td>
-  <td>Returns an empty string if arrayant object is valid or an error message otherwise</td>
+  <td>Returns <code>""</code> if valid, or an error message string</td>
+  <td></td>
 </tr>
 </table><br>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Complex member fuctions:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
+<b><i>Complex member functions:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><a href="#.append">.append</a></td>
-  <td>Append elements of another antenna array</td>
+  <th>Function</th>
+  <th>Description</th>
+  <th></th>
 </tr>
 <tr>
-  <td><a href="#.calc_directivity_dbi">.calc_directivity_dbi</a></td>
-  <td>Calculate the directivity (in dBi) of array antenna elements</td>
+  <td><a href="#.append">.append</a></td>
+  <td>Append elements of another arrayant</td>
+  <td></td>
+</tr>
+<tr>
+  <td><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a></td>
+  <td>Calculate per-element directivity in dBi</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.combine_pattern">.combine_pattern</a></td>
-  <td>Calculate effective radiation patterns for array antennas</td>
+  <td>Compute effective patterns from elements, positions, and coupling</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.copy_element">.copy_element</a></td>
-  <td>Creates a copy of a single array antenna element</td>
+  <td>Copy a single element to one or more destination slots</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.export_obj_file">.export_obj_file</a></td>
-  <td>Export antenna pattern geometry to Wavefront OBJ file</td>
+  <td>Export pattern geometry to Wavefront OBJ</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.interpolate">.interpolate</a></td>
-  <td>Interpolate array antenna field patterns</td>
+  <td>Interpolate field patterns at given azimuth/elevation angles</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.qdant_write">.qdant_write</a></td>
-  <td>Write array antenna object and layout to QDANT file</td>
+  <td>Write arrayant to QDANT file</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.remove_zeros">.remove_zeros</a></td>
-  <td>Remove zeros from antenna pattern data</td>
+  <td>Remove zero-valued entries from pattern data</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.rotate_pattern">.rotate_pattern</a></td>
-  <td>Adjust orientation of antenna patterns</td>
+  <td>Rotate pattern and/or polarization via Euler angles</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.set_size">.set_size</a></td>
-  <td>Change size of antenna array object</td>
+  <td>Resize the arrayant to new dimensions</td>
+  <td></td>
 </tr>
 <tr>
   <td><a href="#.is_valid">.is_valid</a></td>
-  <td>Validate integrity of antenna array object</td>
+  <td>Validate arrayant integrity</td>
+  <td></td>
 </tr>
 </table><br>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".append"></a>
-<b>.append</b> - Append elements of another antenna array
+<b>.append</b> - Append elements of another arrayant to the current one
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Combines elements of another antenna array (<code>new_arrayant</code>) with the current antenna array object. 
-</li><li style="margin-bottom: 0.4em;">Returns a new <code>arrayant</code> object containing elements from both antenna arrays. 
-</li><li style="margin-bottom: 0.4em;">Throws an error if the sampling grids of the two antenna arrays do not match. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Both arrays must share identical sampling grids; throws otherwise 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::append(const arrayant&lt;dtype&gt; *new_arrayant) const;
+quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::append(
+    const arrayant&lt;dtype&gt; *new_arrayant) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arrayant&lt;dtype&gt; *new_arrayant</code> (input)<br> 
-   Pointer to an antenna array object whose elements will be added to the current object. Sampling grids must match exactly. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>new_arrayant</code></b> — Array whose elements are appended; sampling grid must match 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>quadriga_lib::arrayant&lt;dtype&gt;</code><br> 
-   A new antenna array object combining the current and new antenna elements. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">New <code>arrayant</code> containing all elements from both arrays 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-quadriga_lib::arrayant&lt;double&gt; ant1 = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-quadriga_lib::arrayant&lt;double&gt; ant2 = quadriga_lib::generate_arrayant_custom&lt;double&gt;(120.0, 60.0, 0.0);
-quadriga_lib::arrayant&lt;double&gt; combined_ant = ant1.append(&amp;ant2);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".calc_directivity_dbi"></a>
-<b>.calc_directivity_dbi</b> - Calculate the directivity (in dBi) of array antenna elements
+<b>.calc_directivity_dbi</b> - Calculate the directivity in dBi of a single array element
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
-</li><li style="margin-bottom: 0.4em;">Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted 
-   is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction 
-   from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity 
-   of a hypothetical isotropic radiator is 1, or 0 dBi. 
+</li><li style="margin-bottom: 0.4em;">Directivity = 10 * log10(radiation intensity in given direction / mean radiation intensity over all directions); isotropic radiator = 0 dBi 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
@@ -448,315 +458,160 @@ dtype quadriga_lib::arrayant&lt;dtype&gt;::calc_directivity_dBi(arma::uword i_el
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>i_element</b></code><br> 
-   Element index, 0-based<br> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> — Element index, 0-based 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_dipole&lt;float&gt;();
-float directivity = ant.calc_directivity_dBi( 0 );
-</pre>
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Directivity of the specified element in dBi 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".combine_pattern"></a>
-<b>.combine_pattern</b> - Calculate effective radiation patterns for array antennas
+<b>.combine_pattern</b> - Combine element patterns, positions, and coupling weights into effective radiation patterns
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
-</li><li style="margin-bottom: 0.4em;">By integrating element radiation patterns, element positions, and the coupling weights, one can 
-   determine an effective radiation pattern observable by a receiver in the antenna's far field. 
-</li><li style="margin-bottom: 0.4em;">Leveraging these effective patterns is especially beneficial in antenna design, beamforming 
-   applications such as in 5G systems, and in planning wireless communication networks in complex 
-   environments like urban areas. This streamlined approach offers a significant boost in computation 
-   speed when calculating MIMO channel coefficients, as it reduces the number of necessary operations. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li><li style="margin-bottom: 0.4em;">Integrates <code>e_theta_re/im</code>, <code>e_phi_re/im</code>, <code>element_pos</code>, and <code>coupling_re/im</code> to produce one output element per port (column) of the coupling matrix 
+</li><li style="margin-bottom: 0.4em;">Useful for beamforming and MIMO channel computation speedup 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::combine_pattern(
-                const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
-                const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr) const;
+    const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
+    const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*azimuth_grid_new</b></code> (optional)<br> 
-   Azimuth angle grid of the output array antenna in [rad], between -pi and pi, sorted 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*elevation_grid_new</b></code> (optional)<br> 
-   Elevation angle grid of the output array antenna in [rad], between -pi/2 and pi/2, sorted 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid 
+</li><li style="margin-bottom: 0.4em;"><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_omni&lt;double&gt;();  // Generate omni antenna
-ant.copy_element(0, 1);                                     // Duplicate the first element
-ant.element_pos.row(1) = {-0.25, 0.25};                     // Set element positions (in lambda)
-ant.coupling_re.ones(2, 1);                                 // Set coupling matrix (real part)
-ant.coupling_im.reset();                                    // Remove imaginary part
-ant = ant.combine_pattern();                                // Calculate the combined pattern
-</pre>
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">New <code>arrayant</code> with <code>n_ports</code> elements (= number of columns in <code>coupling_re/im</code>), each holding the combined effective pattern for that port 
+</li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".copy_element"></a>
-<b>.copy_element</b> - Creates a copy of a single array antenna element
+<b>.copy_element</b> - Copy a single antenna element to one or more destination slots
 <ul>
 <li style="margin-bottom: 1.5em;">
 <b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> and <code>double</code> 
+</li><li style="margin-bottom: 0.4em;">Array is resized if any destination index exceeds the current number of elements 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
-void quadriga_lib::arrayant&lt;dtype&gt;::copy_element(arma::uword source, arma::uvec destination);
-
 void quadriga_lib::arrayant&lt;dtype&gt;::copy_element(arma::uword source, arma::uword destination);
+void quadriga_lib::arrayant&lt;dtype&gt;::copy_element(arma::uword source, arma::uvec destination);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>source</b></code> (optional)<br> 
-   Index of the source element (0-based) 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>source</code></b> — Index of the element to copy, 0-based 
+</li><li style="margin-bottom: 0.4em;"><b><code>destination</code></b> — Target index or indices, 0-based; array resizes to fit the maximum index 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>destination</b></code> or <code>arma::uword <b>destination</b></code><br> 
-   Index of the destinations element (0-based), either as a vector or as a scalar. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_omni&lt;double&gt;();  // Generate omni antenna
-ant.copy_element(0, 1);                                     // Duplicate the first element
-ant.copy_element(1, {2,3});                                 // Duplicate multiple times
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".export_obj_file"></a>
-<b>.export_obj_file</b> - Export antenna pattern geometry to Wavefront OBJ file
+<b>.export_obj_file</b> - Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function exports the antenna pattern geometry to a Wavefront OBJ file, useful for visualization in 3D software such as Blender. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Pattern is mapped onto an icosphere; higher <code>icosphere_n_div</code> gives finer mesh 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::export_obj_file(
-                std::string fn,
-                dtype directivity_range = 30.0,
-                std::string colormap = "jet",
-                dtype object_radius = 1.0,
-                arma::uword icosphere_n_div = 4,
-                arma::uvec i_element = {}) const;
+    std::string fn,
+    dtype directivity_range = 30.0,
+    std::string colormap = "jet",
+    dtype object_radius = 1.0,
+    arma::uword icosphere_n_div = 4,
+    arma::uvec i_element = {}) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the OBJ file to which the antenna pattern will be exported. Cannot be empty. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Output OBJ filename; must not be empty; filename must end in .obj 
+</li><li style="margin-bottom: 0.4em;"><b><code>directivity_range</code></b> <i>(optional)</i> — Dynamic range of the visualized directivity pattern in dB 
+</li><li style="margin-bottom: 0.4em;"><b><code>colormap</code></b> <i>(optional)</i> — Colormap name; see <a href="#colormap">colormap</a> for supported options 
+</li><li style="margin-bottom: 0.4em;"><b><code>object_radius</code></b> <i>(optional)</i> — Radius of the exported geometry object in meters 
+</li><li style="margin-bottom: 0.4em;"><b><code>icosphere_n_div</code></b> <i>(optional)</i> — Icosphere subdivision count; higher = finer mesh, see <a href="#icosphere">icosphere</a> 
+</li><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> <i>(optional)</i> — 0-based element indices to export; <code>{}</code> exports all elements 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>directivity_range</b> = 30.0</code> (optional input)<br> 
-   Directivity range in decibels (dB) for visualizing the antenna pattern. This value defines the 
-   dynamic range of the visualized directivity pattern. Default: <code>30.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>std::string <b>colormap</b> = "jet"</code> (optional input)<br> 
-   Colormap used for visualizing the antenna directivity. Supported colormaps are: <code>jet</code>, 
-   <code>parula</code>, <code>winter</code>, <code>hot</code>, <code>turbo</code>, <code>copper</code>, <code>spring</code>, <code>cool</code>, <code>gray</code>, <code>autumn</code>, <code>summer</code>. 
-   Default: <code>"jet"</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>object_radius</b> = 1.0</code> (optional input)<br> 
-   Radius of the exported antenna pattern geometry object, specified in meters. Default: <code>1.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>icosphere_n_div</b> = 4</code> (optional input)<br> 
-   Number of subdivisions used to map the antenna pattern onto an icosphere. Higher values yield finer 
-   mesh resolution. Default: <code>4</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>i_element</b> = {}</code> (optional input)<br> 
-   Antenna element indices for which the pattern geometry is exported. Indices are 0-based. Providing 
-   an empty vector <code>{}</code> (default) exports the geometry for all elements of the antenna array. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-ant.export_obj_file("antenna_pattern.obj", 40.0, "turbo", 1.5, 5);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".interpolate"></a>
-<b>.interpolate</b> - Interpolate array antenna field patterns
+<b>.interpolate</b> - Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function interpolates polarimetric antenna field patterns for a given set of azimuth and 
-   elevation angles. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Outputs complex e-theta (V) and e-phi (H) field components at requested angles 
+</li><li style="margin-bottom: 0.4em;"><code>n_out</code> equals <code>n_elements</code> when <code>i_element</code> is omitted; equals <code>len(i_element)</code> otherwise 
+</li><li style="margin-bottom: 0.4em;">Azimuth input supports planar wave mode (<code>[1, n_ang]</code>) or per-element spherical wave mode (<code>[n_out, n_ang]</code>) 
+</li><li style="margin-bottom: 0.4em;">Output matrices are resized automatically if dimensions do not match; this invalidates existing data pointers 
+</li><li style="margin-bottom: 0.4em;"><code>dist</code> is the projection of element positions onto the plane normal to the incident path — needed for phase computation 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::interpolate(
-                const arma::Mat&lt;dtype&gt; *azimuth,
-                const arma::Mat&lt;dtype&gt; *elevation,
-                arma::Mat&lt;dtype&gt; *V_re, arma::Mat&lt;dtype&gt; *V_im,
-                arma::Mat&lt;dtype&gt; *H_re, arma::Mat&lt;dtype&gt; *H_im,
-                arma::uvec i_element,
-                const arma::Cube&lt;dtype&gt; *orientation,
-                const arma::Mat&lt;dtype&gt; *element_pos_i,
-                arma::Mat&lt;dtype&gt; *dist,
-                arma::Mat&lt;dtype&gt; *azimuth_loc, arma::Mat&lt;dtype&gt; *elevation_loc,
-                arma::Mat&lt;dtype&gt; *gamma) const;
+    const arma::Mat&lt;dtype&gt; *azimuth,
+    const arma::Mat&lt;dtype&gt; *elevation,
+    arma::Mat&lt;dtype&gt; *V_re, arma::Mat&lt;dtype&gt; *V_im,
+    arma::Mat&lt;dtype&gt; *H_re, arma::Mat&lt;dtype&gt; *H_im,
+    arma::uvec i_element = {},
+    const arma::Cube&lt;dtype&gt; *orientation = nullptr,
+    const arma::Mat&lt;dtype&gt; *element_pos_i = nullptr,
+    arma::Mat&lt;dtype&gt; *dist = nullptr,
+    arma::Mat&lt;dtype&gt; *azimuth_loc = nullptr,
+    arma::Mat&lt;dtype&gt; *elevation_loc = nullptr,
+    arma::Mat&lt;dtype&gt; *gamma = nullptr) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*azimuth</b></code> (input)<br> 
-   Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be 
-   between -pi and pi, cannot be NULL 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>Option 1:</td>
-  <td>Use the same angles for all antenna elements (planar wave approximation)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
-</tr>
-<tr>
-  <td>Option 2:</td>
-  <td>Provide different angles for each array element (e.g. for spherical waves)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
-</tr>
-</table><br>
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b> — Azimuth angles in rad, in [-pi, pi]; <code>[1, n_ang]</code> or <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>elevation</code></b> — Elevation angles in rad, in [-pi/2, pi/2]; <code>[1, n_ang]</code> or <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>i_element</code></b> <i>(optional)</i> — Element indices (0-based) to interpolate; duplicates allowed; defaults to all elements, <code>[n_out]</code> or <code>{}</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>orientation</code></b> <i>(optional)</i> — Euler angles (bank, tilt, heading) in rad; <code>nullptr</code>, <code>[3, 1]</code>, <code>[3, n_out]</code>, <code>[3, 1, n_ang]</code>, or <code>[3, n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>element_pos_i</code></b> <i>(optional)</i> — Override element positions in m; <code>nullptr</code> uses <code>arrayant.element_pos</code>; <code>[3, n_out]</code> 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*elevation</b></code> (input)<br> 
-   Elevation angles in [rad] for which the field pattern should be interpolated. Values must be 
-   between -pi/2 and pi/2, cannot be NULL 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>Option 1:</td>
-  <td>Use the same angles for all antenna elements (planar wave approximation)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
-</tr>
-<tr>
-  <td>Option 2:</td>
-  <td>Provide different angles for each array element (e.g. for spherical waves)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
-</tr>
-</table><br>
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*V_re</b></code> (output)<br> 
-   Real part of the interpolated e-theta (vertical) field component, Size <code>[n_out, n_ang]</code>, 
-   will be resized if it does not match the required size (invalidates data pointers), cannot be NULL 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*V_im</b></code> (output)<br> 
-   Imaginary part of the interpolated e-theta (vertical) field component, Size <code>[n_out, n_ang]</code> 
-   will be resized if it does not match the required size (invalidates data pointers), cannot be NULL 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*H_re</b></code> (output)<br> 
-   Real part of the interpolated e-phi (horizontal) field component, Size <code>[n_out, n_ang]</code> 
-   will be resized if it does not match the required size (invalidates data pointers), cannot be NULL 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*H_im</b></code> (output)<br> 
-   Imaginary part of the interpolated e-phi (horizontal) field component, Size <code>[n_out, n_ang]</code> 
-   will be resized if it does not match the required size (invalidates data pointers), cannot be NULL 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uvec <b>i_element</b> = {}</code> (optional input)<br> 
-   The element indices for which the interpolation should be done, optional argument, 
-   values must be between 1 and <code>n_elements</code>. It is possible to duplicate elements, i.e. by passing 
-   <code>{1,1,2}</code>. If this parameter is not provided (or an empty array is passed), <code>i_element</code> is initialized 
-   to include all elements of the array antenna. In this case, <code>n_out = n_elements</code>, 
-   Length: <code>n_out</code> or  empty <code>{}</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Cube&lt;dtype&gt; <b>*orientation</b> = nullptr</code> (optional input)<br> 
-   This (optional) 3-element vector allows for setting orientation of the array antenna or 
-   of individual elements using Euler angles (bank, tilt, heading); values must be given in [rad]; 
-   By default, the orientation is <code>{0,0,0}</code>, i.e. the broadside of the antenna points at the horizon 
-   towards the East. Sizes: <code>nullptr</code> (use default), <code>[3, 1]</code> (set orientation for entire array), 
-   <code>[3, n_out]</code> (set orientation for individual elements), or <code>[3, 1, n_ang]</code> (set orientation for 
-   individual angles) or <code>[3, n_out, n_ang]</code> (set orientation for individual elements and angles) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>const arma::Mat&lt;dtype&gt; <b>*element_pos_i</b> = nullptr</code> (optional input)<br> 
-   Positions of the array antenna elements in local cartesian coordinates (using units 
-   of [m]). If this parameter is not given, the element positions from the <code>arrayant</code> object are used. 
-   Sizes: <code>nullptr</code> (use <code>arrayant.element_pos</code>), <code>[3, n_out]</code> (set alternative positions) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*dist</b> = nullptr</code> (optional output)<br> 
-   The effective distances between the antenna elements when seen from the direction 
-   of the incident path. The distance is calculated by an projection of the array positions on the normal 
-   plane of the incident path. This is needed for calculating the phase of the antenna response. 
-   Size: <code>nullptr</code> (do not calculate this) or <code>[n_out, n_ang]</code> (argument be resized if it does not already 
-   match this size) 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*azimuth_loc</b> = nullptr</code> (optional output)<br> 
-   The azimuth angles in [rad] for the local antenna coordinate system, i.e., after 
-   applying the <code>orientation</code>. If no orientation vector is given, these angles are identical to the input 
-   azimuth angles. Size: <code>nullptr</code> or <code>[n_out, n_ang]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*elevation_loc</b> = nullptr</code> (optional output)<br> 
-   The elevation angles in [rad] for the local antenna coordinate system, i.e., after 
-   applying the <code>orientation</code>. If no orientation vector is given, these angles are identical to the input 
-   elevation angles. Size: <code>nullptr</code> or <code>[n_out, n_ang]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*gamma</b> = nullptr</code> (optional output)<br> 
-   Polarization rotation angles in [rad]. Size: <code>nullptr</code> or <code>[n_out, n_ang]</code> 
+</li>
+<li style="margin-bottom: 1.5em;">
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>V_re</code></b> / <b><code>V_im</code></b> — Real/imaginary e-theta (vertical) field component; <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>H_re</code></b> / <b><code>H_im</code></b> — Real/imaginary e-phi (horizontal) field component; <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>dist</code></b> <i>(optional)</i> — Element distances projected onto incident-path normal plane; <code>nullptr</code> or <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>azimuth_loc</code></b> <i>(optional)</i> — Azimuth angles in local (rotated) element frame in rad; <code>nullptr</code> or <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>elevation_loc</code></b> <i>(optional)</i> — Elevation angles in local element frame in rad; <code>nullptr</code> or <code>[n_out, n_ang]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>gamma</code></b> <i>(optional)</i> — Polarization rotation angles in rad; <code>nullptr</code> or <code>[n_out, n_ang]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Example:</i></b><br><pre>
-double pi = arma::datum::pi;
-
-// Directional antenna, pointing east
 auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-
-arma::mat azimuth = {0.0, 0.5 * pi, -0.5 * pi, pi};     // Azimuth angles: East, North, South, West
-arma::mat elevation(1, azimuth.n_elem);                 // Initialize to 0
-arma::mat V_re, V_im, H_re, H_im;                       // Output variables (uninitialized)
+arma::mat azimuth = {0.0, 0.5*pi, -0.5*pi, pi};
+arma::mat elevation(1, azimuth.n_elem);  // zeros
+arma::mat V_re, V_im, H_re, H_im;
 ant.interpolate(&amp;azimuth, &amp;elevation, &amp;V_re, &amp;V_im, &amp;H_re, &amp;H_im);
-V_re.print();
 </pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".is_valid"></a>
-<b>.is_valid</b> - Validate integrity of antenna array object
+<b>.is_valid</b> - Validate the integrity of an arrayant object
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Checks the integrity of an antenna array (<code>arrayant</code>) object. 
-</li><li style="margin-bottom: 0.4em;">Returns an empty string if the antenna object is valid. 
-</li><li style="margin-bottom: 0.4em;">Provides an error message describing any issue if the object is invalid. 
-</li><li style="margin-bottom: 0.4em;">A quick integrity check can be performed for efficiency. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Returns empty string if valid; otherwise returns a descriptive error message 
+</li><li style="margin-bottom: 0.4em;">Quick check (default) validates dimensions and structure; full check additionally verifies data values 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
@@ -766,89 +621,54 @@ std::string quadriga_lib::arrayant&lt;dtype&gt;::is_valid(bool quick_check = tru
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>bool <b>quick_check</b> = true</code> (optional input)<br> 
-   If set to <code>true</code> (default), performs a quick validation check. Setting it to <code>false</code> performs a more thorough validation. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>quick_check</code></b> <i>(optional)</i> — <code>true</code> for fast structural check, <code>false</code> for full data validation 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string</code><br> 
-   Returns an empty string (<code>""</code>) if the antenna object passes the integrity check; otherwise, returns an error message detailing the issue. 
+<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;">Empty string if valid; error message string if invalid 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-quadriga_lib::arrayant&lt;double&gt; ant;
-std::string result = ant.is_valid();
-if(result.empty()) {
-    std::cout &lt;&lt; "Antenna array is valid." &lt;&lt; std::endl;
-} else {
-    std::cout &lt;&lt; "Error: " &lt;&lt; result &lt;&lt; std::endl;
-}
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".qdant_write"></a>
-<b>.qdant_write</b> - Write array antenna object and layout to QDANT file
+<b>.qdant_write</b> - Write arrayant data to a QDANT (XML) file
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function writes array antenna patterns and their layout into the QuaDRiGa array antenna exchange 
-   format (QDANT), an XML-based file format 
-</li><li style="margin-bottom: 0.4em;">Multiple array antennas can be stored in the same file using the <code>id</code> parameter. 
-</li><li style="margin-bottom: 0.4em;">If writing to an exisiting file without specifying an <code>id</code>, the data gests appended at the end. 
-   The output <code>id_in_file</code> identifies the location inside the file. 
-</li><li style="margin-bottom: 0.4em;">An optional storage <code>layout</code> can be provided to organize data inside the file. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Multiple antennas can be stored in the same file using distinct <code>id</code> values 
+</li><li style="margin-bottom: 0.4em;">If <code>id = 0</code> and the file exists, the antenna is appended with <code>id = max_existing_id + 1</code> 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 unsigned quadriga_lib::arrayant&lt;dtype&gt;::qdant_write(
-                std::string fn,
-                unsigned id = 0,
-                arma::u32_mat layout = {}) const;
+    std::string fn,
+    unsigned id = 0,
+    arma::u32_mat layout = {}) const;
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>std::string <b>fn</b></code> (input)<br> 
-   Filename of the QDANT file to write the antenna pattern data. Cannot be empty. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>id</b> = 0</code> (optional input)<br> 
-   ID of the antenna to write into the file. If not provided or set to <code>0</code>, the antenna pattern is appended with a new ID equal to the maximum existing ID in the file plus one. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::u32_mat <b>layout</b> = {}</code> (optional input)<br> 
-   Layout specifying the organization of multiple antenna elements inside the file. This matrix must only contain element IDs present within the file. Default: empty matrix <code>{}</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>fn</code></b> — Output QDANT filename; must not be empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>id</code></b> <i>(optional)</i> — Target ID in file; <code>0</code> appends with auto-assigned ID 
+</li><li style="margin-bottom: 0.4em;"><b><code>layout</code></b> <i>(optional)</i> — Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>unsigned</code><br> 
-   Returns the ID assigned to the antenna pattern within the file after writing. 
-</li></ul>
+<b><i>Returns:</i></b><br>ID assigned to the written antenna within the file
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-quadriga_lib::arrayant&lt;double&gt; ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-unsigned ant_id = ant.qdant_write("antenna_data.qdant");
-</pre>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#arrayant">arrayant</a> 
-</li><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> 
-</li><li style="margin-bottom: 0.4em;">QuaDRiGa Array Antenna Exchange Format  (<a href="formats.html#6cab4884">QDANT</a>) 
+<b><i>See also:</i></b><br><ul><li style="margin-bottom: 0.4em;"><a href="#qdant_read">qdant_read</a> (read back QDANT files) 
 </li></ul>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".remove_zeros"></a>
-<b>.remove_zeros</b> - Remove zeros from antenna pattern data
+<b>.remove_zeros</b> - Remove zero-valued entries from antenna pattern data, reducing its size
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">This function removes zeros from the antenna pattern data, altering its size accordingly. 
-</li><li style="margin-bottom: 0.4em;">If called without an argument, the function modifies the antenna array properties in place. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Modifies in-place when <code>output = nullptr</code>; otherwise writes to <code>*output</code> 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
@@ -858,189 +678,123 @@ void quadriga_lib::arrayant&lt;dtype&gt;::remove_zeros(arrayant&lt;dtype&gt; *ou
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt; <b>*output</b> = nullptr</code> (optional output)<br> 
-   Pointer to an antenna array object where the modified pattern data is should be written to. If set 
-   to <code>nullptr</code> (default), the modifications are applied directly to the calling antenna object. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>output</code></b> <i>(optional)</i> — Target arrayant to write result to; <code>nullptr</code> modifies in-place 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-ant.remove_zeros(); // Modifies ant in-place
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".rotate_pattern"></a>
-<b>.rotate_pattern</b> - Adjust orientation of antenna patterns
+<b>.rotate_pattern</b> - Rotate antenna radiation patterns around the principal axes using Euler rotations
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Adjusts the orientation of antenna radiation patterns by performing precise rotations around the 
-   three principal axes (x, y, z) of the local Cartesian coordinate system (Euler rotations) 
-</li><li style="margin-bottom: 0.4em;">Transforms both uniformly and non-uniformly sampled antenna patterns, useful for precise adjustments 
-   in antennas like parabolic antennas with small apertures. 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">Rotates pattern and/or polarization around x (bank), y (tilt), z (heading) axes in degrees 
+</li><li style="margin-bottom: 0.4em;">Modes 0/1: after rotation, the angular sampling grid is adjusted to follow the rotated pattern — needed for non-uniform grids (e.g. parabolic antennas with small apertures) 
+</li><li style="margin-bottom: 0.4em;">Modes 3/4: grid stays fixed after rotation — correct for uniformly sampled patterns where the original grid structure should be preserved 
+</li><li style="margin-bottom: 0.4em;">Modifies in-place when <code>output = nullptr</code>; otherwise writes to <code>*output</code> 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
-                dtype x_deg = 0.0,
-                dtype y_deg = 0.0,
-                dtype z_deg = 0.0,
-                unsigned usage = 0,
-                unsigned element = -1,
-                arrayant&lt;dtype&gt; *output = nullptr);
+    dtype x_deg = 0.0,
+    dtype y_deg = 0.0,
+    dtype z_deg = 0.0,
+    unsigned usage = 0,
+    unsigned element = -1,
+    arrayant&lt;dtype&gt; *output = nullptr);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>dtype <b>x_deg</b> = 0.0</code> (optional input)<br> 
-   Rotation angle around the x-axis (bank angle), specified in degrees. Default: <code>0.0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>x_deg</code></b> <i>(optional)</i> — Rotation around x-axis (bank) in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>y_deg</code></b> <i>(optional)</i> — Rotation around y-axis (tilt) in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>z_deg</code></b> <i>(optional)</i> — Rotation around z-axis (heading) in degrees 
+</li><li style="margin-bottom: 0.4em;"><b><code>usage</code></b> <i>(optional)</i> — Rotation mode: 
 </li></ul>
  
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>y_deg</b> = 0.0</code> (optional input)<br> 
-   Rotation angle around the y-axis (tilt angle), specified in degrees. Default: <code>0.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>z_deg</b> = 0.0</code> (optional input)<br> 
-   Rotation angle around the z-axis (heading angle), specified in degrees. Default: <code>0.0</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>usage</b> = 0</code> (optional input)<br> 
-   Rotation usage model, specifying which components to rotate: 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <td><code>0</code></td>
-  <td>Rotate both pattern and polarization (with grid adjustment for non-uniform grids),</td>
-</tr>
-<tr>
-  <td><code>1</code></td>
-  <td>Rotate only pattern (with grid adjustment for non-uniform grids),</td>
-</tr>
-<tr>
-  <td><code>2</code></td>
-  <td>Rotate only polarization,</td>
-</tr>
-<tr>
-  <td><code>3</code></td>
-  <td>Rotate both pattern and polarization without adjusting the grid,</td>
-</tr>
-<tr>
-  <td><code>4</code></td>
-  <td>Rotate only pattern without adjusting the grid</td>
-</tr>
-</table><br>
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>unsigned <b>element</b> = -1</code> (optional input)<br> 
-   Index of the antenna element (0-based) to rotate. Default (<code>-1</code>) applies rotation to all elements. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arrayant&lt;dtype&gt; <b>output</b> = nullptr</code> (optional output)<br> 
-   Pointer to an antenna array object to store the modified pattern data. If <code>nullptr</code> (default), modifications are applied directly to the calling antenna object. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Usage Modes:</i></b><br><table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
+  <th></th>
   <th>Mode</th>
   <th>Pattern</th>
   <th>Polarization</th>
-  <th>Grid Adjustment</th>
+  <th>Grid adjustment</th>
+  <th></th>
 </tr>
 <tr>
+  <td></td>
   <td>0</td>
   <td>Yes</td>
   <td>Yes</td>
   <td>Yes</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Yes</td>
   <td>No</td>
   <td>Yes</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>No</td>
   <td>Yes</td>
   <td>No</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>Yes</td>
   <td>Yes</td>
   <td>No</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>Yes</td>
   <td>No</td>
   <td>No</td>
+  <td></td>
 </tr>
 </table><br>
  
-<ul><li style="margin-bottom: 0.4em;">Modes 0 and 1 adjust the angular sampling grid when the input grid is non-uniform (e.g. for parabolic 
-   antennas with small apertures). This ensures the rotated pattern is properly sampled. 
-</li><li style="margin-bottom: 0.4em;">Modes 3 and 4 skip grid adjustment, which is faster and preserves the original grid structure. This 
-   is appropriate for uniformly sampled patterns such as loudspeaker models generated by <code>generate_speaker</code>. 
-</li><li style="margin-bottom: 0.4em;">Mode 4 is particularly useful for rotating loudspeaker directivity patterns where the acoustic 
-   pressure field is scalar (stored only in <code>e_theta_re</code>) and polarization rotation has no physical meaning. 
+<ul><li style="margin-bottom: 0.4em;"><b><code>element</code></b> <i>(optional)</i> — 0-based element index to rotate; <code>-1</code> rotates all elements 
+</li><li style="margin-bottom: 0.4em;"><b><code>output</code></b> <i>(optional)</i> — Target arrayant; <code>nullptr</code> modifies in-place 
 </li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-auto ant = quadriga_lib::generate_arrayant_custom&lt;double&gt;(90.0, 90.0, 0.0);
-ant.rotate_pattern(0.0, 0.0, 45.0);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".set_size"></a>
-<b>.set_size</b> - Change size of antenna array object
+<b>.set_size</b> - Resize an arrayant object to new dimensions
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Changes the size of an antenna array (<code>arrayant</code>) without explicitly preserving existing data. 
-</li><li style="margin-bottom: 0.4em;">Resets <code>element_pos</code> to zero and sets <code>coupling_re</code> and <code>coupling_im</code> to identity matrices. 
-</li><li style="margin-bottom: 0.4em;">Other properties may contain undefined or garbage data after resizing 
-</li><li style="margin-bottom: 0.4em;">Size update is performed only if the existing size differs from the specified new size 
-</li><li style="margin-bottom: 0.4em;">Function returns an error if the antenna object is marked as read-only 
-</li><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Member function of <a href="#arrayant">arrayant</a> 
+</li><li style="margin-bottom: 0.4em;">No-op if current dimensions already match; errors if object is read-only 
+</li><li style="margin-bottom: 0.4em;">After resize: element_pos is zeroed, coupling_re set to identity, coupling_im zeroed; all other field data is undefined 
 </li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 void quadriga_lib::arrayant&lt;dtype&gt;::set_size(
-                arma::uword n_elevation,
-                arma::uword n_azimuth,
-                arma::uword n_elements,
-                arma::uword n_ports);
+    arma::uword n_elevation,
+    arma::uword n_azimuth,
+    arma::uword n_elements,
+    arma::uword n_ports);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_elevation</b></code> (input)<br> 
-   Number of elevation angles to resize to. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>n_elevation</code></b> — Number of elevation samples 
+</li><li style="margin-bottom: 0.4em;"><b><code>n_azimuth</code></b> — Number of azimuth samples 
+</li><li style="margin-bottom: 0.4em;"><b><code>n_elements</code></b> — Number of antenna elements 
+</li><li style="margin-bottom: 0.4em;"><b><code>n_ports</code></b> — Number of ports (columns of coupling matrix) 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_azimuth</b></code> (input)<br> 
-   Number of azimuth angles to resize to. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_elements</b></code> (input)<br> 
-   Number of antenna elements in the array after resizing. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_ports</b></code> (input)<br> 
-   Number of ports (after coupling of elements) in the resized antenna array. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-quadriga_lib::arrayant&lt;double&gt; ant;
-ant.set_size(180, 360, 4, 2);
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div>
@@ -6311,78 +6065,42 @@ void generate_diffraction_paths(
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="icosphere"></a>
-<b>icosphere</b> - Construct a geodesic polyhedron (icosphere) from triangles
+<b>icosphere</b> - Construct a geodesic polyhedron from recursive icosahedron subdivision
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Generates a convex polyhedral surface (icosphere) made entirely of triangles, based on recursive subdivision of an icosahedron. 
-</li><li style="margin-bottom: 0.4em;">Useful for sampling directions uniformly on a sphere, for applications like ray tracing, antenna pattern evaluation, or spatial grids. 
-</li><li style="margin-bottom: 0.4em;">Each triangular face points outward from the center and has an associated normal. 
-</li><li style="margin-bottom: 0.4em;">Optionally returns vertex directions and vector lengths in either Cartesian or spherical coordinates. 
-</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code>. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Produces 20 × n_div² triangular faces, each pointing outward from origin 
+</li><li style="margin-bottom: 0.4em;">All vertices lie on a sphere of specified radius 
+</li><li style="margin-bottom: 0.4em;">Suitable for uniform angular sampling (ray tracing, antenna patterns, spatial grids) 
+</li><li style="margin-bottom: 0.4em;">Allowed datatypes (<code>dtype</code>): <code>float</code> or <code>double</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Declaration:</i></b><br><pre>
 arma::uword quadriga_lib::icosphere(
-                arma::uword n_div,
-                dtype radius,
-                arma::Mat&lt;dtype&gt; *center,
-                arma::Col&lt;dtype&gt; *length = nullptr,
-                arma::Mat&lt;dtype&gt; *vert = nullptr,
-                arma::Mat&lt;dtype&gt; *direction = nullptr,
-                bool direction_xyz = false);
+    arma::uword n_div,
+    dtype radius,
+    arma::Mat&lt;dtype&gt; *center,
+    arma::Col&lt;dtype&gt; *length = nullptr,
+    arma::Mat&lt;dtype&gt; *vert = nullptr,
+    arma::Mat&lt;dtype&gt; *direction = nullptr,
+    bool direction_xyz = false);
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword <b>n_div</b></code> (input)<br> 
-   Number of subdivisions per triangle edge. The total number of faces will be <code>n_faces = 20 × n_div²</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>dtype <b>radius</b></code> (input)<br> 
-   Radius of the icosphere in meters. All triangle vertices lie on this sphere. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*center</b></code> (output)<br> 
-   Unit vectors pointing from the origin to the center of each triangle face. Usually a bit shorter than <code>radius</code>, Size <code>[n_faces, 3]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Col&lt;dtype&gt; <b>*length</b> = nullptr</code> (optional output)<br> 
-   Vector magnitudes of each <code>center</code> vector (usually slightly less than <code>radius</code>). Vector size <code>[n_faces]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*vert</b> = nullptr</code> (optional output)<br> 
-   Vertex vectors from each triangle’s center to its three vertices, flattened as <code>[x1, y1, z1, x2, y2, z2, x3, y3, z3]</code>. Size <code>[n_faces, 9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>arma::Mat&lt;dtype&gt; <b>*direction</b> = nullptr</code> (optional output)<br> 
-   Direction vectors of the three triangle edges. Format depends on <code>direction_xyz</code>: If <code>false</code>  
-   (spherical): <code>[v1az, v1el, v2az, v2el, v3az, v3el]</code>, If <code>true</code> (Cartesian): <code>[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]</code>, 
-   Size <code>[n_faces, 6]</code> or <code>[n_faces, 9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>bool <b>direction_xyz</b> = false</code> (optional input)<br> 
-   If <code>true</code>, output directions in Cartesian coordinates. If <code>false</code>, output in spherical azimuth/elevation. Default: <code>false</code>. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>n_div</code></b> — Number of subdivisions; generates 20 × n_div² faces 
+</li><li style="margin-bottom: 0.4em;"><b><code>radius</code></b> — Radius of icosphere in meters 
+</li><li style="margin-bottom: 0.4em;"><b><code>direction_xyz</code></b> (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false) 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Returns:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>arma::uword</code><br> 
-   The number of triangular faces generated: <code>n_faces = 20 × n_div²</code>. 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>center</code></b> — Unit vectors to triangle face centers, <code>[n_faces, 3]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>length</code></b> (optional) — Magnitude of each <code>center</code> vector, <code>[n_faces]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>vert</code></b> (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3], <code>[n_faces, 9]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>direction</code></b> (optional) — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per <code>direction_xyz</code> flag, <code>[n_faces, 6]</code> or <code>[n_faces, 9]</code> 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Technical Notes:</i></b><br><ul><li style="margin-bottom: 0.4em;">The generated mesh is well-suited for uniform angular sampling on a sphere. 
-</li><li style="margin-bottom: 0.4em;">Triangle vertices are calculated relative to the center to ensure they lie on the desired sphere. 
-</li><li style="margin-bottom: 0.4em;">The radius parameter scales the final structure without changing angular spacing. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-arma::fmat center, vert, direction;
-arma::fvec length;
-
-// 4 subdivisions → 320 faces, map to unit sphere, output Cartesian directions
-auto n = quadriga_lib::icosphere&lt;float&gt;(4, 1.0, &amp;center, &amp;length, &amp;vert, &amp;direction, true);
-</pre>
+<b><i>Returns:</i></b><br>Number of generated triangular faces (20 × n_div²)
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
