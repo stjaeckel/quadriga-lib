@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,54 +27,49 @@ SECTION!*/
 Read metadata from a QRT file
 
 ## Description:
-- Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies.
-- All output arguments are optional; pass `nullptr` to skip any value you don't need.
-- Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version.
+- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
+- All output arguments are optional; pass `nullptr` to skip any.
+- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
+- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
 
 ## Declaration:
 ```
 void quadriga_lib::qrt_file_parse(
-                const std::string &fn,
-                arma::uword *no_cir = nullptr,
-                arma::uword *no_orig = nullptr,
-                arma::uword *no_dest = nullptr,
-                arma::uword *no_freq = nullptr,
-                arma::uvec *cir_offset = nullptr,
-                std::vector<std::string> *orig_names = nullptr,
-                std::vector<std::string> *dest_names = nullptr,
-                int *version = nullptr)
+    const std::string &fn,
+    arma::uword *no_cir = nullptr,
+    arma::uword *no_orig = nullptr,
+    arma::uword *no_dest = nullptr,
+    arma::uword *no_freq = nullptr,
+    arma::uvec *cir_offset = nullptr,
+    std::vector<std::string> *orig_names = nullptr,
+    std::vector<std::string> *dest_names = nullptr,
+    int *version = nullptr,
+    arma::fvec *fGHz = nullptr,
+    arma::fmat *cir_pos = nullptr,
+    arma::fmat *cir_orientation = nullptr,
+    arma::fmat *orig_pos = nullptr,
+    arma::fmat *orig_orientation = nullptr,
+    std::ifstream *file = nullptr);
 ```
 
-## Arguments:
-- `const std::string &**fn**` (input)<br>
-  Path to the QRT file.
-- `arma::uword ***no_cir** = nullptr` (optional output)<br>
-  Number of channel snapshots per origin point.
-- `arma::uword ***no_orig** = nullptr` (optional output)<br>
-  Number of origin points (TX).
-- `arma::uword ***no_dest** = nullptr` (optional output)<br>
-  Number of destinations (RX).
-- `arma::uword ***no_freq** = nullptr` (optional output)<br>
-  Number of frequency bands.
-- `arma::uvec ***cir_offset** = nullptr` (optional output)<br>
-  CIR offset for each destination. Size `[no_dest]`.
-- `std::vector<std::string> ***orig_names** = nullptr` (optional output)<br>
-  Names of the origin points (TXs). Size `[no_orig]`.
-- `std::vector<std::string> ***dest_names** = nullptr` (optional output)<br>
-  Names of the destination points (RXs). Size `[no_dest]`.
-- `int ***version** = nullptr` (optional output)<br>
-  QRT file version number.
+## Input Arguments:
+- **`fn`** — Path to the QRT file
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
-## Example:
-```
-arma::uword no_cir, no_orig, no_dest, no_freq;
-arma::uvec cir_offset;
-std::vector<std::string> orig_names, dest_names;
-int version;
-
-quadriga_lib::qrt_file_parse("scene.qrt", &no_cir, &no_orig, &no_dest, &no_freq,
-                              &cir_offset, &orig_names, &dest_names, &version);
-```
+## Output Arguments:
+- **`no_cir`** *(optional)* — Number of channel snapshots per origin point
+- **`no_orig`** *(optional)* — Number of origin points (TX)
+- **`no_dest`** *(optional)* — Number of destination points (RX)
+- **`no_freq`** *(optional)* — Number of frequency bands
+- **`cir_offset`** *(optional)* — CIR offset per destination, `[no_dest]`
+- **`orig_names`** *(optional)* — Names of origin points, `[no_orig]`
+- **`dest_names`** *(optional)* — Names of destination points, `[no_dest]`
+- **`version`** *(optional)* — QRT file version number
+- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file, `[no_freq]`
+- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates, `[no_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles in radians, `[no_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates, `[no_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles in radians, `[no_orig, 3]`
 MD!*/
 
 void quadriga_lib::qrt_file_parse(const std::string &fn,
@@ -221,7 +216,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     if (no_orig)
         *no_orig = (arma::uword)l_no_orig;
     if (no_dest)
-        *no_dest = (arma::uword)l_no_dest;
+        *no_dest = (arma::uword)(l_no_dest == 0 ? 1 : l_no_dest);
     if (no_freq)
         *no_freq = (arma::uword)l_no_freq;
     if (version)
@@ -232,7 +227,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 
     if (cir_offset)
     {
-        cir_offset->set_size(l_no_dest);
+        cir_offset->set_size(l_cir_index.n_elem);
         auto po = cir_offset->memptr();
         for (auto &val : l_cir_index)
             *po++ = (arma::uword)val;
@@ -296,48 +291,24 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 Initialize a QRT read cache for fast repeated access
 
 ## Description:
-- Reads all fixed metadata from a QRT file into a `qrt_read_cache` struct.
-- Pre-computes byte offsets so that subsequent `qrt_file_read` calls only need to
-  perform 2 seeks and 4 reads (the per-CIR path data) instead of re-parsing the header.
-- Populate the cache once, then pass it to `qrt_file_read` together with a shared
-  `std::ifstream` for maximum performance in tight loops.
+- Reads all fixed metadata from a QRT file into a `quadriga_lib::qrt_read_cache` struct.
+- Pre-computes byte offsets so subsequent [[qrt_file_read]] calls need only 2 seeks and 4 reads instead of re-parsing the header.
+- Populate once, then pass the cache and a shared `std::ifstream` to [[qrt_file_read]] for tight-loop performance.
+- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 
 ## Declaration:
 ```
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
-                const std::string &fn,
-                std::ifstream *file = nullptr)
+    const std::string &fn,
+    std::ifstream *file = nullptr);
 ```
 
-## Arguments:
-- `const std::string &**fn**` (input)<br>
-  Path to the QRT file.
-
-- `std::ifstream ***file** = nullptr` (optional input)<br>
-  Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn`
-  and closed on return. If provided, the stream is left open.
+## Input Arguments:
+- **`fn`** — Path to the QRT file
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
 ## Returns:
-- `qrt_read_cache **cache**` (output)<br>
-  Populated cache structure.
-
-## Example:
-```
-std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
-auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
-
-arma::vec center_freq, tx_pos, rx_pos;
-arma::mat path_gain;
-arma::cube M;
-
-for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
-    for (arma::uword io = 0; io < cache.no_orig; ++io)
-        quadriga_lib::qrt_file_read<double>("", ic, io, true,
-            &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            nullptr, nullptr, &path_gain, nullptr, &M,
-            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
-            nullptr, nullptr, &stream, &cache);
-```
+- Populated `quadriga_lib::qrt_read_cache` struct
 MD!*/
 
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string &fn,
@@ -486,149 +457,96 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
 
 /*!MD
 # qrt_file_read
-Read ray-tracing data from a QRT file
+Read ray-tracing CIR data from a QRT file
 
 ## Description:
-- Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point.
-- Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
-- All output arguments are optional; pass `nullptr` to skip any value you don't need.
-- The `normalize_M` parameter controls how the polarization transfer matrix `M` and path gains are returned.
-- For maximum performance in tight loops, pass a pre-opened `std::ifstream` and a pre-populated
-  `qrt_read_cache`. With both, the per-call I/O is reduced to 2 seeks and 4 reads.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Reads channel impulse response data for a specific snapshot index and origin point.
+- All output arguments are optional; pass `nullptr` to skip any.
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
+- For tight-loop performance, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
+- `fn` is ignored when both `file` and `cache` are provided.
+- Allowed datatypes: `float`, `double`
 
 ## Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::qrt_file_read(
-                const std::string &fn,
-                arma::uword i_cir = 0,
-                arma::uword i_orig = 0,
-                bool downlink = true,
-                arma::Col<dtype> *center_frequency = nullptr,
-                arma::Col<dtype> *tx_pos = nullptr,
-                arma::Col<dtype> *tx_orientation = nullptr,
-                arma::Col<dtype> *rx_pos = nullptr,
-                arma::Col<dtype> *rx_orientation = nullptr,
-                arma::Mat<dtype> *fbs_pos = nullptr,
-                arma::Mat<dtype> *lbs_pos = nullptr,
-                arma::Mat<dtype> *path_gain = nullptr,
-                arma::Col<dtype> *path_length = nullptr,
-                arma::Cube<dtype> *M = nullptr,
-                arma::Col<dtype> *aod = nullptr,
-                arma::Col<dtype> *eod = nullptr,
-                arma::Col<dtype> *aoa = nullptr,
-                arma::Col<dtype> *eoa = nullptr,
-                std::vector<arma::Mat<dtype>> *path_coord = nullptr,
-                int normalize_M = 1,
-                arma::u32_vec *no_int = nullptr,
-                arma::fmat *coord = nullptr,
-                std::ifstream *file = nullptr,
-                const qrt_read_cache *cache = nullptr)
+    const std::string &fn,
+    arma::uword i_cir = 0,
+    arma::uword i_orig = 0,
+    bool downlink = true,
+    arma::Col<dtype> *center_frequency = nullptr,
+    arma::Col<dtype> *tx_pos = nullptr,
+    arma::Col<dtype> *tx_orientation = nullptr,
+    arma::Col<dtype> *rx_pos = nullptr,
+    arma::Col<dtype> *rx_orientation = nullptr,
+    arma::Mat<dtype> *fbs_pos = nullptr,
+    arma::Mat<dtype> *lbs_pos = nullptr,
+    arma::Mat<dtype> *path_gain = nullptr,
+    arma::Col<dtype> *path_length = nullptr,
+    arma::Cube<dtype> *M = nullptr,
+    arma::Col<dtype> *aod = nullptr,
+    arma::Col<dtype> *eod = nullptr,
+    arma::Col<dtype> *aoa = nullptr,
+    arma::Col<dtype> *eoa = nullptr,
+    std::vector<arma::Mat<dtype>> *path_coord = nullptr,
+    int normalize_M = 1,
+    arma::u32_vec *no_int = nullptr,
+    arma::fmat *coord = nullptr,
+    std::ifstream *file = nullptr,
+    const qrt_read_cache *cache = nullptr);
 ```
 
-## Arguments:
-- `const std::string &**fn**` (input)<br>
-  Path to the QRT file. Ignored when both `file` and `cache` are provided.
+## Input Arguments:
+- **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
+- **`i_cir`** — Snapshot index, 0-based
+- **`i_orig`** — Origin index, 0-based
+- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
+- **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]
 
-- `arma::uword **i_cir** = 0` (input)<br>
-  Snapshot index (0-based).
+| `normalize_M` | `M` | `path_gain` |
+|---|---|---|
+| 0 | As stored in QRT file | -FSPL |
+| 1 | Max column power = 1 | -FSPL minus material losses |
 
-- `arma::uword **i_orig** = 0` (input)<br>
-  Origin index, 0-based. For downlink, origin corresponds to the transmitter.
-
-- `bool **downlink** = true` (input)<br>
-  If `true`, origin is TX and destination is RX (downlink). If `false`, roles are swapped (uplink).
-
-- `arma::Col<dtype> ***center_frequency** = nullptr` (optional output)<br>
-  Center frequency in Hz. Size `[n_freq]`.
-
-- `arma::Col<dtype> ***tx_pos** = nullptr` (optional output)<br>
-  Transmitter position in Cartesian coordinates. Size `[3]`.
-
-- `arma::Col<dtype> ***tx_orientation** = nullptr` (optional output)<br>
-  Transmitter orientation (bank, tilt, heading) in radians. Size `[3]`.
-
-- `arma::Col<dtype> ***rx_pos** = nullptr` (optional output)<br>
-  Receiver position in Cartesian coordinates. Size `[3]`.
-
-- `arma::Col<dtype> ***rx_orientation** = nullptr` (optional output)<br>
-  Receiver orientation (bank, tilt, heading) in radians. Size `[3]`.
-
-- `arma::Mat<dtype> ***fbs_pos** = nullptr` (optional output)<br>
-  First-bounce scatterer positions. Size `[3, n_path]`.
-
-- `arma::Mat<dtype> ***lbs_pos** = nullptr` (optional output)<br>
-  Last-bounce scatterer positions. Size `[3, n_path]`.
-
-- `arma::Mat<dtype> ***path_gain** = nullptr` (optional output)<br>
-  Path gain on linear scale. Size `[n_path, n_freq]`.
-
-- `arma::Col<dtype> ***path_length** = nullptr` (optional output)<br>
-  Absolute path length from TX to RX phase center. Size `[n_path]`.
-
-- `arma::Cube<dtype> ***M** = nullptr` (optional output)<br>
-  Polarization transfer matrix. Size `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files.
-
-- `arma::Col<dtype> ***aod** = nullptr` (optional output)<br>
-  Departure azimuth angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***eod** = nullptr` (optional output)<br>
-  Departure elevation angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***aoa** = nullptr` (optional output)<br>
-  Arrival azimuth angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***eoa** = nullptr` (optional output)<br>
-  Arrival elevation angles in radians. Size `[n_path]`.
-
-- `std::vector<arma::Mat<dtype>> ***path_coord** = nullptr` (optional output)<br>
-  Interaction coordinates per path. Vector of length `n_path`, each matrix of size `[3, n_interact + 2]`.
-
-- `int **normalize_M** = 1` (input)<br>
-  Normalization option for the polarization transfer matrix.
-   0 | `M` as stored in QRT file, `path_gain` is -FSPL
-   1 | `M` has sum-column power of 2, `path_gain` is -FSPL minus material losses
-
-- `arma::u32_vec ***no_int** = nullptr` (optional output)<br>
-  Number of mesh interactions per path. Size `[n_path]`. A value of 0 indicates a LOS path.
-
-- `arma::fmat ***coord** = nullptr` (optional output)<br>
-  Interaction coordinates. Size `[3, sum(no_int)]`.
-
-- `std::ifstream ***file** = nullptr` (optional input)<br>
-  Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn` and closed
-  on return. If provided, the stream is left open after return.
-
-- `const qrt_read_cache ***cache** = nullptr` (optional input)<br>
-  Optional pre-parsed metadata cache (from `qrt_read_cache_init`). When provided together with
-  `file`, per-call I/O is reduced to 2 seeks and 4 reads.
+## Output Arguments:
+- **`center_frequency`** *(optional)* — Center frequency in Hz, `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates, `[3]`
+- **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in radians, `[3]`
+- **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates, `[3]`
+- **`rx_orientation`** *(optional)* — Receiver orientation (bank, tilt, heading) in radians, `[3]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions, `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions, `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale, `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center, `[n_path]`
+- **`M`** *(optional)* — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`aod`** *(optional)* — Departure azimuth angles in radians, `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles in radians, `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles in radians, `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles in radians, `[n_path]`
+- **`path_coord`** *(optional)* — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
+- **`no_int`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS, `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates, `[3, sum(no_int)]`
 
 ## Example:
 ```
-arma::vec center_freq, tx_pos, rx_pos, path_length, aod, eod, aoa, eoa;
-arma::mat fbs_pos, lbs_pos, path_gain;
-arma::cube M;
-
-// Single call (opens and closes file internally):
-quadriga_lib::qrt_file_read<double>("scene.qrt", 0, 0, true,
-    &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-    &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-    &aod, &eod, &aoa, &eoa, nullptr, 1);
-
-// Maximum performance with cache and shared stream:
 std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
-quadriga_lib::qrt_read_cache cache;
-quadriga_lib::qrt_read_cache_init("scene.qrt", &cache, &stream);
-
+auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
+arma::vec center_freq, tx_pos, rx_pos, path_length;
+arma::mat path_gain; arma::cube M;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, true,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-            &aod, &eod, &aoa, &eoa, nullptr, 1,
+            nullptr, nullptr, &path_gain, &path_length, &M,
+            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
             nullptr, nullptr, &stream, &cache);
 ```
+
+## See also:
+- [[qrt_read_cache_init]] (populate cache for fast repeated reads)
+- [[qrt_file_parse]] (extract file metadata without reading CIR data)
 MD!*/
 
 template <typename dtype>
