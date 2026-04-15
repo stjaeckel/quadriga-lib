@@ -27,123 +27,73 @@ SECTION!*/
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ## Description:
-- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions.
-- 2D model: no elevation angles are used; azimuth angles and planar motion are considered.
-- Supports channel model types `A, B, C, D, E, F` (as defined by TGn) via `ChannelType`.
-- Can generate MU-MIMO channels (`n_users > 1`) with per-user distances/floors and optional angle offsets according to TGac
-- Optional time evolution via `observation_time`, `update_rate`, and mobility parameters.
+- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
+- 2D model: azimuth angles and planar motion only, no elevation
+- Supported channel types: `A, B, C, D, E, F` (TGn definitions)
+- MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
+- Time-evolving channels via `observation_time`, `update_rate`, and mobility parameters; `observation_time = 0.0` yields a static channel
+- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
+- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+- Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+- NAN or negative value for any override parameter restores the model default
 
 ## Declaration:
 ```
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoor(
-                const arrayant<double> &ap_array,
-                const arrayant<double> &sta_array,
-                std::string ChannelType,
-                double CarrierFreq_Hz = 5.25e9,
-                double tap_spacing_s = 10.0e-9,
-                arma::uword n_users = 1,
-                double observation_time = 0.0,
-                double update_rate = 1.0e-3,
-                double speed_station_kmh = 0.0,
-                double speed_env_kmh = 1.2,
-                arma::vec Dist_m = {4.99},
-                arma::uvec n_floors = {0},
-                bool uplink = false,
-                arma::mat offset_angles = {},
-                arma::uword n_subpath = 20,
-                double Doppler_effect = 50.0,
-                arma::sword seed = -1,
-                double KF_linear = NAN,
-                double XPR_NLOS_linear = NAN,
-                double SF_std_dB_LOS = NAN,
-                double SF_std_dB_NLOS = NAN,
-                double dBP_m = NAN );
+    const quadriga_lib::arrayant<double> &ap_array,
+    const quadriga_lib::arrayant<double> &sta_array,
+    std::string ChannelType,
+    double CarrierFreq_Hz = 5.25e9,
+    double tap_spacing_s = 10.0e-9,
+    arma::uword n_users = 1,
+    double observation_time = 0.0,
+    double update_rate = 1.0e-3,
+    double speed_station_kmh = 0.0,
+    double speed_env_kmh = 1.2,
+    arma::vec Dist_m = {4.99},
+    arma::uvec n_floors = {0},
+    bool uplink = false,
+    arma::mat offset_angles = {},
+    arma::uword n_subpath = 20,
+    double Doppler_effect = 50.0,
+    arma::sword seed = -1,
+    double KF_linear = NAN,
+    double XPR_NLOS_linear = NAN,
+    double SF_std_dB_LOS = NAN,
+    double SF_std_dB_NLOS = NAN,
+    double dBP_m = NAN );
 ```
 
-## Arguments:
-- `const arrayant<double> **ap_array**` (input)<br>
-  Access point array antenna with `n_tx` elements (= ports after element coupling).
+## Input Arguments:
+- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [[arrayant]]
+- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [[arrayant]]
+- **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
+- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency in Hz
+- **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
+- **`n_users`** *(optional)* — Number of users (TGac/TGah only); output vector length equals `n_users`
+- **`observation_time`** *(optional)* — Channel observation time in seconds
+- **`update_rate`** *(optional)* — Channel update interval in seconds; relevant only when `observation_time > 0`
+- **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
+- **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
+- **`Dist_m`** *(optional)* — TX-to-RX distance(s) in meters; `[n_users]` or `[1]`
+- **`n_floors`** *(optional)* — Number of floors per user for TGah (max 4); `[n_users]` or `[1]`
+- **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction
+- **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
+- **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
+- **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
+- **`seed`** *(optional)* — RNG seed for repeatability; `-1` uses the system random device
+- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default
+- **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN or negative restores model default
+- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
+- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
+- **`dBP_m`** *(optional)* — Overrides breakpoint distance in meters; NAN or negative restores model default
 
-- `const arrayant<double> **sta_array**` (input)<br>
-  Mobile station array antenna with `n_rx` elements (= ports after element coupling).
-
-- `std::string **ChannelType**` (input)<br>
-  Channel model type as defined by TGn. Supported: `A, B, C, D, E, F`.
-
-- `double **CarrierFreq_Hz** = 5.25e9` (optional input)<br>
-  Carrier frequency in Hz.
-
-- `double **tap_spacing_s** = 10.0e-9` (optional input)<br>
-  Tap spacing in seconds. Must be equal to `10 ns / 2^k` (TGn default = `10e-9`).
-
-- `arma::uword **n_users** = 1` (optional input)<br>
-  Number of users (only for TGac, TGah). Output vector length equals `n_users`.
-
-- `double **observation_time** = 0.0` (optional input)<br>
-  Channel observation time in seconds. `0.0` creates a static channel.
-
-- `double **update_rate** = 1.0e-3` (optional input)<br>
-  Channel update interval in seconds (only relevant when `observation_time > 0`).
-
-- `double **speed_station_kmh** = 0.0` (optional input)<br>
-  Station movement speed in km/h. Movement direction is `AoA_offset`. Only relevant when `observation_time > 0`.
-
-- `double **speed_env_kmh** = 1.2` (optional input)<br>
-  Environment movement speed in km/h. Default `1.2` for TGn, use `0.089` for TGac. Only relevant when
-  `observation_time > 0`.
-
-- `arma::vec **Dist_m** = {4.99}` (optional input)<br>
-  TX-to-RX distance(s) in meters. Length `n_users` or length `1` (same distance for all users). Size
-  `[n_users]` or `[1]`.
-
-- `arma::uvec **n_floors** = {0}` (optional input)<br>
-  Number of floors for TGah model (per user), up to 4 floors. Length `n_users` or length `1`. Size
-  `[n_users]` or `[1]`.
-
-- `bool **uplink** = false` (optional input)<br>
-  Channel direction flag. Default is downlink; set to `true` to generate reverse (uplink) direction.
-
-- `arma::mat **offset_angles** = {}` (optional input)<br>
-  Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for `n_users > 1`).
-  Size `[4, n_users]` with rows: `AoD LOS, AoD NLOS, AoA LOS, AoA NLOS`.
-
-- `arma::uword **n_subpath** = 20` (optional input)<br>
-  Number of sub-paths per path/cluster used for Laplacian angular spread mapping.
-
-- `double **Doppler_effect** = 50.0` (optional input)<br>
-  Special Doppler effects: models `D, E` (fluorescent lights, value = mains freq.) and `F` (moving
-  vehicle speed in km/h). Use `0.0` to disable.
-
-- `arma::sword **seed** = -1` (optional input)<br>
-  Numeric seed for repeatability. `-1` disables the fixed seed and uses the system random device.
-
-- `double **KF_linear** = NAN` (optional input)<br>
-  Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used:
-  A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise). 
-  KF is applied to the first tap only. Breakpoint distance is ignored for `KF_linear >= 0`.
-
-- `double **XPR_NLOS_linear** = NAN` (optional input)<br>
-  Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative, 
-  the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
-
-- `double **SF_std_dB_LOS** = NAN` (optional input)<br>
-  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
-  the model default of 3 dB is used. `SF_std_dB_LOS` is applied to all LOS channels, where the 
-  AP-STA distance d < dBP.
-
-- `double **SF_std_dB_NLOS** = NAN` (optional input)<br>
-  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
-  the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. `SF_std_dB_NLOS` is applied to all NLOS channels, 
-  where the AP-STA distance d >= dBP.
-
-- `double **dBP_m** = NAN` (optional input)<br>
-  Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative, 
-  the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
- 
 ## Returns:
-- `std::vector<quadriga_lib::channel<double>>` (output)<br>
-  Vector of channel objects with length `n_users`. Each entry contains the generated indoor channel
-  realization for one user (including direction determined by `uplink`).
+- `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
+
+## See also:
+- [[get_channels_planar]] (used internally to compute MIMO coefficients per user)
+- [[arrayant]] (antenna array type for ap_array and sta_array)  
 MD!*/
 
 std::vector<quadriga_lib::channel<double>>
@@ -157,7 +107,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                        double update_rate,                              // Channel update interval in seconds
                                        double speed_station_kmh,                        // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
                                        double speed_env_kmh,                            // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-                                       arma::vec Dist_m,                                // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)
+                                       arma::vec Dist_m,                                // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
                                        arma::uvec n_floors,                             // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users)
                                        bool uplink,                                     // Default channel direction is downlink, set uplink to true to get reverse direction
                                        arma::mat offset_angles,                         // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
@@ -277,8 +227,8 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     const double gamma_spike = f_spike / std::sqrt(90000); // Narrow spike bandwidth
 
     // Switches for Doppler effects
-    bool use_fluor = Doppler_effect > 0.0 && (ChannelType == "D" || ChannelType == "E") && (n_snap > 0);
-    bool use_vehicle = Doppler_effect > 0.0 && (ChannelType == "F") && (n_snap > 0);
+    bool use_fluor = Doppler_effect > 0.0 && (ChannelType == "D" || ChannelType == "E");
+    bool use_vehicle = Doppler_effect > 0.0 && (ChannelType == "F");
 
     // Doppler components due to fluorescent lights
     arma::vec g(n_snap);
@@ -367,7 +317,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                 {
                     mod_paths[i_path_interpol] = mod_paths[i_path_interpol - 1] + 2;                                 // 2 clusters @ 140 ns
                     mod_paths[bw_factor + i_path_interpol] = mod_paths[bw_factor + i_path_interpol - 1] + 2;         // 2 clusters @ 200 ns
-                    mod_paths[2 * bw_factor + i_path_interpol] = mod_paths[2 * bw_factor + i_path_interpol - 1] + 2; // 2 clusters @ 200 ns
+                    mod_paths[2 * bw_factor + i_path_interpol] = mod_paths[2 * bw_factor + i_path_interpol - 1] + 2; // 2 clusters @ 290 ns
                 }
             }
             else if (ChannelType == "E")
