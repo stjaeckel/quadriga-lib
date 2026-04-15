@@ -56,30 +56,3 @@ COMPRESSION GUIDELINES:
 
 Here is the old documentation block to compress:
 
-/*!MD
-# generate_arrayant_omni
-Generate isotropic radiator with vertical polarization
-
-## Description:
-- Generates an isotropic antenna radiator pattern with vertical polarization.
-- Allows specification of the resolution of the antenna pattern sampling grid.
-- Allowed datatypes (`dtype`): `float` or `double`
-
-## Declaration:
-```
-arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0)
-```
-
-## Arguments:
-- `dtype **res** = 1.0` (optional input)<br>
-  Resolution of the antenna pattern sampling grid, specified in degrees. Default: `1.0`
-
-## Returns:
-- `arrayant<dtype>`<br>
-  Antenna array object representing an isotropic radiator with vertical polarization.
-
-## Example:
-```
-auto ant = quadriga_lib::generate_arrayant_omni<float>(10.0f);
-```
-MD!*/
