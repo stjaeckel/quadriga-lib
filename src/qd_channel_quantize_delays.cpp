@@ -23,102 +23,6 @@
 #include <vector>
 #include <stdexcept>
 
-/*!SECTION
-Channel functions
-SECTION!*/
-
-/*!MD
-# quantize_delays
-Fixes the path delays to a grid of delay bins
-
-## Description:
-- For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-  of delay bins (taps). Rounding delays to the nearest tap causes discontinuities in the frequency
-  domain when a delay crosses a tap boundary (e.g. as a mobile terminal moves). This function
-  instead approximates each path delay using two adjacent taps with power-weighted coefficients,
-  producing smooth transitions.
-- For a path at fractional offset &delta; between tap indices, two taps are created with complex
-  coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-  exponent. The default &alpha;=1.0 (linear interpolation) is optimal for narrowband systems. Use
-  &alpha;=0.5 to preserve wideband (incoherent) power.
-- If input delays are already quantized (all fractional offsets below 0.01), the interpolation
-  weight computation is skipped but the same delay-selection logic is used.
-- The `fix_taps` parameter controls whether delay grids are shared across antenna pairs and/or
-  snapshots, trading accuracy for a more compact representation.
-- Input delays may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`. When
-  shared and fix_taps is 0 or 3, delays are expanded internally and output delays are per-antenna.
-  When shared and fix_taps is 1 or 2, output delays remain shared `[1, 1, n_taps]`.
-- The number of antennas `n_rx` and `n_tx` must be the same across all snapshots, but the number
-  of paths `n_path_s` may differ per snapshot.
-
-## Declaration:
-```
-template <typename dtype>
-void quadriga_lib::quantize_delays(
-    const std::vector<arma::Cube<dtype>> *coeff_re,
-    const std::vector<arma::Cube<dtype>> *coeff_im,
-    const std::vector<arma::Cube<dtype>> *delay,
-    std::vector<arma::Cube<dtype>> *coeff_re_quant,
-    std::vector<arma::Cube<dtype>> *coeff_im_quant,
-    std::vector<arma::Cube<dtype>> *delay_quant,
-    dtype tap_spacing = (dtype)5.0e-9,
-    arma::uword max_no_taps = 48,
-    dtype power_exponent = (dtype)1.0,
-    int fix_taps = 0);
-```
-
-## Arguments:
-- `const std::vector<arma::Cube<dtype>> ***coeff_re**` (input)<br>
-  Channel coefficients, real part. Vector of length `n_snap`, each cube of size
-  `[n_rx, n_tx, n_path_s]` where `n_path_s` may differ across snapshots.
-
-- `const std::vector<arma::Cube<dtype>> ***coeff_im**` (input)<br>
-  Channel coefficients, imaginary part. Same sizes as `coeff_re`.
-
-- `const std::vector<arma::Cube<dtype>> ***delay**` (input)<br>
-  Path delays in seconds. Vector of length `n_snap`, each cube of size
-  `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`. The number of paths must match `coeff_re`.
-
-- `std::vector<arma::Cube<dtype>> ***coeff_re_quant**` (output)<br>
-  Output coefficients, real part. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]`.
-
-- `std::vector<arma::Cube<dtype>> ***coeff_im_quant**` (output)<br>
-  Output coefficients, imaginary part. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]`.
-
-- `std::vector<arma::Cube<dtype>> ***delay_quant**` (output)<br>
-  Output delays in seconds. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]` or
-  `[1, 1, n_taps]`.
-
-- `dtype **tap_spacing** = 5.0e-9` (input)<br>
-  Spacing of the delay bins in seconds. Default: 5 ns (200 MHz sampling rate).
-
-- `arma::uword **max_no_taps** = 48` (input)<br>
-  Maximum number of output taps. 0 means unlimited.
-
-- `dtype **power_exponent** = 1.0` (input)<br>
-  Interpolation exponent &alpha;. Use 1.0 for narrowband (linear) or 0.5 for wideband (power-preserving).
-
-- `int **fix_taps** = 0` (input)<br>
-  Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all,
-  2 = per snapshot, 3 = per tx-rx pair.
-
-## Example:
-```
-// Create synthetic test data: 2 snapshots with different numbers of paths
-std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
-cre[0].set_size(1, 1, 3); cim[0].set_size(1, 1, 3); dl[0].set_size(1, 1, 3);
-cre[1].set_size(1, 1, 2); cim[1].set_size(1, 1, 2); dl[1].set_size(1, 1, 2);
-cre[0](0,0,0) = 1.0; cre[0](0,0,1) = 0.5; cre[0](0,0,2) = 0.3;
-cre[1](0,0,0) = 0.8; cre[1](0,0,1) = 0.4;
-cim[0].zeros(); cim[1].zeros();
-dl[0](0,0,0) = 0.0; dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9;
-dl[1](0,0,0) = 0.0; dl[1](0,0,1) = 10.0e-9;
-
-std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
-quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
-```
-MD!*/
-
 // --- Internal helper: find_optimal_delays ---
 // Accumulates PDP, selects the strongest taps up to max_taps.
 // dn/pn: rounded tap indices and their power (n_non entries)
@@ -233,8 +137,24 @@ static std::vector<unsigned> find_optimal_delays(
     return result;
 }
 
-// --- Main implementation ---
-template <typename dtype>
+/*!SECTION
+Channel functions
+SECTION!*/
+
+/*!MD
+# quantize_delays
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
+
+## Description:
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1-delta)^alpha and delta^alpha, where delta is the fractional offset within the bin and alpha is `power_exponent`; this avoids discontinuities when delays cross tap boundaries
+- Use `power_exponent=1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
+- If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but tap-selection logic still applies
+- Input `delay` may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`; shared delays are expanded internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2
+- `n_rx` and `n_tx` must be identical across all snapshots; `n_path_s` may differ per snapshot
+- Allowed dtypes: `float`, `double`
+
+## Declaration:
+```
 void quadriga_lib::quantize_delays(
     const std::vector<arma::Cube<dtype>> *coeff_re,
     const std::vector<arma::Cube<dtype>> *coeff_im,
@@ -242,10 +162,55 @@ void quadriga_lib::quantize_delays(
     std::vector<arma::Cube<dtype>> *coeff_re_quant,
     std::vector<arma::Cube<dtype>> *coeff_im_quant,
     std::vector<arma::Cube<dtype>> *delay_quant,
-    dtype tap_spacing,
-    arma::uword max_no_taps,
-    dtype power_exponent,
-    int fix_taps)
+    dtype tap_spacing = (dtype)5.0e-9,
+    arma::uword max_no_taps = 48,
+    dtype power_exponent = (dtype)1.0,
+    int fix_taps = 0);
+```
+
+## Input Arguments:
+- **`coeff_re`** — Channel coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]`
+- **`coeff_im`** — Channel coefficients, imaginary part; same layout as `coeff_re`
+- **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
+- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate
+- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
+- **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
+- **`fix_taps`** *(optional)* — Delay grid sharing mode:
+
+  | Value | Meaning |
+  |-------|---------|
+  | 0 | Per tx-rx pair and snapshot |
+  | 1 | Single shared grid for all |
+  | 2 | Per snapshot |
+  | 3 | Per tx-rx pair |
+
+## Output Arguments:
+- **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`
+- **`coeff_im_quant`** — Output coefficients, imaginary part; same layout as `coeff_re_quant`
+- **`delay_quant`** — Output delays in seconds; each cube `[n_rx, n_tx, n_taps]` or `[1, 1, n_taps]` depending on `fix_taps`
+
+## Example:
+```
+std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
+cre[0].set_size(1,1,3); cim[0].set_size(1,1,3); dl[0].set_size(1,1,3);
+cre[1].set_size(1,1,2); cim[1].set_size(1,1,2); dl[1].set_size(1,1,2);
+dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9; dl[1](0,0,1) = 10.0e-9;
+std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
+quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
+```
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re,
+                                   const std::vector<arma::Cube<dtype>> *coeff_im,
+                                   const std::vector<arma::Cube<dtype>> *delay,
+                                   std::vector<arma::Cube<dtype>> *coeff_re_quant,
+                                   std::vector<arma::Cube<dtype>> *coeff_im_quant,
+                                   std::vector<arma::Cube<dtype>> *delay_quant,
+                                   dtype tap_spacing,
+                                   arma::uword max_no_taps,
+                                   dtype power_exponent,
+                                   int fix_taps)
 {
     // --- Input validation ---
     if (coeff_re == nullptr)
@@ -308,6 +273,9 @@ void quadriga_lib::quantize_delays(
                 shared_delays = snap_shared;
                 shared_delays_set = true;
             }
+            else if (snap_shared != shared_delays)
+                throw std::invalid_argument("All snapshots must consistently use shared [1,1,n_path] or per-antenna [n_rx,n_tx,n_path] delays.");
+
             if (snap_shared)
             {
                 if (delay->at(s).n_rows != 1 || delay->at(s).n_cols != 1 || delay->at(s).n_slices != n_p)
@@ -646,16 +614,15 @@ void quadriga_lib::quantize_delays(
     {
         const dtype *ore = coeff_re_quant->at(s).memptr();
         const dtype *oim = coeff_im_quant->at(s).memptr();
-        for (arma::uword k = n_taps; k > 0; --k)
+        for (arma::uword k = n_taps; k > max_used; --k) // upper bound tightens as max_used grows
         {
             for (arma::uword a = 0; a < n_ant; ++a)
             {
                 arma::uword oi = a + (k - 1) * n_ant;
                 if (ore[oi] != (dtype)0 || oim[oi] != (dtype)0)
                 {
-                    if (k > max_used)
-                        max_used = k;
-                    continue;
+                    max_used = k; // k > max_used guaranteed by outer loop condition
+                    break;        // no larger k will be checked — outer bound handles it
                 }
             }
         }
