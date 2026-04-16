@@ -26,170 +26,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-/*!SECTION
-Site-Specific Simulation Tools
-SECTION!*/
-
-/*!MD
-# obj_file_read
-Read Wavefront `.obj` file and extract geometry and material information
-
-## Description:
-- Parses a Wavefront `.obj` file containing triangularized 3D geometry.
-- Extracts triangle face data, material properties, vertex indices, and optional metadata such as object/material names.
-- Multiple triangles belonging to the same object are grouped together by `obj_ind`.
-- Supports default and custom ITU-compliant materials encoded via the `usemtl` tag.
-- Automatically resizes output matrices/vectors as needed to match the file content.
-- Returns the number of triangular mesh elements found in the file.
-
-- Allowed datatypes (`dtype`): `float` or `double`.
-
-## Declaration:
-```
-arma::uword quadriga_lib::obj_file_read(
-                std::string fn,
-                arma::Mat<dtype> *mesh = nullptr,
-                arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *vert_list = nullptr,
-                arma::umat *face_ind = nullptr,
-                arma::uvec *obj_ind = nullptr,
-                arma::uvec *mtl_ind = nullptr,
-                std::vector<std::string> *obj_names = nullptr,
-                std::vector<std::string> *mtl_names = nullptr,
-                arma::Mat<dtype> *bsdf = nullptr,
-                const std::string &materials_csv = "");
-```
-
-## Arguments:
-- `std::string **fn**` (input)<br>
-  Path to the `.obj` file to be read.
-
-- `arma::Mat<dtype> ***mesh** = nullptr` (optional output)<br>
-  Flattened triangle mesh data. Each row holds `[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]`. Size: `[n_mesh, 9]`.
-
-- `arma::Mat<dtype> ***mtl_prop** = nullptr` (optional output)<br>
-  Material properties for each triangle. Size: `[n_mesh, 5]`.
-
-- `arma::Mat<dtype> ***vert_list** = nullptr` (optional output)<br>
-  List of all vertex positions found in the `.obj` file. Size: `[n_vert, 3]`.
-
-- `arma::umat ***face_ind** = nullptr` (optional output)<br>
-  Indices into `vert_list` for each triangle (0-based). Size: `[n_mesh, 3]`.
-
-- `arma::uvec ***obj_ind** = nullptr` (optional output)<br>
-  Object index (1-based) for each triangle. Size: `[n_mesh]`.
-
-- `arma::uvec ***mtl_ind** = nullptr` (optional output)<br>
-  Material index (1-based) for each triangle. Size: `[n_mesh]`.
-
-- `std::vector<std::string> ***obj_names** = nullptr` (optional output)<br>
-  Names of objects found in the file. Length: `max(obj_ind)`.
-
-- `std::vector<std::string> ***mtl_names** = nullptr` (optional output)<br>
-  Names of materials found in the file. Length: `max(mtl_ind)`.
-
-- `arma::Mat<dtype> ***bsdf** = nullptr` (optional output)<br>
-  Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
-  .MTL file. Size `[mtl_names.size(), 17]`. Values are:
-  0  | Base Color Red       | Range 0-1     | Default = 0.8
-  1  | Base Color Green     | Range 0-1     | Default = 0.8
-  2  | Base Color Blue      | Range 0-1     | Default = 0.8
-  3  | Transparency (alpha) | Range 0-1     | Default = 1.0 (fully opaque)
-  4  | Roughness            | Range 0-1     | Default = 0.5
-  5  | Metallic             | Range 0-1     | Default = 0.0
-  6  | Index of refraction (IOR)  | Range 0-4     | Default = 1.45
-  7  | Specular Adjustment to the IOR | Range 0-1 | Default = 0.5 (no adjustment)
-  8  | Emission Color Red    | Range 0-1     | Default = 0.0
-  9  | Emission Color Green  | Range 0-1     | Default = 0.0
-  10 | Emission Color Blue   | Range 0-1     | Default = 0.0
-  11 | Sheen                 | Range 0-1     | Default = 0.0
-  12 | Clearcoat             | Range 0-1     | Default = 0.0
-  13 | Clearcoat roughness   | Range 0-1     | Default = 0.0
-  14 | Anisotropic           | Range 0-1     | Default = 0.0
-  15 | Anisotropic rotation  | Range 0-1     | Default = 0.0
-  16 | Transmission          | Range 0-1     | Default = 0.0
-
-- `std::string **materials_csv**` (optional input)<br>
-   Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3
-   materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary).
-   Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),
-   and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:
-   sigma = c * f_GHz^d
-
-## Returns:
-- `arma::uword`<br>
-  Number of mesh triangles found in the file (`n_mesh`).
-
-## Technical Notes:
-- Unknown or missing materials default to `"vacuum"` (ε_r = 1, σ = 0).
-- Materials are applied per triangle via the `usemtl` tag in the `.obj` file.
-- Input geometry must be fully triangulated—quads and n-gons are not supported.
-- File parsing is case-sensitive for material names.
-
-## Material Tag Format:
-- Default materials (ITU-R P.2040-3 Table 3): `"usemtl itu_concrete"`, `"itu_brick"`, `"itu_wood"`, `"itu_water"`, etc.
-- Frequency range: 1–40 GHz (limited to 1–10 GHz for ground materials)
-- Custom materials syntax: `"usemtl Name::A:B:C:D:att"` with `A, B`: Real permittivity ε_r = `A * fGHz^B`,
-  `C, D`: Conductivity σ = `C * fGHz^D`, `att`: Penetration loss in dB (fixed, per interaction)
-
-## Material properties:
-Each material is defined by its electrical properties. Radio waves that interact with a building will
-produce losses that depend on the electrical properties of the building materials, the material
-structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical
-permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is
-obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies.
-The five parameters returned in `mtl_prop` then are:<br><br>
-
-- Real part of relative permittivity at f = 1 GHz (a)
-- Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b
-- Conductivity at f = 1 GHz (c)
-- Frequency dependence of conductivity (d) such that σ = c· f^d
-- Fixed attenuation in dB applied to each transition
-
-A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following
-list of material is currently supported and the material can be selected by using the `usemtl` tag
-in the OBJ file. When using Blender, the simply assign a material with that name to an object or face.
-The following materials are defined by default:<br><br>
-
-Name                  |         a |        b  |         c |         d |       Att |  max fGHz |
-----------------------|-----------|-----------|-----------|-----------|-----------|-----------|
-vacuum / air          |       1.0 |       0.0 |       0.0 |       0.0 |       0.0 |       100 |
-textiles              |       1.5 |       0.0 |      5e-5 |      0.62 |       0.0 |       100 |
-plastic               |      2.44 |       0.0 |   2.33e-5 |       1.0 |       0.0 |       100 |
-ceramic               |       6.5 |       0.0 |    0.0023 |      1.32 |       0.0 |       100 |
-sea_water             |      80.0 |     -0.25 |       4.0 |      0.58 |       0.0 |       100 |
-sea_ice               |       3.2 |    -0.022 |       1.1 |       1.5 |       0.0 |       100 |
-water                 |      80.0 |     -0.18 |       0.6 |      1.52 |       0.0 |        20 |
-water_ice             |      3.17 |    -0.005 |    5.6e-5 |       1.7 |       0.0 |        20 |
-itu_concrete          |      5.24 |       0.0 |    0.0462 |    0.7822 |       0.0 |       100 |
-itu_brick             |      3.91 |       0.0 |    0.0238 |      0.16 |       0.0 |        40 |
-itu_plasterboard      |      2.73 |       0.0 |    0.0085 |    0.9395 |       0.0 |       100 |
-itu_wood              |      1.99 |       0.0 |    0.0047 |    1.0718 |       0.0 |       100 |
-itu_glass             |      6.31 |       0.0 |    0.0036 |    1.3394 |       0.0 |       100 |
-itu_ceiling_board     |      1.48 |       0.0 |    0.0011 |     1.075 |       0.0 |       100 |
-itu_chipboard         |      2.58 |       0.0 |    0.0217 |      0.78 |       0.0 |       100 |
-itu_plywood           |      2.71 |       0.0 |      0.33 |       0.0 |       0.0 |        40 |
-itu_marble            |     7.074 |       0.0 |    0.0055 |    0.9262 |       0.0 |        60 |
-itu_floorboard        |      3.66 |       0.0 |    0.0044 |    1.3515 |       0.0 |       100 |
-itu_metal             |       1.0 |       0.0 |     1.0e7 |       0.0 |       0.0 |       100 |
-itu_very_dry_ground   |       3.0 |       0.0 |   0.00015 |      2.52 |       0.0 |        10 |
-itu_medium_dry_ground |      15.0 |      -0.1 |     0.035 |      1.63 |       0.0 |        10 |
-itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.0 |        10 |
-itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
-irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
-
-
-## Example:
-```
-arma::mat mesh, mtl_prop, vert_list;
-arma::umat face_ind;
-arma::uvec obj_ind, mtl_ind;
-std::vector<std::string> obj_names, mtl_names;
-
-quadriga_lib::obj_file_read<double>("cube.obj", &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
-```
-MD!*/
-
 // Define a struct to store the material properties
 struct MaterialProp
 {
@@ -320,7 +156,108 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
     return materials;
 }
 
-// Read Wavefront .obj file
+/*!SECTION
+Site-Specific Simulation Tools
+SECTION!*/
+
+/*!MD
+# obj_file_read
+Read a Wavefront `.obj` file and extract geometry and material information
+
+## Description:
+- Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0)
+- Material name matching is case-sensitive
+- Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
+- Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
+- Custom material tag syntax: `usemtl Name::A:B:C:D:att` — ε_r = A * fGHz^B, σ = C * fGHz^D, att = fixed penetration loss in dB
+- `mtl_prop` columns: (a) ε_r at 1 GHz, (b) frequency exponent for ε_r, (c) σ at 1 GHz, (d) frequency exponent for σ, (e) fixed attenuation in dB
+- `obj_ind` and `mtl_ind` are 1-based; `face_ind` is 0-based
+- Allowed datatypes: `float` or `double`
+
+## Declaration:
+```
+arma::uword quadriga_lib::obj_file_read(
+    std::string fn,
+    arma::Mat<dtype> *mesh = nullptr,
+    arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *vert_list = nullptr,
+    arma::umat *face_ind = nullptr,
+    arma::uvec *obj_ind = nullptr,
+    arma::uvec *mtl_ind = nullptr,
+    std::vector<std::string> *obj_names = nullptr,
+    std::vector<std::string> *mtl_names = nullptr,
+    arma::Mat<dtype> *bsdf = nullptr,
+    const std::string &materials_csv = "");
+```
+
+## Input Arguments:
+- **`fn`** — Path to the `.obj` file
+- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties; columns: `name, a, b, c, d, att` (order flexible); if empty, ITU-R P.2040-3 defaults are used
+
+## Output Arguments:
+- **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row, `[n_mesh, 9]`
+- **`mtl_prop`** *(optional)* — Material properties (a, b, c, d, att) per triangle, `[n_mesh, 5]`
+- **`vert_list`** *(optional)* — All vertex positions in the file, `[n_vert, 3]`
+- **`face_ind`** *(optional)* — 0-based indices into `vert_list` per triangle, `[n_mesh, 3]`
+- **`obj_ind`** *(optional)* — 1-based object index per triangle, `[n_mesh]`
+- **`mtl_ind`** *(optional)* — 1-based material index per triangle, `[n_mesh]`
+- **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
+- **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
+- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file, `[n_mtl, 17]`; columns:
+    | Index | Property | Range | Default |
+    |-------|----------|-------|---------|
+    | 0 | Base Color Red | 0–1 | 0.8 |
+    | 1 | Base Color Green | 0–1 | 0.8 |
+    | 2 | Base Color Blue | 0–1 | 0.8 |
+    | 3 | Transparency (alpha) | 0–1 | 1.0 |
+    | 4 | Roughness | 0–1 | 0.5 |
+    | 5 | Metallic | 0–1 | 0.0 |
+    | 6 | Index of refraction (IOR) | 0–4 | 1.45 |
+    | 7 | Specular IOR adjustment | 0–1 | 0.5 |
+    | 8 | Emission Red | 0–1 | 0.0 |
+    | 9 | Emission Green | 0–1 | 0.0 |
+    | 10 | Emission Blue | 0–1 | 0.0 |
+    | 11 | Sheen | 0–1 | 0.0 |
+    | 12 | Clearcoat | 0–1 | 0.0 |
+    | 13 | Clearcoat roughness | 0–1 | 0.0 |
+    | 14 | Anisotropic | 0–1 | 0.0 |
+    | 15 | Anisotropic rotation | 0–1 | 0.0 |
+    | 16 | Transmission | 0–1 | 0.0 |
+
+## Returns:
+- Number of triangular mesh elements (`n_mesh`)
+
+## Default material table:
+
+Name                  |         a |        b  |         c |         d |       Att |  max fGHz |
+----------------------|-----------|-----------|-----------|-----------|-----------|-----------|
+vacuum / air          |       1.0 |       0.0 |       0.0 |       0.0 |       0.0 |       100 |
+textiles              |       1.5 |       0.0 |      5e-5 |      0.62 |       0.0 |       100 |
+plastic               |      2.44 |       0.0 |   2.33e-5 |       1.0 |       0.0 |       100 |
+ceramic               |       6.5 |       0.0 |    0.0023 |      1.32 |       0.0 |       100 |
+sea_water             |      80.0 |     -0.25 |       4.0 |      0.58 |       0.0 |       100 |
+sea_ice               |       3.2 |    -0.022 |       1.1 |       1.5 |       0.0 |       100 |
+water                 |      80.0 |     -0.18 |       0.6 |      1.52 |       0.0 |        20 |
+water_ice             |      3.17 |    -0.005 |    5.6e-5 |       1.7 |       0.0 |        20 |
+itu_concrete          |      5.24 |       0.0 |    0.0462 |    0.7822 |       0.0 |       100 |
+itu_brick             |      3.91 |       0.0 |    0.0238 |      0.16 |       0.0 |        40 |
+itu_plasterboard      |      2.73 |       0.0 |    0.0085 |    0.9395 |       0.0 |       100 |
+itu_wood              |      1.99 |       0.0 |    0.0047 |    1.0718 |       0.0 |       100 |
+itu_glass             |      6.31 |       0.0 |    0.0036 |    1.3394 |       0.0 |       100 |
+itu_ceiling_board     |      1.48 |       0.0 |    0.0011 |     1.075 |       0.0 |       100 |
+itu_chipboard         |      2.58 |       0.0 |    0.0217 |      0.78 |       0.0 |       100 |
+itu_plywood           |      2.71 |       0.0 |      0.33 |       0.0 |       0.0 |        40 |
+itu_marble            |     7.074 |       0.0 |    0.0055 |    0.9262 |       0.0 |        60 |
+itu_floorboard        |      3.66 |       0.0 |    0.0044 |    1.3515 |       0.0 |       100 |
+itu_metal             |       1.0 |       0.0 |     1.0e7 |       0.0 |       0.0 |       100 |
+itu_very_dry_ground   |       3.0 |       0.0 |   0.00015 |      2.52 |       0.0 |        10 |
+itu_medium_dry_ground |      15.0 |      -0.1 |     0.035 |      1.63 |       0.0 |        10 |
+itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.0 |        10 |
+itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
+irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
+MD!*/
+
 template <typename dtype>
 arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
                                         arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
@@ -460,7 +397,10 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     {
         // Read mtllib
         if (line.rfind("mtllib ", 0) == 0) // starts with "mtllib "
+        {
             mtllib_fn = line.substr(7);
+            mtllib_fn.erase(mtllib_fn.find_last_not_of(" \t\r\n") + 1); // Trim trailing whitespace / CR
+        }
 
         // Read vertex
         if (line.length() > 2 && line.at(0) == 118 && line.at(1) == 32) // Line starts with "v "
@@ -593,6 +533,10 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         for (arma::uword i = j_face; i < i_face; ++i)
             p_obj_ind[i] = i_object;
 
+    // Single unnamed object: ensure obj_names has one entry
+    if (obj_names != nullptr && i_object == 1 && obj_names->empty())
+        obj_names->push_back("object");
+
     // Calculate the triangle mesh from vertices and faces
     if (mesh != nullptr)
     {
@@ -636,7 +580,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     if (bsdf != nullptr)
     {
         if (mtl_names == nullptr)
-            throw std::invalid_argument("Cannot return 'mtl_color' without the corresponding 'mtl_names'.");
+            throw std::invalid_argument("Cannot return 'bsdf' without the corresponding 'mtl_names'.");
 
         std::filesystem::path mtl_file = obj_file;
         if (mtllib_fn.empty())
@@ -697,8 +641,9 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                     }
                 if (!foundMaterial)
                 {
-                    throw std::invalid_argument(
-                        "Error: material '" + mtl + "' not found in material file.");
+                    // Custom inline materials (:: syntax) won't appear in .mtl file; skip with defaults
+                    ++i_mtl;
+                    continue;
                 }
 
                 // From here, scan until the next "newmtl " or EOF to look for Kd and Ns
