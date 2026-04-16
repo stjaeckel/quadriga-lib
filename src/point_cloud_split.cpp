@@ -26,53 +26,38 @@ SECTION!*/
 Split a point cloud into two sub-clouds along a spatial axis
 
 ## Description:
-- Divides a 3D point cloud into two sub-clouds along the specified axis.
-- Attempts to split the data at the median value to balance the number of points in each half.
-- Returns the axis used for the split, or a negative value if a valid split was not possible (e.g., all points fall on one side).
-- Output point clouds are written into `pointsA` and `pointsB`, and their size is adjusted accordingly.
-- An optional indicator vector identifies the target sub-cloud (A or B) for each input point.
-- Used in recursive spatial partitioning such as building BVH structures.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Splits at the bounding box midpoint along the chosen axis (not the statistical median); 
+  the split may be unbalanced if points are non-uniformly distributed.
+- If `axis == 0`, the longest bounding box extent is used.
+- Returns a negative axis value if the split failed (all points on one side); outputs are not modified in that case.
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 int quadriga_lib::point_cloud_split(
-                const arma::Mat<dtype> *points,
-                arma::Mat<dtype> *pointsA,
-                arma::Mat<dtype> *pointsB,
-                int axis = 0,
-                arma::Col<int> *split_ind = nullptr);
+    const arma::Mat<dtype> *points,
+    arma::Mat<dtype> *pointsA,
+    arma::Mat<dtype> *pointsB,
+    int axis = 0,
+    arma::Col<int> *split_ind = nullptr);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***points**` (input)<br>
-  Input point cloud. Size: `[n_points, 3]`.
+## Input Arguments:
+- **`points`** — Input point cloud; `[n_points, 3]`
+- **`axis`** *(optional)* — Split axis: `0` = longest extent, `1` = x, `2` = y, `3` = z
 
-- `arma::Mat<dtype> ***pointsA**` (output)<br>
-  First sub-cloud after split. Size: `[n_pointsA, 3]`.
-
-- `arma::Mat<dtype> ***pointsB**` (output)<br>
-  Second sub-cloud after split. Size: `[n_pointsB, 3]`.
-
-- `int **axis** = 0` (optional input)<br>
-  Axis to split along: `0` = longest extent (default), `1` = x-axis, `2` = y-axis, `3` = z-axis.
-
-- `arma::Col<int> ***split_ind** = nullptr` (optional output)<br>
-  Vector of length `[n_points]`, where each element is: `1` if the point goes to `pointsA`, `2` if it goes to `pointsB`, `0` if error.
+## Output Arguments:
+- **`pointsA`** — First sub-cloud; `[n_pointsA, 3]`
+- **`pointsB`** — Second sub-cloud; `[n_pointsB, 3]`
+- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB, `0` = error; `[n_points]`
 
 ## Returns:
-- `int` <br>
-   Axis used for splitting: `1` = x, `2` = y, `3` = z,  or `-1`, `-2`, `-3` if the split failed (no points assigned to one of the outputs).
-
-## Notes:
-- The function does not modify `pointsA` or `pointsB` if the split fails.
-- The selected axis is based on the bounding box if `axis == 0`
-- This function is a building block for spatial acceleration structures (e.g., BVH, KD-trees), see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>
+- Axis used: `1` = x, `2` = y, `3` = z; negative (`-1`, `-2`, `-3`) if split failed
 
 ## See also:
-- <a href="#point_cloud_segmentation">point_cloud_aabb</a>
-- <a href="#point_cloud_segmentation">point_cloud_segmentation</a>
-- <a href="#ray_point_intersect">ray_point_intersect</a>
+- [[point_cloud_aabb]] (bounding box computation)
+- [[point_cloud_segmentation]] (recursive partitioning using this function)
+- [[ray_point_intersect]] (downstream use case)
 MD!*/
 
 // Split a point cloud into two sub-clouds along a given axis
