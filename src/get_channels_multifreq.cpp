@@ -27,171 +27,6 @@
 #include "qd_arrayant_interpolate.hpp"
 #include "slerp.h"
 
-/*!SECTION
-Channel generation functions
-SECTION!*/
-
-/*!MD
-# get_channels_multifreq
-Calculate channel coefficients for spherical waves across multiple frequencies
-
-## Description:
-- Extends `get_channels_spherical` to support frequency-dependent antenna patterns, path gains,
-  and polarization transfer (Jones) matrices across multiple output frequencies.
-- **Geometry is computed once**: departure angles, arrival angles, element-resolved path delays, and LOS
-  path detection are frequency-independent and reused for all output frequencies. This avoids redundant
-  trigonometry and distance calculations.
-- **Four frequency grids** are aligned by interpolation:
-  1. | TX array frequencies (defined by `tx_array[i].center_frequency`)
-  2. | RX array frequencies (defined by `rx_array[i].center_frequency`)
-  3. | Input sample frequencies (`freq_in`) at which `path_gain` and `M` are provided
-  4. | Target output frequencies (`freq_out`) at which coefficients and delays are returned
-- For each output frequency, TX and RX antenna patterns are interpolated from their respective
-  multi-frequency vectors using spherical interpolation (SLERP) with linear fallback, the same
-  algorithm used in `arrayant_interpolate_multi`. The private `qd_arrayant_interpolate` function is
-  called directly for maximum performance.
-- Path gain is interpolated linearly across frequency. The Jones matrix `M` is interpolated using
-  SLERP for each complex entry pair to preserve phase coherence.
-- **Extrapolation** is handled by clamping to the nearest available frequency entry in all four grids.
-- **Propagation speed** can be set to support both radio (speed of light, default) and acoustic
-  (speed of sound, ~343 m/s) simulations. This affects wavelength, wave number, and delay calculations.
-- The Jones matrix `M` supports two formats: 8 rows for full polarimetric
-  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), or 2 rows for scalar pressure waves
-  (ReVV, ImVV only), where VH, HV, and HH entries are implicitly zero.
-- Antenna element coupling is applied using the coupling matrices from the first entry of each
-  multi-frequency vector (consistent across all entries by `arrayant_is_valid_multi` constraints).
-- Allowed datatypes (`dtype`): `float` or `double`
-
-## Declaration:
-```
-void quadriga_lib::get_channels_multifreq(
-        const std::vector<arrayant<dtype>> &tx_array,
-        const std::vector<arrayant<dtype>> &rx_array,
-        dtype Tx, dtype Ty, dtype Tz,
-        dtype Tb, dtype Tt, dtype Th,
-        dtype Rx, dtype Ry, dtype Rz,
-        dtype Rb, dtype Rt, dtype Rh,
-        const arma::Mat<dtype> &fbs_pos,
-        const arma::Mat<dtype> &lbs_pos,
-        const arma::Mat<dtype> &path_gain,
-        const arma::Col<dtype> &path_length,
-        const arma::Cube<dtype> &M,
-        const arma::Col<dtype> &freq_in,
-        const arma::Col<dtype> &freq_out,
-        std::vector<arma::Cube<dtype>> &coeff_re,
-        std::vector<arma::Cube<dtype>> &coeff_im,
-        std::vector<arma::Cube<dtype>> &delay,
-        bool use_absolute_delays = false,
-        bool add_fake_los_path = false,
-        dtype propagation_speed = dtype(299792458.0))
-```
-
-## Arguments:
-- `const std::vector<arrayant<dtype>> &**tx_array**` (input)<br>
-  Multi-frequency transmit array antenna vector. All entries must pass `arrayant_is_valid_multi`.
-
-- `const std::vector<arrayant<dtype>> &**rx_array**` (input)<br>
-  Multi-frequency receive array antenna vector. All entries must pass `arrayant_is_valid_multi`.
-
-- `dtype **Tx**, **Ty**, **Tz**` (input)<br>
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)<br>
-  Transmitter orientation (bank, tilt, heading) in [rad].
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)<br>
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)<br>
-  Receiver orientation (bank, tilt, heading) in [rad].
-
-- `const arma::Mat<dtype> &**fbs_pos**` (input)<br>
-  First-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Mat<dtype> &**lbs_pos**` (input)<br>
-  Last-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Mat<dtype> &**path_gain**` (input)<br>
-  Path gain in linear scale, Size: `[n_path, n_freq_in]`. Each column corresponds to one input frequency.
-
-- `const arma::Col<dtype> &**path_length**` (input)<br>
-  Absolute path lengths from TX to RX phase center, Length: `n_path`.
-
-- `const arma::Cube<dtype> &**M**` (input)<br>
-  Polarization transfer matrix, Size: `[8, n_path, n_freq_in]` for full polarimetric or
-  `[2, n_path, n_freq_in]` for scalar pressure. Each slice corresponds to one input frequency.
-  Interleaved complex format: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) for 8 rows,
-  or (ReVV, ImVV) for 2 rows.
-
-- `const arma::Col<dtype> &**freq_in**` (input)<br>
-  Input sample frequencies in [Hz] at which `path_gain` and `M` are defined, Length: `n_freq_in`.
-
-- `const arma::Col<dtype> &**freq_out**` (input)<br>
-  Target frequencies in [Hz] at which to compute output coefficients and delays, Length: `n_freq_out`.
-
-- `std::vector<arma::Cube<dtype>> &**coeff_re**` (output)<br>
-  Real part of channel coefficients. Vector of length `n_freq_out`, each cube of size `[n_rx, n_tx, n_path]`.
-
-- `std::vector<arma::Cube<dtype>> &**coeff_im**` (output)<br>
-  Imaginary part of channel coefficients. Same structure as `coeff_re`.
-
-- `std::vector<arma::Cube<dtype>> &**delay**` (output)<br>
-  Propagation delays in seconds. Same structure as `coeff_re`.
-
-- `bool **use_absolute_delays** = false` (optional input)<br>
-  If true, LOS delay is included in all paths. Default: `false`.
-
-- `bool **add_fake_los_path** = false` (optional input)<br>
-  Adds a zero-power LOS path if no LOS path was detected. Default: `false`.
-
-- `dtype **propagation_speed** = 299792458.0` (optional input)<br>
-  Wave propagation speed in [m/s]. Default is the speed of light for radio simulations.
-  Set to ~343.0 for acoustic simulations in air.
-
-## Example:
-```
-// Build a 2-way speaker as TX (source)
-arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
-auto tx_woofer = quadriga_lib::generate_speaker<double>(
-    "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-auto tx_tweeter = quadriga_lib::generate_speaker<double>(
-    "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
-
-// Omnidirectional microphone as RX (single entry, clamped for all frequencies)
-std::vector<quadriga_lib::arrayant<double>> rx = { quadriga_lib::generate_arrayant_omni<double>() };
-
-// Simple LOS path setup
-arma::mat fbs = arma::mat({0.5, 0.0, 0.0}).t();
-arma::mat lbs = arma::mat({0.5, 0.0, 0.0}).t();
-arma::vec path_length = {1.0};               // 1 meter distance
-
-// Frequency-flat path gain and scalar Jones matrix
-arma::vec freq_in = {100.0, 10000.0};
-arma::mat path_gain_mat(1, 2, arma::fill::ones);
-arma::cube M_cube(2, 1, 2, arma::fill::zeros);
-M_cube(0, 0, 0) = 1.0; M_cube(0, 0, 1) = 1.0;  // ReVV = 1 at both freqs
-
-arma::vec freq_out = {200.0, 1000.0, 5000.0};
-std::vector<arma::cube> coeff_re, coeff_im, delays;
-
-quadriga_lib::get_channels_multifreq(tx, rx,
-    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // TX at origin
-    1.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // RX at (1,0,0)
-    fbs_pos, lbs_pos, path_gain_mat, path_length, M_cube,
-    freq_in, freq_out, coeff_re, coeff_im, delays,
-    false, false, 343.0);             // Speed of sound for acoustics
-```
-
-## See also:
-- <a href="#get_channels_spherical">get_channels_spherical</a>
-- <a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a>
-- <a href="#arrayant_concat_multi">arrayant_concat_multi</a>
-- <a href="#generate_speaker">generate_speaker</a>
-MD!*/
-
 // ------------------------------------------------------------------------------------------------
 // Find bracketing indices and weight for frequency interpolation
 // Returns: i_lo, i_hi, weight (0=lo, 1=hi), exact_match flag
@@ -276,9 +111,81 @@ static inline void interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, con
     }
 }
 
-// ================================================================================================
-// get_channels_multifreq implementation
-// ================================================================================================
+/*!SECTION
+Channel generation functions
+SECTION!*/
+
+/*!MD
+# get_channels_multifreq
+Compute channel coefficients for spherical waves across multiple frequencies
+
+## Description:
+- Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
+- Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
+- Aligns four frequency grids: TX array (from `tx_array[i].center_frequency`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[arrayant_interpolate_multi]])
+- `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
+- Extrapolation clamps to nearest frequency entry on all four grids
+- `propagation_speed` supports radio (speed of light, default) and acoustic (~343 m/s) simulations
+- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
+- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- Allowed datatypes: float or double
+
+## Declaration:
+```
+void quadriga_lib::get_channels_multifreq(
+    const std::vector<arrayant<dtype>> &tx_array,
+    const std::vector<arrayant<dtype>> &rx_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> &fbs_pos,
+    const arma::Mat<dtype> &lbs_pos,
+    const arma::Mat<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Cube<dtype> &M,
+    const arma::Col<dtype> &freq_in,
+    const arma::Col<dtype> &freq_out,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    dtype propagation_speed = dtype(299792458.0));
+```
+
+## Input Arguments:
+- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
+- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
+- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates [m]
+- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading) [rad]
+- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates [m]
+- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading) [rad]
+- **`fbs_pos`** — First-bounce scatterer positions, `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions, `[3, n_path]`
+- **`path_gain`** — Linear-scale path gains, `[n_path, n_freq_in]`
+- **`path_length`** — Absolute TX-to-RX path lengths, `[n_path]`
+- **`M`** — Polarization transfer matrix, `[8, n_path, n_freq_in]` (full pol) or `[2, n_path, n_freq_in]` (scalar)
+- **`freq_in`** — Input sample frequencies [Hz] for `path_gain` and `M`, `[n_freq_in]`
+- **`freq_out`** — Target output frequencies [Hz], `[n_freq_out]`
+- **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
+- **`add_fake_los_path`** *(optional)* — Add zero-power LOS path if none detected
+- **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
+
+## Output Arguments:
+- **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
+- **`coeff_im`** — Imaginary part; same structure as `coeff_re`
+- **`delay`** — Propagation delays [s]; same structure as `coeff_re`
+
+## See also:
+- [[get_channels_spherical]] (single-frequency equivalent)
+- [[arrayant_interpolate_multi]] (underlying pattern interpolation)
+- [[arrayant_concat_multi]] (building multi-frequency arrays)
+- [[generate_speaker]] (acoustic source construction)
+- [[fast_slerp]] (SLERP implementation used for the interpolation)
+MD!*/
 
 template <typename dtype>
 void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arrayant<dtype>> &tx_array,
@@ -457,7 +364,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
     for (arma::uword i_out = 0; i_out < n_out; ++i_out)
     {
-        const arma::uword i = add_fake_los_path ? i_out - 1 : i_out;
+        const arma::uword i = (add_fake_los_path && i_out == 0) ? 0 : (add_fake_los_path ? i_out - 1 : i_out);
         const arma::uword ix = 3 * i, iy = ix + 1, iz = ix + 2;
         const arma::uword o_slice = i_out * n_links;
 
@@ -984,10 +891,9 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
         if (apply_element_coupling)
         {
-            arma::uword N = (n_ports > n_links) ? n_ports : n_links;
-            dtype *tempX = new dtype[N];
-            dtype *tempY = new dtype[N];
-            dtype *tempT = new dtype[N];
+            dtype *tempX = new dtype[n_ports];
+            dtype *tempY = new dtype[n_ports];
+            dtype *tempT = new dtype[n_ports];
 
             const dtype *tx_cpl_re_ptr = tx_cpl_re_f.memptr();
             const dtype *tx_cpl_im_ptr = tx_cpl_im_f.memptr();
@@ -1040,13 +946,19 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
         if (add_fake_los_path && true_los_path != 0)
         {
-            dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re[f].slice_memptr(true_los_path);
-            dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im[f].slice_memptr(true_los_path);
+            dtype *ptrR = coeff_re[f].slice_memptr(true_los_path);
+            dtype *ptrI = coeff_im[f].slice_memptr(true_los_path);
+            dtype *dstR = coeff_re[f].slice_memptr(0);
+            dtype *dstI = coeff_im[f].slice_memptr(0);
 
-            std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
-            std::memcpy(p_coeff_im, ptrI, n_links * sizeof(dtype));
+            std::memcpy(dstR, ptrR, n_ports * sizeof(dtype));
+            std::memcpy(dstI, ptrI, n_ports * sizeof(dtype));
 
-            for (arma::uword k = 0; k < n_links; ++k)
+            dtype *ptrD = delay[f].slice_memptr(true_los_path);
+            dtype *dstD = delay[f].slice_memptr(0);
+            std::memcpy(dstD, ptrD, n_ports * sizeof(dtype));
+
+            for (arma::uword k = 0; k < n_ports; ++k)
                 ptrR[k] = zero, ptrI[k] = zero;
         }
 
