@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,35 +23,23 @@ SECTION!*/
 
 /*!MD
 # colormap
-Generate colormap
+Generate a colormap matrix with RGB values
 
 ## Description:
-- Returns a 64x3 or 256x3 colormap matrix with RGB values in unsigned char format.
-- Each row corresponds to an RGB color entry of the selected colormap.
-- Useful for visualization purposes (e.g., heatmaps or 3D rendering).
-- Available color maps include: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`, `autumn`, `summer`.
+- Returns a `[64, 3]` or `[256, 3]` matrix of unsigned char RGB values (range 0–255)
+- Available maps: `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`
 
 ## Declaration:
 ```
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false)
+arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
 ```
 
-## Arguments:
-- `std::string **map**` (input)<br>
-  Name of the desired colormap. Must be one of:
-  `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`.
-
-- `bool **high_res**` (input)<br>
-  Enables 256 color steps
+## Input Arguments:
+- **`map`** — Name of the colormap
+- **`high_res`** *(optional)* — If true, returns 256 rows instead of 64
 
 ## Returns:
-- `arma::uchar_mat`<br>
-  A matrix of size `[64 x 3]` or `[256 x 3]` containing RGB color values as unsigned chars in the range `[0, 255]`.
-
-## Example:
-```
-arma::uchar_mat cm = quadriga_lib::colormap("turbo");
-```
+- RGB colormap matrix; `[64, 3]` or `[256, 3]`
 MD!*/
 
 // Generate colormap
