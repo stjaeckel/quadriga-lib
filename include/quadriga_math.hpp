@@ -29,63 +29,28 @@ static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned
 namespace quadriga_lib
 {
     // Fast, approximate sine/cosine for single-precision vectors
-    // - Computes sin(x) and/or cos(x) for all elements of an Armadillo vector
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Results are approximate and may differ from std::sinf / std::cosf
-    // - Either 's' or 'c' may be nullptr to compute only one function
-    // - Fallback to std::sinf / std::cosf if complied without AVX2 (or running with non-AVX2 CPU)
     template <typename dtype>
     void fast_sincos(const arma::Col<dtype> &x, // Input angles in radians; n = x.n_elem, float or double
                      arma::fvec *s = nullptr,   // [out] If non-null, set to sin(x). Resized to length n if needed
                      arma::fvec *c = nullptr);  // [out] If non-null, set to cos(x). Resized to length n if needed
 
     // Fast, approximate arc-sine for single-precision vectors
-    // - Computes asin(x) for all elements of an Armadillo vector
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Results are approximate and may differ from std::asinf
-    // - For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-    // - Input values outside [-1, 1] produce NaN (IEEE compliant)
-    // - Fallback to std::asinf if compiled without AVX2 (or running with non-AVX2 CPU)
     template <typename dtype>
     void fast_asin(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
                    arma::fvec &s);            // [out] Set to asin(x). Resized to length n if needed
 
     // Fast, approximate arc-cosine for single-precision vectors
-    // - Computes acos(x) for all elements of an Armadillo vector
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Results are approximate and may differ from std::acosf
-    // - For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-    // - Input values outside [-1, 1] produce NaN (IEEE compliant)
-    // - Fallback to std::acosf if compiled without AVX2 (or running with non-AVX2 CPU)
     template <typename dtype>
     void fast_acos(const arma::Col<dtype> &x, // Input values in [-1, 1]; n = x.n_elem, float or double
                    arma::fvec &c);            // [out] Set to acos(x). Resized to length n if needed
 
     // Fast, approximate atan2(y, x) for single-precision vectors
-    // - Computes atan2(y, x) for all elements of two Armadillo vectors
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Results are approximate and may differ from std::atan2f
-    // - Maximum error is approximately 3 ULP (~3.6e-7) across the full domain
-    // - atan2(0, 0) returns 0; atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
-    // - Fallback to std::atan2f if compiled without AVX2 (or running with non-AVX2 CPU)
     template <typename dtype>
     void fast_atan2(const arma::Col<dtype> &y, // Input y-coordinates, Length [n], float or double
                     const arma::Col<dtype> &x, // Input x-coordinates, Length [n], float or double
                     arma::fvec &a);            // [out] Set to atan2(y, x) in radians. Resized to length n if needed
 
     // Fast, approximate spherical interpolation (SLERP) for complex value pairs
-    // - Interpolates between two complex-valued vectors using SLERP on normalized directions
-    //   and linear interpolation of amplitudes
-    // - Uses AVX2 to process 8 complex pairs per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Near-antipodal inputs (phase angle close to pi) smoothly transition to linear interpolation
-    // - Both amplitudes negligible → output is zero
-    // - Maximum error vs double-precision reference: ~100 ULP (~1.2e-5 relative, ~17.5 effective bits of 23)
-    // - Fallback to scalar slerp_complex_mf if compiled without AVX2 (or running with non-AVX2 CPU)
     template <typename dtype>
     void fast_slerp(const arma::Col<dtype> &Ar, // Real part of source A, Length [n]
                     const arma::Col<dtype> &Ai, // Imaginary part of source A, Length [n]
@@ -96,12 +61,6 @@ namespace quadriga_lib
                     arma::fvec &Xi);            // [out] Imaginary part of interpolated result, Length [n]
 
     // Fast, approximate geographic-to-Cartesian conversion
-    // - Converts azimuth/elevation angles to unit-sphere Cartesian coordinates
-    // - x = cos(el) * cos(az), y = cos(el) * sin(az), z = sin(el)
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Optionally returns the intermediate sin/cos values for downstream use
-    // - Fallback to std::sinf/std::cosf if compiled without AVX2
     template <typename dtype>
     void fast_geo2cart(const arma::Col<dtype> &az, // Input azimuth angles in radians, Length [n]
                        const arma::Col<dtype> &el, // Input elevation angles in radians, Length [n]
@@ -114,18 +73,14 @@ namespace quadriga_lib
                        arma::fvec *cEL = nullptr); // Optional output: cos(el), Length [n]
 
     // Fast, approximate Cartesian-to-geographic conversion
-    // - Converts unit-sphere Cartesian coordinates to azimuth/elevation angles
-    // - az = atan2(y, x), el = asin(clamp(z, -1, 1))
-    // - z is clamped to [-1, 1] to guard against FMA rounding artefacts
-    // - Uses AVX2 to process 8 floats per vector lane
-    // - Parallelizes across cores with OpenMP
-    // - Fallback to std::atan2f/std::asinf if compiled without AVX2
     template <typename dtype>
-    void fast_cart2geo(const arma::Col<dtype> &x, // Input x-coordinates, Length [n]
-                       const arma::Col<dtype> &y, // Input y-coordinates, Length [n]
-                       const arma::Col<dtype> &z, // Input z-coordinates, Length [n]
-                       arma::fvec &az,            // Output azimuth angles in radians, Length [n]
-                       arma::fvec &el);           // Output elevation angles in radians, Length [n]
+    void fast_cart2geo(const arma::Col<dtype> &x,       // Input x-coordinates, Length [n]
+                       const arma::Col<dtype> &y,       // Input y-coordinates, Length [n]
+                       const arma::Col<dtype> &z,       // Input z-coordinates, Length [n]
+                       arma::Col<dtype> &az,            // Output azimuth angles in radians, Length [n]
+                       arma::Col<dtype> &el,            // Output elevation angles in radians, Length [n]
+                       arma::Col<dtype> *len = nullptr, // Vector length, Length [n]
+                       int use_kernel = 0);             // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
 }
 

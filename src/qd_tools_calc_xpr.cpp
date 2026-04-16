@@ -62,7 +62,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
 - **`window_size`** *(optional)* — LOS exclusion window in [m]; paths within `dTR + window_size` are excluded when `include_los = false`
 
 ## Output Arguments:
-- **`xpr`** *(optional)* — XPR on linear scale, `[n_cir, 6]`; columns:
+- **`xpr`** *(optional)* — XPR on linear scale, `[n_cir, 6]`; columns:<br><br>
 
   | Col | Description |
   |-----|-------------|

@@ -141,14 +141,6 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh,
         }
     }
 
-    // Invalidate padding rows
-    for (arma::uword i = n_sub; i < n_out; ++i)
-    {
-        x_min[i] = INFINITY, x_max[i] = -INFINITY;
-        y_min[i] = INFINITY, y_max[i] = -INFINITY;
-        z_min[i] = INFINITY, z_max[i] = -INFINITY;
-    }
-
     return output;
 }
 

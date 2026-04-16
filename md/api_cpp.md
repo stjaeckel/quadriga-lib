@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.1"
 author: "Stephan Jaeckel"
-date: "15.04.2026"
+date: "16.04.2026"
 lang: en-EN
 ---
 
@@ -1215,7 +1215,7 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 | [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
 | [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
 | [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
-| [get_HDF5_version](#get_hdf5_version) | Return the version string of the linked HDF5 library |
+| [get_HDF5_version](#get_hdf5_version) | Return the HDF5 version string as defined by the compile-time header macros |
 | [hdf5_create](#hdf5_create) | Create a new HDF5 channel file with a defined storage layout |
 | [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
 | [hdf5_read_dset](#hdf5_read_dset) | Read an unstructured dataset from an HDF5 file at a specified 4D index |
@@ -1225,9 +1225,9 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 | [hdf5_write](#hdf5_write) | Write a channel object to an HDF5 file at a specified 4D index |
 | [hdf5_write_dset](#hdf5_write_dset) | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
 | [qrt_file_parse](#qrt_file_parse) | Read metadata from a QRT file |
-| [qrt_file_read](#qrt_file_read) | Read ray-tracing data from a QRT file |
+| [qrt_file_read](#qrt_file_read) | Read ray-tracing CIR data from a QRT file |
 | [qrt_read_cache_init](#qrt_read_cache_init) | Initialize a QRT read cache for fast repeated access |
-| [quantize_delays](#quantize_delays) | Fixes the path delays to a grid of delay bins |
+| [quantize_delays](#quantize_delays) | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
 
 ---
 ## any_type_id
@@ -1400,7 +1400,7 @@ void quadriga_lib::baseband_freq_response_vec(
 
 ---
 ## get_HDF5_version
-Return the version string of the linked HDF5 library
+Return the HDF5 version string as defined by the compile-time header macros
 
 ### Declaration:
 ```
@@ -1439,7 +1439,7 @@ void quadriga_lib::hdf5_create(
 
 ### See also:
 - [hdf5_reshape_layout](#hdf5_reshape_layout) (change layout dimensions of an existing file)
-- [hdf5_write_channel](#hdf5_write_channel) (write channel data into a slot)
+- [hdf5_write](#hdf5_write) (write channel data into a slot)
 
 ---
 ## hdf5_read_channel
@@ -1553,7 +1553,7 @@ Read the storage layout of an HDF5 channel file
 
 ### Description:
 - Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
-- Returns `{0, 0, 0, 0}` if the file does not exist or is not a valid channel HDF5 file.
+- Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a valid HDF5 file.
 - `channelID` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
 
 ### Declaration:
@@ -1654,6 +1654,7 @@ Write a single unstructured dataset to an HDF5 file at a specified 4D index
 - Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, `arma::Cube` with element types `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
 - `arma::Row` is converted to `arma::Col` before writing.
 - Throws for unsupported types.
+- Throws if a dataset with the same name already exists at the specified slot; no overwrite/update is supported.
 
 ### Declaration:
 ```
@@ -1687,276 +1688,181 @@ void quadriga_lib::hdf5_write_dset(
 Read metadata from a QRT file
 
 ### Description:
-- Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies.
-- All output arguments are optional; pass `nullptr` to skip any value you don't need.
-- Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version.
+- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
+- All output arguments are optional; pass `nullptr` to skip any.
+- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
+- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and `cir_offset` reflect this.
 
 ### Declaration:
 ```
 void quadriga_lib::qrt_file_parse(
-                const std::string &fn,
-                arma::uword *no_cir = nullptr,
-                arma::uword *no_orig = nullptr,
-                arma::uword *no_dest = nullptr,
-                arma::uword *no_freq = nullptr,
-                arma::uvec *cir_offset = nullptr,
-                std::vector<std::string> *orig_names = nullptr,
-                std::vector<std::string> *dest_names = nullptr,
-                int *version = nullptr)
+    const std::string &fn,
+    arma::uword *no_cir = nullptr,
+    arma::uword *no_orig = nullptr,
+    arma::uword *no_dest = nullptr,
+    arma::uword *no_freq = nullptr,
+    arma::uvec *cir_offset = nullptr,
+    std::vector<std::string> *orig_names = nullptr,
+    std::vector<std::string> *dest_names = nullptr,
+    int *version = nullptr,
+    arma::fvec *fGHz = nullptr,
+    arma::fmat *cir_pos = nullptr,
+    arma::fmat *cir_orientation = nullptr,
+    arma::fmat *orig_pos = nullptr,
+    arma::fmat *orig_orientation = nullptr,
+    std::ifstream *file = nullptr);
 ```
 
-### Arguments:
-- `const std::string &**fn**` (input)
-  Path to the QRT file.
-- `arma::uword ***no_cir** = nullptr` (optional output)
-  Number of channel snapshots per origin point.
-- `arma::uword ***no_orig** = nullptr` (optional output)
-  Number of origin points (TX).
-- `arma::uword ***no_dest** = nullptr` (optional output)
-  Number of destinations (RX).
-- `arma::uword ***no_freq** = nullptr` (optional output)
-  Number of frequency bands.
-- `arma::uvec ***cir_offset** = nullptr` (optional output)
-  CIR offset for each destination. Size `[no_dest]`.
-- `std::vector<std::string> ***orig_names** = nullptr` (optional output)
-  Names of the origin points (TXs). Size `[no_orig]`.
-- `std::vector<std::string> ***dest_names** = nullptr` (optional output)
-  Names of the destination points (RXs). Size `[no_dest]`.
-- `int ***version** = nullptr` (optional output)
-  QRT file version number.
+### Input Arguments:
+- **`fn`** — Path to the QRT file
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
-### Example:
-```
-arma::uword no_cir, no_orig, no_dest, no_freq;
-arma::uvec cir_offset;
-std::vector<std::string> orig_names, dest_names;
-int version;
-
-quadriga_lib::qrt_file_parse("scene.qrt", &no_cir, &no_orig, &no_dest, &no_freq,
-                              &cir_offset, &orig_names, &dest_names, &version);
-```
+### Output Arguments:
+- **`no_cir`** *(optional)* — Number of channel snapshots per origin point
+- **`no_orig`** *(optional)* — Number of origin points (TX)
+- **`no_dest`** *(optional)* — Number of destination points (RX)
+- **`no_freq`** *(optional)* — Number of frequency bands
+- **`cir_offset`** *(optional)* — CIR offset per destination, `[no_dest]`
+- **`orig_names`** *(optional)* — Names of origin points, `[no_orig]`
+- **`dest_names`** *(optional)* — Names of destination points, `[no_dest]`
+- **`version`** *(optional)* — QRT file version number
+- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file, `[no_freq]`
+- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates, `[no_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles in radians, `[no_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates, `[no_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles in radians, `[no_orig, 3]`
 
 ---
 ## qrt_file_read
-Read ray-tracing data from a QRT file
+Read ray-tracing CIR data from a QRT file
 
 ### Description:
-- Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point.
-- Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
-- All output arguments are optional; pass `nullptr` to skip any value you don't need.
-- The `normalize_M` parameter controls how the polarization transfer matrix `M` and path gains are returned.
-- For maximum performance in tight loops, pass a pre-opened `std::ifstream` and a pre-populated
-  `qrt_read_cache`. With both, the per-call I/O is reduced to 2 seeks and 4 reads.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Reads channel impulse response data for a specific snapshot index and origin point.
+- All output arguments are optional; pass `nullptr` to skip any.
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
+- For tight-loop performance, pass a pre-opened `std::ifstream` and a [qrt_read_cache_init](#qrt_read_cache_init)-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
+- `fn` is ignored when both `file` and `cache` are provided.
+- Allowed datatypes: `float`, `double`
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::qrt_file_read(
-                const std::string &fn,
-                arma::uword i_cir = 0,
-                arma::uword i_orig = 0,
-                bool downlink = true,
-                arma::Col<dtype> *center_frequency = nullptr,
-                arma::Col<dtype> *tx_pos = nullptr,
-                arma::Col<dtype> *tx_orientation = nullptr,
-                arma::Col<dtype> *rx_pos = nullptr,
-                arma::Col<dtype> *rx_orientation = nullptr,
-                arma::Mat<dtype> *fbs_pos = nullptr,
-                arma::Mat<dtype> *lbs_pos = nullptr,
-                arma::Mat<dtype> *path_gain = nullptr,
-                arma::Col<dtype> *path_length = nullptr,
-                arma::Cube<dtype> *M = nullptr,
-                arma::Col<dtype> *aod = nullptr,
-                arma::Col<dtype> *eod = nullptr,
-                arma::Col<dtype> *aoa = nullptr,
-                arma::Col<dtype> *eoa = nullptr,
-                std::vector<arma::Mat<dtype>> *path_coord = nullptr,
-                int normalize_M = 1,
-                arma::u32_vec *no_int = nullptr,
-                arma::fmat *coord = nullptr,
-                std::ifstream *file = nullptr,
-                const qrt_read_cache *cache = nullptr)
+    const std::string &fn,
+    arma::uword i_cir = 0,
+    arma::uword i_orig = 0,
+    bool downlink = true,
+    arma::Col<dtype> *center_frequency = nullptr,
+    arma::Col<dtype> *tx_pos = nullptr,
+    arma::Col<dtype> *tx_orientation = nullptr,
+    arma::Col<dtype> *rx_pos = nullptr,
+    arma::Col<dtype> *rx_orientation = nullptr,
+    arma::Mat<dtype> *fbs_pos = nullptr,
+    arma::Mat<dtype> *lbs_pos = nullptr,
+    arma::Mat<dtype> *path_gain = nullptr,
+    arma::Col<dtype> *path_length = nullptr,
+    arma::Cube<dtype> *M = nullptr,
+    arma::Col<dtype> *aod = nullptr,
+    arma::Col<dtype> *eod = nullptr,
+    arma::Col<dtype> *aoa = nullptr,
+    arma::Col<dtype> *eoa = nullptr,
+    std::vector<arma::Mat<dtype>> *path_coord = nullptr,
+    int normalize_M = 1,
+    arma::u32_vec *no_int = nullptr,
+    arma::fmat *coord = nullptr,
+    std::ifstream *file = nullptr,
+    const qrt_read_cache *cache = nullptr);
 ```
 
-### Arguments:
-- `const std::string &**fn**` (input)
-  Path to the QRT file. Ignored when both `file` and `cache` are provided.
+### Input Arguments:
+- **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
+- **`i_cir`** — Snapshot index, 0-based
+- **`i_orig`** — Origin index, 0-based
+- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
+- **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
-- `arma::uword **i_cir** = 0` (input)
-  Snapshot index (0-based).
+| `normalize_M` | `M` | `path_gain` |
+|---|---|---|
+| 0 | As stored in QRT file | -FSPL |
+| 1 | Max column power = 1 | -FSPL minus material losses |
 
-- `arma::uword **i_orig** = 0` (input)
-  Origin index, 0-based. For downlink, origin corresponds to the transmitter.
-
-- `bool **downlink** = true` (input)
-  If `true`, origin is TX and destination is RX (downlink). If `false`, roles are swapped (uplink).
-
-- `arma::Col<dtype> ***center_frequency** = nullptr` (optional output)
-  Center frequency in Hz. Size `[n_freq]`.
-
-- `arma::Col<dtype> ***tx_pos** = nullptr` (optional output)
-  Transmitter position in Cartesian coordinates. Size `[3]`.
-
-- `arma::Col<dtype> ***tx_orientation** = nullptr` (optional output)
-  Transmitter orientation (bank, tilt, heading) in radians. Size `[3]`.
-
-- `arma::Col<dtype> ***rx_pos** = nullptr` (optional output)
-  Receiver position in Cartesian coordinates. Size `[3]`.
-
-- `arma::Col<dtype> ***rx_orientation** = nullptr` (optional output)
-  Receiver orientation (bank, tilt, heading) in radians. Size `[3]`.
-
-- `arma::Mat<dtype> ***fbs_pos** = nullptr` (optional output)
-  First-bounce scatterer positions. Size `[3, n_path]`.
-
-- `arma::Mat<dtype> ***lbs_pos** = nullptr` (optional output)
-  Last-bounce scatterer positions. Size `[3, n_path]`.
-
-- `arma::Mat<dtype> ***path_gain** = nullptr` (optional output)
-  Path gain on linear scale. Size `[n_path, n_freq]`.
-
-- `arma::Col<dtype> ***path_length** = nullptr` (optional output)
-  Absolute path length from TX to RX phase center. Size `[n_path]`.
-
-- `arma::Cube<dtype> ***M** = nullptr` (optional output)
-  Polarization transfer matrix. Size `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files.
-
-- `arma::Col<dtype> ***aod** = nullptr` (optional output)
-  Departure azimuth angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***eod** = nullptr` (optional output)
-  Departure elevation angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***aoa** = nullptr` (optional output)
-  Arrival azimuth angles in radians. Size `[n_path]`.
-
-- `arma::Col<dtype> ***eoa** = nullptr` (optional output)
-  Arrival elevation angles in radians. Size `[n_path]`.
-
-- `std::vector<arma::Mat<dtype>> ***path_coord** = nullptr` (optional output)
-  Interaction coordinates per path. Vector of length `n_path`, each matrix of size `[3, n_interact + 2]`.
-
-- `int **normalize_M** = 1` (input)
-  Normalization option for the polarization transfer matrix.
-   0 | `M` as stored in QRT file, `path_gain` is -FSPL
-   1 | `M` has sum-column power of 2, `path_gain` is -FSPL minus material losses
-
-- `arma::u32_vec ***no_int** = nullptr` (optional output)
-  Number of mesh interactions per path. Size `[n_path]`. A value of 0 indicates a LOS path.
-
-- `arma::fmat ***coord** = nullptr` (optional output)
-  Interaction coordinates. Size `[3, sum(no_int)]`.
-
-- `std::ifstream ***file** = nullptr` (optional input)
-  Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn` and closed
-  on return. If provided, the stream is left open after return.
-
-- `const qrt_read_cache ***cache** = nullptr` (optional input)
-  Optional pre-parsed metadata cache (from `qrt_read_cache_init`). When provided together with
-  `file`, per-call I/O is reduced to 2 seeks and 4 reads.
+### Output Arguments:
+- **`center_frequency`** *(optional)* — Center frequency in Hz, `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates, `[3]`
+- **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in radians, `[3]`
+- **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates, `[3]`
+- **`rx_orientation`** *(optional)* — Receiver orientation (bank, tilt, heading) in radians, `[3]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions, `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions, `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale, `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center, `[n_path]`
+- **`M`** *(optional)* — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`aod`** *(optional)* — Departure azimuth angles in radians, `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles in radians, `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles in radians, `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles in radians, `[n_path]`
+- **`path_coord`** *(optional)* — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
+- **`no_int`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS, `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates, `[3, sum(no_int)]`
 
 ### Example:
 ```
-arma::vec center_freq, tx_pos, rx_pos, path_length, aod, eod, aoa, eoa;
-arma::mat fbs_pos, lbs_pos, path_gain;
-arma::cube M;
-
-// Single call (opens and closes file internally):
-quadriga_lib::qrt_file_read<double>("scene.qrt", 0, 0, true,
-    &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-    &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-    &aod, &eod, &aoa, &eoa, nullptr, 1);
-
-// Maximum performance with cache and shared stream:
 std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
-quadriga_lib::qrt_read_cache cache;
-quadriga_lib::qrt_read_cache_init("scene.qrt", &cache, &stream);
-
+auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
+arma::vec center_freq, tx_pos, rx_pos, path_length;
+arma::mat path_gain; arma::cube M;
 for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
     for (arma::uword io = 0; io < cache.no_orig; ++io)
         quadriga_lib::qrt_file_read<double>("", ic, io, true,
             &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
-            &aod, &eod, &aoa, &eoa, nullptr, 1,
+            nullptr, nullptr, &path_gain, &path_length, &M,
+            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
             nullptr, nullptr, &stream, &cache);
 ```
+
+### See also:
+- [qrt_read_cache_init](#qrt_read_cache_init) (populate cache for fast repeated reads)
+- [qrt_file_parse](#qrt_file_parse) (extract file metadata without reading CIR data)
 
 ---
 ## qrt_read_cache_init
 Initialize a QRT read cache for fast repeated access
 
 ### Description:
-- Reads all fixed metadata from a QRT file into a `qrt_read_cache` struct.
-- Pre-computes byte offsets so that subsequent `qrt_file_read` calls only need to
-  perform 2 seeks and 4 reads (the per-CIR path data) instead of re-parsing the header.
-- Populate the cache once, then pass it to `qrt_file_read` together with a shared
-  `std::ifstream` for maximum performance in tight loops.
+- Reads all fixed metadata from a QRT file into a `quadriga_lib::qrt_read_cache` struct.
+- Pre-computes byte offsets so subsequent [qrt_file_read](#qrt_file_read) calls need only 2 seeks and 4 reads instead of re-parsing the header.
+- Populate once, then pass the cache and a shared `std::ifstream` to [qrt_file_read](#qrt_file_read) for tight-loop performance.
+- If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
 
 ### Declaration:
 ```
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
-                const std::string &fn,
-                std::ifstream *file = nullptr)
+    const std::string &fn,
+    std::ifstream *file = nullptr);
 ```
 
-### Arguments:
-- `const std::string &**fn**` (input)
-  Path to the QRT file.
-
-- `std::ifstream ***file** = nullptr` (optional input)
-  Optional pre-opened binary ifstream. If `nullptr`, the file is opened from `fn`
-  and closed on return. If provided, the stream is left open.
+### Input Arguments:
+- **`fn`** — Path to the QRT file
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
 ### Returns:
-- `qrt_read_cache **cache**` (output)
-  Populated cache structure.
-
-### Example:
-```
-std::ifstream stream("scene.qrt", std::ios::in | std::ios::binary);
-auto cache = quadriga_lib::qrt_read_cache_init("scene.qrt", &stream);
-
-arma::vec center_freq, tx_pos, rx_pos;
-arma::mat path_gain;
-arma::cube M;
-
-for (arma::uword ic = 0; ic < cache.no_cir; ++ic)
-    for (arma::uword io = 0; io < cache.no_orig; ++io)
-        quadriga_lib::qrt_file_read<double>("", ic, io, true,
-            &center_freq, &tx_pos, nullptr, &rx_pos, nullptr,
-            nullptr, nullptr, &path_gain, nullptr, &M,
-            nullptr, nullptr, nullptr, nullptr, nullptr, 1,
-            nullptr, nullptr, &stream, &cache);
-```
+- Populated `quadriga_lib::qrt_read_cache` struct
 
 ---
 ## quantize_delays
-Fixes the path delays to a grid of delay bins
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
 ### Description:
-- For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-  of delay bins (taps). Rounding delays to the nearest tap causes discontinuities in the frequency
-  domain when a delay crosses a tap boundary (e.g. as a mobile terminal moves). This function
-  instead approximates each path delay using two adjacent taps with power-weighted coefficients,
-  producing smooth transitions.
-- For a path at fractional offset &delta; between tap indices, two taps are created with complex
-  coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-  exponent. The default &alpha;=1.0 (linear interpolation) is optimal for narrowband systems. Use
-  &alpha;=0.5 to preserve wideband (incoherent) power.
-- If input delays are already quantized (all fractional offsets below 0.01), the interpolation
-  weight computation is skipped but the same delay-selection logic is used.
-- The `fix_taps` parameter controls whether delay grids are shared across antenna pairs and/or
-  snapshots, trading accuracy for a more compact representation.
-- Input delays may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`. When
-  shared and fix_taps is 0 or 3, delays are expanded internally and output delays are per-antenna.
-  When shared and fix_taps is 1 or 2, output delays remain shared `[1, 1, n_taps]`.
-- The number of antennas `n_rx` and `n_tx` must be the same across all snapshots, but the number
-  of paths `n_path_s` may differ per snapshot.
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1-delta)^alpha and delta^alpha, where delta is the fractional offset within the bin and alpha is `power_exponent`; this avoids discontinuities when delays cross tap boundaries
+- Use `power_exponent=1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
+- If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but tap-selection logic still applies
+- Input `delay` may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`; shared delays are expanded internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2
+- `n_rx` and `n_tx` must be identical across all snapshots; `n_path_s` may differ per snapshot
+- Allowed dtypes: `float`, `double`
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::quantize_delays(
     const std::vector<arma::Cube<dtype>> *coeff_re,
     const std::vector<arma::Cube<dtype>> *coeff_im,
@@ -1970,53 +1876,33 @@ void quadriga_lib::quantize_delays(
     int fix_taps = 0);
 ```
 
-### Arguments:
-- `const std::vector<arma::Cube<dtype>> ***coeff_re**` (input)
-  Channel coefficients, real part. Vector of length `n_snap`, each cube of size
-  `[n_rx, n_tx, n_path_s]` where `n_path_s` may differ across snapshots.
+### Input Arguments:
+- **`coeff_re`** — Channel coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]`
+- **`coeff_im`** — Channel coefficients, imaginary part; same layout as `coeff_re`
+- **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
+- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate
+- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
+- **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
+- **`fix_taps`** *(optional)* — Delay grid sharing mode:
 
-- `const std::vector<arma::Cube<dtype>> ***coeff_im**` (input)
-  Channel coefficients, imaginary part. Same sizes as `coeff_re`.
+  | Value | Meaning |
+  |-------|---------|
+  | 0 | Per tx-rx pair and snapshot |
+  | 1 | Single shared grid for all |
+  | 2 | Per snapshot |
+  | 3 | Per tx-rx pair |
 
-- `const std::vector<arma::Cube<dtype>> ***delay**` (input)
-  Path delays in seconds. Vector of length `n_snap`, each cube of size
-  `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`. The number of paths must match `coeff_re`.
-
-- `std::vector<arma::Cube<dtype>> ***coeff_re_quant**` (output)
-  Output coefficients, real part. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]`.
-
-- `std::vector<arma::Cube<dtype>> ***coeff_im_quant**` (output)
-  Output coefficients, imaginary part. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]`.
-
-- `std::vector<arma::Cube<dtype>> ***delay_quant**` (output)
-  Output delays in seconds. Vector of length `n_snap`, each cube of size `[n_rx, n_tx, n_taps]` or
-  `[1, 1, n_taps]`.
-
-- `dtype **tap_spacing** = 5.0e-9` (input)
-  Spacing of the delay bins in seconds. Default: 5 ns (200 MHz sampling rate).
-
-- `arma::uword **max_no_taps** = 48` (input)
-  Maximum number of output taps. 0 means unlimited.
-
-- `dtype **power_exponent** = 1.0` (input)
-  Interpolation exponent &alpha;. Use 1.0 for narrowband (linear) or 0.5 for wideband (power-preserving).
-
-- `int **fix_taps** = 0` (input)
-  Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all,
-  2 = per snapshot, 3 = per tx-rx pair.
+### Output Arguments:
+- **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`
+- **`coeff_im_quant`** — Output coefficients, imaginary part; same layout as `coeff_re_quant`
+- **`delay_quant`** — Output delays in seconds; each cube `[n_rx, n_tx, n_taps]` or `[1, 1, n_taps]` depending on `fix_taps`
 
 ### Example:
 ```
-// Create synthetic test data: 2 snapshots with different numbers of paths
 std::vector<arma::Cube<double>> cre(2), cim(2), dl(2);
-cre[0].set_size(1, 1, 3); cim[0].set_size(1, 1, 3); dl[0].set_size(1, 1, 3);
-cre[1].set_size(1, 1, 2); cim[1].set_size(1, 1, 2); dl[1].set_size(1, 1, 2);
-cre[0](0,0,0) = 1.0; cre[0](0,0,1) = 0.5; cre[0](0,0,2) = 0.3;
-cre[1](0,0,0) = 0.8; cre[1](0,0,1) = 0.4;
-cim[0].zeros(); cim[1].zeros();
-dl[0](0,0,0) = 0.0; dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9;
-dl[1](0,0,0) = 0.0; dl[1](0,0,1) = 10.0e-9;
-
+cre[0].set_size(1,1,3); cim[0].set_size(1,1,3); dl[0].set_size(1,1,3);
+cre[1].set_size(1,1,2); cim[1].set_size(1,1,2); dl[1].set_size(1,1,2);
+dl[0](0,0,1) = 12.5e-9; dl[0](0,0,2) = 33.4e-9; dl[1](0,0,1) = 10.0e-9;
 std::vector<arma::Cube<double>> cre_q, cim_q, dl_q;
 quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48, 1.0, 0);
 ```
@@ -2028,651 +1914,386 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 | Function | Description |
 | --- | --- |
 | [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models |
-| [get_channels_irs](#get_channels_irs) | Calculate channel coefficients for intelligent reflective surfaces (IRS) |
-| [get_channels_multifreq](#get_channels_multifreq) | Calculate channel coefficients for spherical waves across multiple frequencies |
-| [get_channels_planar](#get_channels_planar) | Calculate channel coefficients for planar waves |
-| [get_channels_spherical](#get_channels_spherical) | Calculate channel coefficients for spherical waves |
+| [get_channels_irs](#get_channels_irs) | Calculate MIMO channel coefficients for IRS-assisted communication |
+| [get_channels_multifreq](#get_channels_multifreq) | Compute channel coefficients for spherical waves across multiple frequencies |
+| [get_channels_planar](#get_channels_planar) | Calculate MIMO channel coefficients for planar wave paths |
+| [get_channels_spherical](#get_channels_spherical) | Calculate MIMO channel coefficients and delays for spherical wave propagation |
 
 ---
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ### Description:
-- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions.
-- 2D model: no elevation angles are used; azimuth angles and planar motion are considered.
-- Supports channel model types `A, B, C, D, E, F` (as defined by TGn) via `ChannelType`.
-- Can generate MU-MIMO channels (`n_users > 1`) with per-user distances/floors and optional angle offsets according to TGac
-- Optional time evolution via `observation_time`, `update_rate`, and mobility parameters.
+- Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
+- 2D model: azimuth angles and planar motion only, no elevation
+- Supported channel types: `A, B, C, D, E, F` (TGn definitions)
+- MU-MIMO supported (`n_users > 1`) with per-user distances/floors and optional angle offsets per TGac
+- Time-evolving channels via `observation_time`, `update_rate`, and mobility parameters; `observation_time = 0.0` yields a static channel
+- Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
+- Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+- Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+- NAN or negative value for any override parameter restores the model default
 
 ### Declaration:
 ```
 std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoor(
-                const arrayant<double> &ap_array,
-                const arrayant<double> &sta_array,
-                std::string ChannelType,
-                double CarrierFreq_Hz = 5.25e9,
-                double tap_spacing_s = 10.0e-9,
-                arma::uword n_users = 1,
-                double observation_time = 0.0,
-                double update_rate = 1.0e-3,
-                double speed_station_kmh = 0.0,
-                double speed_env_kmh = 1.2,
-                arma::vec Dist_m = {4.99},
-                arma::uvec n_floors = {0},
-                bool uplink = false,
-                arma::mat offset_angles = {},
-                arma::uword n_subpath = 20,
-                double Doppler_effect = 50.0,
-                arma::sword seed = -1,
-                double KF_linear = NAN,
-                double XPR_NLOS_linear = NAN,
-                double SF_std_dB_LOS = NAN,
-                double SF_std_dB_NLOS = NAN,
-                double dBP_m = NAN );
+    const quadriga_lib::arrayant<double> &ap_array,
+    const quadriga_lib::arrayant<double> &sta_array,
+    std::string ChannelType,
+    double CarrierFreq_Hz = 5.25e9,
+    double tap_spacing_s = 10.0e-9,
+    arma::uword n_users = 1,
+    double observation_time = 0.0,
+    double update_rate = 1.0e-3,
+    double speed_station_kmh = 0.0,
+    double speed_env_kmh = 1.2,
+    arma::vec Dist_m = {4.99},
+    arma::uvec n_floors = {0},
+    bool uplink = false,
+    arma::mat offset_angles = {},
+    arma::uword n_subpath = 20,
+    double Doppler_effect = 50.0,
+    arma::sword seed = -1,
+    double KF_linear = NAN,
+    double XPR_NLOS_linear = NAN,
+    double SF_std_dB_LOS = NAN,
+    double SF_std_dB_NLOS = NAN,
+    double dBP_m = NAN );
 ```
 
-### Arguments:
-- `const arrayant<double> **ap_array**` (input)
-  Access point array antenna with `n_tx` elements (= ports after element coupling).
-
-- `const arrayant<double> **sta_array**` (input)
-  Mobile station array antenna with `n_rx` elements (= ports after element coupling).
-
-- `std::string **ChannelType**` (input)
-  Channel model type as defined by TGn. Supported: `A, B, C, D, E, F`.
-
-- `double **CarrierFreq_Hz** = 5.25e9` (optional input)
-  Carrier frequency in Hz.
-
-- `double **tap_spacing_s** = 10.0e-9` (optional input)
-  Tap spacing in seconds. Must be equal to `10 ns / 2^k` (TGn default = `10e-9`).
-
-- `arma::uword **n_users** = 1` (optional input)
-  Number of users (only for TGac, TGah). Output vector length equals `n_users`.
-
-- `double **observation_time** = 0.0` (optional input)
-  Channel observation time in seconds. `0.0` creates a static channel.
-
-- `double **update_rate** = 1.0e-3` (optional input)
-  Channel update interval in seconds (only relevant when `observation_time > 0`).
-
-- `double **speed_station_kmh** = 0.0` (optional input)
-  Station movement speed in km/h. Movement direction is `AoA_offset`. Only relevant when `observation_time > 0`.
-
-- `double **speed_env_kmh** = 1.2` (optional input)
-  Environment movement speed in km/h. Default `1.2` for TGn, use `0.089` for TGac. Only relevant when
-  `observation_time > 0`.
-
-- `arma::vec **Dist_m** = {4.99}` (optional input)
-  TX-to-RX distance(s) in meters. Length `n_users` or length `1` (same distance for all users). Size
-  `[n_users]` or `[1]`.
-
-- `arma::uvec **n_floors** = {0}` (optional input)
-  Number of floors for TGah model (per user), up to 4 floors. Length `n_users` or length `1`. Size
-  `[n_users]` or `[1]`.
-
-- `bool **uplink** = false` (optional input)
-  Channel direction flag. Default is downlink; set to `true` to generate reverse (uplink) direction.
-
-- `arma::mat **offset_angles** = {}` (optional input)
-  Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for `n_users > 1`).
-  Size `[4, n_users]` with rows: `AoD LOS, AoD NLOS, AoA LOS, AoA NLOS`.
-
-- `arma::uword **n_subpath** = 20` (optional input)
-  Number of sub-paths per path/cluster used for Laplacian angular spread mapping.
-
-- `double **Doppler_effect** = 50.0` (optional input)
-  Special Doppler effects: models `D, E` (fluorescent lights, value = mains freq.) and `F` (moving
-  vehicle speed in km/h). Use `0.0` to disable.
-
-- `arma::sword **seed** = -1` (optional input)
-  Numeric seed for repeatability. `-1` disables the fixed seed and uses the system random device.
-
-- `double **KF_linear** = NAN` (optional input)
-  Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used:
-  A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise). 
-  KF is applied to the first tap only. Breakpoint distance is ignored for `KF_linear >= 0`.
-
-- `double **XPR_NLOS_linear** = NAN` (optional input)
-  Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative, 
-  the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
-
-- `double **SF_std_dB_LOS** = NAN` (optional input)
-  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
-  the model default of 3 dB is used. `SF_std_dB_LOS` is applied to all LOS channels, where the 
-  AP-STA distance d < dBP.
-
-- `double **SF_std_dB_NLOS** = NAN` (optional input)
-  Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default), 
-  the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. `SF_std_dB_NLOS` is applied to all NLOS channels, 
-  where the AP-STA distance d >= dBP.
-
-- `double **dBP_m** = NAN` (optional input)
-  Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative, 
-  the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
+### Input Arguments:
+- **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [arrayant](#arrayant)
+- **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [arrayant](#arrayant)
+- **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
+- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency in Hz
+- **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
+- **`n_users`** *(optional)* — Number of users (TGac/TGah only); output vector length equals `n_users`
+- **`observation_time`** *(optional)* — Channel observation time in seconds
+- **`update_rate`** *(optional)* — Channel update interval in seconds; relevant only when `observation_time > 0`
+- **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
+- **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
+- **`Dist_m`** *(optional)* — TX-to-RX distance(s) in meters; `[n_users]` or `[1]`
+- **`n_floors`** *(optional)* — Number of floors per user for TGah (max 4); `[n_users]` or `[1]`
+- **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction
+- **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
+- **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
+- **`Doppler_effect`** *(optional)* — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); `0.0` disables
+- **`seed`** *(optional)* — RNG seed for repeatability; `-1` uses the system random device
+- **`KF_linear`** *(optional)* — Overrides model KF (linear scale); NAN or negative restores model default
+- **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN or negative restores model default
+- **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
+- **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
+- **`dBP_m`** *(optional)* — Overrides breakpoint distance in meters; NAN or negative restores model default
 
 ### Returns:
-- `std::vector<quadriga_lib::channel<double>>` (output)
-  Vector of channel objects with length `n_users`. Each entry contains the generated indoor channel
-  realization for one user (including direction determined by `uplink`).
+- `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
+
+### See also:
+- [get_channels_planar](#get_channels_planar) (used internally to compute MIMO coefficients per user)
+- [arrayant](#arrayant) (antenna array type for ap_array and sta_array)
 
 ---
 ## get_channels_irs
-Calculate channel coefficients for intelligent reflective surfaces (IRS)
+Calculate MIMO channel coefficients for IRS-assisted communication
 
 ### Description:
-- Calculates MIMO channel coefficients and delays for IRS-assisted communication using two channel segments:
-  1. TX → IRS; 2. IRS → RX
-- The IRS is modeled as a passive antenna array with phase shifts defined via its coupling matrix.
-- IRS codebook entries can be selected via a port index (`i_irs`).
-- Supports combining paths from both segments to form `n_path_irs` valid output paths, subject to a gain threshold.
-- Optional second IRS array allows different antenna behavior for TX-IRS and IRS-RX directions.
-- Returns a boolean vector indicating which path combinations are included in the output.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
+- IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
+- Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2` (interleaved Re/Im for VV, VH, HV, HH components)
+- Output paths `n_path_irs` are all combinations of segment 1 and segment 2 paths that exceed `threshold_dB`
+- If `active_path` is provided, it overrides `threshold_dB` for path selection
+- Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
+- Setting `center_frequency = 0.0` disables phase computation
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 std::vector<bool> quadriga_lib::get_channels_irs(
-                const arrayant<dtype> *tx_array,
-                const arrayant<dtype> *rx_array,
-                const arrayant<dtype> *irs_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                dtype Ix, dtype Iy, dtype Iz,
-                dtype Ib, dtype It, dtype Ih,
-                const arma::Mat<dtype> *fbs_pos_1,
-                const arma::Mat<dtype> *lbs_pos_1,
-                const arma::Col<dtype> *path_gain_1,
-                const arma::Col<dtype> *path_length_1,
-                const arma::Mat<dtype> *M_1,
-                const arma::Mat<dtype> *fbs_pos_2,
-                const arma::Mat<dtype> *lbs_pos_2,
-                const arma::Col<dtype> *path_gain_2,
-                const arma::Col<dtype> *path_length_2,
-                const arma::Mat<dtype> *M_2,
-                arma::Cube<dtype> *coeff_re,
-                arma::Cube<dtype> *coeff_im,
-                arma::Cube<dtype> *delay,
-                arma::uword i_irs = 0,
-                dtype threshold_dB = -140.0,
-                dtype center_frequency = 0.0,
-                bool use_absolute_delays = false,
-                arma::Cube<dtype> *aod = nullptr,
-                arma::Cube<dtype> *eod = nullptr,
-                arma::Cube<dtype> *aoa = nullptr,
-                arma::Cube<dtype> *eoa = nullptr,
-                const arrayant<dtype> *irs_array_2 = nullptr,
-                const std::vector<bool> *active_path = nullptr);
+    const quadriga_lib::arrayant<dtype> *tx_array,
+    const quadriga_lib::arrayant<dtype> *rx_array,
+    const quadriga_lib::arrayant<dtype> *irs_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    dtype Ix, dtype Iy, dtype Iz,
+    dtype Ib, dtype It, dtype Ih,
+    const arma::Mat<dtype> *fbs_pos_1,
+    const arma::Mat<dtype> *lbs_pos_1,
+    const arma::Col<dtype> *path_gain_1,
+    const arma::Col<dtype> *path_length_1,
+    const arma::Mat<dtype> *M_1,
+    const arma::Mat<dtype> *fbs_pos_2,
+    const arma::Mat<dtype> *lbs_pos_2,
+    const arma::Col<dtype> *path_gain_2,
+    const arma::Col<dtype> *path_length_2,
+    const arma::Mat<dtype> *M_2,
+    arma::Cube<dtype> *coeff_re,
+    arma::Cube<dtype> *coeff_im,
+    arma::Cube<dtype> *delay,
+    arma::uword i_irs = 0,
+    dtype threshold_dB = -140.0,
+    dtype center_frequency = 0.0,
+    bool use_absolute_delays = false,
+    arma::Cube<dtype> *aod = nullptr,
+    arma::Cube<dtype> *eod = nullptr,
+    arma::Cube<dtype> *aoa = nullptr,
+    arma::Cube<dtype> *eoa = nullptr,
+    const quadriga_lib::arrayant<dtype> *irs_array_2 = nullptr,
+    const std::vector<bool> *active_path = nullptr);
 ```
 
-### Arguments:
-- `const arrayant<dtype> ***tx_array**` (input)
-  Pointer to the transmit antenna array object (with `n_tx` elements).
+### Input Arguments:
+- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](#arrayant)
+- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](#arrayant)
+- **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [arrayant](#arrayant)
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, meters
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), radians
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, meters
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), radians
+- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates, meters
+- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading), radians
+- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths, `[3, n_path_1]`
+- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths, `[3, n_path_1]`
+- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths, `[n_path_1]`
+- **`path_length_1`** — Total path lengths from TX to IRS phase center, meters, `[n_path_1]`
+- **`M_1`** — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path_1]`
+- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths, `[3, n_path_2]`
+- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths, `[3, n_path_2]`
+- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths, `[n_path_2]`
+- **`path_length_2`** — Total path lengths from IRS to RX phase center, meters, `[n_path_2]`
+- **`M_2`** — Polarization transfer matrix for IRS → RX paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path_2]`
+- **`i_irs`** *(optional)* — IRS codebook port index
+- **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
+- **`center_frequency`** *(optional)* — Center frequency in Hz; set to `0` to skip phase computation
+- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
+- **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [arrayant](#arrayant)
+- **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`, `[n_path_1 * n_path_2]`
 
-- `const arrayant<dtype> ***rx_array**` (input)
-  Pointer to the receive antenna array object (with `n_rx` elements).
-
-- `const arrayant<dtype> ***irs_array**` (input)
-  Pointer to the IRS array antenna (with `n_irs` elements).
-
-- `dtype **Tx**, **Ty**, **Tz**` (input)
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)
-  Transmitter orientation (Euler angles) in radians.
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)
-  Receiver orientation (Euler angles) in radians.
-
-- `dtype **Ix**, **Iy**, **Iz**` (input)
-  IRS position in Cartesian coordinates [m].
-
-- `dtype **Ib**, **It**, **Ih**` (input)
-  IRS orientation (Euler angles) in radians.
-
-- `const arma::Mat<dtype> ***fbs_pos_1**` (input)
-  First-bounce scatterer positions of TX → IRS paths, Size `[3, n_path_1]`.
-
-- `const arma::Mat<dtype> ***lbs_pos_1**` (input)
-  Last-bounce scatterer positions of TX → IRS paths, Size `[3, n_path_1]`.
-
-- `const arma::Col<dtype> ***path_gain_1**` (input)
-  Path gains (linear) for TX → IRS paths, Length `n_path_1`.
-
-- `const arma::Col<dtype> ***path_length_1**` (input)
-  Path lengths for TX → IRS paths, Length `n_path_1`.
-
-- `const arma::Mat<dtype> ***M_1**` (input)
-  Polarization transfer matrix for TX → IRS paths, Size `[8, n_path_1]`.
-
-- `const arma::Mat<dtype> ***fbs_pos_2**` (input)
-  First-bounce scatterer positions of IRS → RX paths, Size `[3, n_path_2]`.
-
-- `const arma::Mat<dtype> ***lbs_pos_2**` (input)
-  Last-bounce scatterer positions of IRS → RX paths, Size `[3, n_path_2]`.
-
-- `const arma::Col<dtype> ***path_gain_2**` (input)
-  Path gains (linear) for IRS → RX paths, Length `n_path_2`.
-
-- `const arma::Col<dtype> ***path_length_2**` (input)
-  Path lengths for IRS → RX paths, Length `n_path_2`.
-
-- `const arma::Mat<dtype> ***M_2**` (input)
-  Polarization transfer matrix for IRS → RX paths, Size `[8, n_path_2]`.
-
-- `arma::Cube<dtype> ***coeff_re**` (output)
-  Real part of resulting IRS-assisted channel coefficients, Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::Cube<dtype> ***coeff_im**` (output)
-  Imaginary part of channel coefficients, Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::Cube<dtype> ***delay**` (output)
-  Propagation delays in seconds, Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::uword **i_irs** = 0` (optional input)
-  Index of IRS codebook entry (port number), Default: `0`.
-
-- `dtype **threshold_dB** = -140.0` (optional input)
-  Threshold (in dB) below which paths are discarded. Default: `-140.0`.
-
-- `dtype **center_frequency** = 0.0` (optional input)
-  Center frequency in Hz; `0.0` disables phase computation. Default: `0.0`.
-
-- `bool **use_absolute_delays** = false` (optional input)
-  If true, includes LOS delay in all paths. Default: `false`.
-
-- `arma::Cube<dtype> ***aod** = nullptr` (optional output)
-  Azimuth of Departure angles [rad], Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::Cube<dtype> ***eod** = nullptr` (optional output)
-  Elevation of Departure angles [rad], Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::Cube<dtype> ***aoa** = nullptr` (optional output)
-  Azimuth of Arrival angles [rad], Size `[n_rx, n_tx, n_path_irs]`.
-
-- `arma::Cube<dtype> ***eoa** = nullptr` (optional output)
-  Elevation of Arrival angles [rad], Size `[n_rx, n_tx, n_path_irs]`.
-
-- `const arrayant<dtype> ***irs_array_2** = nullptr` (optional input)
-  Optional second IRS array (TX side) for asymmetric IRS behavior.
-
-- `const std::vector<bool> ***active_path** = nullptr` (optional input)
-  Optional bitmask for selecting active TX-IRS and IRS-RX path pairs. Ignores `threshold_dB` when provided.
+### Output Arguments:
+- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path_irs]`
+- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path_irs]`
+- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path_irs]`
+- **`aod`** *(optional)* — Azimuth of departure, radians, `[n_rx, n_tx, n_path_irs]`
+- **`eod`** *(optional)* — Elevation of departure, radians, `[n_rx, n_tx, n_path_irs]`
+- **`aoa`** *(optional)* — Azimuth of arrival, radians, `[n_rx, n_tx, n_path_irs]`
+- **`eoa`** *(optional)* — Elevation of arrival, radians, `[n_rx, n_tx, n_path_irs]`
 
 ### Returns:
-- `std::vector<bool>` 
-  Boolean mask of length `n_path_1 * n_path_2`, indicating which path combinations were used.
+- Boolean mask of length `n_path_1 * n_path_2` indicating which path combinations were included in the output
 
 ### See also:
-- [combine_irs_coord](#combine_irs_coord)
-- [get_channels_spherical](#get_channels_spherical)
-- [get_channels_planar](#get_channels_planar)
+- [combine_irs_coord](#combine_irs_coord) (coordinate setup for IRS geometry)
+- [get_channels_spherical](#get_channels_spherical) (single-segment spherical-wave channel)
+- [get_channels_planar](#get_channels_planar) (single-segment planar-wave channel)
+- [arrayant](#arrayant) (antenna array class)
 
 ---
 ## get_channels_multifreq
-Calculate channel coefficients for spherical waves across multiple frequencies
+Compute channel coefficients for spherical waves across multiple frequencies
 
 ### Description:
-- Extends `get_channels_spherical` to support frequency-dependent antenna patterns, path gains,
-  and polarization transfer (Jones) matrices across multiple output frequencies.
-- **Geometry is computed once**: departure angles, arrival angles, element-resolved path delays, and LOS
-  path detection are frequency-independent and reused for all output frequencies. This avoids redundant
-  trigonometry and distance calculations.
-- **Four frequency grids** are aligned by interpolation:
-  1. | TX array frequencies (defined by `tx_array[i].center_frequency`)
-  2. | RX array frequencies (defined by `rx_array[i].center_frequency`)
-  3. | Input sample frequencies (`freq_in`) at which `path_gain` and `M` are provided
-  4. | Target output frequencies (`freq_out`) at which coefficients and delays are returned
-- For each output frequency, TX and RX antenna patterns are interpolated from their respective
-  multi-frequency vectors using spherical interpolation (SLERP) with linear fallback, the same
-  algorithm used in `arrayant_interpolate_multi`. The private `qd_arrayant_interpolate` function is
-  called directly for maximum performance.
-- Path gain is interpolated linearly across frequency. The Jones matrix `M` is interpolated using
-  SLERP for each complex entry pair to preserve phase coherence.
-- **Extrapolation** is handled by clamping to the nearest available frequency entry in all four grids.
-- **Propagation speed** can be set to support both radio (speed of light, default) and acoustic
-  (speed of sound, ~343 m/s) simulations. This affects wavelength, wave number, and delay calculations.
-- The Jones matrix `M` supports two formats: 8 rows for full polarimetric
-  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), or 2 rows for scalar pressure waves
-  (ReVV, ImVV only), where VH, HV, and HH entries are implicitly zero.
-- Antenna element coupling is applied using the coupling matrices from the first entry of each
-  multi-frequency vector (consistent across all entries by `arrayant_is_valid_multi` constraints).
-- Allowed datatypes (`dtype`): `float` or `double`
+- Multi-frequency extension of [get_channels_spherical](#get_channels_spherical) with frequency-dependent antenna patterns, path gains, and Jones matrices
+- Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
+- Aligns four frequency grids: TX array (from `tx_array[i].center_frequency`), RX array, input samples (`freq_in`), and output (`freq_out`)
+- TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [arrayant_interpolate_multi](#arrayant_interpolate_multi))
+- `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
+- Extrapolation clamps to nearest frequency entry on all four grids
+- `propagation_speed` supports radio (speed of light, default) and acoustic (~343 m/s) simulations
+- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
+- `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
 void quadriga_lib::get_channels_multifreq(
-        const std::vector<arrayant<dtype>> &tx_array,
-        const std::vector<arrayant<dtype>> &rx_array,
-        dtype Tx, dtype Ty, dtype Tz,
-        dtype Tb, dtype Tt, dtype Th,
-        dtype Rx, dtype Ry, dtype Rz,
-        dtype Rb, dtype Rt, dtype Rh,
-        const arma::Mat<dtype> &fbs_pos,
-        const arma::Mat<dtype> &lbs_pos,
-        const arma::Mat<dtype> &path_gain,
-        const arma::Col<dtype> &path_length,
-        const arma::Cube<dtype> &M,
-        const arma::Col<dtype> &freq_in,
-        const arma::Col<dtype> &freq_out,
-        std::vector<arma::Cube<dtype>> &coeff_re,
-        std::vector<arma::Cube<dtype>> &coeff_im,
-        std::vector<arma::Cube<dtype>> &delay,
-        bool use_absolute_delays = false,
-        bool add_fake_los_path = false,
-        dtype propagation_speed = dtype(299792458.0))
+    const std::vector<arrayant<dtype>> &tx_array,
+    const std::vector<arrayant<dtype>> &rx_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> &fbs_pos,
+    const arma::Mat<dtype> &lbs_pos,
+    const arma::Mat<dtype> &path_gain,
+    const arma::Col<dtype> &path_length,
+    const arma::Cube<dtype> &M,
+    const arma::Col<dtype> &freq_in,
+    const arma::Col<dtype> &freq_out,
+    std::vector<arma::Cube<dtype>> &coeff_re,
+    std::vector<arma::Cube<dtype>> &coeff_im,
+    std::vector<arma::Cube<dtype>> &delay,
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    dtype propagation_speed = dtype(299792458.0));
 ```
 
-### Arguments:
-- `const std::vector<arrayant<dtype>> &**tx_array**` (input)
-  Multi-frequency transmit array antenna vector. All entries must pass `arrayant_is_valid_multi`.
+### Input Arguments:
+- **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
+- **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [arrayant_is_valid_multi](#arrayant_is_valid_multi)
+- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates [m]
+- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading) [rad]
+- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates [m]
+- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading) [rad]
+- **`fbs_pos`** — First-bounce scatterer positions, `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions, `[3, n_path]`
+- **`path_gain`** — Linear-scale path gains, `[n_path, n_freq_in]`
+- **`path_length`** — Absolute TX-to-RX path lengths, `[n_path]`
+- **`M`** — Polarization transfer matrix, `[8, n_path, n_freq_in]` (full pol) or `[2, n_path, n_freq_in]` (scalar)
+- **`freq_in`** — Input sample frequencies [Hz] for `path_gain` and `M`, `[n_freq_in]`
+- **`freq_out`** — Target output frequencies [Hz], `[n_freq_out]`
+- **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
+- **`add_fake_los_path`** *(optional)* — Add zero-power LOS path if none detected
+- **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 
-- `const std::vector<arrayant<dtype>> &**rx_array**` (input)
-  Multi-frequency receive array antenna vector. All entries must pass `arrayant_is_valid_multi`.
-
-- `dtype **Tx**, **Ty**, **Tz**` (input)
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)
-  Transmitter orientation (bank, tilt, heading) in [rad].
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)
-  Receiver orientation (bank, tilt, heading) in [rad].
-
-- `const arma::Mat<dtype> &**fbs_pos**` (input)
-  First-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Mat<dtype> &**lbs_pos**` (input)
-  Last-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Mat<dtype> &**path_gain**` (input)
-  Path gain in linear scale, Size: `[n_path, n_freq_in]`. Each column corresponds to one input frequency.
-
-- `const arma::Col<dtype> &**path_length**` (input)
-  Absolute path lengths from TX to RX phase center, Length: `n_path`.
-
-- `const arma::Cube<dtype> &**M**` (input)
-  Polarization transfer matrix, Size: `[8, n_path, n_freq_in]` for full polarimetric or
-  `[2, n_path, n_freq_in]` for scalar pressure. Each slice corresponds to one input frequency.
-  Interleaved complex format: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) for 8 rows,
-  or (ReVV, ImVV) for 2 rows.
-
-- `const arma::Col<dtype> &**freq_in**` (input)
-  Input sample frequencies in [Hz] at which `path_gain` and `M` are defined, Length: `n_freq_in`.
-
-- `const arma::Col<dtype> &**freq_out**` (input)
-  Target frequencies in [Hz] at which to compute output coefficients and delays, Length: `n_freq_out`.
-
-- `std::vector<arma::Cube<dtype>> &**coeff_re**` (output)
-  Real part of channel coefficients. Vector of length `n_freq_out`, each cube of size `[n_rx, n_tx, n_path]`.
-
-- `std::vector<arma::Cube<dtype>> &**coeff_im**` (output)
-  Imaginary part of channel coefficients. Same structure as `coeff_re`.
-
-- `std::vector<arma::Cube<dtype>> &**delay**` (output)
-  Propagation delays in seconds. Same structure as `coeff_re`.
-
-- `bool **use_absolute_delays** = false` (optional input)
-  If true, LOS delay is included in all paths. Default: `false`.
-
-- `bool **add_fake_los_path** = false` (optional input)
-  Adds a zero-power LOS path if no LOS path was detected. Default: `false`.
-
-- `dtype **propagation_speed** = 299792458.0` (optional input)
-  Wave propagation speed in [m/s]. Default is the speed of light for radio simulations.
-  Set to ~343.0 for acoustic simulations in air.
-
-### Example:
-```
-// Build a 2-way speaker as TX (source)
-arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
-auto tx_woofer = quadriga_lib::generate_speaker<double>(
-    "piston", 0.083, 50.0, 3000.0, 12.0, 24.0, 87.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-auto tx_tweeter = quadriga_lib::generate_speaker<double>(
-    "piston", 0.013, 1500.0, 20000.0, 24.0, 12.0, 90.0, "hemisphere",
-    0.0, 0.0, 0.0, 0.20, 0.30, freqs, 10.0);
-auto tx = quadriga_lib::arrayant_concat_multi(tx_woofer, tx_tweeter);
-
-// Omnidirectional microphone as RX (single entry, clamped for all frequencies)
-std::vector<quadriga_lib::arrayant<double>> rx = { quadriga_lib::generate_arrayant_omni<double>() };
-
-// Simple LOS path setup
-arma::mat fbs = arma::mat({0.5, 0.0, 0.0}).t();
-arma::mat lbs = arma::mat({0.5, 0.0, 0.0}).t();
-arma::vec path_length = {1.0};               // 1 meter distance
-
-// Frequency-flat path gain and scalar Jones matrix
-arma::vec freq_in = {100.0, 10000.0};
-arma::mat path_gain_mat(1, 2, arma::fill::ones);
-arma::cube M_cube(2, 1, 2, arma::fill::zeros);
-M_cube(0, 0, 0) = 1.0; M_cube(0, 0, 1) = 1.0;  // ReVV = 1 at both freqs
-
-arma::vec freq_out = {200.0, 1000.0, 5000.0};
-std::vector<arma::cube> coeff_re, coeff_im, delays;
-
-quadriga_lib::get_channels_multifreq(tx, rx,
-    0.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // TX at origin
-    1.0, 0.0, 0.0, 0.0, 0.0, 0.0,   // RX at (1,0,0)
-    fbs_pos, lbs_pos, path_gain_mat, path_length, M_cube,
-    freq_in, freq_out, coeff_re, coeff_im, delays,
-    false, false, 343.0);             // Speed of sound for acoustics
-```
+### Output Arguments:
+- **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
+- **`coeff_im`** — Imaginary part; same structure as `coeff_re`
+- **`delay`** — Propagation delays [s]; same structure as `coeff_re`
 
 ### See also:
-- [get_channels_spherical](#get_channels_spherical)
-- [arrayant_interpolate_multi](#arrayant_interpolate_multi)
-- [arrayant_concat_multi](#arrayant_concat_multi)
-- [generate_speaker](#generate_speaker)
+- [get_channels_spherical](#get_channels_spherical) (single-frequency equivalent)
+- [arrayant_interpolate_multi](#arrayant_interpolate_multi) (underlying pattern interpolation)
+- [arrayant_concat_multi](#arrayant_concat_multi) (building multi-frequency arrays)
+- [generate_speaker](#generate_speaker) (acoustic source construction)
+- [fast_slerp](#fast_slerp) (SLERP implementation used for the interpolation)
 
 ---
 ## get_channels_planar
-Calculate channel coefficients for planar waves
+Calculate MIMO channel coefficients for planar wave paths
 
 ### Description:
-- Calculates MIMO channel coefficients and delays for a set of planar wave paths between two antenna arrays.
-- Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays.
-- Supports LOS path identification based on distance (angles are ignored).
-- Polarization transfer matrix models polarization coupling and must be normalized.
-- Doppler weights can optionally be calculated from receiver motion relative to path direction.
-- Element positions and antenna orientation are fully considered for delay and phase.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
+- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
+- LOS path detection is distance-based (angles ignored).
+- Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
+- If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
+- Setting `center_frequency = 0` disables phase calculation (delays still computed).
+- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::get_channels_planar(
-                const arrayant<dtype> *tx_array,
-                const arrayant<dtype> *rx_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                const arma::Col<dtype> *aod,
-                const arma::Col<dtype> *eod,
-                const arma::Col<dtype> *aoa,
-                const arma::Col<dtype> *eoa,
-                const arma::Col<dtype> *path_gain,
-                const arma::Col<dtype> *path_length,
-                const arma::Mat<dtype> *M,
-                arma::Cube<dtype> *coeff_re,
-                arma::Cube<dtype> *coeff_im,
-                arma::Cube<dtype> *delay,
-                dtype center_frequency = dtype(0.0),
-                bool use_absolute_delays = false,
-                bool add_fake_los_path = false,
-                arma::Col<dtype> *rx_Doppler = nullptr);
+    const quadriga_lib::arrayant<dtype> *tx_array,
+    const quadriga_lib::arrayant<dtype> *rx_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Col<dtype> *aod,
+    const arma::Col<dtype> *eod,
+    const arma::Col<dtype> *aoa,
+    const arma::Col<dtype> *eoa,
+    const arma::Col<dtype> *path_gain,
+    const arma::Col<dtype> *path_length,
+    const arma::Mat<dtype> *M,
+    arma::Cube<dtype> *coeff_re,
+    arma::Cube<dtype> *coeff_im,
+    arma::Cube<dtype> *delay,
+    dtype center_frequency = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    arma::Col<dtype> *rx_Doppler = nullptr);
 ```
 
-### Arguments:
-- `const arrayant<dtype> ***tx_array**` (input)
-  Pointer to the transmit antenna array object (with `n_tx` elements).
+### Input Arguments:
+- **`tx_array`** — Transmit antenna array; `n_tx` elements
+- **`rx_array`** — Receive antenna array; `n_rx` elements
+- **`Tx, Ty, Tz`** — Transmitter position in meters
+- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading in radians
+- **`Rx, Ry, Rz`** — Receiver position in meters
+- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading in radians
+- **`aod`** — Departure azimuth angles in radians, `[n_path]`
+- **`eod`** — Departure elevation angles in radians, `[n_path]`
+- **`aoa`** — Arrival azimuth angles in radians, `[n_path]`
+- **`eoa`** — Arrival elevation angles in radians, `[n_path]`
+- **`path_gain`** — Path gains in linear scale, `[n_path]`
+- **`path_length`** — Path lengths from TX to RX phase center in meters, `[n_path]`
+- **`M`** — Polarization transfer matrix, row order: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH; `[8, n_path]`
+- **`center_frequency`** *(optional)* — Center frequency in Hz; 0 disables phase calculation
+- **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
+- **`add_fake_los_path`** *(optional)* — Append a zero-power LOS path when no LOS is present
 
-- `const arrayant<dtype> ***rx_array**` (input)
-  Pointer to the receive antenna array object (with `n_rx` elements).
+### Output Arguments:
+- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
+- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
+- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path(+1)]`
+- **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; positive = moving toward path, negative = away; `[n_path(+1)]`
 
-- `dtype **Tx**, **Ty**, **Tz**` (input)
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)
-  Transmitter orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)
-  Receiver orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `const arma::Col<dtype> ***aod**` (input)
-  Departure azimuth angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***eod**` (input)
-  Departure elevation angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***aoa**` (input)
-  Arrival azimuth angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***eoa**` (input)
-  Arrival elevation angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***path_gain**` (input)
-  Path gains in linear scale, Length `n_path`.
-
-- `const arma::Col<dtype> ***path_length**` (input)
-  Path lengths from TX to RX phase center, Length `n_path`.
-
-- `const arma::Mat<dtype> ***M**` (input)
-  Polarization transfer matrix of size `[8, n_path]`, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH).
-
-- `arma::Cube<dtype> ***coeff_re**` (output)
-  Real part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `arma::Cube<dtype> ***coeff_im**` (output)
-  Imaginary part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `arma::Cube<dtype> ***delay**` (output)
-  Propagation delays in seconds, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `dtype **center_frequency** = 0.0` (optional input)
-  Center frequency in Hz; set to 0 to disable phase calculation. Default: `0.0`
-
-- `bool **use_absolute_delays** = false` (optional input)
-  If true, includes LOS delay in all paths. Default: `false`
-
-- `bool **add_fake_los_path** = false` (optional input)
-  Adds a zero-power LOS path if no LOS is present. Default: `false`
-
-- `arma::Col<dtype> ***rx_Doppler** = nullptr` (optional output)
-  Doppler weights for moving RX, Length `n_path(+1)`. Positive = towards path, Negative = away.
+### See also:
+- [get_channels_spherical](#get_channels_spherical) (spherical wave variant accounting for per-element angle differences)
 
 ---
 ## get_channels_spherical
-Calculate channel coefficients for spherical waves
+Calculate MIMO channel coefficients and delays for spherical wave propagation
 
 ### Description:
-- Calculates MIMO channel coefficients and delays for a set of spherical wave paths between two antenna arrays.
-- Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays.
-- Accurately models path-based propagation using provided scatterer positions.
-- Supports LOS path identification and handles complex polarization coupling.
-- Element positions and antenna orientation are fully considered for delay and phase.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
+- Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
+- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
+- If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
+- If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::get_channels_spherical(
-                const arrayant<dtype> *tx_array,
-                const arrayant<dtype> *rx_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                const arma::Mat<dtype> *fbs_pos,
-                const arma::Mat<dtype> *lbs_pos,
-                const arma::Col<dtype> *path_gain,
-                const arma::Col<dtype> *path_length,
-                const arma::Mat<dtype> *M,
-                arma::Cube<dtype> *coeff_re,
-                arma::Cube<dtype> *coeff_im,
-                arma::Cube<dtype> *delay,
-                dtype center_frequency = dtype(0.0),
-                bool use_absolute_delays = false,
-                bool add_fake_los_path = false,
-                arma::Cube<dtype> *aod = nullptr,
-                arma::Cube<dtype> *eod = nullptr,
-                arma::Cube<dtype> *aoa = nullptr,
-                arma::Cube<dtype> *eoa = nullptr)
+    const quadriga_lib::arrayant<dtype> *tx_array,
+    const quadriga_lib::arrayant<dtype> *rx_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Mat<dtype> *fbs_pos,
+    const arma::Mat<dtype> *lbs_pos,
+    const arma::Col<dtype> *path_gain,
+    const arma::Col<dtype> *path_length,
+    const arma::Mat<dtype> *M,
+    arma::Cube<dtype> *coeff_re,
+    arma::Cube<dtype> *coeff_im,
+    arma::Cube<dtype> *delay,
+    dtype center_frequency = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    arma::Cube<dtype> *aod = nullptr,
+    arma::Cube<dtype> *eod = nullptr,
+    arma::Cube<dtype> *aoa = nullptr,
+    arma::Cube<dtype> *eoa = nullptr,
+    bool use_avx2 = false);
 ```
 
-### Arguments:
-- `const arrayant<dtype> ***tx_array**` (input)
-  Pointer to the transmit antenna array object (with `n_tx` elements).
+### Input Arguments:
+- **`tx_array`** — Transmit antenna array with `n_tx` elements; see [arrayant](#arrayant)
+- **`rx_array`** — Receive antenna array with `n_rx` elements; see [arrayant](#arrayant)
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, meters
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), radians
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, meters
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), radians
+- **`fbs_pos`** — First-bounce scatterer positions, `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions, `[3, n_path]`
+- **`path_gain`** — Path gains in linear scale, `[n_path]`
+- **`path_length`** — Total path lengths from TX to RX phase center, meters, `[n_path]`
+- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path]`
+- **`center_frequency`** *(optional)* — Center frequency in Hz; set to `0` to skip phase computation
+- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
+- **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present
+- **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported
 
-- `const arrayant<dtype> ***rx_array**` (input)
-  Pointer to the receive antenna array object (with `n_rx` elements).
+### Output Arguments:
+- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path]`
+- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path]`
+- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path]`
+- **`aod`** *(optional)* — Azimuth of departure, radians, `[n_rx, n_tx, n_path]`
+- **`eod`** *(optional)* — Elevation of departure, radians, `[n_rx, n_tx, n_path]`
+- **`aoa`** *(optional)* — Azimuth of arrival, radians, `[n_rx, n_tx, n_path]`
+- **`eoa`** *(optional)* — Elevation of arrival, radians, `[n_rx, n_tx, n_path]`
 
-- `dtype **Tx**, **Ty**, **Tz**` (input)
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)
-  Transmitter orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)
-  Receiver orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `const arma::Mat<dtype> ***fbs_pos**` (input)
-  First-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Mat<dtype> ***lbs_pos**` (input)
-  Last-bounce scatterer positions, Size: `[3, n_path]`.
-
-- `const arma::Col<dtype> ***path_gain**` (input)
-  Path gains in linear scale, Length `n_path`.
-
-- `const arma::Col<dtype> ***path_length**` (input)
-  Path lengths from TX to RX phase center Length `n_path`.
-
-- `const arma::Mat<dtype> ***M**` (input)
-  Polarization transfer matrix of size `[8, n_path]`, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH).
-
-- `arma::Cube<dtype> ***coeff_re**` (output)
-  Real part of channel coefficients, Size `[n_rx, n_tx, n_path]`.
-
-- `arma::Cube<dtype> ***coeff_im**` (output)
-  Imaginary part of channel coefficients, Size `[n_rx, n_tx, n_path]`.
-
-- `arma::Cube<dtype> ***delay**` (output)
-  Propagation delays in seconds, Size `[n_rx, n_tx, n_path]`.
-
-- `dtype **center_frequency** = 0.0` (optional input)
-  Center frequency in Hz; set to 0 to disable phase calculation. Default: `0.0`
-
-- `bool **use_absolute_delays** = false` (optional input)
-  If true, includes LOS delay in all paths. Default: `false`
-
-- `bool **add_fake_los_path** = false` (optional input)
-  Adds a zero-power LOS path if no LOS is present. Default: `false`
-
-- `arma::Cube<dtype> ***aod** = nullptr` (optional output)
-  Azimuth of Departure angles in radians, Size `[n_rx, n_tx, n_path]`.
-
-- `arma::Cube<dtype> ***eod** = nullptr` (optional output)
-  Elevation of Departure angles in radians, Size `[n_rx, n_tx, n_path]`.
-
-- `arma::Cube<dtype> ***aoa** = nullptr` (optional output)
-  Azimuth of Arrival angles in radians, Size `[n_rx, n_tx, n_path]`.
-
-- `arma::Cube<dtype> ***eoa = nullptr` (optional output)
-  Elevation of Arrival angles in radians, Size `[n_rx, n_tx, n_path]`.
+### See also:
+- [get_channels_planar](#get_channels_planar) (planar wave variant)
+- [arrayant](#arrayant) (antenna array class)
 
 ---
 
@@ -2680,187 +2301,135 @@ void quadriga_lib::get_channels_spherical(
 
 | Function | Description |
 | --- | --- |
-| [fast_acos](#fast_acos) | Fast, approximate arc-cosine |
-| [fast_asin](#fast_asin) | Fast, approximate arc-sine |
-| [fast_atan2](#fast_atan2) | Fast, approximate two-argument arc-tangent |
-| [fast_cart2geo](#fast_cart2geo) | Fast, approximate Cartesian-to-geographic conversion |
-| [fast_geo2cart](#fast_geo2cart) | Fast, approximate geographic-to-Cartesian conversion |
-| [fast_sincos](#fast_sincos) | Fast, approximate sine/cosine |
-| [fast_slerp](#fast_slerp) | Fast, approximate spherical interpolation (SLERP) for complex value pairs |
+| [fast_acos](#fast_acos) | Compute elementwise approximate arc-cosine of a vector |
+| [fast_asin](#fast_asin) | Compute elementwise approximate arc-sine of a vector |
+| [fast_atan2](#fast_atan2) | Compute elementwise approximate two-argument arc-tangent of two vectors |
+| [fast_cart2geo](#fast_cart2geo) | Convert elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles |
+| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates |
+| [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
+| [fast_slerp](#fast_slerp) | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
 
 ---
 ## fast_acos
-Fast, approximate arc-cosine
+Compute elementwise approximate arc-cosine of a vector
 
 ### Description:
-Computes elementwise arc-cosine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input values in [-1, 1]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::acosf`
-- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-- Input values outside [-1, 1] produce NaN (IEEE compliant)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- In-place operation not allowed (input and output cannot alias)
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
 void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
-void quadriga_lib::fast_acos(const arma::vec &x, arma::fvec &c);
+void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
 ```
 
-### Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)
-  Input values in [-1, 1]. Length `[n]`.
+### Input Arguments:
+- **`x`** — Input values in [-1, 1]; `[n]`
 
-- `arma::fvec &**c**` (output)
-  Set to `acos(x)`. Resized to length `n` if needed. Length `[n]`.
-
-### Example:
-```
-arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
-arma::fvec c;
-quadriga_lib::fast_acos(x, c);
-```
+### Output Arguments:
+- **`c`** — acos(x); `[n]`
 
 ---
 ## fast_asin
-Fast, approximate arc-sine
+Compute elementwise approximate arc-sine of a vector
 
 ### Description:
-Computes elementwise arc-sine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input values in [-1, 1]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::asinf`
-- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-- Input values outside [-1, 1] produce NaN (IEEE compliant)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- In-place operation not allowed (input and output cannot alias)
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
 void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
-void quadriga_lib::fast_asin(const arma::vec &x, arma::fvec &s);
+void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
 ```
 
-### Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)
-  Input values in [-1, 1]. Length `[n]`.
+### Input Arguments:
+- **`x`** — Input values in [-1, 1]; `[n]`
 
-- `arma::fvec &**s**` (output)
-  Set to `asin(x)`. Resized to length `n` if needed. Length `[n]`.
-
-### Example:
-```
-arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
-arma::fvec s;
-quadriga_lib::fast_asin(x, s);
-```
+### Output Arguments:
+- **`s`** — asin(x); `[n]`
 
 ---
 ## fast_atan2
-Fast, approximate two-argument arc-tangent
+Compute elementwise approximate two-argument arc-tangent of two vectors
 
 ### Description:
-Computes elementwise `atan2(y, x)` for two Armadillo vectors. Designed for high throughput on modern CPUs.
-- Returns angles in radians in the range (-pi, pi]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::atan2f`
-- Maximum error is approximately 3 ULP (~3.6e-7) across the full domain
-- `atan2(0, 0)` returns 0; `atan2(±0, -0)` returns `±0` (not `±pi`)
-- Both input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Returns angles in radians in (-pi, pi]; max error ~3 ULP (~3.6e-7)
+- atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
+- Both inputs must have the same length; in-place operation not allowed
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
 void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &a);
-void quadriga_lib::fast_atan2(const arma::vec &y, const arma::vec &x, arma::fvec &a);
+void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &a);
 ```
 
-### Arguments:
-- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)
-  Y-coordinates (numerator of atan2). Length `[n]`.
+### Input Arguments:
+- **`y`** — Y-coordinates (numerator); `[n]`
+- **`x`** — X-coordinates (denominator); `[n]`
 
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)
-  X-coordinates (denominator of atan2). Length `[n]`.
-
-- `arma::fvec &**a**` (output)
-  Set to `atan2(y, x)` in radians. Resized to length `n` if needed. Length `[n]`.
-
-### Example:
-```
-arma::fvec y = {1.0f, -1.0f, 0.0f, 1.0f};
-arma::fvec x = {1.0f,  1.0f, -1.0f, 0.0f};
-arma::fvec a;
-quadriga_lib::fast_atan2(y, x, a);
-// a ≈ {0.7854, -0.7854, 3.1416, 1.5708}
-```
+### Output Arguments:
+- **`a`** — atan2(y, x) in radians; `[n]`
 
 ---
 ## fast_cart2geo
-Fast, approximate Cartesian-to-geographic conversion
+Convert elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles
 
 ### Description:
-Converts elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles (in radians).
-- az = atan2(y, x), el = asin(clamp(z, -1, 1))
-- The z-coordinate is clamped to [-1, 1] before computing asin, guarding against FMA rounding artefacts
-  from upstream matrix multiplications that can push abs(z) slightly above 1
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::atan2f` / `std::asinf`
-- All input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Conversion: az = atan2(y, x), el = asin(clamp(z, -1, 1))
+- z is clamped to [-1, 1] before asin to guard against FMA rounding artefacts pushing abs(z) slightly above 1
+- All inputs must have the same length
+- In-place and output-output aliasing not allowed (x/y/z cannot alias az or el; az and el cannot alias each other)
+- Output vectors resized automatically if needed
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
 void quadriga_lib::fast_cart2geo(const arma::fvec &x, const arma::fvec &y, const arma::fvec &z,
                                  arma::fvec &az, arma::fvec &el);
+
 void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const arma::vec &z,
                                  arma::fvec &az, arma::fvec &el);
 ```
 
-### Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)
-  X-coordinates. Length `[n]`.
+### Input Arguments:
+- **`x`** — X-coordinates; `[n]`
+- **`y`** — Y-coordinates; `[n]`
+- **`z`** — Z-coordinates; `[n]`
 
-- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)
-  Y-coordinates. Length `[n]`.
+### Output Arguments:
+- **`az`** — Azimuth angles in radians; `[n]`
+- **`el`** — Elevation angles in radians; `[n]`
 
-- `const arma::fvec &**z**` or `const arma::vec &**z**` (input)
-  Z-coordinates. Length `[n]`.
-
-- `arma::fvec &**az**` (output)
-  Azimuth angles in radians. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**el**` (output)
-  Elevation angles in radians. Resized to length `n` if needed. Length `[n]`.
-
-### Example:
-```
-arma::fvec x = {1.0f, 0.0f, -1.0f};
-arma::fvec y = {0.0f, 1.0f, 0.0f};
-arma::fvec z = {0.0f, 0.0f, 0.0f};
-arma::fvec az, el;
-quadriga_lib::fast_cart2geo(x, y, z, az, el);
-// az ≈ {0.0, 1.5708, 3.1416},  el ≈ {0.0, 0.0, 0.0}
-```
+### See also:
+- [fast_geo2cart](#fast_geo2cart) (inverse conversion)
 
 ---
 ## fast_geo2cart
-Fast, approximate geographic-to-Cartesian conversion
+Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates
 
 ### Description:
-Converts elementwise azimuth/elevation angles (in radians) to unit-sphere Cartesian coordinates.
-- x = cos(el) * cos(az), y = cos(el) * sin(az), z = sin(el)
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::sinf` / `std::cosf`
-- Optionally returns intermediate sin/cos values via pointer arguments; pass `nullptr` to skip
-- Both input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Conversion: x = cos(el)*cos(az), y = cos(el)*sin(az), z = sin(el)
+- Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
+- Both inputs must have the same length; in-place operation not allowed
+- Output vectors resized automatically if needed
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2868,107 +2437,69 @@ void quadriga_lib::fast_geo2cart(const arma::fvec &az, const arma::fvec &el,
                                  arma::fvec &x, arma::fvec &y, arma::fvec &z,
                                  arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
                                  arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
+
 void quadriga_lib::fast_geo2cart(const arma::vec &az, const arma::vec &el,
                                  arma::fvec &x, arma::fvec &y, arma::fvec &z,
                                  arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
                                  arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
 ```
 
-### Arguments:
-- `const arma::fvec &**az**` or `const arma::vec &**az**` (input)
-  Azimuth angles in radians. Length `[n]`.
+### Input Arguments:
+- **`az`** — Azimuth angles in radians; `[n]`
+- **`el`** — Elevation angles in radians; `[n]`
 
-- `const arma::fvec &**el**` or `const arma::vec &**el**` (input)
-  Elevation angles in radians. Length `[n]`.
+### Output Arguments:
+- **`x`** — X-coordinates on the unit sphere; `[n]`
+- **`y`** — Y-coordinates on the unit sphere; `[n]`
+- **`z`** — Z-coordinates on the unit sphere; `[n]`
+- **`sAZ`** *(optional)* — sin(az); `[n]` or `nullptr`
+- **`cAZ`** *(optional)* — cos(az); `[n]` or `nullptr`
+- **`sEL`** *(optional)* — sin(el); `[n]` or `nullptr`
+- **`cEL`** *(optional)* — cos(el); `[n]` or `nullptr`
 
-- `arma::fvec &**x**` (output)
-  X-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**y**` (output)
-  Y-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**z**` (output)
-  Z-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec ***sAZ** = nullptr` (optional output)
-  If non-null, set to `sin(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***cAZ** = nullptr` (optional output)
-  If non-null, set to `cos(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***sEL** = nullptr` (optional output)
-  If non-null, set to `sin(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***cEL** = nullptr` (optional output)
-  If non-null, set to `cos(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-### Example:
-```
-arma::fvec az = {0.0f, 1.5708f, 3.1416f};
-arma::fvec el = {0.0f, 0.5f, -0.5f};
-arma::fvec x, y, z, sAZ, cEL;
-quadriga_lib::fast_geo2cart(az, el, x, y, z, &sAZ, nullptr, nullptr, &cEL);
-```
+### See also:
+- [fast_cart2geo](#fast_cart2geo) (inverse conversion)
 
 ---
 ## fast_sincos
-Fast, approximate sine/cosine
+Compute elementwise approximate sine and/or cosine of a vector
 
 ### Description:
-Computes elementwise sine and/or cosine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input angles in radians
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::sinf` / `std::cosf`
-- For x in [-pi, pi], the maximum absolute error is 2^(-22.1), and larger otherwise
-- For x in [-500, 500], the maximum absolute error is 2^(-16.0)
-- Either output (`s` or `c`) may be `nullptr` to skip its computation
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
+- Either `s` or `c` may be `nullptr` to skip that computation
+- Output vectors are resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
 void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
-void quadriga_lib::fast_sincos(const arma::vec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arma::fvec *c = nullptr);
 ```
 
-### Arguments:
-- `const arma::fvec **x**` or `const arma::vec **x**` (input)
-  Input angles in radians. Size `[n]`.
+### Input Arguments:
+- **`x`** — Input angles in radians; `[n]`
 
-- `arma::fvec ***s** = nullptr` (optional output)
-  If non-null, set to `sin(x)`. Resized to length `n` if needed. Size `[n]` or `nullptr`.
-
-- `arma::fvec ***c** = nullptr` (optional output)
-  If non-null, set to `cos(x)`. Resized to length `n` if needed. Size `[n]` or `nullptr`.
-
-### Returns:
-- `void` (output)
-  No return value. Results written via output pointers.
-
-### Example:
-```
-arma::fvec x = arma::linspace[arma::fvec](arma::fvec)(0.0f, 6.2831853f, 1000);
-arma::fvec s, c;
-quadriga_lib::fast_sincos(x, &s, &c);      // compute both
-quadriga_lib::fast_sincos(x, &s, nullptr); // compute sine only
-quadriga_lib::fast_sincos(x, nullptr, &c); // compute cosine only
-```
+### Output Arguments:
+- **`s`** *(optional)* — sin(x); `[n]` or `nullptr`
+- **`c`** *(optional)* — cos(x); `[n]` or `nullptr`
 
 ---
 ## fast_slerp
-Fast, approximate spherical interpolation (SLERP) for complex value pairs
+Compute elementwise approximate SLERP interpolation between two complex-valued vectors
 
 ### Description:
-Interpolates elementwise between two complex-valued vectors using spherical linear interpolation
-(SLERP) on the normalised directions and linear interpolation of amplitudes.
-- Processes per-element interpolation weights (0 = A, 1 = B)
-- AVX2-optimized (8 complex pairs per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback
-- If both input amplitudes are negligible, the output is zero
-- Maximum error versus double-precision reference is approximately 5 ULP
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
-- All input vectors must have the same length
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated
+- Weight `w=0` returns A, `w=1` returns B; per-element weights in [0, 1]
+- Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
+- If both input amplitudes are negligible, output is zero
+- Max error vs. double-precision reference: ~5 ULP
+- All input vectors must have the same length; output vectors resized automatically
+- Output Xr and Xi cannot alias each other
+- AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2976,46 +2507,23 @@ void quadriga_lib::fast_slerp(const arma::fvec &Ar, const arma::fvec &Ai,
                               const arma::fvec &Br, const arma::fvec &Bi,
                               const arma::fvec &w,
                               arma::fvec &Xr, arma::fvec &Xi);
+
 void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
                               const arma::vec &Br, const arma::vec &Bi,
                               const arma::vec &w,
                               arma::fvec &Xr, arma::fvec &Xi);
 ```
 
-### Arguments:
-- `const arma::fvec &**Ar**` or `const arma::vec &**Ar**` (input)
-  Real part of source A. Length `[n]`.
+### Input Arguments:
+- **`Ar`** — Real part of source A; `[n]`
+- **`Ai`** — Imaginary part of source A; `[n]`
+- **`Br`** — Real part of source B; `[n]`
+- **`Bi`** — Imaginary part of source B; `[n]`
+- **`w`** — Per-element interpolation weight in [0, 1]; `[n]`
 
-- `const arma::fvec &**Ai**` or `const arma::vec &**Ai**` (input)
-  Imaginary part of source A. Length `[n]`.
-
-- `const arma::fvec &**Br**` or `const arma::vec &**Br**` (input)
-  Real part of source B. Length `[n]`.
-
-- `const arma::fvec &**Bi**` or `const arma::vec &**Bi**` (input)
-  Imaginary part of source B. Length `[n]`.
-
-- `const arma::fvec &**w**` or `const arma::vec &**w**` (input)
-  Per-element interpolation weight in [0, 1]. 0 returns A, 1 returns B. Length `[n]`.
-
-- `arma::fvec &**Xr**` (output)
-  Real part of interpolated result. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**Xi**` (output)
-  Imaginary part of interpolated result. Resized to length `n` if needed. Length `[n]`.
-
-### Returns:
-- `void` (output)
-  No return value. Results written to Xr and Xi.
-
-### Example:
-```
-arma::fvec Ar = {1.0f, 0.0f}, Ai = {0.0f, 1.0f};
-arma::fvec Br = {0.0f, 1.0f}, Bi = {1.0f, 0.0f};
-arma::fvec w = {0.5f, 0.5f};
-arma::fvec Xr, Xi;
-quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
-```
+### Output Arguments:
+- **`Xr`** — Real part of interpolated result; `[n]`
+- **`Xi`** — Imaginary part of interpolated result; `[n]`
 
 ---
 
@@ -3026,84 +2534,57 @@ quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
 | [acdf](#acdf) | Calculate the empirical averaged cumulative distribution function (CDF) |
 | [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Calculate azimuth and elevation angular spreads with spherical wrapping |
 | [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
-| [calc_delay_spread](#calc_delay_spread) | Calculate the RMS delay spread in [s] |
+| [calc_delay_spread](#calc_delay_spread) | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Calculate the Rician K-Factor from channel impulse response data |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Calculate rotation matrices from Euler angles |
 | [cart2geo](#cart2geo) | Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance) |
-| [colormap](#colormap) | Generate colormap |
+| [colormap](#colormap) | Generate a colormap matrix with RGB values |
 | [geo2cart](#geo2cart) | Transform geographic (azimuth, elevation, length) to Cartesian coordinates |
 | [interp_1D / interp_2D](#interp_1d-interp_2d) | Perform linear interpolation (1D or 2D) on single or multiple data sets. |
-| [write_png](#write_png) | Write data to a PNG file |
+| [write_png](#write_png) | Write a data matrix to a color-coded PNG file |
 
 ---
 ## acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 ### Description:
-- Calculates the empirical CDF from the given data matrix, where each column represents an
-  independent data set (e.g., repeated experiment runs).
-- Individual CDFs are computed per column by histogramming into the given (or auto-generated) bins
-  and taking the cumulative sum normalized by the number of valid samples.
-- An averaged CDF is obtained by interpolating in quantile space: for a fine grid of probability
-  levels, the corresponding x-values from each individual CDF are averaged, then the result is
-  mapped back to the bin grid.
-- Quantile statistics (mean and standard deviation) are reported at the 0.1, 0.2, ..., 0.9
-  probability levels.
-- `Inf` and `NaN` values in the data are excluded from the computation.
-- If `bins` points to an empty vector, 201 equally spaced bins spanning the data range are
-  generated and stored back. If `bins` points to a non-empty vector, those bin centers are used.
-  If `bins` is `nullptr`, bins are auto-generated internally.
+- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
+- `Inf` and `NaN` values are excluded from computation
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
-                        arma::Col<dtype> *bins = nullptr,
-                        arma::Mat<dtype> *Sh = nullptr,
-                        arma::Col<dtype> *Sc = nullptr,
-                        arma::Col<dtype> *mu = nullptr,
-                        arma::Col<dtype> *sig = nullptr,
-                        arma::uword n_bins = 201);
+    arma::Col<dtype> *bins = nullptr,
+    arma::Mat<dtype> *Sh = nullptr,
+    arma::Col<dtype> *Sc = nullptr,
+    arma::Col<dtype> *mu = nullptr,
+    arma::Col<dtype> *sig = nullptr,
+    arma::uword n_bins = 201);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> &**data**` (input)
-  Input data matrix. Size `[n_samples, n_sets]`. Each column is one data set.
+### Input Arguments:
+- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`, `[n_bins]`
+- **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
-- `arma::Col<dtype> ***bins** = nullptr` (optional input/output)
-  Bin centers for the histogram. Length `[n_bins]`. If pointing to an empty vector, auto-generated
-  bins are stored here. If pointing to a non-empty vector, those bin centers are used. If `nullptr`,
-  bins are auto-generated internally.
-
-- `arma::Mat<dtype> ***Sh** = nullptr` (optional output)
-  Individual CDFs, one per column of data. Size `[n_bins, n_sets]`.
-
-- `arma::Col<dtype> ***Sc** = nullptr` (optional output)
-  Averaged CDF obtained by quantile-space averaging across data sets. Length `[n_bins]`.
-
-- `arma::Col<dtype> ***mu** = nullptr` (optional output)
-  Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-- `arma::Col<dtype> ***sig** = nullptr` (optional output)
-  Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-- `arma::uword **n_bins** = 201` (input)
-  Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when
-  non-empty bins are provided.
+### Output Arguments:
+- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins, n_sets]`
+- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
+- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 
 ### Example:
 ```
-#include "quadriga_tools.hpp"
-
-// Generate random data: 10000 samples x 5 experiment runs
 arma::mat data = arma::randn<arma::mat>(10000, 5);
-
 arma::vec bins;
 arma::mat Sh;
 arma::vec Sc, mu, sig;
 quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
-
-// bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
+// bins: [201], Sh: [201,5], Sc: [201], mu/sig: [9]
 ```
 
 ---
@@ -3111,29 +2592,16 @@ quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
 Calculate azimuth and elevation angular spreads with spherical wrapping
 
 ### Description:
-- Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
-- Inputs and outputs use `std::vector<arma::Col<dtype>>` so that each channel impulse response
-  (CIR) can have a different number of paths.
-- The RMS angular spread is computed as `sqrt(sum(pw .* d.^2))` where `d` are the wrapped
-  deviations from the circular mean. This is the second-moment definition used in 3GPP TR 38.901,
-  as opposed to the standard-deviation form `sqrt(E[d^2] - E[d]^2)`.
-- Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
-  direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
-  on the equator before computing spreads.
-- Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread
-  despite energy being focused into a small solid angle). This method corrects for that.
-- Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
-  elevation spread, corresponding to the principal axes of the angular power distribution.
-- The bank angle is derived analytically from the eigenvectors of the 2x2 power-weighted
-  covariance matrix of the centered azimuth and elevation angles.
-- An optional quantization step can group nearby paths before computing the spread.
-- Setting `disable_wrapping` to true skips the rotation and computes spreads directly from the
-  raw azimuth and elevation angles (equivalent to treating them as independent 1D variables).
-  In this mode, the orientation output will be zero and phi/theta will equal the input az/el.
+- Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
+- RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
+- Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
+- When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
+- When `disable_wrapping = true`, spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
+- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads.
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::calc_angular_spreads_sphere(
     const std::vector<arma::Col<dtype>> &az,
     const std::vector<arma::Col<dtype>> &el,
@@ -3148,91 +2616,37 @@ void quadriga_lib::calc_angular_spreads_sphere(
     dtype quantize = (dtype)0);
 ```
 
-### Arguments:
-- `const std::vector<arma::Col<dtype>> &**az**` (input)
-  Azimuth angles in [rad], ranging from -pi to pi. Vector of length `n_cir`, each element has
-  length `n_path` (may differ per CIR).
+### Input Arguments:
+- **`az`** — Azimuth angles in [rad], range -pi to pi; `[n_cir]` vector, each element of length `n_path`
+- **`el`** — Elevation angles in [rad], range -pi/2 to pi/2; same structure as `az`
+- **`powers`** — Path powers in [W]; same structure as `az`
+- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles
+- **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when `disable_wrapping = false`
+- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping
 
-- `const std::vector<arma::Col<dtype>> &**el**` (input)
-  Elevation angles in [rad], ranging from -pi/2 to pi/2. Vector of length `n_cir`, each element
-  has length `n_path` matching the corresponding element in `az`.
-
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)
-  Path powers in [W]. Vector of length `n_cir`, each element has length `n_path` matching the
-  corresponding element in `az`.
-
-- `arma::Col<dtype> ***azimuth_spread** = nullptr` (optional output)
-  RMS azimuth angular spread in [rad]. Length `[n_cir]`.
-
-- `arma::Col<dtype> ***elevation_spread** = nullptr` (optional output)
-  RMS elevation angular spread in [rad]. Length `[n_cir]`.
-
-- `arma::Mat<dtype> ***orientation** = nullptr` (optional output)
-  Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle,
-  row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size `[3, n_cir]`.
-
-- `std::vector<arma::Col<dtype>> ***phi** = nullptr` (optional output)
-  Rotated azimuth angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
-
-- `std::vector<arma::Col<dtype>> ***theta** = nullptr` (optional output)
-  Rotated elevation angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
-
-- `bool **disable_wrapping** = false` (input)
-  If true, skip the spherical rotation and compute spreads directly from raw angles. The
-  orientation output will be zero and phi/theta will equal the input az/el.
-
-- `bool **calc_bank_angle** = true` (input)
-  If true, the optimal bank angle is computed analytically. Only used when `disable_wrapping`
-  is false.
-
-- `dtype **quantize** = 0` (input)
-  Angular quantization step in [deg]. Paths within this angular distance are grouped and their
-  powers summed before computing the spread. Set to 0 to treat all paths independently.
-
-### Example:
-```
-std::vector<arma::vec> az(2), el(2), powers(2);
-az[0] = {0.1, -0.1, 0.05};              // CIR 0: 3 paths
-az[1] = {0.2, -0.2, 0.1, -0.1};         // CIR 1: 4 paths
-el[0] = {0.0, 0.0, 0.0};
-el[1] = {0.05, -0.05, 0.0, 0.0};
-powers[0] = {1.0, 1.0, 0.5};
-powers[1] = {2.0, 1.0, 1.5, 0.5};
-
-arma::vec as, es;
-arma::mat orient;
-quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
-// as(0), as(1) contain the azimuth spreads for each CIR
-```
+### Output Arguments:
+- **`azimuth_spread`** *(optional)* — RMS azimuth spread in [rad], `[n_cir]`
+- **`elevation_spread`** *(optional)* — RMS elevation spread in [rad], `[n_cir]`
+- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading] in [rad], `[3, n_cir]`
+- **`phi`** *(optional)* — Rotated azimuth angles in [rad]; `[n_cir]` vector, each element of length `n_path`
+- **`theta`** *(optional)* — Rotated elevation angles in [rad]; same structure as `phi`
 
 ---
 ## calc_cross_polarization_ratio
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
 ### Description:
-- Computes the aggregate cross-polarization ratio (XPR) from the polarization transfer matrices
-  of all channel impulse responses (CIRs) using the total-power-ratio method (Option B).
-- For each CIR, the total co-polarized and cross-polarized received powers are accumulated
-  across all qualifying paths, and the XPR is obtained as a single ratio of the totals.
-- This method is physically meaningful: it corresponds to what a receiver antenna measures as
-  the ratio of co-polarized to cross-polarized energy across the entire channel impulse response.
-- In addition to the linear V/H basis, the XPR is also computed in the circular LHCP/RHCP basis
-  by applying the unitary Jones matrix transformation M_circ = T * M_lin * T^-1.
-- The LOS path is identified by comparing each path's absolute length against the direct
-  TX-RX distance `dTR`. All paths with `path_length < dTR + window_size` are excluded from
-  the XPR calculation by default (controlled by `include_los`).
-- The polarization transfer matrix `M` is stored in column-major order with interleaved
-  real/imaginary parts: rows = [Re(M_vv), Im(M_vv), Re(M_hv), Im(M_hv), Re(M_vh), Im(M_vh),
-  Re(M_hh), Im(M_hh)], i.e., 8 rows per path.
-- `M` may or may not be normalized. Normalization does not affect the XPR since it cancels
-  in the ratio. However, it does affect the path gain output `pg`.
-- If the total cross-polarized power is zero and co-polarized power is positive (perfect
-  polarization isolation), the XPR is set to infinity. If both are zero (no qualifying paths),
-  the XPR is set to 0.
+- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio.
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via Jones matrix transform `M_circ = T * M_lin * T^-1`.
+- LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with `path_length < dTR + window_size` are excluded by default (`include_los = false`).
+- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary parts, 8 rows per path: `[Re(M_vv), Im(M_vv), Re(M_hv), Im(M_hv), Re(M_vh), Im(M_vh), Re(M_hh), Im(M_hh)]`.
+- Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`.
+- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
+- TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<dtype>> &powers,
     const std::vector<arma::Mat<dtype>> &M,
@@ -3245,90 +2659,41 @@ void quadriga_lib::calc_cross_polarization_ratio(
     dtype window_size = 0.01);
 ```
 
-### Arguments:
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)
-  Path powers in Watts. Vector of length `[n_cir]`, each element is a column vector of length `[n_path]`.
+### Input Arguments:
+- **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
+- **`M`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
+- **`path_length`** — Absolute TX-to-RX path lengths in [m]; same structure as `powers`
+- **`tx_pos`** — Transmitter position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`rx_pos`** — Receiver position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR calculation
+- **`window_size`** *(optional)* — LOS exclusion window in [m]; paths within `dTR + window_size` are excluded when `include_los = false`
 
-- `const std::vector<arma::Mat<dtype>> &**M**` (input)
-  Polarization transfer matrices. Vector of length `[n_cir]`, each element is a matrix of size `[8, n_path]`
-  with interleaved real/imaginary parts in column-major order.
+### Output Arguments:
+- **`xpr`** *(optional)* — XPR on linear scale, `[n_cir, 6]`; columns:
 
-- `const std::vector<arma::Col<dtype>> &**path_length**` (input)
-  Absolute path length from TX to RX phase center in meters. Vector of length `[n_cir]`,
-  each element is a column vector of length `[n_path]`.
+  | Col | Description |
+  |-----|-------------|
+  | 0 | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol) |
+  | 1 | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2) |
+  | 2 | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2) |
+  | 3 | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+  | 4 | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2) |
+  | 5 | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2) |
 
-- `const arma::Mat<dtype> &**tx_pos**` (input)
-  Transmitter position in Cartesian coordinates. Size `[3, 1]` (fixed TX) or `[3, n_cir]` (mobile TX).
-
-- `const arma::Mat<dtype> &**rx_pos**` (input)
-  Receiver position in Cartesian coordinates. Size `[3, 1]` (fixed RX) or `[3, n_cir]` (mobile RX).
-
-- `arma::Mat<dtype> ***xpr** = nullptr` (optional output)
-  Cross-polarization ratio in linear scale. Size `[n_cir, 6]` with columns:
-  0 = Aggregate linear XPR (total V+H co-pol / total V+H cross-pol),
-  1 = V-XPR (|M_vv|^2 / |M_hv|^2, power-summed over paths),
-  2 = H-XPR (|M_hh|^2 / |M_vh|^2, power-summed over paths),
-  3 = Aggregate circular XPR (total L+R co-pol / total L+R cross-pol),
-  4 = LHCP XPR (|M_LL|^2 / |M_RL|^2, power-summed over paths),
-  5 = RHCP XPR (|M_RR|^2 / |M_LR|^2, power-summed over paths).
-
-- `arma::Col<dtype> ***pg** = nullptr` (optional output)
-  Total path gain computed over all paths (including LOS). Length `[n_cir]`.
-  Calculated as the sum of `powers[p] * (|M_vv|^2 + |M_hv|^2 + |M_vh|^2 + |M_hh|^2)` over all paths.
-
-- `bool **include_los** = false` (input)
-  If `true`, include LOS and near-LOS paths in the XPR calculation.
-  If `false` (default), exclude paths with `path_length < dTR + window_size`.
-
-- `dtype **window_size** = 0.01` (input)
-  LOS window size in meters. Paths within `dTR + window_size` of the direct path are excluded
-  from the XPR calculation when `include_los` is `false`. Default is 0.01 m (1 cm).
-
-### Example:
-```
-#include "quadriga_channel.hpp"
-
-// Single CIR with 3 paths
-arma::vec pw = {1.0, 0.5, 0.3};
-arma::mat M(8, 3);
-M.col(0) = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}; // LOS: diagonal
-M.col(1) = {0.9, 0.0, 0.1, 0.0, 0.1, 0.0, 0.8, 0.0};   // NLOS
-M.col(2) = {0.7, 0.0, 0.2, 0.0, 0.15, 0.0, 0.6, 0.0};   // NLOS
-
-arma::vec pl = {10.0, 12.0, 15.0};
-arma::mat tx(3, 1); tx.col(0) = {0.0, 0.0, 0.0};
-arma::mat rx(3, 1); rx.col(0) = {10.0, 0.0, 0.0};
-
-std::vector<arma::vec> powers_vec = {pw};
-std::vector<arma::mat> M_vec = {M};
-std::vector<arma::vec> pl_vec = {pl};
-
-arma::mat xpr;
-arma::vec pg;
-
-quadriga_lib::calc_cross_polarization_ratio(powers_vec, M_vec, pl_vec, tx, rx, &xpr, &pg);
-// xpr has size [1, 6], pg has size [1]
-```
+- **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as 
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`, `[n_cir]`
 
 ---
 ## calc_delay_spread
-Calculate the RMS delay spread in [s]
+Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 ### Description:
-- Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding
-  linear-scale powers for each channel impulse response (CIR).
-- An optional power threshold in [dB] relative to the strongest path can be applied. Paths with
-  power below `p_max(dB) - threshold` are excluded from the calculation.
-- An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths
-  falling into the same delay bin are summed before computing the delay spread. This is useful
-  when the system bandwidth limits the time resolution (e.g. 50 ns at 20 MHz bandwidth).
-- When granularity is applied the function recursively calls itself on the binned power delay
-  profile.
-- Optionally returns the mean delay for each CIR.
+- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; default threshold of 100 dB effectively includes all paths.
+- When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
-template <typename dtype>
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
@@ -3337,58 +2702,30 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
-### Arguments:
-- `const std::vector<arma::Col<dtype>> &**delays**` (input)
-  Delays in [s]. A vector of length `n_cir`, where each element is an Armadillo column vector
-  of length `n_path` (the number of paths may differ per CIR).
+### Input Arguments:
+- **`delays`** — Delays in [s] per CIR; `[n_cir]` vector, each element a column vector of length `n_path`
+- **`powers`** — Path powers in linear scale [W]; same structure as `delays`
+- **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below threshold are excluded
+- **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping
 
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)
-  Path powers on a linear scale [W]. Same structure as `delays`.
-
-- `dtype **threshold** = 100.0` (input)
-  Power threshold in [dB] relative to the strongest path. Paths with power below
-  `max_power / 10^(0.1 * threshold)` are excluded. Default: 100 dB (effectively all paths).
-
-- `dtype **granularity** = 0.0` (input)
-  Window size in [s] for grouping paths in the delay domain. Paths whose delays fall into the
-  same bin of width `granularity` have their powers summed. Default: 0 (no grouping).
-
-- `arma::Col<dtype> ***mean_delay** = nullptr` (optional output)
-  Mean delay in [s] for each CIR. Length `[n_cir]`.
+### Output Arguments:
+- **`mean_delay`** *(optional)* — Mean delay in [s] per CIR, `[n_cir]`
 
 ### Returns:
-- `arma::Col<dtype> **ds**` (output)
-  RMS delay spread in [s] for each CIR. Length `[n_cir]`.
-
-### Example:
-```
-std::vector<arma::vec> delays = { {0.0, 1e-6, 2e-6} };
-std::vector<arma::vec> powers = { {1.0, 0.5, 0.25} };
-arma::vec mean_delay;
-arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
-// ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
-```
+- RMS delay spread in [s] for each CIR, `[n_cir]`
 
 ---
 ## calc_rician_k_factor
 Calculate the Rician K-Factor from channel impulse response data
 
 ### Description:
-- The Rician K-Factor (KF) is defined as the ratio of signal power in the dominant line-of-sight
-  (LOS) path to the power in the scattered (non-line-of-sight, NLOS) paths.
-- The LOS path is identified by matching the absolute path length with the direct distance between
-  TX and RX positions (`dTR`).
-- All paths arriving within `dTR + window_size` are considered LOS and their power is summed.
-- Paths arriving after `dTR + window_size` are considered NLOS and their power is summed.
-- If the total NLOS power is zero (i.e. no scattered paths), the K-Factor is set to infinity (`HUGE_VAL`).
-- If the total LOS power is zero (i.e. no LOS paths), the K-Factor is set to zero.
-- The transmitter and receiver positions can be fixed (size `[3, 1]`) or mobile (size `[3, n_cir]`).
-  Fixed positions are reused for all channel snapshots.
-- Optional output `pg` returns the total path gain (sum of all path powers) for each snapshot.
+- KF = LOS power / NLOS power; LOS paths are those with length ≤ `dTR + window_size`, where `dTR` is the direct TX-RX distance.
+- If total NLOS power is zero, KF is set to `HUGE_VAL`; if total LOS power is zero, KF is set to 0.
+- TX/RX positions may be fixed `[3, 1]` (reused for all snapshots) or mobile `[3, n_cir]`.
+- Allowed datatypes: float or double
 
 ### Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::calc_rician_k_factor(
     const std::vector<arma::Col<dtype>> &powers,
     const std::vector<arma::Col<dtype>> &path_length,
@@ -3399,61 +2736,25 @@ void quadriga_lib::calc_rician_k_factor(
     dtype window_size = 0.01);
 ```
 
-### Arguments:
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)
-  Path powers in Watts [W]. Vector of length `n_cir`, where each element is a column vector of
-  length `n_path` (number of paths may vary per snapshot).
+### Input Arguments:
+- **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
+- **`path_length`** — Absolute TX-to-RX path lengths in [m]; same structure as `powers`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`window_size`** *(optional)* — LOS window in [m]; paths with length ≤ `dTR + window_size` are treated as LOS
 
-- `const std::vector<arma::Col<dtype>> &**path_length**` (input)
-  Absolute path lengths from TX to RX phase center in meters. Vector of length `n_cir`, where
-  each element is a column vector of length `n_path` matching the corresponding entry in `powers`.
-
-- `const arma::Mat<dtype> &**tx_pos**` (input)
-  Transmitter position in Cartesian coordinates [x; y; z]. Size `[3, 1]` for a fixed TX or
-  `[3, n_cir]` for a mobile TX.
-
-- `const arma::Mat<dtype> &**rx_pos**` (input)
-  Receiver position in Cartesian coordinates [x; y; z]. Size `[3, 1]` for a fixed RX or
-  `[3, n_cir]` for a mobile RX.
-
-- `arma::Col<dtype> ***kf** = nullptr` (optional output)
-  Rician K-Factor on linear scale. Length `[n_cir]`.
-
-- `arma::Col<dtype> ***pg** = nullptr` (optional output)
-  Total path gain (sum of path powers). Length `[n_cir]`.
-
-- `dtype **window_size** = 0.01` (input)
-  LOS window size in meters. Paths with length ≤ `dTR + window_size` are considered LOS.
-
-### Example:
-```
-#include "quadriga_tools.hpp"
-
-// Single snapshot with 3 paths
-std::vector<arma::vec> powers(1), path_length(1);
-powers[0] = {1.0, 0.5, 0.25};       // Path powers in W
-path_length[0] = {10.0, 11.0, 12.0}; // Path lengths in m
-
-arma::mat tx_pos(3, 1), rx_pos(3, 1);
-tx_pos.col(0) = {0.0, 0.0, 0.0};
-rx_pos.col(0) = {10.0, 0.0, 0.0};   // dTR = 10.0 m
-
-arma::vec kf, pg;
-quadriga_lib::calc_rician_k_factor(powers, path_length, tx_pos, rx_pos, &kf, &pg, 0.01);
-// kf[0] = 1.0 / (0.5 + 0.25) = 1.333...
-// pg[0] = 1.0 + 0.5 + 0.25 = 1.75
-```
+### Output Arguments:
+- **`kf`** *(optional)* — Rician K-Factor on linear scale, `[n_cir]`
+- **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W], `[n_cir]`
 
 ---
 ## calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
 ### Description:
-- Computes 3D rotation matrices from input Euler angles (bank, tilt, head).
-- The result is returned in column-major order as a 3×3 matrix per input orientation vector.
-- Calculations are internally performed in double precision for improved numerical accuracy, even if `dtype` is `float`.
-- Supports optional inversion of the y-axis and optional transposition of the output matrix.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
+- Internally uses double precision regardless of `dtype`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
@@ -3467,28 +2768,13 @@ arma::Col<dtype> quadriga_lib::calc_rotation_matrix(const arma::Col<dtype> &orie
                 bool invert_y_axis = false, bool transposeR = false);
 ```
 
-### Arguments:
-- `const arma::Cube<dtype> **&orientation**` or `const arma::Mat<dtype> **&orientation**` or `const arma::Col<dtype> **&orientation**` (input)
-  Input Euler angles (bank, tilt, head) in radians, Size `[3, n_row, n_col]` or `[3, n_mat]` or Size `[3]`.
-
-- `bool **invert_y_axis** = false` (optional input)
-  If true, the y-axis of the rotation is inverted. Default: `false`.
-
-- `bool **transposeR** = false` (optional input)
-  If true, the transpose of the rotation matrix is returned. Default: `false`.
+### Input Arguments:
+- **`orientation`** — Euler angles (bank, tilt, head) in radians; `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
+- **`invert_y_axis`** *(optional)* — Inverts the y-axis of the rotation
+- **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
 
 ### Returns:
-- `arma::Cube<dtype>` or `arma::Mat<dtype>` or `arma::Col<dtype>`
-  Rotation matrices in column-major ordering. Size `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`.
-
-### Example:
-```
-arma::cube ori(3, 1, 1);
-ori(0, 0, 0) = 0.0;         // bank
-ori(1, 0, 0) = 0.0;         // tilt
-ori(2, 0, 0) = 1.5708;      // head
-auto R = quadriga_lib::calc_rotation_matrix(ori);
-```
+- Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
 
 ---
 ## cart2geo
@@ -3527,35 +2813,23 @@ auto geo = quadriga_lib::cart2geo(cart);
 
 ---
 ## colormap
-Generate colormap
+Generate a colormap matrix with RGB values
 
 ### Description:
-- Returns a 64x3 or 256x3 colormap matrix with RGB values in unsigned char format.
-- Each row corresponds to an RGB color entry of the selected colormap.
-- Useful for visualization purposes (e.g., heatmaps or 3D rendering).
-- Available color maps include: `jet`, `parula`, `winter`, `hot`, `turbo`, `copper`, `spring`, `cool`, `gray`, `autumn`, `summer`.
+- Returns a `[64, 3]` or `[256, 3]` matrix of unsigned char RGB values (range 0–255)
+- Available maps: `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`
 
 ### Declaration:
 ```
-arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false)
+arma::uchar_mat quadriga_lib::colormap(std::string map, bool high_res = false);
 ```
 
-### Arguments:
-- `std::string **map**` (input)
-  Name of the desired colormap. Must be one of:
-  `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`.
-
-- `bool **high_res**` (input)
-  Enables 256 color steps
+### Input Arguments:
+- **`map`** — Name of the colormap
+- **`high_res`** *(optional)* — If true, returns 256 rows instead of 64
 
 ### Returns:
-- `arma::uchar_mat`
-  A matrix of size `[64 x 3]` or `[256 x 3]` containing RGB color values as unsigned chars in the range `[0, 255]`.
-
-### Example:
-```
-arma::uchar_mat cm = quadriga_lib::colormap("turbo");
-```
+- RGB colormap matrix; `[64, 3]` or `[256, 3]`
 
 ---
 ## geo2cart
@@ -3665,49 +2939,31 @@ auto output = quadriga_lib::interp_1D(input, xi, xo);
 
 ---
 ## write_png
-Write data to a PNG file
+Write a data matrix to a color-coded PNG file
 
 ### Description:
-- Converts input data into a color-coded PNG file for visualization
-- Support optional selection of a colormap, as well a minimum and maximum value limits
-- Allowed datatypes (`dtype`): `float` or `double`
-- Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing
+- Values are clipped to `[min_val, max_val]` before colormap mapping; auto-detected from data if `NAN`
+- Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
-void write_png( const arma::Mat<dtype> &data, 
-                std::string fn,              
-                std::string colormap = "jet", 
-                dtype min_val = NAN, 
-                dtype max_val = NAN, 
-                bool log_transform = false);
+void quadriga_lib::write_png(
+    const arma::Mat<dtype> &data,
+    std::string fn,
+    std::string colormap = "jet",
+    dtype min_val = NAN,
+    dtype max_val = NAN,
+    bool log_transform = false);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> **&data**`
-  Data matrix
-
-- `std::string **fn**`
-  Path to the `.png` file to be written
-
-- `std::string **colormap**`
-  Name of the desired colormap. Must be one of:
-  `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`.
-
-- `dtype **min_val**`
-  Minimum value. Values below this value will have be encoded with the color of the smallest value.
-  If `NAN` is provided (default), the lowest values is determined from the data.
-
-- `dtype **max_val**`
-  Maximum value. Values above this value will have be encoded with the color of the largest value.
-  If `NAN` is provided (default), the largest values is determined from the data.
-
-- `bool **log_transform**`
-  If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.
-  Default: false (disabled)
-
-### See also:
-- [colormap](#colormap)
+### Input Arguments:
+- **`data`** — Input data matrix
+- **`fn`** — Output `.png` file path
+- **`colormap`** *(optional)* — Colormap name; see [colormap](#colormap) for valid values
+- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
+- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
+- **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
 
 ---
 
@@ -3715,325 +2971,207 @@ void write_png( const arma::Mat<dtype> &data,
 
 | Function | Description |
 | --- | --- |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh |
-| [combine_irs_coord](#combine_irs_coord) | Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS) |
-| [coord2path](#coord2path) | Convert path interaction coordinates into FBS/LBS positions, path length and angles |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Generate propagation paths for estimating the diffraction gain |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
+| [combine_irs_coord](#combine_irs_coord) | Combine path interaction coordinates for IRS-assisted TX → RX channels |
+| [coord2path](#coord2path) | Convert path interaction coordinates into FBS/LBS positions, path length, and angles |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Generate elliptic propagation paths and weights for diffraction gain estimation |
 | [icosphere](#icosphere) | Construct a geodesic polyhedron from recursive icosahedron subdivision |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Write geometry and material data to a Mitsuba 3 XML scene file. |
-| [obj_file_read](#obj_file_read) | Read Wavefront `.obj` file and extract geometry and material information |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Write a triangular mesh to a Mitsuba 3 XML scene file |
+| [obj_file_read](#obj_file_read) | Read a Wavefront `.obj` file and extract geometry and material information |
 | [obj_overlap_test](#obj_overlap_test) | Detect overlapping 3D objects in a triangular mesh |
-| [path_to_tube](#path_to_tube) | Convert a 3D path into a tube surface for visualization |
-| [point_cloud_aabb](#point_cloud_aabb) | Compute the Axis-Aligned Bounding Boxes (AABB) of a 3D point cloud |
+| [path_to_tube](#path_to_tube) | Convert a 3D path into a tube surface mesh for visualization |
+| [point_cloud_aabb](#point_cloud_aabb) | Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud |
 | [point_cloud_segmentation](#point_cloud_segmentation) | Reorganize a point cloud into spatial sub-clouds for efficient processing |
 | [point_cloud_split](#point_cloud_split) | Split a point cloud into two sub-clouds along a spatial axis |
 | [point_inside_mesh](#point_inside_mesh) | Test whether 3D points are inside a triangle mesh using raycasting |
 | [ray_mesh_interact](#ray_mesh_interact) | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
-| [ray_point_intersect](#ray_point_intersect) | Calculates the intersection of ray beams with points in three dimensions |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Calculates the intersection of rays and triangles in three dimensions |
+| [ray_point_intersect](#ray_point_intersect) | Calculate intersections of ray beams with points in 3D space |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm |
 | [subdivide_rays](#subdivide_rays) | Subdivide ray beams into four smaller sub-beams |
 | [subdivide_triangles](#subdivide_triangles) | Subdivide triangles into smaller triangles |
 | [triangle_mesh_aabb](#triangle_mesh_aabb) | Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D mesh into smaller sub-meshes for faster processing |
-| [triangle_mesh_split](#triangle_mesh_split) | Split a 3D mesh into two sub-meshes along a given axis |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing |
+| [triangle_mesh_split](#triangle_mesh_split) | Split a 3D triangular mesh into two sub-meshes along a given axis |
 
 ---
 ## calc_diffraction_gain
-Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
+Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
 ### Description:
-- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave
-  propagation between each TX-RX pair is divided into `n_path` elliptic-arc paths (controlled by `lod`),
-  each approximated by `n_seg` line segments. 
-- Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
-  generalized to arbitrary 3D shapes.
-- Optional sub-mesh indexing (see [triangle_mesh_segmentation](#triangle_mesh_segmentation)) accelerates computation by skipping
-  geometry whose bounding box does not intersect the TX-RX path.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided into `n_path` elliptic-arc paths (controlled by `lod`), each approximated by `n_seg` line segments
+- Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, generalized to arbitrary 3D shapes
+- Optional sub-mesh indexing (see [triangle_mesh_segmentation](#triangle_mesh_segmentation)) accelerates computation by skipping triangles whose bounding box does not intersect the TX-RX path
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
-void quadriga_lib::calc_diffraction_gain(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                const arma::Mat<dtype> *mesh,
-                const arma::Mat<dtype> *mtl_prop,
-                dtype center_frequency,
-                int lod = 2,
-                arma::Col<dtype> *gain = nullptr,
-                arma::Cube<dtype> *coord = nullptr,
-                int verbose = 0,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+void calc_diffraction_gain(
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *mesh,
+    const arma::Mat<dtype> *mtl_prop,
+    dtype center_frequency,
+    int lod = 2,
+    arma::Col<dtype> *gain = nullptr,
+    arma::Cube<dtype> *coord = nullptr,
+    int verbose = 0,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)
-  TX positions, size `[n_pos, 3]`.
-- `const arma::Mat<dtype> ***dest**` (input)
-  RX positions, size `[n_pos, 3]`.
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, size `[n_mesh, 9]`.
-- `const arma::Mat<dtype> ***mtl_prop**` (input)
-  Material properties per triangle, size `[n_mesh, 5]`. See [obj_file_read](#obj_file_read).
-- `dtype **center_frequency**` (input)
-  Center frequency in Hz.
-- `int **lod** = 2` (optional input)
-  Level of detail (0–6). Controls `n_path` and `n_seg`. See [generate_diffraction_paths](#generate_diffraction_paths).
-- `arma::Col<dtype> ***gain**` (output, optional)
-  Diffraction gain per TX-RX pair, linear scale, size `[n_pos]`.
-- `arma::Cube<dtype> ***coord**` (output, optional)
-  Diffracted path coordinates (excluding endpoints), size `[3, n_seg-1, n_pos]`.
-- `int **verbose** = 0` (optional input)
-  Verbosity level. Default: `0`.
-- `const arma::u32_vec ***sub_mesh_index**` (input, optional)
-  Sub-mesh index for acceleration, 0-based, length `[n_mesh]`. See [triangle_mesh_segmentation](#triangle_mesh_segmentation).
-- `int **use_kernel** = 0` (optional input)
-  Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Error if unavailable.
-- `int **gpu_id** = 0` (optional input)
-  CUDA device ID. Ignored for non-CUDA kernels.
+### Input Arguments:
+- **`orig`** — TX positions, `[n_pos, 3]`
+- **`dest`** — RX positions, `[n_pos, 3]`
+- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties per triangle; see [obj_file_read](#obj_file_read), `[n_mesh, 5]`
+- **`center_frequency`** — Center frequency in Hz
+- **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
+- **`verbose`** *(optional)* — Verbosity level
+- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation), `[n_mesh]`
+- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+
+### Output Arguments:
+- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale, `[n_pos]`
+- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints, `[3, n_seg-1, n_pos]`
 
 ### See also:
-- [generate_diffraction_paths](#generate_diffraction_paths)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation)
-- [obj_file_read](#obj_file_read)
+- [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
+- [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
 
 ---
 ## combine_irs_coord
-Combine path interaction coordinates for channels with intelligent reflective surfaces (IRS)
+Combine path interaction coordinates for IRS-assisted TX → RX channels
 
 ### Description:
-- Merges two propagation segments — (1) TX → IRS and (2) IRS → RX — into complete TX → RX paths via an IRS.
-- Interaction coordinates of both segments are stored in a compressed format where `no_interact` is a vector of
-  length `n_path` storing the number of interactions per path and `interact_coord` stores all
-  interaction coordinates in path order.
-- Each combined path includes interaction points from both segments, optionally reversed for each segment.
-- The number of output paths `n_path_irs` is at most `n_path_1 × n_path_2`, but can be reduced by specifying `active_path`.
-- Output includes the number and coordinates of interaction points per IRS-reflected path.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
+- Interaction coordinates use a compressed format: `no_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
+- Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
+- Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [get_channels_irs](#get_channels_irs)) reduces this to active combinations only
+- Typically used after [get_channels_irs](#get_channels_irs) to produce interaction data for path visualization (e.g. in Blender) via [coord2path](#coord2path)
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::combine_irs_coord(
-                dtype Ix, dtype Iy, dtype Iz,
-                const arma::u32_vec *no_interact_1,
-                const arma::Mat<dtype> *interact_coord_1,
-                const arma::u32_vec *no_interact_2,
-                const arma::Mat<dtype> *interact_coord_2,
-                arma::u32_vec *no_interact,
-                arma::Mat<dtype> *interact_coord,
-                bool reverse_segment_1 = false,
-                bool reverse_segment_2 = false,
-                const std::vector<bool> *active_path = nullptr);
+    dtype Ix, dtype Iy, dtype Iz,
+    const arma::u32_vec *no_interact_1,
+    const arma::Mat<dtype> *interact_coord_1,
+    const arma::u32_vec *no_interact_2,
+    const arma::Mat<dtype> *interact_coord_2,
+    arma::u32_vec *no_interact,
+    arma::Mat<dtype> *interact_coord,
+    bool reverse_segment_1 = false,
+    bool reverse_segment_2 = false,
+    const std::vector<bool> *active_path = nullptr);
 ```
 
-### Arguments:
-- `dtype **Ix**, **Iy**, **Iz**` (input)
-  IRS position in Cartesian coordinates `[m]`.
+### Input Arguments:
+- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates, meters
+- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS), `[n_path_1]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1, `[3, sum(no_interact_1)]`
+- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX), `[n_path_2]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2, `[3, sum(no_interact_2)]`
+- **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
+- **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [get_channels_irs](#get_channels_irs) directly, `[n_path_1 × n_path_2]`
 
-- `const arma::u32_vec ***no_interact_1**` (input)
-  Number of interaction points in segment 1 (TX → IRS), vector of length `[n_path_1]`
-
-- `const arma::Mat<dtype> ***interact_coord_1**` (input)
-  Interaction coordinates for segment 1, matrix of size `[3, sum(no_interact_1)]`.
-
-- `const arma::u32_vec ***no_interact_2**` (input)
-  Number of interaction points in segment 2 (IRS → RX), vector of length `[n_path_2]`
-
-- `const arma::Mat<dtype> ***interact_coord_2**` (input)
-  Interaction coordinates for segment 2, matrix of size `[3, sum(no_interact_2)]`.
-
-- `arma::u32_vec ***no_interact**` (output)
-  Combined number of interaction points per IRS-based path, vector of length `[n_path_irs]`.
-
-- `arma::Mat<dtype> ***interact_coord**` (output)
-  Combined interaction coordinates, matrix of size `[3, sum(no_interact)]`.
-
-- `bool **reverse_segment_1** = false` (optional input)
-  If `true`, reverses the interaction coordinates of segment 1. TX and IRS positions are not swapped. Default: `false`.
-
-- `bool **reverse_segment_2** = false` (optional input)
-  If `true`, reverses the interaction coordinates of segment 2. IRS and RX positions are not swapped. Default: `false`.
-
-- `const std::vector<bool> ***active_path** = nullptr` (optional input)
-  Optional mask vector of length `[n_path_1 × n_path_2]`. If provided, only paths with `true` are combined. 
-  This is generated as the output of [get_channels_irs](#get_channels_irs)
-
-### Technical Notes:
-- Paths are created by appending interaction coordinates from both segments. Reversing only affects the order of these coordinates.
-- Output matrix `interact_coord` is built sequentially and should be preallocated only if the total number of interaction points is known in advance.
-- The function supports sparsely activated paths via `active_path`, this is generated as a return value of [get_channels_irs](#get_channels_irs)
-  and filters out paths that have very little power after being reflected by the IRS. 
-- This function is typically used as a complementary step to delay or coefficient calculations involving IRS-based channels. 
-  It calculated the required data for visualizing paths, e.g. in Blender or other visualization tools.
+### Output Arguments:
+- **`no_interact`** — Number of interaction points per combined path, `[n_path_irs]`
+- **`interact_coord`** — Combined interaction coordinates for all output paths, `[3, sum(no_interact)]`
 
 ### See also:
-- [get_channels_irs](#get_channels_irs) (for computing IRS channels)
-- [coord2path](#coord2path) (for processing coordinates, calculating departure and arrival angels, etc.)
+- [get_channels_irs](#get_channels_irs) (generates `active_path` and channel coefficients for IRS channels)
+- [coord2path](#coord2path) (consumes interaction coordinates to compute angles and path geometry)
 
 ---
 ## coord2path
-Convert path interaction coordinates into FBS/LBS positions, path length and angles
+Convert path interaction coordinates into FBS/LBS positions, path length, and angles
 
 ### Description:
-- Interaction coordinates can be stored in a compressed format where `no_interact` is a vector of
-  length `n_path` storing the number of interactions per path and `interact_coord` stores all
-  interaction coordinates in path order.
-- This function processes the interaction coordinates of to extract relevant propagation metrics.
-- Calculates absolute path lengths and first/last bounce scatterer positions and angles.
-- LOS paths are assigned a virtual FBS/LBS position at the midpoint between TX and RX.
-- Automatically resizes output arguments if necessary.
-- Optionally reverses TX and RX to simulate the reverse link.
-- Allowed datatypes (`dtype`): `float` or `double`
+- `no_interact` is a vector of length `n_path` with the number of interactions per path
+- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(no_interact)]`
+- LOS paths (`no_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
+- Output arguments are resized automatically; pass `nullptr` to skip any output
+- Set `reverse_path = true` to swap TX/RX and reverse all interaction sequences
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::coord2path(
-                dtype Tx, dtype Ty, dtype Tz, 
-                dtype Rx, dtype Ry, dtype Rz,
-                const arma::u32_vec *no_interact, 
-                const arma::Mat<dtype> *interact_coord,
-                arma::Col<dtype> *path_length, 
-                arma::Mat<dtype> *fbs_pos, 
-                arma::Mat<dtype> *lbs_pos,
-                arma::Mat<dtype> *path_angles, 
-                std::vector<arma::Mat<dtype>> *path_coord, 
-                bool reverse_path);
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Rx, dtype Ry, dtype Rz,
+    const arma::u32_vec *no_interact,
+    const arma::Mat<dtype> *interact_coord,
+    arma::Col<dtype> *path_length = nullptr,
+    arma::Mat<dtype> *fbs_pos = nullptr,
+    arma::Mat<dtype> *lbs_pos = nullptr,
+    arma::Mat<dtype> *path_angles = nullptr,
+    std::vector<arma::Mat<dtype>> *path_coord = nullptr,
+    bool reverse_path = false);
 ```
 
-### Arguments:
-- `dtype **Tx**, **Ty**, **Tz**` (input)
-  Transmitter position in Cartesian coordinates in [m]
+### Input Arguments:
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates in meters
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates in meters
+- **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
 
-- `dtype **Rx**, **Ry**, **Rz**` (input)
-  Receiver position in Cartesian coordinates in [m]
-
-- `const arma::u32_vec ***no_interact**` (input)
-  Vector of length `n_path` indicating the number of interactions per path (0 = LOS)
-
-- `const arma::Mat<dtype> ***interact_coord**` (input)
-  Matrix of size `[3, sum(no_interact)]` containing interaction coordinates in path order
-
-- `arma::Col<dtype> ***path_length**` (output, optional)
-  Absolute path lengths from TX to RX, Length `[n_path]`
-
-- `arma::Mat<dtype> ***fbs_pos**` (output, optional)
-  First-bounce scatterer positions, Size `[3, n_path]`; For LOS, set to midpoint between TX and RX
-
-- `arma::Mat<dtype> ***lbs_pos**` (output, optional)
-  Last-bounce scatterer positions, Size `[3, n_path]`. For LOS, set to midpoint between TX and RX
-
-- `arma::Mat<dtype> ***path_angles**` (output, optional)
-  Departure and arrival angles: columns {AOD, EOD, AOA, EOA}, size `[n_path, 4]`
-
-- `std::vector<arma::Mat<dtype>> ***path_coord**` (output, optional)
-  Full path coordinates (including TX and RX), vector of size `n_path` with each entry of size `[3, n_interact+2]`
-
-- `bool **reverse_path** = false` (optional input)
-  If `true`, swaps TX and RX and reverses all interaction sequences.
-
-### Example:
-```
-// Suppose we have two paths: one LOS, one single-bounce.
-// Path 0: LOS (no_interact[0] = 0)
-// Path 1: single bounce at {5,0,2}.
-
-arma::u32_vec no_int = {0, 1};
-arma::mat interact(3, 1);
-interact.col(0) = {5.0, 0.0, 2.0};
-
-arma::vec lengths;
-arma::mat fbs, lbs;
-arma::mat angles;
-std::vector<arma::mat> coords;
-
-quadriga_lib::coord2path<double>(
-    0.0, 0.0, 0.0,  // TX at origin
-    10.0, 0.0, 0.0, // RX at x = 10 m
-    &no_int, &interact, &lengths, &fbs, &lbs, &angles, &coords);
-
-// After the call:
-// lengths: [10.0, 10.77]
-// fbs:     Path 1 [5,0,0], Path 2 [5,0,2]
-// lbs:     Path 1 [5,0,0], Path 2 [5,0,2]
-// angles:  Path 1 [0, 0, pi, p], Path 2 [0, 22°, pi, 22°]
-// coords[0]: [ [0,0,0], [10,0,0] ]
-// coords[1]: [ [0,0,0], [5,0,2], [10,0,0] ]
-```
+### Output Arguments:
+- **`path_length`** (optional) — Absolute path length TX to RX; `[n_path]`
+- **`fbs_pos`** (optional) — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** (optional) — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA} in radians; `[n_path, 4]`
+- **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
+- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
 ---
 ## generate_diffraction_paths
-Generate propagation paths for estimating the diffraction gain
+Generate elliptic propagation paths and weights for diffraction gain estimation
 
 ### Description:
-This function generates the elliptic propagation paths and corresponding weights necessary for the
-calculation of the diffraction gain in [calc_diffraction_gain](#calc_diffraction_gain).
-
-### Caveat:
-- Each ellipsoid consists of `n_path` diffraction paths. The number of paths is determined by the
-  level of detail (`lod`).
-- All diffraction paths of an ellipsoid originate at `orig` and arrive at `dest`
-- Each diffraction path has `n_seg` segments
-- Points `orig` and `dest` lay on the semi-major axis of the ellipsoid
-- The generated rays sample the volume of the ellipsoid
-- Weights are calculated from the Knife-edge diffraction model when parts of the ellipsoid are shadowed
-- Initial weights are normalized such that `sum(prod(weights,3),2) = 1`
-- Inputs `orig` and `dest` may be provided as double or single precision
-- Supported datatypes `dtype` are `float` or `double`
+- Generates inputs required by [calc_diffraction_gain](#calc_diffraction_gain): elliptic-arc paths sampling the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
+- Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
+- Weights are derived from the knife-edge diffraction model; initial weights normalized so `sum(prod(weights,3),2) = 1`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void generate_diffraction_paths(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                dtype center_frequency,
-                int lod,
-                arma::Cube<dtype> *ray_x,
-                arma::Cube<dtype> *ray_y,
-                arma::Cube<dtype> *ray_z,
-                arma::Cube<dtype> *weight);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    dtype center_frequency,
+    int lod,
+    arma::Cube<dtype> *ray_x,
+    arma::Cube<dtype> *ray_y,
+    arma::Cube<dtype> *ray_z,
+    arma::Cube<dtype> *weight);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)
-  Pointer to Armadillo matrix containing the origin points of the propagation ellipsoid (e.g.
-  transmitter positions). Size: `[ n_pos, 3 ]`
+### Input Arguments:
+- **`orig`** — TX positions, `[n_pos, 3]`
+- **`dest`** — RX positions, `[n_pos, 3]`
+- **`center_frequency`** — Center frequency in Hz
+- **`lod`** — Level of detail; controls `n_path` and `n_seg`:
+    | `lod` | `n_path` | `n_seg` | Note |
+    |-------|----------|---------|------|
+    | 1 | 7 | 3 | |
+    | 2 | 19 | 3 | |
+    | 3 | 37 | 4 | |
+    | 4 | 61 | 5 | |
+    | 5 | 1 | 2 | debug |
+    | 6 | 2 | 2 | debug |
 
-- `const arma::Mat<dtype> ***dest**` (input)
-  Pointer to Armadillo matrix containing the destination point of the propagation ellipsoid (e.g.
-  receiver positions). Size: `[ n_pos, 3 ]`
-
-- `dtype **center_frequency**` (input)
-  The center frequency in [Hz], scalar, default = 299792458 Hz
-
-- `int **lod**` (input)
-  Level of detail, scalar value
-  `lod = 1` | results in `n_path = 7` and `n_seg = 3`
-  `lod = 2` | results in `n_path = 19` and `n_seg = 3`
-  `lod = 3` | results in `n_path = 37` and `n_seg = 4`
-  `lod = 4` | results in `n_path = 61` and `n_seg = 5`
-  `lod = 5` | results in `n_path = 1` and `n_seg = 2` (for debugging)
-  `lod = 6` | results in `n_path = 2` and `n_seg = 2` (for debugging)
-
-- `arma::Cube<dtype> ***ray_x**` (output)
-  Pointer to an Armadillo cube for the x-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***ray_y**` (output)
-  Pointer to an Armadillo cube for the y-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***ray_z**` (output)
-  Pointer to an Armadillo cube for the z-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***weight**` (output)
-  Pointer to an Armadillo cube for the  weights; Size: `[ n_pos, n_path, n_seg ]`
-  Size will be adjusted if not set correctly.
+### Output Arguments:
+- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`weight`** — Per-segment weights, `[n_pos, n_path, n_seg]`
 
 ### See also:
-- [calc_diffraction_gain](#calc_diffraction_gain)
+- [calc_diffraction_gain](#calc_diffraction_gain) (consumes the output of this function)
 
 ---
 ## icosphere
@@ -4073,191 +3211,113 @@ Number of generated triangular faces (20 × n_div²)
 
 ---
 ## mitsuba_xml_file_write
-Write geometry and material data to a Mitsuba 3 XML scene file.
+Write a triangular mesh to a Mitsuba 3 XML scene file
 
 ### Description:
-This routine converts a triangular surface mesh stored in *quadriga-lib* data structures into the
-XML format understood by **Mitsuba 3** <a href="https://www.mitsuba-renderer.org">www.mitsuba-renderer.org</a>.
-The generated file can be loaded directly by **NVIDIA Sionna RT** for differentiable radio-propagation
-simulations.
-
-- Converts a 3D geometry mesh into Mitsuba 3 XML format for use with rendering tools.
-- Enables exporting models from `quadriga-lib` to be used with **Mitsuba 3** or **Sionna RT**:
-- <a href="https://www.mitsuba-renderer.org">Mitsuba 3</a>: Research-oriented retargetable rendering system.
-- <a href="https://developer.nvidia.com/sionna">NVIDIA Sionna</a>: Hardware-accelerated differentiable ray tracer for wireless propagation, built on Mitsuba 3.
-- Supports grouping faces into named objects and assigning materials by name.
-- Optionally maps materials to ITU default presets used by Sionna RT.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for differentiable radio-propagation simulations
+- Supports grouping faces into named objects with per-face material assignments
+- Optionally maps material names to ITU-defined presets used by Sionna RT
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; both the XML and the mesh folder must be distributable together
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::mitsuba_xml_file_write(
-                const std::string &fn,
-                const arma::Mat<dtype> &vert_list,
-                const arma::umat &face_ind,
-                const arma::uvec &obj_ind,
-                const arma::uvec &mtl_ind,
-                const std::vector<std::string> &obj_names,
-                const std::vector<std::string> &mtl_names,
-                const arma::Mat<dtype> &bsdf = {},
-                bool map_to_itu_materials = false);
-
+    const std::string &fn,
+    const arma::Mat<dtype> &vert_list,
+    const arma::umat &face_ind,
+    const arma::uvec &obj_ind,
+    const arma::uvec &mtl_ind,
+    const std::vector<std::string> &obj_names,
+    const std::vector<std::string> &mtl_names,
+    const arma::Mat<dtype> &bsdf = {},
+    bool map_to_itu_materials = false);
 ```
 
-### Arguments:
-- `const std::string **fn**` (input)
-  Output file name (including path and `.xml` extension).
-
-- `const arma::Mat<dtype> **vert_list**` (input)
-  Vertex list, size `[n_vert, 3]`, each row is a vertex (x, y, z) in Cartesian coordinates [m].
-
-- `const arma::umat **face_ind**` (input)
-  Face indices (0-based), size `[n_mesh, 3]`, each row defines a triangle via vertex indices.
-
-- `const arma::uvec **obj_ind**` (input)
-  Object indices (1-based), size `[n_mesh]`. Assigns each triangle to an object.
-
-- `const arma::uvec **mtl_ind**` (input)
-  Material indices (1-based), size `[n_mesh]`. Assigns each triangle to a material.
-
-- `const std::vector<std::string> **obj_names**` (input)
-  Names of objects. Length must be equal to `max(obj_ind)`.
-
-- `const std::vector<std::string> **mtl_names**` (input)
-  Names of materials. Length must be equal to `max(mtl_ind)`.
-
-- `const arma::Mat<dtype> **bsdf** = {}` (optional input)
-  Material reflectivity data (BSDF parameters), size `[mtl_names.size(), 17]`. If omitted, the `null` BSDF is used.
-  Note that Sionna RT ignores all BSDF parameters. They are only used by the Mitsuma rendering system.
-  See [obj_file_read](#obj_file_read) for a definition of the data fields.
-
-- `bool **map_to_itu_materials** = false` (optional input)
-  If true, maps material names to ITU-defined presets used by Sionna RT. Default: `false`
+### Input Arguments:
+- **`fn`** — Output file path including `.xml` extension
+- **`vert_list`** — Vertex coordinates (x, y, z) in meters; `[n_vert, 3]`
+- **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
+- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; `[n_mesh]`
+- **`obj_names`** — Object names; length must equal `max(obj_ind)`
+- **`mtl_names`** — Material names; length must equal `max(mtl_ind)`
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`
+- **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ### See also:
-- [obj_file_read](#obj_file_read)
+- [obj_file_read](#obj_file_read) (source for mesh data and BSDF field layout)
 
 ---
 ## obj_file_read
-Read Wavefront `.obj` file and extract geometry and material information
+Read a Wavefront `.obj` file and extract geometry and material information
 
 ### Description:
-- Parses a Wavefront `.obj` file containing triangularized 3D geometry.
-- Extracts triangle face data, material properties, vertex indices, and optional metadata such as object/material names.
-- Multiple triangles belonging to the same object are grouped together by `obj_ind`.
-- Supports default and custom ITU-compliant materials encoded via the `usemtl` tag.
-- Automatically resizes output matrices/vectors as needed to match the file content.
-- Returns the number of triangular mesh elements found in the file.
-
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0)
+- Material name matching is case-sensitive
+- Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
+- Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
+- Custom material tag syntax: `usemtl Name::A:B:C:D:att` — ε_r = A * fGHz^B, σ = C * fGHz^D, att = fixed penetration loss in dB
+- `mtl_prop` columns: (a) ε_r at 1 GHz, (b) frequency exponent for ε_r, (c) σ at 1 GHz, (d) frequency exponent for σ, (e) fixed attenuation in dB
+- `obj_ind` and `mtl_ind` are 1-based; `face_ind` is 0-based
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::uword quadriga_lib::obj_file_read(
-                std::string fn,
-                arma::Mat<dtype> *mesh = nullptr,
-                arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *vert_list = nullptr,
-                arma::umat *face_ind = nullptr,
-                arma::uvec *obj_ind = nullptr,
-                arma::uvec *mtl_ind = nullptr,
-                std::vector<std::string> *obj_names = nullptr,
-                std::vector<std::string> *mtl_names = nullptr,
-                arma::Mat<dtype> *bsdf = nullptr,
-                const std::string &materials_csv = "");
+    std::string fn,
+    arma::Mat<dtype> *mesh = nullptr,
+    arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *vert_list = nullptr,
+    arma::umat *face_ind = nullptr,
+    arma::uvec *obj_ind = nullptr,
+    arma::uvec *mtl_ind = nullptr,
+    std::vector<std::string> *obj_names = nullptr,
+    std::vector<std::string> *mtl_names = nullptr,
+    arma::Mat<dtype> *bsdf = nullptr,
+    const std::string &materials_csv = "");
 ```
 
-### Arguments:
-- `std::string **fn**` (input)
-  Path to the `.obj` file to be read.
+### Input Arguments:
+- **`fn`** — Path to the `.obj` file
+- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties; columns: `name, a, b, c, d, att` (order flexible); if empty, ITU-R P.2040-3 defaults are used
 
-- `arma::Mat<dtype> ***mesh** = nullptr` (optional output)
-  Flattened triangle mesh data. Each row holds `[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]`. Size: `[n_mesh, 9]`.
-
-- `arma::Mat<dtype> ***mtl_prop** = nullptr` (optional output)
-  Material properties for each triangle. Size: `[n_mesh, 5]`.
-
-- `arma::Mat<dtype> ***vert_list** = nullptr` (optional output)
-  List of all vertex positions found in the `.obj` file. Size: `[n_vert, 3]`.
-
-- `arma::umat ***face_ind** = nullptr` (optional output)
-  Indices into `vert_list` for each triangle (0-based). Size: `[n_mesh, 3]`.
-
-- `arma::uvec ***obj_ind** = nullptr` (optional output)
-  Object index (1-based) for each triangle. Size: `[n_mesh]`.
-
-- `arma::uvec ***mtl_ind** = nullptr` (optional output)
-  Material index (1-based) for each triangle. Size: `[n_mesh]`.
-
-- `std::vector<std::string> ***obj_names** = nullptr` (optional output)
-  Names of objects found in the file. Length: `max(obj_ind)`.
-
-- `std::vector<std::string> ***mtl_names** = nullptr` (optional output)
-  Names of materials found in the file. Length: `max(mtl_ind)`.
-
-- `arma::Mat<dtype> ***bsdf** = nullptr` (optional output)
-  Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
-  .MTL file. Size `[mtl_names.size(), 17]`. Values are:
-  0  | Base Color Red       | Range 0-1     | Default = 0.8
-  1  | Base Color Green     | Range 0-1     | Default = 0.8
-  2  | Base Color Blue      | Range 0-1     | Default = 0.8
-  3  | Transparency (alpha) | Range 0-1     | Default = 1.0 (fully opaque)
-  4  | Roughness            | Range 0-1     | Default = 0.5
-  5  | Metallic             | Range 0-1     | Default = 0.0
-  6  | Index of refraction (IOR)  | Range 0-4     | Default = 1.45
-  7  | Specular Adjustment to the IOR | Range 0-1 | Default = 0.5 (no adjustment)
-  8  | Emission Color Red    | Range 0-1     | Default = 0.0
-  9  | Emission Color Green  | Range 0-1     | Default = 0.0
-  10 | Emission Color Blue   | Range 0-1     | Default = 0.0
-  11 | Sheen                 | Range 0-1     | Default = 0.0
-  12 | Clearcoat             | Range 0-1     | Default = 0.0
-  13 | Clearcoat roughness   | Range 0-1     | Default = 0.0
-  14 | Anisotropic           | Range 0-1     | Default = 0.0
-  15 | Anisotropic rotation  | Range 0-1     | Default = 0.0
-  16 | Transmission          | Range 0-1     | Default = 0.0
-
-- `std::string **materials_csv**` (optional input)
-   Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3
-   materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary).
-   Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),
-   and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:
-   sigma = c * f_GHz^d
+### Output Arguments:
+- **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row, `[n_mesh, 9]`
+- **`mtl_prop`** *(optional)* — Material properties (a, b, c, d, att) per triangle, `[n_mesh, 5]`
+- **`vert_list`** *(optional)* — All vertex positions in the file, `[n_vert, 3]`
+- **`face_ind`** *(optional)* — 0-based indices into `vert_list` per triangle, `[n_mesh, 3]`
+- **`obj_ind`** *(optional)* — 1-based object index per triangle, `[n_mesh]`
+- **`mtl_ind`** *(optional)* — 1-based material index per triangle, `[n_mesh]`
+- **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
+- **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
+- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file, `[n_mtl, 17]`; columns:
+    | Index | Property | Range | Default |
+    |-------|----------|-------|---------|
+    | 0 | Base Color Red | 0–1 | 0.8 |
+    | 1 | Base Color Green | 0–1 | 0.8 |
+    | 2 | Base Color Blue | 0–1 | 0.8 |
+    | 3 | Transparency (alpha) | 0–1 | 1.0 |
+    | 4 | Roughness | 0–1 | 0.5 |
+    | 5 | Metallic | 0–1 | 0.0 |
+    | 6 | Index of refraction (IOR) | 0–4 | 1.45 |
+    | 7 | Specular IOR adjustment | 0–1 | 0.5 |
+    | 8 | Emission Red | 0–1 | 0.0 |
+    | 9 | Emission Green | 0–1 | 0.0 |
+    | 10 | Emission Blue | 0–1 | 0.0 |
+    | 11 | Sheen | 0–1 | 0.0 |
+    | 12 | Clearcoat | 0–1 | 0.0 |
+    | 13 | Clearcoat roughness | 0–1 | 0.0 |
+    | 14 | Anisotropic | 0–1 | 0.0 |
+    | 15 | Anisotropic rotation | 0–1 | 0.0 |
+    | 16 | Transmission | 0–1 | 0.0 |
 
 ### Returns:
-- `arma::uword`
-  Number of mesh triangles found in the file (`n_mesh`).
+- Number of triangular mesh elements (`n_mesh`)
 
-### Technical Notes:
-- Unknown or missing materials default to `"vacuum"` (ε_r = 1, σ = 0).
-- Materials are applied per triangle via the `usemtl` tag in the `.obj` file.
-- Input geometry must be fully triangulated—quads and n-gons are not supported.
-- File parsing is case-sensitive for material names.
-
-### Material Tag Format:
-- Default materials (ITU-R P.2040-3 Table 3): `"usemtl itu_concrete"`, `"itu_brick"`, `"itu_wood"`, `"itu_water"`, etc.
-- Frequency range: 1–40 GHz (limited to 1–10 GHz for ground materials)
-- Custom materials syntax: `"usemtl Name::A:B:C:D:att"` with `A, B`: Real permittivity ε_r = `A * fGHz^B`,
-  `C, D`: Conductivity σ = `C * fGHz^D`, `att`: Penetration loss in dB (fixed, per interaction)
-
-### Material properties:
-Each material is defined by its electrical properties. Radio waves that interact with a building will
-produce losses that depend on the electrical properties of the building materials, the material
-structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical
-permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is
-obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies.
-The five parameters returned in `mtl_prop` then are:
-
-- Real part of relative permittivity at f = 1 GHz (a)
-- Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b
-- Conductivity at f = 1 GHz (c)
-- Frequency dependence of conductivity (d) such that σ = c· f^d
-- Fixed attenuation in dB applied to each transition
-
-A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following
-list of material is currently supported and the material can be selected by using the `usemtl` tag
-in the OBJ file. When using Blender, the simply assign a material with that name to an object or face.
-The following materials are defined by default:
-
+### Default material table:
 Name                  |         a |        b  |         c |         d |       Att |  max fGHz |
 ----------------------|-----------|-----------|-----------|-----------|-----------|-----------|
 vacuum / air          |       1.0 |       0.0 |       0.0 |       0.0 |       0.0 |       100 |
@@ -4285,305 +3345,215 @@ itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.
 itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
 irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
 
-### Example:
-```
-arma::mat mesh, mtl_prop, vert_list;
-arma::umat face_ind;
-arma::uvec obj_ind, mtl_ind;
-std::vector<std::string> obj_names, mtl_names;
-
-quadriga_lib::obj_file_read<double>("cube.obj", &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names);
-```
-
 ---
 ## obj_overlap_test
 Detect overlapping 3D objects in a triangular mesh
 
 ### Description:
-- Tests whether any objects in a triangular mesh overlap by checking for shared volume or intersection.
+- Returns 1-based indices of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
-- Returns the indices (1-based) of all objects that intersect with at least one other object.
-- Can optionally output a list of overlap reasons for diagnostic purposes.
-- Uses a configurable geometric tolerance to account for numerical precision.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
+- Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
+- Does not modify or repair the mesh
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::uvec quadriga_lib::obj_overlap_test(
-                const arma::Mat<dtype> *mesh,
-                const arma::uvec *obj_ind,
-                std::vector[std::string](std::string) *reason = nullptr,
-                dtype tolerance = 0.0005);
+    const arma::Mat<dtype> *mesh,
+    const arma::uvec *obj_ind,
+    std::vector<std::string> *reason = nullptr,
+    dtype tolerance = 0.0005);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Triangular mesh geometry. Each row contains 3 vertices flattened as `[X1, Y1, Z1, X2, Y2, Z2, X3, Y3, Z3]`. Size: `[n_mesh, 9]`.
-
-- `const arma::uvec ***obj_ind**` (input)
-  Object indices (1-based) that map multiple triangles in `mesh` to objects; Size: `[n_mesh]`;
-  This is an output generated by [obj_file_read](#obj_file_read).
-
-- `std::vector<std::string> ***reason** = nullptr` (optional output)
-  Human-readable list of overlap reasons corresponding to each overlapping object. Length: `[n_overlap]`.
-
-- `dtype **tolerance** = 0.0005` (optional input)
-  Geometric tolerance (in meters) used to determine intersections. Default: `0.0005` (0.5 mm).
+### Input Arguments:
+- **`mesh`** — Triangular mesh; each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, `[n_mesh, 9]`
+- **`obj_ind`** — 1-based object index mapping triangles to objects; output of [obj_file_read](#obj_file_read), `[n_mesh]`
+- **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object, `[n_overlap]`
+- **`tolerance`** *(optional)* — Geometric tolerance in meters; intersections smaller than this are ignored
 
 ### Returns:
-- `arma::uvec`: Vector of unique object indices (1-based) that were found to overlap, size `[n_overlap]`.
-
-### Technical Notes:
-- Overlap detection includes checks for: Intersecting triangle faces (shared volume), Vertices or edges penetrating another object’s bounding volume.
-- The `tolerance` accounts for modeling inaccuracies and numerical instability—small overlaps below this threshold are ignored.
-- This function does **not** modify the mesh or attempt to repair overlapping geometry — it only reports it.
+- `arma::uvec`: Unique 1-based object indices of all overlapping objects, `[n_overlap]`
 
 ### See also:
-- [obj_file_read](#obj_file_read)
+- [obj_file_read](#obj_file_read) (reads mesh data from files and generates `obj_ind` input)
 
 ---
 ## path_to_tube
-Convert a 3D path into a tube surface for visualization
+Convert a 3D path into a tube surface mesh for visualization
 
 ### Description:
-- Converts a sequence of 3D points (path) into a tubular surface using a ring of vertices around each path segment.
-- Produces a quad-based mesh suitable for rendering in 3D tools such as Blender or MeshLab.
-- Uses circular cross-sections with configurable radius and edge count.
-- Internal calculations are performed in double precision to ensure numerical stability along complex paths.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Converts an ordered sequence of 3D points into a tubular quad mesh with circular cross-sections
+- At bends steeper than 10°, the tube is split and an extra vertex ring is inserted to avoid intersection
+- Cross-section orientation uses continuous frame alignment between segments to minimize twisting
+- Output `faces` indices are directly usable in `.obj` or `.ply` export
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 void quadriga_lib::path_to_tube(
-                const arma::Mat<dtype> *path_coord,
-                arma::Mat<dtype> *vert,
-                arma::umat *faces,
-                dtype radius = 1.0,
-                arma::uword n_edges = 5);
+    const arma::Mat<dtype> *path_coord,
+    arma::Mat<dtype> *vert,
+    arma::umat *faces,
+    dtype radius = 1.0,
+    arma::uword n_edges = 5);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***path_coord**` (input)
-  Ordered list of 3D coordinates along the path, matrix of size `[3, n_coord]`.
+### Input Arguments:
+- **`path_coord`** — Ordered 3D path coordinates; `[3, n_coord]`
+- **`radius`** *(optional)* — Tube cross-section radius in meters
+- **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
-- `arma::Mat<dtype> ***vert**` (output)
-  Generated tube vertex positions. Size: `[3, n_coord × n_edges]`.
+### Output Arguments:
+- **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of bends > 10°
+- **`faces`** — Quad face indices into `vert`, 4 indices per quad; `[4, (n_coord - 1) × n_edges]`
 
-- `arma::umat ***faces**` (output)
-  Quad face indices into `vert`. Each row contains 4 indices forming a quad. Size: `[4, (n_coord - 1) × n_edges]`.
-
-- `dtype **radius** = 1.0` (optional input)
-  Radius of the tube cross-section (in meters). Default: `1.0`.
-
-- `arma::uword **n_edges** = 5` (optional input)
-  Number of vertices used to approximate each circular cross-section. Must be `≥ 3`. Default: `5`.
-
-### Technical Notes:
-- The generated tube is centered around the path with perpendicular circular cross-sections.
-- Orientation between path segments is handled with continuous frame alignment to reduce twisting.
-- Quad faces are generated by connecting adjacent rings along the path.
-- Output `faces` can be directly exported to formats like `.obj` or `.ply`.
+### See also:
+- [ray_triangle_intersect](#ray_triangle_intersect) (used internally to project vertex rings at bends)
 
 ---
 ## point_cloud_aabb
-Compute the Axis-Aligned Bounding Boxes (AABB) of a 3D point cloud
+Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 ### Description:
-- Calculates the axis-aligned bounding box (AABB) for either a single point cloud or a set of sub-clouds.
-- Each sub-cloud is defined by its starting row index in the input matrix.
-- The result is a matrix where each row contains the minimum and maximum extents of a sub-cloud in the x, y, and z dimensions.
-- For SIMD-friendly memory alignment, the result is zero-padded to the nearest multiple of `vec_size`.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
+- If `sub_cloud_index` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
-                const arma::Mat<dtype> *points,
-                const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::uword vec_size = 1);
+    const arma::Mat<dtype> *points,
+    const arma::u32_vec *sub_cloud_index = nullptr,
+    arma::uword vec_size = 1);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***points**` (input)
-  Matrix of 3D point coordinates. Size: `[n_points, 3]`.
-
-- `const arma::u32_vec ***sub_cloud_index** = nullptr` (optional input)
-  Vector of row indices indicating the start of each sub-cloud. Length: `[n_sub]`.
-  If `nullptr`, the entire input is treated as a single cloud.
-
-- `arma::uword **vec_size** = 1` (optional input)
-  Vector size for SIMD alignment (e.g., 4, 8, or 16). The number of output rows is padded to a multiple of `vec_size`.
-  Default: `1`.
+### Input Arguments:
+- **`points`** — 3D point coordinates; `[n_points, 3]`
+- **`sub_cloud_index`** *(optional)* — Row indices marking the start of each sub-cloud; use [point_cloud_segmentation](#point_cloud_segmentation) to generate; `[n_sub]`
+- **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
 ### Returns:
-- `arma::Mat<dtype>`
-  Matrix of bounding boxes for each sub-cloud. Size: `[n_out, 6]`, where `n_out` is the padded number of sub-clouds.
-  Each row has the format: `[x_min, x_max, y_min, y_max, z_min, z_max]`.
-
-### Technical Notes:
-- If `sub_cloud_index` is provided, the last index is assumed to span to the end of the `points` matrix.
-- Padding rows (if any) are filled with zeros and should be ignored if `n_sub` is known externally.
-- Suitable for preprocessing in geometry analysis, rendering pipelines, and spatial acceleration structures (e.g., BVH or octrees).
-- Sub-clouds can be computed using [point_cloud_segmentation](#point_cloud_segmentation)
+- Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ### See also:
-- [point_cloud_segmentation](#point_cloud_segmentation)
-- [point_cloud_split](#point_cloud_split)
-- [ray_point_intersect](#ray_point_intersect)
+- [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud indices)
+- [point_cloud_split](#point_cloud_split) (split point cloud)
+- [ray_point_intersect](#ray_point_intersect) (use AABBs for intersection)
 
 ---
 ## point_cloud_segmentation
 Reorganize a point cloud into spatial sub-clouds for efficient processing
 
 ### Description:
-- Recursively partitions a 3D point cloud into smaller sub-clouds, each below a given size threshold.
-- Sub-clouds are aligned to a specified SIMD vector size (e.g., for AVX or CUDA), with padding if necessary.
-- Outputs (`pointsR`) a reorganized version of the input points that groups points by sub-cloud.
-- Also produces forward and reverse index maps to track the reordering of points.
-- Useful for optimizing spatial processing tasks such as bounding volume hierarchies or GPU batch execution.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Recursively partitions a 3D point cloud into sub-clouds by splitting along bounding box axes at the midpoint.
+- Sub-clouds can be padded to a multiple of `vec_size` for SIMD alignment; padding points are placed at the sub-cloud AABB center.
+- Produces a reorganized point array and index maps to track reordering.
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::uword quadriga_lib::point_cloud_segmentation(
-                const arma::Mat<dtype> *points,
-                arma::Mat<dtype> *pointsR,
-                arma::u32_vec *sub_cloud_index,
-                arma::uword target_size = 1024,
-                arma::uword vec_size = 1,
-                arma::u32_vec *forward_index = nullptr,
-                arma::u32_vec *reverse_index = nullptr);
+    const arma::Mat<dtype> *points,
+    arma::Mat<dtype> *pointsR,
+    arma::u32_vec *sub_cloud_index,
+    arma::uword target_size = 1024,
+    arma::uword vec_size = 1,
+    arma::u32_vec *forward_index = nullptr,
+    arma::u32_vec *reverse_index = nullptr);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***points**` (input)
-  Original 3D point cloud to be segmented. Size: `[n_points, 3]`.
+### Input Arguments:
+- **`points`** — Original 3D point cloud; `[n_points, 3]`
+- **`target_size`** *(optional)* — Maximum points per sub-cloud before padding
+- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`
 
-- `arma::Mat<dtype> ***pointsR**` (output)
-  Reorganized point cloud with points grouped by sub-cloud. Size: `[n_pointsR, 3]`.
-
-- `arma::u32_vec ***sub_cloud_index**` (output)
-  Vector of starting indices (0-based) for each sub-cloud within `pointsR`. Length: `[n_sub]`.
-
-- `arma::uword **target_size** = 1024` (optional input)
-  Maximum number of elements allowed per sub-cloud (before padding). Default: `1024`.
-
-- `arma::uword **vec_size** = 1` (optional input)
-  Vector alignment size for SIMD or CUDA. The number of points in each sub-cloud is padded to a multiple of this value. Default: `1`.
-
-- `arma::u32_vec ***forward_index** = nullptr` (optional output)
-  Index map from original `points` to reorganized `pointsR` (1-based). Size: `[n_pointsR]`. Padding indices are `0`.
-
-- `arma::u32_vec ***reverse_index** = nullptr` (optional output)
-  Index map from `pointsR` back to original `points` (0-based). Size: `[n_points]`.
+### Output Arguments:
+- **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
+- **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_index`** *(optional)* — 1-based index map from `points` to `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_index`** *(optional)* — 0-based index map from `pointsR` back to `points`; `[n_points]`
 
 ### Returns:
-- `arma::uword`
-  Number of generated sub-clouds, `n_sub`.
-
-### Technical Notes:
-- Sub-clouds are formed using recursive spatial splitting (e.g., median-split along bounding box axes).
-- Padding points are placed at the AABB center of the corresponding sub-cloud and can be ignored in processing.
-- This function is typically used as a preprocessing step for GPU acceleration or bounding volume hierarchy (BVH) generation.
-- If `vec_size = 1`, no padding is applied and all output maps contain valid indices only.
+- Number of generated sub-clouds `n_sub`
 
 ### See also:
-- [point_cloud_aabb](#point_cloud_aabb)
-- [point_cloud_split](#point_cloud_split)
-- [ray_point_intersect](#ray_point_intersect)
+- [point_cloud_aabb](#point_cloud_aabb) (bounding box computation)
+- [point_cloud_split](#point_cloud_split) (related spatial splitting)
+- [ray_point_intersect](#ray_point_intersect) (downstream use case)
 
 ---
 ## point_cloud_split
 Split a point cloud into two sub-clouds along a spatial axis
 
 ### Description:
-- Divides a 3D point cloud into two sub-clouds along the specified axis.
-- Attempts to split the data at the median value to balance the number of points in each half.
-- Returns the axis used for the split, or a negative value if a valid split was not possible (e.g., all points fall on one side).
-- Output point clouds are written into `pointsA` and `pointsB`, and their size is adjusted accordingly.
-- An optional indicator vector identifies the target sub-cloud (A or B) for each input point.
-- Used in recursive spatial partitioning such as building BVH structures.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Splits at the bounding box midpoint along the chosen axis (not the statistical median); 
+  the split may be unbalanced if points are non-uniformly distributed.
+- If `axis == 0`, the longest bounding box extent is used.
+- Returns a negative axis value if the split failed (all points on one side); outputs are not modified in that case.
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 int quadriga_lib::point_cloud_split(
-                const arma::Mat<dtype> *points,
-                arma::Mat<dtype> *pointsA,
-                arma::Mat<dtype> *pointsB,
-                int axis = 0,
-                arma::Col<int> *split_ind = nullptr);
+    const arma::Mat<dtype> *points,
+    arma::Mat<dtype> *pointsA,
+    arma::Mat<dtype> *pointsB,
+    int axis = 0,
+    arma::Col<int> *split_ind = nullptr);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***points**` (input)
-  Input point cloud. Size: `[n_points, 3]`.
+### Input Arguments:
+- **`points`** — Input point cloud; `[n_points, 3]`
+- **`axis`** *(optional)* — Split axis: `0` = longest extent, `1` = x, `2` = y, `3` = z
 
-- `arma::Mat<dtype> ***pointsA**` (output)
-  First sub-cloud after split. Size: `[n_pointsA, 3]`.
-
-- `arma::Mat<dtype> ***pointsB**` (output)
-  Second sub-cloud after split. Size: `[n_pointsB, 3]`.
-
-- `int **axis** = 0` (optional input)
-  Axis to split along: `0` = longest extent (default), `1` = x-axis, `2` = y-axis, `3` = z-axis.
-
-- `arma::Col<int> ***split_ind** = nullptr` (optional output)
-  Vector of length `[n_points]`, where each element is: `1` if the point goes to `pointsA`, `2` if it goes to `pointsB`, `0` if error.
+### Output Arguments:
+- **`pointsA`** — First sub-cloud; `[n_pointsA, 3]`
+- **`pointsB`** — Second sub-cloud; `[n_pointsB, 3]`
+- **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB, `0` = error; `[n_points]`
 
 ### Returns:
-- `int` 
-   Axis used for splitting: `1` = x, `2` = y, `3` = z,  or `-1`, `-2`, `-3` if the split failed (no points assigned to one of the outputs).
-
-### Notes:
-- The function does not modify `pointsA` or `pointsB` if the split fails.
-- The selected axis is based on the bounding box if `axis == 0`
-- This function is a building block for spatial acceleration structures (e.g., BVH, KD-trees), see [point_cloud_segmentation](#point_cloud_segmentation)
+- Axis used: `1` = x, `2` = y, `3` = z; negative (`-1`, `-2`, `-3`) if split failed
 
 ### See also:
-- [point_cloud_aabb](#point_cloud_segmentation)
-- [point_cloud_segmentation](#point_cloud_segmentation)
-- [ray_point_intersect](#ray_point_intersect)
+- [point_cloud_aabb](#point_cloud_aabb) (bounding box computation)
+- [point_cloud_segmentation](#point_cloud_segmentation) (recursive partitioning using this function)
+- [ray_point_intersect](#ray_point_intersect) (downstream use case)
 
 ---
 ## point_inside_mesh
 Test whether 3D points are inside a triangle mesh using raycasting
 
 ### Description:
-- Uses raycasting to determine whether each 3D point lies inside a triangle mesh.
-- Requires that the mesh is watertight and all normals are pointing outwards.
-- For each point, multiple rays are cast in various directions.
-- If any ray intersects a mesh element with a negative incidence angle, the point is classified as **inside**.
-- Output can be binary (0 = outside, 1 = inside) or labeled with object indices.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Casts multiple rays per point in various directions
+- A point is inside if any ray hits a face with a negative incidence angle, or if the ray thickness at FBS is below 1 mm (surface proximity)
+- Mesh must be watertight with all normals pointing outward
+- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- `distance > 0` classifies points within that many meters of the mesh surface as inside; increases computation time significantly; range: 0–20 m
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::u32_vec quadriga_lib::point_inside_mesh(
-                const arma::Mat<dtype> *points,
-                const arma::Mat<dtype> *mesh,
-                const arma::u32_vec *obj_ind = nullptr,
-                dtype distance = 0.0);
+    const arma::Mat<dtype> *points,
+    const arma::Mat<dtype> *mesh,
+    const arma::u32_vec *obj_ind = nullptr,
+    dtype distance = 0.0);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***points**` (input)
-  3D point coordinates to test, size `[n_points, 3]`.
-
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format (x1,y1,z1,x2,y2,z2,x3,y3,z3), size `[n_mesh, 9]`.
-
-- `const arma::u32_vec ***obj_ind** = nullptr` (optional input)
-  Optional object index for each mesh element (1-based), size `[n_mesh]`. If provided, the return vector will contain the index of the enclosing object instead of binary values.
-
-- `dtype **distance** = 0.0` (optional input)
-  Optional distance in meters from objects that should be considered as *inside* the object.
-  Possible range: 0 - 20 m. Using this parameter significantly increases computation time.
+### Input Arguments:
+- **`points`** — 3D coordinates of test points; `[n_points, 3]`
+- **`mesh`** — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); `[n_mesh, 9]`
+- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
+- **`distance`** *(optional)* — Surface proximity threshold in meters to also classify as inside
 
 ### Returns:
-- `arma::u32_vec`, size `[n_points]`
-  For each point: Returns `0` if the point is outside the mesh (or all objects), `1` if inside (or close to) any mesh object
-  (if `obj_ind` not given), or returns the **1-based object index** if `obj_ind` is provided.
+- `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
+
+### See also:
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (used internally to build BVH for ray queries)
+- [icosphere](#icosphere) (generates ray directions for distance proximity check)
 
 ---
 ## ray_mesh_interact
@@ -4674,437 +3644,281 @@ void quadriga_lib::ray_mesh_interact(
 
 ---
 ## ray_point_intersect
-Calculates the intersection of ray beams with points in three dimensions
+Calculate intersections of ray beams with points in 3D space
 
 ### Description:
-Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as
-beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This
-approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio
-waves spreads as they travel from a point source. The volumetric nature of the beams allows for more
-realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed
-across their cross-sectional area, affecting the intensity of the interaction with surfaces.
-Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires
-volumetric intersection tests. 
-
-- This function computes whether points in 3D Cartesian space are intersected by ray beams.
-- A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors.
-- Returns a list of ray indices (0-based) that intersect with each point in the input point cloud.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 points in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_points >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Optional support for pre-segmented point clouds (e.g., using [point_cloud_segmentation](#point_cloud_segmentation))
-  to reduce computational cost.
-- All internal computations use single precision for speed.
-- Recommended to use with small tube radius and well-distributed points for optimal accuracy.
+- Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
+- Returns, for each point, the list of 0-based ray indices whose beam intersects that point.
+- Allowed datatypes: `float` or `double`; all internal computations use single precision.
 
 ### Declaration:
 ```
-template <typename dtype>
 std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
-                const arma::Mat<dtype> *points,
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *trivec,
-                const arma::Mat<dtype> *tridir,
-                const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::u32_vec *hit_count = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+    const arma::Mat<dtype> *points,
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *trivec,
+    const arma::Mat<dtype> *tridir,
+    const arma::u32_vec *sub_cloud_index = nullptr,
+    arma::u32_vec *hit_count = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***points**` (input)
-  3D coordinates of the point cloud. Size: `[n_points, 3]`.
-
-- `const arma::Mat<dtype> ***orig**` (input)
-  Ray origin positions in global coordinate system. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***trivec**` (input)
-  The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of
-  a triangular propagation tube (the beam), the values are in the order
-  `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ no_ray, 9 ]`
-
-- `const arma::Mat<dtype> ***tridir**` (input)
-  The directions of the vertex-rays. Size: `[ n_ray, 9 ]`, Values must be given in Cartesian
-  coordinates in the order  `[ d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z  ]`; The vector does
-  not need to be normalized.
-
-- `const arma::u32_vec ***sub_cloud_index** = nullptr` (optional input)
-  Index vector to mark boundaries between point cloud segments (e.g. for SIMD optimization). Length: `[n_sub]`.
-  When using AVX2, sub-cloud start indices must be aligned to multiples of 8.
-
-- `arma::u32_vec ***hit_count** = nullptr` (optional output)
-  Output array with number of rays that intersected each point. Length: `[n_points]`.
-
-- `int **use_kernel** = 0` (optional input)
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- `int **gpu_id** = 0` (optional input)
-  GPU device ID for CUDA kernel. Ignored when not using CUDA.
+### Input Arguments:
+- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
+- **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
+- **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
+- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
+- **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`
+- **`hit_count`** *(optional)* — Output: number of rays intersecting each point; `[n_points]`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 10000` and CUDA is available, else AVX2, else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ### Returns:
-- `std::vector<arma::u32_vec>`
-  List of ray indices that intersected each point (0-based). Each entry in the returned vector corresponds to one point.
+- `std::vector<arma::u32_vec>` — Per-point list of 0-based ray indices that intersected that point; length `n_points`
 
 ### See also:
-- [icosphere](#icosphere) (for generating beams)
-- [point_cloud_segmentation](#point_cloud_segmentation) (for generating point cloud segments)
-- [subdivide_rays](#subdivide_rays) (for subdivides ray beams into sub beams)
-- [ray_triangle_intersect](#ray_triangle_intersect) (for calculating intersection of rays and triangles)
-- [ray_mesh_interact](#ray_mesh_interact) (for calculating interactions of beams and a 3D model)
+- [icosphere](#icosphere) (generate ray beams)
+- [point_cloud_segmentation](#point_cloud_segmentation) (generate sub-cloud index)
+- [subdivide_rays](#subdivide_rays) (subdivide beams into sub-beams)
+- [ray_triangle_intersect](#ray_triangle_intersect) (ray–triangle intersection)
+- [ray_mesh_interact](#ray_mesh_interact) (beam–mesh interaction)
 
 ---
 ## ray_triangle_intersect
-Calculates the intersection of rays and triangles in three dimensions
+Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
 ### Description:
-- Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 triangles in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_ray >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
-- Allowed datatypes (`dtype`): `float` or `double`
-- Internal computations are carried out in **single precision** regardless of `dtype`.
+- Counts the total number of intersection between `orig` and `dest`
+- Computes the coordinates and object IDs if the first two intersections per ray (FBS/SBS)
+- Allowed datatypes: `float` or `double`
+- Internal computations always use single precision for AVX2 and CUDA kernel; only GENERIC has `double` support
 
 ### Declaration:
 ```
 void quadriga_lib::ray_triangle_intersect(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *fbs = nullptr,
-                arma::Mat<dtype> *sbs = nullptr,
-                arma::u32_vec *no_interact = nullptr,
-                arma::u32_vec *fbs_ind = nullptr,
-                arma::u32_vec *sbs_ind = nullptr,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                const arma::Mat<dtype> *aabb = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *fbs = nullptr,
+    arma::Mat<dtype> *sbs = nullptr,
+    arma::u32_vec *no_interact = nullptr,
+    arma::u32_vec *fbs_ind = nullptr,
+    arma::u32_vec *sbs_ind = nullptr,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::Mat<dtype> *aabb = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)
-  Ray origins in global coordinate system (GCS). Size: `[n_ray, 3]`.
+### Input Arguments:
+- **`orig`** — Ray origins in GCS; `[n_ray, 3]`
+- **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-- `const arma::Mat<dtype> ***dest**` (input)
-  Ray destinations in GCS. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Triangular surface mesh. Size: `[n_mesh, 9]`, where each row contains the 3 vertices
-  `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`.
-
-- `arma::Mat<dtype> ***fbs**` (optional output)
-  First-bounce surface intersection points (FBS). Size: `[n_ray, 3]`.
-
-- `arma::Mat<dtype> ***sbs**` (optional output)
-  Second-bounce surface intersection points (SBS). Size: `[n_ray, 3]`.
-
-- `arma::u32_vec ***no_interact**` (optional output)
-  Number of intersections per ray (0, 1, or 2). Size: `[n_ray]`.
-
-- `arma::u32_vec ***fbs_ind**` (optional output)
-  1-based index of the first intersected mesh element, 0 = no intersection. Size: `[n_ray]`.
-
-- `arma::u32_vec ***sbs_ind**` (optional output)
-  1-based index of the second intersected mesh element, 0 = no second intersection. Size: `[n_ray]`.
-
-- `const arma::u32_vec ***sub_mesh_index**` (optional input)
-  Indexes indicating start of sub-meshes in `mesh`. Size: `[n_sub]`. Enables faster processing via segmentation.
-
-- `const arma::Mat<dtype> ***aabb**` (optional input)
-  Pre-computed axis-aligned bounding boxes per sub-mesh. Size: `[n_sub, 6]`, where each row contains
-  `{x_min, x_max, y_min, y_max, z_min, z_max}`. If `nullptr`, AABBs are computed internally from `mesh`.
-
-- `bool **transpose_inputs** = false` (optional input)
-  If `true`, treats `orig`/`dest` as `[3, n_ray]` and `mesh` as `[9, n_mesh]`.
-
-- `int **use_kernel** = 0` (optional input)
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- `int **gpu_id** = 0` (optional input)
-  GPU device ID for CUDA kernel. Ignored when not using CUDA.
+### Output Arguments:
+- **`fbs`** (optional) — First-bounce intersection points in GCS, `[n_ray, 3]`
+- **`sbs`** (optional) — Second-bounce intersection points in GCS, `[n_ray, 3]`
+- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`, `[n_ray]`
+- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none, `[n_ray]`
+- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none, `[n_ray]`
 
 ### See also:
-- [obj_file_read](#obj_file_read) (for loading `mesh` from an OBJ file)
-- [icosphere](#icosphere) (for generating beams)
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (for calculating sub-meshes)
-- [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
-- [subdivide_rays](#subdivide_rays) (for subdivides ray beams into sub beams)
+- [obj_file_read](#obj_file_read) (load mesh from OBJ file)
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (compute sub-mesh indices and AABBs)
+- [ray_point_intersect](#ray_point_intersect) (beam interactions with sampling points)
+- [icosphere](#icosphere) (generate ray beams)
+- [subdivide_rays](#subdivide_rays) (split ray beams into sub-beams)
 
 ---
 ## subdivide_rays
 Subdivide ray beams into four smaller sub-beams
 
 ### Description:
-- Subdivides each ray beam (defined by a triangular wavefront) into four new beams with adjusted origin, shape, and direction.
-- Supports input in Spherical or Cartesian direction format.
-- When `dest` is not provided, the corresponding output `destN` is omitted.
-- Useful for hierarchical ray tracing or angular resolution refinement.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Each triangular beam is split into 4 sub-beams; output size is `4 × n_ray` or `4 × n_ind` when `index` is provided
+- `tridir` format auto-detected: spherical `[n_ray, 6]` or Cartesian `[n_ray, 9]`; output matches input format
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::uword quadriga_lib::subdivide_rays(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *trivec,
-                const arma::Mat<dtype> *tridir,
-                const arma::Mat<dtype> *dest = nullptr,
-                arma::Mat<dtype> *origN = nullptr,
-                arma::Mat<dtype> *trivecN = nullptr,
-                arma::Mat<dtype> *tridirN = nullptr,
-                arma::Mat<dtype> *destN = nullptr,
-                const arma::u32_vec *index = nullptr,
-                const double ray_offset = 0.0);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *trivec,
+    const arma::Mat<dtype> *tridir,
+    const arma::Mat<dtype> *dest = nullptr,
+    arma::Mat<dtype> *origN = nullptr,
+    arma::Mat<dtype> *trivecN = nullptr,
+    arma::Mat<dtype> *tridirN = nullptr,
+    arma::Mat<dtype> *destN = nullptr,
+    const arma::u32_vec *index = nullptr,
+    const double ray_offset = 0.0);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)
-  Ray origin points in global coordinate system (GCS).
-  Size: `[n_ray, 3]`.
+### Input Arguments:
+- **`orig`** — Ray origin points in GCS; `[n_ray, 3]`
+- **`trivec`** — Vectors from origin to triangle vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
+- **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
+- **`dest`** (optional) — Ray destination points; `[n_ray, 3]`
+- **`index`** (optional) — 0-based indices of rays to subdivide; `[n_ind]`
+- **`ray_offset`** (optional) — Origin offset in meters along propagation direction
 
-- `const arma::Mat<dtype> ***trivec**` (input)
-  Vectors pointing from the ray origin to the three triangle vertices.
-  Size: `[n_ray, 9]`, order: `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`.
-
-- `const arma::Mat<dtype> ***tridir**` (input)
-  Directions of the three vertex-rays.
-  Format can be Spherical `[n_ray, 6]` as `[v1az v1el v2az v2el v3az v3el]`,
-  or Cartesian `[n_ray, 9]` as `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`.
-
-- `const arma::Mat<dtype> ***dest** = nullptr` (input)
-  Ray destination points. If `nullptr`, the output `destN` will remain empty.
-  Size: `[n_ray, 3]`.
-
-- `arma::Mat<dtype> ***origN**` (output)
-  New ray origins after subdivision.
-  Size: `[n_rayN, 3]`.
-
-- `arma::Mat<dtype> ***trivecN**` (output)
-  Updated vectors for each subdivided triangle beam.
-  Size: `[n_rayN, 9]`.
-
-- `arma::Mat<dtype> ***tridirN**` (output)
-  New directions of the subdivided vertex-rays, in the same format as input.
-  Size: `[n_rayN, 6]` (spherical) or `[n_rayN, 9]` (Cartesian).
-
-- `arma::Mat<dtype> ***destN**` (output)
-  Updated destination points.
-  Size: `[n_rayN, 3]`, empty if input `dest` was `nullptr`.
-
-- `const arma::u32_vec ***index**` (optional input)
-  List of ray indices to be subdivided (0-based). Only the specified rays are subdivided.
-  Size: `[n_ind]`.
-
-- `const double **ray_offset** = 0.0` (optional input)
-  Offset (in meters) applied to the origin of each subdivided ray along its propagation direction.
-  Default: `0.0`.
+### Output Arguments:
+- **`origN`** — Subdivided ray origins; `[n_rayN, 3]`
+- **`trivecN`** — Subdivided triangle vectors; `[n_rayN, 9]`
+- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]`
+- **`destN`** — Subdivided destinations, empty if `dest` was `nullptr` or empty; `[n_rayN, 3]`
 
 ### Returns:
-- `arma::uword  **n_rayN**`
-  Number of output rays, typically `4 × n_ray` or `4 × n_ind` if `index` is provided.
+- `n_rayN` — Number of output rays
 
 ### See also:
-- [icosphere](#icosphere) (for generating beams)
-- [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
-- [ray_triangle_intersect](#ray_triangle_intersect) (for calculating beam interactions with triangles)
+- [icosphere](#icosphere) (generate initial beams)
+- [ray_point_intersect](#ray_point_intersect) (beam–sample-point interaction)
+- [ray_triangle_intersect](#ray_triangle_intersect) (beam–triangle interaction)
 
 ---
 ## subdivide_triangles
 Subdivide triangles into smaller triangles
 
 ### Description:
-- Uniformly subdivides each input triangle into `n_div × n_div` smaller triangles.
-- Increases spatial resolution for mesh-based processing (e.g., ray tracing or visualization).
-- Optional input/output material properties are duplicated across subdivided triangles.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
+- Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
+- Material properties are duplicated from parent triangle to all sub-triangles
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::uword quadriga_lib::subdivide_triangles(
-                arma::uword n_div,
-                const arma::Mat<dtype> *triangles_in,
-                arma::Mat<dtype> *triangles_out,
-                const arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *mtl_prop_out = nullptr);
+    arma::uword n_div,
+    const arma::Mat<dtype> *triangles_in,
+    arma::Mat<dtype> *triangles_out,
+    const arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *mtl_prop_out = nullptr);
 ```
 
-### Arguments:
-- `arma::uword **n_div**` (input)
-  Number of subdivisions per triangle edge;
-  total output triangles: `n_triangles_out = n_triangles_in × n_div × n_div`.
+### Input Arguments:
+- **`n_div`** — Number of subdivisions per edge
+- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`mtl_prop`** *(optional)* — Material properties of input triangles; `[n_triangles_in, 5]`
 
-- `const arma::Mat<dtype> ***triangles_in**` (input)
-  Vertices of the triangular mesh in global Cartesian coordinates; each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[n_triangles_in, 9]`
-
-- `arma::Mat<dtype> ***triangles_out**` (output)
-  Vertices of the sub-divided mesh in global Cartesian coordinates; Size: `[n_triangles_out, 9]`
-
-- `const arma::Mat<dtype> ***mtl_prop** = nullptr` (optional input)
-  Material properties associated for the input triangles; Size: `[n_triangles_in, 5]`.
-
-- `arma::Mat<dtype> ***mtl_prop_out** = nullptr` (optional output)
-  Material properties for the subdivided triangles, copied from the parent triangle,
-  Size: `[n_triangles_out, 5]`.
+### Output Arguments:
+- **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
+- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 5]`
 
 ### Returns:
-- `arma::uword **n_triangles_out**`
-  Number of generated triangles (equals `n_triangles_in × n_div × n_div`).
+- `n_triangles_out` — Number of generated triangles
 
 ---
 ## triangle_mesh_aabb
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
 ### Description:
-The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum
-bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian)
-coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of
-triangles. In order to find intersections with the triangles (e.g. using ray tracing), the
-initial check is the intersections between the rays and the AABBs. Since it is usually a much
-less expensive operation than the check of the actual intersection (because it only requires
-comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
-
-- This function computes the axis-aligned bounding box for each sub-mesh in a 3D triangle mesh.
-- Each triangle is defined by three vertices in a flat row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`.
-- Sub-meshes are defined by the `sub_mesh_index` list, indicating the starting row of each sub-mesh.
-- The resulting bounding boxes are returned as a matrix of shape `[n_sub, 6]` with columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`.
-- If `vec_size > 1`, the result is padded such that the number of rows in the output is a multiple of `vec_size`.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
+- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
+- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
-                const arma::Mat<dtype> *mesh,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                arma::uword vec_size = 1);
+    const arma::Mat<dtype> *mesh,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    arma::uword vec_size = 1);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Vertices of the triangle mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ n_triangles, 9 ]`
-
-- `const arma::u32_vec ***sub_mesh_index** = nullptr` (optional input)
-  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
-  the entire triangle mesh is returned; Length `[n_sub]`
-
-- `arma::uword **vec_size** = 1` (optional input)
-  Alignment size for SIMD processing (e.g., `8` for AVX2, `32` for CUDA). 
-  Output is padded to a multiple of this value.
+### Input Arguments:
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
+- **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
+- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
 ### Returns:
-- `arma::Mat<dtype>` 
-  A matrix of shape `[n_sub_aligned, 6]`, where each row is `[x_min, x_max, y_min, y_max, z_min, z_max]`.
+- `arma::Mat<dtype>` of shape `[n_sub_aligned, 6]`, one AABB per sub-mesh row
+
+### See also:
+- [ray_triangle_intersect](#ray_triangle_intersect) (consumer of the outout)
 
 ---
 ## triangle_mesh_segmentation
-Reorganize a 3D mesh into smaller sub-meshes for faster processing
+Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
 
 ### Description:
-This function processes the elements of a large triangle mesh by clustering those that are
-closely spaced. The resulting mesh retains the same elements but rearranges their order.
-The function aims to minimize the size of the axis-aligned bounding box around each cluster,
-referred to as a sub-mesh, while striving to maintain a specific number of elements within
-each cluster.
-
-- Subdivision is recursive and based on bounding box partitioning until each sub-mesh contains no more than `target_size` triangles.
-- Sub-meshes are aligned to `vec_size` for SIMD or GPU optimization; padded with dummy triangles at the center of each sub-mesh if needed.
-- If material properties are provided, these are also reorganized and padded accordingly.
-- The function returns the number of created sub-meshes, and reorders the triangles and materials.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
+- Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
+- If `mtl_prop` is provided, material rows are reordered and padded in the same way
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
-arma::uword quadriga_lib::triangle_mesh_segmentation(
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *meshR,
-                arma::u32_vec *sub_mesh_index,
-                arma::uword target_size = 1024,
-                arma::uword vec_size = 1,
-                const arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *mtl_propR = nullptr,
-                arma::u32_vec *mesh_index = nullptr);
+arma::uword triangle_mesh_segmentation(
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *meshR,
+    arma::u32_vec *sub_mesh_index,
+    arma::uword target_size = 1024,
+    arma::uword vec_size = 1,
+    const arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *mtl_propR = nullptr,
+    arma::u32_vec *mesh_index = nullptr);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[n_mesh, 9]`
+### Input Arguments:
+- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`, `[n_mesh, 9]`
+- **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
+- **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
+- **`mtl_prop`** *(optional)* — Material properties for the original mesh; see [obj_file_read](#obj_file_read), `[n_mesh, 5]`
 
-- `arma::Mat<dtype> ***meshR**` (output)
-  Vertices of the clustered mesh in global Cartesian coordinates; Size: `[n_meshR, 9]`
-
-- `arma::u32_vec ***sub_mesh_index**` (output)
-  Start indices of the sub-meshes in 0-based notation; Vector of length `[n_sub]`
-
-- `arma::uword **target_size** = 1024` (input)
-  The target number of elements of each sub-mesh. Default value = 1024. For best performance, the
-  value should be around `sgrt(n_mesh)`
-
-- `arma::uword **vec_size** = 1` (input)
-  Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1.
-  For values > 1,the number of rows for each sub-mesh in the output is increased to a multiple
-  of `vec_size`. For padding, zero-sized triangles are placed at the center of the AABB of
-  the corresponding sub-mesh.
-
-- `const arma::Mat<dtype> ***mtl_prop** = nullptr` (optional input)
-  Material properties corresponding to the original mesh; Size: `[n_mesh, 5]`; See [obj_file_read](#obj_file_read)
-
-- `arma::Mat<dtype> ***mtl_propR** = nullptr` (optional output)
-  Reorganized material properties, aligned and padded if necessary, Size: `[n_meshR, 5]`
-
-- `arma::u32_vec ***mesh_index** = nullptr` (optional output)
-  1-based mapping from the original mesh to the reorganized mesh; Size: `[n_meshR]` (0 = padding)
+### Output Arguments:
+- **`meshR`** — Reordered and padded triangle vertices, `[n_meshR, 9]`
+- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`, `[n_sub]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties, `[n_meshR, 5]`
+- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding), `[n_meshR]`
 
 ### Returns:
-- `arma::uword **n_sub**`
-  The number of created sub-meshes. Output matrices are resized accordingly.
+- Number of created sub-meshes `n_sub`
+
+### See also:
+- [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_index` for acceleration)
+- [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
 
 ---
 ## triangle_mesh_split
-Split a 3D mesh into two sub-meshes along a given axis
+Split a 3D triangular mesh into two sub-meshes along a given axis
 
 ### Description:
-- Divides a triangular mesh into two sub-meshes along a selected axis (or automatically the longest).
-- The function chooses a split point based on the bounding box center of the selected axis.
-- Returns the axis used for the split: `1 = x`, `2 = y`, `3 = z`; or negative values if the split failed.
-- An optional indicator vector identifies the target sub-mesh (A or B) for each input point.
-- On failure (i.e., all triangles fall into one side), outputs `meshA` and `meshB` remain unchanged.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Splits at the bounding box center of the selected axis; triangles where all vertices lie within the 
+  lower half go to `meshA`; any triangle with at least one vertex exceeding the threshold goes to `meshB`
+- `axis = 0` selects the axis with the longest bounding box extent automatically
+- On failure (all triangles fall to one side), `meshA` and `meshB` are left unchanged and the return value is negative
+- Used internally by [triangle_mesh_segmentation](#triangle_mesh_segmentation)
+- Allowed datatypes: `float` or `double`
 
 ### Declaration:
 ```
-int quadriga_lib::triangle_mesh_split(
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *meshA,
-                arma::Mat<dtype> *meshB,
-                int axis = 0,
-                arma::Col<int> *split_ind = nullptr);
+int triangle_mesh_split(
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *meshA,
+    arma::Mat<dtype> *meshB,
+    int axis = 0,
+    arma::Col<int> *split_ind = nullptr);
 ```
 
-### Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)
-  Triangle mesh input; each row contains one triangle as `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`
-  Size: `[n_mesh, 9]`
+### Input Arguments:
+- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`, `[n_mesh, 9]`
+- **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
-- `arma::Mat<dtype> ***meshA**` (output)
-  First resulting sub-mesh; triangles with centroid below split threshold. Size: `[n_meshA, 9]`
-
-- `arma::Mat<dtype> ***meshB**` (output)
-  Second resulting sub-mesh; triangles with centroid above split threshold. Size: `[n_meshB, 9]`
-
-- `int **axis** = 0` (optional input)
-  Axis to split along: `0` = longest extent (default), `1` = x-axis, `2` = y-axis, `3` = z-axis.
-
-- `arma::Col<int> ***split_ind** = nullptr` (optional output)
-  Output vector indicating assignment of each triangle: `1` = meshA, `2` = meshB, `0` = not assigned (on failure)
-  Length: `[n_mesh]`
+### Output Arguments:
+- **`meshA`** — Triangles with all vertices within the lower half of the bounding box, `[n_meshA, 9]`
+- **`meshB`** — Triangles with at least one vertex exceeding the split threshold, `[n_meshB, 9]`
+- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure), `[n_mesh]`
 
 ### Returns:
-- `int` 
-  The axis used for the split (`1`, `2`, or `3`), or negative value on failure (`-1`, `-2`, or `-3`).
+- Axis used for the split (1, 2, or 3); negative (-1, -2, or -3) on failure
+
+### See also:
+- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (calls this function recursively)
 

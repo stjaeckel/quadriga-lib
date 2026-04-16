@@ -186,17 +186,20 @@ void qd_GEO2CART_GENERIC(const dtype *__restrict az, const dtype *__restrict el,
 
 template <typename dtype>
 void qd_CART2GEO_GENERIC(const dtype *__restrict x, const dtype *__restrict y, const dtype *__restrict z,
-                         float *__restrict az, float *__restrict el,
-                         size_t n_val)
+                         dtype *__restrict az, dtype *__restrict el, dtype *__restrict len, size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_val_ll; ++i)
     {
-        float xi = (float)x[i], yi = (float)y[i], zi = (float)z[i];
-        az[i] = atan2f(yi, xi);
-        zi = zi > 1.0f ? 1.0f : (zi < -1.0f ? -1.0f : zi);
-        el[i] = asinf(zi);
+        dtype xi = x[i], yi = y[i], zi = z[i];
+        dtype r = std::sqrt(xi * xi + yi * yi + zi * zi);
+        if (len)
+            len[i] = r;
+        az[i] = std::atan2(yi, xi);
+        dtype zn = r > dtype(0) ? zi / r : dtype(0);
+        zn = zn > dtype(1) ? dtype(1) : (zn < dtype(-1) ? dtype(-1) : zn);
+        el[i] = std::asin(zn);
     }
 }
 

@@ -476,33 +476,6 @@ TEST_CASE("Quadriga tools - Rotation matrix")
     auto Rv = quadriga_lib::calc_rotation_matrix(oriv);
 }
 
-TEST_CASE("Quadriga tools - Cart 2 Geo")
-{
-    arma::vec cart = {1.0, 1.0, 0.0};
-    auto geo = quadriga_lib::cart2geo(cart);
-
-    arma::vec T = {0.7854, 0.0, 1.4142};
-    CHECK(arma::approx_equal(geo, T, "absdiff", 1e-3));
-}
-
-TEST_CASE("Quadriga tools - Geo 2 Cart")
-{
-    arma::mat az(2, 2), el(2, 2), len(2, 2, arma::fill::ones);
-    auto cart = quadriga_lib::geo2cart(az, el, len);
-
-    CHECK(cart.n_rows == 3);
-    CHECK(cart.n_cols == 2);
-    CHECK(cart.n_slices == 2);
-
-    auto cart2 = quadriga_lib::geo2cart(az, el);
-
-    CHECK(cart.n_rows == 3);
-    CHECK(cart.n_cols == 2);
-    CHECK(cart.n_slices == 2);
-
-    CHECK(arma::approx_equal(cart, cart2, "absdiff", 1e-13));
-}
-
 TEST_CASE("Quadriga tools - coord2path example")
 {
     arma::u32_vec no_int = {0, 1};

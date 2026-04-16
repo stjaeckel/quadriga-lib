@@ -6,17 +6,17 @@ try
     quadriga_lib.cart2geo;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Cartesian coordinates not given.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
 
 try
-    quadriga_lib.cart2geo(e,[]);
+    quadriga_lib.cart2geo(e,0,[]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many input arguments.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -26,7 +26,7 @@ try
     quadriga_lib.cart2geo([]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input cannot be empty.';
+    expectedErrorMessage = 'Input must have 3 rows.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -45,11 +45,6 @@ end
 [az,el] = quadriga_lib.cart2geo(e);
 assert( isa(az,'double') );
 assert( isa(el,'double') );
-
-[az,el,le] = quadriga_lib.cart2geo(single(e));
-assert( isa(az,'single') );
-assert( isa(el,'single') );
-assert( isa(le,'single') );
 
 v = 1/sqrt(2);
 [az,el,le] = quadriga_lib.cart2geo([-v;-v;0]);

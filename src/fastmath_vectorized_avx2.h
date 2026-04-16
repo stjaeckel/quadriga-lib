@@ -78,7 +78,8 @@ template <typename dtype> // float or double
 void qd_CART2GEO_AVX2(const dtype *__restrict x,
                       const dtype *__restrict y,
                       const dtype *__restrict z,
-                      float *__restrict az,
-                      float *__restrict el,
+                      dtype *__restrict az,
+                      dtype *__restrict el,
+                      dtype *__restrict len, 
                       size_t n_val);
 #endif

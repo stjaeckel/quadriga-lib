@@ -162,7 +162,7 @@ try
     [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,32]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'calc_diffraction_gain: Sub-mesh indices cannot exceed number of faces.';
+    expectedErrorMessage = 'Sub-mesh indices cannot exceed number of faces.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

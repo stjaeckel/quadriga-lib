@@ -418,7 +418,8 @@ static inline void avx2_rotate_and_polarize(
     *dz8 = _mm256_fmadd_ps(R.r[2], Cx8, _mm256_fmadd_ps(R.r[5], Cy8, _mm256_mul_ps(R.r[8], sELi8)));
 
     // cart2geo: local az = atan2(dy, dx), local el = asin(clamp(dz))
-    _fm256_cart2geo_ps(*dx8, *dy8, *dz8, az8, el8);
+    __m256 len;
+    _fm256_cart2geo_ps(*dx8, *dy8, *dz8, az8, el8, &len);
 
     // Derive sin/cos of output angles from dx/dy/dz directly (avoids extra sincos)
     __m256 hyp_sq8 = _mm256_fmadd_ps(*dx8, *dx8, _mm256_mul_ps(*dy8, *dy8));

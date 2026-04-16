@@ -155,7 +155,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 
     // Check if the sub-cloud indices are valid
     size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
-    arma::u32_vec sci(1arma ::fill::zeros);                         // Sub-cloud-index (local copy)
+    arma::u32_vec sci(1, arma::fill::zeros);                        // Sub-cloud-index (local copy)
     if (sub_cloud_index != nullptr && sub_cloud_index->n_elem != 0) // Input is available
     {
         n_sub_t = (size_t)sub_cloud_index->n_elem;

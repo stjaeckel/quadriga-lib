@@ -123,21 +123,6 @@ namespace quadriga_lib
                                        bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
                                        dtype window_size = 0.01);                        // LOS window size in meters, paths within dTR + window_size are excluded
 
-    // Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
-    // - Input: Cartesian coordinates, size [3, n_row, n_col]
-    // - Output: Geographic coordinates, size [n_row, n_col, 3]
-    template <typename dtype>
-    void cart2geo(const arma::Cube<dtype> &cart, arma::Cube<dtype> &geo);
-
-    template <typename dtype>
-    void cart2geo(const arma::Mat<dtype> &cart, arma::Mat<dtype> &geo); // Input: [3, n_row], Output: [n_row, 3]
-
-    template <typename dtype>
-    void cart2geo(const arma::Col<dtype> &cart, arma::Col<dtype> &geo); // Input / Output: [3]
-
-    template <typename arma_type>
-    arma_type cart2geo(const arma_type &cart);
-
     // Generate colormap
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
