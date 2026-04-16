@@ -93,7 +93,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 
 ## See also:
 - [[get_channels_planar]] (used internally to compute MIMO coefficients per user)
-- [[arrayant]] (antenna array type for ap_array and sta_array)  
+- [[arrayant]] (antenna array type for ap_array and sta_array)
 MD!*/
 
 std::vector<quadriga_lib::channel<double>>
@@ -158,7 +158,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
 
     qd_ieee_indoor_param(rx_pos, rx_orientation, aod, aoa, pow, delay, M,
                          ChannelType, CarrierFreq_Hz, tap_spacing_s, n_users, Dist_m, n_floors,
-                         offset_angles, n_subpath, seed, 
+                         offset_angles, n_subpath, seed,
                          KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
 
     arma::uword n_tx = ap_array.n_ports();
@@ -481,10 +481,9 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                           &coeff_re, &coeff_im, &coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
-        arma::cx_cube coeff_cplx; // Size: [n_tx * n_rx, n_sub, n_path]
-        quadriga_lib::complex_cast(arma::cube(coeff_re.memptr(), n_probe * n_probe, n_subpath, n_path_out, false, true),
-                                   arma::cube(coeff_im.memptr(), n_probe * n_probe, n_subpath, n_path_out, false, true),
-                                   coeff_cplx);
+        arma::cx_cube coeff_cplx(
+            arma::cube(coeff_re.memptr(), n_probe * n_probe, n_subpath, n_path_out, false, true),
+            arma::cube(coeff_im.memptr(), n_probe * n_probe, n_subpath, n_path_out, false, true));
 
         // Calculate the power after summing over the sub-paths
         arma::mat pow_dynamic(n_path_out, n_snap, arma::fill::zeros);
@@ -573,9 +572,9 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
                                           &coeff_re, &coeff_im, &coeff_delay, CarrierFreq_Hz, false, false, &Doppler_Jakes);
 
         // Combine and restructure coefficients
-        quadriga_lib::complex_cast(arma::cube(coeff_re.memptr(), n_rx * n_tx, n_subpath, n_path_out, false, true),
-                                   arma::cube(coeff_im.memptr(), n_rx * n_tx, n_subpath, n_path_out, false, true),
-                                   coeff_cplx);
+        coeff_cplx = arma::cx_cube(
+            arma::cube(coeff_re.memptr(), n_rx * n_tx, n_subpath, n_path_out, false, true),
+            arma::cube(coeff_im.memptr(), n_rx * n_tx, n_subpath, n_path_out, false, true));
 
         // Build channel object for the current user
         quadriga_lib::channel<double> chan_user;
