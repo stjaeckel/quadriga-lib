@@ -266,3 +266,51 @@ TEST_CASE("ACDF - Quantile correctness")
         CHECK(std::abs(mu(q) - expected) < 10.0); // Allow some binning tolerance
     }
 }
+
+TEST_CASE("ACDF - strictly increasing")
+{
+    auto check_monotonic = [](const arma::vec &b) {
+        REQUIRE(b.n_elem == 201);
+        for (arma::uword i = 1; i < b.n_elem; ++i)
+            REQUIRE(b(i) > b(i - 1));
+    };
+
+    SECTION("Constant negative data")
+    {
+        arma::mat data(100, 3, arma::fill::value(-5.0));
+        arma::vec bins;
+        quadriga_lib::acdf(data, &bins);
+        check_monotonic(bins);
+        REQUIRE(bins.front() < -5.0);
+        REQUIRE(bins.back()  > -5.0);
+    }
+
+    SECTION("Constant zero data")
+    {
+        arma::mat data(100, 2, arma::fill::zeros);
+        arma::vec bins;
+        quadriga_lib::acdf(data, &bins);
+        check_monotonic(bins);
+        REQUIRE(bins.front() < 0.0);
+        REQUIRE(bins.back()  > 0.0);
+    }
+
+    SECTION("Constant positive data")
+    {
+        arma::mat data(100, 2, arma::fill::value(7.5));
+        arma::vec bins;
+        quadriga_lib::acdf(data, &bins);
+        check_monotonic(bins);
+        REQUIRE(bins.front() < 7.5);
+        REQUIRE(bins.back()  > 7.5);
+    }
+
+    SECTION("Normal random data")
+    {
+        arma::arma_rng::set_seed(42);
+        arma::mat data = arma::randn<arma::mat>(1000, 4);
+        arma::vec bins;
+        quadriga_lib::acdf(data, &bins);
+        check_monotonic(bins);
+    }
+}

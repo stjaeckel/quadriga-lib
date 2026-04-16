@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,70 +31,43 @@ SECTION!*/
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 ## Description:
-- Calculates the empirical CDF from the given data matrix, where each column represents an
-  independent data set (e.g., repeated experiment runs).
-- Individual CDFs are computed per column by histogramming into the given (or auto-generated) bins
-  and taking the cumulative sum normalized by the number of valid samples.
-- An averaged CDF is obtained by interpolating in quantile space: for a fine grid of probability
-  levels, the corresponding x-values from each individual CDF are averaged, then the result is
-  mapped back to the bin grid.
-- Quantile statistics (mean and standard deviation) are reported at the 0.1, 0.2, ..., 0.9
-  probability levels.
-- `Inf` and `NaN` values in the data are excluded from the computation.
-- If `bins` points to an empty vector, 201 equally spaced bins spanning the data range are
-  generated and stored back. If `bins` points to a non-empty vector, those bin centers are used.
-  If `bins` is `nullptr`, bins are auto-generated internally.
+- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
+- `Inf` and `NaN` values are excluded from computation
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- Allowed datatypes: float or double
 
 ## Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
-                        arma::Col<dtype> *bins = nullptr,
-                        arma::Mat<dtype> *Sh = nullptr,
-                        arma::Col<dtype> *Sc = nullptr,
-                        arma::Col<dtype> *mu = nullptr,
-                        arma::Col<dtype> *sig = nullptr,
-                        arma::uword n_bins = 201);
+    arma::Col<dtype> *bins = nullptr,
+    arma::Mat<dtype> *Sh = nullptr,
+    arma::Col<dtype> *Sc = nullptr,
+    arma::Col<dtype> *mu = nullptr,
+    arma::Col<dtype> *sig = nullptr,
+    arma::uword n_bins = 201);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> &**data**` (input)<br>
-  Input data matrix. Size `[n_samples, n_sets]`. Each column is one data set.
+## Input Arguments:
+- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`, `[n_bins]`
+- **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
-- `arma::Col<dtype> ***bins** = nullptr` (optional input/output)<br>
-  Bin centers for the histogram. Length `[n_bins]`. If pointing to an empty vector, auto-generated
-  bins are stored here. If pointing to a non-empty vector, those bin centers are used. If `nullptr`,
-  bins are auto-generated internally.
-
-- `arma::Mat<dtype> ***Sh** = nullptr` (optional output)<br>
-  Individual CDFs, one per column of data. Size `[n_bins, n_sets]`.
-
-- `arma::Col<dtype> ***Sc** = nullptr` (optional output)<br>
-  Averaged CDF obtained by quantile-space averaging across data sets. Length `[n_bins]`.
-
-- `arma::Col<dtype> ***mu** = nullptr` (optional output)<br>
-  Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-- `arma::Col<dtype> ***sig** = nullptr` (optional output)<br>
-  Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-- `arma::uword **n_bins** = 201` (input)<br>
-  Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when
-  non-empty bins are provided.
+## Output Arguments:
+- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins, n_sets]`
+- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
+- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 
 ## Example:
 ```
-#include "quadriga_tools.hpp"
-
-// Generate random data: 10000 samples x 5 experiment runs
 arma::mat data = arma::randn<arma::mat>(10000, 5);
-
 arma::vec bins;
 arma::mat Sh;
 arma::vec Sc, mu, sig;
 quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
-
-// bins has 201 elements, Sh is [201, 5], Sc is [201], mu and sig are [9]
+// bins: [201], Sh: [201,5], Sc: [201], mu/sig: [9]
 ```
 MD!*/
 
@@ -140,8 +113,10 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
             dtype val = p_data[i];
             if (std::isfinite(val))
             {
-                if (val < mi) mi = val;
-                if (val > ma) ma = val;
+                if (val < mi)
+                    mi = val;
+                if (val > ma)
+                    ma = val;
             }
         }
 
@@ -150,13 +125,9 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
         if (mi == ma)
         {
-            mi = (dtype)0.9 * mi;
-            ma = (dtype)1.1 * ma;
-            if (mi == ma) // handles mi == ma == 0
-            {
-                mi = (dtype)-1.0;
-                ma = (dtype)1.0;
-            }
+            dtype offset = (mi == (dtype)0.0) ? (dtype)1.0 : std::abs(mi) * (dtype)0.1;
+            mi -= offset;
+            ma += offset;
         }
 
         bins_local.set_size(n_bins);
@@ -271,8 +242,10 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     }
                     mu_local(q) = p_bins[idx];
                 }
-                if (mu != nullptr) *mu = mu_local;
-                if (sig != nullptr) *sig = sig_local;
+                if (mu != nullptr)
+                    *mu = mu_local;
+                if (sig != nullptr)
+                    *sig = sig_local;
             }
         }
         else
@@ -286,7 +259,11 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
             // For each probability level, find x-value from each CDF and average
             arma::Col<dtype> Sc_q(n_vals); // averaged x-values in quantile space
-            arma::Mat<dtype> temp(n_sets, n_vals);
+
+            bool get_mu_sig = (mu != nullptr || sig != nullptr);
+            arma::Mat<dtype> temp;
+            if (get_mu_sig)
+                temp.set_size(n_sets, n_vals);
 
             for (arma::uword v = 0; v < n_vals; ++v)
             {
@@ -300,7 +277,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     arma::uword idx = no_bins - 1;
                     for (arma::uword b = 0; b < no_bins; ++b)
                     {
-                        if (p_cdf[b] > level)
+                        if (p_cdf[b] >= level)
                         {
                             idx = b;
                             break;
@@ -308,13 +285,14 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     }
                     dtype x_val = p_bins[idx];
                     sum_x += x_val;
-                    temp(s, v) = x_val;
+                    if (get_mu_sig)
+                        temp(s, v) = x_val;
                 }
                 Sc_q(v) = sum_x / (dtype)n_sets;
             }
 
             // Compute mu and sig at quantile levels 0.1, 0.2, ..., 0.9
-            if (mu != nullptr || sig != nullptr)
+            if (get_mu_sig)
             {
                 arma::Col<dtype> mu_local(9);
                 arma::Col<dtype> sig_local(9);
@@ -352,8 +330,10 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     sig_local(q) = (sample_var > (dtype)0.0) ? std::sqrt(sample_var) : (dtype)0.0;
                 }
 
-                if (mu != nullptr) *mu = mu_local;
-                if (sig != nullptr) *sig = sig_local;
+                if (mu != nullptr)
+                    *mu = mu_local;
+                if (sig != nullptr)
+                    *sig = sig_local;
             }
 
             // Map averaged quantile function back to bin grid
