@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,45 +26,30 @@ SECTION!*/
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
 ## Description:
-The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum
-bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian)
-coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of
-triangles. In order to find intersections with the triangles (e.g. using ray tracing), the
-initial check is the intersections between the rays and the AABBs. Since it is usually a much
-less expensive operation than the check of the actual intersection (because it only requires
-comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.<br><br>
-
-- This function computes the axis-aligned bounding box for each sub-mesh in a 3D triangle mesh.
-- Each triangle is defined by three vertices in a flat row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`.
-- Sub-meshes are defined by the `sub_mesh_index` list, indicating the starting row of each sub-mesh.
-- The resulting bounding boxes are returned as a matrix of shape `[n_sub, 6]` with columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`.
-- If `vec_size > 1`, the result is padded such that the number of rows in the output is a multiple of `vec_size`.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
+- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
+- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
-                const arma::Mat<dtype> *mesh,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                arma::uword vec_size = 1);
+    const arma::Mat<dtype> *mesh,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    arma::uword vec_size = 1);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Vertices of the triangle mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ n_triangles, 9 ]`
-
-- `const arma::u32_vec ***sub_mesh_index** = nullptr` (optional input)<br>
-  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
-  the entire triangle mesh is returned; Length `[n_sub]`
-
-- `arma::uword **vec_size** = 1` (optional input)<br>
-  Alignment size for SIMD processing (e.g., `8` for AVX2, `32` for CUDA). 
-  Output is padded to a multiple of this value.
+## Input Arguments:
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
+- **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
+- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
 
 ## Returns:
-- `arma::Mat<dtype>`<br> 
-  A matrix of shape `[n_sub_aligned, 6]`, where each row is `[x_min, x_max, y_min, y_max, z_min, z_max]`.
+- `arma::Mat<dtype>` of shape `[n_sub_aligned, 6]`, one AABB per sub-mesh row
+
+## See also:
+- [[ray_triangle_intersect]] (consumer of the outout)
 MD!*/
 
 template <typename dtype>
@@ -93,9 +78,6 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh,
     if (sub_mesh_index != nullptr && sub_mesh_index->n_elem > 0)
     {
         n_sub = sub_mesh_index->n_elem;
-        if (n_sub == 0)
-            throw std::invalid_argument("Input 'sub_mesh_index' must have at least one element.");
-
         p_sub = sub_mesh_index->memptr();
 
         if (*p_sub != 0U)
@@ -111,7 +93,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh,
 
     // Reserve memory for the output
     arma::uword n_out = (n_sub % vec_size == 0) ? n_sub : (n_sub / vec_size + 1) * vec_size;
-    arma::Mat<dtype> output(n_out, 6); // Initialized to 0
+    arma::Mat<dtype> output(n_out, 6, arma::fill::zeros);
 
     dtype *x_min = output.colptr(0), *x_max = output.colptr(1),
           *y_min = output.colptr(2), *y_max = output.colptr(3),
@@ -157,6 +139,14 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(const arma::Mat<dtype> *mesh,
             z_min[i_sub] = (v < z_min[i_sub]) ? v : z_min[i_sub];
             z_max[i_sub] = (v > z_max[i_sub]) ? v : z_max[i_sub];
         }
+    }
+
+    // Invalidate padding rows
+    for (arma::uword i = n_sub; i < n_out; ++i)
+    {
+        x_min[i] = INFINITY, x_max[i] = -INFINITY;
+        y_min[i] = INFINITY, y_max[i] = -INFINITY;
+        z_min[i] = INFINITY, z_max[i] = -INFINITY;
     }
 
     return output;
