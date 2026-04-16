@@ -24,96 +24,46 @@ SECTION!*/
 
 /*!MD
 # coord2path
-Convert path interaction coordinates into FBS/LBS positions, path length and angles
+Convert path interaction coordinates into FBS/LBS positions, path length, and angles
 
 ## Description:
-- Interaction coordinates can be stored in a compressed format where `no_interact` is a vector of
-  length `n_path` storing the number of interactions per path and `interact_coord` stores all
-  interaction coordinates in path order.
-- This function processes the interaction coordinates of to extract relevant propagation metrics.
-- Calculates absolute path lengths and first/last bounce scatterer positions and angles.
-- LOS paths are assigned a virtual FBS/LBS position at the midpoint between TX and RX.
-- Automatically resizes output arguments if necessary.
-- Optionally reverses TX and RX to simulate the reverse link.
-- Allowed datatypes (`dtype`): `float` or `double`
+- `no_interact` is a vector of length `n_path` with the number of interactions per path
+- `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(no_interact)]`
+- LOS paths (`no_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
+- Output arguments are resized automatically; pass `nullptr` to skip any output
+- Set `reverse_path = true` to swap TX/RX and reverse all interaction sequences
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 void quadriga_lib::coord2path(
-                dtype Tx, dtype Ty, dtype Tz, 
-                dtype Rx, dtype Ry, dtype Rz,
-                const arma::u32_vec *no_interact, 
-                const arma::Mat<dtype> *interact_coord,
-                arma::Col<dtype> *path_length, 
-                arma::Mat<dtype> *fbs_pos, 
-                arma::Mat<dtype> *lbs_pos,
-                arma::Mat<dtype> *path_angles, 
-                std::vector<arma::Mat<dtype>> *path_coord, 
-                bool reverse_path);
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Rx, dtype Ry, dtype Rz,
+    const arma::u32_vec *no_interact,
+    const arma::Mat<dtype> *interact_coord,
+    arma::Col<dtype> *path_length,
+    arma::Mat<dtype> *fbs_pos,
+    arma::Mat<dtype> *lbs_pos,
+    arma::Mat<dtype> *path_angles,
+    std::vector<arma::Mat<dtype>> *path_coord,
+    bool reverse_path = false);
 ```
 
-## Arguments:
-- `dtype **Tx**, **Ty**, **Tz**` (input)<br>
-  Transmitter position in Cartesian coordinates in [m]
+## Input Arguments:
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates in meters
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates in meters
+- **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
+- **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
 
-- `dtype **Rx**, **Ry**, **Rz**` (input)<br>
-  Receiver position in Cartesian coordinates in [m]
-
-- `const arma::u32_vec ***no_interact**` (input)<br>
-  Vector of length `n_path` indicating the number of interactions per path (0 = LOS)
-
-- `const arma::Mat<dtype> ***interact_coord**` (input)<br>
-  Matrix of size `[3, sum(no_interact)]` containing interaction coordinates in path order
-
-- `arma::Col<dtype> ***path_length**` (output, optional)<br>
-  Absolute path lengths from TX to RX, Length `[n_path]`
-
-- `arma::Mat<dtype> ***fbs_pos**` (output, optional)<br>
-  First-bounce scatterer positions, Size `[3, n_path]`; For LOS, set to midpoint between TX and RX
-
-- `arma::Mat<dtype> ***lbs_pos**` (output, optional)<br>
-  Last-bounce scatterer positions, Size `[3, n_path]`. For LOS, set to midpoint between TX and RX
-
-- `arma::Mat<dtype> ***path_angles**` (output, optional)<br>
-  Departure and arrival angles: columns {AOD, EOD, AOA, EOA}, size `[n_path, 4]`
-
-- `std::vector<arma::Mat<dtype>> ***path_coord**` (output, optional)<br>
-  Full path coordinates (including TX and RX), vector of size `n_path` with each entry of size `[3, n_interact+2]`
-
-- `bool **reverse_path** = false` (optional input)<br>
-  If `true`, swaps TX and RX and reverses all interaction sequences.
-
-## Example:
-```
-// Suppose we have two paths: one LOS, one single-bounce.
-// Path 0: LOS (no_interact[0] = 0)
-// Path 1: single bounce at {5,0,2}.
-
-arma::u32_vec no_int = {0, 1};
-arma::mat interact(3, 1);
-interact.col(0) = {5.0, 0.0, 2.0};
-
-arma::vec lengths;
-arma::mat fbs, lbs;
-arma::mat angles;
-std::vector<arma::mat> coords;
-
-quadriga_lib::coord2path<double>(
-    0.0, 0.0, 0.0,  // TX at origin
-    10.0, 0.0, 0.0, // RX at x = 10 m
-    &no_int, &interact, &lengths, &fbs, &lbs, &angles, &coords);
-
-// After the call:
-// lengths: [10.0, 10.77]
-// fbs:     Path 1 [5,0,0], Path 2 [5,0,2]
-// lbs:     Path 1 [5,0,0], Path 2 [5,0,2]
-// angles:  Path 1 [0, 0, pi, p], Path 2 [0, 22°, pi, 22°]
-// coords[0]: [ [0,0,0], [10,0,0] ]
-// coords[1]: [ [0,0,0], [5,0,2], [10,0,0] ]
-```
+## Output Arguments:
+- **`path_length`** (optional) — Absolute path length TX to RX; `[n_path]`
+- **`fbs_pos`** (optional) — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** (optional) — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA} in radians; `[n_path, 4]`
+- **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
+- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 MD!*/
 
-// Convert path interaction coordinates into FBS/LBS positions, path length and angles
 template <typename dtype>
 void quadriga_lib::coord2path(dtype Tx, dtype Ty, dtype Tz, dtype Rx, dtype Ry, dtype Rz,
                               const arma::u32_vec *no_interact, const arma::Mat<dtype> *interact_coord,
