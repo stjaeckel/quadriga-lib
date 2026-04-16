@@ -32,85 +32,46 @@ SECTION!*/
 
 /*!MD
 # ray_point_intersect
-Calculates the intersection of ray beams with points in three dimensions
+Calculate intersections of ray beams with points in 3D space
 
 ## Description:
-Unlike traditional ray tracing, where rays do not have a physical size, beam tracing models rays as
-beams with volume. Beams are defined by triangles whose vertices diverge as the beam extends. This
-approach is used to simulate a kind of divergence or spread in the beam, reminiscent of how radio
-waves spreads as they travel from a point source. The volumetric nature of the beams allows for more
-realistic modeling of energy distribution. As beams widen, the energy they carry can be distributed
-across their cross-sectional area, affecting the intensity of the interaction with surfaces.
-Unlike traditional ray tracing where intersections are line-to-geometry tests, beam tracing requires
-volumetric intersection tests. <br><br>
-
-- This function computes whether points in 3D Cartesian space are intersected by ray beams.
-- A ray beam is defined by a ray origin and a triangular wavefront formed by three directional vectors.
-- Returns a list of ray indices (0-based) that intersect with each point in the input point cloud.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 points in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_points >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Optional support for pre-segmented point clouds (e.g., using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>)
-  to reduce computational cost.
-- All internal computations use single precision for speed.
-- Recommended to use with small tube radius and well-distributed points for optimal accuracy.
+- Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
+- Returns, for each point, the list of 0-based ray indices whose beam intersects that point.
+- Throws if the requested kernel is unavailable at runtime.
+- Allowed datatypes: `float` or `double`; all internal computations use single precision.
 
 ## Declaration:
 ```
-template <typename dtype>
 std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
-                const arma::Mat<dtype> *points,
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *trivec,
-                const arma::Mat<dtype> *tridir,
-                const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::u32_vec *hit_count = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+    const arma::Mat<dtype> *points,
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *trivec,
+    const arma::Mat<dtype> *tridir,
+    const arma::u32_vec *sub_cloud_index = nullptr,
+    arma::u32_vec *hit_count = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***points**` (input)<br>
-  3D coordinates of the point cloud. Size: `[n_points, 3]`.
-
-- `const arma::Mat<dtype> ***orig**` (input)<br>
-  Ray origin positions in global coordinate system. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***trivec**` (input)<br>
-  The 3 vectors pointing from the center point of the ray at the ray origin to the vertices of
-  a triangular propagation tube (the beam), the values are in the order
-  `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[ no_ray, 9 ]`
-
-- `const arma::Mat<dtype> ***tridir**` (input)<br>
-  The directions of the vertex-rays. Size: `[ n_ray, 9 ]`, Values must be given in Cartesian
-  coordinates in the order  `[ d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z  ]`; The vector does
-  not need to be normalized.
-
-- `const arma::u32_vec ***sub_cloud_index** = nullptr` (optional input)<br>
-  Index vector to mark boundaries between point cloud segments (e.g. for SIMD optimization). Length: `[n_sub]`.
-  When using AVX2, sub-cloud start indices must be aligned to multiples of 8.
-
-- `arma::u32_vec ***hit_count** = nullptr` (optional output)<br>
-  Output array with number of rays that intersected each point. Length: `[n_points]`.
-
-- `int **use_kernel** = 0` (optional input)<br>
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- `int **gpu_id** = 0` (optional input)<br>
-  GPU device ID for CUDA kernel. Ignored when not using CUDA.
+## Input Arguments:
+- **`points`** — 3D point cloud coordinates; `[n_points, 3]`
+- **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
+- **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
+- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
+- **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [[point_cloud_segmentation]]); `[n_sub]`
+- **`hit_count`** *(optional)* — Output: number of rays intersecting each point; `[n_points]`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 10000` and a CUDA is available, else AVX2, else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ## Returns:
-- `std::vector<arma::u32_vec>`<br>
-  List of ray indices that intersected each point (0-based). Each entry in the returned vector corresponds to one point.
+- `std::vector<arma::u32_vec>` — Per-point list of 0-based ray indices that intersected that point; length `n_points`
 
 ## See also:
-- <a href="#icosphere">icosphere</a> (for generating beams)
-- <a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for generating point cloud segments)
-- <a href="#subdivide_rays">subdivide_rays</a> (for subdivides ray beams into sub beams)
-- <a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating intersection of rays and triangles)
-- <a href="#ray_mesh_interact">ray_mesh_interact</a> (for calculating interactions of beams and a 3D model)
+- [[icosphere]] (generate ray beams)
+- [[point_cloud_segmentation]] (generate sub-cloud index)
+- [[subdivide_rays]] (subdivide beams into sub-beams)
+- [[ray_triangle_intersect]] (ray–triangle intersection)
+- [[ray_mesh_interact]] (beam–mesh interaction)
 MD!*/
 
 template <typename dtype>
@@ -150,7 +111,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     size_t n_point_t = (size_t)points->n_rows;
     int n_ray_i = (int)n_ray_t;
 
-    // Bound chek
+    // Bound check
     if (n_point_t >= INT32_MAX)
         throw std::invalid_argument("Number of points exceeds maximum supported number.");
     if (n_ray_t >= INT32_MAX)
@@ -182,7 +143,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
     }
     else // Auto-select (use_kernel == 0)
     {
-        if (n_point_t >= 10000ULL && quadriga_lib::quadriga_lib_has_CUDA())
+        if (n_point_t >= 10000 && quadriga_lib::quadriga_lib_has_CUDA())
             kernel = 3;
         else if (quadriga_lib::quadriga_lib_has_AVX2())
             kernel = 2;
@@ -195,7 +156,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(const arma::Mat<dty
 
     // Check if the sub-cloud indices are valid
     size_t n_sub_t = 1;                                             // Number of sub-clouds (at least 1)
-    arma::u32_vec sci(1);                                           // Sub-cloud-index (local copy)
+    arma::u32_vec sci(1arma ::fill::zeros);                         // Sub-cloud-index (local copy)
     if (sub_cloud_index != nullptr && sub_cloud_index->n_elem != 0) // Input is available
     {
         n_sub_t = (size_t)sub_cloud_index->n_elem;
