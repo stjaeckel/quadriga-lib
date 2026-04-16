@@ -21,110 +21,6 @@
 #include <stdexcept>
 #include <string>
 
-/*!SECTION
-Miscellaneous / Tools
-SECTION!*/
-
-/*!MD
-# calc_angular_spreads_sphere
-Calculate azimuth and elevation angular spreads with spherical wrapping
-
-## Description:
-- Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
-- Inputs and outputs use `std::vector<arma::Col<dtype>>` so that each channel impulse response
-  (CIR) can have a different number of paths.
-- The RMS angular spread is computed as `sqrt(sum(pw .* d.^2))` where `d` are the wrapped
-  deviations from the circular mean. This is the second-moment definition used in 3GPP TR 38.901,
-  as opposed to the standard-deviation form `sqrt(E[d^2] - E[d]^2)`.
-- Uses spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
-  direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
-  on the equator before computing spreads.
-- Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread
-  despite energy being focused into a small solid angle). This method corrects for that.
-- Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
-  elevation spread, corresponding to the principal axes of the angular power distribution.
-- The bank angle is derived analytically from the eigenvectors of the 2x2 power-weighted
-  covariance matrix of the centered azimuth and elevation angles.
-- An optional quantization step can group nearby paths before computing the spread.
-- Setting `disable_wrapping` to true skips the rotation and computes spreads directly from the
-  raw azimuth and elevation angles (equivalent to treating them as independent 1D variables).
-  In this mode, the orientation output will be zero and phi/theta will equal the input az/el.
-
-## Declaration:
-```
-template <typename dtype>
-void quadriga_lib::calc_angular_spreads_sphere(
-    const std::vector<arma::Col<dtype>> &az,
-    const std::vector<arma::Col<dtype>> &el,
-    const std::vector<arma::Col<dtype>> &powers,
-    arma::Col<dtype> *azimuth_spread = nullptr,
-    arma::Col<dtype> *elevation_spread = nullptr,
-    arma::Mat<dtype> *orientation = nullptr,
-    std::vector<arma::Col<dtype>> *phi = nullptr,
-    std::vector<arma::Col<dtype>> *theta = nullptr,
-    bool disable_wrapping = false,
-    bool calc_bank_angle = true,
-    dtype quantize = (dtype)0);
-```
-
-## Arguments:
-- `const std::vector<arma::Col<dtype>> &**az**` (input)<br>
-  Azimuth angles in [rad], ranging from -pi to pi. Vector of length `n_cir`, each element has
-  length `n_path` (may differ per CIR).
-
-- `const std::vector<arma::Col<dtype>> &**el**` (input)<br>
-  Elevation angles in [rad], ranging from -pi/2 to pi/2. Vector of length `n_cir`, each element
-  has length `n_path` matching the corresponding element in `az`.
-
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)<br>
-  Path powers in [W]. Vector of length `n_cir`, each element has length `n_path` matching the
-  corresponding element in `az`.
-
-- `arma::Col<dtype> ***azimuth_spread** = nullptr` (optional output)<br>
-  RMS azimuth angular spread in [rad]. Length `[n_cir]`.
-
-- `arma::Col<dtype> ***elevation_spread** = nullptr` (optional output)<br>
-  RMS elevation angular spread in [rad]. Length `[n_cir]`.
-
-- `arma::Mat<dtype> ***orientation** = nullptr` (optional output)<br>
-  Power-weighted mean-angle orientation using aircraft principal axes: row 0 = bank angle,
-  row 1 = tilt angle, row 2 = heading angle, all in [rad]. Size `[3, n_cir]`.
-
-- `std::vector<arma::Col<dtype>> ***phi** = nullptr` (optional output)<br>
-  Rotated azimuth angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
-
-- `std::vector<arma::Col<dtype>> ***theta** = nullptr` (optional output)<br>
-  Rotated elevation angles in [rad]. Vector of length `n_cir`, each element has length `n_path`.
-
-- `bool **disable_wrapping** = false` (input)<br>
-  If true, skip the spherical rotation and compute spreads directly from raw angles. The
-  orientation output will be zero and phi/theta will equal the input az/el.
-
-- `bool **calc_bank_angle** = true` (input)<br>
-  If true, the optimal bank angle is computed analytically. Only used when `disable_wrapping`
-  is false.
-
-- `dtype **quantize** = 0` (input)<br>
-  Angular quantization step in [deg]. Paths within this angular distance are grouped and their
-  powers summed before computing the spread. Set to 0 to treat all paths independently.
-
-## Example:
-```
-std::vector<arma::vec> az(2), el(2), powers(2);
-az[0] = {0.1, -0.1, 0.05};              // CIR 0: 3 paths
-az[1] = {0.2, -0.2, 0.1, -0.1};         // CIR 1: 4 paths
-el[0] = {0.0, 0.0, 0.0};
-el[1] = {0.05, -0.05, 0.0, 0.0};
-powers[0] = {1.0, 1.0, 0.5};
-powers[1] = {2.0, 1.0, 1.5, 0.5};
-
-arma::vec as, es;
-arma::mat orient;
-quadriga_lib::calc_angular_spreads_sphere(az, el, powers, &as, &es, &orient);
-// as(0), as(1) contain the azimuth spreads for each CIR
-```
-MD!*/
-
 // --- Internal helper: 1D RMS angular spread with wrapping and optional quantization ---
 template <typename dtype>
 static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uword L, dtype quantize_rad)
@@ -208,20 +104,67 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
     return (E_phi2 > (dtype)0) ? std::sqrt(E_phi2) : (dtype)0;
 }
 
-// --- Main function ---
-template <typename dtype>
+/*!SECTION
+Miscellaneous / Tools
+SECTION!*/
+
+/*!MD
+# calc_angular_spreads_sphere
+Calculate azimuth and elevation angular spreads with spherical wrapping
+
+## Description:
+- Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
+- RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
+- Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
+- When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
+- When `disable_wrapping = true`, spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
+- When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads.
+- Allowed datatypes: float or double
+
+## Declaration:
+```
 void quadriga_lib::calc_angular_spreads_sphere(
     const std::vector<arma::Col<dtype>> &az,
     const std::vector<arma::Col<dtype>> &el,
     const std::vector<arma::Col<dtype>> &powers,
-    arma::Col<dtype> *azimuth_spread,
-    arma::Col<dtype> *elevation_spread,
-    arma::Mat<dtype> *orientation,
-    std::vector<arma::Col<dtype>> *phi_out,
-    std::vector<arma::Col<dtype>> *theta_out,
-    bool disable_wrapping,
-    bool calc_bank_angle,
-    dtype quantize)
+    arma::Col<dtype> *azimuth_spread = nullptr,
+    arma::Col<dtype> *elevation_spread = nullptr,
+    arma::Mat<dtype> *orientation = nullptr,
+    std::vector<arma::Col<dtype>> *phi = nullptr,
+    std::vector<arma::Col<dtype>> *theta = nullptr,
+    bool disable_wrapping = false,
+    bool calc_bank_angle = true,
+    dtype quantize = (dtype)0);
+```
+
+## Input Arguments:
+- **`az`** — Azimuth angles in [rad], range -pi to pi; `[n_cir]` vector, each element of length `n_path`
+- **`el`** — Elevation angles in [rad], range -pi/2 to pi/2; same structure as `az`
+- **`powers`** — Path powers in [W]; same structure as `az`
+- **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles
+- **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when `disable_wrapping = false`
+- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping
+
+## Output Arguments:
+- **`azimuth_spread`** *(optional)* — RMS azimuth spread in [rad], `[n_cir]`
+- **`elevation_spread`** *(optional)* — RMS elevation spread in [rad], `[n_cir]`
+- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading] in [rad], `[3, n_cir]`
+- **`phi`** *(optional)* — Rotated azimuth angles in [rad]; `[n_cir]` vector, each element of length `n_path`
+- **`theta`** *(optional)* — Rotated elevation angles in [rad]; same structure as `phi`
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::calc_angular_spreads_sphere(const std::vector<arma::Col<dtype>> &az,
+                                               const std::vector<arma::Col<dtype>> &el,
+                                               const std::vector<arma::Col<dtype>> &powers,
+                                               arma::Col<dtype> *azimuth_spread,
+                                               arma::Col<dtype> *elevation_spread,
+                                               arma::Mat<dtype> *orientation,
+                                               std::vector<arma::Col<dtype>> *phi_out,
+                                               std::vector<arma::Col<dtype>> *theta_out,
+                                               bool disable_wrapping,
+                                               bool calc_bank_angle,
+                                               dtype quantize)
 {
     arma::uword N = (arma::uword)az.size();
 
@@ -440,7 +383,6 @@ void quadriga_lib::calc_angular_spreads_sphere(
     }
 }
 
-// --- Explicit template instantiations ---
 template void quadriga_lib::calc_angular_spreads_sphere(
     const std::vector<arma::Col<float>> &, const std::vector<arma::Col<float>> &,
     const std::vector<arma::Col<float>> &,

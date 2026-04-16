@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,23 +23,15 @@ SECTION!*/
 
 /*!MD
 # calc_delay_spread
-Calculate the RMS delay spread in [s]
+Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
 ## Description:
-- Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding
-  linear-scale powers for each channel impulse response (CIR).
-- An optional power threshold in [dB] relative to the strongest path can be applied. Paths with
-  power below `p_max(dB) - threshold` are excluded from the calculation.
-- An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths
-  falling into the same delay bin are summed before computing the delay spread. This is useful
-  when the system bandwidth limits the time resolution (e.g. 50 ns at 20 MHz bandwidth).
-- When granularity is applied the function recursively calls itself on the binned power delay
-  profile.
-- Optionally returns the mean delay for each CIR.
+- Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; default threshold of 100 dB effectively includes all paths.
+- When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.
+- Allowed datatypes: float or double
 
 ## Declaration:
 ```
-template <typename dtype>
 arma::Col<dtype> quadriga_lib::calc_delay_spread(
     const std::vector<arma::Col<dtype>> &delays,
     const std::vector<arma::Col<dtype>> &powers,
@@ -48,37 +40,17 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
-## Arguments:
-- `const std::vector<arma::Col<dtype>> &**delays**` (input)<br>
-  Delays in [s]. A vector of length `n_cir`, where each element is an Armadillo column vector
-  of length `n_path` (the number of paths may differ per CIR).
+## Input Arguments:
+- **`delays`** — Delays in [s] per CIR; `[n_cir]` vector, each element a column vector of length `n_path`
+- **`powers`** — Path powers in linear scale [W]; same structure as `delays`
+- **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below threshold are excluded
+- **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping
 
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)<br>
-  Path powers on a linear scale [W]. Same structure as `delays`.
-
-- `dtype **threshold** = 100.0` (input)<br>
-  Power threshold in [dB] relative to the strongest path. Paths with power below
-  `max_power / 10^(0.1 * threshold)` are excluded. Default: 100 dB (effectively all paths).
-
-- `dtype **granularity** = 0.0` (input)<br>
-  Window size in [s] for grouping paths in the delay domain. Paths whose delays fall into the
-  same bin of width `granularity` have their powers summed. Default: 0 (no grouping).
-
-- `arma::Col<dtype> ***mean_delay** = nullptr` (optional output)<br>
-  Mean delay in [s] for each CIR. Length `[n_cir]`.
+## Output Arguments:
+- **`mean_delay`** *(optional)* — Mean delay in [s] per CIR, `[n_cir]`
 
 ## Returns:
-- `arma::Col<dtype> **ds**` (output)<br>
-  RMS delay spread in [s] for each CIR. Length `[n_cir]`.
-
-## Example:
-```
-std::vector<arma::vec> delays = { {0.0, 1e-6, 2e-6} };
-std::vector<arma::vec> powers = { {1.0, 0.5, 0.25} };
-arma::vec mean_delay;
-arma::vec ds = quadriga_lib::calc_delay_spread(delays, powers, 100.0, 0.0, &mean_delay);
-// ds(0) ≈ 0.6901e-6, mean_delay(0) ≈ 0.5714e-6
-```
+- RMS delay spread in [s] for each CIR, `[n_cir]`
 MD!*/
 
 template <typename dtype>
@@ -239,7 +211,6 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<dty
     return ds;
 }
 
-// --- Explicit template instantiation ---
 template arma::Col<float> quadriga_lib::calc_delay_spread(const std::vector<arma::Col<float>> &delays,
                                                           const std::vector<arma::Col<float>> &powers,
                                                           float threshold,

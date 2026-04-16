@@ -29,29 +29,17 @@ SECTION!*/
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
 ## Description:
-- Computes the aggregate cross-polarization ratio (XPR) from the polarization transfer matrices
-  of all channel impulse responses (CIRs) using the total-power-ratio method (Option B).
-- For each CIR, the total co-polarized and cross-polarized received powers are accumulated
-  across all qualifying paths, and the XPR is obtained as a single ratio of the totals.
-- This method is physically meaningful: it corresponds to what a receiver antenna measures as
-  the ratio of co-polarized to cross-polarized energy across the entire channel impulse response.
-- In addition to the linear V/H basis, the XPR is also computed in the circular LHCP/RHCP basis
-  by applying the unitary Jones matrix transformation M_circ = T * M_lin * T^-1.
-- The LOS path is identified by comparing each path's absolute length against the direct
-  TX-RX distance `dTR`. All paths with `path_length < dTR + window_size` are excluded from
-  the XPR calculation by default (controlled by `include_los`).
-- The polarization transfer matrix `M` is stored in column-major order with interleaved
-  real/imaginary parts: rows = [Re(M_vv), Im(M_vv), Re(M_hv), Im(M_hv), Re(M_vh), Im(M_vh),
-  Re(M_hh), Im(M_hh)], i.e., 8 rows per path.
-- `M` may or may not be normalized. Normalization does not affect the XPR since it cancels
-  in the ratio. However, it does affect the path gain output `pg`.
-- If the total cross-polarized power is zero and co-polarized power is positive (perfect
-  polarization isolation), the XPR is set to infinity. If both are zero (no qualifying paths),
-  the XPR is set to 0.
+- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio.
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via Jones matrix transform `M_circ = T * M_lin * T^-1`.
+- LOS paths are identified by comparing path length against direct TX-RX distance `dTR`; paths with `path_length < dTR + window_size` are excluded by default (`include_los = false`).
+- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary parts, 8 rows per path: `[Re(M_vv), Im(M_vv), Re(M_hv), Im(M_hv), Re(M_vh), Im(M_vh), Re(M_hh), Im(M_hh)]`.
+- Normalization of `M` does not affect XPR (cancels in ratio) but does affect `pg`.
+- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0.
+- TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`.
+- Allowed datatypes: float or double
 
 ## Declaration:
 ```
-template <typename dtype>
 void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<dtype>> &powers,
     const std::vector<arma::Mat<dtype>> &M,
@@ -64,83 +52,41 @@ void quadriga_lib::calc_cross_polarization_ratio(
     dtype window_size = 0.01);
 ```
 
-## Arguments:
-- `const std::vector<arma::Col<dtype>> &**powers**` (input)<br>
-  Path powers in Watts. Vector of length `[n_cir]`, each element is a column vector of length `[n_path]`.
+## Input Arguments:
+- **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
+- **`M`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
+- **`path_length`** — Absolute TX-to-RX path lengths in [m]; same structure as `powers`
+- **`tx_pos`** — Transmitter position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`rx_pos`** — Receiver position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR calculation
+- **`window_size`** *(optional)* — LOS exclusion window in [m]; paths within `dTR + window_size` are excluded when `include_los = false`
 
-- `const std::vector<arma::Mat<dtype>> &**M**` (input)<br>
-  Polarization transfer matrices. Vector of length `[n_cir]`, each element is a matrix of size `[8, n_path]`
-  with interleaved real/imaginary parts in column-major order.
+## Output Arguments:
+- **`xpr`** *(optional)* — XPR on linear scale, `[n_cir, 6]`; columns:
 
-- `const std::vector<arma::Col<dtype>> &**path_length**` (input)<br>
-  Absolute path length from TX to RX phase center in meters. Vector of length `[n_cir]`,
-  each element is a column vector of length `[n_path]`.
+  | Col | Description |
+  |-----|-------------|
+  | 0 | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol) |
+  | 1 | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2) |
+  | 2 | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2) |
+  | 3 | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+  | 4 | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2) |
+  | 5 | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2) |
 
-- `const arma::Mat<dtype> &**tx_pos**` (input)<br>
-  Transmitter position in Cartesian coordinates. Size `[3, 1]` (fixed TX) or `[3, n_cir]` (mobile TX).
-
-- `const arma::Mat<dtype> &**rx_pos**` (input)<br>
-  Receiver position in Cartesian coordinates. Size `[3, 1]` (fixed RX) or `[3, n_cir]` (mobile RX).
-
-- `arma::Mat<dtype> ***xpr** = nullptr` (optional output)<br>
-  Cross-polarization ratio in linear scale. Size `[n_cir, 6]` with columns:<br>
-  0 = Aggregate linear XPR (total V+H co-pol / total V+H cross-pol),<br>
-  1 = V-XPR (|M_vv|^2 / |M_hv|^2, power-summed over paths),<br>
-  2 = H-XPR (|M_hh|^2 / |M_vh|^2, power-summed over paths),<br>
-  3 = Aggregate circular XPR (total L+R co-pol / total L+R cross-pol),<br>
-  4 = LHCP XPR (|M_LL|^2 / |M_RL|^2, power-summed over paths),<br>
-  5 = RHCP XPR (|M_RR|^2 / |M_LR|^2, power-summed over paths).
-
-- `arma::Col<dtype> ***pg** = nullptr` (optional output)<br>
-  Total path gain computed over all paths (including LOS). Length `[n_cir]`.
-  Calculated as the sum of `powers[p] * (|M_vv|^2 + |M_hv|^2 + |M_vh|^2 + |M_hh|^2)` over all paths.
-
-- `bool **include_los** = false` (input)<br>
-  If `true`, include LOS and near-LOS paths in the XPR calculation.
-  If `false` (default), exclude paths with `path_length < dTR + window_size`.
-
-- `dtype **window_size** = 0.01` (input)<br>
-  LOS window size in meters. Paths within `dTR + window_size` of the direct path are excluded
-  from the XPR calculation when `include_los` is `false`. Default is 0.01 m (1 cm).
-
-## Example:
-```
-#include "quadriga_channel.hpp"
-
-// Single CIR with 3 paths
-arma::vec pw = {1.0, 0.5, 0.3};
-arma::mat M(8, 3);
-M.col(0) = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}; // LOS: diagonal
-M.col(1) = {0.9, 0.0, 0.1, 0.0, 0.1, 0.0, 0.8, 0.0};   // NLOS
-M.col(2) = {0.7, 0.0, 0.2, 0.0, 0.15, 0.0, 0.6, 0.0};   // NLOS
-
-arma::vec pl = {10.0, 12.0, 15.0};
-arma::mat tx(3, 1); tx.col(0) = {0.0, 0.0, 0.0};
-arma::mat rx(3, 1); rx.col(0) = {10.0, 0.0, 0.0};
-
-std::vector<arma::vec> powers_vec = {pw};
-std::vector<arma::mat> M_vec = {M};
-std::vector<arma::vec> pl_vec = {pl};
-
-arma::mat xpr;
-arma::vec pg;
-
-quadriga_lib::calc_cross_polarization_ratio(powers_vec, M_vec, pl_vec, tx, rx, &xpr, &pg);
-// xpr has size [1, 6], pg has size [1]
-```
+- **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as 
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`, `[n_cir]`
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::calc_cross_polarization_ratio(
-    const std::vector<arma::Col<dtype>> &powers,
-    const std::vector<arma::Mat<dtype>> &M,
-    const std::vector<arma::Col<dtype>> &path_length,
-    const arma::Mat<dtype> &tx_pos,
-    const arma::Mat<dtype> &rx_pos,
-    arma::Mat<dtype> *xpr,
-    arma::Col<dtype> *pg,
-    bool include_los,
-    dtype window_size)
+void quadriga_lib::calc_cross_polarization_ratio(const std::vector<arma::Col<dtype>> &powers,
+                                                 const std::vector<arma::Mat<dtype>> &M,
+                                                 const std::vector<arma::Col<dtype>> &path_length,
+                                                 const arma::Mat<dtype> &tx_pos,
+                                                 const arma::Mat<dtype> &rx_pos,
+                                                 arma::Mat<dtype> *xpr,
+                                                 arma::Col<dtype> *pg,
+                                                 bool include_los,
+                                                 dtype window_size)
 {
     // --- Input validation ---
     arma::uword n_cir = (arma::uword)powers.size();
@@ -243,7 +189,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
             P_total += path_power;
 
             // Exclude LOS / near-LOS paths from XPR if requested
-            if (!include_los && pL[p] < threshold)
+            if (!include_los && pL[p] <= threshold)
                 continue;
 
             // --- Linear basis ---
@@ -320,7 +266,6 @@ void quadriga_lib::calc_cross_polarization_ratio(
     }
 }
 
-// --- Explicit template instantiation ---
 template void quadriga_lib::calc_cross_polarization_ratio(
     const std::vector<arma::Col<float>> &powers,
     const std::vector<arma::Mat<float>> &M,
