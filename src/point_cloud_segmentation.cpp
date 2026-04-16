@@ -26,61 +26,41 @@ SECTION!*/
 Reorganize a point cloud into spatial sub-clouds for efficient processing
 
 ## Description:
-- Recursively partitions a 3D point cloud into smaller sub-clouds, each below a given size threshold.
-- Sub-clouds are aligned to a specified SIMD vector size (e.g., for AVX or CUDA), with padding if necessary.
-- Outputs (`pointsR`) a reorganized version of the input points that groups points by sub-cloud.
-- Also produces forward and reverse index maps to track the reordering of points.
-- Useful for optimizing spatial processing tasks such as bounding volume hierarchies or GPU batch execution.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Recursively partitions a 3D point cloud into sub-clouds by splitting along bounding box axes at the midpoint.
+- Sub-clouds can be padded to a multiple of `vec_size` for SIMD alignment; padding points are placed at the sub-cloud AABB center.
+- Produces a reorganized point array and index maps to track reordering.
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::uword quadriga_lib::point_cloud_segmentation(
-                const arma::Mat<dtype> *points,
-                arma::Mat<dtype> *pointsR,
-                arma::u32_vec *sub_cloud_index,
-                arma::uword target_size = 1024,
-                arma::uword vec_size = 1,
-                arma::u32_vec *forward_index = nullptr,
-                arma::u32_vec *reverse_index = nullptr);
+    const arma::Mat<dtype> *points,
+    arma::Mat<dtype> *pointsR,
+    arma::u32_vec *sub_cloud_index,
+    arma::uword target_size = 1024,
+    arma::uword vec_size = 1,
+    arma::u32_vec *forward_index = nullptr,
+    arma::u32_vec *reverse_index = nullptr);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***points**` (input)<br>
-  Original 3D point cloud to be segmented. Size: `[n_points, 3]`.
+## Input Arguments:
+- **`points`** — Original 3D point cloud; `[n_points, 3]`
+- **`target_size`** *(optional)* — Maximum points per sub-cloud before padding
+- **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`
 
-- `arma::Mat<dtype> ***pointsR**` (output)<br>
-  Reorganized point cloud with points grouped by sub-cloud. Size: `[n_pointsR, 3]`.
-
-- `arma::u32_vec ***sub_cloud_index**` (output)<br>
-  Vector of starting indices (0-based) for each sub-cloud within `pointsR`. Length: `[n_sub]`.
-
-- `arma::uword **target_size** = 1024` (optional input)<br>
-  Maximum number of elements allowed per sub-cloud (before padding). Default: `1024`.
-
-- `arma::uword **vec_size** = 1` (optional input)<br>
-  Vector alignment size for SIMD or CUDA. The number of points in each sub-cloud is padded to a multiple of this value. Default: `1`.
-
-- `arma::u32_vec ***forward_index** = nullptr` (optional output)<br>
-  Index map from original `points` to reorganized `pointsR` (1-based). Size: `[n_pointsR]`. Padding indices are `0`.
-
-- `arma::u32_vec ***reverse_index** = nullptr` (optional output)<br>
-  Index map from `pointsR` back to original `points` (0-based). Size: `[n_points]`.
+## Output Arguments:
+- **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
+- **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
+- **`forward_index`** *(optional)* — 1-based index map from `points` to `pointsR`; padding entries are `0`; `[n_pointsR]`
+- **`reverse_index`** *(optional)* — 0-based index map from `pointsR` back to `points`; `[n_points]`
 
 ## Returns:
-- `arma::uword`<br>
-  Number of generated sub-clouds, `n_sub`.
-
-## Technical Notes:
-- Sub-clouds are formed using recursive spatial splitting (e.g., median-split along bounding box axes).
-- Padding points are placed at the AABB center of the corresponding sub-cloud and can be ignored in processing.
-- This function is typically used as a preprocessing step for GPU acceleration or bounding volume hierarchy (BVH) generation.
-- If `vec_size = 1`, no padding is applied and all output maps contain valid indices only.
+- Number of generated sub-clouds `n_sub`
 
 ## See also:
-- <a href="#point_cloud_aabb">point_cloud_aabb</a>
-- <a href="#point_cloud_split">point_cloud_split</a>
-- <a href="#ray_point_intersect">ray_point_intersect</a>
+- [[point_cloud_aabb]] (bounding box computation)
+- [[point_cloud_split]] (related spatial splitting)
+- [[ray_point_intersect]] (downstream use case)
 MD!*/
 
 // Reorganize a point cloud into smaller sub-clouds for faster processing
