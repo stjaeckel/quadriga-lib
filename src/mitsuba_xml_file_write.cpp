@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -80,69 +80,43 @@ SECTION!*/
 
 /*!MD
 # mitsuba_xml_file_write
-Write geometry and material data to a Mitsuba 3 XML scene file.
+Write a triangular mesh to a Mitsuba 3 XML scene file
 
 ## Description:
-This routine converts a triangular surface mesh stored in *quadriga-lib* data structures into the
-XML format understood by **Mitsuba 3** <a href="https://www.mitsuba-renderer.org">www.mitsuba-renderer.org</a>.
-The generated file can be loaded directly by **NVIDIA Sionna RT** for differentiable radio-propagation
-simulations.<br><br>
-
-- Converts a 3D geometry mesh into Mitsuba 3 XML format for use with rendering tools.
-- Enables exporting models from `quadriga-lib` to be used with **Mitsuba 3** or **Sionna RT**:
-- <a href="https://www.mitsuba-renderer.org">Mitsuba 3</a>: Research-oriented retargetable rendering system.
-- <a href="https://developer.nvidia.com/sionna">NVIDIA Sionna</a>: Hardware-accelerated differentiable ray tracer for wireless propagation, built on Mitsuba 3.
-- Supports grouping faces into named objects and assigning materials by name.
-- Optionally maps materials to ITU default presets used by Sionna RT.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for differentiable radio-propagation simulations
+- Supports grouping faces into named objects with per-face material assignments
+- Optionally maps material names to ITU-defined presets used by Sionna RT
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; both the XML and the mesh folder must be distributable together
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 void quadriga_lib::mitsuba_xml_file_write(
-                const std::string &fn,
-                const arma::Mat<dtype> &vert_list,
-                const arma::umat &face_ind,
-                const arma::uvec &obj_ind,
-                const arma::uvec &mtl_ind,
-                const std::vector<std::string> &obj_names,
-                const std::vector<std::string> &mtl_names,
-                const arma::Mat<dtype> &bsdf = {},
-                bool map_to_itu_materials = false);
-
+    const std::string &fn,
+    const arma::Mat<dtype> &vert_list,
+    const arma::umat &face_ind,
+    const arma::uvec &obj_ind,
+    const arma::uvec &mtl_ind,
+    const std::vector<std::string> &obj_names,
+    const std::vector<std::string> &mtl_names,
+    const arma::Mat<dtype> &bsdf = {},
+    bool map_to_itu_materials = false);
 ```
 
-## Arguments:
-- `const std::string **fn**` (input)<br>
-  Output file name (including path and `.xml` extension).
-
-- `const arma::Mat<dtype> **vert_list**` (input)<br>
-  Vertex list, size `[n_vert, 3]`, each row is a vertex (x, y, z) in Cartesian coordinates [m].
-
-- `const arma::umat **face_ind**` (input)<br>
-  Face indices (0-based), size `[n_mesh, 3]`, each row defines a triangle via vertex indices.
-
-- `const arma::uvec **obj_ind**` (input)<br>
-  Object indices (1-based), size `[n_mesh]`. Assigns each triangle to an object.
-
-- `const arma::uvec **mtl_ind**` (input)<br>
-  Material indices (1-based), size `[n_mesh]`. Assigns each triangle to a material.
-
-- `const std::vector<std::string> **obj_names**` (input)<br>
-  Names of objects. Length must be equal to `max(obj_ind)`.
-
-- `const std::vector<std::string> **mtl_names**` (input)<br>
-  Names of materials. Length must be equal to `max(mtl_ind)`.
-
-- `const arma::Mat<dtype> **bsdf** = {}` (optional input)<br>
-  Material reflectivity data (BSDF parameters), size `[mtl_names.size(), 17]`. If omitted, the `null` BSDF is used.
-  Note that Sionna RT ignores all BSDF parameters. They are only used by the Mitsuma rendering system.
-  See [[obj_file_read]] for a definition of the data fields.
-
-- `bool **map_to_itu_materials** = false` (optional input)<br>
-  If true, maps material names to ITU-defined presets used by Sionna RT. Default: `false`
+## Input Arguments:
+- **`fn`** — Output file path including `.xml` extension
+- **`vert_list`** — Vertex coordinates (x, y, z) in meters; `[n_vert, 3]`
+- **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
+- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; `[n_mesh]`
+- **`obj_names`** — Object names; length must equal `max(obj_ind)`
+- **`mtl_names`** — Material names; length must equal `max(mtl_ind)`
+- **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`
+- **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
 ## See also:
-- [[obj_file_read]]
+- [[obj_file_read]] (source for mesh data and BSDF field layout)
 MD!*/
 
 template <typename dtype>
@@ -185,7 +159,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         throw std::invalid_argument("Found " + std::to_string(vert_list.n_rows) + " vertices, but expected " + std::to_string(n_vert) + ".");
 
     if (vert_list.n_cols != 3)
-        throw std::invalid_argument("Vertex list mit have 3 columns.");
+        throw std::invalid_argument("Vertex list must have 3 columns.");
 
     // Fix invalid characters in obj names
     std::vector<std::string> obj_names_valid;
@@ -223,7 +197,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         if (bsdf.n_rows != n_mtl)
             throw std::invalid_argument("Found " + std::to_string(bsdf.n_rows) + " BSDF entries, but expected " + std::to_string(n_mtl) + ".");
         if (bsdf.n_cols != 17)
-            throw std::invalid_argument("BSDF Matrix mit have 17 columns.");
+            throw std::invalid_argument("BSDF Matrix must have 17 columns.");
         use_bsdf = true;
     }
 
@@ -355,7 +329,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
 
         std::ofstream fileW(ply_file, std::ios::out | std::ios::binary);
         if (!fileW.is_open())
-            throw std::runtime_error("Cannot open file '" + ply_file.string() + "'for writing.");
+            throw std::runtime_error("Cannot open file '" + ply_file.string() + "' for writing.");
 
         std::string bin_data = "ply\nformat binary_little_endian 1.0\ncomment Created by Quadriga-Lib " + quadriga_lib::quadriga_lib_version() + "\n";
         fileW.write(bin_data.c_str(), bin_data.size());
@@ -385,7 +359,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         arma::u32_mat ply_vert_idx(n_faces, 3);
         for (const auto &i_vert : unique_vert_idx)
         {
-            if (i_vert > n_vert)
+            if (i_vert >= n_vert)
                 throw std::runtime_error("Vertex list out of bound. This should not happen! Ever!");
 
             float x = (float)vert_list.at(i_vert, 0);
@@ -599,7 +573,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         arma::uvec face_idx = arma::find(obj_ind_local == i_obj + 1, 1);
         arma::uword mtl_idx = mtl_ind_local.at(face_idx.at(0));
 
-        if (mtl_idx - 1 > n_mtl)
+        if (mtl_idx - 1 >= n_mtl)
             throw std::runtime_error("Material index out of bound. This should not happen! Ever!");
 
         auto node_ref = node_shape.append_child("ref");
