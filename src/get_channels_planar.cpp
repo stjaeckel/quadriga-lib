@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include <stdexcept>
-#include <cstring>   // std::memcopy
+#include <cstring>   // std::memcpy
 #include <iomanip>   // std::setprecision
 #include <algorithm> // std::replace
 #include <iostream>
@@ -31,102 +31,69 @@ SECTION!*/
 
 /*!MD
 # get_channels_planar
-Calculate channel coefficients for planar waves
+Calculate MIMO channel coefficients for planar wave paths
 
 ## Description:
-- Calculates MIMO channel coefficients and delays for a set of planar wave paths between two antenna arrays.
-- Interpolates antenna patterns (including orientation and polarization) for both transmitter and receiver arrays.
-- Supports LOS path identification based on distance (angles are ignored).
-- Polarization transfer matrix models polarization coupling and must be normalized.
-- Doppler weights can optionally be calculated from receiver motion relative to path direction.
-- Element positions and antenna orientation are fully considered for delay and phase.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
+- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
+- LOS path detection is distance-based (angles ignored).
+- Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
+- If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
+- Setting `center_frequency = 0` disables phase calculation (delays still computed).
+- `use_absolute_delays = false` subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 void quadriga_lib::get_channels_planar(
-                const arrayant<dtype> *tx_array,
-                const arrayant<dtype> *rx_array,
-                dtype Tx, dtype Ty, dtype Tz,
-                dtype Tb, dtype Tt, dtype Th,
-                dtype Rx, dtype Ry, dtype Rz,
-                dtype Rb, dtype Rt, dtype Rh,
-                const arma::Col<dtype> *aod,
-                const arma::Col<dtype> *eod,
-                const arma::Col<dtype> *aoa,
-                const arma::Col<dtype> *eoa,
-                const arma::Col<dtype> *path_gain,
-                const arma::Col<dtype> *path_length,
-                const arma::Mat<dtype> *M,
-                arma::Cube<dtype> *coeff_re,
-                arma::Cube<dtype> *coeff_im,
-                arma::Cube<dtype> *delay,
-                dtype center_frequency = dtype(0.0),
-                bool use_absolute_delays = false,
-                bool add_fake_los_path = false,
-                arma::Col<dtype> *rx_Doppler = nullptr);
+    const quadriga_lib::arrayant<dtype> *tx_array,
+    const quadriga_lib::arrayant<dtype> *rx_array,
+    dtype Tx, dtype Ty, dtype Tz,
+    dtype Tb, dtype Tt, dtype Th,
+    dtype Rx, dtype Ry, dtype Rz,
+    dtype Rb, dtype Rt, dtype Rh,
+    const arma::Col<dtype> *aod,
+    const arma::Col<dtype> *eod,
+    const arma::Col<dtype> *aoa,
+    const arma::Col<dtype> *eoa,
+    const arma::Col<dtype> *path_gain,
+    const arma::Col<dtype> *path_length,
+    const arma::Mat<dtype> *M,
+    arma::Cube<dtype> *coeff_re,
+    arma::Cube<dtype> *coeff_im,
+    arma::Cube<dtype> *delay,
+    dtype center_frequency = dtype(0.0),
+    bool use_absolute_delays = false,
+    bool add_fake_los_path = false,
+    arma::Col<dtype> *rx_Doppler = nullptr);
 ```
 
-## Arguments:
-- `const arrayant<dtype> ***tx_array**` (input)<br>
-  Pointer to the transmit antenna array object (with `n_tx` elements).
+## Input Arguments:
+- **`tx_array`** — Transmit antenna array; `n_tx` elements
+- **`rx_array`** — Receive antenna array; `n_rx` elements
+- **`Tx, Ty, Tz`** — Transmitter position in meters
+- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading in radians
+- **`Rx, Ry, Rz`** — Receiver position in meters
+- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading in radians
+- **`aod`** — Departure azimuth angles in radians, `[n_path]`
+- **`eod`** — Departure elevation angles in radians, `[n_path]`
+- **`aoa`** — Arrival azimuth angles in radians, `[n_path]`
+- **`eoa`** — Arrival elevation angles in radians, `[n_path]`
+- **`path_gain`** — Path gains in linear scale, `[n_path]`
+- **`path_length`** — Path lengths from TX to RX phase center in meters, `[n_path]`
+- **`M`** — Polarization transfer matrix, row order: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH; `[8, n_path]`
+- **`center_frequency`** *(optional)* — Center frequency in Hz; 0 disables phase calculation
+- **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
+- **`add_fake_los_path`** *(optional)* — Append a zero-power LOS path when no LOS is present
 
-- `const arrayant<dtype> ***rx_array**` (input)<br>
-  Pointer to the receive antenna array object (with `n_rx` elements).
+## Output Arguments:
+- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
+- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
+- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path(+1)]`
+- **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; positive = moving toward path, negative = away; `[n_path(+1)]`
 
-- `dtype **Tx**, **Ty**, **Tz**` (input)<br>
-  Transmitter position in Cartesian coordinates [m].
-
-- `dtype **Tb**, **Tt**, **Th**` (input)<br>
-  Transmitter orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `dtype **Rx**, **Ry**, **Rz**` (input)<br>
-  Receiver position in Cartesian coordinates [m].
-
-- `dtype **Rb**, **Rt**, **Rh**` (input)<br>
-  Receiver orientation (Euler) angles (bank, tilt, head) in [rad].
-
-- `const arma::Col<dtype> ***aod**` (input)<br>
-  Departure azimuth angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***eod**` (input)<br>
-  Departure elevation angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***aoa**` (input)<br>
-  Arrival azimuth angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***eoa**` (input)<br>
-  Arrival elevation angles in radians, Length `n_path`.
-
-- `const arma::Col<dtype> ***path_gain**` (input)<br>
-  Path gains in linear scale, Length `n_path`.
-
-- `const arma::Col<dtype> ***path_length**` (input)<br>
-  Path lengths from TX to RX phase center, Length `n_path`.
-
-- `const arma::Mat<dtype> ***M**` (input)<br>
-  Polarization transfer matrix of size `[8, n_path]`, interleaved: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH).
-
-- `arma::Cube<dtype> ***coeff_re**` (output)<br>
-  Real part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `arma::Cube<dtype> ***coeff_im**` (output)<br>
-  Imaginary part of channel coefficients, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `arma::Cube<dtype> ***delay**` (output)<br>
-  Propagation delays in seconds, Size `[n_rx, n_tx, n_path(+1)]`.
-
-- `dtype **center_frequency** = 0.0` (optional input)<br>
-  Center frequency in Hz; set to 0 to disable phase calculation. Default: `0.0`
-
-- `bool **use_absolute_delays** = false` (optional input)<br>
-  If true, includes LOS delay in all paths. Default: `false`
-
-- `bool **add_fake_los_path** = false` (optional input)<br>
-  Adds a zero-power LOS path if no LOS is present. Default: `false`
-
-- `arma::Col<dtype> ***rx_Doppler** = nullptr` (optional output)<br>
-  Doppler weights for moving RX, Length `n_path(+1)`. Positive = towards path, Negative = away.
+## See also:
+- [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
 MD!*/
 
 // Calculate channel coefficients for planar waves
@@ -252,7 +219,9 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         AOA_loc.set_size(n_rx, n_path);
         EOA_loc.set_size(n_rx, n_path);
         if (rx_Doppler->n_elem != n_out)
-            rx_Doppler->set_size(n_out);
+            rx_Doppler->zeros(n_out);
+        else if (add_fake_los_path)
+            rx_Doppler->at(0) = zero;
     }
 
     arma::Col<unsigned> i_element(n_tx, arma::fill::none);
@@ -310,10 +279,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
         dtype *pPt = Pt.colptr(i), *pPr = Pr.colptr(i);
 
         dtype path_amplitude = add_fake_los_path && j == 0ULL ? zero : std::sqrt(p_gain[i]);
-        dtype path_length = add_fake_los_path && j == 0ULL ? dist_rx_tx : p_length[i];
+        dtype path_length_local = add_fake_los_path && j == 0ULL ? dist_rx_tx : p_length[i];
 
         // LOS path detection
-        if (std::abs(path_length - dist_rx_tx) < los_limit && add_fake_los_path && j != 0ULL && p_gain[i] > true_los_power)
+        if (std::abs(path_length_local - dist_rx_tx) < los_limit && add_fake_los_path && j != 0ULL && p_gain[i] > true_los_power)
             true_los_path = j, true_los_power = p_gain[i];
 
         arma::uword O = j * n_links; // Slice offset
@@ -333,7 +302,7 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
                 im += pVrr[r] * pM[5] * pHtr[t] + pVri[r] * pM[4] * pHtr[t] + pVrr[r] * pM[4] * pHti[t] - pVri[r] * pM[5] * pHti[t];
                 im += pHrr[r] * pM[7] * pHtr[t] + pHri[r] * pM[6] * pHtr[t] + pHrr[r] * pM[6] * pHti[t] - pHri[r] * pM[7] * pHti[t];
 
-                dtype dl = pPt[t] + path_length + pPr[r];
+                dtype dl = pPt[t] + path_length_local + pPr[r];
                 dtype phase = wave_number * std::fmod(dl, wavelength);
                 dtype cp = std::cos(phase), sp = std::sin(phase);
 
@@ -348,14 +317,23 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
     // Set the true LOS path as the first path
     if (add_fake_los_path && true_los_path != 0ULL)
     {
+        // --- coefficient swap ---
         dtype *ptrR = different_output_size ? CR.slice_memptr(true_los_path) : coeff_re->slice_memptr(true_los_path);
         dtype *ptrI = different_output_size ? CI.slice_memptr(true_los_path) : coeff_im->slice_memptr(true_los_path);
-
         std::memcpy(p_coeff_re, ptrR, n_links * sizeof(dtype));
         std::memcpy(p_coeff_im, ptrI, n_links * sizeof(dtype));
-
         for (arma::uword i = 0ULL; i < n_links; ++i)
             ptrR[i] = zero, ptrI[i] = zero;
+
+        // --- delay swap ---
+        dtype *ptrD = different_output_size ? DL.slice_memptr(true_los_path) : delay->slice_memptr(true_los_path);
+        std::vector<dtype> tmp(p_delays, p_delays + n_links);   // save slot-0 delays
+        std::memcpy(p_delays, ptrD, n_links * sizeof(dtype));   // copy true-LOS delays to slot 0
+        std::memcpy(ptrD, tmp.data(), n_links * sizeof(dtype)); // put old slot-0 delays at true_los_path
+
+        // --- Doppler swap ---
+        if (rx_Doppler != nullptr)
+            std::swap(rx_Doppler->at(0), rx_Doppler->at(true_los_path));
     }
 
     // Apply antenna element coupling
@@ -377,10 +355,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
 
                 // Apply coupling to coefficients
                 qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
-                                             &p_coeff_re[o], &p_coeff_im[o],
-                                             tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
-                                             coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
-                                             n_rx, n_rx_ports, n_tx, n_tx_ports);
+                                          &p_coeff_re[o], &p_coeff_im[o],
+                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                          coeff_re->slice_memptr(j), coeff_im->slice_memptr(j),
+                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                 // Apply coupling to delays
                 qd_multiply_3_mat(p_rx_cpl, &p_delays[o], p_tx_cpl, delay->slice_memptr(j), n_rx, n_rx_ports, n_tx, n_tx_ports);
@@ -396,10 +374,10 @@ void quadriga_lib::get_channels_planar(const quadriga_lib::arrayant<dtype> *tx_a
             {
                 // Apply coupling to coefficients
                 qd_multiply_3_complex_mat(rx_array->coupling_re.memptr(), rx_array->coupling_im.memptr(),
-                                             &p_coeff_re[o], &p_coeff_im[o],
-                                             tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
-                                             tempX, tempY,
-                                             n_rx, n_rx_ports, n_tx, n_tx_ports);
+                                          &p_coeff_re[o], &p_coeff_im[o],
+                                          tx_array->coupling_re.memptr(), tx_array->coupling_im.memptr(),
+                                          tempX, tempY,
+                                          n_rx, n_rx_ports, n_tx, n_tx_ports);
 
                 std::memcpy(&p_coeff_re[o], tempX, n_ports * sizeof(dtype));
                 std::memcpy(&p_coeff_im[o], tempY, n_ports * sizeof(dtype));
