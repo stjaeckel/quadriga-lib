@@ -23,50 +23,34 @@ SECTION!*/
 
 /*!MD
 # point_cloud_aabb
-Compute the Axis-Aligned Bounding Boxes (AABB) of a 3D point cloud
+Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
 ## Description:
-- Calculates the axis-aligned bounding box (AABB) for either a single point cloud or a set of sub-clouds.
-- Each sub-cloud is defined by its starting row index in the input matrix.
-- The result is a matrix where each row contains the minimum and maximum extents of a sub-cloud in the x, y, and z dimensions.
-- For SIMD-friendly memory alignment, the result is zero-padded to the nearest multiple of `vec_size`.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
+- If `sub_cloud_index` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
+- Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
-                const arma::Mat<dtype> *points,
-                const arma::u32_vec *sub_cloud_index = nullptr,
-                arma::uword vec_size = 1);
+    const arma::Mat<dtype> *points,
+    const arma::u32_vec *sub_cloud_index = nullptr,
+    arma::uword vec_size = 1);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***points**` (input)<br>
-  Matrix of 3D point coordinates. Size: `[n_points, 3]`.
-
-- `const arma::u32_vec ***sub_cloud_index** = nullptr` (optional input)<br>
-  Vector of row indices indicating the start of each sub-cloud. Length: `[n_sub]`.
-  If `nullptr`, the entire input is treated as a single cloud.
-
-- `arma::uword **vec_size** = 1` (optional input)<br>
-  Vector size for SIMD alignment (e.g., 4, 8, or 16). The number of output rows is padded to a multiple of `vec_size`.
-  Default: `1`.
+## Input Arguments:
+- **`points`** — 3D point coordinates; `[n_points, 3]`
+- **`sub_cloud_index`** *(optional)* — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] to generate; `[n_sub]`
+- **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)
 
 ## Returns:
-- `arma::Mat<dtype>`<br>
-  Matrix of bounding boxes for each sub-cloud. Size: `[n_out, 6]`, where `n_out` is the padded number of sub-clouds.
-  Each row has the format: `[x_min, x_max, y_min, y_max, z_min, z_max]`.
-
-## Technical Notes:
-- If `sub_cloud_index` is provided, the last index is assumed to span to the end of the `points` matrix.
-- Padding rows (if any) are filled with zeros and should be ignored if `n_sub` is known externally.
-- Suitable for preprocessing in geometry analysis, rendering pipelines, and spatial acceleration structures (e.g., BVH or octrees).
-- Sub-clouds can be computed using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>
+- Bounding box matrix; `[n_out, 6]` where `n_out` is `n_sub` padded to a multiple of `vec_size`
 
 ## See also:
-- <a href="#point_cloud_segmentation">point_cloud_segmentation</a>
-- <a href="#point_cloud_split">point_cloud_split</a>
-- <a href="#ray_point_intersect">ray_point_intersect</a>
+- [[point_cloud_segmentation]] (generate sub-cloud indices)
+- [[point_cloud_split]] (split point cloud)
+- [[ray_point_intersect]] (use AABBs for intersection)
 MD!*/
 
 template <typename dtype>
@@ -95,9 +79,6 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(const arma::Mat<dtype> *points,
     if (sub_cloud_index != nullptr && sub_cloud_index->n_elem > 0)
     {
         n_sub = (arma::uword)sub_cloud_index->n_elem;
-        if (n_sub == 0)
-            throw std::invalid_argument("Input 'sub_cloud_index' must have at least one element.");
-
         p_sub = sub_cloud_index->memptr();
 
         if (*p_sub != 0U)
