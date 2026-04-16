@@ -301,8 +301,7 @@ TEST_CASE("IEEE Chan - B + 3user + Floors and Distances")
     CHECK(std::abs(p[3] + 3.20) < 0.01); // p = 3, c = 2
 
     // Check LOS steering matrix (should only contain phasors multiplied by path gain)
-    arma::cx_mat S;
-    quadriga_lib::complex_cast(chan[0].coeff_re[0].slice(0), chan[0].coeff_im[0].slice(0), S);
+    arma::cx_mat S = arma::cx_mat(chan[0].coeff_re[0].slice(0), chan[0].coeff_im[0].slice(0));
 
     arma::mat A = arma::abs(S);
     A /= std::sqrt(chan[0].path_gain[0][0]);
