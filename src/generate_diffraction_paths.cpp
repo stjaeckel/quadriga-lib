@@ -24,76 +24,49 @@ SECTION!*/
 
 /*!MD
 # generate_diffraction_paths
-Generate propagation paths for estimating the diffraction gain
+Generate elliptic propagation paths and weights for diffraction gain estimation
 
 ## Description:
-This function generates the elliptic propagation paths and corresponding weights necessary for the
-calculation of the diffraction gain in <a href="#calc_diffraction_gain">calc_diffraction_gain</a>.
-
-## Caveat:
-- Each ellipsoid consists of `n_path` diffraction paths. The number of paths is determined by the
-  level of detail (`lod`).
-- All diffraction paths of an ellipsoid originate at `orig` and arrive at `dest`
-- Each diffraction path has `n_seg` segments
-- Points `orig` and `dest` lay on the semi-major axis of the ellipsoid
-- The generated rays sample the volume of the ellipsoid
-- Weights are calculated from the Knife-edge diffraction model when parts of the ellipsoid are shadowed
-- Initial weights are normalized such that `sum(prod(weights,3),2) = 1`
-- Inputs `orig` and `dest` may be provided as double or single precision
-- Supported datatypes `dtype` are `float` or `double`
+- Generates inputs required by [[calc_diffraction_gain]]: elliptic-arc paths sampling the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
+- Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
+- Weights are derived from the knife-edge diffraction model; initial weights normalized so `sum(prod(weights,3),2) = 1`
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 void generate_diffraction_paths(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                dtype center_frequency,
-                int lod,
-                arma::Cube<dtype> *ray_x,
-                arma::Cube<dtype> *ray_y,
-                arma::Cube<dtype> *ray_z,
-                arma::Cube<dtype> *weight);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    dtype center_frequency,
+    int lod,
+    arma::Cube<dtype> *ray_x,
+    arma::Cube<dtype> *ray_y,
+    arma::Cube<dtype> *ray_z,
+    arma::Cube<dtype> *weight);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)<br>
-  Pointer to Armadillo matrix containing the origin points of the propagation ellipsoid (e.g.
-  transmitter positions). Size: `[ n_pos, 3 ]`
+## Input Arguments:
+- **`orig`** — TX positions, `[n_pos, 3]`
+- **`dest`** — RX positions, `[n_pos, 3]`
+- **`center_frequency`** — Center frequency in Hz
+- **`lod`** — Level of detail; controls `n_path` and `n_seg`:
+    | `lod` | `n_path` | `n_seg` | Note |
+    |-------|----------|---------|------|
+    | 1 | 7 | 3 | |
+    | 2 | 19 | 3 | |
+    | 3 | 37 | 4 | |
+    | 4 | 61 | 5 | |
+    | 5 | 1 | 2 | debug |
+    | 6 | 2 | 2 | debug |
 
-- `const arma::Mat<dtype> ***dest**` (input)<br>
-  Pointer to Armadillo matrix containing the destination point of the propagation ellipsoid (e.g.
-  receiver positions). Size: `[ n_pos, 3 ]`
-
-- `dtype **center_frequency**` (input)<br>
-  The center frequency in [Hz], scalar, default = 299792458 Hz
-
-- `int **lod**` (input)<br>
-  Level of detail, scalar value
-  `lod = 1` | results in `n_path = 7` and `n_seg = 3`
-  `lod = 2` | results in `n_path = 19` and `n_seg = 3`
-  `lod = 3` | results in `n_path = 37` and `n_seg = 4`
-  `lod = 4` | results in `n_path = 61` and `n_seg = 5`
-  `lod = 5` | results in `n_path = 1` and `n_seg = 2` (for debugging)
-  `lod = 6` | results in `n_path = 2` and `n_seg = 2` (for debugging)
-
-- `arma::Cube<dtype> ***ray_x**` (output)<br>
-  Pointer to an Armadillo cube for the x-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***ray_y**` (output)<br>
-  Pointer to an Armadillo cube for the y-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***ray_z**` (output)<br>
-  Pointer to an Armadillo cube for the z-coordinates of the generated rays; Size: `[ n_pos, n_path, n_seg-1 ]`
-  Size will be adjusted if not set correctly.
-
-- `arma::Cube<dtype> ***weight**` (output)<br>
-  Pointer to an Armadillo cube for the  weights; Size: `[ n_pos, n_path, n_seg ]`
-  Size will be adjusted if not set correctly.
+## Output Arguments:
+- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
+- **`weight`** — Per-segment weights, `[n_pos, n_path, n_seg]`
 
 ## See also:
-- <a href="#calc_diffraction_gain">calc_diffraction_gain</a>
+- [[calc_diffraction_gain]] (consumes the output of this function)
 MD!*/
 
 template <typename dtype>

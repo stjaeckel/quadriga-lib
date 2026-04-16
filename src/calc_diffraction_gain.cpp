@@ -15,7 +15,7 @@
 // limitations under the License.
 // ------------------------------------------------------------------------
 
-#include <cstring> // For std::memcopy
+#include <cstring> // For std::memcpy
 #include <complex>
 #include "quadriga_tools.hpp"
 
@@ -213,65 +213,51 @@ SECTION!*/
 
 /*!MD
 # calc_diffraction_gain
-Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
+Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
 ## Description:
-- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave
-  propagation between each TX-RX pair is divided into `n_path` elliptic-arc paths (controlled by `lod`),
-  each approximated by `n_seg` line segments. 
-- Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
-  generalized to arbitrary 3D shapes.
-- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
-  geometry whose bounding box does not intersect the TX-RX path.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided into `n_path` elliptic-arc paths (controlled by `lod`), each approximated by `n_seg` line segments
+- Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, generalized to arbitrary 3D shapes
+- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping triangles whose bounding box does not intersect the TX-RX path
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
-void quadriga_lib::calc_diffraction_gain(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                const arma::Mat<dtype> *mesh,
-                const arma::Mat<dtype> *mtl_prop,
-                dtype center_frequency,
-                int lod = 2,
-                arma::Col<dtype> *gain = nullptr,
-                arma::Cube<dtype> *coord = nullptr,
-                int verbose = 0,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+void calc_diffraction_gain(
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *mesh,
+    const arma::Mat<dtype> *mtl_prop,
+    dtype center_frequency,
+    int lod = 2,
+    arma::Col<dtype> *gain = nullptr,
+    arma::Cube<dtype> *coord = nullptr,
+    int verbose = 0,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)<br>
-  TX positions, size `[n_pos, 3]`.
-- `const arma::Mat<dtype> ***dest**` (input)<br>
-  RX positions, size `[n_pos, 3]`.
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, size `[n_mesh, 9]`.
-- `const arma::Mat<dtype> ***mtl_prop**` (input)<br>
-  Material properties per triangle, size `[n_mesh, 5]`. See [[obj_file_read]].
-- `dtype **center_frequency**` (input)<br>
-  Center frequency in Hz.
-- `int **lod** = 2` (optional input)<br>
-  Level of detail (0–6). Controls `n_path` and `n_seg`. See [[generate_diffraction_paths]].
-- `arma::Col<dtype> ***gain**` (output, optional)<br>
-  Diffraction gain per TX-RX pair, linear scale, size `[n_pos]`.
-- `arma::Cube<dtype> ***coord**` (output, optional)<br>
-  Diffracted path coordinates (excluding endpoints), size `[3, n_seg-1, n_pos]`.
-- `int **verbose** = 0` (optional input)<br>
-  Verbosity level. Default: `0`.
-- `const arma::u32_vec ***sub_mesh_index**` (input, optional)<br>
-  Sub-mesh index for acceleration, 0-based, length `[n_mesh]`. See [[triangle_mesh_segmentation]].
-- `int **use_kernel** = 0` (optional input)<br>
-  Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Error if unavailable.
-- `int **gpu_id** = 0` (optional input)<br>
-  CUDA device ID. Ignored for non-CUDA kernels.
+## Input Arguments:
+- **`orig`** — TX positions, `[n_pos, 3]`
+- **`dest`** — RX positions, `[n_pos, 3]`
+- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties per triangle; see [[obj_file_read]], `[n_mesh, 5]`
+- **`center_frequency`** — Center frequency in Hz
+- **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
+- **`verbose`** *(optional)* — Verbosity level
+- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]], `[n_mesh]`
+- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+
+## Output Arguments:
+- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale, `[n_pos]`
+- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints, `[3, n_seg-1, n_pos]`
 
 ## See also:
-- [[generate_diffraction_paths]]
-- [[triangle_mesh_segmentation]]
-- [[obj_file_read]]
+- [[generate_diffraction_paths]] (controls path/segment count via `lod`)
+- [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
+- [[obj_file_read]] (defines `mtl_prop` format)
 MD!*/
 
 template <typename dtype>
@@ -885,8 +871,6 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                     power *= medium_gain_linear(mtl_prop, iM2, ray_offset, fGHz);
                                     p_ray_state[iG] = iM2;
                                 }
-
-                                power *= medium_gain_linear(mtl_prop, RS, dist + ray_offset, fGHz); // M1 medium defined by RS
                             }
                             else // Material in buffer (should not happen)
                             {

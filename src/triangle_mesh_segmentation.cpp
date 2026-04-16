@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,67 +23,46 @@ SECTION!*/
 
 /*!MD
 # triangle_mesh_segmentation
-Reorganize a 3D mesh into smaller sub-meshes for faster processing
+Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
 
 ## Description:
-This function processes the elements of a large triangle mesh by clustering those that are
-closely spaced. The resulting mesh retains the same elements but rearranges their order.
-The function aims to minimize the size of the axis-aligned bounding box around each cluster,
-referred to as a sub-mesh, while striving to maintain a specific number of elements within
-each cluster.<br><br>
-
-- Subdivision is recursive and based on bounding box partitioning until each sub-mesh contains no more than `target_size` triangles.
-- Sub-meshes are aligned to `vec_size` for SIMD or GPU optimization; padded with dummy triangles at the center of each sub-mesh if needed.
-- If material properties are provided, these are also reorganized and padded accordingly.
-- The function returns the number of created sub-meshes, and reorders the triangles and materials.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
+- Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
+- If `mtl_prop` is provided, material rows are reordered and padded in the same way
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
-arma::uword quadriga_lib::triangle_mesh_segmentation(
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *meshR,
-                arma::u32_vec *sub_mesh_index,
-                arma::uword target_size = 1024,
-                arma::uword vec_size = 1,
-                const arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *mtl_propR = nullptr,
-                arma::u32_vec *mesh_index = nullptr);
+arma::uword triangle_mesh_segmentation(
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *meshR,
+    arma::u32_vec *sub_mesh_index,
+    arma::uword target_size = 1024,
+    arma::uword vec_size = 1,
+    const arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *mtl_propR = nullptr,
+    arma::u32_vec *mesh_index = nullptr);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[n_mesh, 9]`
+## Input Arguments:
+- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`, `[n_mesh, 9]`
+- **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
+- **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
+- **`mtl_prop`** *(optional)* — Material properties for the original mesh; see [[obj_file_read]], `[n_mesh, 5]`
 
-- `arma::Mat<dtype> ***meshR**` (output)<br>
-  Vertices of the clustered mesh in global Cartesian coordinates; Size: `[n_meshR, 9]`
-
-- `arma::u32_vec ***sub_mesh_index**` (output)<br>
-  Start indices of the sub-meshes in 0-based notation; Vector of length `[n_sub]`
-
-- `arma::uword **target_size** = 1024` (input)<br>
-  The target number of elements of each sub-mesh. Default value = 1024. For best performance, the
-  value should be around `sgrt(n_mesh)`
-
-- `arma::uword **vec_size** = 1` (input)<br>
-  Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1.
-  For values > 1,the number of rows for each sub-mesh in the output is increased to a multiple
-  of `vec_size`. For padding, zero-sized triangles are placed at the center of the AABB of
-  the corresponding sub-mesh.
-
-- `const arma::Mat<dtype> ***mtl_prop** = nullptr` (optional input)<br>
-  Material properties corresponding to the original mesh; Size: `[n_mesh, 5]`; See <a href="#obj_file_read">obj_file_read</a>
-
-- `arma::Mat<dtype> ***mtl_propR** = nullptr` (optional output)<br>
-  Reorganized material properties, aligned and padded if necessary, Size: `[n_meshR, 5]`
-
-- `arma::u32_vec ***mesh_index** = nullptr` (optional output)<br>
-  1-based mapping from the original mesh to the reorganized mesh; Size: `[n_meshR]` (0 = padding)
+## Output Arguments:
+- **`meshR`** — Reordered and padded triangle vertices, `[n_meshR, 9]`
+- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`, `[n_sub]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties, `[n_meshR, 5]`
+- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding), `[n_meshR]`
 
 ## Returns:
-- `arma::uword **n_sub**`<br>
-  The number of created sub-meshes. Output matrices are resized accordingly.
+- Number of created sub-meshes `n_sub`
+
+## See also:
+- [[calc_diffraction_gain]] (uses `sub_mesh_index` for acceleration)
+- [[obj_file_read]] (defines `mtl_prop` format)
 MD!*/
 
 template <typename dtype>

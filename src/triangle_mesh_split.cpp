@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,47 +23,40 @@ SECTION!*/
 
 /*!MD
 # triangle_mesh_split
-Split a 3D mesh into two sub-meshes along a given axis
+Split a 3D triangular mesh into two sub-meshes along a given axis
 
 ## Description:
-- Divides a triangular mesh into two sub-meshes along a selected axis (or automatically the longest).
-- The function chooses a split point based on the bounding box center of the selected axis.
-- Returns the axis used for the split: `1 = x`, `2 = y`, `3 = z`; or negative values if the split failed.
-- An optional indicator vector identifies the target sub-mesh (A or B) for each input point.
-- On failure (i.e., all triangles fall into one side), outputs `meshA` and `meshB` remain unchanged.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Splits at the bounding box center of the selected axis; triangles where all vertices lie within the 
+  lower half go to `meshA`; any triangle with at least one vertex exceeding the threshold goes to `meshB`
+- `axis = 0` selects the axis with the longest bounding box extent automatically
+- On failure (all triangles fall to one side), `meshA` and `meshB` are left unchanged and the return value is negative
+- Used internally by [[triangle_mesh_segmentation]]
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
-int quadriga_lib::triangle_mesh_split(
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *meshA,
-                arma::Mat<dtype> *meshB,
-                int axis = 0,
-                arma::Col<int> *split_ind = nullptr);
+int triangle_mesh_split(
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *meshA,
+    arma::Mat<dtype> *meshB,
+    int axis = 0,
+    arma::Col<int> *split_ind = nullptr);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangle mesh input; each row contains one triangle as `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`
-  Size: `[n_mesh, 9]`
+## Input Arguments:
+- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`, `[n_mesh, 9]`
+- **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
-- `arma::Mat<dtype> ***meshA**` (output)<br>
-  First resulting sub-mesh; triangles with centroid below split threshold. Size: `[n_meshA, 9]`
-
-- `arma::Mat<dtype> ***meshB**` (output)<br>
-  Second resulting sub-mesh; triangles with centroid above split threshold. Size: `[n_meshB, 9]`
-
-- `int **axis** = 0` (optional input)<br>
-  Axis to split along: `0` = longest extent (default), `1` = x-axis, `2` = y-axis, `3` = z-axis.
-
-- `arma::Col<int> ***split_ind** = nullptr` (optional output)<br>
-  Output vector indicating assignment of each triangle: `1` = meshA, `2` = meshB, `0` = not assigned (on failure)
-  Length: `[n_mesh]`
+## Output Arguments:
+- **`meshA`** — Triangles with all vertices within the lower half of the bounding box, `[n_meshA, 9]`
+- **`meshB`** — Triangles with at least one vertex exceeding the split threshold, `[n_meshB, 9]`
+- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure), `[n_mesh]`
 
 ## Returns:
-- `int` <br>
-  The axis used for the split (`1`, `2`, or `3`), or negative value on failure (`-1`, `-2`, or `-3`).
+- Axis used for the split (1, 2, or 3); negative (-1, -2, or -3) on failure
+
+## See also:
+- [[triangle_mesh_segmentation]] (calls this function recursively)
 MD!*/
 
 template <typename dtype>
@@ -136,7 +129,10 @@ int quadriga_lib::triangle_mesh_split(const arma::Mat<dtype> *mesh,
 
     // Check if the mesh was split
     if (n_faceA == 0 || n_faceB == 0)
+    {
+        delete[] isB;
         return -axis;
+    }
 
     // Adjust output size
     meshA->set_size(n_faceA, 9);
