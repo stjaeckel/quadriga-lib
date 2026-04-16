@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,77 +26,46 @@ SECTION!*/
 Subdivide ray beams into four smaller sub-beams
 
 ## Description:
-- Subdivides each ray beam (defined by a triangular wavefront) into four new beams with adjusted origin, shape, and direction.
-- Supports input in Spherical or Cartesian direction format.
-- When `dest` is not provided, the corresponding output `destN` is omitted.
-- Useful for hierarchical ray tracing or angular resolution refinement.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Each triangular beam is split into 4 sub-beams; output size is `4 × n_ray` or `4 × n_ind` when `index` is provided
+- `tridir` format auto-detected: spherical `[n_ray, 6]` or Cartesian `[n_ray, 9]`; output matches input format
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::uword quadriga_lib::subdivide_rays(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *trivec,
-                const arma::Mat<dtype> *tridir,
-                const arma::Mat<dtype> *dest = nullptr,
-                arma::Mat<dtype> *origN = nullptr,
-                arma::Mat<dtype> *trivecN = nullptr,
-                arma::Mat<dtype> *tridirN = nullptr,
-                arma::Mat<dtype> *destN = nullptr,
-                const arma::u32_vec *index = nullptr,
-                const double ray_offset = 0.0);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *trivec,
+    const arma::Mat<dtype> *tridir,
+    const arma::Mat<dtype> *dest = nullptr,
+    arma::Mat<dtype> *origN = nullptr,
+    arma::Mat<dtype> *trivecN = nullptr,
+    arma::Mat<dtype> *tridirN = nullptr,
+    arma::Mat<dtype> *destN = nullptr,
+    const arma::u32_vec *index = nullptr,
+    const double ray_offset = 0.0);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)<br>
-  Ray origin points in global coordinate system (GCS).
-  Size: `[n_ray, 3]`.
+## Input Arguments:
+- **`orig`** — Ray origin points in GCS; `[n_ray, 3]`
+- **`trivec`** — Vectors from origin to triangle vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
+- **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
+- **`dest`** (optional) — Ray destination points; `[n_ray, 3]`
+- **`index`** (optional) — 0-based indices of rays to subdivide; `[n_ind]`
+- **`ray_offset`** (optional) — Origin offset in meters along propagation direction
 
-- `const arma::Mat<dtype> ***trivec**` (input)<br>
-  Vectors pointing from the ray origin to the three triangle vertices.
-  Size: `[n_ray, 9]`, order: `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`.
-
-- `const arma::Mat<dtype> ***tridir**` (input)<br>
-  Directions of the three vertex-rays.
-  Format can be Spherical `[n_ray, 6]` as `[v1az v1el v2az v2el v3az v3el]`,
-  or Cartesian `[n_ray, 9]` as `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`.
-
-- `const arma::Mat<dtype> ***dest** = nullptr` (input)<br>
-  Ray destination points. If `nullptr`, the output `destN` will remain empty.
-  Size: `[n_ray, 3]`.
-
-- `arma::Mat<dtype> ***origN**` (output)<br>
-  New ray origins after subdivision.
-  Size: `[n_rayN, 3]`.
-
-- `arma::Mat<dtype> ***trivecN**` (output)<br>
-  Updated vectors for each subdivided triangle beam.
-  Size: `[n_rayN, 9]`.
-
-- `arma::Mat<dtype> ***tridirN**` (output)<br>
-  New directions of the subdivided vertex-rays, in the same format as input.
-  Size: `[n_rayN, 6]` (spherical) or `[n_rayN, 9]` (Cartesian).
-
-- `arma::Mat<dtype> ***destN**` (output)<br>
-  Updated destination points.
-  Size: `[n_rayN, 3]`, empty if input `dest` was `nullptr`.
-
-- `const arma::u32_vec ***index**` (optional input)<br>
-  List of ray indices to be subdivided (0-based). Only the specified rays are subdivided.
-  Size: `[n_ind]`.
-
-- `const double **ray_offset** = 0.0` (optional input)<br>
-  Offset (in meters) applied to the origin of each subdivided ray along its propagation direction.
-  Default: `0.0`.
+## Output Arguments:
+- **`origN`** — Subdivided ray origins; `[n_rayN, 3]`
+- **`trivecN`** — Subdivided triangle vectors; `[n_rayN, 9]`
+- **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]`
+- **`destN`** — Subdivided destinations, empty if `dest` was `nullptr` or empty; `[n_rayN, 3]`
 
 ## Returns:
-- `arma::uword  **n_rayN**`<br>
-  Number of output rays, typically `4 × n_ray` or `4 × n_ind` if `index` is provided.
+- `n_rayN` — Number of output rays
 
 ## See also:
-- <a href="#icosphere">icosphere</a> (for generating beams)
-- <a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
-- <a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating beam interactions with triangles)
+- [[icosphere]] (generate initial beams)
+- [[ray_point_intersect]] (beam–sample-point interaction)
+- [[ray_triangle_intersect]] (beam–triangle interaction)
 MD!*/
 
 template <typename dtype>
@@ -180,7 +149,7 @@ arma::uword quadriga_lib::subdivide_rays(const arma::Mat<dtype> *orig, const arm
     else if (tridirN != nullptr && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
         tridirN->set_size(n_rayN, 6);
 
-    if (dest != nullptr && destN != nullptr && (destN->n_rows != n_rayN || destN->n_cols != 3))
+    if (dest != nullptr && !dest->is_empty() && destN != nullptr && (destN->n_rows != n_rayN || destN->n_cols != 3))
         destN->set_size(n_rayN, 3);
     else if (destN != nullptr)
         destN->reset();
