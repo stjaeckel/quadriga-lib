@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2026 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,47 +29,28 @@ SECTION!*/
 
 /*!MD
 # fast_sincos
-Fast, approximate sine/cosine
+Compute elementwise approximate sine and/or cosine of a vector
 
 ## Description:
-Computes elementwise sine and/or cosine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input angles in radians
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::sinf` / `std::cosf`
-- For x in [-pi, pi], the maximum absolute error is 2^(-22.1), and larger otherwise
-- For x in [-500, 500], the maximum absolute error is 2^(-16.0)
-- Either output (`s` or `c`) may be `nullptr` to skip its computation
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
+- Either `s` or `c` may be `nullptr` to skip that computation
+- Output vectors are resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
 void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
-void quadriga_lib::fast_sincos(const arma::vec &x, arma::fvec *s = nullptr, arma::fvec *c = nullptr);
+void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arma::fvec *c = nullptr);
 ```
 
-## Arguments:
-- `const arma::fvec **x**` or `const arma::vec **x**` (input)<br>
-  Input angles in radians. Size `[n]`.
+## Input Arguments:
+- **`x`** — Input angles in radians; `[n]`
 
-- `arma::fvec ***s** = nullptr` (optional output)<br>
-  If non-null, set to `sin(x)`. Resized to length `n` if needed. Size `[n]` or `nullptr`.
-
-- `arma::fvec ***c** = nullptr` (optional output)<br>
-  If non-null, set to `cos(x)`. Resized to length `n` if needed. Size `[n]` or `nullptr`.
-
-## Returns:
-- `void` (output)<br>
-  No return value. Results written via output pointers.
-
-## Example:
-```
-arma::fvec x = arma::linspace[arma::fvec](arma::fvec)(0.0f, 6.2831853f, 1000);
-arma::fvec s, c;
-quadriga_lib::fast_sincos(x, &s, &c);      // compute both
-quadriga_lib::fast_sincos(x, &s, nullptr); // compute sine only
-quadriga_lib::fast_sincos(x, nullptr, &c); // compute cosine only
-```
+## Output Arguments:
+- **`s`** *(optional)* — sin(x); `[n]` or `nullptr`
+- **`c`** *(optional)* — cos(x); `[n]` or `nullptr`
 MD!*/
 
 template <typename dtype>
@@ -84,6 +65,9 @@ void quadriga_lib::fast_sincos(const arma::Col<dtype> &x, arma::fvec *s, arma::f
         s->set_size(n_val);
     if (c != nullptr && c->n_elem != n_val)
         c->set_size(n_val);
+
+    if (n_val == 0)
+        return;
 
     const dtype *__restrict Xa = x.memptr();
     float *__restrict Sa = (s == nullptr) ? nullptr : s->memptr();
@@ -133,37 +117,27 @@ template void quadriga_lib::fast_sincos(const arma::Col<double> &x, arma::fvec *
 
 /*!MD
 # fast_asin
-Fast, approximate arc-sine
+Compute elementwise approximate arc-sine of a vector
 
 ## Description:
-Computes elementwise arc-sine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input values in [-1, 1]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::asinf`
-- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-- Input values outside [-1, 1] produce NaN (IEEE compliant)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- In-place operation not allowed (input and output cannot alias)
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
 void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
-void quadriga_lib::fast_asin(const arma::vec &x, arma::fvec &s);
+void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
 ```
 
-## Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
-  Input values in [-1, 1]. Length `[n]`.
+## Input Arguments:
+- **`x`** — Input values in [-1, 1]; `[n]`
 
-- `arma::fvec &**s**` (output)<br>
-  Set to `asin(x)`. Resized to length `n` if needed. Length `[n]`.
-
-## Example:
-```
-arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
-arma::fvec s;
-quadriga_lib::fast_asin(x, s);
-```
+## Output Arguments:
+- **`s`** — asin(x); `[n]`
 MD!*/
 
 template <typename dtype>
@@ -202,37 +176,27 @@ template void quadriga_lib::fast_asin(const arma::Col<double> &x, arma::fvec &s)
 
 /*!MD
 # fast_acos
-Fast, approximate arc-cosine
+Compute elementwise approximate arc-cosine of a vector
 
 ## Description:
-Computes elementwise arc-cosine for an Armadillo vector. Designed for high throughput on modern CPUs.
-- Operates on input values in [-1, 1]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::acosf`
-- For x in [-1, 1], the maximum error is approximately 2 ULP (~2.4e-7)
-- Input values outside [-1, 1] produce NaN (IEEE compliant)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
+- In-place operation not allowed (input and output cannot alias)
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
 void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
-void quadriga_lib::fast_acos(const arma::vec &x, arma::fvec &c);
+void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
 ```
 
-## Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
-  Input values in [-1, 1]. Length `[n]`.
+## Input Arguments:
+- **`x`** — Input values in [-1, 1]; `[n]`
 
-- `arma::fvec &**c**` (output)<br>
-  Set to `acos(x)`. Resized to length `n` if needed. Length `[n]`.
-
-## Example:
-```
-arma::fvec x = arma::linspace<arma::fvec>(-1.0f, 1.0f, 1000);
-arma::fvec c;
-quadriga_lib::fast_acos(x, c);
-```
+## Output Arguments:
+- **`c`** — acos(x); `[n]`
 MD!*/
 
 template <typename dtype>
@@ -271,44 +235,29 @@ template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c)
 
 /*!MD
 # fast_atan2
-Fast, approximate two-argument arc-tangent
+Compute elementwise approximate two-argument arc-tangent of two vectors
 
 ## Description:
-Computes elementwise `atan2(y, x)` for two Armadillo vectors. Designed for high throughput on modern CPUs.
-- Returns angles in radians in the range (-pi, pi]
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::atan2f`
-- Maximum error is approximately 3 ULP (~3.6e-7) across the full domain
-- `atan2(0, 0)` returns 0; `atan2(±0, -0)` returns `±0` (not `±pi`)
-- Both input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- Returns angles in radians in (-pi, pi]; max error ~3 ULP (~3.6e-7)
+- atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
+- Both inputs must have the same length; in-place operation not allowed
+- Output vector is resized automatically if needed
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
 void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fvec &a);
-void quadriga_lib::fast_atan2(const arma::vec &y, const arma::vec &x, arma::fvec &a);
+void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &a);
 ```
 
-## Arguments:
-- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)<br>
-  Y-coordinates (numerator of atan2). Length `[n]`.
+## Input Arguments:
+- **`y`** — Y-coordinates (numerator); `[n]`
+- **`x`** — X-coordinates (denominator); `[n]`
 
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
-  X-coordinates (denominator of atan2). Length `[n]`.
-
-- `arma::fvec &**a**` (output)<br>
-  Set to `atan2(y, x)` in radians. Resized to length `n` if needed. Length `[n]`.
-
-## Example:
-```
-arma::fvec y = {1.0f, -1.0f, 0.0f, 1.0f};
-arma::fvec x = {1.0f,  1.0f, -1.0f, 0.0f};
-arma::fvec a;
-quadriga_lib::fast_atan2(y, x, a);
-// a ≈ {0.7854, -0.7854, 3.1416, 1.5708}
-```
+## Output Arguments:
+- **`a`** — atan2(y, x) in radians; `[n]`
 MD!*/
 
 template <typename dtype>
@@ -354,19 +303,19 @@ template void quadriga_lib::fast_atan2(const arma::Col<double> &y, const arma::C
 
 /*!MD
 # fast_slerp
-Fast, approximate spherical interpolation (SLERP) for complex value pairs
+Compute elementwise approximate SLERP interpolation between two complex-valued vectors
 
 ## Description:
-Interpolates elementwise between two complex-valued vectors using spherical linear interpolation
-(SLERP) on the normalised directions and linear interpolation of amplitudes.
-- Processes per-element interpolation weights (0 = A, 1 = B)
-- AVX2-optimized (8 complex pairs per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Near-antipodal inputs (phase angle close to pi) smoothly transition to a linear fallback
-- If both input amplitudes are negligible, the output is zero
-- Maximum error versus double-precision reference is approximately 5 ULP
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
-- All input vectors must have the same length
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated
+- Weight `w=0` returns A, `w=1` returns B; per-element weights in [0, 1]
+- Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
+- If both input amplitudes are negligible, output is zero
+- Max error vs. double-precision reference: ~5 ULP
+- All input vectors must have the same length; output vectors resized automatically
+- Output Xr and Xi cannot alias each other
+- AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
@@ -374,46 +323,23 @@ void quadriga_lib::fast_slerp(const arma::fvec &Ar, const arma::fvec &Ai,
                               const arma::fvec &Br, const arma::fvec &Bi,
                               const arma::fvec &w,
                               arma::fvec &Xr, arma::fvec &Xi);
+
 void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
                               const arma::vec &Br, const arma::vec &Bi,
                               const arma::vec &w,
                               arma::fvec &Xr, arma::fvec &Xi);
 ```
 
-## Arguments:
-- `const arma::fvec &**Ar**` or `const arma::vec &**Ar**` (input)<br>
-  Real part of source A. Length `[n]`.
+## Input Arguments:
+- **`Ar`** — Real part of source A; `[n]`
+- **`Ai`** — Imaginary part of source A; `[n]`
+- **`Br`** — Real part of source B; `[n]`
+- **`Bi`** — Imaginary part of source B; `[n]`
+- **`w`** — Per-element interpolation weight in [0, 1]; `[n]`
 
-- `const arma::fvec &**Ai**` or `const arma::vec &**Ai**` (input)<br>
-  Imaginary part of source A. Length `[n]`.
-
-- `const arma::fvec &**Br**` or `const arma::vec &**Br**` (input)<br>
-  Real part of source B. Length `[n]`.
-
-- `const arma::fvec &**Bi**` or `const arma::vec &**Bi**` (input)<br>
-  Imaginary part of source B. Length `[n]`.
-
-- `const arma::fvec &**w**` or `const arma::vec &**w**` (input)<br>
-  Per-element interpolation weight in [0, 1]. 0 returns A, 1 returns B. Length `[n]`.
-
-- `arma::fvec &**Xr**` (output)<br>
-  Real part of interpolated result. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**Xi**` (output)<br>
-  Imaginary part of interpolated result. Resized to length `n` if needed. Length `[n]`.
-
-## Returns:
-- `void` (output)<br>
-  No return value. Results written to Xr and Xi.
-
-## Example:
-```
-arma::fvec Ar = {1.0f, 0.0f}, Ai = {0.0f, 1.0f};
-arma::fvec Br = {0.0f, 1.0f}, Bi = {1.0f, 0.0f};
-arma::fvec w = {0.5f, 0.5f};
-arma::fvec Xr, Xi;
-quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi);
-```
+## Output Arguments:
+- **`Xr`** — Real part of interpolated result; `[n]`
+- **`Xi`** — Imaginary part of interpolated result; `[n]`
 MD!*/
 
 template <typename dtype>
@@ -478,18 +404,16 @@ template void quadriga_lib::fast_slerp(const arma::Col<double> &Ar, const arma::
 
 /*!MD
 # fast_geo2cart
-Fast, approximate geographic-to-Cartesian conversion
+Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates
 
 ## Description:
-Converts elementwise azimuth/elevation angles (in radians) to unit-sphere Cartesian coordinates.
-- x = cos(el) * cos(az), y = cos(el) * sin(az), z = sin(el)
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::sinf` / `std::cosf`
-- Optionally returns intermediate sin/cos values via pointer arguments; pass `nullptr` to skip
-- Both input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Conversion: x = cos(el)*cos(az), y = cos(el)*sin(az), z = sin(el)
+- Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
+- Both inputs must have the same length; in-place operation not allowed
+- Output vectors resized automatically if needed
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
@@ -497,47 +421,28 @@ void quadriga_lib::fast_geo2cart(const arma::fvec &az, const arma::fvec &el,
                                  arma::fvec &x, arma::fvec &y, arma::fvec &z,
                                  arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
                                  arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
+
 void quadriga_lib::fast_geo2cart(const arma::vec &az, const arma::vec &el,
                                  arma::fvec &x, arma::fvec &y, arma::fvec &z,
                                  arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
                                  arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
 ```
 
-## Arguments:
-- `const arma::fvec &**az**` or `const arma::vec &**az**` (input)<br>
-  Azimuth angles in radians. Length `[n]`.
+## Input Arguments:
+- **`az`** — Azimuth angles in radians; `[n]`
+- **`el`** — Elevation angles in radians; `[n]`
 
-- `const arma::fvec &**el**` or `const arma::vec &**el**` (input)<br>
-  Elevation angles in radians. Length `[n]`.
+## Output Arguments:
+- **`x`** — X-coordinates on the unit sphere; `[n]`
+- **`y`** — Y-coordinates on the unit sphere; `[n]`
+- **`z`** — Z-coordinates on the unit sphere; `[n]`
+- **`sAZ`** *(optional)* — sin(az); `[n]` or `nullptr`
+- **`cAZ`** *(optional)* — cos(az); `[n]` or `nullptr`
+- **`sEL`** *(optional)* — sin(el); `[n]` or `nullptr`
+- **`cEL`** *(optional)* — cos(el); `[n]` or `nullptr`
 
-- `arma::fvec &**x**` (output)<br>
-  X-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**y**` (output)<br>
-  Y-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**z**` (output)<br>
-  Z-coordinates on the unit sphere. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec ***sAZ** = nullptr` (optional output)<br>
-  If non-null, set to `sin(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***cAZ** = nullptr` (optional output)<br>
-  If non-null, set to `cos(az)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***sEL** = nullptr` (optional output)<br>
-  If non-null, set to `sin(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-- `arma::fvec ***cEL** = nullptr` (optional output)<br>
-  If non-null, set to `cos(el)`. Resized to length `n` if needed. Length `[n]` or `nullptr`.
-
-## Example:
-```
-arma::fvec az = {0.0f, 1.5708f, 3.1416f};
-arma::fvec el = {0.0f, 0.5f, -0.5f};
-arma::fvec x, y, z, sAZ, cEL;
-quadriga_lib::fast_geo2cart(az, el, x, y, z, &sAZ, nullptr, nullptr, &cEL);
-```
+## See also:
+- [[fast_cart2geo]] (inverse conversion)
 MD!*/
 
 template <typename dtype>
@@ -615,53 +520,38 @@ template void quadriga_lib::fast_geo2cart(const arma::Col<double> &az, const arm
 
 /*!MD
 # fast_cart2geo
-Fast, approximate Cartesian-to-geographic conversion
+Convert elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles
 
 ## Description:
-Converts elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles (in radians).
-- az = atan2(y, x), el = asin(clamp(z, -1, 1))
-- The z-coordinate is clamped to [-1, 1] before computing asin, guarding against FMA rounding artefacts
-  from upstream matrix multiplications that can push abs(z) slightly above 1
-- AVX2-optimized (8 floats per lane); scalar fallback without AVX2 or on non-AVX2 CPUs
-- Parallelizes across cores with OpenMP when enabled
-- Results are approximate and may differ from `std::atan2f` / `std::asinf`
-- All input vectors must have the same length
-- Input and output cannot alias (in-place operation not allowed)
-- Allowed input datatype: `float` (Armadillo `fvec`) or `double` (Armadillo `vec`)
+- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
+- Conversion: az = atan2(y, x), el = asin(clamp(z, -1, 1))
+- z is clamped to [-1, 1] before asin to guard against FMA rounding artefacts pushing abs(z) slightly above 1
+- All inputs must have the same length
+- In-place and output-output aliasing not allowed (x/y/z cannot alias az or el; az and el cannot alias each other)
+- Output vectors resized automatically if needed
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- OpenMP-parallelized when enabled
 
 ## Declaration:
 ```
 void quadriga_lib::fast_cart2geo(const arma::fvec &x, const arma::fvec &y, const arma::fvec &z,
                                  arma::fvec &az, arma::fvec &el);
+
 void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const arma::vec &z,
                                  arma::fvec &az, arma::fvec &el);
 ```
 
-## Arguments:
-- `const arma::fvec &**x**` or `const arma::vec &**x**` (input)<br>
-  X-coordinates. Length `[n]`.
+## Input Arguments:
+- **`x`** — X-coordinates; `[n]`
+- **`y`** — Y-coordinates; `[n]`
+- **`z`** — Z-coordinates; `[n]`
 
-- `const arma::fvec &**y**` or `const arma::vec &**y**` (input)<br>
-  Y-coordinates. Length `[n]`.
+## Output Arguments:
+- **`az`** — Azimuth angles in radians; `[n]`
+- **`el`** — Elevation angles in radians; `[n]`
 
-- `const arma::fvec &**z**` or `const arma::vec &**z**` (input)<br>
-  Z-coordinates. Length `[n]`.
-
-- `arma::fvec &**az**` (output)<br>
-  Azimuth angles in radians. Resized to length `n` if needed. Length `[n]`.
-
-- `arma::fvec &**el**` (output)<br>
-  Elevation angles in radians. Resized to length `n` if needed. Length `[n]`.
-
-## Example:
-```
-arma::fvec x = {1.0f, 0.0f, -1.0f};
-arma::fvec y = {0.0f, 1.0f, 0.0f};
-arma::fvec z = {0.0f, 0.0f, 0.0f};
-arma::fvec az, el;
-quadriga_lib::fast_cart2geo(x, y, z, az, el);
-// az ≈ {0.0, 1.5708, 3.1416},  el ≈ {0.0, 0.0, 0.0}
-```
+## See also:
+- [[fast_geo2cart]] (inverse conversion)
 MD!*/
 
 template <typename dtype>
