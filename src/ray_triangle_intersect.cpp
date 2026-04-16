@@ -32,84 +32,53 @@ SECTION!*/
 
 /*!MD
 # ray_triangle_intersect
-Calculates the intersection of rays and triangles in three dimensions
+Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
 ## Description:
-- Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 triangles in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_ray >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
-- Allowed datatypes (`dtype`): `float` or `double`
-- Internal computations are carried out in **single precision** regardless of `dtype`.
+- Counts the total number of intersection between `orig` and `dest`
+- Computes the coordinates and object IDs if the first two intersections per ray (FBS/SBS)
+- Allowed datatypes: `float` or `double`
+- Internal computations always use single precision for AVX2 and CUDA kernel; only GENERIC has `double` support
 
 ## Declaration:
 ```
 void quadriga_lib::ray_triangle_intersect(
-                const arma::Mat<dtype> *orig,
-                const arma::Mat<dtype> *dest,
-                const arma::Mat<dtype> *mesh,
-                arma::Mat<dtype> *fbs = nullptr,
-                arma::Mat<dtype> *sbs = nullptr,
-                arma::u32_vec *no_interact = nullptr,
-                arma::u32_vec *fbs_ind = nullptr,
-                arma::u32_vec *sbs_ind = nullptr,
-                const arma::u32_vec *sub_mesh_index = nullptr,
-                const arma::Mat<dtype> *aabb = nullptr,
-                int use_kernel = 0,
-                int gpu_id = 0);
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *mesh,
+    arma::Mat<dtype> *fbs = nullptr,
+    arma::Mat<dtype> *sbs = nullptr,
+    arma::u32_vec *no_interact = nullptr,
+    arma::u32_vec *fbs_ind = nullptr,
+    arma::u32_vec *sbs_ind = nullptr,
+    const arma::u32_vec *sub_mesh_index = nullptr,
+    const arma::Mat<dtype> *aabb = nullptr,
+    int use_kernel = 0,
+    int gpu_id = 0);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***orig**` (input)<br>
-  Ray origins in global coordinate system (GCS). Size: `[n_ray, 3]`.
+## Input Arguments:
+- **`orig`** — Ray origins in GCS; `[n_ray, 3]`
+- **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-- `const arma::Mat<dtype> ***dest**` (input)<br>
-  Ray destinations in GCS. Size: `[n_ray, 3]`.
-
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangular surface mesh. Size: `[n_mesh, 9]`, where each row contains the 3 vertices
-  `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`.
-
-- `arma::Mat<dtype> ***fbs**` (optional output)<br>
-  First-bounce surface intersection points (FBS). Size: `[n_ray, 3]`.
-
-- `arma::Mat<dtype> ***sbs**` (optional output)<br>
-  Second-bounce surface intersection points (SBS). Size: `[n_ray, 3]`.
-
-- `arma::u32_vec ***no_interact**` (optional output)<br>
-  Number of intersections per ray (0, 1, or 2). Size: `[n_ray]`.
-
-- `arma::u32_vec ***fbs_ind**` (optional output)<br>
-  1-based index of the first intersected mesh element, 0 = no intersection. Size: `[n_ray]`.
-
-- `arma::u32_vec ***sbs_ind**` (optional output)<br>
-  1-based index of the second intersected mesh element, 0 = no second intersection. Size: `[n_ray]`.
-
-- `const arma::u32_vec ***sub_mesh_index**` (optional input)<br>
-  Indexes indicating start of sub-meshes in `mesh`. Size: `[n_sub]`. Enables faster processing via segmentation.
-
-- `const arma::Mat<dtype> ***aabb**` (optional input)<br>
-  Pre-computed axis-aligned bounding boxes per sub-mesh. Size: `[n_sub, 6]`, where each row contains
-  `{x_min, x_max, y_min, y_max, z_min, z_max}`. If `nullptr`, AABBs are computed internally from `mesh`.
-
-- `bool **transpose_inputs** = false` (optional input)<br>
-  If `true`, treats `orig`/`dest` as `[3, n_ray]` and `mesh` as `[9, n_mesh]`.
-
-- `int **use_kernel** = 0` (optional input)<br>
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- `int **gpu_id** = 0` (optional input)<br>
-  GPU device ID for CUDA kernel. Ignored when not using CUDA.
+## Output Arguments:
+- **`fbs`** (optional) — First-bounce intersection points in GCS, `[n_ray, 3]`
+- **`sbs`** (optional) — Second-bounce intersection points in GCS, `[n_ray, 3]`
+- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`, `[n_ray]`
+- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none, `[n_ray]`
+- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none, `[n_ray]`
 
 ## See also:
-- <a href="#obj_file_read">obj_file_read</a> (for loading `mesh` from an OBJ file)
-- <a href="#icosphere">icosphere</a> (for generating beams)
-- <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
-- <a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
-- <a href="#subdivide_rays">subdivide_rays</a> (for subdivides ray beams into sub beams)
+- [[obj_file_read]] (load mesh from OBJ file)
+- [[triangle_mesh_segmentation]] (compute sub-mesh indices and AABBs)
+- [[ray_point_intersect]] (beam interactions with sampling points)
+- [[icosphere]] (generate ray beams)
+- [[subdivide_rays]] (split ray beams into sub-beams)
 MD!*/
 
 template <typename dtype>
@@ -181,7 +150,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
 
     // Check if the sub-mesh indices are valid
     arma::uword n_sub = 1ULL;                                     // Number of sub-meshes (at least 1)
-    arma::u32_vec smi(1);                                         // Sub-mesh-index (local copy)
+    arma::u32_vec smi(1, arma::fill::zeros);                      // Sub-mesh-index (local copy)
     if (sub_mesh_index != nullptr && sub_mesh_index->n_elem != 0) // Input is available
     {
         n_sub = sub_mesh_index->n_elem;
