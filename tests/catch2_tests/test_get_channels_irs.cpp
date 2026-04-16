@@ -493,3 +493,75 @@ TEST_CASE("Channel - Add Paths")
     CHECK(n_paths[0] == 17ULL);
     CHECK(n_paths[1] == 18ULL);
 }
+
+TEST_CASE("Tools - Combine IRS Coord inactive")
+{
+    // n_path_1 = 1, n_path_2 = 3
+    // active_path skips middle path (index 1)
+    // pI2 = [1, 2, 1] — middle path has 2 coords that must still advance i_start_2
+    // Without the bug fix, path 2 reads from the wrong offset in interact_coord_2
+
+    float Ix = 1.0f, Iy = 2.0f, Iz = 3.0f;
+
+    arma::u32_vec no_interact_1 = {1};
+    arma::Mat<float> interact_coord_1(3, 1, arma::fill::zeros);
+    interact_coord_1(0, 0) = 10.0f;
+    interact_coord_1(1, 0) = 11.0f;
+    interact_coord_1(2, 0) = 12.0f;
+
+    arma::u32_vec no_interact_2 = {1, 2, 1};
+    arma::Mat<float> interact_coord_2(3, 4, arma::fill::zeros);
+    interact_coord_2(0, 0) = 20.0f;
+    interact_coord_2(1, 0) = 21.0f;
+    interact_coord_2(2, 0) = 22.0f;
+    interact_coord_2(0, 1) = 30.0f;
+    interact_coord_2(1, 1) = 31.0f;
+    interact_coord_2(2, 1) = 32.0f;
+    interact_coord_2(0, 2) = 33.0f;
+    interact_coord_2(1, 2) = 34.0f;
+    interact_coord_2(2, 2) = 35.0f;
+    interact_coord_2(0, 3) = 40.0f;
+    interact_coord_2(1, 3) = 41.0f;
+    interact_coord_2(2, 3) = 42.0f;
+
+    std::vector<bool> active_path = {true, false, true};
+
+    arma::u32_vec no_interact;
+    arma::Mat<float> interact_coord;
+
+    quadriga_lib::combine_irs_coord(Ix, Iy, Iz,
+                                    &no_interact_1, &interact_coord_1,
+                                    &no_interact_2, &interact_coord_2,
+                                    &no_interact, &interact_coord,
+                                    false, false, &active_path);
+
+    // Two active paths, each with 3 interaction points: seg1 + IRS + seg2
+    REQUIRE(no_interact.n_elem == 2);
+    CHECK(no_interact(0) == 3);
+    CHECK(no_interact(1) == 3);
+
+    REQUIRE(interact_coord.n_cols == 6);
+
+    // Path 0: seg1[0] → IRS → seg2[0]
+    CHECK(interact_coord(0, 0) == 10.0f);
+    CHECK(interact_coord(1, 0) == 11.0f);
+    CHECK(interact_coord(2, 0) == 12.0f);
+    CHECK(interact_coord(0, 1) == Ix);
+    CHECK(interact_coord(1, 1) == Iy);
+    CHECK(interact_coord(2, 1) == Iz);
+    CHECK(interact_coord(0, 2) == 20.0f);
+    CHECK(interact_coord(1, 2) == 21.0f);
+    CHECK(interact_coord(2, 2) == 22.0f);
+
+    // Path 1: seg1[0] → IRS → seg2[2]  (seg2 path index 2, col 3 in interact_coord_2)
+    // Bug: without fix this reads col 1 ([30,31,32]) instead of col 3 ([40,41,42])
+    CHECK(interact_coord(0, 3) == 10.0f);
+    CHECK(interact_coord(1, 3) == 11.0f);
+    CHECK(interact_coord(2, 3) == 12.0f);
+    CHECK(interact_coord(0, 4) == Ix);
+    CHECK(interact_coord(1, 4) == Iy);
+    CHECK(interact_coord(2, 4) == Iz);
+    CHECK(interact_coord(0, 5) == 40.0f);
+    CHECK(interact_coord(1, 5) == 41.0f);
+    CHECK(interact_coord(2, 5) == 42.0f);
+}
