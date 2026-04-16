@@ -26,43 +26,32 @@ SECTION!*/
 Subdivide triangles into smaller triangles
 
 ## Description:
-- Uniformly subdivides each input triangle into `n_div × n_div` smaller triangles.
-- Increases spatial resolution for mesh-based processing (e.g., ray tracing or visualization).
-- Optional input/output material properties are duplicated across subdivided triangles.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
+- Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
+- Material properties are duplicated from parent triangle to all sub-triangles
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::uword quadriga_lib::subdivide_triangles(
-                arma::uword n_div,
-                const arma::Mat<dtype> *triangles_in,
-                arma::Mat<dtype> *triangles_out,
-                const arma::Mat<dtype> *mtl_prop = nullptr,
-                arma::Mat<dtype> *mtl_prop_out = nullptr);
+    arma::uword n_div,
+    const arma::Mat<dtype> *triangles_in,
+    arma::Mat<dtype> *triangles_out,
+    const arma::Mat<dtype> *mtl_prop = nullptr,
+    arma::Mat<dtype> *mtl_prop_out = nullptr);
 ```
 
-## Arguments:
-- `arma::uword **n_div**` (input)<br>
-  Number of subdivisions per triangle edge;
-  total output triangles: `n_triangles_out = n_triangles_in × n_div × n_div`.
+## Input Arguments:
+- **`n_div`** — Number of subdivisions per edge
+- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`mtl_prop`** *(optional)* — Material properties of input triangles; `[n_triangles_in, 5]`
 
-- `const arma::Mat<dtype> ***triangles_in**` (input)<br>
-  Vertices of the triangular mesh in global Cartesian coordinates; each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Size: `[n_triangles_in, 9]`
-
-- `arma::Mat<dtype> ***triangles_out**` (output)<br>
-  Vertices of the sub-divided mesh in global Cartesian coordinates; Size: `[n_triangles_out, 9]`
-
-- `const arma::Mat<dtype> ***mtl_prop** = nullptr` (optional input)<br>
-  Material properties associated for the input triangles; Size: `[n_triangles_in, 5]`.
-
-- `arma::Mat<dtype> ***mtl_prop_out** = nullptr` (optional output)<br>
-  Material properties for the subdivided triangles, copied from the parent triangle,
-  Size: `[n_triangles_out, 5]`.
+## Output Arguments:
+- **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
+- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 5]`
 
 ## Returns:
-- `arma::uword **n_triangles_out**`<br>
-  Number of generated triangles (equals `n_triangles_in × n_div × n_div`).
+- `n_triangles_out` — Number of generated triangles
 MD!*/
 
 // Subdivide triangles into smaller triangles
@@ -153,9 +142,9 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
                 p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w2z
 
                 // Lower triangle third vertex
-                p_triangles_out[cnt + 6 * n_triangles_out] = v1x + fvl * e12x + fuu * e13x; // w2x
-                p_triangles_out[cnt + 7 * n_triangles_out] = v1y + fvl * e12y + fuu * e13y; // w2y
-                p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w2z
+                p_triangles_out[cnt + 6 * n_triangles_out] = v1x + fvl * e12x + fuu * e13x; // w3x
+                p_triangles_out[cnt + 7 * n_triangles_out] = v1y + fvl * e12y + fuu * e13y; // w3y
+                p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w3z
 
                 // Material
                 if (process_mtl_prop)
@@ -174,15 +163,15 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
                     p_triangles_out[cnt + n_triangles_out] = v1y + fvl * e12y + fuu * e13y;     // w1y
                     p_triangles_out[cnt + 2 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w1z
 
-                    // Upper triangle second vertex
+                    // Upper triangle second vertex (stored in v2 columns)
                     p_triangles_out[cnt + 6 * n_triangles_out] = v1x + fvu * e12x + fuu * e13x; // w2x
                     p_triangles_out[cnt + 7 * n_triangles_out] = v1y + fvu * e12y + fuu * e13y; // w2y
                     p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvu * e12z + fuu * e13z; // w2z
 
-                    // Upper triangle third vertex
-                    p_triangles_out[cnt + 3 * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w2x
-                    p_triangles_out[cnt + 4 * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w2y
-                    p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w2z
+                    // Upper triangle third vertex (stored in v3 columns)
+                    p_triangles_out[cnt + 3 * n_triangles_out] = v1x + fvu * e12x + ful * e13x; // w3x
+                    p_triangles_out[cnt + 4 * n_triangles_out] = v1y + fvu * e12y + ful * e13y; // w3y
+                    p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w3z
 
                     // Material
                     if (process_mtl_prop)
