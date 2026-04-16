@@ -41,11 +41,11 @@ void quadriga_lib::coord2path(
     dtype Rx, dtype Ry, dtype Rz,
     const arma::u32_vec *no_interact,
     const arma::Mat<dtype> *interact_coord,
-    arma::Col<dtype> *path_length,
-    arma::Mat<dtype> *fbs_pos,
-    arma::Mat<dtype> *lbs_pos,
-    arma::Mat<dtype> *path_angles,
-    std::vector<arma::Mat<dtype>> *path_coord,
+    arma::Col<dtype> *path_length = nullptr,
+    arma::Mat<dtype> *fbs_pos = nullptr,
+    arma::Mat<dtype> *lbs_pos = nullptr,
+    arma::Mat<dtype> *path_angles = nullptr,
+    std::vector<arma::Mat<dtype>> *path_coord = nullptr,
     bool reverse_path = false);
 ```
 
