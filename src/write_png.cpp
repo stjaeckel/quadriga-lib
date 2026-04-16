@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 
 #include "quadriga_tools.hpp"
 #include "lodepng.h"
+#include <limits>
 
 /*!SECTION
 Miscellaneous / Tools
@@ -24,49 +25,31 @@ SECTION!*/
 
 /*!MD
 # write_png
-Write data to a PNG file
+Write a data matrix to a color-coded PNG file
 
 ## Description:
-- Converts input data into a color-coded PNG file for visualization
-- Support optional selection of a colormap, as well a minimum and maximum value limits
-- Allowed datatypes (`dtype`): `float` or `double`
-- Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing
+- Values are clipped to `[min_val, max_val]` before colormap mapping; auto-detected from data if `NAN`
+- Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
-void write_png( const arma::Mat<dtype> &data, 
-                std::string fn,              
-                std::string colormap = "jet", 
-                dtype min_val = NAN, 
-                dtype max_val = NAN, 
-                bool log_transform = false);
+void quadriga_lib::write_png(
+    const arma::Mat<dtype> &data,
+    std::string fn,
+    std::string colormap = "jet",
+    dtype min_val = NAN,
+    dtype max_val = NAN,
+    bool log_transform = false);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> **&data**`<br>
-  Data matrix
-
-- `std::string **fn**`<br>
-  Path to the `.png` file to be written
-
-- `std::string **colormap**`<br>
-  Name of the desired colormap. Must be one of:
-  `"jet"`, `"parula"`, `"winter"`, `"hot"`, `"turbo"`, `"copper"`, `"spring"`, `"cool"`, `"gray"`, `"autumn"`, `"summer"`.
-
-- `dtype **min_val**`<br>
-  Minimum value. Values below this value will have be encoded with the color of the smallest value.
-  If `NAN` is provided (default), the lowest values is determined from the data.
-
-- `dtype **max_val**`<br>
-  Maximum value. Values above this value will have be encoded with the color of the largest value.
-  If `NAN` is provided (default), the largest values is determined from the data.
-
-- `bool **log_transform**`<br>
-  If enabled, the `data` values are transformed to the log-domain (`10*log10(data)`) before processing.
-  Default: false (disabled)
-
-## See also:
-- [[colormap]]
+## Input Arguments:
+- **`data`** — Input data matrix
+- **`fn`** — Output `.png` file path
+- **`colormap`** *(optional)* — Colormap name; see [[colormap]] for valid values
+- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
+- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
+- **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
 MD!*/
 
 template <typename dtype>
@@ -95,11 +78,17 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, std::string fn, std::
         for (auto &val : data)
         {
             double x = (double)val;
-            x = (log_transform && x < 0.0) ? 0.0 : x;
-            x = log_transform ? 10.0 * std::log10(x) : x;
-
-            mi = (set_min && x < mi) ? x : mi;
-            ma = (set_max && x > ma) ? x : ma;
+            if (log_transform)
+            {
+                if (x <= 0.0)
+                    continue; // non-positive → skip for range detection
+                x = 10.0 * std::log10(x);
+            }
+            if (!std::isnan(x))
+            {
+                mi = (set_min && x < mi) ? x : mi;
+                ma = (set_max && x > ma) ? x : ma;
+            }
         }
 
     mi = (mi > ma) ? ma : mi;
@@ -111,8 +100,8 @@ void quadriga_lib::write_png(const arma::Mat<dtype> &data, std::string fn, std::
     for (size_t i_val = 0; i_val < no_values; ++i_val)
     {
         double x = (double)values[i_val];
-        x = (log_transform && x < 0.0) ? 0.0 : x;
-        x = log_transform ? 10.0 * std::log10(x) : x;
+        if (log_transform)
+            x = (x <= 0.0) ? -std::numeric_limits<double>::infinity() : 10.0 * std::log10(x);
 
         x = (x < mi) ? mi : x;
         x = (x > ma) ? ma : x;
