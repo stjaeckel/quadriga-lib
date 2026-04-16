@@ -27,40 +27,34 @@ SECTION!*/
 Test whether 3D points are inside a triangle mesh using raycasting
 
 ## Description:
-- Uses raycasting to determine whether each 3D point lies inside a triangle mesh.
-- Requires that the mesh is watertight and all normals are pointing outwards.
-- For each point, multiple rays are cast in various directions.
-- If any ray intersects a mesh element with a negative incidence angle, the point is classified as **inside**.
-- Output can be binary (0 = outside, 1 = inside) or labeled with object indices.
-- Allowed datatypes (`dtype`): `float` or `double`.
+- Casts multiple rays per point in various directions
+- A point is inside if any ray hits a face with a negative incidence angle, or if the ray thickness at FBS is below 1 mm (surface proximity)
+- Mesh must be watertight with all normals pointing outward
+- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- `distance > 0` classifies points within that many meters of the mesh surface as inside; increases computation time significantly; range: 0–20 m
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::u32_vec quadriga_lib::point_inside_mesh(
-                const arma::Mat<dtype> *points,
-                const arma::Mat<dtype> *mesh,
-                const arma::u32_vec *obj_ind = nullptr,
-                dtype distance = 0.0);
+    const arma::Mat<dtype> *points,
+    const arma::Mat<dtype> *mesh,
+    const arma::u32_vec *obj_ind = nullptr,
+    dtype distance = 0.0);
 ```
 
-## Arguments:
-- `const arma::Mat<dtype> ***points**` (input)<br>
-  3D point coordinates to test, size `[n_points, 3]`.
-
-- `const arma::Mat<dtype> ***mesh**` (input)<br>
-  Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format (x1,y1,z1,x2,y2,z2,x3,y3,z3), size `[n_mesh, 9]`.
-
-- `const arma::u32_vec ***obj_ind** = nullptr` (optional input)<br>
-  Optional object index for each mesh element (1-based), size `[n_mesh]`. If provided, the return vector will contain the index of the enclosing object instead of binary values.
-
-- `dtype **distance** = 0.0` (optional input)<br>
-  Optional distance in meters from objects that should be considered as *inside* the object.
-  Possible range: 0 - 20 m. Using this parameter significantly increases computation time.
+## Input Arguments:
+- **`points`** — 3D coordinates of test points; `[n_points, 3]`
+- **`mesh`** — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); `[n_mesh, 9]`
+- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
+- **`distance`** *(optional)* — Surface proximity threshold in meters to also classify as inside
 
 ## Returns:
-- `arma::u32_vec`, size `[n_points]`<br>
-  For each point: Returns `0` if the point is outside the mesh (or all objects), `1` if inside (or close to) any mesh object
-  (if `obj_ind` not given), or returns the **1-based object index** if `obj_ind` is provided.
+- `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
+
+## See also:
+- [[triangle_mesh_segmentation]] (used internally to build BVH for ray queries)
+- [[icosphere]] (generates ray directions for distance proximity check)
 MD!*/
 
 template <typename dtype>
@@ -88,7 +82,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
     arma::uword n_mesh = mesh->n_rows;
 
     // Generate 4 rays for "inside" detection [x0, x1, x2, x3, y0, y1, y2, y3, z0, z1, z2, z3 ]
-    dtype dir[12] = {1.0f, -0.5f, -0.25f, -0.25f, 0.0f, 0.866f, -0.433f, -0.433f, 0.0f, 0.0f, 0.866f, -0.866f};
+    dtype dir[12] = {1.0, -0.5, -0.25, -0.25, 0.0, 0.866, -0.433, -0.433, 0.0, 0.0, 0.866, -0.866};
     qd_rotate_inplace<dtype>(0.1745f, 0.3491f, 0.5236f, dir, 4, true);
     qd_multiply_scalar<dtype>(1000.0f, dir, 12);
     arma::uword n_cast = 4;
@@ -128,7 +122,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
         qd_repeat_sequence(direction.colptr(1), n_cast, 1, n_points, dest.colptr(1));
         qd_repeat_sequence(direction.colptr(2), n_cast, 1, n_points, dest.colptr(2));
 
-        dtype scale = distance / 1000.0f;
+        dtype scale = distance * dtype(0.001);
         for (arma::uword i = 0; i < orig.n_elem; ++i)
         {
             dtype orig_tmp = (i % n_cast < 4) ? p_orig[i] : p_dest[i] * scale + p_orig[i];
