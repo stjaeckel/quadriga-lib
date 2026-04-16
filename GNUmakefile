@@ -7,7 +7,7 @@ arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
 octave = ON
-matlab = OFF
+matlab = ON
 avx2 = ON
 cuda = ON
 

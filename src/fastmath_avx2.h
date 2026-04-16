@@ -482,15 +482,22 @@ static inline void _fm256_geo2cart_ps(__m256 az, __m256 el, __m256 *__restrict x
         *cEL = ce;
 }
 
-// Convert Cartesian (x, y, z) to geographic (azimuth, elevation)
-// z is clamped to [-1, +1] before asin to guard against out-of-range
-// values from upstream matrix multiplications or FMA rounding.
-//   az = atan2(y, x)
-//   el = asin(clamp(z, -1, 1))
-static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z, __m256 *__restrict az, __m256 *__restrict el)
+// Convert Cartesian (x, y, z) to geographic (azimuth, elevation, length)
+//   len = sqrt(x^2 + y^2 + z^2)
+//   az  = atan2(y, x)
+//   el  = asin(clamp(z / len, -1, 1))
+// Clamp guards against len == 0 (produces NaN/Inf from div) and FMA rounding.
+static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z,
+                                      __m256 *__restrict az, __m256 *__restrict el, __m256 *__restrict len)
 {
-    *az = _fm256_atan2256_ps(y, x);
-    *el = _fm256_asin256_ps(_fm256_clamp_pm1_ps(z));
+    __m256 r2 = _mm256_fmadd_ps(z, z, _mm256_fmadd_ps(y, y, _mm256_mul_ps(x, x)));
+    __m256 r  = _mm256_sqrt_ps(r2);
+    *len = r;
+    *az  = _fm256_atan2256_ps(y, x);
+    // Mask: select z/r where r > 0, else 0 — matches GENERIC behavior at origin
+    __m256 mask = _mm256_cmp_ps(r, _mm256_setzero_ps(), _CMP_GT_OQ);
+    __m256 zn   = _mm256_and_ps(mask, _mm256_div_ps(z, r));
+    *el  = _fm256_asin256_ps(_fm256_clamp_pm1_ps(zn));
 }
 
 // Convert complex RE/IM to polar form (magnitude and phase angle)

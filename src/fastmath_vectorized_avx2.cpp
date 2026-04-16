@@ -676,7 +676,7 @@ void qd_GEO2CART_AVX2(const double *__restrict az, const double *__restrict el,
 
 template <> // float
 void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, const float *__restrict z,
-                      float *__restrict az, float *__restrict el, size_t n_val)
+                      float *__restrict az, float *__restrict el, float *__restrict len, size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
 
@@ -687,10 +687,14 @@ void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, cons
         __m256 vx = _mm256_loadu_ps(x + off);
         __m256 vy = _mm256_loadu_ps(y + off);
         __m256 vz = _mm256_loadu_ps(z + off);
-        __m256 vaz, vel;
-        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel);
+
+        __m256 vaz, vel, vlen;
+        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel, &vlen);
+
         _mm256_storeu_ps(az + off, vaz);
         _mm256_storeu_ps(el + off, vel);
+        if (len)
+            _mm256_storeu_ps(len + off, vlen);
     }
 
     const size_t n_tail = n_val & 7;
@@ -701,19 +705,24 @@ void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, cons
         std::memcpy(px, x + off, n_tail * sizeof(float));
         std::memcpy(py, y + off, n_tail * sizeof(float));
         std::memcpy(pz, z + off, n_tail * sizeof(float));
-        __m256 vaz, vel;
-        _fm256_cart2geo_ps(_mm256_load_ps(px), _mm256_load_ps(py), _mm256_load_ps(pz), &vaz, &vel);
-        alignas(32) float baz[8], bel[8];
+
+        __m256 vaz, vel, vlen;
+        _fm256_cart2geo_ps(_mm256_load_ps(px), _mm256_load_ps(py), _mm256_load_ps(pz), &vaz, &vel, &vlen);
+
+        alignas(32) float baz[8], bel[8], blen[8];
         _mm256_store_ps(baz, vaz);
         _mm256_store_ps(bel, vel);
+        _mm256_store_ps(blen, vlen);
         std::memcpy(az + off, baz, n_tail * sizeof(float));
         std::memcpy(el + off, bel, n_tail * sizeof(float));
+        if (len)
+            std::memcpy(len + off, blen, n_tail * sizeof(float));
     }
 }
 
 template <> // double
 void qd_CART2GEO_AVX2(const double *__restrict x, const double *__restrict y, const double *__restrict z,
-                      float *__restrict az, float *__restrict el, size_t n_val)
+                      double *__restrict az, double *__restrict el, double *__restrict len, size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
 
@@ -727,10 +736,19 @@ void qd_CART2GEO_AVX2(const double *__restrict x, const double *__restrict y, co
                                     _mm256_cvtpd_ps(_mm256_loadu_pd(y + off)));
         __m256 vz = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_loadu_pd(z + off + 4)),
                                     _mm256_cvtpd_ps(_mm256_loadu_pd(z + off)));
-        __m256 vaz, vel;
-        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel);
-        _mm256_storeu_ps(az + off, vaz);
-        _mm256_storeu_ps(el + off, vel);
+
+        __m256 vaz, vel, vlen;
+        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel, &vlen);
+
+        _mm256_storeu_pd(az + off, _mm256_cvtps_pd(_mm256_castps256_ps128(vaz)));
+        _mm256_storeu_pd(az + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vaz, 1)));
+        _mm256_storeu_pd(el + off, _mm256_cvtps_pd(_mm256_castps256_ps128(vel)));
+        _mm256_storeu_pd(el + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vel, 1)));
+        if (len)
+        {
+            _mm256_storeu_pd(len + off, _mm256_cvtps_pd(_mm256_castps256_ps128(vlen)));
+            _mm256_storeu_pd(len + off + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vlen, 1)));
+        }
     }
 
     const size_t n_tail = n_val & 7;
@@ -747,12 +765,24 @@ void qd_CART2GEO_AVX2(const double *__restrict x, const double *__restrict y, co
                                     _mm256_cvtpd_ps(_mm256_load_pd(py)));
         __m256 vz = _mm256_set_m128(_mm256_cvtpd_ps(_mm256_load_pd(pz + 4)),
                                     _mm256_cvtpd_ps(_mm256_load_pd(pz)));
-        __m256 vaz, vel;
-        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel);
-        alignas(32) float baz[8], bel[8];
-        _mm256_store_ps(baz, vaz);
-        _mm256_store_ps(bel, vel);
-        std::memcpy(az + off, baz, n_tail * sizeof(float));
-        std::memcpy(el + off, bel, n_tail * sizeof(float));
+
+        __m256 vaz, vel, vlen;
+        _fm256_cart2geo_ps(vx, vy, vz, &vaz, &vel, &vlen);
+
+        alignas(32) double daz[8], del[8], dlen[8];
+        _mm256_store_pd(daz, _mm256_cvtps_pd(_mm256_castps256_ps128(vaz)));
+        _mm256_store_pd(daz + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vaz, 1)));
+        std::memcpy(az + off, daz, n_tail * sizeof(double));
+
+        _mm256_store_pd(del, _mm256_cvtps_pd(_mm256_castps256_ps128(vel)));
+        _mm256_store_pd(del + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vel, 1)));
+        std::memcpy(el + off, del, n_tail * sizeof(double));
+
+        if (len)
+        {
+            _mm256_store_pd(dlen, _mm256_cvtps_pd(_mm256_castps256_ps128(vlen)));
+            _mm256_store_pd(dlen + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(vlen, 1)));
+            std::memcpy(len + off, dlen, n_tail * sizeof(double));
+        }
     }
 }

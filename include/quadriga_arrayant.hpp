@@ -334,22 +334,21 @@ namespace quadriga_lib
     // - Frequency samples are in Hz; if empty, third-octave bands from lower_cutoff to upper_cutoff are used
     // - Angular resolution is in degrees; used to generate azimuth_grid and elevation_grid
     template <typename dtype>
-    std::vector<arrayant<dtype>> generate_speaker(
-        std::string driver_type = "piston",                // Driver type: "piston", "horn", "omni"
-        dtype radius = 0.05,                               // Effective radiating radius in [m] (piston: cone, horn: mouth)
-        dtype lower_cutoff = 80.0,                         // Lower -3 dB frequency in [Hz]
-        dtype upper_cutoff = 12000.0,                      // Upper -3 dB frequency in [Hz]
-        dtype lower_rolloff_slope = 12.0,                  // Low-frequency rolloff in [dB/octave]
-        dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
-        dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
-        std::string radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
-        dtype hor_coverage = 0.0,                          // Horizontal coverage angle in [deg], horn only, 0 = auto (90)
-        dtype ver_coverage = 0.0,                          // Vertical coverage angle in [deg], horn only, 0 = auto (60)
-        dtype horn_control_freq = 0.0,                     // Horn pattern control frequency in [Hz], 0 = auto from radius
-        dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
-        dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
-        arma::Col<dtype> frequencies = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
-        dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
+    std::vector<arrayant<dtype>> generate_speaker(std::string driver_type = "piston",                // Driver type: "piston", "horn", "omni"
+                                                  dtype radius = 0.05,                               // Effective radiating radius in [m] (piston: cone, horn: mouth)
+                                                  dtype lower_cutoff = 80.0,                         // Lower -3 dB frequency in [Hz]
+                                                  dtype upper_cutoff = 12000.0,                      // Upper -3 dB frequency in [Hz]
+                                                  dtype lower_rolloff_slope = 12.0,                  // Low-frequency rolloff in [dB/octave]
+                                                  dtype upper_rolloff_slope = 12.0,                  // High-frequency rolloff in [dB/octave]
+                                                  dtype sensitivity = 85.0,                          // On-axis sensitivity in [dB SPL] at 1W/1m
+                                                  std::string radiation_type = "hemisphere",         // Radiation type: "monopole", "hemisphere", "dipole", "cardioid"
+                                                  dtype hor_coverage = 0.0,                          // Horizontal coverage angle in [deg], horn only, 0 = auto (90)
+                                                  dtype ver_coverage = 0.0,                          // Vertical coverage angle in [deg], horn only, 0 = auto (60)
+                                                  dtype horn_control_freq = 0.0,                     // Horn pattern control frequency in [Hz], 0 = auto from radius
+                                                  dtype baffle_width = 0.15,                         // Enclosure baffle width in [m], piston only
+                                                  dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
+                                                  arma::Col<dtype> frequencies = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
+                                                  dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)
@@ -383,7 +382,7 @@ namespace quadriga_lib
                                 arma::Cube<dtype> *eod = nullptr,    // Optional output: Elevation of Departure angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *aoa = nullptr,    // Optional output: Azimuth of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
                                 arma::Cube<dtype> *eoa = nullptr,    // Optional output: Elevation of Arrival angles in [rad], Size [n_rx, n_tx, n_path]
-                                bool use_avx2 = false);               // Use AVX2 for antenna interpolation (faster, but less accurate, ignored when not supported)
+                                bool use_avx2 = false);              // Use AVX2 for antenna interpolation (faster, but less accurate, ignored when not supported)
 
     // Calculate channel coefficients for spherical waves across multiple frequencies
     // - Extends get_channels_spherical to support frequency-dependent antenna patterns, path gains, and Jones matrices

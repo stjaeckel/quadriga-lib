@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "quadriga_math.hpp"
 
 /*!SECTION
 Miscellaneous / Tools
@@ -51,23 +51,32 @@ geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
   Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.
 MD!*/
 
-// #include <chrono>
-
-// std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now(); // Start time
-// std::cout << "Start CPP" << std::endl;
-
-// std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now(); // Current time
-// double ms = (double)std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-// std::cout << "Input data converted, t = " << std::round(ms/100.0)/10.0 << std::endl;
-
 py::array_t<double> cart2geo(const py::array_t<double> &cart)
 {
-    const auto cart_arma = qd_python_numpy2arma_Cube(cart, true);
+    const auto data = qd_python_numpy2arma_Cube(cart, true);
 
+    if (data.n_elem == 0 || data.n_rows != 3)
+        throw std::invalid_argument("Input must have 3 rows.");
+
+    // Split data
+    arma::uword n_val = data.n_cols * data.n_slices;
+    arma::vec x(n_val, arma::fill::none), y(n_val, arma::fill::none), z(n_val, arma::fill::none);
+    const double *pd = data.memptr();
+    double *px = x.memptr(), *py = y.memptr(), *pz = z.memptr();
+    for (arma::uword i = 0; i < n_val; ++i)
+        px[i] = pd[3 * i], py[i] = pd[3 * i + 1], pz[i] = pd[3 * i + 2];
+
+    // Call library function (double precision)
+    arma::vec az, el, len;
+    quadriga_lib::fast_cart2geo<double>(x, y, z, az, el, &len, 1);
+
+    // Combine outputs
     arma::cube geo_arma;
-    auto geo = qd_python_init_output(cart_arma.n_cols, cart_arma.n_slices, cart_arma.n_rows, &geo_arma);
+    auto geo = qd_python_init_output(3, data.n_cols, data.n_slices, &geo_arma);
 
-    quadriga_lib::cart2geo(cart_arma, geo_arma);
+    double *pa = az.memptr(), *pe = el.memptr(), *pl = len.memptr(), *po = geo_arma.memptr();
+    for (arma::uword i = 0; i < n_val; ++i)
+        po[3 * i] = pa[i], po[3 * i + 1] = pe[i], po[3 * i + 2] = pl[i];
 
     return geo;
 }
