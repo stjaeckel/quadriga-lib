@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,11 +27,9 @@ SECTION!*/
 Calculate rotation matrices from Euler angles
 
 ## Description:
-- Computes 3D rotation matrices from input Euler angles (bank, tilt, head).
-- The result is returned in column-major order as a 3×3 matrix per input orientation vector.
-- Calculations are internally performed in double precision for improved numerical accuracy, even if `dtype` is `float`.
-- Supports optional inversion of the y-axis and optional transposition of the output matrix.
-- Allowed datatypes (`dtype`): `float` or `double`
+- Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
+- Internally uses double precision regardless of `dtype`
+- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -45,28 +43,13 @@ arma::Col<dtype> quadriga_lib::calc_rotation_matrix(const arma::Col<dtype> &orie
                 bool invert_y_axis = false, bool transposeR = false);
 ```
 
-## Arguments:
-- `const arma::Cube<dtype> **&orientation**` or `const arma::Mat<dtype> **&orientation**` or `const arma::Col<dtype> **&orientation**` (input)<br>
-  Input Euler angles (bank, tilt, head) in radians, Size `[3, n_row, n_col]` or `[3, n_mat]` or Size `[3]`.
-
-- `bool **invert_y_axis** = false` (optional input)<br>
-  If true, the y-axis of the rotation is inverted. Default: `false`.
-
-- `bool **transposeR** = false` (optional input)<br>
-  If true, the transpose of the rotation matrix is returned. Default: `false`.
+## Input Arguments:
+- **`orientation`** — Euler angles (bank, tilt, head) in radians; `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
+- **`invert_y_axis`** *(optional)* — Inverts the y-axis of the rotation
+- **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
 
 ## Returns:
-- `arma::Cube<dtype>` or `arma::Mat<dtype>` or `arma::Col<dtype>`<br>
-  Rotation matrices in column-major ordering. Size `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`.
-
-## Example:
-```
-arma::cube ori(3, 1, 1);
-ori(0, 0, 0) = 0.0;         // bank
-ori(1, 0, 0) = 0.0;         // tilt
-ori(2, 0, 0) = 1.5708;      // head
-auto R = quadriga_lib::calc_rotation_matrix(ori);
-```
+- Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
 MD!*/
 
 template <typename dtype>
