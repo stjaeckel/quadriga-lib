@@ -63,7 +63,7 @@ namespace quadriga_lib
                              double update_rate = 1.0e-3,       // Channel update interval in seconds
                              double speed_station_kmh = 0.0,    // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
                              double speed_env_kmh = 1.2,        // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-                             arma::vec Dist_m = {4.99},         // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)
+                             arma::vec Dist_m = {4.99},         // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
                              arma::uvec n_floors = {0},         // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users)
                              bool uplink = false,               // Default channel direction is downlink, set uplink to true to get reverse direction
                              arma::mat offset_angles = {},      // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS

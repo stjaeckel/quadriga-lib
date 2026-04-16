@@ -143,27 +143,6 @@ namespace quadriga_lib
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map, bool high_res = false);
 
-    // Combine real and imaginary parts to complex types, cast to double
-    template <typename dtype>
-    void complex_cast(const arma::Mat<dtype> &real, // Matrix (real part, float or double)
-                      const arma::Mat<dtype> &imag, // Matrix (imaginary part, float or double)
-                      arma::cx_mat &complex);       // Output: Complex matrix, double
-
-    template <typename dtype>
-    void complex_cast(const arma::Cube<dtype> &real, // Cube (real part, float or double)
-                      const arma::Cube<dtype> &imag, // Cube (imaginary part, float or double)
-                      arma::cx_cube &complex);       // Output: Complex cube, double
-
-    template <typename dtype>
-    void complex_cast(const arma::cx_mat &complex, // Complex matrix, double
-                      arma::Mat<dtype> &real,      // Output: Matrix (real part, float or double)
-                      arma::Mat<dtype> &imag);     // Output: Matrix (imaginary part, float or double)
-
-    template <typename dtype>
-    void complex_cast(const arma::cx_cube &complex, // Complex cube, double
-                      arma::Cube<dtype> &real,      // Output: Cube (real part, float or double)
-                      arma::Cube<dtype> &imag);     // Output: Cube (imaginary part, float or double)
-
     // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
     // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
     template <typename dtype>
