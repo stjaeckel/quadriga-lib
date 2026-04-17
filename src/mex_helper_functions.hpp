@@ -146,6 +146,7 @@
 #include <cstring> // For std::memcopy
 #include <any>
 #include <string>
+#include <type_traits>
 
 // Macro to redirect any exception to stderr
 #define CALL_QD(expr)                                              \
@@ -160,6 +161,41 @@
             mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ex.what()); \
         }                                                          \
     } while (0)
+
+// Helper: check if MATLAB array type matches the requested C++ dtype
+template <typename dtype>
+inline bool qd_mex_type_matches(const mxArray *input)
+{
+    if constexpr (std::is_same_v<dtype, double>)
+        return mxIsDouble(input);
+    else if constexpr (std::is_same_v<dtype, float>)
+        return mxIsSingle(input);
+    else if constexpr (std::is_same_v<dtype, int>)
+        return mxIsClass(input, "int32");
+    else if constexpr (std::is_same_v<dtype, unsigned>)
+        return mxIsClass(input, "uint32");
+    else if constexpr (std::is_same_v<dtype, long long>)
+        return mxIsClass(input, "int64");
+    else if constexpr (std::is_same_v<dtype, unsigned long long>)
+        return mxIsClass(input, "uint64");
+    else
+        return false;
+}
+
+// Helper: Read up to 4 dimensions from a MATLAB array. Missing dims default to 1.
+// Returns {d1, d2, d3, d4, n_data}. Also checks for complex input.
+inline std::array<size_t, 5> qd_mex_get_dims(const mxArray *input)
+{
+    if (mxIsComplex(input))
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
+    const mwSize *dims = mxGetDimensions(input);
+    size_t d1 = (size_t)dims[0];
+    size_t d2 = (size_t)dims[1];
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];
+    return {d1, d2, d3, d4, d1 * d2 * d3 * d4};
+}
 
 // Read a scalar input from MATLAB and convert it to a desired c++ output type
 // - Casts to <dtype>
@@ -406,262 +442,98 @@ inline std::any qd_mex_anycast(const mxArray *input, std::string var_name = "", 
     return std::any();
 }
 
+// Copy-convert MATLAB array data into a pre-allocated C++ buffer.
+// Dispatches on the input's MATLAB type; casts each element to `dtype`.
+template <typename dtype>
+inline void qd_mex_copy_convert(const mxArray *input, dtype *ptr, size_t n_data,
+                                const std::string &var_name = "")
+{
+    auto copy = [&](auto *src)
+    {
+        for (size_t m = 0; m < n_data; ++m)
+            ptr[m] = (dtype)src[m];
+    };
+    if (qd_mex_type_matches<double>(input))
+        copy((const double *)mxGetData(input));
+    else if (qd_mex_type_matches<float>(input))
+        copy((const float *)mxGetData(input));
+    else if (qd_mex_type_matches<unsigned>(input))
+        copy((const unsigned *)mxGetData(input));
+    else if (qd_mex_type_matches<int>(input))
+        copy((const int *)mxGetData(input));
+    else if (qd_mex_type_matches<unsigned long long>(input))
+        copy((const unsigned long long *)mxGetData(input));
+    else if (qd_mex_type_matches<long long>(input))
+        copy((const long long *)mxGetData(input));
+    else
+    {
+        std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
+    }
+}
+
 // Reads input and converts it to desired C++ type, creates a copy of the input
 template <typename dtype>
 inline arma::Col<dtype> qd_mex_typecast_Col(const mxArray *input, std::string var_name = "", size_t n_elem = 0)
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
-    size_t n_data = d1 * d2 * d3 * d4;
-
-    if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
-
-    if (n_data == 0) // Return empty
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input);
+    if (n_data == 0)
         return arma::Col<dtype>();
-
     if (n_elem != 0 && n_data != n_elem)
     {
-        if (var_name.empty())
-            mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Incorrect number of elements.");
-        else
-        {
-            std::string error_message = "Input '" + var_name + "' has incorrect number of elements.";
-            mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
-        }
+        std::string msg = var_name.empty() ? "Incorrect number of elements." : "Input '" + var_name + "' has incorrect number of elements.";
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
     }
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else if (var_name.empty())
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
-    else
-    {
-        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
-    }
-
-    // Convert data to armadillo output
-    arma::Col<dtype> output = arma::Col<dtype>(n_data, arma::fill::none);
-    dtype *ptr = output.memptr();
-    if (T == 1)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_d[m];
-    else if (T == 2)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_f[m];
-    else if (T == 3)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ui[m];
-    else if (T == 4)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_i[m];
-    else if (T == 5)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ull[m];
-    else if (T == 6)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ll[m];
+    arma::Col<dtype> output(n_data, arma::fill::none);
+    qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
 }
 
-// Reads input and converts it to desired c++ type, creates a copy of the input
 template <typename dtype>
 inline arma::Mat<dtype> qd_mex_typecast_Mat(const mxArray *input, std::string var_name = "")
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
-    size_t n_data = d1 * d2 * d3 * d4;
-
-    if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
-
-    if (n_data == 0) // Return empty
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input);
+    if (n_data == 0)
         return arma::Mat<dtype>();
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else if (var_name.empty())
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
-    else
-    {
-        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
-    }
-
-    // Convert data to armadillo output
-    auto output = arma::Mat<dtype>(d1, d2 * d3 * d4, arma::fill::none);
-    dtype *ptr = output.memptr();
-    if (T == 1)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_d[m];
-    else if (T == 2)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_f[m];
-    else if (T == 3)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ui[m];
-    else if (T == 4)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_i[m];
-    else if (T == 5)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ull[m];
-    else if (T == 6)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ll[m];
+    arma::Mat<dtype> output(d1, d2 * d3 * d4, arma::fill::none);
+    qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
 }
 
-// Reads input and converts it to desired c++ type, creates a copy of the input
 template <typename dtype>
 inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string var_name = "")
 {
-    size_t n_dim = (size_t)mxGetNumberOfDimensions(input); // Number of dimensions - either 2, 3 or 4
-    const mwSize *dims = mxGetDimensions(input);           // Read number of elements elements per dimension
-    size_t d1 = (size_t)dims[0];                           // Number of elements on first dimension
-    size_t d2 = (size_t)dims[1];                           // Number of elements on second dimension
-    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];           // Number of elements on third dimension
-    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];           // Number of elements on fourth dimension
-    size_t n_data = d1 * d2 * d3 * d4;
-
-    if (mxIsComplex(input))
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Complex datatypes are not supported.");
-
-    if (n_data == 0) // Return empty
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input);
+    if (n_data == 0)
         return arma::Cube<dtype>();
-
-    // Generate pointers for the 6 supported MATLAB data types
-    double *ptr_d = nullptr;
-    float *ptr_f = nullptr;
-    unsigned *ptr_ui = nullptr;
-    int *ptr_i = nullptr;
-    unsigned long long *ptr_ull = nullptr;
-    long long *ptr_ll = nullptr;
-
-    // Assign the MATLAB data to the correct pointer
-    unsigned T = 0; // Type ID of input type
-    if (mxIsDouble(input))
-        T = 1, ptr_d = (double *)mxGetData(input);
-    else if (mxIsSingle(input))
-        T = 2, ptr_f = (float *)mxGetData(input);
-    else if (mxIsClass(input, "uint32"))
-        T = 3, ptr_ui = (unsigned *)mxGetData(input);
-    else if (mxIsClass(input, "int32"))
-        T = 4, ptr_i = (int *)mxGetData(input);
-    else if (mxIsClass(input, "uint64"))
-        T = 5, ptr_ull = (unsigned long long *)mxGetData(input);
-    else if (mxIsClass(input, "int64"))
-        T = 6, ptr_ll = (long long *)mxGetData(input);
-    else if (var_name.empty())
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", "Unsupported data type.");
-    else
-    {
-        std::string error_message = "Input '" + var_name + "' has an unsupported data type.";
-        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", error_message.c_str());
-    }
-
-    // Convert data to armadillo output
-    auto output = arma::Cube<dtype>(d1, d2, d3 * d4, arma::fill::none);
-    dtype *ptr = output.memptr();
-    if (T == 1)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_d[m];
-    else if (T == 2)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_f[m];
-    else if (T == 3)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ui[m];
-    else if (T == 4)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_i[m];
-    else if (T == 5)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ull[m];
-    else if (T == 6)
-        for (size_t m = 0; m < n_data; ++m)
-            ptr[m] = (dtype)ptr_ll[m];
+    arma::Cube<dtype> output(d1, d2, d3 * d4, arma::fill::none);
+    qd_mex_copy_convert<dtype>(input, output.memptr(), n_data, var_name);
     return output;
 }
 
 // Quick input converters
-inline arma::vec qd_mex_get_double_Col(const mxArray *input, bool copy = false)
+template <typename dtype>
+inline arma::Col<dtype> qd_mex_get_Col(const mxArray *input, bool copy = false)
 {
-    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Col<double>(input) : qd_mex_typecast_Col<double>(input);
+    return (qd_mex_type_matches<dtype>(input) && !copy)
+               ? qd_mex_reinterpret_Col<dtype>(input)
+               : qd_mex_typecast_Col<dtype>(input);
 }
 
-inline arma::fvec qd_mex_get_single_Col(const mxArray *input, bool copy = false)
+template <typename dtype>
+inline arma::Mat<dtype> qd_mex_get_Mat(const mxArray *input, bool copy = false)
 {
-    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Col<float>(input) : qd_mex_typecast_Col<float>(input);
+    return (qd_mex_type_matches<dtype>(input) && !copy)
+               ? qd_mex_reinterpret_Mat<dtype>(input)
+               : qd_mex_typecast_Mat<dtype>(input);
 }
 
-inline arma::mat qd_mex_get_double_Mat(const mxArray *input, bool copy = false)
+template <typename dtype>
+inline arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false)
 {
-    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Mat<double>(input) : qd_mex_typecast_Mat<double>(input);
-}
-
-inline arma::fmat qd_mex_get_single_Mat(const mxArray *input, bool copy = false)
-{
-    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Mat<float>(input) : qd_mex_typecast_Mat<float>(input);
-}
-
-inline arma::cube qd_mex_get_double_Cube(const mxArray *input, bool copy = false)
-{
-    return (mxIsDouble(input) && !copy) ? qd_mex_reinterpret_Cube<double>(input) : qd_mex_typecast_Cube<double>(input);
-}
-
-inline arma::fcube qd_mex_get_single_Cube(const mxArray *input, bool copy = false)
-{
-    return (mxIsSingle(input) && !copy) ? qd_mex_reinterpret_Cube<float>(input) : qd_mex_typecast_Cube<float>(input);
+    return (qd_mex_type_matches<dtype>(input) && !copy)
+               ? qd_mex_reinterpret_Cube<dtype>(input)
+               : qd_mex_typecast_Cube<dtype>(input);
 }
 
 // Creates an mxArray based on the armadillo input type, copies content

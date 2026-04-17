@@ -97,10 +97,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
     // Load inputs (cast to double if needed)
-    arma::mat orig = qd_mex_get_double_Mat(prhs[0]);
-    arma::mat dest = qd_mex_get_double_Mat(prhs[1]);
-    arma::mat mesh = qd_mex_get_double_Mat(prhs[2]);
-    arma::mat mtl_prop = qd_mex_get_double_Mat(prhs[3]);
+    arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
+    arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
+    arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
+    arma::mat mtl_prop = qd_mex_get_Mat<double>(prhs[3]);
 
     double center_freq = qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
     int lod = (nrhs < 6) ? 2 : qd_mex_get_scalar<int>(prhs[5], "lod", 2);

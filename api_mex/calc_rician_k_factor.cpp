@@ -87,8 +87,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[1], 1);
 
     // Read TX and RX positions
-    arma::mat tx_pos = qd_mex_get_double_Mat(prhs[2]);
-    arma::mat rx_pos = qd_mex_get_double_Mat(prhs[3]);
+    arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[2]);
+    arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[3]);
 
     // Read optional window_size
     double window_size = (nrhs < 5) ? 0.01 : qd_mex_get_scalar<double>(prhs[4], "window_size", 0.01);

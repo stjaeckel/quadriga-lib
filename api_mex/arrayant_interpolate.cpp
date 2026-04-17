@@ -152,34 +152,34 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     auto ant = quadriga_lib::arrayant<double>();
     if (nrhs <= 6) // Struct
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
-        ant.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
-        ant.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
-        ant.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
-        ant.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
-        ant.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
+        ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
+        ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
+        ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
+        ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
+        ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
+        ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
 
         if (qd_mex_has_field(prhs[0], "element_pos"))
-            ant.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "element_pos"));
+            ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
     }
     else if (nrhs == 12) // Separate
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(prhs[6]);
-        ant.e_theta_im = qd_mex_get_double_Cube(prhs[7]);
-        ant.e_phi_re = qd_mex_get_double_Cube(prhs[8]);
-        ant.e_phi_im = qd_mex_get_double_Cube(prhs[9]);
-        ant.azimuth_grid = qd_mex_get_double_Col(prhs[10]);
-        ant.elevation_grid = qd_mex_get_double_Col(prhs[11]);
+        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[6]);
+        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[7]);
+        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[8]);
+        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[9]);
+        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[10]);
+        ant.elevation_grid = qd_mex_get_Col<double>(prhs[11]);
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     // Parse other inputs
-    const auto az = qd_mex_get_double_Mat(prhs[1]);
-    const auto el = qd_mex_get_double_Mat(prhs[2]);
+    const auto az = qd_mex_get_Mat<double>(prhs[1]);
+    const auto el = qd_mex_get_Mat<double>(prhs[2]);
     const arma::uvec element_ind = (nrhs > 3) ? qd_mex_typecast_Col<arma::uword>(prhs[3]) - 1 : arma::uvec();
-    const auto ori = (nrhs > 4) ? qd_mex_get_double_Cube(prhs[4]) : arma::cube();
-    const auto elpos = (nrhs > 5) ? qd_mex_get_double_Mat(prhs[5]) : arma::mat();
+    const auto ori = (nrhs > 4) ? qd_mex_get_Cube<double>(prhs[4]) : arma::cube();
+    const auto elpos = (nrhs > 5) ? qd_mex_get_Mat<double>(prhs[5]) : arma::mat();
 
     if (az.n_elem == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Azimuth angles cannot be empty.");

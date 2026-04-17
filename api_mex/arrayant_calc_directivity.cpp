@@ -114,21 +114,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     auto ant = quadriga_lib::arrayant<double>();
     if (nrhs <= 2) // Struct
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
-        ant.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
-        ant.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
-        ant.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
-        ant.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
-        ant.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
+        ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
+        ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
+        ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
+        ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
+        ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
+        ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
     }
     else // Separate
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(prhs[0]);
-        ant.e_theta_im = qd_mex_get_double_Cube(prhs[1]);
-        ant.e_phi_re = qd_mex_get_double_Cube(prhs[2]);
-        ant.e_phi_im = qd_mex_get_double_Cube(prhs[3]);
-        ant.azimuth_grid = qd_mex_get_double_Col(prhs[4]);
-        ant.elevation_grid = qd_mex_get_double_Col(prhs[5]);
+        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[0]);
+        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[1]);
+        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[2]);
+        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[3]);
+        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[4]);
+        ant.elevation_grid = qd_mex_get_Col<double>(prhs[5]);
     }
 
     arma::uvec element_ind;

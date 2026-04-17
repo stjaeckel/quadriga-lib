@@ -145,18 +145,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     auto ant = quadriga_lib::arrayant<double>();
     if (nrhs <= 4) // Struct
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
-        ant.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
-        ant.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
-        ant.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
-        ant.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
-        ant.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
+        ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
+        ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
+        ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
+        ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
+        ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
+        ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
         if (qd_mex_has_field(prhs[0], "element_pos"))
-            ant.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "element_pos"));
+            ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
         if (qd_mex_has_field(prhs[0], "coupling_re"))
-            ant.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_re"));
+            ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_re"));
         if (qd_mex_has_field(prhs[0], "coupling_im"))
-            ant.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_im"));
+            ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_im"));
         if (qd_mex_has_field(prhs[0], "center_freq"))
             ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(prhs[0], "center_freq"));
         if (qd_mex_has_field(prhs[0], "name"))
@@ -164,18 +164,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else if (nrhs >= 10) // Separate
     {
-        ant.e_theta_re = qd_mex_get_double_Cube(prhs[4]);
-        ant.e_theta_im = qd_mex_get_double_Cube(prhs[5]);
-        ant.e_phi_re = qd_mex_get_double_Cube(prhs[6]);
-        ant.e_phi_im = qd_mex_get_double_Cube(prhs[7]);
-        ant.azimuth_grid = qd_mex_get_double_Col(prhs[8]);
-        ant.elevation_grid = qd_mex_get_double_Col(prhs[9]);
+        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[4]);
+        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[5]);
+        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[6]);
+        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[7]);
+        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[8]);
+        ant.elevation_grid = qd_mex_get_Col<double>(prhs[9]);
         if (nrhs > 10)
-            ant.element_pos = qd_mex_get_double_Mat(prhs[10]);
+            ant.element_pos = qd_mex_get_Mat<double>(prhs[10]);
         if (nrhs > 11)
-            ant.coupling_re = qd_mex_get_double_Mat(prhs[11]);
+            ant.coupling_re = qd_mex_get_Mat<double>(prhs[11]);
         if (nrhs > 12)
-            ant.coupling_im = qd_mex_get_double_Mat(prhs[12]);
+            ant.coupling_im = qd_mex_get_Mat<double>(prhs[12]);
         if (nrhs > 13)
             ant.center_frequency = qd_mex_get_scalar<double>(prhs[13]);
         if (nrhs > 14)
@@ -190,9 +190,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Parse grid
     arma::vec az, el;
     if (nrhs > 2)
-        az = qd_mex_get_double_Col(prhs[2]);
+        az = qd_mex_get_Col<double>(prhs[2]);
     if (nrhs > 3)
-        el = qd_mex_get_double_Col(prhs[3]);
+        el = qd_mex_get_Col<double>(prhs[3]);
 
     // Call member function
     auto arrayant_out = quadriga_lib::arrayant<double>();

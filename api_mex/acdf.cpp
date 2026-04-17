@@ -86,8 +86,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    arma::mat data = qd_mex_get_double_Mat(prhs[0]);
-    arma::vec bins = (nrhs < 2) ? arma::vec() : qd_mex_get_double_Col(prhs[1]);
+    arma::mat data = qd_mex_get_Mat<double>(prhs[0]);
+    arma::vec bins = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
     arma::uword n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);
 
     // Set up output pointers based on nlhs

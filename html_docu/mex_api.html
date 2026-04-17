@@ -3946,6 +3946,11 @@ where azimuth and elevation measure angles. In the geographic coordinate system,
    Cartesian coordinates (x,y,z) 
    Single or double precision, Size: <code>[3, n_row, n_col]</code> 
 </li></ul>
+ 
+<ul><li style="margin-bottom: 0.4em;"><b>kernel</b><br> 
+   Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2  
+   (throws if AVX2 unavailable); default <code>0</code> 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b><br> 

@@ -97,8 +97,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
 
     // tx_pos, rx_pos
-    arma::mat tx_pos = qd_mex_get_double_Mat(prhs[3]);
-    arma::mat rx_pos = qd_mex_get_double_Mat(prhs[4]);
+    arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
+    arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
 
     // --- Read optional inputs ---
     bool include_los = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "include_los", false);

@@ -76,11 +76,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (mxIsSingle(prhs[0]) && nlhs > 0)
     {
-        const arma::fvec xi = qd_mex_get_single_Col(prhs[0]);
-        const arma::fvec yi = twoD ? qd_mex_get_single_Col(prhs[1]) : arma::fvec(1);
-        const arma::fcube data = qd_mex_get_single_Cube(prhs[2]);
-        const arma::fvec xo = qd_mex_get_single_Col(prhs[3]);
-        const arma::fvec yo = (nrhs > 4 && twoD)  ? qd_mex_get_single_Col(prhs[4]) : arma::fvec(1);
+        const arma::fvec xi = qd_mex_get_Col<float>(prhs[0]);
+        const arma::fvec yi = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
+        const arma::fcube data = qd_mex_get_Cube<float>(prhs[2]);
+        const arma::fvec xo = qd_mex_get_Col<float>(prhs[3]);
+        const arma::fvec yo = (nrhs > 4 && twoD)  ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
 
         arma::fcube output;
         plhs[0] = qd_mex_init_output(&output, yo.n_elem, xo.n_elem, data.n_slices);
@@ -89,11 +89,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else if (nlhs > 0)
     {
-        const arma::vec xi = qd_mex_get_double_Col(prhs[0]);
-        const arma::vec yi = twoD ? qd_mex_get_double_Col(prhs[1]) : arma::vec(1);
-        const arma::cube data = qd_mex_get_double_Cube(prhs[2]);
-        const arma::vec xo = qd_mex_get_double_Col(prhs[3]);
-        const arma::vec yo = (nrhs > 4 && twoD) ? qd_mex_get_double_Col(prhs[4]) : arma::vec(1);
+        const arma::vec xi = qd_mex_get_Col<double>(prhs[0]);
+        const arma::vec yi = twoD ? qd_mex_get_Col<double>(prhs[1]) : arma::vec(1);
+        const arma::cube data = qd_mex_get_Cube<double>(prhs[2]);
+        const arma::vec xo = qd_mex_get_Col<double>(prhs[3]);
+        const arma::vec yo = (nrhs > 4 && twoD) ? qd_mex_get_Col<double>(prhs[4]) : arma::vec(1);
 
         arma::cube output;
         plhs[0] = qd_mex_init_output(&output, yo.n_elem, xo.n_elem, data.n_slices);

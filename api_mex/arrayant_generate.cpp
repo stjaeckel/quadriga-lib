@@ -203,12 +203,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs > 15) // Use custom pattern
         {
             quadriga_lib::arrayant<double> custom_array;
-            custom_array.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[15], "e_theta_re"));
-            custom_array.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[15], "e_theta_im"));
-            custom_array.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[15], "e_phi_re"));
-            custom_array.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[15], "e_phi_im"));
-            custom_array.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[15], "azimuth_grid"));
-            custom_array.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[15], "elevation_grid"));
+            custom_array.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[15], "e_theta_re"));
+            custom_array.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[15], "e_theta_im"));
+            custom_array.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[15], "e_phi_re"));
+            custom_array.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[15], "e_phi_im"));
+            custom_array.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[15], "azimuth_grid"));
+            custom_array.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[15], "elevation_grid"));
             arrayant = quadriga_lib::generate_arrayant_3GPP<double>(M, N, freq, pol, tilt, spacing, Mg, Ng, dgv, dgh, &custom_array);
         }
         else if (az_3dB > 0.0 && el_3dB > 0.0) // Use custom beam width
@@ -250,7 +250,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     {
         arma::mat beam_angles(3, 1);
         if (nrhs > 9)
-            beam_angles = qd_mex_get_double_Mat(prhs[9]);
+            beam_angles = qd_mex_get_Mat<double>(prhs[9]);
         else
             beam_angles(2, 0) = 1.0;
 

@@ -2304,7 +2304,7 @@ void quadriga_lib::get_channels_spherical(
 | [fast_acos](#fast_acos) | Compute elementwise approximate arc-cosine of a vector |
 | [fast_asin](#fast_asin) | Compute elementwise approximate arc-sine of a vector |
 | [fast_atan2](#fast_atan2) | Compute elementwise approximate two-argument arc-tangent of two vectors |
-| [fast_cart2geo](#fast_cart2geo) | Convert elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles |
+| [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
 | [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
@@ -2385,35 +2385,37 @@ void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fv
 
 ---
 ## fast_cart2geo
-Convert elementwise unit-sphere Cartesian coordinates to azimuth/elevation angles
+Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
-- Conversion: az = atan2(y, x), el = asin(clamp(z, -1, 1))
-- z is clamped to [-1, 1] before asin to guard against FMA rounding artefacts pushing abs(z) slightly above 1
+- Conversion: len = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / len, -1, 1))
+- Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
+- z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1
 - All inputs must have the same length
-- In-place and output-output aliasing not allowed (x/y/z cannot alias az or el; az and el cannot alias each other)
+- In-place and output-output aliasing not allowed (x/y/z cannot alias az, el, or len; az, el, and len cannot alias each other)
 - Output vectors resized automatically if needed
-- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- OpenMP-parallelized when enabled
+- Allowed datatypes: `float` or `double`
+- AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full `dtype` precision
 
 ### Declaration:
 ```
 void quadriga_lib::fast_cart2geo(const arma::fvec &x, const arma::fvec &y, const arma::fvec &z,
-                                 arma::fvec &az, arma::fvec &el);
+                                 arma::fvec &az, arma::fvec &el, arma::fvec *len = nullptr, int use_kernel = 0);
 
 void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const arma::vec &z,
-                                 arma::fvec &az, arma::fvec &el);
+                                 arma::vec &az, arma::vec &el, arma::vec *len = nullptr, int use_kernel = 0);
 ```
 
 ### Input Arguments:
 - **`x`** — X-coordinates; `[n]`
 - **`y`** — Y-coordinates; `[n]`
 - **`z`** — Z-coordinates; `[n]`
+- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); default `0`
 
 ### Output Arguments:
 - **`az`** — Azimuth angles in radians; `[n]`
 - **`el`** — Elevation angles in radians; `[n]`
+- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n]`
 
 ### See also:
 - [fast_geo2cart](#fast_geo2cart) (inverse conversion)
@@ -2537,7 +2539,6 @@ void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
 | [calc_delay_spread](#calc_delay_spread) | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
 | [calc_rician_k_factor](#calc_rician_k_factor) | Calculate the Rician K-Factor from channel impulse response data |
 | [calc_rotation_matrix](#calc_rotation_matrix) | Calculate rotation matrices from Euler angles |
-| [cart2geo](#cart2geo) | Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance) |
 | [colormap](#colormap) | Generate a colormap matrix with RGB values |
 | [geo2cart](#geo2cart) | Transform geographic (azimuth, elevation, length) to Cartesian coordinates |
 | [interp_1D / interp_2D](#interp_1d-interp_2d) | Perform linear interpolation (1D or 2D) on single or multiple data sets. |
@@ -2775,41 +2776,6 @@ arma::Col<dtype> quadriga_lib::calc_rotation_matrix(const arma::Col<dtype> &orie
 
 ### Returns:
 - Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`
-
----
-## cart2geo
-Convert Cartesian coordinates to geographic coordinates (azimuth, elevation, distance)
-
-### Description:
-- Transforms 3D Cartesian coordinates `(x, y, z)` into geographic coordinates:
-  - Azimuth angle [rad]
-  - Elevation angle [rad]
-  - Distance (vector norm)
-- Azimuth is measured in the x-y plane from the x-axis; elevation is from the x-y plane upward.
-- Allowed datatypes (`dtype`): `float` or `double`
-
-### Declaration:
-```
-arma::Cube<dtype> quadriga_lib::cart2geo(const arma::Cube<dtype> &cart);
-
-arma::Mat<dtype> quadriga_lib::cart2geo(const arma::Mat<dtype> &cart);
-
-arma::Col<dtype> quadriga_lib::cart2geo(const arma::Col<dtype> &cart);
-```
-
-### Arguments:
-- `const arma::Cube<dtype> ***cart**` or `const arma::Mat<dtype> ***cart**` or `const arma::Col<dtype> **cart**` (input)
-  Cartesian coordinate vectors (x, y, z), Size `[3, n_row, n_col]` or `[3, n_row]` or `[3]`.
-
-### Returns:
-- `arma::Cube<dtype>` or `arma::Mat<dtype>` or `arma::Col<dtype>`
-  Geographic coordinate vectors `(azimuth, elevation, distance)`, Size `[n_row, n_col, 3]` or `[n_row, 3]` or `[3]`.
-
-### Example:
-```
-arma::vec cart = {1.0, 1.0, 1.0};
-auto geo = quadriga_lib::cart2geo(cart);
-```
 
 ---
 ## colormap
