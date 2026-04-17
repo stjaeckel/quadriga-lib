@@ -36,7 +36,6 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
 - If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
-- Allowed datatypes: float or double
 
 ## Declaration:
 ```
@@ -59,16 +58,6 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 - **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
-
-## Example:
-```
-arma::mat data = arma::randn<arma::mat>(10000, 5);
-arma::vec bins;
-arma::mat Sh;
-arma::vec Sc, mu, sig;
-quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
-// bins: [201], Sh: [201,5], Sc: [201], mu/sig: [9]
-```
 MD!*/
 
 template <typename dtype>
