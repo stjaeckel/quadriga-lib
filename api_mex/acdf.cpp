@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,93 +24,84 @@ Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
-# acdf
+# ACDF
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 ## Description:
-- Calculates the empirical CDF from the given data matrix, where each column represents an
-  independent data set (e.g., repeated experiment runs).
-- Individual CDFs are computed per column and an averaged CDF is obtained by interpolation in
-  quantile space.
-- `Inf` and `NaN` values in the data are excluded from the computation.
-- If `bins` is empty or not provided, 201 equally spaced bins spanning the data range are generated.
+- Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative
+  sum
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from
+  each column CDF are averaged, then mapped back to the bin grid
+- Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
+- `Inf` and `NaN` values are excluded from computation
+- If `bins` is empty, equally spaced bins spanning the data range are generated
 
 ## Usage:
 ```
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data );
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data, bins );
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data, bins, n_bins );
+[ Sh, bins_out, Sc, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
 ```
 
-## Input arguments:
-- `**data**` (input)<br>
-  Input data matrix. Size `[n_samples, n_sets]`. Each column is one data set.
+## Input Arguments:
+- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
+- **`bins_in`** *(optional)* — Bin centers; used as-is if non-empty, `[n_bins_in]`
+- **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when
+  non-empty `bins_in` are provided
 
-- `**bins** = []` (optional input)<br>
-  Bin centers for the histogram. Length `[n_bins]`. If empty, bins are auto-generated.
-
-- `**n_bins** = 201` (optional input)<br>
-  Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when
-  non-empty bins are provided.
-
-## Output arguments:
-- `double **Sh**` (output)<br>
-  Individual CDFs. Size `[n_bins, n_sets]`.
-
-- `double **bins**` (output)<br>
-  Bin centers. Length `[n_bins]`.
-
-- `double **Sc**` (output)<br>
-  Averaged CDF. Length `[n_bins]`.
-
-- `double **mu**` (output)<br>
-  Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-- `double **sig**` (output)<br>
-  Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length `[9]`.
-
-## Example:
-```
-data = randn(10000, 5);
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data );
-% bins has 201 elements, Sh is [201, 5], Sc is [201, 1], mu and sig are [9, 1]
-```
+## Output Arguments:
+- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins_out, n_sets]`
+- **`bins_out`** *(optional)* — Auto-generated bins; copy of `bins_in` when
+  non-empty `bins_in` are provided, `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
+- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
+- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 1)
+    if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
-    arma::mat data = qd_mex_get_Mat<double>(prhs[0]);
-    arma::vec bins = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
-    arma::uword n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);
+    const arma::mat data = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::vec bins_in = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
+    const arma::uword n_bins = (nrhs < 3) ? 201 : qd_mex_get_scalar<arma::uword>(prhs[2], "n_bins", 201);
 
-    // Set up output pointers based on nlhs
+    arma::uword n_bins_out = bins_in.empty() ? n_bins : bins_in.n_elem;
+    arma::uword n_sets = data.n_cols;
+
+    // Output allocation
     arma::mat Sh;
-    arma::vec Sc, mu, sig;
+    arma::vec Sc, bins_out, mu, sig;
 
-    arma::mat *p_Sh = (nlhs > 0) ? &Sh : nullptr;
-    arma::vec *p_Sc = (nlhs > 2) ? &Sc : nullptr;
-    arma::vec *p_mu = (nlhs > 3) ? &mu : nullptr;
-    arma::vec *p_sig = (nlhs > 4) ? &sig : nullptr;
-
-    // Call library function (double precision)
-    CALL_QD(quadriga_lib::acdf<double>(data, &bins, p_Sh, p_Sc, p_mu, p_sig, n_bins));
-
-    // Write outputs
     if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&Sh);
-    if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&bins);
+        plhs[0] = qd_mex_init_output(&Sh, n_bins_out, n_sets);
+
     if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&Sc);
+        plhs[2] = qd_mex_init_output(&Sc, n_bins_out);
+
     if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&mu);
+        plhs[3] = qd_mex_init_output(&mu, 9);
+
     if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab(&sig);
+        plhs[4] = qd_mex_init_output(&sig, 9);
+
+    // Special case for bins
+    if (!bins_in.empty())
+        bins_out = bins_in;
+
+    // Wrap optional pointers
+    arma::mat *p_Sh = Sh.empty() ? nullptr : &Sh;
+    arma::vec *p_Sc = Sc.empty() ? nullptr : &Sc;
+    arma::vec *p_mu = mu.empty() ? nullptr : &mu;
+    arma::vec *p_sig = sig.empty() ? nullptr : &sig;
+
+    // Call library function
+    CALL_QD(quadriga_lib::acdf<double>(data, &bins_out, p_Sh, p_Sc, p_mu, p_sig, n_bins));
+
+    // Copy to MATLAB
+    if (nlhs > 1)
+        plhs[1] = qd_mex_copy2matlab(&bins_out);
 }
