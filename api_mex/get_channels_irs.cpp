@@ -188,62 +188,62 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Assemble TX array antenna object
     auto ant_tx = quadriga_lib::arrayant<double>();
-    ant_tx.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
-    ant_tx.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
-    ant_tx.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
-    ant_tx.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
-    ant_tx.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
-    ant_tx.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
+    ant_tx.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
+    ant_tx.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
+    ant_tx.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
+    ant_tx.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
+    ant_tx.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
+    ant_tx.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
     if (qd_mex_has_field(prhs[0], "element_pos"))
-        ant_tx.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "element_pos"));
+        ant_tx.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
     if (qd_mex_has_field(prhs[0], "coupling_re"))
-        ant_tx.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_re"));
+        ant_tx.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_re"));
     if (qd_mex_has_field(prhs[0], "coupling_im"))
-        ant_tx.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_im"));
+        ant_tx.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_im"));
 
     // Assemble RX array antenna object
     auto ant_rx = quadriga_lib::arrayant<double>();
-    ant_rx.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_re"));
-    ant_rx.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_im"));
-    ant_rx.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_re"));
-    ant_rx.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_im"));
-    ant_rx.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "azimuth_grid"));
-    ant_rx.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "elevation_grid"));
+    ant_rx.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_re"));
+    ant_rx.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_im"));
+    ant_rx.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_re"));
+    ant_rx.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_im"));
+    ant_rx.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "azimuth_grid"));
+    ant_rx.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "elevation_grid"));
     if (qd_mex_has_field(prhs[1], "element_pos"))
-        ant_rx.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "element_pos"));
+        ant_rx.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "element_pos"));
     if (qd_mex_has_field(prhs[1], "coupling_re"))
-        ant_rx.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "coupling_re"));
+        ant_rx.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "coupling_re"));
     if (qd_mex_has_field(prhs[1], "coupling_im"))
-        ant_rx.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "coupling_im"));
+        ant_rx.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "coupling_im"));
 
     // Assemble IRS array antenna object
     auto ant_irs = quadriga_lib::arrayant<double>();
-    ant_irs.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[2], "e_theta_re"));
-    ant_irs.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[2], "e_theta_im"));
-    ant_irs.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[2], "e_phi_re"));
-    ant_irs.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[2], "e_phi_im"));
-    ant_irs.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[2], "azimuth_grid"));
-    ant_irs.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[2], "elevation_grid"));
+    ant_irs.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[2], "e_theta_re"));
+    ant_irs.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[2], "e_theta_im"));
+    ant_irs.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[2], "e_phi_re"));
+    ant_irs.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[2], "e_phi_im"));
+    ant_irs.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[2], "azimuth_grid"));
+    ant_irs.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[2], "elevation_grid"));
     if (qd_mex_has_field(prhs[2], "element_pos"))
-        ant_irs.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[2], "element_pos"));
+        ant_irs.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[2], "element_pos"));
     if (qd_mex_has_field(prhs[2], "coupling_re"))
-        ant_irs.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[2], "coupling_re"));
+        ant_irs.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[2], "coupling_re"));
     if (qd_mex_has_field(prhs[2], "coupling_im"))
-        ant_irs.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[2], "coupling_im"));
+        ant_irs.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[2], "coupling_im"));
 
     // Segment TX > IRS
-    const auto fbs_pos_1 = qd_mex_get_double_Mat(prhs[3]);
-    const auto lbs_pos_1 = qd_mex_get_double_Mat(prhs[4]);
-    const auto path_gain_1 = qd_mex_get_double_Col(prhs[5]);
-    const auto path_length_1 = qd_mex_get_double_Col(prhs[6]);
-    const auto M_1 = qd_mex_get_double_Mat(prhs[7]);
+    const auto fbs_pos_1 = qd_mex_get_Mat<double>(prhs[3]);
+    const auto lbs_pos_1 = qd_mex_get_Mat<double>(prhs[4]);
+    const auto path_gain_1 = qd_mex_get_Col<double>(prhs[5]);
+    const auto path_length_1 = qd_mex_get_Col<double>(prhs[6]);
+    const auto M_1 = qd_mex_get_Mat<double>(prhs[7]);
 
     // Segment IRS > RX
-    const auto fbs_pos_2 = qd_mex_get_double_Mat(prhs[8]);
-    const auto lbs_pos_2 = qd_mex_get_double_Mat(prhs[9]);
-    const auto path_gain_2 = qd_mex_get_double_Col(prhs[10]);
-    const auto path_length_2 = qd_mex_get_double_Col(prhs[11]);
-    const auto M_2 = qd_mex_get_double_Mat(prhs[12]);
+    const auto fbs_pos_2 = qd_mex_get_Mat<double>(prhs[8]);
+    const auto lbs_pos_2 = qd_mex_get_Mat<double>(prhs[9]);
+    const auto path_gain_2 = qd_mex_get_Col<double>(prhs[10]);
+    const auto path_length_2 = qd_mex_get_Col<double>(prhs[11]);
+    const auto M_2 = qd_mex_get_Mat<double>(prhs[12]);
 
     // Positions and Orientations
     const auto tx_pos = qd_mex_typecast_Col<double>(prhs[13], "tx_pos", 3);
@@ -265,18 +265,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     bool use_alternative_irs = nrhs > 24 && mxIsStruct(prhs[24]);
     if (use_alternative_irs)
     {
-        ant_irs_2.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[24], "e_theta_re"));
-        ant_irs_2.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[24], "e_theta_im"));
-        ant_irs_2.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[24], "e_phi_re"));
-        ant_irs_2.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[24], "e_phi_im"));
-        ant_irs_2.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[24], "azimuth_grid"));
-        ant_irs_2.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[24], "elevation_grid"));
+        ant_irs_2.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[24], "e_theta_re"));
+        ant_irs_2.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[24], "e_theta_im"));
+        ant_irs_2.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[24], "e_phi_re"));
+        ant_irs_2.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[24], "e_phi_im"));
+        ant_irs_2.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[24], "azimuth_grid"));
+        ant_irs_2.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[24], "elevation_grid"));
         if (qd_mex_has_field(prhs[24], "element_pos"))
-            ant_irs_2.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[24], "element_pos"));
+            ant_irs_2.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[24], "element_pos"));
         if (qd_mex_has_field(prhs[24], "coupling_re"))
-            ant_irs_2.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[24], "coupling_re"));
+            ant_irs_2.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[24], "coupling_re"));
         if (qd_mex_has_field(prhs[24], "coupling_im"))
-            ant_irs_2.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[24], "coupling_im"));
+            ant_irs_2.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[24], "coupling_im"));
     }
 
     // Extract scalar values

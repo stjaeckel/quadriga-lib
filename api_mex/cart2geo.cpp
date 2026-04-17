@@ -76,7 +76,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    arma::cube data = qd_mex_get_double_Cube(prhs[0]);
+    arma::cube data = qd_mex_get_Cube<double>(prhs[0]);
     int kernel = (nrhs < 2) ? 1 : qd_mex_get_scalar<int>(prhs[1], "kernel", 1);
 
     if (data.n_elem == 0 || data.n_rows != 3)

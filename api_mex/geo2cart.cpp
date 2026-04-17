@@ -69,9 +69,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (mxIsSingle(prhs[0]) && nlhs > 0)
     {
-        const arma::fmat azimuth = qd_mex_get_single_Mat(prhs[0]);
-        const arma::fmat elevation = (nrhs > 1) ? qd_mex_get_single_Mat(prhs[1]) : arma::fmat(azimuth.n_rows, azimuth.n_cols);
-        const arma::fmat length = (nrhs > 2) ? qd_mex_get_single_Mat(prhs[2]) : arma::fmat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
+        const arma::fmat azimuth = qd_mex_get_Mat<float>(prhs[0]);
+        const arma::fmat elevation = (nrhs > 1) ? qd_mex_get_Mat<float>(prhs[1]) : arma::fmat(azimuth.n_rows, azimuth.n_cols);
+        const arma::fmat length = (nrhs > 2) ? qd_mex_get_Mat<float>(prhs[2]) : arma::fmat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
 
         arma::fcube cart;
         CALL_QD(cart = quadriga_lib::geo2cart(azimuth, elevation, length));
@@ -79,9 +79,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else if (nlhs > 0)
     {
-        const arma::mat azimuth = qd_mex_get_double_Mat(prhs[0]);
-        const arma::mat elevation = (nrhs > 1) ? qd_mex_get_double_Mat(prhs[1]) : arma::mat(azimuth.n_rows, azimuth.n_cols);
-        const arma::mat length = (nrhs > 2) ? qd_mex_get_double_Mat(prhs[2]) : arma::mat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
+        const arma::mat azimuth = qd_mex_get_Mat<double>(prhs[0]);
+        const arma::mat elevation = (nrhs > 1) ? qd_mex_get_Mat<double>(prhs[1]) : arma::mat(azimuth.n_rows, azimuth.n_cols);
+        const arma::mat length = (nrhs > 2) ? qd_mex_get_Mat<double>(prhs[2]) : arma::mat(azimuth.n_rows, azimuth.n_cols, arma::fill::ones);
 
         arma::cube cart;
         CALL_QD(cart = quadriga_lib::geo2cart(azimuth, elevation, length));

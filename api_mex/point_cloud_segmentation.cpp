@@ -107,14 +107,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (mxIsSingle(prhs[0]))
     {
-        const arma::fmat points_in = qd_mex_get_single_Mat(prhs[0]);
+        const arma::fmat points_in = qd_mex_get_Mat<float>(prhs[0]);
         CALL_QD(quadriga_lib::point_cloud_segmentation<float>(&points_in, &points_out_single,
                                                               &sub_cloud_index, target_size, vec_size,
                                                               &forward_index, &reverse_index));
     }
     else
     {
-        const arma::mat points_in = qd_mex_get_double_Mat(prhs[0]);
+        const arma::mat points_in = qd_mex_get_Mat<double>(prhs[0]);
         CALL_QD(quadriga_lib::point_cloud_segmentation<double>(&points_in, &points_out_double,
                                                               &sub_cloud_index, target_size, vec_size,
                                                               &forward_index, &reverse_index));

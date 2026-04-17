@@ -84,15 +84,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Assemble array antenna object (copy input data)
     auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_re"), true);
-    ant.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_im"), true);
-    ant.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_re"), true);
-    ant.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_im"), true);
-    ant.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "azimuth_grid"), true);
-    ant.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "elevation_grid"), true);
+    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_re"), true);
+    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_im"), true);
+    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_re"), true);
+    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_im"), true);
+    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "azimuth_grid"), true);
+    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "elevation_grid"), true);
 
     if (qd_mex_has_field(prhs[1], "element_pos"))
-        ant.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "element_pos"), true);
+        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "element_pos"), true);
 
     if (qd_mex_has_field(prhs[1], "name"))
         ant.name = qd_mex_get_string(qd_mex_get_field(prhs[1], "name"));

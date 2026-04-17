@@ -70,8 +70,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    const auto points_arma = qd_mex_get_double_Mat(prhs[0]);
-    const auto mesh_arma = qd_mex_get_double_Mat(prhs[1]);
+    const auto points_arma = qd_mex_get_Mat<double>(prhs[0]);
+    const auto mesh_arma = qd_mex_get_Mat<double>(prhs[1]);
     const auto obj_ind_arma = (nrhs < 3) ? arma::u32_vec() : qd_mex_typecast_Col<unsigned>(prhs[2]);
     double distance = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "distance", 0.0);
 

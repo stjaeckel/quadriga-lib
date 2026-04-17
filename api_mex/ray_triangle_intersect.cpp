@@ -99,9 +99,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
     // Load inputs (cast to double if needed)
-    arma::mat orig = qd_mex_get_double_Mat(prhs[0]);
-    arma::mat dest = qd_mex_get_double_Mat(prhs[1]);
-    arma::mat mesh = qd_mex_get_double_Mat(prhs[2]);
+    arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
+    arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
+    arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
 
     // Optional: sub_mesh_index
     arma::u32_vec sub_mesh_index;
@@ -114,7 +114,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     // Optional: aabb, use_kernel and gpu_id
-    arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_double_Mat(prhs[4]);
+    arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
 

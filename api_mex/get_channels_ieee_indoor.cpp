@@ -160,33 +160,33 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Assemble TX array antenna object
     auto ant_tx = quadriga_lib::arrayant<double>();
-    ant_tx.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_re"));
-    ant_tx.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_theta_im"));
-    ant_tx.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_re"));
-    ant_tx.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[0], "e_phi_im"));
-    ant_tx.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "azimuth_grid"));
-    ant_tx.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[0], "elevation_grid"));
+    ant_tx.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
+    ant_tx.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
+    ant_tx.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
+    ant_tx.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
+    ant_tx.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
+    ant_tx.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
     if (qd_mex_has_field(prhs[0], "element_pos"))
-        ant_tx.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "element_pos"));
+        ant_tx.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
     if (qd_mex_has_field(prhs[0], "coupling_re"))
-        ant_tx.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_re"));
+        ant_tx.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_re"));
     if (qd_mex_has_field(prhs[0], "coupling_im"))
-        ant_tx.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[0], "coupling_im"));
+        ant_tx.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_im"));
 
     // Assemble RX array antenna object
     auto ant_rx = quadriga_lib::arrayant<double>();
-    ant_rx.e_theta_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_re"));
-    ant_rx.e_theta_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_theta_im"));
-    ant_rx.e_phi_re = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_re"));
-    ant_rx.e_phi_im = qd_mex_get_double_Cube(qd_mex_get_field(prhs[1], "e_phi_im"));
-    ant_rx.azimuth_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "azimuth_grid"));
-    ant_rx.elevation_grid = qd_mex_get_double_Col(qd_mex_get_field(prhs[1], "elevation_grid"));
+    ant_rx.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_re"));
+    ant_rx.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_im"));
+    ant_rx.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_re"));
+    ant_rx.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_im"));
+    ant_rx.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "azimuth_grid"));
+    ant_rx.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "elevation_grid"));
     if (qd_mex_has_field(prhs[1], "element_pos"))
-        ant_rx.element_pos = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "element_pos"));
+        ant_rx.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "element_pos"));
     if (qd_mex_has_field(prhs[1], "coupling_re"))
-        ant_rx.coupling_re = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "coupling_re"));
+        ant_rx.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "coupling_re"));
     if (qd_mex_has_field(prhs[1], "coupling_im"))
-        ant_rx.coupling_im = qd_mex_get_double_Mat(qd_mex_get_field(prhs[1], "coupling_im"));
+        ant_rx.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "coupling_im"));
 
     // Read model parameters
     std::string ChannelType = qd_mex_get_string(prhs[2]);
@@ -197,10 +197,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double update_rate = (nrhs < 8) ? 1.0e-3 : qd_mex_get_scalar<double>(prhs[7], "update_rate", 1.0e-3);
     double speed_station_kmh = (nrhs < 9) ? 0.0 : qd_mex_get_scalar<double>(prhs[8], "speed_station_kmh", 0.0);
     double speed_env_kmh = (nrhs < 10) ? 1.2 : qd_mex_get_scalar<double>(prhs[9], "speed_env_kmh", 1.2);
-    arma::vec Dist = (nrhs < 11) ? arma::vec{4.99} : qd_mex_get_double_Col(prhs[10]);
+    arma::vec Dist = (nrhs < 11) ? arma::vec{4.99} : qd_mex_get_Col<double>(prhs[10]);
     arma::uvec n_floors = (nrhs < 12) ? arma::uvec{0} : qd_mex_typecast_Col<arma::uword>(prhs[11]);
     bool uplink = (nrhs < 13) ? false : qd_mex_get_scalar<bool>(prhs[12], "uplink", false);
-    arma::mat offset_angles = (nrhs < 14) ? arma::mat{} : qd_mex_get_double_Mat(prhs[13]);
+    arma::mat offset_angles = (nrhs < 14) ? arma::mat{} : qd_mex_get_Mat<double>(prhs[13]);
     arma::uword n_subpath = (nrhs < 15) ? 20 : qd_mex_get_scalar<arma::uword>(prhs[14], "n_subpath", 20);
     double Doppler_effect = (nrhs < 16) ? 50.0 : qd_mex_get_scalar<double>(prhs[15], "Doppler_effect", 50.0);
     arma::sword seed = (nrhs < 17) ? -1 : qd_mex_get_scalar<arma::sword>(prhs[16], "seed", -1);
