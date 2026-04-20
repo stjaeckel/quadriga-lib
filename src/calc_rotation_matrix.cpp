@@ -1,51 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Math functions
 SECTION!*/
 
 /*!MD
 # calc_rotation_matrix
 Calculate rotation matrices from Euler angles
 
-## Description:
 - Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements per orientation)
 - Internally uses double precision regardless of `dtype`
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
-arma::Cube<dtype> quadriga_lib::calc_rotation_matrix(const arma::Cube<dtype> &orientation,
-                bool invert_y_axis = false, bool transposeR = false);
+arma::Cube<dtype> quadriga_lib::calc_rotation_matrix(
+    const arma::Cube<dtype> &orientation,
+    bool invert_y_axis = false, 
+    bool transposeR = false);
 
-arma::Mat<dtype> quadriga_lib::calc_rotation_matrix(const arma::Mat<dtype> &orientation,
-                bool invert_y_axis = false, bool transposeR = false);
+arma::Mat<dtype> quadriga_lib::calc_rotation_matrix(
+    const arma::Mat<dtype> &orientation,
+    bool invert_y_axis = false, 
+    bool transposeR = false);
 
-arma::Col<dtype> quadriga_lib::calc_rotation_matrix(const arma::Col<dtype> &orientation,
-                bool invert_y_axis = false, bool transposeR = false);
+arma::Col<dtype> quadriga_lib::calc_rotation_matrix(
+    const arma::Col<dtype> &orientation,
+    bool invert_y_axis = false, 
+    bool transposeR = false);
 ```
 
-## Input Arguments:
-- **`orientation`** — Euler angles (bank, tilt, head) in radians; `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`invert_y_axis`** *(optional)* — Inverts the y-axis of the rotation
+## Inputs:
+- **`orientation`** — Euler angles (bank, tilt, head); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
+- **`invert_y_axis`** *(optional)* — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of `tilt`; use when the input convention defines positive tilt as downward
 - **`transposeR`** *(optional)* — Returns the transpose of the rotation matrix
 
 ## Returns:

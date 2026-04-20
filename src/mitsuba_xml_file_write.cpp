@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
 
@@ -75,20 +62,21 @@ static std::string_view map_to_itu(std::string_view name)
 }
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
-## Description:
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for differentiable radio-propagation simulations
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for 
+  differentiable radio-propagation simulations
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
-- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; both the XML and the mesh folder must be distributable together
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
-- Allowed datatypes: `float` or `double`
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; 
+  both the XML and the mesh folder must be distributable together
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) 
+  and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 
 ## Declaration:
 ```
@@ -104,9 +92,9 @@ void quadriga_lib::mitsuba_xml_file_write(
     bool map_to_itu_materials = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Output file path including `.xml` extension
-- **`vert_list`** — Vertex coordinates (x, y, z) in meters; `[n_vert, 3]`
+- **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
 - **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; `[n_mesh]`
 - **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; `[n_mesh]`

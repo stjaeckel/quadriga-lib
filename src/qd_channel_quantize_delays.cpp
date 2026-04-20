@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
 
@@ -145,13 +132,14 @@ SECTION!*/
 # quantize_delays
 Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
-## Description:
-- Each path delay is approximated by two adjacent taps with coefficients scaled by (1-delta)^alpha and delta^alpha, where delta is the fractional offset within the bin and alpha is `power_exponent`; this avoids discontinuities when delays cross tap boundaries
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1-delta)^alpha and delta^alpha,
+  where delta is the fractional offset within the bin and alpha is `power_exponent`; this avoids discontinuities when 
+  delays cross tap boundaries
 - Use `power_exponent=1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
 - If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but tap-selection logic still applies
-- Input `delay` may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`; shared delays are expanded internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2
+- Input `delay` may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`; shared delays are expanded 
+  internally when `fix_taps` is 0 or 3, and output delays remain shared `[1, 1, n_taps]` when `fix_taps` is 1 or 2
 - `n_rx` and `n_tx` must be identical across all snapshots; `n_path_s` may differ per snapshot
-- Allowed dtypes: `float`, `double`
 
 ## Declaration:
 ```
@@ -168,23 +156,23 @@ void quadriga_lib::quantize_delays(
     int fix_taps = 0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`coeff_re`** — Channel coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]`
 - **`coeff_im`** — Channel coefficients, imaginary part; same layout as `coeff_re`
 - **`delay`** — Path delays in seconds; vector of length `n_snap`, each cube `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
 - **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate
 - **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
-- **`fix_taps`** *(optional)* — Delay grid sharing mode:
+- **`fix_taps`** *(optional)* — Delay grid sharing mode:<br>
 
   | Value | Meaning |
   |-------|---------|
-  | 0 | Per tx-rx pair and snapshot |
-  | 1 | Single shared grid for all |
-  | 2 | Per snapshot |
-  | 3 | Per tx-rx pair |
+  | 0 | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]` |
+  | 1 | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot |
+  | 2 | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
+  | 3 | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]` |
 
-## Output Arguments:
+## Outputs:
 - **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`
 - **`coeff_im_quant`** — Output coefficients, imaginary part; same layout as `coeff_re_quant`
 - **`delay_quant`** — Output delays in seconds; each cube `[n_rx, n_tx, n_taps]` or `[1, 1, n_taps]` depending on `fix_taps`

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
@@ -281,20 +268,18 @@ static inline int line_triangle_intersect_2D(dtype x1, dtype x2, dtype y2,    //
 }
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # obj_overlap_test
 Detect overlapping 3D objects in a triangular mesh
 
-## Description:
 - Returns 1-based indices of all objects that intersect at least one other object
 - Touching faces or edges are not considered overlapping
 - Checks for intersecting triangle faces and vertices/edges penetrating another object's bounding volume
 - Overlaps smaller than `tolerance` are ignored to account for numerical imprecision
 - Does not modify or repair the mesh
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -305,14 +290,14 @@ arma::uvec quadriga_lib::obj_overlap_test(
     dtype tolerance = 0.0005);
 ```
 
-## Input Arguments:
-- **`mesh`** — Triangular mesh; each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, `[n_mesh, 9]`
-- **`obj_ind`** — 1-based object index mapping triangles to objects; output of [[obj_file_read]], `[n_mesh]`
-- **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object, `[n_overlap]`
-- **`tolerance`** *(optional)* — Geometric tolerance in meters; intersections smaller than this are ignored
+## Inputs:
+- **`mesh`** — Triangular mesh; each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
+- **`obj_ind`** — 1-based object index mapping triangles to objects; output of [[obj_file_read]]; `[n_mesh]`
+- **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object; `[n_overlap]`
+- **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
 
 ## Returns:
-- `arma::uvec`: Unique 1-based object indices of all overlapping objects, `[n_overlap]`
+- `arma::uvec`: Unique 1-based object indices of all overlapping objects; `[n_overlap]`
 
 ## See also:
 - [[obj_file_read]] (reads mesh data from files and generates `obj_ind` input)

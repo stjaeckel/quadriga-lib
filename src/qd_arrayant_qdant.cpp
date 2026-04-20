@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <iostream>
 #include <algorithm>
@@ -307,7 +294,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
     std::string pfx = ""; // Set the default prefix
     int ID = id;          // Copy ID
 
-    // Try to load an exisiting xml file. If it exists, load it to
+    // Try to load an existing xml file. If it exists, load it to
     // "pugi::xml_document" otherwise create a new "pugi::xml_document"
     pugi::xml_document doc;
     pugi::xml_parse_result result = doc.load_file(fn.c_str());
@@ -356,7 +343,7 @@ std::string qd_arrayant_qdant_write(const std::string fn, const int id,
                 return "Exisiting file format is invalid. Requires 'QuaDRiGa Array Antenna Exchange Format (QDANT)'.";
         }
 
-        // Read all exisiting IDs in the file
+        // Read all existing IDs in the file
         std::string node_name = pfx + "arrayant";
         for (pugi::xml_node node_arrayant : node_qdant.children(node_name.c_str()))
         {

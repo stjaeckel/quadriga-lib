@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
@@ -21,18 +8,16 @@
 #include <stdexcept>
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
 # calc_rician_k_factor
 Calculate the Rician K-Factor from channel impulse response data
 
-## Description:
 - KF = LOS power / NLOS power; LOS paths are those with length ≤ `dTR + window_size`, where `dTR` is the direct TX-RX distance.
 - If total NLOS power is zero, KF is set to `HUGE_VAL`; if total LOS power is zero, KF is set to 0.
 - TX/RX positions may be fixed `[3, 1]` (reused for all snapshots) or mobile `[3, n_cir]`.
-- Allowed datatypes: float or double
 
 ## Declaration:
 ```
@@ -46,16 +31,16 @@ void quadriga_lib::calc_rician_k_factor(
     dtype window_size = 0.01);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
-- **`path_length`** — Absolute TX-to-RX path lengths in [m]; same structure as `powers`
-- **`tx_pos`** — Transmitter position in Cartesian coordinates [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
-- **`rx_pos`** — Receiver position in Cartesian coordinates [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
-- **`window_size`** *(optional)* — LOS window in [m]; paths with length ≤ `dTR + window_size` are treated as LOS
+- **`path_length`** — Absolute TX-to-RX path lengths; same structure as `powers`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates [x; y; z]; `[3, 1]` or `[3, n_cir]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates [x; y; z]; `[3, 1]` or `[3, n_cir]`
+- **`window_size`** *(optional)* — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS
 
-## Output Arguments:
-- **`kf`** *(optional)* — Rician K-Factor on linear scale, `[n_cir]`
-- **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W], `[n_cir]`
+## Outputs:
+- **`kf`** *(optional)* — Rician K-Factor on linear scale; `[n_cir]`
+- **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W]; `[n_cir]`
 MD!*/
 
 template <typename dtype>

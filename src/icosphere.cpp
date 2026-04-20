@@ -1,35 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # icosphere
 Construct a geodesic polyhedron from recursive icosahedron subdivision
 
-## Description:
 - Produces 20 × n_div² triangular faces, each pointing outward from origin
 - All vertices lie on a sphere of specified radius
 - Suitable for uniform angular sampling (ray tracing, antenna patterns, spatial grids)
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
@@ -43,19 +28,19 @@ arma::uword quadriga_lib::icosphere(
     bool direction_xyz = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 × n_div² faces
 - **`radius`** — Radius of icosphere in meters
 - **`direction_xyz`** (optional) — Output directions in Cartesian (true) or spherical azimuth/elevation (false)
 
-## Output Arguments:
-- **`center`** — Unit vectors to triangle face centers, `[n_faces, 3]`
-- **`length`** (optional) — Magnitude of each `center` vector, `[n_faces]`
-- **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3], `[n_faces, 9]`
-- **`direction`** (optional) — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag, `[n_faces, 6]` or `[n_faces, 9]`
+## Outputs:
+- **`center`** — Face center coordinates in Cartesian space; each vector points radially outward from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
+- **`length`** (optional) — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`vert`** (optional) — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; `[n_faces, 9]`
+- **`direction`** (optional) — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian [x1,y1,z1,x2,y2,z2,x3,y3,z3] per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
 
 ## Returns:
-Number of generated triangular faces (20 × n_div²)
+- Number of generated triangular faces (20 × n_div²)
 MD!*/
 
 // Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
@@ -205,7 +190,7 @@ arma::uword quadriga_lib::icosphere(arma::uword n_div, dtype radius, arma::Mat<d
         // Distance from origin to plane
         tmp = (p_icosphere[n] * Nx + p_icosphere[n + n_faces] * Ny + p_icosphere[n + 2 * n_faces] * Nz);
 
-        // Calculate intersect coordinate
+        // Origin projection onto face plane
         p_dest[n] = dtype(tmp * Nx);
         p_dest[n + n_faces] = dtype(tmp * Ny);
         p_dest[n + 2 * n_faces] = dtype(tmp * Nz);

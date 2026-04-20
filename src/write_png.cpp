@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "lodepng.h"
 #include <limits>
 
 /*!SECTION
-Miscellaneous / Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # write_png
 Write a data matrix to a color-coded PNG file
 
-## Description:
 - Values are clipped to `[min_val, max_val]` before colormap mapping; auto-detected from data if `NAN`
 - Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -43,7 +28,7 @@ void quadriga_lib::write_png(
     bool log_transform = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`data`** — Input data matrix
 - **`fn`** — Output `.png` file path
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for valid values

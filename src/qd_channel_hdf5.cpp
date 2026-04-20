@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
 #include <hdf5.h>
@@ -159,7 +146,7 @@ static bool qHDF_isalnum(const std::string &str)
 
 // Helper function : get channel ID from HDF file
 // Usage: 0 - Returns ID if it exists in the file, 0 otherwise
-//        1 - Creates new channel ID. Reuses exisiting if it contains ONLY unstructured data
+//        1 - Creates new channel ID. Reuses existing if it contains ONLY unstructured data
 //        2 - Returns ID if it exists in the file, creates new one if it does not!
 // Always returns 0 if index out of bound.
 static inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned iy, unsigned iz, unsigned iw, unsigned usage = 0)
@@ -209,8 +196,8 @@ static inline unsigned qHDF_get_channel_ID(hid_t file_id, unsigned ix, unsigned 
 
     if (usage == 1)
     {
-        // Check if there is an exisiting channel
-        if (channel_index == 0) // No exisiting channel
+        // Check if there is an existing channel
+        if (channel_index == 0) // No existing channel
             create_new = true;
         else // Check if there is channel data at this location
         {
@@ -804,7 +791,6 @@ static inline std::any qHDF_read_data(hid_t group_id, std::string dataset_name, 
 # hdf5_create
 Create a new HDF5 channel file with a defined storage layout
 
-## Description:
 - Initializes a new HDF5 file for storing wireless channel data; overwrites existing files.
 - Defines a 4D layout (x, y, z, w) where each index combination maps to one channel storage slot.
 - Typical dimension mapping: x = BS, y = UE, z = frequency, w = scenario/repetition.
@@ -820,7 +806,7 @@ void quadriga_lib::hdf5_create(
     unsigned nw = 1);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path and filename of the HDF5 file to create
 - **`nx`** *(optional)* — Size of x-dimension
 - **`ny`** *(optional)* — Size of y-dimension
@@ -889,7 +875,6 @@ void quadriga_lib::hdf5_create(std::string fn, unsigned nx, unsigned ny, unsigne
 # hdf5_read_layout
 Read the storage layout of an HDF5 channel file
 
-## Description:
 - Returns `{nx, ny, nz, nw}` describing the 4D slot grid of the file.
 - Returns `{0, 0, 0, 0}` if the file does not exist; throws if the file exists but is not a valid HDF5 file.
 - `channelID` entries are `0` for empty slots; length equals `nx × ny × nz × nw` (serialized linear index).
@@ -901,7 +886,7 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(
     arma::u32_vec *channelID = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`channelID`** *(optional)* — Pointer to vector receiving the serialized slot occupancy list; `[nx·ny·nz·nw]`
 
@@ -982,7 +967,6 @@ arma::u32_vec quadriga_lib::hdf5_read_layout(std::string fn, arma::u32_vec *chan
 # hdf5_write
 Write a channel object to an HDF5 file at a specified 4D index
 
-## Description:
 - Writes a `quadriga_lib::channel<dtype>` object to slot `(ix, iy, iz, iw)` in the HDF5 file.
 - Creates the file with default layout `(65536 × 1 × 1 × 1)` if it does not exist; appends to existing files.
 - Overwrites slot content if the index already contains data.
@@ -1003,7 +987,7 @@ int quadriga_lib::hdf5_write(
     bool assume_valid = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`ch`** — Pointer to the channel object to write
 - **`fn`** — Path to the HDF5 file
 - **`ix`** *(optional)* — Slot index in x-dimension
@@ -1547,11 +1531,9 @@ template int quadriga_lib::hdf5_write(const quadriga_lib::channel<double> *ch, s
 # hdf5_read_channel
 Read a channel object from an HDF5 file at a specified 4D index
 
-## Description:
 - Returns an empty channel object (`no_snapshots == 0`) if the slot contains no valid data.
 - Structured data is stored in single precision in the file and converted to `dtype` on read.
 - Unstructured fields (`std::any`) retain their original stored type without conversion.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -1563,7 +1545,7 @@ quadriga_lib::channel<dtype> quadriga_lib::hdf5_read_channel(
     unsigned iw = 0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`ix`** *(optional)* — Slot index in x-dimension
 - **`iy`** *(optional)* — Slot index in y-dimension
@@ -2121,7 +2103,6 @@ template quadriga_lib::channel<double> quadriga_lib::hdf5_read_channel(std::stri
 # hdf5_reshape_layout
 Reshape the 4D storage layout of an existing HDF5 channel file
 
-## Description:
 - Updates `{nx, ny, nz, nw}` of an existing file; total slot count `nx × ny × nz × nw` must remain unchanged.
 - Throws if the new layout violates the total-count constraint.
 
@@ -2135,7 +2116,7 @@ void quadriga_lib::hdf5_reshape_layout(
     unsigned nw = 1);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`nx`** — New size of x-dimension
 - **`ny`** *(optional)* — New size of y-dimension
@@ -2197,7 +2178,6 @@ void quadriga_lib::hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny,
 # hdf5_read_dset
 Read an unstructured dataset from an HDF5 file at a specified 4D index
 
-## Description:
 - Reads a user-defined dataset stored under `prefix + par_name` (e.g., `"par_carrier_frequency"`).
 - Returns an empty `std::any` if the dataset does not exist at the specified slot or name.
 - Use [[any_type_id]] to determine the contained type and obtain a raw pointer.
@@ -2214,7 +2194,7 @@ std::any quadriga_lib::hdf5_read_dset(
     std::string prefix = "par_");
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`par_name`** — Dataset name without prefix, e.g., `"carrier_frequency"`
 - **`ix`** *(optional)* — Slot index in x-dimension
@@ -2278,7 +2258,6 @@ std::any quadriga_lib::hdf5_read_dset(std::string fn, std::string par_name,
 # hdf5_read_dset_names
 Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 
-## Description:
 - Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`; returned names exclude the prefix.
 
 ## Declaration:
@@ -2293,7 +2272,7 @@ arma::uword quadriga_lib::hdf5_read_dset_names(
     std::string prefix = "par_");
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`par_names`** — Pointer to vector receiving dataset names (without prefix)
 - **`ix`** *(optional)* — Slot index in x-dimension
@@ -2358,7 +2337,6 @@ arma::uword quadriga_lib::hdf5_read_dset_names(std::string fn, std::vector<std::
 # hdf5_write_dset
 Write a single unstructured dataset to an HDF5 file at a specified 4D index
 
-## Description:
 - Dataset is stored under `prefix + par_name`; name must contain only alphanumeric characters and underscores.
 - Supported scalar types: `std::string`, `unsigned`, `int`, `long long`, `unsigned long long`, `float`, `double`
 - Supported Armadillo types: `arma::Col`, `arma::Row`, `arma::Mat`, `arma::Cube` with element types `float`, `double`, `int`, `unsigned`, `sword`, `uword`, `unsigned long long`
@@ -2379,7 +2357,7 @@ void quadriga_lib::hdf5_write_dset(
     std::string prefix = "par_");
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the HDF5 file
 - **`par_name`** — Dataset name without prefix; alphanumeric and underscores only
 - **`par_data`** — Pointer to the data to write; type must be supported (see above)
@@ -2392,6 +2370,7 @@ void quadriga_lib::hdf5_write_dset(
 ## See also:
 - [[hdf5_read_dset]] (read an unstructured dataset by name)
 - [[hdf5_read_dset_names]] (list available dataset names at a slot)
+- [[any_type_id]] (inspect the type held in a `std::any`)
 MD!*/
 
 // Writes unstructured data to a hdf5 file

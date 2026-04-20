@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
 #include <cstring>   // std::memcpy
@@ -33,7 +20,6 @@ SECTION!*/
 # get_channels_planar
 Calculate MIMO channel coefficients for planar wave paths
 
-## Description:
 - Computes complex channel coefficients and delays for all TX/RX element pairs across `n_path` propagation paths.
 - Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
 - LOS path detection is distance-based (angles ignored).
@@ -41,7 +27,6 @@ Calculate MIMO channel coefficients for planar wave paths
 - If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
 - Setting `center_frequency = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance from all path lengths before converting to delay.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -68,32 +53,36 @@ void quadriga_lib::get_channels_planar(
     arma::Col<dtype> *rx_Doppler = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` elements
 - **`rx_array`** — Receive antenna array; `n_rx` elements
-- **`Tx, Ty, Tz`** — Transmitter position in meters
-- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading in radians
-- **`Rx, Ry, Rz`** — Receiver position in meters
-- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading in radians
-- **`aod`** — Departure azimuth angles in radians, `[n_path]`
-- **`eod`** — Departure elevation angles in radians, `[n_path]`
-- **`aoa`** — Arrival azimuth angles in radians, `[n_path]`
-- **`eoa`** — Arrival elevation angles in radians, `[n_path]`
-- **`path_gain`** — Path gains in linear scale, `[n_path]`
-- **`path_length`** — Path lengths from TX to RX phase center in meters, `[n_path]`
+- **`Tx, Ty, Tz`** — Transmitter position
+- **`Tb, Tt, Th`** — Transmitter orientation: bank, tilt, heading
+- **`Rx, Ry, Rz`** — Receiver position
+- **`Rb, Rt, Rh`** — Receiver orientation: bank, tilt, heading
+- **`aod`** — Departure azimuth angles; `[n_path]`
+- **`eod`** — Departure elevation angles; `[n_path]`
+- **`aoa`** — Arrival azimuth angles; `[n_path]`
+- **`eoa`** — Arrival elevation angles; `[n_path]`
+- **`path_gain`** — Path gains in linear scale; `[n_path]`
+- **`path_length`** — Path lengths from TX to RX phase center; `[n_path]`
 - **`M`** — Polarization transfer matrix, row order: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH; `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency in Hz; 0 disables phase calculation
+- **`center_frequency`** *(optional)* — Center frequency; 0 disables phase calculation
 - **`use_absolute_delays`** *(optional)* — Include LOS delay offset in all paths
 - **`add_fake_los_path`** *(optional)* — Append a zero-power LOS path when no LOS is present
 
-## Output Arguments:
-- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
-- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path(+1)]`
-- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path(+1)]`
+## Outputs:
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
 - **`rx_Doppler`** *(optional)* — Doppler weights for moving RX; positive = moving toward path, negative = away; `[n_path(+1)]`
 
 ## See also:
 - [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
+- [[get_channels_ieee_indoor]] (for generating IEEE compliant channels using `get_channels_planar` internally)
+- [[baseband_freq_response]] (for calculating the frequency response)
+- [[quantize_delays]] (for mapping delays to a fixed grid)
+- [[arrayant]] (antenna array class)
 MD!*/
 
 // Calculate channel coefficients for planar waves

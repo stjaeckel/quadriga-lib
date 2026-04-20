@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
-## Description:
 - Generates inputs required by [[calc_diffraction_gain]]: elliptic-arc paths sampling the Fresnel ellipsoid volume between each TX-RX pair, plus per-segment weights
 - Each ellipsoid has `n_path` paths, each with `n_seg` segments; `orig` and `dest` lie on the semi-major axis
 - Weights are derived from the knife-edge diffraction model; initial weights normalized so `sum(prod(weights,3),2) = 1`
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -45,25 +30,25 @@ void generate_diffraction_paths(
     arma::Cube<dtype> *weight);
 ```
 
-## Input Arguments:
-- **`orig`** — TX positions, `[n_pos, 3]`
-- **`dest`** — RX positions, `[n_pos, 3]`
-- **`center_frequency`** — Center frequency in Hz
-- **`lod`** — Level of detail; controls `n_path` and `n_seg`:
-    | `lod` | `n_path` | `n_seg` | Note |
-    |-------|----------|---------|------|
-    | 1 | 7 | 3 | |
-    | 2 | 19 | 3 | |
-    | 3 | 37 | 4 | |
-    | 4 | 61 | 5 | |
-    | 5 | 1 | 2 | debug |
-    | 6 | 2 | 2 | debug |
+## Inputs:
+- **`orig`** — TX positions; `[n_pos, 3]`
+- **`dest`** — RX positions; `[n_pos, 3]`
+- **`center_frequency`** — Center frequency
+- **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
+   `lod` | `n_path` | `n_seg` | Note 
+  -------|----------|---------|------
+   1     | 7        | 3       | 
+   2     | 19       | 3       | 
+   3     | 37       | 4       | 
+   4     | 61       | 5       | 
+   5     | 1        | 2       | debug 
+   6     | 2        | 2       | debug 
 
-## Output Arguments:
-- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
-- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
-- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints), `[n_pos, n_path, n_seg-1]`
-- **`weight`** — Per-segment weights, `[n_pos, n_path, n_seg]`
+## Outputs:
+- **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
+- **`ray_y`** — y-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
+- **`ray_z`** — z-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
+- **`weight`** — Per-segment weights; `[n_pos, n_path, n_seg]`
 
 ## See also:
 - [[calc_diffraction_gain]] (consumes the output of this function)

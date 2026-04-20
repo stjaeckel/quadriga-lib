@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <cstring> // For std::memcpy
 #include <complex>
@@ -208,18 +195,16 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
 }
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # calc_diffraction_gain
 Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
-## Description:
 - Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided into `n_path` elliptic-arc paths (controlled by `lod`), each approximated by `n_seg` line segments
 - Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, generalized to arbitrary 3D shapes
 - Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping triangles whose bounding box does not intersect the TX-RX path
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -238,21 +223,21 @@ void calc_diffraction_gain(
     int gpu_id = 0);
 ```
 
-## Input Arguments:
-- **`orig`** — TX positions, `[n_pos, 3]`
-- **`dest`** — RX positions, `[n_pos, 3]`
-- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`, `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties per triangle; see [[obj_file_read]], `[n_mesh, 5]`
-- **`center_frequency`** — Center frequency in Hz
+## Inputs:
+- **`orig`** — TX positions; `[n_pos, 3]`
+- **`dest`** — RX positions; `[n_pos, 3]`
+- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
+- **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** *(optional)* — Verbosity level
-- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]], `[n_mesh]`
+- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
 - **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
 
-## Output Arguments:
-- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale, `[n_pos]`
-- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints, `[3, n_seg-1, n_pos]`
+## Outputs:
+- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
+- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)

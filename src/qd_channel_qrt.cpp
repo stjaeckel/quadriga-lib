@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
@@ -26,7 +13,6 @@ SECTION!*/
 # qrt_file_parse
 Read metadata from a QRT file
 
-## Description:
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `file` is `nullptr`, the file is opened internally and closed on return; if provided, the stream is left open.
@@ -52,24 +38,24 @@ void quadriga_lib::qrt_file_parse(
     std::ifstream *file = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QRT file
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
-## Output Arguments:
+## Outputs:
 - **`no_cir`** *(optional)* — Number of channel snapshots per origin point
 - **`no_orig`** *(optional)* — Number of origin points (TX)
 - **`no_dest`** *(optional)* — Number of destination points (RX)
 - **`no_freq`** *(optional)* — Number of frequency bands
-- **`cir_offset`** *(optional)* — CIR offset per destination, `[no_dest]`
-- **`orig_names`** *(optional)* — Names of origin points, `[no_orig]`
-- **`dest_names`** *(optional)* — Names of destination points, `[no_dest]`
+- **`cir_offset`** *(optional)* — CIR offset per destination; `[no_dest]`
+- **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
+- **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file, `[no_freq]`
-- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates, `[no_cir, 3]`
-- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles in radians, `[no_cir, 3]`
-- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates, `[no_orig, 3]`
-- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles in radians, `[no_orig, 3]`
+- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file; `[no_freq]`
+- **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
+- **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
+- **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
+- **`orig_orientation`** *(optional)* — Origin (TX) orientations as Euler angles; `[no_orig, 3]`
 MD!*/
 
 void quadriga_lib::qrt_file_parse(const std::string &fn,
@@ -290,7 +276,6 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
 # qrt_read_cache_init
 Initialize a QRT read cache for fast repeated access
 
-## Description:
 - Reads all fixed metadata from a QRT file into a `quadriga_lib::qrt_read_cache` struct.
 - Pre-computes byte offsets so subsequent [[qrt_file_read]] calls need only 2 seeks and 4 reads instead of re-parsing the header.
 - Populate once, then pass the cache and a shared `std::ifstream` to [[qrt_file_read]] for tight-loop performance.
@@ -303,7 +288,7 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
     std::ifstream *file = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QRT file
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
@@ -459,13 +444,11 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string
 # qrt_file_read
 Read ray-tracing CIR data from a QRT file
 
-## Description:
 - Reads channel impulse response data for a specific snapshot index and origin point.
 - All output arguments are optional; pass `nullptr` to skip any.
 - If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped.
 - For tight-loop performance, pass a pre-opened `std::ifstream` and a [[qrt_read_cache_init]]-populated cache; reduces per-call I/O to 2 seeks and 4 reads.
 - `fn` is ignored when both `file` and `cache` are provided.
-- Allowed datatypes: `float`, `double`
 
 ## Declaration:
 ```
@@ -496,38 +479,37 @@ void quadriga_lib::qrt_file_read(
     const qrt_read_cache *cache = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QRT file; ignored when both `file` and `cache` are provided
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
-- **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]
+- **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
+   `normalize_M` | `M` | `path_gain`
+  ---|---|---
+   0 | As stored in QRT file | -FSPL
+   1 | Max column power = 1 | -FSPL minus material losses
 
-| `normalize_M` | `M` | `path_gain` |
-|---|---|---|
-| 0 | As stored in QRT file | -FSPL |
-| 1 | Max column power = 1 | -FSPL minus material losses |
-
-## Output Arguments:
-- **`center_frequency`** *(optional)* — Center frequency in Hz, `[n_freq]`
-- **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates, `[3]`
-- **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading) in radians, `[3]`
-- **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates, `[3]`
-- **`rx_orientation`** *(optional)* — Receiver orientation (bank, tilt, heading) in radians, `[3]`
-- **`fbs_pos`** *(optional)* — First-bounce scatterer positions, `[3, n_path]`
-- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions, `[3, n_path]`
-- **`path_gain`** *(optional)* — Path gain on linear scale, `[n_path, n_freq]`
-- **`path_length`** *(optional)* — Absolute path length TX to RX phase center, `[n_path]`
+## Outputs:
+- **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`
+- **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates; `[3]`
+- **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading); `[3]`
+- **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates; `[3]`
+- **`rx_orientation`** *(optional)* — Receiver orientation (bank, tilt, heading); `[3]`
+- **`fbs_pos`** *(optional)* — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** *(optional)* — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_gain`** *(optional)* — Path gain on linear scale; `[n_path, n_freq]`
+- **`path_length`** *(optional)* — Absolute path length TX to RX phase center; `[n_path]`
 - **`M`** *(optional)* — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
-- **`aod`** *(optional)* — Departure azimuth angles in radians, `[n_path]`
-- **`eod`** *(optional)* — Departure elevation angles in radians, `[n_path]`
-- **`aoa`** *(optional)* — Arrival azimuth angles in radians, `[n_path]`
-- **`eoa`** *(optional)* — Arrival elevation angles in radians, `[n_path]`
+- **`aod`** *(optional)* — Departure azimuth angles; `[n_path]`
+- **`eod`** *(optional)* — Departure elevation angles; `[n_path]`
+- **`aoa`** *(optional)* — Arrival azimuth angles; `[n_path]`
+- **`eoa`** *(optional)* — Arrival elevation angles; `[n_path]`
 - **`path_coord`** *(optional)* — Interaction coordinates per path; vector of length `n_path`, each `[3, n_interact + 2]`
-- **`no_int`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS, `[n_path]`
-- **`coord`** *(optional)* — Interaction coordinates, `[3, sum(no_int)]`
+- **`no_int`** *(optional)* — Number of mesh interactions per path; 0 indicates LOS; `[n_path]`
+- **`coord`** *(optional)* — Interaction coordinates; `[3, sum(no_int)]`
 
 ## Example:
 ```

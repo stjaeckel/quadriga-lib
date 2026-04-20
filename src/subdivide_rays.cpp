@@ -1,34 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # subdivide_rays
 Subdivide ray beams into four smaller sub-beams
 
-## Description:
 - Each triangular beam is split into 4 sub-beams; output size is `4 × n_ray` or `4 × n_ind` when `index` is provided
 - `tridir` format auto-detected: spherical `[n_ray, 6]` or Cartesian `[n_ray, 9]`; output matches input format
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -45,15 +30,15 @@ arma::uword quadriga_lib::subdivide_rays(
     const double ray_offset = 0.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`orig`** — Ray origin points in GCS; `[n_ray, 3]`
 - **`trivec`** — Vectors from origin to triangle vertices, columns `[x1 y1 z1 x2 y2 z2 x3 y3 z3]`; `[n_ray, 9]`
 - **`tridir`** — Vertex-ray directions, spherical `[v1az v1el v2az v2el v3az v3el]` or Cartesian `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 6]` or `[n_ray, 9]`
 - **`dest`** (optional) — Ray destination points; `[n_ray, 3]`
 - **`index`** (optional) — 0-based indices of rays to subdivide; `[n_ind]`
-- **`ray_offset`** (optional) — Origin offset in meters along propagation direction
+- **`ray_offset`** (optional) — Origin offset along propagation direction
 
-## Output Arguments:
+## Outputs:
 - **`origN`** — Subdivided ray origins; `[n_rayN, 3]`
 - **`trivecN`** — Subdivided triangle vectors; `[n_rayN, 9]`
 - **`tridirN`** — Subdivided vertex-ray directions, same format as `tridir`; `[n_rayN, 6]` or `[n_rayN, 9]`

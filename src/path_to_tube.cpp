@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
@@ -21,7 +8,7 @@
 // Rotate a vector around an arbitrary axis
 static inline void rotate_vector_around_axis(double vx, double vy, double vz,    // The vector to rotate
                                              double kx, double ky, double kz,    // The axis of rotation
-                                             double theta,                       // Rotation angle in radians
+                                             double theta,                       // Rotation angle
                                              double *rx, double *ry, double *rz, // Result
                                              bool k_is_normalized = false)
 {
@@ -45,19 +32,17 @@ static inline void rotate_vector_around_axis(double vx, double vy, double vz,   
 }
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # path_to_tube
 Convert a 3D path into a tube surface mesh for visualization
 
-## Description:
 - Converts an ordered sequence of 3D points into a tubular quad mesh with circular cross-sections
 - At bends steeper than 10°, the tube is split and an extra vertex ring is inserted to avoid intersection
 - Cross-section orientation uses continuous frame alignment between segments to minimize twisting
 - Output `faces` indices are directly usable in `.obj` or `.ply` export
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -69,17 +54,14 @@ void quadriga_lib::path_to_tube(
     arma::uword n_edges = 5);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`path_coord`** — Ordered 3D path coordinates; `[3, n_coord]`
-- **`radius`** *(optional)* — Tube cross-section radius in meters
+- **`radius`** *(optional)* — Tube cross-section radius
 - **`n_edges`** *(optional)* — Number of vertices per circular cross-section; must be ≥ 3
 
-## Output Arguments:
+## Outputs:
 - **`vert`** — Tube vertex positions; `[3, (n_coord + n_split) × n_edges]` where `n_split` is the number of bends > 10°
 - **`faces`** — Quad face indices into `vert`, 4 indices per quad; `[4, (n_coord - 1) × n_edges]`
-
-## See also:
-- [[ray_triangle_intersect]] (used internally to project vertex rings at bends)
 MD!*/
 
 // Convert paths to tubes

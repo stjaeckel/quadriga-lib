@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # triangle_mesh_segmentation
 Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
 
-## Description:
 - Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
 - Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
 - If `mtl_prop` is provided, material rows are reordered and padded in the same way
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -45,17 +30,17 @@ arma::uword triangle_mesh_segmentation(
     arma::u32_vec *mesh_index = nullptr);
 ```
 
-## Input Arguments:
-- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`, `[n_mesh, 9]`
+## Inputs:
+- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
-- **`mtl_prop`** *(optional)* — Material properties for the original mesh; see [[obj_file_read]], `[n_mesh, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
 
-## Output Arguments:
-- **`meshR`** — Reordered and padded triangle vertices, `[n_meshR, 9]`
-- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`, `[n_sub]`
-- **`mtl_propR`** *(optional)* — Reordered and padded material properties, `[n_meshR, 5]`
-- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding), `[n_meshR]`
+## Outputs:
+- **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
+- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 5]`
+- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
 
 ## Returns:
 - Number of created sub-meshes `n_sub`

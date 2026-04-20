@@ -1,37 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # combine_irs_coord
 Combine path interaction coordinates for IRS-assisted TX → RX channels
 
-## Description:
 - Merges two propagation segments (TX → IRS and IRS → RX) into complete path interaction coordinate sequences
 - Interaction coordinates use a compressed format: `no_interact` counts interactions per path, `interact_coord` stores all coordinates sequentially in path order
 - Each combined path appends segment 1 coordinates (optionally reversed) then the IRS position then segment 2 coordinates (optionally reversed); reversing affects coordinate order only, not endpoint positions
 - Output contains at most `n_path_1 × n_path_2` paths; `active_path` (typically the return value of [[get_channels_irs]]) reduces this to active combinations only
 - Typically used after [[get_channels_irs]] to produce interaction data for path visualization (e.g. in Blender) via [[coord2path]]
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -48,19 +33,19 @@ void quadriga_lib::combine_irs_coord(
     const std::vector<bool> *active_path = nullptr);
 ```
 
-## Input Arguments:
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates, meters
-- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS), `[n_path_1]`
-- **`interact_coord_1`** — Interaction coordinates for segment 1, `[3, sum(no_interact_1)]`
-- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX), `[n_path_2]`
-- **`interact_coord_2`** — Interaction coordinates for segment 2, `[3, sum(no_interact_2)]`
+## Inputs:
+- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
+- **`no_interact_1`** — Number of interaction points per path for segment 1 (TX → IRS); `[n_path_1]`
+- **`interact_coord_1`** — Interaction coordinates for segment 1; `[3, sum(no_interact_1)]`
+- **`no_interact_2`** — Number of interaction points per path for segment 2 (IRS → RX); `[n_path_2]`
+- **`interact_coord_2`** — Interaction coordinates for segment 2; `[3, sum(no_interact_2)]`
 - **`reverse_segment_1`** *(optional)* — If `true`, reverses interaction coordinate order within segment 1
 - **`reverse_segment_2`** *(optional)* — If `true`, reverses interaction coordinate order within segment 2
-- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [[get_channels_irs]] directly, `[n_path_1 × n_path_2]`
+- **`active_path`** *(optional)* — Boolean mask selecting path combinations to include; pass the return value of [[get_channels_irs]] directly; `[n_path_1 × n_path_2]`
 
-## Output Arguments:
-- **`no_interact`** — Number of interaction points per combined path, `[n_path_irs]`
-- **`interact_coord`** — Combined interaction coordinates for all output paths, `[3, sum(no_interact)]`
+## Outputs:
+- **`no_interact`** — Number of interaction points per combined path; `[n_path_irs]`
+- **`interact_coord`** — Combined interaction coordinates for all output paths; `[3, sum(no_interact)]`
 
 ## See also:
 - [[get_channels_irs]] (generates `active_path` and channel coefficients for IRS channels)

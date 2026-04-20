@@ -1,34 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
 # calc_delay_spread
 Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
-## Description:
 - Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; default threshold of 100 dB effectively includes all paths.
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their powers summed before computing the spread; function recurses on the binned profile.
-- Allowed datatypes: float or double
 
 ## Declaration:
 ```
@@ -40,17 +25,21 @@ arma::Col<dtype> quadriga_lib::calc_delay_spread(
     arma::Col<dtype> *mean_delay = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_cir]` vector, each element a column vector of length `n_path`
 - **`powers`** — Path powers in linear scale [W]; same structure as `delays`
 - **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths below threshold are excluded
 - **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain; 0 disables grouping
 
-## Output Arguments:
-- **`mean_delay`** *(optional)* — Mean delay in [s] per CIR, `[n_cir]`
+## Outputs:
+- **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
 
 ## Returns:
-- RMS delay spread in [s] for each CIR, `[n_cir]`
+- RMS delay spread in [s] for each CIR; `[n_cir]`
+
+## See also:
+- [[quantize_delays]] (for mapping delays to a fixed tap grid)
+- [[calc_rician_k_factor]] (for calculating K-factor)
 MD!*/
 
 template <typename dtype>

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_math.hpp"
 #include "quadriga_channel.hpp"
@@ -38,13 +25,13 @@ SECTION!*/
 # baseband_freq_response
 Compute the baseband frequency response of a MIMO channel
 
-## Description:
-- Computes the frequency-domain channel matrix `H` at given sub-carrier positions via DFT over time-domain path coefficients and delays
+- Computes the frequency-domain channel matrix `H` at given sub-carrier positions via DFT over time-domain 
+  path coefficients and delays
 - `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
-- Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation
+- Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation; double inputs are 
+  narrowed to float internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -59,17 +46,23 @@ void quadriga_lib::baseband_freq_response(
     arma::Cube<std::complex<dtype>> *hmat = nullptr);
 ```
 
-## Input Arguments:
-- **`coeff_re`** — Real part of time-domain channel coefficients, `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of time-domain channel coefficients, `[n_rx, n_tx, n_path]`
-- **`delay`** — Path delays in seconds, `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`, `[n_carriers]`
-- **`bandwidth`** — Total baseband bandwidth in Hz
+## Inputs:
+- **`coeff_re`** — Real part of time-domain channel coefficients; `[n_rx, n_tx, n_path]`
+- **`coeff_im`** — Imaginary part of time-domain channel coefficients; `[n_rx, n_tx, n_path]`
+- **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
+- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
+- **`bandwidth`** — Total baseband bandwidth
 
-## Output Arguments:
-- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix, `[n_rx, n_tx, n_carriers]`
-- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix, `[n_rx, n_tx, n_carriers]`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix, `[n_rx, n_tx, n_carriers]`
+## Outputs:
+- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
+- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carriers]`
+
+## See also:
+- [[baseband_freq_response_vec]] (vectorized version)
+- [[baseband_freq_response_multi]] (multi-freq counterpart)
+- [[get_channels_planar]] (for generating coeff and delay)
+- [[get_channels_spherical]] (for generating coeff and delay)
 MD!*/
 
 template <typename dtype>
@@ -222,12 +215,10 @@ template void quadriga_lib::baseband_freq_response(const arma::Cube<double> *coe
 # baseband_freq_response_vec
 Compute the baseband frequency response of multiple MIMO channels
 
-## Description:
 - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
 - Each element of the input vectors is a cube of shape `[n_rx, n_tx, n_path]`; `delay` supports broadcasting to `[1, 1, n_path]`
 - Output vectors have length `n_out`: either `n_snap` (all snapshots) or `length(i_snap)` (subset)
 - Internal arithmetic is single-precision
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -242,17 +233,21 @@ void quadriga_lib::baseband_freq_response_vec(
     const arma::u32_vec *i_snap = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`coeff_re`** — Real part of time-domain channel coefficients, vector of `n_snap` cubes `[n_rx, n_tx, n_path]`
 - **`coeff_im`** — Imaginary part of time-domain channel coefficients, same structure as `coeff_re`
 - **`delay`** — Path delays in seconds, same structure as `coeff_re`; each cube broadcastable to `[1, 1, n_path]`
-- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`, `[n_carriers]`
-- **`bandwidth`** — Total baseband bandwidth in Hz
-- **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed, `[n_out]`
+- **`pilot_grid`** — Normalized sub-carrier positions in range `[0.0, 1.0]`; `[n_carriers]`
+- **`bandwidth`** — Total baseband bandwidth
+- **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
 
-## Output Arguments:
+## Outputs:
 - **`hmat_re`** — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
 - **`hmat_im`** — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
+
+## See also:
+- [[baseband_freq_response]] (single-snapshot variant)
+- [[baseband_freq_response_multi]] (multi-freq counterpart)
 MD!*/
 
 // Compute the baseband frequency response of multiple MIMO channels
@@ -341,15 +336,15 @@ template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::C
 # baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-## Description:
-- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense output grid (`freq_out`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
-- Applies delay-induced phase rotation `exp(-j * 2 * pi * freq_out * delay)` per output carrier in double precision to preserve accuracy at high carrier frequencies
-- Only `delay[0]` is used; all entries in the `delay` vector should be identical (path geometry is frequency-independent)
+- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense 
+  output grid (`freq_out`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
+- Applies delay-induced phase rotation `exp(-j·2·pi·freq_out·delay)` per output carrier in double 
+  precision to preserve accuracy at high carrier frequencies
+- Only `delay[0]` is used; all entries in the `delay` vector should be identical 
+  (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
 - Output frequencies outside the range of `freq_in` use constant extrapolation from the nearest endpoint
-- **`remove_delay_phase = true` (default):** removes the baked-in phase `exp(-j * 2 * pi * freq_in[f] * delay)` before SLERP, then re-applies the full delay phase at each output frequency; required when input comes from [[get_channels_multifreq]] or [[get_channels_spherical]], which bake the delay phase into coefficients at each input frequency; set to `false` only when input coefficients are pure slowly-varying envelopes without baked-in delay phase
 - At least one of `hmat_re`/`hmat_im` or `hmat` must be non-null
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -365,27 +360,20 @@ void quadriga_lib::baseband_freq_response_multi(
     bool remove_delay_phase = true);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`coeff_re`** — Real part of channel coefficients at each input frequency, vector of `n_freq_in` cubes `[n_rx, n_tx, n_path]`
 - **`coeff_im`** — Imaginary part of channel coefficients at each input frequency, same structure as `coeff_re`
 - **`delay`** — Path delays in seconds, vector of `n_freq_in` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
-- **`freq_in`** — Input sample frequencies in Hz, sorted ascending, `[n_freq_in]`
-- **`freq_out`** — Output carrier frequencies in Hz (absolute), `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Remove baked-in delay phase before interpolation and re-apply analytically; must be `true` for output from [[get_channels_multifreq]] or [[get_channels_spherical]]
+- **`freq_in`** — Input sample frequencies, sorted ascending; `[n_freq_in]`
+- **`freq_out`** — Output carrier frequencies (absolute); `[n_carrier]`
+- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and 
+  re-applies analytically at output frequencies; must be `true` for output from 
+  [[get_channels_multifreq]] or [[get_channels_spherical]], `false` for pure envelope coefficients
 
-## Output Arguments:
-- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix, `[n_rx, n_tx, n_carrier]`
-- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix, `[n_rx, n_tx, n_carrier]`
-- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix, `[n_rx, n_tx, n_carrier]`
-
-## Example:
-```
-arma::Col<double> freq_in = {0.5e9, 1.0e9, 1.5e9, 2.0e9};
-arma::Col<double> freq_out = arma::linspace<arma::Col<double>>(0.5e9, 2.0e9, 2048);
-// populate coeff_re, coeff_im, delays via get_channels_multifreq ...
-arma::Cube<double> Hr, Hi;
-quadriga_lib::baseband_freq_response_multi(coeff_re, coeff_im, delays, freq_in, freq_out, &Hr, &Hi);
-```
+## Outputs:
+- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
+- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
+- **`hmat`** *(optional)* — Complex-valued frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
 
 ## See also:
 - [[baseband_freq_response]] (single-snapshot narrowband version)

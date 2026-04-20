@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
 
@@ -25,7 +12,6 @@ SECTION!*/
 # any_type_id
 Get type ID and raw access from a `std::any` object
 
-## Description:
 - Inspects a `std::any` object and returns an integer type identifier for its contents
 - Optionally retrieves dimensions (rows, columns, slices) for Armadillo matrix/cube/vector types; for `std::string`, `dims[0]` is the string length, `dims[1]`/`dims[2]` are zero
 - Optionally retrieves a raw `void*` to the internal data — not type-safe, bypasses `const` protection; use with caution
@@ -38,30 +24,32 @@ int quadriga_lib::any_type_id(
     void **dataptr = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`data`** — Pointer to the `std::any` object to inspect
 
-## Output Arguments:
+## Outputs:
 - **`dims`** *(optional)* — Array of 3 values filled with `[rows, cols, slices]` of the contained Armadillo object
 - **`dataptr`** *(optional)* — Receives a raw pointer to the object's internal data
 
 ## Returns:
-Integer type ID of the contained value:
+- Integer type ID of the contained value:<br><br>
+  ID | Type                       | ID | Type                       | ID | Type
+  ---|----------------------------|----|----------------------------|----|------------------------
+  -2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
+  10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
+  13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
+  20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
+  23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
+  30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
+  33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
+  40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
+  43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
+  50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
+  53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
 
-ID | Type                       | ID | Type                       | ID | Type
----|----------------------------|----|----------------------------|----|------------------------
--2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
-10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
-13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
-20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
-23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
-30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
-33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
-40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
-43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
-50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
-53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
-
+## See also:
+- [[hdf5_read_dset]] (uses `any_type_id` to read dataset from HDF5 file)
+- [[hdf5_write_dset]] (HDF5 dataset writer)
 MD!*/
 
 // Returns type ID of a std::any field:

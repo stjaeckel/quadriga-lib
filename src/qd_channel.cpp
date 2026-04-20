@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_channel.hpp"
 #include "quadriga_tools.hpp"
@@ -28,33 +15,31 @@ SECTION!*/
 # channel<++>
 Class for storing and managing MIMO channel data and metadata across multiple snapshots
 
-## Description:
 - Represents path-level MIMO channel data between antenna arrays over multiple time snapshots
 - Each snapshot may have a different number of propagation paths `n_path`
 - Unstructured metadata supported via `par_names` / `par_data`
-- Allowed datatypes: `float` or `double`
 
 ## Attributes:
 
 | Attribute | Size | Description |
 |-----------|------|-------------|
 | `std::string name` | — | Name of the channel object |
-| `arma::Col<dtype> center_frequency` | `[1]`, `[n_snap]`, or `[]` | Center frequency in Hz |
-| `arma::Mat<dtype> tx_pos` | `[3, n_snap]` or `[3, 1]` | Transmitter positions |
-| `arma::Mat<dtype> rx_pos` | `[3, n_snap]` or `[3, 1]` | Receiver positions |
-| `arma::Mat<dtype> tx_orientation` | `[3, n_snap]`, `[3, 1]`, or `[]` | Transmitter orientation (Euler angles) |
-| `arma::Mat<dtype> rx_orientation` | `[3, n_snap]`, `[3, 1]`, or `[]` | Receiver orientation (Euler angles) |
-| `std::vector<arma::Cube<dtype>> coeff_re` | `[n_rx, n_tx, n_path]` per snap | Channel coefficients, real part |
-| `std::vector<arma::Cube<dtype>> coeff_im` | `[n_rx, n_tx, n_path]` per snap | Channel coefficients, imaginary part |
-| `std::vector<arma::Cube<dtype>> delay` | `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` per snap | Path delays in seconds |
-| `std::vector<arma::Col<dtype>> path_gain` | `[n_path]` per snap | Path gains before antenna pattern |
-| `std::vector<arma::Col<dtype>> path_length` | `[n_path]` per snap | Path lengths TX to RX in meters |
-| `std::vector<arma::Mat<dtype>> path_polarization` | `[8, n_path]` per snap | Interleaved polarization transfer matrices |
-| `std::vector<arma::Mat<dtype>> path_angles` | `[n_path, 4]` per snap | Angles {AOD, EOD, AOA, EOA} in rad |
-| `std::vector<arma::Mat<dtype>> path_fbs_pos` | `[3, n_path]` per snap | First-bounce scatterer positions |
-| `std::vector<arma::Mat<dtype>> path_lbs_pos` | `[3, n_path]` per snap | Last-bounce scatterer positions |
-| `std::vector<arma::Col<unsigned>> no_interact` | `[n_path]` per snap | Number of interactions per path |
-| `std::vector<arma::Mat<dtype>> interact_coord` | `[3, sum(no_interact)]` per snap | Interaction point coordinates |
+| `arma::Col<dtype> center_frequency` | `[1]`; `[n_snap]`, or `[]` | Center frequency |
+| `arma::Mat<dtype> tx_pos` | `[3, n_snap]` or `[3, 1]` = static | Transmitter positions |
+| `arma::Mat<dtype> rx_pos` | `[3, n_snap]` or `[3, 1]` = static | Receiver positions |
+| `arma::Mat<dtype> tx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Transmitter orientation (Euler angles) |
+| `arma::Mat<dtype> rx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Receiver orientation (Euler angles) |
+| `std::vector<arma::Cube<dtype>> coeff_re` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, real part |
+| `std::vector<arma::Cube<dtype>> coeff_im` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, imaginary part |
+| `std::vector<arma::Cube<dtype>> delay` | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds |
+| `std::vector<arma::Col<dtype>> path_gain` | per snap `[n_path]` | Path gains before antenna pattern |
+| `std::vector<arma::Col<dtype>> path_length` | per snap `[n_path]` | Path lengths TX to RX |
+| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]` | Interleaved polarization transfer matrices |
+| `std::vector<arma::Mat<dtype>> path_angles` | per snap `[n_path, 4]` | Angles {AOD, EOD, AOA, EOA} in rad |
+| `std::vector<arma::Mat<dtype>> path_fbs_pos` | per snap `[3, n_path]` | First-bounce scatterer positions |
+| `std::vector<arma::Mat<dtype>> path_lbs_pos` | per snap `[3, n_path]` | Last-bounce scatterer positions |
+| `std::vector<arma::Col<unsigned>> no_interact` | per snap `[n_path]` | Number of interactions per path |
+| `std::vector<arma::Mat<dtype>> interact_coord` | per snap `[3, sum(no_interact)]` | Interaction point coordinates |
 | `std::vector<std::string> par_names` | — | Names of unstructured metadata fields |
 | `std::vector<std::any> par_data` | — | Unstructured metadata values (string, scalar, matrix, etc.) |
 | `int initial_position` | scalar | 0-based index of the reference snapshot |
@@ -71,9 +56,9 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 | `.is_valid()` | Returns empty string if valid, otherwise an error message |
 
 ## Complex member functions:
-- [[.add_paths]]
-- [[.calc_effective_path_gain]]
-- [[.write_paths_to_obj_file]]
+- .[[add_paths]]
+- .[[calc_effective_path_gain]]
+- .[[write_paths_to_obj_file]]
 MD!*/
 
 // CHANNEL METHODS : Return object dimensions
@@ -400,11 +385,8 @@ std::string quadriga_lib::channel<dtype>::is_valid() const
 # .add_paths
 Append new propagation paths to an existing channel snapshot
 
-## Description:
 - Adds path-level data to snapshot `i_snap` in a `channel` object; does not modify `tx_pos`, `rx_pos`, or orientation fields
 - All provided fields must have consistent length `n_path_add` and match existing snapshot structure
-- Member function of [[channel]]
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -423,19 +405,19 @@ void quadriga_lib::channel<dtype>::add_paths(
     const arma::Mat<dtype> *path_lbs_pos_add = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`i_snap`** — 0-based snapshot index to append paths to
-- **`coeff_re_add`** *(optional)* — Real part of channel coefficients, `[n_rx, n_tx, n_path_add]`
-- **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path_add]`
-- **`delay_add`** *(optional)* — Propagation delays in seconds, `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
-- **`no_interact_add`** *(optional)* — Number of interaction points per path, `[n_path_add]`
-- **`interact_coord_add`** *(optional)* — Interaction point coordinates, `[3, sum(no_interact)]`
-- **`path_gain_add`** *(optional)* — Path gains before antenna effects, `[n_path_add]`
-- **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center in meters, `[n_path_add]`
-- **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices, `[8, n_path_add]`
-- **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad, `[n_path_add, 4]`
-- **`path_fbs_pos_add`** *(optional)* — First-bounce scatterer positions, `[3, n_path_add]`
-- **`path_lbs_pos_add`** *(optional)* — Last-bounce scatterer positions, `[3, n_path_add]`
+- **`coeff_re_add`** *(optional)* — Real part of channel coefficients; `[n_rx, n_tx, n_path_add]`
+- **`coeff_im_add`** *(optional)* — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_add]`
+- **`delay_add`** *(optional)* — Propagation delays in seconds; `[n_rx, n_tx, n_path_add]` or `[1, 1, n_path_add]`
+- **`no_interact_add`** *(optional)* — Number of interaction points per path; `[n_path_add]`
+- **`interact_coord_add`** *(optional)* — Interaction point coordinates; `[3, sum(no_interact)]`
+- **`path_gain_add`** *(optional)* — Path gains before antenna effects; `[n_path_add]`
+- **`path_length_add`** *(optional)* — Path lengths from TX to RX phase center; `[n_path_add]`
+- **`path_polarization_add`** *(optional)* — Interleaved polarization transfer matrices; `[8, n_path_add]`
+- **`path_angles_add`** *(optional)* — Departure/arrival angles {AOD, EOD, AOA, EOA} in rad; `[n_path_add, 4]`
+- **`path_fbs_pos_add`** *(optional)* — First-bounce scatterer positions; `[3, n_path_add]`
+- **`path_lbs_pos_add`** *(optional)* — Last-bounce scatterer positions; `[3, n_path_add]`
 MD!*/
 
 template <typename dtype>
@@ -460,7 +442,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (coeff_re_add != nullptr)
     {
         if (this->coeff_re.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting MIMO coefficients.");
+            throw std::invalid_argument("Channel object requires existing MIMO coefficients.");
 
         if (coeff_im_add == nullptr || delay_add == nullptr)
             throw std::invalid_argument("'coeff_im_add' or 'delay_add' is missing.");
@@ -492,7 +474,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (no_interact_add != nullptr)
     {
         if (this->no_interact.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting interaction coordinates.");
+            throw std::invalid_argument("Channel object requires existing interaction coordinates.");
 
         if (interact_coord_add == nullptr)
             throw std::invalid_argument("'no_interact_add' is given but 'interact_coord_add' is missing.");
@@ -516,7 +498,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_gain_add != nullptr)
     {
         if (this->path_gain.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_gain'.");
+            throw std::invalid_argument("Channel object requires existing 'path_gain'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_gain_add->n_elem : n_path_add;
         if (path_gain_add->n_elem != n_path_add)
@@ -529,7 +511,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_length_add != nullptr)
     {
         if (this->path_length.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_length'.");
+            throw std::invalid_argument("Channel object requires existing 'path_length'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_length_add->n_elem : n_path_add;
         if (path_length_add->n_elem != n_path_add)
@@ -542,7 +524,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_polarization_add != nullptr)
     {
         if (this->path_polarization.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_polarization'.");
+            throw std::invalid_argument("Channel object requires existing 'path_polarization'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_polarization_add->n_cols : n_path_add;
         if (path_polarization_add->n_cols != n_path_add)
@@ -557,7 +539,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_angles_add != nullptr)
     {
         if (this->path_angles.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_angles'.");
+            throw std::invalid_argument("Channel object requires existing 'path_angles'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_angles_add->n_rows : n_path_add;
         if (path_angles_add->n_rows != n_path_add)
@@ -572,7 +554,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_fbs_pos_add != nullptr)
     {
         if (this->path_fbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_fbs_pos'.");
+            throw std::invalid_argument("Channel object requires existing 'path_fbs_pos'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_fbs_pos_add->n_cols : n_path_add;
         if (path_fbs_pos_add->n_cols != n_path_add)
@@ -587,7 +569,7 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
     if (path_lbs_pos_add != nullptr)
     {
         if (this->path_lbs_pos.size() == 0)
-            throw std::invalid_argument("Channel object requires exisiting 'path_lbs_pos'.");
+            throw std::invalid_argument("Channel object requires existing 'path_lbs_pos'.");
 
         n_path_add = (n_path_add == 0ULL) ? path_lbs_pos_add->n_cols : n_path_add;
         if (path_lbs_pos_add->n_cols != n_path_add)
@@ -635,23 +617,20 @@ void quadriga_lib::channel<dtype>::add_paths(arma::uword i_snap,
 # .calc_effective_path_gain
 Calculate the effective path gain per snapshot in linear scale
 
-## Description:
 - Sums power over all paths and TX/RX antenna pairs to produce one gain value per snapshot
 - Uses `coeff_re`/`coeff_im` if available; falls back to `path_polarization` assuming ideal XPOL antennas
 - Throws if neither coefficients nor polarization data are present
-- Member function of [[channel]]
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
 arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool assume_valid = false) const;
 ```
 
-## Input Arguments:
+## Inputs:
 - **`assume_valid`** *(optional)* — Skip internal consistency checks for performance in trusted contexts
 
 ## Returns:
-- Effective path gains in linear scale, one entry per snapshot, `[n_snap]`
+- Effective path gains in linear scale, one entry per snapshot; `[n_snap]`
 MD!*/
 
 template <typename dtype>
@@ -735,12 +714,9 @@ arma::Col<dtype> quadriga_lib::channel<dtype>::calc_effective_path_gain(bool ass
 # .write_paths_to_obj_file
 Export propagation paths to a Wavefront OBJ file for 3D visualization
 
-## Description:
 - Writes ray-traced paths as tube geometry to a `.obj` file (e.g., for Blender)
 - Tubes are color-coded by path gain using a selected colormap; radius also scales with gain
 - Paths below `gain_min` are excluded; `max_no_paths` limits total count
-- Member function of [[channel]]
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -756,15 +732,15 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
     arma::uword n_edges = 5) const;
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Output `.obj` file path
 - **`max_no_paths`** *(optional)* — Max paths to export; `0` includes all paths above `gain_min`
 - **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped
 - **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded
 - **`colormap`** *(optional)* — Colormap name; see [[colormap]] for supported options
 - **`i_snap`** *(optional)* — 0-based snapshot indices to include; empty exports all snapshots
-- **`radius_max`** *(optional)* — Tube radius in meters at maximum gain
-- **`radius_min`** *(optional)* — Tube radius in meters at minimum gain
+- **`radius_max`** *(optional)* — Tube radius at maximum gain
+- **`radius_min`** *(optional)* — Tube radius at minimum gain
 - **`n_edges`** *(optional)* — Vertices per tube cross-section; must be ≥ 3
 
 ## See also:
