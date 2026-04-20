@@ -19,9 +19,6 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - `z/len` is clamped to [-1, 1] before `asin` to guard against `len == 0` and rounding artifacts
   pushing `abs(z/len)` slightly above 1
-- All inputs must have the same length
-- In-place and output-output aliasing not allowed (`x`/`y`/`z` cannot alias `az`, `el`, or `len`;
-  `az`, `el`, and `len` cannot alias each other)
 - Option to provide a single `[3, n, m]` cube or separate x, y, z `[n, m]` inputs
 
 ## Usage:

@@ -115,9 +115,9 @@
 <tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
 <tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
-<tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
+<tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
-<tr><td><a href="#geo2cart">geo2cart</a></td><td>Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates</td></tr>
+<tr><td><a href="#geo2cart">geo2cart</a></td><td>Convert elementwise azimuth/elevation angles to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp">interp</a></td><td>2D and 1D linear interpolation.</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
@@ -3556,62 +3556,35 @@ execution of this process, several pieces of input data are required:<br><br>
 <b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Calculates the empirical CDF from the given data matrix, where each column represents an 
-   independent data set (e.g., repeated experiment runs). 
-</li><li style="margin-bottom: 0.4em;">Individual CDFs are computed per column and an averaged CDF is obtained by interpolation in 
-   quantile space. 
-</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values in the data are excluded from the computation. 
-</li><li style="margin-bottom: 0.4em;">If <code>bins</code> is empty or not provided, 201 equally spaced bins spanning the data range are generated. 
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative 
+   sum 
+</li><li style="margin-bottom: 0.4em;">Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from 
+   each column CDF are averaged, then mapped back to the bin grid 
+</li><li style="margin-bottom: 0.4em;">Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels 
+</li><li style="margin-bottom: 0.4em;"><code>Inf</code> and <code>NaN</code> values are excluded from computation 
+</li><li style="margin-bottom: 0.4em;">If <code>bins</code> is empty, equally spaced bins spanning the data range are generated 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data );
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data, bins );
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data, bins, n_bins );
+[ Sh, bins_out, Sc, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code><b>data</b></code> (input)<br> 
-   Input data matrix. Size <code>[n_samples, n_sets]</code>. Each column is one data set. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code><b>bins</b> = []</code> (optional input)<br> 
-   Bin centers for the histogram. Length <code>[n_bins]</code>. If empty, bins are auto-generated. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code><b>n_bins</b> = 201</code> (optional input)<br> 
-   Number of bins to generate when bins are auto-generated. Must be at least 2. Ignored when 
-   non-empty bins are provided. 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>data</code></b> — Input data matrix; each column is one independent data set, <code>[n_samples, n_sets]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>bins_in</code></b> <i>(optional)</i> — Bin centers; used as-is if non-empty, <code>[n_bins_in]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>n_bins</code></b> <i>(optional)</i> — Number of bins when auto-generating; must be >= 2; ignored when 
+   non-empty <code>bins_in</code> are provided 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><code>double <b>Sh</b></code> (output)<br> 
-   Individual CDFs. Size <code>[n_bins, n_sets]</code>. 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>Sh</code></b> <i>(optional)</i> — Individual CDFs, one per column of data, <code>[n_bins_out, n_sets]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>bins_out</code></b> <i>(optional)</i> — Auto-generated bins; copy of <code>bins_in</code> when 
+   non-empty <code>bins_in</code> are provided, <code>[n_bins_out = n_bins]</code> or <code>[n_bins_out = n_bins_in]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>Sc</code></b> <i>(optional)</i> — Averaged CDF via quantile-space averaging across data sets, <code>[n_bins]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>mu</code></b> <i>(optional)</i> — Mean of the 0.1–0.9 quantiles across data sets, <code>[9]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>sig</code></b> <i>(optional)</i> — Standard deviation of the 0.1–0.9 quantiles across data sets, <code>[9]</code> 
 </li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>double <b>bins</b></code> (output)<br> 
-   Bin centers. Length <code>[n_bins]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>double <b>Sc</b></code> (output)<br> 
-   Averaged CDF. Length <code>[n_bins]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>double <b>mu</b></code> (output)<br> 
-   Mean of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><code>double <b>sig</b></code> (output)<br> 
-   Standard deviation of the 0.1, 0.2, ..., 0.9 quantiles across data sets. Length <code>[9]</code>. 
-</li></ul>
-</li>
-<li style="margin-bottom: 1.5em;">
-<b><i>Example:</i></b><br><pre>
-data = randn(10000, 5);
-[ Sh, bins, Sc, mu, sig ] = quadriga_lib.acdf( data );
-% bins has 201 elements, Sh is [201, 5], Sc is [201, 1], mu and sig are [9, 1]
-</pre>
 </li>
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -3927,45 +3900,33 @@ R = reshape( rotation, 3, 3 );
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="cart2geo"></a>
-<b>cart2geo</b> - Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+<b>cart2geo</b> - Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90° points to the zenith and θ = 0° points to the horizon.
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Computes: <code>len = sqrt(x² + y² + z²)</code>, <code>az = atan2(y, x)</code>, <code>el = asin(clamp(z / len, -1, 1))</code> 
+</li><li style="margin-bottom: 0.4em;">Inputs are arbitrary 3D vectors (not required to be unit-length); <code>len</code> returns the Euclidean norm 
+</li><li style="margin-bottom: 0.4em;"><code>z/len</code> is clamped to [-1, 1] before <code>asin</code> to guard against <code>len == 0</code> and rounding artifacts 
+   pushing <code>abs(z/len)</code> slightly above 1 
+</li><li style="margin-bottom: 0.4em;">Option to provide a single <code>[3, n, m]</code> cube or separate x, y, z <code>[n, m]</code> inputs 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-[ azimuth, elevation, length ] = arrayant_lib.cart2geo( cart )
+[ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart</code></b><br> 
-   Cartesian coordinates (x,y,z) 
-   Single or double precision, Size: <code>[3, n_row, n_col]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b>kernel</b><br> 
-   Kernel selection: <code>0</code> = auto (AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2  
-   (throws if AVX2 unavailable); default <code>0</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>x</code></b> — X-coordinates or combined input; <code>[n, m]</code> or <code>[3, n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 
+   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b><br> 
-   Azimuth angles in [rad], values between -pi and pi. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>elevation</code></b><br> 
-   Elevation angles in [rad], values between -pi/2 and pi/2. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>length</code></b><br> 
-   Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length <code>sqrt(x² + y² + z²)</code>; <code>[n, m]</code> 
 </li></ul>
 </li>
 </ul>
@@ -4034,40 +3995,47 @@ c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
 </ul>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="geo2cart"></a>
-<b>geo2cart</b> - Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
+<b>geo2cart</b> - Convert elementwise azimuth/elevation angles to Cartesian coordinates
 <ul>
 <li style="margin-bottom: 1.5em;">
-<b><i>Description:</i></b><br>This function transforms Geographic (azimuth, elevation, length) coordinates to Cartesian (x,y,z) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90◦ points to the zenith and θ = 0◦ points to the horizon.
+<b><i>Description:</i></b><br><ul><li style="margin-bottom: 0.4em;">Conversion: <code>x = cos(el) cos(az) len</code>, <code>y = cos(el) sin(az) len</code>, <code>z = sin(el) len</code> 
+</li><li style="margin-bottom: 0.4em;">Optional outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; omit from the 
+   output list to skip their computation 
+</li><li style="margin-bottom: 0.4em;">Defaults to the GENERIC kernel (<code>use_kernel=1</code>) to preserve full double precision, matching 
+   MATLAB's default numeric type 
+</li><li style="margin-bottom: 0.4em;">Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel 
+   computes in single precision internally (inputs narrowed to float, results widened back) 
+</li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
 <b><i>Usage:</i></b><br><pre>
-cart = arrayant_lib.geo2cart( azimuth, elevation, length )
+split = true;
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+
+split = false;
+cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 </pre>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>azimuth</code></b><br> 
-   Azimuth angles in [rad], values between -pi and pi. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>elevation</code></b><br> 
-   Elevation angles in [rad], values between -pi/2 and pi/2. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> 
-</li></ul>
- 
-<ul><li style="margin-bottom: 0.4em;"><b><code>length</code></b> (optional)<br> 
-   Vector length, i.e. the distance from the origin to the point defined by x,y,z. 
-   Single or double precision (same as input), Size <code>[n_row, n_col]</code> or empty <code>[]</code> 
+<b><i>Input Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length sqrt(x^2 + y^2 + z^2); <code>[n, m]</code>; default: 1 
+</li><li style="margin-bottom: 0.4em;"><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 
+   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1 
+</li><li style="margin-bottom: 0.4em;"><b><code>split</code></b> <i>(optional)</i> — If true, return x/y/z and optional sin/cos as separate <code>[n, m]</code> 
+   matrices. If false, return a single combined <code>[3, n, m]</code> cube; sin/cos outputs unavailable 
+   in this mode; default: false 
 </li></ul>
 </li>
 <li style="margin-bottom: 1.5em;">
-<b><i>Output Argument:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>cart</code></b><br> 
-   Cartesian coordinates (x,y,z) 
-   Single or double precision, Size: <code>[3, n_row, n_col]</code> 
+<b><i>Output Arguments:</i></b><br><ul><li style="margin-bottom: 0.4em;"><b><code>x_or_cart</code></b> — If <code>split=true</code>: X-coordinates <code>[n, m]</code>. If <code>split=false</code>: combined cube 
+   with components along the first dim, <code>[3, n, m]</code> 
+</li><li style="margin-bottom: 0.4em;"><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>sAZ</code></b> <i>(optional)</i> — sin(az); <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>cAZ</code></b> <i>(optional)</i> — cos(az); <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>sEL</code></b> <i>(optional)</i> — sin(el); <code>[n, m]</code> or empty 
+</li><li style="margin-bottom: 0.4em;"><b><code>cEL</code></b> <i>(optional)</i> — cos(el); <code>[n, m]</code> or empty 
 </li></ul>
 </li>
 </ul>

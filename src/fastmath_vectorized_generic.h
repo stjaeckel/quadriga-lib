@@ -1,24 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
-
-// GENERIC reference / fallback vectorized math functions
-// - Vector lengths must be multiple of 1
-// - Input / output vectors do not need to be aligned
-// - No sanity checks - incorrect argument formatting leads to undefined behavior
+// Part of quadriga-lib — see LICENSE for terms.
 
 #ifndef quadriga_lib_fastmath_vec_generic_H
 #define quadriga_lib_fastmath_vec_generic_H
@@ -27,6 +9,10 @@
 #include <stddef.h>
 #include <limits.h>
 #include "slerp.h"
+
+#ifndef QD_OMP_THRESHOLD
+#define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
+#endif
 
 // Scalar double-precision Cody–Waite range reduction: map x into [-pi, pi].
 // Two-constant split: CW_C1 + CW_C2 = 2*pi, with CW_C1 exactly representable.
@@ -43,14 +29,10 @@ static inline double qd_range_reduce_2pi(double x)
     return x;
 }
 
-#ifndef QD_OMP_THRESHOLD
-#define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
-#endif
-
 template <typename dtype>
-void qd_SINCOS_GENERIC(const dtype *__restrict x,
-                       float *__restrict s,
-                       float *__restrict c,
+void qd_SINCOS_GENERIC(const dtype * x,
+                       float * s,
+                       float * c,
                        size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -64,8 +46,8 @@ void qd_SINCOS_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
-void qd_SIN_GENERIC(const dtype *__restrict x,
-                    float *__restrict s,
+void qd_SIN_GENERIC(const dtype * x,
+                    float * s,
                     size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -78,8 +60,8 @@ void qd_SIN_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
-void qd_COS_GENERIC(const dtype *__restrict x,
-                    float *__restrict c,
+void qd_COS_GENERIC(const dtype * x,
+                    float * c,
                     size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -92,8 +74,8 @@ void qd_COS_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
-void qd_ASIN_GENERIC(const dtype *__restrict x,
-                     float *__restrict s,
+void qd_ASIN_GENERIC(const dtype * x,
+                     float * s,
                      size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -106,8 +88,8 @@ void qd_ASIN_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
-void qd_ACOS_GENERIC(const dtype *__restrict x,
-                     float *__restrict c,
+void qd_ACOS_GENERIC(const dtype * x,
+                     float * c,
                      size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -120,9 +102,9 @@ void qd_ACOS_GENERIC(const dtype *__restrict x,
 }
 
 template <typename dtype>
-void qd_ATAN2_GENERIC(const dtype *__restrict y,
-                      const dtype *__restrict x,
-                      float *__restrict a,
+void qd_ATAN2_GENERIC(const dtype * y,
+                      const dtype * x,
+                      float * a,
                       size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -136,10 +118,10 @@ void qd_ATAN2_GENERIC(const dtype *__restrict y,
 }
 
 template <typename dtype>
-void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
-                      const dtype *__restrict Br, const dtype *__restrict Bi,
-                      const dtype *__restrict w,
-                      float *__restrict Xr, float *__restrict Xi,
+void qd_SLERP_GENERIC(const dtype * Ar, const dtype * Ai,
+                      const dtype * Br, const dtype * Bi,
+                      const dtype * w,
+                      float * Xr, float * Xi,
                       size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
@@ -156,37 +138,59 @@ void qd_SLERP_GENERIC(const dtype *__restrict Ar, const dtype *__restrict Ai,
 }
 
 template <typename dtype>
-void qd_GEO2CART_GENERIC(const dtype *__restrict az, const dtype *__restrict el,
-                         float *__restrict x, float *__restrict y, float *__restrict z,
-                         float *__restrict sAZ, float *__restrict cAZ,
-                         float *__restrict sEL, float *__restrict cEL,
+void qd_GEO2CART_GENERIC(const dtype *az, const dtype *el, const dtype *len,
+                         dtype *x, dtype *y, dtype *z,
+                         dtype *sAZ, dtype *cAZ, dtype *sEL, dtype *cEL,
                          size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
-#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
-    for (long long i = 0; i < n_val_ll; ++i)
+    if (len)
     {
-        const float azi = (float)qd_range_reduce_2pi((double)az[i]);
-        const float eli = (float)qd_range_reduce_2pi((double)el[i]);
-        float sa = sinf(azi), ca = cosf(azi);
-        float se = sinf(eli), ce = cosf(eli);
-        x[i] = ce * ca;
-        y[i] = ce * sa;
-        z[i] = se;
-        if (sAZ)
-            sAZ[i] = sa;
-        if (cAZ)
-            cAZ[i] = ca;
-        if (sEL)
-            sEL[i] = se;
-        if (cEL)
-            cEL[i] = ce;
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+        for (long long i = 0; i < n_val_ll; ++i)
+        {
+            const dtype azi = az[i], eli = el[i], leni = len[i];
+            dtype sa = std::sin(azi), ca = std::cos(azi);
+            dtype se = std::sin(eli), ce = std::cos(eli);
+            x[i] = ce * ca * leni;
+            y[i] = ce * sa * leni;
+            z[i] = se * leni;
+            if (sAZ)
+                sAZ[i] = sa;
+            if (cAZ)
+                cAZ[i] = ca;
+            if (sEL)
+                sEL[i] = se;
+            if (cEL)
+                cEL[i] = ce;
+        }
+    }
+    else
+    {
+#pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)
+        for (long long i = 0; i < n_val_ll; ++i)
+        {
+            const dtype azi = az[i], eli = el[i];
+            dtype sa = std::sin(azi), ca = std::cos(azi);
+            dtype se = std::sin(eli), ce = std::cos(eli);
+            x[i] = ce * ca;
+            y[i] = ce * sa;
+            z[i] = se;
+            if (sAZ)
+                sAZ[i] = sa;
+            if (cAZ)
+                cAZ[i] = ca;
+            if (sEL)
+                sEL[i] = se;
+            if (cEL)
+                cEL[i] = ce;
+        }
     }
 }
 
 template <typename dtype>
-void qd_CART2GEO_GENERIC(const dtype *__restrict x, const dtype *__restrict y, const dtype *__restrict z,
-                         dtype *__restrict az, dtype *__restrict el, dtype *__restrict len, size_t n_val)
+void qd_CART2GEO_GENERIC(const dtype * x, const dtype * y, const dtype * z,
+                         dtype * az, dtype * el, dtype * len, size_t n_val)
 {
     const long long n_val_ll = (long long)n_val;
 #pragma omp parallel for schedule(static) if (n_val_ll >= QD_OMP_THRESHOLD)

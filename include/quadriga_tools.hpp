@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #ifndef quadriga_tools_H
 #define quadriga_tools_H
@@ -127,13 +114,6 @@ namespace quadriga_lib
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map, bool high_res = false);
-
-    // Transform Geographic (az, el, length) to Cartesian (x,y,z) coordinates coordinates
-    // - Returns: Cartesian coordinates, Size [3, n_row, n_col]
-    template <typename dtype>
-    arma::Cube<dtype> geo2cart(const arma::Mat<dtype> &azimuth,      // Azimuth angles, Size [n_row, n_col]
-                               const arma::Mat<dtype> &elevation,    // Elevation angles, Size [n_row, n_col]
-                               const arma::Mat<dtype> &length = {}); // Radius, Size [n_row, n_col] or [0,0] for unit length
 
     // 2D linear interpolation of multiple data sets
     // - Output object is passed as a reference (its data will be overwritten)

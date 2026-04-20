@@ -6,7 +6,7 @@ try
     quadriga_lib.geo2cart;
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Need at least one input argument.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -17,7 +17,7 @@ try
     [~] = quadriga_lib.geo2cart([],e);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs cannot be empty.';
+    expectedErrorMessage = 'az and el must have the same shape.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -27,17 +27,7 @@ try
     [~] = quadriga_lib.geo2cart(e,[]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs cannot be empty.';
-    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
-        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
-    end
-end
-
-try
-    [~] = quadriga_lib.geo2cart([],[]);
-    error('moxunit:exceptionNotRaised', 'Expected an error!');
-catch ME
-    expectedErrorMessage = 'Inputs cannot be empty.';
+    expectedErrorMessage = 'az and el must have the same shape.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -48,7 +38,7 @@ try
     [~] = quadriga_lib.geo2cart(e(1,:),e);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs must have the same size.';
+    expectedErrorMessage = 'az and el must have the same shape.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -58,7 +48,7 @@ try
     [~] = quadriga_lib.geo2cart(e,e(1,:));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs must have the same size.';
+    expectedErrorMessage = 'az and el must have the same shape.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -68,7 +58,7 @@ try
     [~] = quadriga_lib.geo2cart(e,e,e(1,:));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs must have the same size.';
+    expectedErrorMessage = 'len must have the same shape as az.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -76,11 +66,11 @@ end
 
 c = quadriga_lib.geo2cart(single(e),single(e),single(e));
 assertEqual( size(c), [3,2,6] )
-assert( isa(c,'single') );
+assert( isa(c,'double') );
 
 c = quadriga_lib.geo2cart(single(e),e,e);
 assertEqual( size(c), [3,2,6] )
-assert( isa(c,'single') );
+assert( isa(c,'double') );
 
 c = quadriga_lib.geo2cart(e,e,e);
 assertEqual( size(c), [3,2,6] )

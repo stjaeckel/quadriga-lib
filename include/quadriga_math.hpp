@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #ifndef quadriga_math_H
 #define quadriga_math_H
@@ -62,15 +49,17 @@ namespace quadriga_lib
 
     // Fast, approximate geographic-to-Cartesian conversion
     template <typename dtype>
-    void fast_geo2cart(const arma::Col<dtype> &az, // Input azimuth angles in radians, Length [n]
-                       const arma::Col<dtype> &el, // Input elevation angles in radians, Length [n]
-                       arma::fvec &x,              // Output x-coordinates, Length [n]
-                       arma::fvec &y,              // Output y-coordinates, Length [n]
-                       arma::fvec &z,              // Output z-coordinates, Length [n]
-                       arma::fvec *sAZ = nullptr,  // Optional output: sin(az), Length [n]
-                       arma::fvec *cAZ = nullptr,  // Optional output: cos(az), Length [n]
-                       arma::fvec *sEL = nullptr,  // Optional output: sin(el), Length [n]
-                       arma::fvec *cEL = nullptr); // Optional output: cos(el), Length [n]
+    void fast_geo2cart(const arma::Col<dtype> &az,            // Input azimuth angles in radians, Length [n]
+                       const arma::Col<dtype> &el,            // Input elevation angles in radians, Length [n]
+                       arma::Col<dtype> &x,                   // Output x-coordinates, Length [n]
+                       arma::Col<dtype> &y,                   // Output y-coordinates, Length [n]
+                       arma::Col<dtype> &z,                   // Output z-coordinates, Length [n]
+                       arma::Col<dtype> *sAZ = nullptr,       // Optional output: sin(az), Length [n]
+                       arma::Col<dtype> *cAZ = nullptr,       // Optional output: cos(az), Length [n]
+                       arma::Col<dtype> *sEL = nullptr,       // Optional output: sin(el), Length [n]
+                       arma::Col<dtype> *cEL = nullptr,       // Optional output: cos(el), Length [n]
+                       const arma::Col<dtype> *len = nullptr, // Optional input vector length, Length [n]
+                       int use_kernel = 0);                   // Kernel: 0 = auto, 1 = GENERIC, 2 = AVX2
 
     // Fast, approximate Cartesian-to-geographic conversion
     template <typename dtype>
