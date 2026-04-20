@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.1"
 author: "Stephan Jaeckel"
-date: "16.04.2026"
+date: "20.04.2026"
 lang: en-EN
 ---
 
@@ -2305,7 +2305,7 @@ void quadriga_lib::get_channels_spherical(
 | [fast_asin](#fast_asin) | Compute elementwise approximate arc-sine of a vector |
 | [fast_atan2](#fast_atan2) | Compute elementwise approximate two-argument arc-tangent of two vectors |
 | [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
-| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates |
+| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
 | [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
 | [fast_slerp](#fast_slerp) | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
 
@@ -2314,12 +2314,9 @@ void quadriga_lib::get_channels_spherical(
 Compute elementwise approximate arc-cosine of a vector
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
-- In-place operation not allowed (input and output cannot alias)
 - Output vector is resized automatically if needed
-- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2338,12 +2335,9 @@ void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
 Compute elementwise approximate arc-sine of a vector
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
-- In-place operation not allowed (input and output cannot alias)
 - Output vector is resized automatically if needed
-- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2362,13 +2356,10 @@ void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
 Compute elementwise approximate two-argument arc-tangent of two vectors
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); output is always `arma::fvec`
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Returns angles in radians in (-pi, pi]; max error ~3 ULP (~3.6e-7)
 - atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
-- Both inputs must have the same length; in-place operation not allowed
 - Output vector is resized automatically if needed
-- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2422,38 +2413,43 @@ void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const a
 
 ---
 ## fast_geo2cart
-Convert elementwise azimuth/elevation angles to unit-sphere Cartesian coordinates
+Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
-- Conversion: x = cos(el)*cos(az), y = cos(el)*sin(az), z = sin(el)
+- Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
 - Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
-- Both inputs must have the same length; in-place operation not allowed
 - Output vectors resized automatically if needed
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- OpenMP-parallelized when enabled
+- Precision: GENERIC kernel uses full `dtype` precision (double or float).
+- AVX2 kernel always computes in single precision internally — for `dtype=double`, inputs are narrowed to 
+  float and results widened back. Use `use_kernel=1` to force GENERIC if full double precision is required.
 
 ### Declaration:
 ```
-void quadriga_lib::fast_geo2cart(const arma::fvec &az, const arma::fvec &el,
-                                 arma::fvec &x, arma::fvec &y, arma::fvec &z,
-                                 arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
-                                 arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
-
-void quadriga_lib::fast_geo2cart(const arma::vec &az, const arma::vec &el,
-                                 arma::fvec &x, arma::fvec &y, arma::fvec &z,
-                                 arma::fvec *sAZ = nullptr, arma::fvec *cAZ = nullptr,
-                                 arma::fvec *sEL = nullptr, arma::fvec *cEL = nullptr);
+void fast_geo2cart(
+    const arma::Col<dtype> &az,
+    const arma::Col<dtype> &el,
+    arma::Col<dtype> &x,
+    arma::Col<dtype> &y,
+    arma::Col<dtype> &z,
+    arma::Col<dtype> *sAZ = nullptr,
+    arma::Col<dtype> *cAZ = nullptr,
+    arma::Col<dtype> *sEL = nullptr,
+    arma::Col<dtype> *cEL = nullptr,
+    const arma::Col<dtype> *len = nullptr,
+    int use_kernel = 0);
 ```
 
 ### Input Arguments:
 - **`az`** — Azimuth angles in radians; `[n]`
 - **`el`** — Elevation angles in radians; `[n]`
+- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n]`
+- **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable)
 
 ### Output Arguments:
-- **`x`** — X-coordinates on the unit sphere; `[n]`
-- **`y`** — Y-coordinates on the unit sphere; `[n]`
-- **`z`** — Z-coordinates on the unit sphere; `[n]`
+- **`x`** — X-coordinates; `[n]`
+- **`y`** — Y-coordinates; `[n]`
+- **`z`** — Z-coordinates; `[n]`
 - **`sAZ`** *(optional)* — sin(az); `[n]` or `nullptr`
 - **`cAZ`** *(optional)* — cos(az); `[n]` or `nullptr`
 - **`sEL`** *(optional)* — sin(el); `[n]` or `nullptr`
@@ -2467,12 +2463,10 @@ void quadriga_lib::fast_geo2cart(const arma::vec &az, const arma::vec &el,
 Compute elementwise approximate sine and/or cosine of a vector
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
 - Either `s` or `c` may be `nullptr` to skip that computation
 - Output vectors are resized automatically if needed
-- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2492,7 +2486,6 @@ void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arm
 Compute elementwise approximate SLERP interpolation between two complex-valued vectors
 
 ### Description:
-- Allowed datatypes: `float` (input `arma::fvec`) or `double` (input `arma::vec`); outputs are always `arma::fvec`
 - Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated
 - Weight `w=0` returns A, `w=1` returns B; per-element weights in [0, 1]
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
@@ -2501,7 +2494,6 @@ Compute elementwise approximate SLERP interpolation between two complex-valued v
 - All input vectors must have the same length; output vectors resized automatically
 - Output Xr and Xi cannot alias each other
 - AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
-- OpenMP-parallelized when enabled
 
 ### Declaration:
 ```
@@ -2554,7 +2546,6 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
 - If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
-- Allowed datatypes: float or double
 
 ### Declaration:
 ```
@@ -2577,16 +2568,6 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 - **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
-
-### Example:
-```
-arma::mat data = arma::randn<arma::mat>(10000, 5);
-arma::vec bins;
-arma::mat Sh;
-arma::vec Sc, mu, sig;
-quadriga_lib::acdf(data, &bins, &Sh, &Sc, &mu, &sig);
-// bins: [201], Sh: [201,5], Sc: [201], mu/sig: [9]
-```
 
 ---
 ## calc_angular_spreads_sphere

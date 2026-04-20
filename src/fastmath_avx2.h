@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 // AVX2 accelerated math functions
 
@@ -60,7 +47,7 @@ static inline __m256 _fm256_rsqrt_nr_ps(__m256 x)
 
 // Note: A SINE / COSINE-only version provides no significant performance advantage
 // Just compute both and drop the unwanted one
-static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *__restrict c)
+static inline void _fm256_sincos256_ps(__m256 x, __m256 * s, __m256 * c)
 {
     // Bit masks
     const __m256 sign_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
@@ -149,7 +136,7 @@ static inline void _fm256_sincos256_ps(__m256 x, __m256 *__restrict s, __m256 *_
 // converts to float, then evaluates the same Cephes polynomial + reconstruction.
 // This avoids the cascaded reduction problem where the float kernel would
 // re-reduce an already-reduced input, losing precision near octant boundaries.
-static inline void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 *__restrict s, __m256 *__restrict c)
+static inline void _fm256_sincos256_pd(__m256d xl, __m256d xh, __m256 * s, __m256 * c)
 {
     // --- Double-precision constants for range reduction ---
     const __m256d abs_mask_d = _mm256_castsi256_pd(
@@ -460,9 +447,9 @@ static inline __m256 _fm256_atan2256_ps(__m256 y, __m256 x)
 //   x = cos(el) * cos(az)
 //   y = cos(el) * sin(az)
 //   z = sin(el)
-static inline void _fm256_geo2cart_ps(__m256 az, __m256 el, __m256 *__restrict x, __m256 *__restrict y, __m256 *__restrict z,
-                                      __m256 *__restrict sAZ = nullptr, __m256 *__restrict cAZ = nullptr,
-                                      __m256 *__restrict sEL = nullptr, __m256 *__restrict cEL = nullptr)
+static inline void _fm256_geo2cart_ps(__m256 az, __m256 el, __m256 * x, __m256 * y, __m256 * z,
+                                      __m256 * sAZ = nullptr, __m256 * cAZ = nullptr,
+                                      __m256 * sEL = nullptr, __m256 * cEL = nullptr)
 {
     __m256 sa, ca, se, ce;
     _fm256_sincos256_ps(az, &sa, &ca);
@@ -488,7 +475,7 @@ static inline void _fm256_geo2cart_ps(__m256 az, __m256 el, __m256 *__restrict x
 //   el  = asin(clamp(z / len, -1, 1))
 // Clamp guards against len == 0 (produces NaN/Inf from div) and FMA rounding.
 static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z,
-                                      __m256 *__restrict az, __m256 *__restrict el, __m256 *__restrict len)
+                                      __m256 * az, __m256 * el, __m256 * len)
 {
     __m256 r2 = _mm256_fmadd_ps(z, z, _mm256_fmadd_ps(y, y, _mm256_mul_ps(x, x)));
     __m256 r  = _mm256_sqrt_ps(r2);
@@ -502,7 +489,7 @@ static inline void _fm256_cart2geo_ps(__m256 x, __m256 y, __m256 z,
 
 // Convert complex RE/IM to polar form (magnitude and phase angle)
 // abs = sqrt(re² + im²),  arg = atan2(im, re)
-static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 *__restrict abs, __m256 *__restrict arg)
+static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 * abs, __m256 * arg)
 {
     *abs = _mm256_sqrt_ps(_mm256_fmadd_ps(re, re, _mm256_mul_ps(im, im)));
     *arg = _fm256_atan2256_ps(im, re);
@@ -510,7 +497,7 @@ static inline void _fm256_absarg_ps(__m256 re, __m256 im, __m256 *__restrict abs
 
 // Convert polar form (magnitude and phase angle) to complex RE/IM
 // Equivalent to std::polar(abs, arg): re = abs * cos(arg),  im = abs * sin(arg)
-static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 *__restrict re, __m256 *__restrict im)
+static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 * re, __m256 * im)
 {
     __m256 s, c;
     _fm256_sincos256_ps(arg, &s, &c);
@@ -539,7 +526,7 @@ static inline void _fm256_polar_ps(__m256 abs, __m256 arg, __m256 *__restrict re
 //   w       – interpolation weight per lane  (0 → A, 1 → B)
 //   Xr, Xi  – output real/imag parts (written via restrict pointer)
 static inline void _fm256_slerp_complex_ps(__m256 Ar, __m256 Ai, __m256 Br, __m256 Bi, __m256 w,
-                                           __m256 *__restrict Xr, __m256 *__restrict Xi)
+                                           __m256 * Xr, __m256 * Xi)
 {
     // ---- Constants ----
     const __m256 one = _mm256_set1_ps(1.0f);

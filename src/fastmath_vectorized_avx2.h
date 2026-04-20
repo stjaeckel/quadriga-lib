@@ -1,24 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
-
-// AVX2 accelerated vectorized math functions
-// - Vector lengths must be multiple of 8
-// - Input / output vectors do not need to be aligned
-// - No sanity checks - incorrect argument formatting leads to undefined behavior
+// Part of quadriga-lib — see LICENSE for terms.
 
 #ifndef quadriga_lib_fastmath_vec_avx2_H
 #define quadriga_lib_fastmath_vec_avx2_H
@@ -26,60 +8,52 @@
 #include <stddef.h>
 
 template <typename dtype> // float or double
-void qd_SINCOS_AVX2(const dtype *__restrict x,
-                    float *__restrict s,
-                    float *__restrict c,
+void qd_SINCOS_AVX2(const dtype *x,
+                    float *s,
+                    float *c,
                     size_t n_val);
 
 template <typename dtype> // float or double
-void qd_SIN_AVX2(const dtype *__restrict x,
-                 float *__restrict s,
+void qd_SIN_AVX2(const dtype *x,
+                 float *s,
                  size_t n_val);
 
 template <typename dtype> // float or double
-void qd_COS_AVX2(const dtype *__restrict x,
-                 float *__restrict c,
+void qd_COS_AVX2(const dtype *x,
+                 float *c,
                  size_t n_val);
 
 template <typename dtype> // float or double
-void qd_ASIN_AVX2(const dtype *__restrict x,
-                  float *__restrict s,
+void qd_ASIN_AVX2(const dtype *x,
+                  float *s,
                   size_t n_val);
 
 template <typename dtype> // float or double
-void qd_ACOS_AVX2(const dtype *__restrict x,
-                  float *__restrict c,
+void qd_ACOS_AVX2(const dtype *x,
+                  float *c,
                   size_t n_val);
 
 template <typename dtype> // float or double
-void qd_ATAN2_AVX2(const dtype *__restrict y,
-                   const dtype *__restrict x,
-                   float *__restrict a,
+void qd_ATAN2_AVX2(const dtype *y,
+                   const dtype *x,
+                   float *a,
                    size_t n_val);
 
 template <typename dtype> // float or double
-void qd_SLERP_AVX2(const dtype *__restrict Ar, const dtype *__restrict Ai,
-                   const dtype *__restrict Br, const dtype *__restrict Bi,
-                   const dtype *__restrict w,
-                   float *__restrict Xr, float *__restrict Xi,
+void qd_SLERP_AVX2(const dtype *Ar, const dtype *Ai,
+                   const dtype *Br, const dtype *Bi,
+                   const dtype *w,
+                   float *Xr, float *Xi,
                    size_t n_val);
 
 template <typename dtype> // float or double
-void qd_GEO2CART_AVX2(const dtype *__restrict az,
-                      const dtype *__restrict el,
-                      float *__restrict x,
-                      float *__restrict y,
-                      float *__restrict z,
-                      float *__restrict sAZ, float *__restrict cAZ,
-                      float *__restrict sEL, float *__restrict cEL,
+void qd_GEO2CART_AVX2(const dtype *az, const dtype *el, const dtype *len,
+                      dtype *x, dtype *y, dtype *z,
+                      dtype *sAZ, dtype *cAZ, dtype *sEL, dtype *cEL,
                       size_t n_val);
 
 template <typename dtype> // float or double
-void qd_CART2GEO_AVX2(const dtype *__restrict x,
-                      const dtype *__restrict y,
-                      const dtype *__restrict z,
-                      dtype *__restrict az,
-                      dtype *__restrict el,
-                      dtype *__restrict len, 
+void qd_CART2GEO_AVX2(const dtype *x, const dtype *y, const dtype *z,
+                      dtype *az, dtype *el, dtype *len,
                       size_t n_val);
 #endif

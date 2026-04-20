@@ -1,35 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "fastmath_vectorized_avx2.h"
 #include "fastmath_avx2.h"
 
 #include <immintrin.h>
 #include <limits.h>
-#include <cstring> // memcpy
+#include <cstring> // std::memcpy
 
 #ifndef QD_OMP_THRESHOLD
 #define QD_OMP_THRESHOLD 4096 // iterations of the inner loop before parallelizing
 #endif
 
 template <> // float
-void qd_SINCOS_AVX2(const float *__restrict x,
-                    float *__restrict s,
-                    float *__restrict c,
+void qd_SINCOS_AVX2(const float *x,
+                    float *s,
+                    float *c,
                     size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3; // number of full 8-float vectors
@@ -62,9 +49,9 @@ void qd_SINCOS_AVX2(const float *__restrict x,
 }
 
 template <> // double
-void qd_SINCOS_AVX2(const double *__restrict x,
-                    float *__restrict s,
-                    float *__restrict c,
+void qd_SINCOS_AVX2(const double *x,
+                    float *s,
+                    float *c,
                     size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -97,8 +84,8 @@ void qd_SINCOS_AVX2(const double *__restrict x,
 }
 
 template <> // float
-void qd_SIN_AVX2(const float *__restrict x,
-                 float *__restrict s,
+void qd_SIN_AVX2(const float *x,
+                 float *s,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -128,8 +115,8 @@ void qd_SIN_AVX2(const float *__restrict x,
 }
 
 template <> // double
-void qd_SIN_AVX2(const double *__restrict x,
-                 float *__restrict s,
+void qd_SIN_AVX2(const double *x,
+                 float *s,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -159,8 +146,8 @@ void qd_SIN_AVX2(const double *__restrict x,
 }
 
 template <> // float
-void qd_COS_AVX2(const float *__restrict x,
-                 float *__restrict c,
+void qd_COS_AVX2(const float *x,
+                 float *c,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -190,8 +177,8 @@ void qd_COS_AVX2(const float *__restrict x,
 }
 
 template <> // double
-void qd_COS_AVX2(const double *__restrict x,
-                 float *__restrict c,
+void qd_COS_AVX2(const double *x,
+                 float *c,
                  size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -221,8 +208,8 @@ void qd_COS_AVX2(const double *__restrict x,
 }
 
 template <> // float
-void qd_ASIN_AVX2(const float *__restrict x,
-                  float *__restrict s,
+void qd_ASIN_AVX2(const float *x,
+                  float *s,
                   size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -248,8 +235,8 @@ void qd_ASIN_AVX2(const float *__restrict x,
 }
 
 template <> // double
-void qd_ASIN_AVX2(const double *__restrict x,
-                  float *__restrict s,
+void qd_ASIN_AVX2(const double *x,
+                  float *s,
                   size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -282,8 +269,8 @@ void qd_ASIN_AVX2(const double *__restrict x,
 }
 
 template <> // float
-void qd_ACOS_AVX2(const float *__restrict x,
-                  float *__restrict c,
+void qd_ACOS_AVX2(const float *x,
+                  float *c,
                   size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -309,8 +296,8 @@ void qd_ACOS_AVX2(const float *__restrict x,
 }
 
 template <> // double
-void qd_ACOS_AVX2(const double *__restrict x,
-                  float *__restrict c,
+void qd_ACOS_AVX2(const double *x,
+                  float *c,
                   size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -343,9 +330,9 @@ void qd_ACOS_AVX2(const double *__restrict x,
 }
 
 template <> // float
-void qd_ATAN2_AVX2(const float *__restrict y,
-                   const float *__restrict x,
-                   float *__restrict a,
+void qd_ATAN2_AVX2(const float *y,
+                   const float *x,
+                   float *a,
                    size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -373,9 +360,9 @@ void qd_ATAN2_AVX2(const float *__restrict y,
 }
 
 template <> // double
-void qd_ATAN2_AVX2(const double *__restrict y,
-                   const double *__restrict x,
-                   float *__restrict a,
+void qd_ATAN2_AVX2(const double *y,
+                   const double *x,
+                   float *a,
                    size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -409,10 +396,10 @@ void qd_ATAN2_AVX2(const double *__restrict y,
 }
 
 template <> // float
-void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
-                   const float *__restrict Br, const float *__restrict Bi,
-                   const float *__restrict w,
-                   float *__restrict Xr, float *__restrict Xi,
+void qd_SLERP_AVX2(const float *Ar, const float *Ai,
+                   const float *Br, const float *Bi,
+                   const float *w,
+                   float *Xr, float *Xi,
                    size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -455,10 +442,10 @@ void qd_SLERP_AVX2(const float *__restrict Ar, const float *__restrict Ai,
 }
 
 template <> // double
-void qd_SLERP_AVX2(const double *__restrict Ar, const double *__restrict Ai,
-                   const double *__restrict Br, const double *__restrict Bi,
-                   const double *__restrict w,
-                   float *__restrict Xr, float *__restrict Xi,
+void qd_SLERP_AVX2(const double *Ar, const double *Ai,
+                   const double *Br, const double *Bi,
+                   const double *w,
+                   float *Xr, float *Xi,
                    size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
@@ -518,22 +505,29 @@ void qd_SLERP_AVX2(const double *__restrict Ar, const double *__restrict Ai,
 }
 
 template <> // float
-void qd_GEO2CART_AVX2(const float *__restrict az, const float *__restrict el,
-                      float *__restrict x, float *__restrict y, float *__restrict z,
-                      float *__restrict sAZ, float *__restrict cAZ,
-                      float *__restrict sEL, float *__restrict cEL,
+void qd_GEO2CART_AVX2(const float *az, const float *el, const float *len,
+                      float *x, float *y, float *z,
+                      float *sAZ, float *cAZ, float *sEL, float *cEL,
                       size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
+    const bool has_len = (len != nullptr);
 
 #pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_vec; ++i)
     {
         const size_t off = (static_cast<size_t>(i) << 3);
-        __m256 vaz = _mm256_loadu_ps(az + off);
-        __m256 vel = _mm256_loadu_ps(el + off);
+        const __m256 vaz = _mm256_loadu_ps(az + off);
+        const __m256 vel = _mm256_loadu_ps(el + off);
         __m256 vx, vy, vz, vsa, vca, vse, vce;
         _fm256_geo2cart_ps(vaz, vel, &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
+        if (has_len)
+        {
+            const __m256 vlen = _mm256_loadu_ps(len + off);
+            vx = _mm256_mul_ps(vx, vlen);
+            vy = _mm256_mul_ps(vy, vlen);
+            vz = _mm256_mul_ps(vz, vlen);
+        }
         _mm256_storeu_ps(x + off, vx);
         _mm256_storeu_ps(y + off, vy);
         _mm256_storeu_ps(z + off, vz);
@@ -551,54 +545,60 @@ void qd_GEO2CART_AVX2(const float *__restrict az, const float *__restrict el,
     if (n_tail)
     {
         const size_t off = n_val - n_tail;
-        alignas(32) float paz[8] = {}, pel[8] = {};
-        std::memcpy(paz, az + off, n_tail * sizeof(float));
-        std::memcpy(pel, el + off, n_tail * sizeof(float));
+
+        // Stage tail inputs/outputs through aligned 8-float scratch buffers.
+        alignas(32) float scratch_in[8] = {};
+        alignas(32) float scratch_out[8];
+
+        auto load_tail = [&](const float *src) -> __m256
+        {
+            std::memcpy(scratch_in, src + off, n_tail * sizeof(float));
+            return _mm256_load_ps(scratch_in);
+        };
+        auto store_tail = [&](float *dst, __m256 v)
+        {
+            if (!dst)
+                return;
+            _mm256_store_ps(scratch_out, v);
+            std::memcpy(dst + off, scratch_out, n_tail * sizeof(float));
+        };
+
+        const __m256 vaz = load_tail(az);
+        const __m256 vel = load_tail(el);
         __m256 vx, vy, vz, vsa, vca, vse, vce;
-        _fm256_geo2cart_ps(_mm256_load_ps(paz), _mm256_load_ps(pel),
-                           &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
-        alignas(32) float bx[8], by[8], bz[8];
-        _mm256_store_ps(bx, vx);
-        _mm256_store_ps(by, vy);
-        _mm256_store_ps(bz, vz);
-        std::memcpy(x + off, bx, n_tail * sizeof(float));
-        std::memcpy(y + off, by, n_tail * sizeof(float));
-        std::memcpy(z + off, bz, n_tail * sizeof(float));
-        if (sAZ)
+        _fm256_geo2cart_ps(vaz, vel, &vx, &vy, &vz, &vsa, &vca, &vse, &vce);
+        if (has_len)
         {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vsa);
-            std::memcpy(sAZ + off, b, n_tail * sizeof(float));
+            const __m256 vlen = load_tail(len);
+            vx = _mm256_mul_ps(vx, vlen);
+            vy = _mm256_mul_ps(vy, vlen);
+            vz = _mm256_mul_ps(vz, vlen);
         }
-        if (cAZ)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vca);
-            std::memcpy(cAZ + off, b, n_tail * sizeof(float));
-        }
-        if (sEL)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vse);
-            std::memcpy(sEL + off, b, n_tail * sizeof(float));
-        }
-        if (cEL)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vce);
-            std::memcpy(cEL + off, b, n_tail * sizeof(float));
-        }
+
+        store_tail(x, vx);
+        store_tail(y, vy);
+        store_tail(z, vz);
+        store_tail(sAZ, vsa);
+        store_tail(cAZ, vca);
+        store_tail(sEL, vse);
+        store_tail(cEL, vce);
     }
 }
 
 template <> // double
-void qd_GEO2CART_AVX2(const double *__restrict az, const double *__restrict el,
-                      float *__restrict x, float *__restrict y, float *__restrict z,
-                      float *__restrict sAZ, float *__restrict cAZ,
-                      float *__restrict sEL, float *__restrict cEL,
+void qd_GEO2CART_AVX2(const double *az, const double *el, const double *len,
+                      double *x, double *y, double *z,
+                      double *sAZ, double *cAZ, double *sEL, double *cEL,
                       size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
+    const bool has_len = (len != nullptr);
+
+    auto store8 = [](double *dst, __m256 v)
+    {
+        _mm256_storeu_pd(dst, _mm256_cvtps_pd(_mm256_castps256_ps128(v)));
+        _mm256_storeu_pd(dst + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(v, 1)));
+    };
 
 #pragma omp parallel for schedule(static) if (n_vec >= QD_OMP_THRESHOLD)
     for (long long i = 0; i < n_vec; ++i)
@@ -607,76 +607,96 @@ void qd_GEO2CART_AVX2(const double *__restrict az, const double *__restrict el,
         const double *azp = az + off;
         const double *elp = el + off;
 
-        __m256 vsa, vca;
+        __m256 vsa, vca, vse, vce;
         _fm256_sincos256_pd(_mm256_loadu_pd(azp), _mm256_loadu_pd(azp + 4), &vsa, &vca);
-
-        __m256 vse, vce;
         _fm256_sincos256_pd(_mm256_loadu_pd(elp), _mm256_loadu_pd(elp + 4), &vse, &vce);
 
-        _mm256_storeu_ps(x + off, _mm256_mul_ps(vce, vca));
-        _mm256_storeu_ps(y + off, _mm256_mul_ps(vce, vsa));
-        _mm256_storeu_ps(z + off, vse);
+        __m256 vx = _mm256_mul_ps(vce, vca);
+        __m256 vy = _mm256_mul_ps(vce, vsa);
+        __m256 vz = vse;
+
+        if (has_len)
+        {
+            const double *lp = len + off;
+            const __m128 lo = _mm256_cvtpd_ps(_mm256_loadu_pd(lp));
+            const __m128 hi = _mm256_cvtpd_ps(_mm256_loadu_pd(lp + 4));
+            const __m256 vlen = _mm256_set_m128(hi, lo);
+            vx = _mm256_mul_ps(vx, vlen);
+            vy = _mm256_mul_ps(vy, vlen);
+            vz = _mm256_mul_ps(vz, vlen);
+        }
+
+        store8(x + off, vx);
+        store8(y + off, vy);
+        store8(z + off, vz);
         if (sAZ)
-            _mm256_storeu_ps(sAZ + off, vsa);
+            store8(sAZ + off, vsa);
         if (cAZ)
-            _mm256_storeu_ps(cAZ + off, vca);
+            store8(cAZ + off, vca);
         if (sEL)
-            _mm256_storeu_ps(sEL + off, vse);
+            store8(sEL + off, vse);
         if (cEL)
-            _mm256_storeu_ps(cEL + off, vce);
+            store8(cEL + off, vce);
     }
 
     const size_t n_tail = n_val & 7;
     if (n_tail)
     {
         const size_t off = n_val - n_tail;
-        alignas(32) double paz[8] = {}, pel[8] = {};
-        std::memcpy(paz, az + off, n_tail * sizeof(double));
-        std::memcpy(pel, el + off, n_tail * sizeof(double));
 
-        __m256 vsa, vca;
-        _fm256_sincos256_pd(_mm256_load_pd(paz), _mm256_load_pd(paz + 4), &vsa, &vca);
+        alignas(32) double scratch_in[8] = {};
+        alignas(32) double scratch_out[8];
 
-        __m256 vse, vce;
-        _fm256_sincos256_pd(_mm256_load_pd(pel), _mm256_load_pd(pel + 4), &vse, &vce);
+        auto load_tail_pd = [&](const double *src, __m256d &lo, __m256d &hi)
+        {
+            std::memcpy(scratch_in, src + off, n_tail * sizeof(double));
+            lo = _mm256_load_pd(scratch_in);
+            hi = _mm256_load_pd(scratch_in + 4);
+        };
+        auto store_tail = [&](double *dst, __m256 v)
+        {
+            if (!dst)
+                return;
+            _mm256_store_pd(scratch_out, _mm256_cvtps_pd(_mm256_castps256_ps128(v)));
+            _mm256_store_pd(scratch_out + 4, _mm256_cvtps_pd(_mm256_extractf128_ps(v, 1)));
+            std::memcpy(dst + off, scratch_out, n_tail * sizeof(double));
+        };
 
-        alignas(32) float bx[8], by[8], bz[8];
-        _mm256_store_ps(bx, _mm256_mul_ps(vce, vca));
-        _mm256_store_ps(by, _mm256_mul_ps(vce, vsa));
-        _mm256_store_ps(bz, vse);
-        std::memcpy(x + off, bx, n_tail * sizeof(float));
-        std::memcpy(y + off, by, n_tail * sizeof(float));
-        std::memcpy(z + off, bz, n_tail * sizeof(float));
-        if (sAZ)
+        __m256d vaz_lo, vaz_hi, vel_lo, vel_hi;
+        load_tail_pd(az, vaz_lo, vaz_hi);
+        load_tail_pd(el, vel_lo, vel_hi);
+
+        __m256 vsa, vca, vse, vce;
+        _fm256_sincos256_pd(vaz_lo, vaz_hi, &vsa, &vca);
+        _fm256_sincos256_pd(vel_lo, vel_hi, &vse, &vce);
+
+        __m256 vx = _mm256_mul_ps(vce, vca);
+        __m256 vy = _mm256_mul_ps(vce, vsa);
+        __m256 vz = vse;
+
+        if (has_len)
         {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vsa);
-            std::memcpy(sAZ + off, b, n_tail * sizeof(float));
+            __m256d vlen_lo, vlen_hi;
+            load_tail_pd(len, vlen_lo, vlen_hi);
+            const __m256 vlen = _mm256_set_m128(_mm256_cvtpd_ps(vlen_hi), _mm256_cvtpd_ps(vlen_lo));
+            vx = _mm256_mul_ps(vx, vlen);
+            vy = _mm256_mul_ps(vy, vlen);
+            vz = _mm256_mul_ps(vz, vlen);
         }
-        if (cAZ)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vca);
-            std::memcpy(cAZ + off, b, n_tail * sizeof(float));
-        }
-        if (sEL)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vse);
-            std::memcpy(sEL + off, b, n_tail * sizeof(float));
-        }
-        if (cEL)
-        {
-            alignas(32) float b[8];
-            _mm256_store_ps(b, vce);
-            std::memcpy(cEL + off, b, n_tail * sizeof(float));
-        }
+
+        store_tail(x, vx);
+        store_tail(y, vy);
+        store_tail(z, vz);
+        store_tail(sAZ, vsa);
+        store_tail(cAZ, vca);
+        store_tail(sEL, vse);
+        store_tail(cEL, vce);
     }
 }
 
 template <> // float
-void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, const float *__restrict z,
-                      float *__restrict az, float *__restrict el, float *__restrict len, size_t n_val)
+void qd_CART2GEO_AVX2(const float *x, const float *y, const float *z,
+                      float *az, float *el, float *len, size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
 
@@ -721,8 +741,8 @@ void qd_CART2GEO_AVX2(const float *__restrict x, const float *__restrict y, cons
 }
 
 template <> // double
-void qd_CART2GEO_AVX2(const double *__restrict x, const double *__restrict y, const double *__restrict z,
-                      double *__restrict az, double *__restrict el, double *__restrict len, size_t n_val)
+void qd_CART2GEO_AVX2(const double *x, const double *y, const double *z,
+                      double *az, double *el, double *len, size_t n_val)
 {
     const long long n_vec = (long long)n_val >> 3;
 
