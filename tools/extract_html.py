@@ -66,6 +66,7 @@ def format_text(text):
     text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)
       
     # Encode [[]] as internal links
+    text = re.sub(r'\.\[\[(.*?)\]\]', r'<a href="#.\1">.\1</a>', text)
     text = re.sub(r'\[\[(.*?)\]\]', r'<a href="#\1">\1</a>', text)
 
     return text
@@ -84,7 +85,7 @@ def format_nested_lists(text):
                 formatted_text += "<ul>"
             else:
                 formatted_text += "</li>"
-            formatted_text += '<li style="margin-bottom: 0.4em;">' + line[2:] + '\n'
+            formatted_text += '<li>' + line[2:] + '\n'
         elif (line.startswith("  ") or line.startswith("  ")) and inside_list:  # Continuation of the current list item
             formatted_text += " " + line + "\n"
         else:  # End of the list or some other content
@@ -120,7 +121,7 @@ def format_tables(text):
             for col in cols:
                 if i == 0 and alignment_line is not None:
                     # If this is the first line, and an alignment line was found, use <th>
-                    html_content += f"  <th>{col.strip()}</th>\n"
+                    html_content += f'  <th style="text-align: left;">{col.strip()}</th>\n'
                 else:
                     html_content += f"  <td>{col.strip()}</td>\n"
             html_content += "</tr>\n"
@@ -308,11 +309,29 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
                     short_description = lines[1]
                
                 if len(short_description) > 0:
-                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b> - {short_description}\n<ul>\n'
+                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b> - {short_description}\n'
                 else:
-                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b>\n<ul>\n'
+                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b>\n'
 
                 i = 2  # Start after the function name and short description
+
+                # Emit any intro lines before the first ## subsection
+                intro_lines = []
+                while i < len(lines) and not lines[i].startswith("## "):
+                    intro_lines.append(lines[i])
+                    i += 1
+                intro_text = "\n".join(intro_lines)
+                intro_lines_formatted = ""
+                for ln in intro_lines:
+                    intro_lines_formatted += format_text(ln) + " \n"
+                intro_lines_formatted = format_nested_lists(intro_lines_formatted)
+                intro_lines_formatted = format_tables(intro_lines_formatted)
+                if intro_lines_formatted.strip():
+                    html_content += f'<div style="margin-bottom: 1.5em;">\n{intro_lines_formatted.strip()}\n</div>\n'
+
+                no_intro = not bool(intro_lines_formatted.strip())
+                first_section = True
+
                 while i < len(lines):
                     line = lines[i]
                     if line.startswith("## "):  # Detected a section
@@ -342,11 +361,13 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
                         section_content = format_tables(section_content)
                         #section_content = format_text(section_content)
 
-                        html_content += f'<li style="margin-bottom: 1.5em;">\n<b><i>{section_name}</i></b><br>{section_content.strip()}\n</li>\n'
+                        prefix = '<br><br>\n' if (no_intro and first_section) else '\n'
+                        first_section = False 
+                        html_content += f'{prefix}<i>{section_name}</i><br>\n{section_content.strip()}\n'
                     else:
                         i += 1
 
-                html_content += '</ul>\n'
+                html_content += '\n'
 
     # Read the content of the file 'tools/html_parts/html_foot.html.part'
     with open("tools/html_parts/html_foot.html.part", "r") as foot_file:

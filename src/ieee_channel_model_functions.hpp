@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #ifndef qdlib_ieee_channel_model_functions_H
 #define qdlib_ieee_channel_model_functions_H
@@ -38,7 +25,7 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
                                  std::vector<arma::vec> &delay,          // Output: Path delays in seconds, per-user, Length: n_path_out
                                  std::vector<arma::cube> &M,             // Output: Polarization transfer matrix, interleaved complex, col-major, per-user, Size: 8, n_subpath, n_path_out
                                  std::string ChannelType,                // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-                                 double CarrierFreq_Hz = 5.25e9,         // Carrier frequency in Hz
+                                 double CarrierFreq_Hz = 5.25e9,         // Carrier frequency
                                  double tap_spacing_s = 10.0e-9,         // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
                                  arma::uword n_users = 1,                // Number of user (only for TGac, TGah)
                                  arma::vec Dist_m = {4.99},              // Distance between TX and TX in meters, length n_users or length 1 (if same for all users)

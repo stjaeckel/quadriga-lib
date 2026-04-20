@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
 #include <cstring>   // std::memcpy
@@ -31,7 +18,6 @@ SECTION!*/
 # get_channels_irs
 Calculate MIMO channel coefficients for IRS-assisted communication
 
-## Description:
 - Computes channel coefficients and delays from two path segments: TX → IRS and IRS → RX
 - IRS is modeled as a passive array; phase shifts are defined via its coupling matrix; codebook entry selected by `i_irs`
 - Polarization coupling is applied via the 8-row transfer matrices `M_1`, `M_2` (interleaved Re/Im for VV, VH, HV, HH components)
@@ -39,7 +25,6 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - If `active_path` is provided, it overrides `threshold_dB` for path selection
 - Optional `irs_array_2` provides a separate IRS antenna pattern for the RX-facing side (asymmetric IRS)
 - Setting `center_frequency = 0.0` disables phase computation
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -78,41 +63,41 @@ std::vector<bool> quadriga_lib::get_channels_irs(
     const std::vector<bool> *active_path = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
 - **`irs_array`** — IRS antenna array (TX-facing side) with `n_irs` elements; see [[arrayant]]
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, meters
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), radians
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, meters
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), radians
-- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates, meters
-- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading), radians
-- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths, `[3, n_path_1]`
-- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths, `[3, n_path_1]`
-- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths, `[n_path_1]`
-- **`path_length_1`** — Total path lengths from TX to IRS phase center, meters, `[n_path_1]`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path_1]`
-- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths, `[3, n_path_2]`
-- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths, `[3, n_path_2]`
-- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths, `[n_path_2]`
-- **`path_length_2`** — Total path lengths from IRS to RX phase center, meters, `[n_path_2]`
-- **`M_2`** — Polarization transfer matrix for IRS → RX paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path_2]`
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
+- **`Ix, Iy, Iz`** — IRS position in Cartesian coordinates
+- **`Ib, It, Ih`** — IRS orientation as Euler angles (bank, tilt, heading)
+- **`fbs_pos_1`** — First-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
+- **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
+- **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1]`
+- **`path_length_1`** — Total path lengths from TX to IRS phase center; `[n_path_1]`
+- **`M_1`** — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path_1]`
+- **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
+- **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
+- **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `[n_path_2]`
+- **`path_length_2`** — Total path lengths from IRS to RX phase center; `[n_path_2]`
+- **`M_2`** — Polarization transfer matrix for IRS → RX paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path_2]`
 - **`i_irs`** *(optional)* — IRS codebook port index
 - **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded
-- **`center_frequency`** *(optional)* — Center frequency in Hz; set to `0` to skip phase computation
+- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`irs_array_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns; see [[arrayant]]
-- **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`, `[n_path_1 * n_path_2]`
+- **`active_path`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`; `[n_path_1 * n_path_2]`
 
-## Output Arguments:
-- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path_irs]`
-- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path_irs]`
-- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path_irs]`
-- **`aod`** *(optional)* — Azimuth of departure, radians, `[n_rx, n_tx, n_path_irs]`
-- **`eod`** *(optional)* — Elevation of departure, radians, `[n_rx, n_tx, n_path_irs]`
-- **`aoa`** *(optional)* — Azimuth of arrival, radians, `[n_rx, n_tx, n_path_irs]`
-- **`eoa`** *(optional)* — Elevation of arrival, radians, `[n_rx, n_tx, n_path_irs]`
+## Outputs:
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_irs]`
+- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path_irs]`
+- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
+- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
+- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
 
 ## Returns:
 - Boolean mask of length `n_path_1 * n_path_2` indicating which path combinations were included in the output

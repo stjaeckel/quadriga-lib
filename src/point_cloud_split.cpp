@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # point_cloud_split
 Split a point cloud into two sub-clouds along a spatial axis
 
-## Description:
 - Splits at the bounding box midpoint along the chosen axis (not the statistical median); 
   the split may be unbalanced if points are non-uniformly distributed.
 - If `axis == 0`, the longest bounding box extent is used.
 - Returns a negative axis value if the split failed (all points on one side); outputs are not modified in that case.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -42,11 +27,11 @@ int quadriga_lib::point_cloud_split(
     arma::Col<int> *split_ind = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — Input point cloud; `[n_points, 3]`
 - **`axis`** *(optional)* — Split axis: `0` = longest extent, `1` = x, `2` = y, `3` = z
 
-## Output Arguments:
+## Outputs:
 - **`pointsA`** — First sub-cloud; `[n_pointsA, 3]`
 - **`pointsB`** — Second sub-cloud; `[n_pointsB, 3]`
 - **`split_ind`** *(optional)* — Per-point destination: `1` = pointsA, `2` = pointsB, `0` = error; `[n_points]`

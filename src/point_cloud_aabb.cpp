@@ -1,35 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # point_cloud_aabb
 Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 
-## Description:
 - Each row of the output contains `[x_min, x_max, y_min, y_max, z_min, z_max]` for one sub-cloud
 - If `sub_cloud_index` is `nullptr` or empty, the entire input is treated as a single cloud; last index spans to end of `points`
 - Output row count is zero-padded to the nearest multiple of `vec_size`; padding rows are zeros
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -39,7 +24,7 @@ arma::Mat<dtype> quadriga_lib::point_cloud_aabb(
     arma::uword vec_size = 1);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — 3D point coordinates; `[n_points, 3]`
 - **`sub_cloud_index`** *(optional)* — Row indices marking the start of each sub-cloud; use [[point_cloud_segmentation]] to generate; `[n_sub]`
 - **`vec_size`** *(optional)* — SIMD alignment padding factor (e.g. 4, 8, 16)

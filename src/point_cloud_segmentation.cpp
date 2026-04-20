@@ -1,35 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # point_cloud_segmentation
 Reorganize a point cloud into spatial sub-clouds for efficient processing
 
-## Description:
 - Recursively partitions a 3D point cloud into sub-clouds by splitting along bounding box axes at the midpoint.
 - Sub-clouds can be padded to a multiple of `vec_size` for SIMD alignment; padding points are placed at the sub-cloud AABB center.
 - Produces a reorganized point array and index maps to track reordering.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -43,12 +28,12 @@ arma::uword quadriga_lib::point_cloud_segmentation(
     arma::u32_vec *reverse_index = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — Original 3D point cloud; `[n_points, 3]`
 - **`target_size`** *(optional)* — Maximum points per sub-cloud before padding
 - **`vec_size`** *(optional)* — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of this value; no padding when `1`
 
-## Output Arguments:
+## Outputs:
 - **`pointsR`** — Reorganized point cloud with points grouped by sub-cloud; `[n_pointsR, 3]`
 - **`sub_cloud_index`** — 0-based starting index of each sub-cloud within `pointsR`; `[n_sub]`
 - **`forward_index`** *(optional)* — 1-based index map from `points` to `pointsR`; padding entries are `0`; `[n_pointsR]`

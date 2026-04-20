@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_arrayant.hpp"
 #include "quadriga_tools.hpp"
@@ -34,17 +21,26 @@ SECTION!*/
 # generate_speaker
 Generate a parametric frequency-dependent loudspeaker directivity model
 
-## Description:
-- Returns one `quadriga_lib::arrayant` per frequency sample; each has a single element with the real-valued directivity balloon in `e_theta_re` and `center_frequency` set to the corresponding frequency in Hz.
-- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
-- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))`, where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
+- Returns one [[arrayant]] object per frequency sample; each has a single element with the real-valued 
+  directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
+- Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining results 
+  via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass responses.
+- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`, 
+  where `n = slope_dB_per_octave / 6`; −3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity − 85) / 20)`.
-- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
+- If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below 
+  `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
-- **Driver models** (`driver_type`): `"piston"` — circular piston in baffle, `D(θ) = 2*J1(ka*sinθ)/(ka*sinθ)`, rotationally symmetric, narrows with increasing `ka`; `"horn"` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`; `"omni"` — frequency-independent omnidirectional pattern.
-- **Enclosure models** (`radiation_type`): `"monopole"` — no modification; `"hemisphere"` — sealed box with baffle-step transition, `f_baffle = c/(π*sqrt(W*H))`; `"dipole"` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere; `"cardioid"` — `R = 0.5*(1+cos(θ_off))`.
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π*radius)`.
-- Allowed datatypes (`dtype`): `float` or `double`
+- **Driver models** (`driver_type`): 
+  `"piston"` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`; 
+  `"horn"` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`; 
+  `"omni"` — frequency-independent omnidirectional pattern.
+- **Enclosure models** (`radiation_type`): 
+  `"monopole"` — no modification; 
+  `"hemisphere"` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W*H))`; 
+  `"dipole"` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere; 
+  `"cardioid"` — `R = 0.5·(1+cos(θ_off))`.
+- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π·radius)`.
 
 ## Declaration:
 ```
@@ -66,21 +62,21 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::generate_speaker(
         dtype angular_resolution = 5.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`driver_type`** *(optional)* — Driver directivity model: `"piston"`, `"horn"`, or `"omni"`
-- **`radius`** *(optional)* — Effective radiating radius in meters; cone/dome radius for piston, mouth radius for horn
-- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency in Hz
-- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency in Hz
+- **`radius`** *(optional)* — Effective radiating radius; cone/dome radius for piston, mouth radius for horn
+- **`lower_cutoff`** *(optional)* — Lower −3 dB bandpass frequency
+- **`upper_cutoff`** *(optional)* — Upper −3 dB bandpass frequency
 - **`lower_rolloff_slope`** *(optional)* — Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth)
 - **`upper_rolloff_slope`** *(optional)* — High-frequency rolloff in dB/octave
 - **`sensitivity`** *(optional)* — On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude
 - **`radiation_type`** *(optional)* — Enclosure radiation model: `"monopole"`, `"hemisphere"`, `"dipole"`, or `"cardioid"`
 - **`hor_coverage`** *(optional)* — Horn horizontal coverage angle in degrees; `0` defaults to 90°
 - **`ver_coverage`** *(optional)* — Horn vertical coverage angle in degrees; `0` defaults to 60°
-- **`horn_control_freq`** *(optional)* — Horn pattern control frequency in Hz; `0` auto-derives from `radius`
-- **`baffle_width`** *(optional)* — Baffle width in meters; used by `"hemisphere"` model
-- **`baffle_height`** *(optional)* — Baffle height in meters; used by `"hemisphere"` model
-- **`frequencies`** *(optional)* — Frequency sample points in Hz; auto-generated third-octave bands if empty, `[n_freq]`
+- **`horn_control_freq`** *(optional)* — Horn pattern control frequency; `0` auto-derives from `radius`
+- **`baffle_width`** *(optional)* — Baffle width; used by `"hemisphere"` model
+- **`baffle_height`** *(optional)* — Baffle height; used by `"hemisphere"` model
+- **`frequencies`** *(optional)* — Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
 - **`angular_resolution`** *(optional)* — Azimuth and elevation sampling grid resolution in degrees
 
 ## Returns:
@@ -96,7 +92,6 @@ auto sub = quadriga_lib::generate_speaker<double>("omni", 0.13, 30.0, 200.0,
                12.0, 24.0, 92.0, "monopole", 0.0, 0.0, 0.0, 0.15, 0.25, {30.,50.,80.,120.,200.}, 10.0);
 ```
 MD!*/
-
 
 // Piston directivity function: 2*J1(x)/x, returns 1.0 at x=0
 // Uses C++17 std::cyl_bessel_j for J1

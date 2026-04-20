@@ -1,38 +1,26 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # point_inside_mesh
 Test whether 3D points are inside a triangle mesh using raycasting
 
-## Description:
-- Casts multiple rays per point in various directions
-- A point is inside if any ray hits a face with a negative incidence angle, or if the ray thickness at FBS is below 1 mm (surface proximity)
+- Always casts 4 rays per point in near-tetrahedral directions (rotated regular tetrahedron,
+  scaled to 1000 m) for inside/outside detection
+- When `distance > 0`, adds icosphere-sampled rays at subdivision level ⌈distance⌉ + 1
+  (e.g. subdiv 2 for distance ≤ 1 m, subdiv 3 for ≤ 2 m), substantially increasing ray count
+- A point is inside if any ray hits a face with a negative incidence angle, or if the ray
+  thickness at FBS is below 1 mm (surface proximity)
 - Mesh must be watertight with all normals pointing outward
 - If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
-- `distance > 0` classifies points within that many meters of the mesh surface as inside; increases computation time significantly; range: 0–20 m
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -43,18 +31,20 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
     dtype distance = 0.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
 - **`mesh`** — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); `[n_mesh, 9]`
 - **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
-- **`distance`** *(optional)* — Surface proximity threshold in meters to also classify as inside
+- **`distance`** *(optional)* — Surface proximity threshold; points within this distance
+  of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
+  range: 0–20 m (default: 0)
 
 ## Returns:
 - `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
 
 ## See also:
 - [[triangle_mesh_segmentation]] (used internally to build BVH for ray queries)
-- [[icosphere]] (generates ray directions for distance proximity check)
+- [[icosphere]] (generates icosphere ray directions for distance proximity check; subdivision level = ⌈distance⌉ + 1)
 MD!*/
 
 template <typename dtype>

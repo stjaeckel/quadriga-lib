@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
@@ -27,17 +14,16 @@
 #endif
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # ray_point_intersect
 Calculate intersections of ray beams with points in 3D space
 
-## Description:
 - Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation.
 - Returns, for each point, the list of 0-based ray indices whose beam intersects that point.
-- Allowed datatypes: `float` or `double`; all internal computations use single precision.
+- All internal computations use single precision.
 
 ## Declaration:
 ```
@@ -52,7 +38,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
     int gpu_id = 0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`

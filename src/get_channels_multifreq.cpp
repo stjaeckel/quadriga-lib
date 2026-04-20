@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
 #include <cstring>
@@ -119,18 +106,16 @@ SECTION!*/
 # get_channels_multifreq
 Compute channel coefficients for spherical waves across multiple frequencies
 
-## Description:
 - Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) computed once and reused across all output frequencies
 - Aligns four frequency grids: TX array (from `tx_array[i].center_frequency`), RX array, input samples (`freq_in`), and output (`freq_out`)
 - TX/RX patterns interpolated per output frequency via SLERP with linear fallback (same as [[arrayant_interpolate_multi]])
 - `path_gain` interpolated linearly; `M` interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to nearest frequency entry on all four grids
-- `propagation_speed` supports radio (speed of light, default) and acoustic (~343 m/s) simulations
+- `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
 - `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
 - Coupling matrices interpolated across frequencies per complex entry (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
-- Allowed datatypes: float or double
 
 ## Declaration:
 ```
@@ -156,25 +141,25 @@ void quadriga_lib::get_channels_multifreq(
     dtype propagation_speed = dtype(299792458.0));
 ```
 
-## Input Arguments:
+## Inputs:
 - **`tx_array`** — Multi-frequency TX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
 - **`rx_array`** — Multi-frequency RX arrayant vector; all entries must pass [[arrayant_is_valid_multi]]
-- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates [m]
-- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading) [rad]
-- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates [m]
-- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading) [rad]
-- **`fbs_pos`** — First-bounce scatterer positions, `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions, `[3, n_path]`
-- **`path_gain`** — Linear-scale path gains, `[n_path, n_freq_in]`
-- **`path_length`** — Absolute TX-to-RX path lengths, `[n_path]`
-- **`M`** — Polarization transfer matrix, `[8, n_path, n_freq_in]` (full pol) or `[2, n_path, n_freq_in]` (scalar)
-- **`freq_in`** — Input sample frequencies [Hz] for `path_gain` and `M`, `[n_freq_in]`
-- **`freq_out`** — Target output frequencies [Hz], `[n_freq_out]`
+- **`Tx, Ty, Tz`** — TX position in Cartesian coordinates
+- **`Tb, Tt, Th`** — TX orientation, Euler angles (bank, tilt, heading)
+- **`Rx, Ry, Rz`** — RX position in Cartesian coordinates
+- **`Rb, Rt, Rh`** — RX orientation, Euler angles  (bank, tilt, heading)
+- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_gain`** — Linear-scale path gains; `[n_path, n_freq_in]`
+- **`path_length`** — Absolute TX-to-RX path lengths; `[n_path]`
+- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq_in]` (full pol) or `[2, n_path, n_freq_in]` (scalar)
+- **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in]`
+- **`freq_out`** — Target output frequencies; `[n_freq_out]`
 - **`use_absolute_delays`** *(optional)* — Include LOS delay in all paths if true
 - **`add_fake_los_path`** *(optional)* — Add zero-power LOS path if none detected
 - **`propagation_speed`** *(optional)* — Wave speed [m/s]; use ~343.0 for acoustics
 
-## Output Arguments:
+## Outputs:
 - **`coeff_re`** — Real part of coefficients; vector length `n_freq_out`, each cube `[n_rx_ports, n_tx_ports, n_path_out]`
 - **`coeff_im`** — Imaginary part; same structure as `coeff_re`
 - **`delay`** — Propagation delays [s]; same structure as `coeff_re`
@@ -184,7 +169,6 @@ void quadriga_lib::get_channels_multifreq(
 - [[arrayant_interpolate_multi]] (underlying pattern interpolation)
 - [[arrayant_concat_multi]] (building multi-frequency arrays)
 - [[generate_speaker]] (acoustic source construction)
-- [[fast_slerp]] (SLERP implementation used for the interpolation)
 MD!*/
 
 template <typename dtype>

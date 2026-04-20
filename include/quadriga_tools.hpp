@@ -21,7 +21,7 @@ static_assert(sizeof(size_t) == sizeof(unsigned long long), "size_t and unsigned
 namespace quadriga_lib
 {
 
-    // ---- Miscellaneous tools ----
+    // ---- Channel statistics ----
 
     // Calculate the empirical averaged cumulative distribution function (CDF)
     // Input data matrix has samples in rows and data sets in columns.
@@ -35,20 +35,6 @@ namespace quadriga_lib
               arma::Col<dtype> *mu = nullptr,   // Mean 0.1-0.9 quantiles, Length [9]
               arma::Col<dtype> *sig = nullptr,  // Std of 0.1-0.9 quantiles, Length [9]
               arma::uword n_bins = 201);        // Number of auto-generated bins
-
-    // Calculates the rotation matrix from Euler angles
-    // - Returns: Coefficients of the rotation matrix in column-major ordering, Size: [9, n_row, n_col]
-    // - Internal calculations are done in double precision, even if the <dtype> is <float>
-    template <typename dtype>
-    arma::Cube<dtype> calc_rotation_matrix(const arma::Cube<dtype> &orientation, // Orientation vectors (Euler rotations) in [rad], Size [3, n_row, n_col]
-                                           bool invert_y_axis = false,           // Inverts the y-axis
-                                           bool transposeR = false);             // Returns the transpose of R instead of R
-
-    template <typename dtype>
-    arma::Mat<dtype> calc_rotation_matrix(const arma::Mat<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
-
-    template <typename dtype>
-    arma::Col<dtype> calc_rotation_matrix(const arma::Col<dtype> &orientation, bool invert_y_axis = false, bool transposeR = false);
 
     // Calculate the RMS delay spread in [s]
     // Returns: RMS delay spread, size: [ n_cir ]
@@ -110,51 +96,12 @@ namespace quadriga_lib
                                        bool include_los = false,                         // Include the LOS path(s) in the XPR calculation
                                        dtype window_size = 0.01);                        // LOS window size in meters, paths within dTR + window_size are excluded
 
+    // ---- Site-specific simulation tools ----
+
     // Generate colormap
     // - Returns a 64 x 3 matrix of unsigned chars
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map, bool high_res = false);
-
-    // 2D linear interpolation of multiple data sets
-    // - Output object is passed as a reference (its data will be overwritten)
-    // - If output is not initialized to size [ my, mx, me ], it will be resized, invalidating data pointers
-    template <typename dtype>
-    void interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                   const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
-                   const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
-                   const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
-                   const arma::Col<dtype> &yo,     // y sample points of output; vector length my
-                   arma::Cube<dtype> &output);     // Interpolated data, size [ my, mx, me ]
-
-    // 2D linear interpolation of multiple data sets
-    // - Returns interpolated data, size [ my, mx, me ]
-    template <typename dtype>
-    arma::Cube<dtype> interp_2D(const arma::Cube<dtype> &input, // Input data; size [ ny, nx, ne ], ne = multiple data sets
-                                const arma::Col<dtype> &xi,     // x sample points of input; vector length nx
-                                const arma::Col<dtype> &yi,     // y sample points of input; vector length ny
-                                const arma::Col<dtype> &xo,     // x sample points of output; vector length mx
-                                const arma::Col<dtype> &yo);    // y sample points of output; vector length my
-
-    // 2D linear interpolation of a single data set
-    // - Returns interpolated data, size [ my, mx ]
-    template <typename dtype>
-    arma::Mat<dtype> interp_2D(const arma::Mat<dtype> &input,                           // Input data; size [ ny, nx ]
-                               const arma::Col<dtype> &xi, const arma::Col<dtype> &yi,  // x/y input sample points
-                               const arma::Col<dtype> &xo, const arma::Col<dtype> &yo); // x/y output sample points
-
-    // 1D linear interpolation of multiple data sets
-    // - Returns interpolated data, size [ mx, ne ]
-    template <typename dtype>
-    arma::Mat<dtype> interp_1D(const arma::Mat<dtype> &input, // Input data; size [ nx, ne ], ne = multiple data sets
-                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
-                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
-
-    // 1D linear interpolation of single data set
-    // - Returns interpolated data, length mx
-    template <typename dtype>
-    arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, // Input data vector, vector length nx
-                               const arma::Col<dtype> &xi,    // Input sample points, vector length nx
-                               const arma::Col<dtype> &xo);   // Output sample points, vector length mx
 
     // Write data to PNG file
     template <typename dtype>                    // Types: float, double
@@ -164,8 +111,6 @@ namespace quadriga_lib
                    dtype min_val = NAN,          // Minimum value, when passing NAN, minimum in data is used
                    dtype max_val = NAN,          // Maximum value, when passing NAN, maximum data is used
                    bool log_transform = false);  // Transform data to log-domain (10*log10(data))
-
-    // ---- Site-Specific Simulation Tools ----
 
     // Calculate diffraction gain for multiple transmit and receive positions
     template <typename dtype>                                                 // Supported types: float or double

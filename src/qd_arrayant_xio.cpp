@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_functions.hpp"
@@ -29,12 +16,10 @@ SECTION!*/
 # qdant_write_multi
 Write a vector of arrayant objects to a single QDANT file
 
-## Description:
-- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using [[.qdant_write]].
+- Writes each entry in `arrayant_vec` to a QDANT file with sequential 1-based IDs using .[[qdant_write]].
 - Auto-generates a `[n_entries, 1]` layout matrix with entries `1, 2, ..., n_entries`.
 - Deletes any existing file before writing; all entries are validated first.
 - Primary use case: frequency-dependent models where each arrayant holds a pattern at one frequency via `center_frequency`.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -43,21 +28,12 @@ void quadriga_lib::qdant_write_multi(
         const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path of the QDANT file to write; must not be empty
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects to store
 
-## Example:
-```
-arma::vec freqs = {100.0, 500.0, 1000.0, 5000.0, 10000.0};
-auto spk = quadriga_lib::generate_speaker<double>("piston", 0.05, 80.0, 12000.0,
-                12.0, 12.0, 85.0, "hemisphere", 0.0, 0.0, 0.0, 0.15, 0.25, freqs, 5.0);
-quadriga_lib::qdant_write_multi("speaker.qdant", spk);
-auto ant = quadriga_lib::qdant_read<double>("speaker.qdant", 3); // read 3rd entry
-```
-
 ## See also:
-- [[.qdant_write]] (per-object write used internally)
+- .[[qdant_write]] (per-object write used internally)
 - [[qdant_read]] (read back individual entries by ID)
 - [[generate_speaker]] (typical source of frequency-dependent arrayant vectors)
 MD!*/
@@ -105,9 +81,7 @@ template void quadriga_lib::qdant_write_multi(const std::string &, const std::ve
 # qdant_read
 Read an arrayant object from a QDANT file
 
-## Description:
 - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -117,7 +91,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
         arma::u32_mat *layout = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QDANT file; must not be empty
 - **`id`** *(optional)* — 1-based ID of the antenna entry to read
 - **`layout`** *(optional)* — Output pointer filled with the file's layout matrix of element IDs
@@ -126,7 +100,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::qdant_read(
 - `quadriga_lib::arrayant<dtype>` constructed from the specified entry in the file
 
 ## See also:
-- [[.qdant_write]] (write a single arrayant)
+- .[[qdant_write]] (write a single arrayant)
 - [[qdant_write_multi]] (write multiple arrayants with sequential IDs)
 MD!*/
 
@@ -172,11 +146,9 @@ template quadriga_lib::arrayant<double> quadriga_lib::qdant_read(std::string fn,
 # qdant_read_multi
 Read all arrayant objects from a QDANT file into a vector
 
-## Description:
 - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
 - Each unique ID is read exactly once regardless of how many times it appears in the layout.
 - Counterpart to [[qdant_write_multi]]; primary mechanism for loading frequency-dependent models where `center_frequency` on each entry identifies the corresponding frequency.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -185,7 +157,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(
         arma::u32_mat *layout = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QDANT file; must not be empty
 - **`layout`** *(optional)* — Output pointer filled with the file's layout matrix; non-zero values are entry IDs
 
@@ -297,12 +269,10 @@ template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::qdant_read_mu
 # arrayant_is_valid_multi
 Validate a vector of arrayant objects for multi-frequency consistency
 
-## Description:
 - Each entry is validated individually via its `is_valid` member; `quick_check` is forwarded to that call.
 - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
 - Pattern data, `center_frequency`, and coupling matrix values are not compared (expected to vary).
 - Stops at first error and returns a message identifying the failing entry and property.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -311,7 +281,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
         bool quick_check = true);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects to validate
 - **`quick_check`** *(optional)* — If `true`, uses fast pointer-based per-entry validation; if `false`, performs full deep validation
 
@@ -319,7 +289,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 - Empty string if valid; otherwise a message such as `"Entry 3: Azimuth grid values do not match entry 0."`
 
 ## See also:
-- [[.is_valid]] (per-entry validation called internally)
+- .[[is_valid]] (per-entry validation called internally)
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
 MD!*/
 
@@ -429,11 +399,9 @@ template std::string quadriga_lib::arrayant_is_valid_multi(const std::vector<qua
 # arrayant_copy_element_multi
 Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
 
-## Description:
-- Calls `arrayant::copy_element` on every entry in the vector with the same source and destination indices.
+- Calls .[[copy_element]] on every entry in the vector with the same source and destination indices.
 - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
 - Source and destination indices are 0-based.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -448,7 +416,7 @@ void quadriga_lib::arrayant_copy_element_multi(
         arma::uword destination);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
 - **`source`** — 0-based index of the element to copy from; must be within current element count
 - **`destination`** — 0-based index or indices of target elements; enlarges all entries if any index exceeds current count
@@ -463,7 +431,7 @@ quadriga_lib::arrayant_copy_element_multi(driver, 0, arma::uvec{1, 2, 3});
 ```
 
 ## See also:
-- [[.copy_element]] (per-entry operation called internally)
+- .[[copy_element]] (per-entry operation called internally)
 - [[arrayant_set_element_pos_multi]] (set element positions after copying)
 - [[arrayant_concat_multi]] (combine multiple arrayant vectors)
 MD!*/
@@ -512,12 +480,10 @@ template void quadriga_lib::arrayant_copy_element_multi(std::vector<quadriga_lib
 # arrayant_set_element_pos_multi
 Set element positions for all entries in a multi-frequency arrayant vector
 
-## Description:
 - Updates `element_pos` in-place on every entry in the vector identically.
 - If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
 - If `i_element` is provided, only those 0-based indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -527,9 +493,9 @@ void quadriga_lib::arrayant_set_element_pos_multi(
         arma::uvec i_element = arma::uvec());
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
-- **`element_pos`** — New (x, y, z) positions in meters, `[3, n_update]`
+- **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
 - **`i_element`** *(optional)* — 0-based indices of elements to update; if empty, all elements are replaced
 
 ## See also:
@@ -610,11 +576,9 @@ template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_
 # arrayant_rotate_pattern_multi
 Apply Euler rotations to all entries in a multi-frequency arrayant vector
 
-## Description:
-- Calls `arrayant::rotate_pattern` on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
+- Calls .[[rotate_pattern]] on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
 - If `i_element` is empty, all elements are rotated; otherwise only the specified 0-based indices are affected.
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -627,7 +591,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
         arma::uvec i_element = arma::uvec())
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`x_deg`** *(optional)* — Bank angle in degrees
 - **`y_deg`** *(optional)* — Tilt angle in degrees
@@ -636,7 +600,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 - **`i_element`** *(optional)* — 0-based indices of elements to rotate; if empty, all elements are rotated
 
 ## See also:
-- [[.rotate_pattern]] (per-entry operation called internally)
+- .[[rotate_pattern]] (per-entry operation called internally)
 - [[arrayant_concat_multi]] (combine multi-frequency vectors before rotating)
 - [[arrayant_set_element_pos_multi]] (set element positions in multi-frequency vectors)
 MD!*/
@@ -709,12 +673,10 @@ template void quadriga_lib::arrayant_rotate_pattern_multi(std::vector<quadriga_l
 # arrayant_concat_multi
 Concatenate two multi-frequency arrayant vectors into a single multi-element model
 
-## Description:
 - Both inputs must have equal entry counts, identical angular grids, and matching `center_frequency` values at each index.
 - Per frequency entry: pattern cubes are joined along the element (slice) dimension; `element_pos` matrices are horizontally concatenated (empty positions treated as zeros).
 - Both inputs are validated with [[arrayant_is_valid_multi]] before processing; each output entry is validated before returning.
 - Output inherits name, azimuth/elevation grids, and `center_frequency` from `arrayant_vec1`.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -723,17 +685,17 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
         const std::vector<quadriga_lib::arrayant<dtype>> &arrayant_vec2);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec1`** — First validated, mutually consistent arrayant vector
 - **`arrayant_vec2`** — Second arrayant vector; must match entry count, grids, and center frequencies of `arrayant_vec1`
 
 ## Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports per entry
-- Coupling matrices are assembled block-diagonally — elements from `vec1` connect only to ports from `vec1` and vice versa:
-  | Element \ Port | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
-  |----------------|:-------------:|:--------------------:|
-  | E1…En1 (vec1)  | C1 block      | 0                    |
-  | En1+1…En1+n2 (vec2) | 0        | C2 block             |
+- Coupling matrices are assembled block-diagonally — elements from `vec1` connect only to ports from `vec1` and vice versa:<br><br>
+   Element \ Port | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
+  ----------------|:-------------:|:--------------------:|
+   E1…En1 (vec1)  | C1 block      | 0                    |
+   En1+1…En1+n2 (vec2) | 0        | C2 block             |
 
 ## See also:
 - [[arrayant_is_valid_multi]] (validation called on both inputs)

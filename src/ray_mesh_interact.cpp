@@ -1,43 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <cstring> // For std::memcopy
 #include <complex>
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # ray_mesh_interact
 Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
-## Description:
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
-- Face side determined by vertex order; front-side hit with FBS≠SBS → air-to-media; back-side hit
-  with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.
+- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
+  front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
+  FBS=SBS with opposing normals → media-to-media.
 - Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format.
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
 - Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
   simulation with impedance-mapped material parameters (ε derived from Z).
-- Allowed datatypes (`dtype`): `float` or `double`.
 
 ## Declaration:
 ```
@@ -61,19 +47,19 @@ void quadriga_lib::ray_mesh_interact(
     arma::s32_vec *out_typeN = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
-- **`center_frequency`** — Center frequency in Hz
+- **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangle mesh faces; `[n_mesh, 9]` (see `obj_file_read`)
-- **`mtl_prop`** — Material properties per face; `[n_mesh, 5]` (see `obj_file_read`)
+- **`mesh`** — Triangle mesh faces; ee [[obj_file_read]]; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
 - **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
 
-## Output Arguments:
+## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
@@ -81,28 +67,27 @@ void quadriga_lib::ray_mesh_interact(
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
-- **`thicknessN`** — Material thickness (FBS-to-SBS distance) in meters; `[n_rayN]`
+- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN, 3]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code; `[n_rayN]`<br><br>
-
-  | Code | Description                                          |
-  |------|------------------------------------------------------|
-  |    1 | Single hit, outside→inside                           |
-  |    2 | Single hit, inside→outside                           |
-  |    3 | Single hit, inside→outside, total reflection         |
-  |    4 | Media-to-media, M2 hit first                         |
-  |    5 | Media-to-media, M1 hit first                         |
-  |    6 | Media-to-media, M1 hit first, total reflection       |
-  |    7 | Overlapping faces, outside→inside                    |
-  |    8 | Overlapping faces, inside→outside                    |
-  |    9 | Overlapping faces, inside→outside, total reflection  |
-  |   10 | Edge hit, outside→inside→outside                     |
-  |   11 | Edge hit, inside→outside→inside                      |
-  |   12 | Edge hit, inside→outside→inside, total reflection    |
-  |   13 | Edge hit, outside→inside                             |
-  |   14 | Edge hit, inside→outside                             |
-  |   15 | Edge hit, inside→outside, total reflection           |
+   Code | Description
+  ------|---------------------------
+      1 | Single hit, outside→inside
+      2 | Single hit, inside→outside
+      3 | Single hit, inside→outside, total reflection
+      4 | Media-to-media, M2 hit first
+      5 | Media-to-media, M1 hit first
+      6 | Media-to-media, M1 hit first, total reflection
+      7 | Overlapping faces, outside→inside
+      8 | Overlapping faces, inside→outside
+      9 | Overlapping faces, inside→outside, total reflection
+     10 | Edge hit, outside→inside→outside
+     11 | Edge hit, inside→outside→inside
+     12 | Edge hit, inside→outside→inside, total reflection
+     13 | Edge hit, outside→inside
+     14 | Edge hit, inside→outside
+     15 | Edge hit, inside→outside, total reflection
 
 ## See also:
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)

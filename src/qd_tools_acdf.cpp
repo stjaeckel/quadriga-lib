@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
@@ -23,14 +10,13 @@
 #include <limits>
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
 # acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
 
-## Description:
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
 - Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
@@ -48,14 +34,14 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::uword n_bins = 201);
 ```
 
-## Input Arguments:
-- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`, `[n_bins]`
+## Inputs:
+- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
-## Output Arguments:
-- **`Sh`** *(optional)* — Individual CDFs, one per column of data, `[n_bins, n_sets]`
-- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
+## Outputs:
+- **`Sh`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
+- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 MD!*/

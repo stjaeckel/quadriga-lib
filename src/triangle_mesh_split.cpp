@@ -1,37 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # triangle_mesh_split
 Split a 3D triangular mesh into two sub-meshes along a given axis
 
-## Description:
 - Splits at the bounding box center of the selected axis; triangles where all vertices lie within the 
   lower half go to `meshA`; any triangle with at least one vertex exceeding the threshold goes to `meshB`
 - `axis = 0` selects the axis with the longest bounding box extent automatically
 - On failure (all triangles fall to one side), `meshA` and `meshB` are left unchanged and the return value is negative
 - Used internally by [[triangle_mesh_segmentation]]
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -43,14 +28,14 @@ int triangle_mesh_split(
     arma::Col<int> *split_ind = nullptr);
 ```
 
-## Input Arguments:
-- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`, `[n_mesh, 9]`
+## Inputs:
+- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`; `[n_mesh, 9]`
 - **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
-## Output Arguments:
-- **`meshA`** — Triangles with all vertices within the lower half of the bounding box, `[n_meshA, 9]`
-- **`meshB`** — Triangles with at least one vertex exceeding the split threshold, `[n_meshB, 9]`
-- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure), `[n_mesh]`
+## Outputs:
+- **`meshA`** — Triangles with all vertices within the lower half of the bounding box; `[n_meshA, 9]`
+- **`meshB`** — Triangles with at least one vertex exceeding the split threshold; `[n_meshB, 9]`
+- **`split_ind`** *(optional)* — Per-triangle assignment: 1 = meshA, 2 = meshB, 0 = unassigned (failure); `[n_mesh]`
 
 ## Returns:
 - Axis used for the split (1, 2, or 3); negative (-1, -2, or -3) on failure

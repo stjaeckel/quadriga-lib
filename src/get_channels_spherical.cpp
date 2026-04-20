@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
 #include <cstring>   // std::memcpy
@@ -38,14 +25,12 @@ SECTION!*/
 # get_channels_spherical
 Calculate MIMO channel coefficients and delays for spherical wave propagation
 
-## Description:
 - Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths, using spherical wave assumption with per-element phase and delay.
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation (bank/tilt/heading Euler angles).
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
 - If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -74,35 +59,39 @@ void quadriga_lib::get_channels_spherical(
     bool use_avx2 = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`tx_array`** — Transmit antenna array with `n_tx` elements; see [[arrayant]]
 - **`rx_array`** — Receive antenna array with `n_rx` elements; see [[arrayant]]
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates, meters
-- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading), radians
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates, meters
-- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading), radians
-- **`fbs_pos`** — First-bounce scatterer positions, `[3, n_path]`
-- **`lbs_pos`** — Last-bounce scatterer positions, `[3, n_path]`
-- **`path_gain`** — Path gains in linear scale, `[n_path]`
-- **`path_length`** — Total path lengths from TX to RX phase center, meters, `[n_path]`
-- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), `[8, n_path]`
-- **`center_frequency`** *(optional)* — Center frequency in Hz; set to `0` to skip phase computation
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
+- **`Tb, Tt, Th`** — Transmitter orientation as Euler angles (bank, tilt, heading)
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
+- **`Rb, Rt, Rh`** — Receiver orientation as Euler angles (bank, tilt, heading)
+- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_gain`** — Path gains in linear scale; `[n_path]`
+- **`path_length`** — Total path lengths from TX to RX phase center; `[n_path]`
+- **`M`** — Polarization transfer matrix, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path]`
+- **`center_frequency`** *(optional)* — Center frequency; set to `0` to skip phase computation
 - **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component
 - **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present
 - **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate; ignored when not supported
 
-## Output Arguments:
-- **`coeff_re`** — Real part of channel coefficients, `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of channel coefficients, `[n_rx, n_tx, n_path]`
-- **`delay`** — Propagation delays in seconds, `[n_rx, n_tx, n_path]`
-- **`aod`** *(optional)* — Azimuth of departure, radians, `[n_rx, n_tx, n_path]`
-- **`eod`** *(optional)* — Elevation of departure, radians, `[n_rx, n_tx, n_path]`
-- **`aoa`** *(optional)* — Azimuth of arrival, radians, `[n_rx, n_tx, n_path]`
-- **`eoa`** *(optional)* — Elevation of arrival, radians, `[n_rx, n_tx, n_path]`
+## Outputs:
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path]`
+- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path]`
+- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path]`
+- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path]`
+- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path]`
 
 ## See also:
 - [[get_channels_planar]] (planar wave variant)
+- [[get_channels_multifreq]] (multi-freq counterpart)
+- [[get_channels_irs]] (for IRS-assisted communication)
 - [[arrayant]] (antenna array class)
+- [[baseband_freq_response]] (for calculating the frequency response)
+- [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/
 
 // Calculate channel coefficients for spherical waves

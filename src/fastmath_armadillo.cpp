@@ -11,18 +11,16 @@
 #endif
 
 /*!SECTION
-Math Functions
+Math functions
 SECTION!*/
 
 /*!MD
 # fast_sincos
 Compute elementwise approximate sine and/or cosine of a vector
 
-## Description:
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
 - Either `s` or `c` may be `nullptr` to skip that computation
-- Output vectors are resized automatically if needed
 
 ## Declaration:
 ```
@@ -30,12 +28,12 @@ void quadriga_lib::fast_sincos(const arma::fvec &x, arma::fvec *s = nullptr, arm
 void quadriga_lib::fast_sincos(const arma::vec &x,  arma::fvec *s = nullptr, arma::fvec *c = nullptr);
 ```
 
-## Input Arguments:
-- **`x`** — Input angles in radians; `[n]`
+## Inputs:
+- **`x`** — Input angles; `[n_elem]`
 
-## Output Arguments:
-- **`s`** *(optional)* — sin(x); `[n]` or `nullptr`
-- **`c`** *(optional)* — cos(x); `[n]` or `nullptr`
+## Outputs:
+- **`s`** *(optional)* — sin(x); `[n_elem]` or `nullptr`
+- **`c`** *(optional)* — cos(x); `[n_elem]` or `nullptr`
 MD!*/
 
 template <typename dtype>
@@ -104,10 +102,8 @@ template void quadriga_lib::fast_sincos(const arma::Col<double> &x, arma::fvec *
 # fast_asin
 Compute elementwise approximate arc-sine of a vector
 
-## Description:
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
-- Output vector is resized automatically if needed
 
 ## Declaration:
 ```
@@ -115,11 +111,11 @@ void quadriga_lib::fast_asin(const arma::fvec &x, arma::fvec &s);
 void quadriga_lib::fast_asin(const arma::vec &x,  arma::fvec &s);
 ```
 
-## Input Arguments:
-- **`x`** — Input values in [-1, 1]; `[n]`
+## Inputs:
+- **`x`** — Input values in [-1, 1]; `[n_elem]`
 
-## Output Arguments:
-- **`s`** — asin(x); `[n]`
+## Outputs:
+- **`s`** — asin(x); `[n_elem]`
 MD!*/
 
 template <typename dtype>
@@ -160,10 +156,8 @@ template void quadriga_lib::fast_asin(const arma::Col<double> &x, arma::fvec &s)
 # fast_acos
 Compute elementwise approximate arc-cosine of a vector
 
-## Description:
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Max error for x in [-1, 1]: ~2 ULP (~2.4e-7); values outside [-1, 1] produce NaN
-- Output vector is resized automatically if needed
 
 ## Declaration:
 ```
@@ -171,11 +165,11 @@ void quadriga_lib::fast_acos(const arma::fvec &x, arma::fvec &c);
 void quadriga_lib::fast_acos(const arma::vec &x,  arma::fvec &c);
 ```
 
-## Input Arguments:
-- **`x`** — Input values in [-1, 1]; `[n]`
+## Inputs:
+- **`x`** — Input values in [-1, 1]; `[n_elem]`
 
-## Output Arguments:
-- **`c`** — acos(x); `[n]`
+## Outputs:
+- **`c`** — acos(x); `[n_elem]`
 MD!*/
 
 template <typename dtype>
@@ -216,11 +210,9 @@ template void quadriga_lib::fast_acos(const arma::Col<double> &x, arma::fvec &c)
 # fast_atan2
 Compute elementwise approximate two-argument arc-tangent of two vectors
 
-## Description:
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
-- Returns angles in radians in (-pi, pi]; max error ~3 ULP (~3.6e-7)
+- Returns angles in (-pi, pi]; max error ~3 ULP (~3.6e-7)
 - atan2(0, 0) returns 0; atan2(±0, -0) returns ±0 (not ±pi)
-- Output vector is resized automatically if needed
 
 ## Declaration:
 ```
@@ -228,12 +220,12 @@ void quadriga_lib::fast_atan2(const arma::fvec &y, const arma::fvec &x, arma::fv
 void quadriga_lib::fast_atan2(const arma::vec &y,  const arma::vec &x,  arma::fvec &a);
 ```
 
-## Input Arguments:
-- **`y`** — Y-coordinates (numerator); `[n]`
-- **`x`** — X-coordinates (denominator); `[n]`
+## Inputs:
+- **`y`** — Y-coordinates (numerator); `[n_elem]`
+- **`x`** — X-coordinates (denominator); `[n_elem]`
 
-## Output Arguments:
-- **`a`** — atan2(y, x) in radians; `[n]`
+## Outputs:
+- **`a`** — atan2(y, x); `[n_elem]`
 MD!*/
 
 template <typename dtype>
@@ -281,13 +273,11 @@ template void quadriga_lib::fast_atan2(const arma::Col<double> &y, const arma::C
 # fast_slerp
 Compute elementwise approximate SLERP interpolation between two complex-valued vectors
 
-## Description:
 - Interpolates phase via SLERP on normalized directions; amplitudes are linearly interpolated
 - Weight `w=0` returns A, `w=1` returns B; per-element weights in [0, 1]
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
 - If both input amplitudes are negligible, output is zero
 - Max error vs. double-precision reference: ~5 ULP
-- All input vectors must have the same length; output vectors resized automatically
 - Output Xr and Xi cannot alias each other
 - AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
 
@@ -304,16 +294,16 @@ void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
                               arma::fvec &Xr, arma::fvec &Xi);
 ```
 
-## Input Arguments:
-- **`Ar`** — Real part of source A; `[n]`
-- **`Ai`** — Imaginary part of source A; `[n]`
-- **`Br`** — Real part of source B; `[n]`
-- **`Bi`** — Imaginary part of source B; `[n]`
-- **`w`** — Per-element interpolation weight in [0, 1]; `[n]`
+## Inputs:
+- **`Ar`** — Real part of source A; `[n_elem]`
+- **`Ai`** — Imaginary part of source A; `[n_elem]`
+- **`Br`** — Real part of source B; `[n_elem]`
+- **`Bi`** — Imaginary part of source B; `[n_elem]`
+- **`w`** — Per-element interpolation weight in [0, 1]; `[n_elem]`
 
-## Output Arguments:
-- **`Xr`** — Real part of interpolated result; `[n]`
-- **`Xi`** — Imaginary part of interpolated result; `[n]`
+## Outputs:
+- **`Xr`** — Real part of interpolated result; `[n_elem]`
+- **`Xi`** — Imaginary part of interpolated result; `[n_elem]`
 MD!*/
 
 template <typename dtype>
@@ -380,10 +370,8 @@ template void quadriga_lib::fast_slerp(const arma::Col<double> &Ar, const arma::
 # fast_geo2cart
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
-## Description:
 - Conversion: x = cos(el)*cos(az)*len, y = cos(el)*sin(az)*len, z = sin(el)*len
 - Optional pointer outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; pass `nullptr` to skip
-- Output vectors resized automatically if needed
 - AVX2-optimized (8 floats/lane); scalar fallback without AVX2
 - Precision: GENERIC kernel uses full `dtype` precision (double or float).
 - AVX2 kernel always computes in single precision internally — for `dtype=double`, inputs are narrowed to 
@@ -405,20 +393,20 @@ void fast_geo2cart(
     int use_kernel = 0);
 ```
 
-## Input Arguments:
-- **`az`** — Azimuth angles in radians; `[n]`
-- **`el`** — Elevation angles in radians; `[n]`
-- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n]`
+## Inputs:
+- **`az`** — Azimuth angles; `[n_elem]`
+- **`el`** — Elevation angles; `[n_elem]`
+- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
 - **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable)
 
-## Output Arguments:
-- **`x`** — X-coordinates; `[n]`
-- **`y`** — Y-coordinates; `[n]`
-- **`z`** — Z-coordinates; `[n]`
-- **`sAZ`** *(optional)* — sin(az); `[n]` or `nullptr`
-- **`cAZ`** *(optional)* — cos(az); `[n]` or `nullptr`
-- **`sEL`** *(optional)* — sin(el); `[n]` or `nullptr`
-- **`cEL`** *(optional)* — cos(el); `[n]` or `nullptr`
+## Outputs:
+- **`x`** — X-coordinates; `[n_elem]`
+- **`y`** — Y-coordinates; `[n_elem]`
+- **`z`** — Z-coordinates; `[n_elem]`
+- **`sAZ`** *(optional)* — sin(az); `[n_elem]` or `nullptr`
+- **`cAZ`** *(optional)* — cos(az); `[n_elem]` or `nullptr`
+- **`sEL`** *(optional)* — sin(el); `[n_elem]` or `nullptr`
+- **`cEL`** *(optional)* — cos(el); `[n_elem]` or `nullptr`
 
 ## See also:
 - [[fast_cart2geo]] (inverse conversion)
@@ -515,14 +503,11 @@ template void quadriga_lib::fast_geo2cart(const arma::Col<double> &az, const arm
 # fast_cart2geo
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-## Description:
 - Conversion: len = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / len, -1, 1))
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1
 - All inputs must have the same length
 - In-place and output-output aliasing not allowed (x/y/z cannot alias az, el, or len; az, el, and len cannot alias each other)
-- Output vectors resized automatically if needed
-- Allowed datatypes: `float` or `double`
 - AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full `dtype` precision
 
 ## Declaration:
@@ -533,16 +518,16 @@ void quadriga_lib::fast_cart2geo(const arma::fvec &x, const arma::fvec &y, const
 void quadriga_lib::fast_cart2geo(const arma::vec &x, const arma::vec &y, const arma::vec &z,
                                  arma::vec &az, arma::vec &el, arma::vec *len = nullptr, int use_kernel = 0);
 ```
-## Input Arguments:
-- **`x`** — X-coordinates; `[n]`
-- **`y`** — Y-coordinates; `[n]`
-- **`z`** — Z-coordinates; `[n]`
+## Inputs:
+- **`x`** — X-coordinates; `[n_elem]`
+- **`y`** — Y-coordinates; `[n_elem]`
+- **`z`** — Z-coordinates; `[n_elem]`
 - **`use_kernel`** — Kernel selection: `0` = auto (AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2 (throws if AVX2 unavailable); default `0`
 
-## Output Arguments:
-- **`az`** — Azimuth angles in radians; `[n]`
-- **`el`** — Elevation angles in radians; `[n]`
-- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n]`
+## Outputs:
+- **`az`** — Azimuth angles; `[n_elem]`
+- **`el`** — Elevation angles; `[n_elem]`
+- **`len`** *(optional)* — Euclidean vector length sqrt(x² + y² + z²); `[n_elem]`
 
 ## See also:
 - [[fast_geo2cart]] (inverse conversion)

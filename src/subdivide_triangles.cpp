@@ -1,35 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # subdivide_triangles
 Subdivide triangles into smaller triangles
 
-## Description:
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
 - Material properties are duplicated from parent triangle to all sub-triangles
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -41,12 +26,12 @@ arma::uword quadriga_lib::subdivide_triangles(
     arma::Mat<dtype> *mtl_prop_out = nullptr);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
-- **`mtl_prop`** *(optional)* — Material properties of input triangles; `[n_triangles_in, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_triangles_in, 5]`
 
-## Output Arguments:
+## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
 - **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 5]`
 

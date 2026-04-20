@@ -1,36 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # triangle_mesh_aabb
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
-## Description:
 - Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
 - Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
 - Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
 - If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -40,7 +25,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
     arma::uword vec_size = 1);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
 - **`sub_mesh_index`** *(optional)* — 0-based start indices of sub-meshes; if omitted, the AABB of the entire mesh is returned; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32` for CUDA)
@@ -49,7 +34,7 @@ arma::Mat<dtype> quadriga_lib::triangle_mesh_aabb(
 - `arma::Mat<dtype>` of shape `[n_sub_aligned, 6]`, one AABB per sub-mesh row
 
 ## See also:
-- [[ray_triangle_intersect]] (consumer of the outout)
+- [[ray_triangle_intersect]] (consumer of the output)
 MD!*/
 
 template <typename dtype>

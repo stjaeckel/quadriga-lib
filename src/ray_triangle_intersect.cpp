@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
 #include "quadriga_lib_generic_functions.hpp"
@@ -27,18 +14,16 @@
 #endif
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # ray_triangle_intersect
 Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
-## Description:
-- Counts the total number of intersection between `orig` and `dest`
-- Computes the coordinates and object IDs if the first two intersections per ray (FBS/SBS)
-- Allowed datatypes: `float` or `double`
-- Internal computations always use single precision for AVX2 and CUDA kernel; only GENERIC has `double` support
+- Counts the total number of intersections between `orig` and `dest`
+- Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
+- Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has `double` support
 
 ## Declaration:
 ```
@@ -57,7 +42,7 @@ void quadriga_lib::ray_triangle_intersect(
     int gpu_id = 0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
@@ -66,12 +51,12 @@ void quadriga_lib::ray_triangle_intersect(
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-## Output Arguments:
-- **`fbs`** (optional) — First-bounce intersection points in GCS, `[n_ray, 3]`
-- **`sbs`** (optional) — Second-bounce intersection points in GCS, `[n_ray, 3]`
-- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`, `[n_ray]`
-- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none, `[n_ray]`
-- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none, `[n_ray]`
+## Outputs:
+- **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
+- **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
+- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
+- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
 ## See also:
 - [[obj_file_read]] (load mesh from OBJ file)

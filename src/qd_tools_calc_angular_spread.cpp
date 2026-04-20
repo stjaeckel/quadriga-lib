@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 
@@ -105,21 +92,19 @@ static dtype calc_angular_spread_1d(const dtype *ang, const dtype *pw, arma::uwo
 }
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
 # calc_angular_spreads_sphere
 Calculate azimuth and elevation angular spreads with spherical wrapping
 
-## Description:
 - Computes RMS azimuth and elevation angular spreads from power-weighted angles; each CIR may have a different number of paths.
 - RMS spread formula: `sqrt(sum(pw .* d^2))` where `d` are wrapped deviations from the circular mean (3GPP TR 38.901 second-moment definition).
 - Mean direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies on the equator before computing spreads, avoiding pole singularity artifacts.
 - When `calc_bank_angle = true`, an optimal bank angle maximizing azimuth spread is derived analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered angles.
 - When `disable_wrapping = true`, spreads are computed directly from raw angles; `orientation` will be zero and `phi`/`theta` equal the input `az`/`el`.
 - When `quantize > 0`, paths within that angular distance are grouped and their powers summed before computing spreads.
-- Allowed datatypes: float or double
 
 ## Declaration:
 ```
@@ -137,20 +122,20 @@ void quadriga_lib::calc_angular_spreads_sphere(
     dtype quantize = (dtype)0);
 ```
 
-## Input Arguments:
-- **`az`** — Azimuth angles in [rad], range -pi to pi; `[n_cir]` vector, each element of length `n_path`
-- **`el`** — Elevation angles in [rad], range -pi/2 to pi/2; same structure as `az`
+## Inputs:
+- **`az`** — Azimuth angles; range -pi to pi; `[n_cir]` vector, each element of length `n_path`
+- **`el`** — Elevation angles; range -pi/2 to pi/2; same structure as `az`
 - **`powers`** — Path powers in [W]; same structure as `az`
 - **`disable_wrapping`** *(optional)* — If true, skips spherical rotation and computes spreads from raw angles
 - **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically; only used when `disable_wrapping = false`
 - **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this distance are grouped; 0 disables grouping
 
-## Output Arguments:
-- **`azimuth_spread`** *(optional)* — RMS azimuth spread in [rad], `[n_cir]`
-- **`elevation_spread`** *(optional)* — RMS elevation spread in [rad], `[n_cir]`
-- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading] in [rad], `[3, n_cir]`
-- **`phi`** *(optional)* — Rotated azimuth angles in [rad]; `[n_cir]` vector, each element of length `n_path`
-- **`theta`** *(optional)* — Rotated elevation angles in [rad]; same structure as `phi`
+## Outputs:
+- **`azimuth_spread`** *(optional)* — RMS azimuth spread; `[n_cir]`
+- **`elevation_spread`** *(optional)* — RMS elevation spread; `[n_cir]`
+- **`orientation`** *(optional)* — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `[3, n_cir]`
+- **`phi`** *(optional)* — Rotated azimuth angles; `[n_cir]` vector, each element of length `n_path`
+- **`theta`** *(optional)* — Rotated elevation angles; same structure as `phi`
 MD!*/
 
 template <typename dtype>

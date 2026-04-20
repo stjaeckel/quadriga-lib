@@ -1,38 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # coord2path
 Convert path interaction coordinates into FBS/LBS positions, path length, and angles
 
-## Description:
 - `no_interact` is a vector of length `n_path` with the number of interactions per path
 - `interact_coord` stores all coordinates concatenated in path order, size `[3, sum(no_interact)]`
 - LOS paths (`no_interact[i] == 0`) get a virtual FBS/LBS at the midpoint between TX and RX
-- Output arguments are resized automatically; pass `nullptr` to skip any output
 - Set `reverse_path = true` to swap TX/RX and reverse all interaction sequences
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -49,19 +33,19 @@ void quadriga_lib::coord2path(
     bool reverse_path = false);
 ```
 
-## Input Arguments:
-- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates in meters
-- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates in meters
+## Inputs:
+- **`Tx, Ty, Tz`** — Transmitter position in Cartesian coordinates
+- **`Rx, Ry, Rz`** — Receiver position in Cartesian coordinates
 - **`no_interact`** — Number of interactions per path (0 = LOS); must not be null; `[n_path]`
 - **`interact_coord`** — Interaction coordinates in path order; must not be null, must have 3 rows; `[3, sum(no_interact)]`
+- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 
-## Output Arguments:
+## Outputs:
 - **`path_length`** (optional) — Absolute path length TX to RX; `[n_path]`
 - **`fbs_pos`** (optional) — First-bounce scatterer positions; `[3, n_path]`
 - **`lbs_pos`** (optional) — Last-bounce scatterer positions; `[3, n_path]`
-- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA} in radians; `[n_path, 4]`
+- **`path_angles`** (optional) — Departure and arrival angles {AOD, EOD, AOA, EOA}; `[n_path, 4]`
 - **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
-- **`reverse_path`** (optional) — If `true`, swaps TX/RX and reverses interaction sequences
 MD!*/
 
 template <typename dtype>

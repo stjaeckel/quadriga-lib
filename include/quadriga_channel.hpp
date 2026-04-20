@@ -261,7 +261,6 @@ namespace quadriga_lib
                                     const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
 
     // Fixes the path delays to a grid of delay bins
-    // - Todo: explain fix_taps options here
     template <typename dtype>
     void quantize_delays(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
                          const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]

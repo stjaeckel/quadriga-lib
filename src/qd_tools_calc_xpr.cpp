@@ -44,14 +44,14 @@ void quadriga_lib::calc_cross_polarization_ratio(
 ## Inputs:
 - **`powers`** — Path powers in [W]; `[n_cir]` vector, each element of length `n_path`
 - **`M`** — Polarization transfer matrices; `[n_cir]` vector, each element of size `[8, n_path]`
-- **`path_length`** — Absolute TX-to-RX path lengths in [m]; same structure as `powers`
-- **`tx_pos`** — Transmitter position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
-- **`rx_pos`** — Receiver position [x; y; z] in [m], `[3, 1]` or `[3, n_cir]`
+- **`path_length`** — Absolute TX-to-RX path lengths; same structure as `powers`
+- **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` or `[3, n_cir]`
+- **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` or `[3, n_cir]`
 - **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR calculation
-- **`window_size`** *(optional)* — LOS exclusion window in [m]; paths within `dTR + window_size` are excluded when `include_los = false`
+- **`window_size`** *(optional)* — LOS exclusion window; paths within `dTR + window_size` are excluded when `include_los = false`
 
 ## Outputs:
-- **`xpr`** *(optional)* — XPR on linear scale, `[n_cir, 6]`; columns:<br><br>
+- **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
    Col | Description
   -----|-------------
    0 | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)
@@ -61,7 +61,7 @@ void quadriga_lib::calc_cross_polarization_ratio(
    4 | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)
    5 | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)
 - **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
-  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`, `[n_cir]`
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 MD!*/
 
 template <typename dtype>

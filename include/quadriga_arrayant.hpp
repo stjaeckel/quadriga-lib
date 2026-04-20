@@ -121,7 +121,6 @@ namespace quadriga_lib
         // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
         // - Data in other properties may contain garbage
         // - Only performs a size update if exisiting size is different from new size
-        // - Returns error when read-only
         void set_size(arma::uword n_elevation, // Number of elevation angles
                       arma::uword n_azimuth,   // Number of azimuth angles
                       arma::uword n_elements,  // Number of antenna elements
@@ -252,7 +251,7 @@ namespace quadriga_lib
     // Generate an antenna with a custom 3dB beam with (FWHM)
     template <typename dtype>
     arrayant<dtype> generate_arrayant_custom(dtype az_3dB = 90.0,       // Azimuth 3dB beam with in degree
-                                             dtype el_3db = 90.0,       // Elevation 3dB beam with in degree
+                                             dtype el_3dB = 90.0,       // Elevation 3dB beam with in degree
                                              dtype rear_gain_lin = 0.0, // Front-back ration, linear value
                                              dtype res = 1.0);          // Resolution of the antenna pattern sampling grid in degree
 

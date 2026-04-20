@@ -16,7 +16,7 @@
 // ------------------------------------------------------------------------
 
 #include "mex.h"
-#include "quadriga_tools.hpp"
+#include "quadriga_math.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION

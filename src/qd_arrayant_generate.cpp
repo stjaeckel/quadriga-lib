@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <stdexcept>
 #include <cstring>   // std::memcopy
@@ -34,16 +21,14 @@ SECTION!*/
 # generate_arrayant_omni
 Generate an isotropic radiator with vertical polarization
 
-## Description:
 - Returns a single-element antenna array with omnidirectional pattern and vertical polarization.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_omni(dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ## Returns:
@@ -92,16 +77,14 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_omni(dou
 # generate_arrayant_xpol
 Generate a cross-polarized isotropic radiator
 
-## Description:
 - Returns a two-element antenna array with omnidirectional patterns in vertical and horizontal polarization.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_xpol(dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ## Returns:
@@ -160,16 +143,14 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_xpol(dou
 # generate_arrayant_dipole
 Generate a short dipole antenna with vertical polarization
 
-## Description:
 - Returns a single-element short dipole antenna pattern with vertical polarization.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_dipole(dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ## Returns:
@@ -223,16 +204,14 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_dipole(d
 # generate_arrayant_half_wave_dipole
 Generate a half-wave dipole antenna with vertical polarization
 
-## Description:
 - Returns a single-element half-wave dipole antenna pattern with vertical polarization.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_half_wave_dipole(dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
 ## Returns:
@@ -288,20 +267,21 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_half_wav
 # generate_arrayant_custom
 Generate an antenna with custom 3dB beamwidth
 
-## Description:
 - Returns a single-element antenna with independently configurable azimuth and elevation 3dB (FWHM) beamwidths.
 - Rear-side gain is controlled by a linear front-to-back ratio; `0.0` means no rear radiation.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB = 90.0,
-                dtype el_3db = 90.0, dtype rear_gain_lin = 0.0, dtype res = 1.0);
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(
+    dtype az_3dB = 90.0,
+    dtype el_3dB = 90.0, 
+    dtype rear_gain_lin = 0.0, 
+    dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`az_3dB`** *(optional)* — Azimuth 3dB beamwidth in degrees
-- **`el_3db`** *(optional)* — Elevation 3dB beamwidth in degrees
+- **`el_3dB`** *(optional)* — Elevation 3dB beamwidth in degrees
 - **`rear_gain_lin`** *(optional)* — Front-to-back gain ratio (linear)
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees
 
@@ -310,11 +290,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 MD!*/
 
 template <typename dtype>
-quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3db, dtype rear_gain_lin, dtype res)
+quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3dB, dtype el_3dB, dtype rear_gain_lin, dtype res)
 {
     // Fix input ranges
     az_3dB = (az_3dB <= (dtype)0.0) ? (dtype)90.0 : az_3dB;
-    el_3db = (el_3db <= (dtype)0.0) ? (dtype)90.0 : el_3db;
+    el_3dB = (el_3dB <= (dtype)0.0) ? (dtype)90.0 : el_3dB;
     rear_gain_lin = (rear_gain_lin <= (dtype)0.0) ? (dtype)0.0 : rear_gain_lin;
     res = (res <= (dtype)0.0) ? (dtype)1.0 : (res >= (dtype)90.0 ? (dtype)90.0 : res);
 
@@ -332,9 +312,9 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
     arma::Col<dtype> phi_sq = ant.azimuth_grid % ant.azimuth_grid;
     arma::Col<dtype> cos_theta = arma::cos(ant.elevation_grid);
     cos_theta.at(0) = zero, cos_theta.at(no_el - 1) = zero;
-    arma::Col<dtype> az_3dB_rad(1), el_3db_rad(1);
+    arma::Col<dtype> az_3dB_rad(1), el_3dB_rad(1);
     az_3dB_rad.at(0) = az_3dB * deg2rad;
-    el_3db_rad.at(0) = el_3db * deg2rad;
+    el_3dB_rad.at(0) = el_3dB * deg2rad;
 
     // Calculate azimuth pattern cut
     dtype a = one, d = half, x = limit_inf, delta = limit_inf;
@@ -361,7 +341,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
         dtype an = (lp == 0) ? a : a + d;
         delta = (lp == 0) ? limit_inf : std::abs(a - an);
         D = arma::pow(cos_theta, an);
-        auto xn = quadriga_lib::interp_1D(D, ant.elevation_grid, el_3db_rad);
+        auto xn = quadriga_lib::interp_1D(D, ant.elevation_grid, el_3dB_rad);
         dtype xm = std::abs(xn.at(0) - half);
         a = xm < x ? an : a;
         d = xm < x ? d : step * d;
@@ -406,29 +386,30 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_custom(dtype az_3d
 
     return ant;
 }
-template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3db, float rear_gain_lin, float res);
-template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3db, double rear_gain_lin, double res);
+template quadriga_lib::arrayant<float> quadriga_lib::generate_arrayant_custom(float az_3dB, float el_3dB, float rear_gain_lin, float res);
+template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_custom(double az_3dB, double el_3dB, double rear_gain_lin, double res);
 
 /*!MD
 # generate_arrayant_ula
 Generate a uniform linear array (ULA)
 
-## Description:
 - Returns a horizontally stacked linear array of N elements with half-wavelength spacing by default.
 - Default per-element pattern is a vertically polarized isotropic radiator.
 - If `pattern` is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from `pattern` are ignored.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_ula(
-                arma::uword N = 1, dtype center_freq = 299792458.0, dtype spacing = 0.5,
-                const quadriga_lib::arrayant<dtype> *pattern = nullptr, dtype res = 1.0);
+    arma::uword N = 1, 
+    dtype center_freq = 299792458.0, 
+    dtype spacing = 0.5,
+    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`N`** *(optional)* — Number of elements
-- **`center_freq`** *(optional)* — Center frequency in Hz
+- **`center_freq`** *(optional)* — Center frequency
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`pattern`** *(optional)* — Custom per-element antenna pattern; overrides default isotropic pattern
 - **`res`** *(optional)* — Antenna pattern sampling grid resolution in degrees; ignored if `pattern` is provided
@@ -495,36 +476,40 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_ula(arma
 # generate_arrayant_3GPP
 Generate a 3GPP-NR compliant antenna array model
 
-## Description:
 - Supports vertical (M) and horizontal (N) element stacking within panels, and multi-panel arrays (Mg × Ng).
 - If `pattern` is provided, its radiation pattern is used for each element; element positions, coupling, and center frequency from `pattern` are ignored.
 - Electrical downtilt (`tilt`) applies only to `pol` modes 4, 5, and 6.
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
-                arma::uword M = 1, arma::uword N = 1, dtype center_freq = 299792458.0,
-                unsigned pol = 1, dtype tilt = 0.0, dtype spacing = 0.5, arma::uword Mg = 1,
-                arma::uword Ng = 1, dtype dgv = 0.5, dtype dgh = 0.5,
-                const quadriga_lib::arrayant<dtype> *pattern = nullptr, dtype res = 1.0);
+    arma::uword M = 1, 
+    arma::uword N = 1, 
+    dtype center_freq = 299792458.0,
+    unsigned pol = 1, 
+    dtype tilt = 0.0, 
+    dtype spacing = 0.5, 
+    arma::uword Mg = 1,
+    arma::uword Ng = 1, 
+    dtype dgv = 0.5, 
+    dtype dgh = 0.5,
+    const quadriga_lib::arrayant<dtype> *pattern = nullptr, 
+    dtype res = 1.0);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`M`** *(optional)* — Number of vertical elements per panel
 - **`N`** *(optional)* — Number of horizontal elements per panel
-- **`center_freq`** *(optional)* — Center frequency in Hz
-- **`pol`** *(optional)* — Polarization mode:
-
-  | `pol` | Description | Elements |
-  |-------|-------------|----------|
-  | 1 | Vertical polarization | NM |
-  | 2 | H/V polarization | 2NM |
-  | 3 | ±45° polarization | 2NM |
-  | 4 | Vertical, vertical elements combined | N |
-  | 5 | H/V, vertical elements combined | 2N |
-  | 6 | ±45°, vertical elements combined | 2N |
-
+- **`center_freq`** *(optional)* — Center frequency
+- **`pol`** *(optional)* — Polarization mode:<br><br>
+   `pol` | Description | Elements 
+  -------|-------------|----------
+   1 | Vertical polarization | NM 
+   2 | H/V polarization | 2NM 
+   3 | ±45° polarization | 2NM 
+   4 | Vertical, vertical elements combined | N 
+   5 | H/V, vertical elements combined | 2N 
+   6 | ±45°, vertical elements combined | 2N 
 - **`tilt`** *(optional)* — Electrical downtilt in degrees; applies to `pol` 4–6
 - **`spacing`** *(optional)* — Inter-element spacing within a panel in wavelengths
 - **`Mg`** *(optional)* — Number of vertically stacked panels
@@ -536,11 +521,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — 3GPP-NR antenna array object
-
-## Example:
-```
-auto ant = quadriga_lib::generate_arrayant_3GPP<double>(4, 4, 3e9, 2);
-```
 MD!*/
 
 template <typename dtype>
@@ -743,49 +723,45 @@ template quadriga_lib::arrayant<double> quadriga_lib::generate_arrayant_3GPP(arm
 # generate_arrayant_multibeam
 Generate a planar multi-element antenna array with multiple beam directions
 
-## Description:
 - Returns an M×N planar array with beamforming weights computed via maximum-ratio transmission (MRT).
 - MRT is optimal for a single beam; approximate when multiple beams are specified.
 - Weights control relative beam contribution; only their ratios matter, not absolute values.
 - If `separate_beams = true`, each angle pair produces an independent beam (weights ignored).
 - If `apply_weights = true`, beamforming weights are baked into the element coupling matrix.
 - Per-element pattern shape is controlled by `az_3dB`, `el_3dB`, and `rear_gain_lin`; see [[generate_arrayant_custom]].
-- Allowed datatypes (`dtype`): `float` or `double`
 
 ## Declaration:
 ```
 quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
-                arma::uword M = 1,
-                arma::uword N = 1,
-                arma::Col<dtype> az = {0.0},
-                arma::Col<dtype> el = {0.0},
-                arma::Col<dtype> weight = {1.0},
-                dtype center_freq = 299792458.0,
-                unsigned pol = 1,
-                dtype spacing = 0.5,
-                dtype az_3dB = 120.0,
-                dtype el_3dB = 120.0,
-                dtype rear_gain_lin = 0.0,
-                dtype res = 1.0,
-                bool separate_beams = false,
-                bool apply_weights = false);
+    arma::uword M = 1,
+    arma::uword N = 1,
+    arma::Col<dtype> az = {0.0},
+    arma::Col<dtype> el = {0.0},
+    arma::Col<dtype> weight = {1.0},
+    dtype center_freq = 299792458.0,
+    unsigned pol = 1,
+    dtype spacing = 0.5,
+    dtype az_3dB = 120.0,
+    dtype el_3dB = 120.0,
+    dtype rear_gain_lin = 0.0,
+    dtype res = 1.0,
+    bool separate_beams = false,
+    bool apply_weights = false);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`M`** *(optional)* — Number of vertical (row) elements
 - **`N`** *(optional)* — Number of horizontal (column) elements
-- **`az`** *(optional)* — Azimuth beam angles in degrees, `[n_beams]`
-- **`el`** *(optional)* — Elevation beam angles in degrees, `[n_beams]`
-- **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1), `[n_beams]`
-- **`center_freq`** *(optional)* — Center frequency in Hz
-- **`pol`** *(optional)* — Polarization mode:
-
-  | `pol` | Description | Elements |
-  |-------|-------------|----------|
-  | 1 | Vertical polarization | NM |
-  | 2 | H/V polarization | 2NM |
-  | 3 | ±45° polarization | 2NM |
-
+- **`az`** *(optional)* — Azimuth beam angles in degrees; `[n_beams]`
+- **`el`** *(optional)* — Elevation beam angles in degrees; `[n_beams]`
+- **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1); `[n_beams]`
+- **`center_freq`** *(optional)* — Center frequency
+- **`pol`** *(optional)* — Polarization mode:<br><br>
+   `pol` | Description | Elements 
+  -------|-------------|----------
+   1 | Vertical polarization | NM 
+   2 | H/V polarization | 2NM 
+   3 | ±45° polarization | 2NM 
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
 - **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees
@@ -796,12 +772,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 
 ## Returns:
 - `quadriga_lib::arrayant<dtype>` — Multibeam planar array antenna object
-
-## Example:
-```
-arma::vec az = {20.0, 0.0}, el = {-7.0, 30.0}, weight = {2.0, 1.0};
-auto ant = quadriga_lib::generate_arrayant_multibeam<double>(6, 6, az, el, weight, 3.75e9);
-```
 MD!*/
 
 // Generate multi-beam antenna

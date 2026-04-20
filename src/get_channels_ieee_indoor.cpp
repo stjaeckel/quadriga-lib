@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_lib.hpp"
 #include "ieee_channel_model_functions.hpp"
@@ -26,7 +13,6 @@ SECTION!*/
 # get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
-## Description:
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
 - 2D model: azimuth angles and planar motion only, no elevation
 - Supported channel types: `A, B, C, D, E, F` (TGn definitions)
@@ -64,18 +50,18 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double dBP_m = NAN );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`ap_array`** — Access point array antenna; `n_tx` = number of ports after element coupling, see [[arrayant]]
 - **`sta_array`** — Mobile station array antenna; `n_rx` = number of ports after element coupling, see [[arrayant]]
 - **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
-- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency in Hz
+- **`CarrierFreq_Hz`** *(optional)* — Carrier frequency
 - **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
 - **`n_users`** *(optional)* — Number of users (TGac/TGah only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds
 - **`update_rate`** *(optional)* — Channel update interval in seconds; relevant only when `observation_time > 0`
 - **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
 - **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
-- **`Dist_m`** *(optional)* — TX-to-RX distance(s) in meters; `[n_users]` or `[1]`
+- **`Dist_m`** *(optional)* — TX-to-RX distance(s); `[n_users]` or `[1]`
 - **`n_floors`** *(optional)* — Number of floors per user for TGah (max 4); `[n_users]` or `[1]`
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
@@ -86,7 +72,7 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`XPR_NLOS_linear`** *(optional)* — Overrides NLOS cross-polarization ratio (linear scale); NAN or negative restores model default
 - **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
 - **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
-- **`dBP_m`** *(optional)* — Overrides breakpoint distance in meters; NAN or negative restores model default
+- **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
 
 ## Returns:
 - `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
@@ -100,7 +86,7 @@ std::vector<quadriga_lib::channel<double>>
 quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_array,  // Access point array antenna with 'n_tx' elements (= ports after element coupling)
                                        const quadriga_lib::arrayant<double> &sta_array, // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
                                        std::string ChannelType,                         // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-                                       double CarrierFreq_Hz,                           // Carrier frequency in Hz
+                                       double CarrierFreq_Hz,                           // Carrier frequency
                                        double tap_spacing_s,                            // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
                                        arma::uword n_users,                             // Number of user (only for TGac, TGah)
                                        double observation_time,                         // Channel observation time in seconds (0.0 = static channel)

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_interpolate.hpp"
@@ -34,13 +21,11 @@ SECTION!*/
 # arrayant_interpolate_multi
 Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies
 
-## Description:
 - For each requested frequency, finds the two bracketing `center_frequency` entries, runs spatial interpolation on both via `qd_arrayant_interpolate`, then blends results in the frequency dimension.
 - Frequency blending uses SLERP of complex field values with automatic fallback to linear interpolation when phase difference exceeds a threshold.
 - Out-of-range frequencies are clamped to the nearest entry (no extrapolation).
 - Consecutive frequency requests sharing the same bracketing entries reuse cached spatial interpolation results; sort `frequency` ascending or descending for best cache utilization.
 - If `validate_input` is true, calls [[arrayant_is_valid_multi]] once before processing; set to `false` in performance-critical loops after initial validation.
-- Allowed datatypes: `float` or `double`
 
 ## Declaration:
 ```
@@ -59,21 +44,21 @@ void quadriga_lib::arrayant_interpolate_multi(
         bool validate_input = true);
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant_vec`** — Multi-frequency arrayant vector; entries need not be sorted by frequency
 - **`azimuth`** — Azimuth angles in rad; must not be NULL, `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in rad; must not be NULL; size must match `azimuth`
-- **`frequency`** — Target frequencies in Hz; must not be NULL or empty, `[n_freq]`
+- **`frequency`** — Target frequencies; must not be NULL or empty; `[n_freq]`
 - **`i_element`** *(optional)* — 0-based element indices to interpolate; if empty, all elements are used (`n_out = n_elements`)
-- **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad, applied at all frequencies; `[3,1,1]`, `[3,n_out,1]`, `[3,1,n_ang]`, or `[3,n_out,n_ang]`
-- **`element_pos_i`** *(optional)* — Override element positions in m; if `nullptr`, positions from entry 0 are used, `[3, n_out]`
+- **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad, applied at all frequencies; `[3,1,1]`; `[3,n_out,1]`; `[3,1,n_ang]`, or `[3,n_out,n_ang]`
+- **`element_pos_i`** *(optional)* — Override element positions in m; if `nullptr`, positions from entry 0 are used; `[3, n_out]`
 - **`validate_input`** *(optional)* — If `true`, validates `arrayant_vec` with [[arrayant_is_valid_multi]] before processing
 
-## Output Arguments:
-- **`V_re`** — Real part of interpolated e-theta field; must not be NULL, `[n_out, n_ang, n_freq]`
-- **`V_im`** — Imaginary part of interpolated e-theta field; must not be NULL, `[n_out, n_ang, n_freq]`
-- **`H_re`** — Real part of interpolated e-phi field; must not be NULL, `[n_out, n_ang, n_freq]`
-- **`H_im`** — Imaginary part of interpolated e-phi field; must not be NULL, `[n_out, n_ang, n_freq]`
+## Outputs:
+- **`V_re`** — Real part of interpolated e-theta field; must not be NULL; `[n_out, n_ang, n_freq]`
+- **`V_im`** — Imaginary part of interpolated e-theta field; must not be NULL; `[n_out, n_ang, n_freq]`
+- **`H_re`** — Real part of interpolated e-phi field; must not be NULL; `[n_out, n_ang, n_freq]`
+- **`H_im`** — Imaginary part of interpolated e-phi field; must not be NULL; `[n_out, n_ang, n_freq]`
 
 ## Example:
 ```
@@ -86,7 +71,7 @@ quadriga_lib::arrayant_interpolate_multi(speaker, &az, &el, &qf, &V_re, &V_im, &
 ```
 
 ## See also:
-- [[.interpolate]] (single-frequency spatial interpolation)
+- .[[interpolate]] (single-frequency spatial interpolation)
 - [[arrayant_concat_multi]] (build multi-element/multi-frequency models)
 - [[arrayant_is_valid_multi]] (validation called when validate_input is true)
 - [[generate_speaker]] (typical source of multi-frequency arrayant vectors)
