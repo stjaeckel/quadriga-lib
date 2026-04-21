@@ -134,6 +134,7 @@ SECTION!*/
 - 1-line summary should be identical to the C++ documentation block
 - Description should be adapted to MATLAB users, e.g. by removing C++-specific details and adding MATLAB-specific usage notes if needed. 
 - It should be in bullet point format, with one concise fact per bullet
+- Never use "*" or "|" in formulas or any other text. These are reserved for markdown formatting. Instead use "·" for multiplication, e.g. "Rz·Ry·Rx" instead of "Rz*Ry*Rx" and abs() for absolute values.
 - Lines longer than 100 characters need to be split into multiple lines for better readability, and indent the continued lines by 2 spaces. 
 - You can omit any dtype specifications in the documentation block, as they are not relevant for the MATLAB user. All C++ functions that have a dtype specialization are wrapped with the double version in MATLAB.
 - Instead of the "## Declaration:" section, use a "## Usage:" section that includes the function signature as it should be called from MATLAB, such as:
