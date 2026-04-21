@@ -487,10 +487,10 @@ void quadriga_lib::qrt_file_read(
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
-   `normalize_M` | `M` | `path_gain`
-  ---|---|---
-   0 | As stored in QRT file | -FSPL
-   1 | Max column power = 1 | -FSPL minus material losses
+   | `normalize_M` | `M`                   | `path_gain`                 |
+   | ------------- | --------------------- | --------------------------- |
+   | 0             | As stored in QRT file | -FSPL                       |
+   | 1             | Max column power = 1  | -FSPL minus material losses |
 
 ## Outputs:
 - **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`

@@ -98,7 +98,7 @@ documentation:
 	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
 	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
 
-	python3 tools/extract_md.py -o md/api_cpp.md -a cpp
+	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master

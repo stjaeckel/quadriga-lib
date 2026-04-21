@@ -71,23 +71,23 @@ void quadriga_lib::ray_mesh_interact(
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN, 3]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code; `[n_rayN]`<br><br>
-   Code | Description
-  ------|---------------------------
-      1 | Single hit, outside→inside
-      2 | Single hit, inside→outside
-      3 | Single hit, inside→outside, total reflection
-      4 | Media-to-media, M2 hit first
-      5 | Media-to-media, M1 hit first
-      6 | Media-to-media, M1 hit first, total reflection
-      7 | Overlapping faces, outside→inside
-      8 | Overlapping faces, inside→outside
-      9 | Overlapping faces, inside→outside, total reflection
-     10 | Edge hit, outside→inside→outside
-     11 | Edge hit, inside→outside→inside
-     12 | Edge hit, inside→outside→inside, total reflection
-     13 | Edge hit, outside→inside
-     14 | Edge hit, inside→outside
-     15 | Edge hit, inside→outside, total reflection
+   | Code  | Description                                         |
+   | :---: | --------------------------------------------------- |
+   |   1   | Single hit, outside→inside                          |
+   |   2   | Single hit, inside→outside                          |
+   |   3   | Single hit, inside→outside, total reflection        |
+   |   4   | Media-to-media, M2 hit first                        |
+   |   5   | Media-to-media, M1 hit first                        |
+   |   6   | Media-to-media, M1 hit first, total reflection      |
+   |   7   | Overlapping faces, outside→inside                   |
+   |   8   | Overlapping faces, inside→outside                   |
+   |   9   | Overlapping faces, inside→outside, total reflection |
+   |  10   | Edge hit, outside→inside→outside                    |
+   |  11   | Edge hit, inside→outside→inside                     |
+   |  12   | Edge hit, inside→outside→inside, total reflection   |
+   |  13   | Edge hit, outside→inside                            |
+   |  14   | Edge hit, inside→outside                            |
+   |  15   | Edge hit, inside→outside, total reflection          |
 
 ## See also:
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)

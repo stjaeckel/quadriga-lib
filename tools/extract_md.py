@@ -159,7 +159,7 @@ def generate_markdown(folder_name, api_type, version_path):
     md += f'title: "{title}"\n'
     md += f'author: "Stephan Jaeckel"\n'
     md += f'date: "{today}"\n'
-    md += "lang: en-EN\n"
+    md += "lang: en-US\n"
     md += "---\n\n"
 
     # Preamble
@@ -269,7 +269,7 @@ def generate_markdown(folder_name, api_type, version_path):
             while i < len(lines):
                 line = lines[i]
                 if line.startswith("## "):
-                    subsection_name = line[3:]
+                    subsection_name = clean_md(line[3:]).strip()
                     i += 1
                     block_lines = []
                     while i < len(lines) and not lines[i].startswith("## "):

@@ -190,56 +190,56 @@ arma::uword quadriga_lib::obj_file_read(
 - **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
 - **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
 - **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
-   Index | Property | Range | Default 
-  -------|----------|-------|---------
-   0 | Base Color Red | 0–1 | 0.8 
-   1 | Base Color Green | 0–1 | 0.8 
-   2 | Base Color Blue | 0–1 | 0.8 
-   3 | Transparency (alpha) | 0–1 | 1.0 
-   4 | Roughness | 0–1 | 0.5 
-   5 | Metallic | 0–1 | 0.0 
-   6 | Index of refraction (IOR) | 0–4 | 1.45 
-   7 | Specular IOR adjustment | 0–1 | 0.5 
-   8 | Emission Red | 0–1 | 0.0 
-   9 | Emission Green | 0–1 | 0.0 
-   10 | Emission Blue | 0–1 | 0.0 
-   11 | Sheen | 0–1 | 0.0 
-   12 | Clearcoat | 0–1 | 0.0 
-   13 | Clearcoat roughness | 0–1 | 0.0 
-   14 | Anisotropic | 0–1 | 0.0 
-   15 | Anisotropic rotation | 0–1 | 0.0 
-   16 | Transmission | 0–1 | 0.0 
+   | Index | Property                  | Range | Default |
+   | ----- | ------------------------- | ----- | ------- |
+   | 0     | Base Color Red            | 0–1   | 0.8     |
+   | 1     | Base Color Green          | 0–1   | 0.8     |
+   | 2     | Base Color Blue           | 0–1   | 0.8     |
+   | 3     | Transparency (alpha)      | 0–1   | 1.0     |
+   | 4     | Roughness                 | 0–1   | 0.5     |
+   | 5     | Metallic                  | 0–1   | 0.0     |
+   | 6     | Index of refraction (IOR) | 0–4   | 1.45    |
+   | 7     | Specular IOR adjustment   | 0–1   | 0.5     |
+   | 8     | Emission Red              | 0–1   | 0.0     |
+   | 9     | Emission Green            | 0–1   | 0.0     |
+   | 10    | Emission Blue             | 0–1   | 0.0     |
+   | 11    | Sheen                     | 0–1   | 0.0     |
+   | 12    | Clearcoat                 | 0–1   | 0.0     |
+   | 13    | Clearcoat roughness       | 0–1   | 0.0     |
+   | 14    | Anisotropic               | 0–1   | 0.0     |
+   | 15    | Anisotropic rotation      | 0–1   | 0.0     |
+   | 16    | Transmission              | 0–1   | 0.0     |
 
 ## Returns:
 - Number of triangular mesh elements (`n_mesh`)
 
 ## Default material table:<br>
-    Name                  |         a |        b  |         c |         d |       Att |  max fGHz |
-    ----------------------|-----------|-----------|-----------|-----------|-----------|-----------|
-    vacuum / air          |       1.0 |       0.0 |       0.0 |       0.0 |       0.0 |       100 |
-    textiles              |       1.5 |       0.0 |      5e-5 |      0.62 |       0.0 |       100 |
-    plastic               |      2.44 |       0.0 |   2.33e-5 |       1.0 |       0.0 |       100 |
-    ceramic               |       6.5 |       0.0 |    0.0023 |      1.32 |       0.0 |       100 |
-    sea_water             |      80.0 |     -0.25 |       4.0 |      0.58 |       0.0 |       100 |
-    sea_ice               |       3.2 |    -0.022 |       1.1 |       1.5 |       0.0 |       100 |
-    water                 |      80.0 |     -0.18 |       0.6 |      1.52 |       0.0 |        20 |
-    water_ice             |      3.17 |    -0.005 |    5.6e-5 |       1.7 |       0.0 |        20 |
-    itu_concrete          |      5.24 |       0.0 |    0.0462 |    0.7822 |       0.0 |       100 |
-    itu_brick             |      3.91 |       0.0 |    0.0238 |      0.16 |       0.0 |        40 |
-    itu_plasterboard      |      2.73 |       0.0 |    0.0085 |    0.9395 |       0.0 |       100 |
-    itu_wood              |      1.99 |       0.0 |    0.0047 |    1.0718 |       0.0 |       100 |
-    itu_glass             |      6.31 |       0.0 |    0.0036 |    1.3394 |       0.0 |       100 |
-    itu_ceiling_board     |      1.48 |       0.0 |    0.0011 |     1.075 |       0.0 |       100 |
-    itu_chipboard         |      2.58 |       0.0 |    0.0217 |      0.78 |       0.0 |       100 |
-    itu_plywood           |      2.71 |       0.0 |      0.33 |       0.0 |       0.0 |        40 |
-    itu_marble            |     7.074 |       0.0 |    0.0055 |    0.9262 |       0.0 |        60 |
-    itu_floorboard        |      3.66 |       0.0 |    0.0044 |    1.3515 |       0.0 |       100 |
-    itu_metal             |       1.0 |       0.0 |     1.0e7 |       0.0 |       0.0 |       100 |
-    itu_very_dry_ground   |       3.0 |       0.0 |   0.00015 |      2.52 |       0.0 |        10 |
-    itu_medium_dry_ground |      15.0 |      -0.1 |     0.035 |      1.63 |       0.0 |        10 |
-    itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.0 |        10 |
-    itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
-    irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
+  | Name                  | a     | b      | c       | d      | Att  | max fGHz |
+  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
+  | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
+  | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
+  | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
+  | ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 100      |
+  | sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 100      |
+  | sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 100      |
+  | water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 20       |
+  | water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 20       |
+  | itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 100      |
+  | itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 40       |
+  | itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 100      |
+  | itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 100      |
+  | itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 100      |
+  | itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 100      |
+  | itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 100      |
+  | itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 40       |
+  | itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 60       |
+  | itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 100      |
+  | itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 100      |
+  | itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 10       |
+  | itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 10       |
+  | itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
+  | itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
+  | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ## See also:
 - [[obj_overlap_test]] (for testing mesh geometry)

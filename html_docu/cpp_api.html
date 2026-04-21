@@ -43,8 +43,36 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.11.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.11.2</b></big>
 <br><br><br>
+
+<b>Markdown version of this page:</b>
+<ul><li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_api_cpp.md">quadriga_lib_api_cpp.md</a></li></ul>
+<br>
+
+<b>General usage notes</b>
+<ul>
+<li>Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.</li>
+<li>Array sizes follow in backticks, e.g. <code>[n_rx, n_tx, n_path]</code>.</li>
+<li>All functions and classes live in the <code>quadriga_lib</code> namespace.</li>
+<li>Default include: <code>#include "quadriga_lib.hpp"</code>.</li>
+<li>Template parameter <code>dtype</code> is <code>float</code> or <code>double</code> unless stated.</li>
+<li>Armadillo types are column-major. Shape notation <code>[a, b, c]</code> means <code>[rows, cols, slices]</code> for 
+    <code>arma::Cube</code>; <code>[rows, cols]</code> for <code>arma::Mat</code>; <code>[n]</code> for <code>arma::Col</code>/<code>arma::Row</code>.</li>
+<li>Pointer arguments: <code>nullptr</code> skips optional outputs; required inputs throw on <code>nullptr</code>.</li>
+<li>Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.</li>
+<li>Invalid inputs (shape/domain) cause a <code>std::invalid_argument</code>; I/O failures a <code>std::runtime_error</code>.</li>
+<li>Index conventions: 0-based unless the field is explicitly called "1-based"</li>
+<li>Units: angles in radians (degrees only where stated, e.g. <code>*_deg</code>, <code>*_3dB</code>); distances in meters; frequencies in Hz; time in seconds; powers linear unless <code>_dB</code>.</li>
+<li>Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.</li>
+<li>Polarization transfer matrix M: 8 rows per path, interleaved real/imaginary, order 
+    <code>[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]</code>. A 2-row form <code>[ReVV, ImVV]</code> is used for scalar (acoustic) fields.</li>
+<li>Speed of light/sound defaults: 299792458.0 m/s (EM), 343.0 m/s (acoustic).</li>
+<li>Kernel-selection parameters (<code>use_kernel</code>): 0 = auto (CUDA if available and problem large enough, 
+    else AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2, 3 = CUDA. Throws if the requested kernel is unavailable.</li>
+<li><code>gpu_id</code> is only read when <code>use_kernel</code> resolves to CUDA.</li>
+</ul>
+<br>
 
 <b>Overview</b>
 <ul>
@@ -235,7 +263,7 @@
 </li></ul>
 </div>
 
-<i>Attributes:</i><br>
+<i>Attributes:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;">Attribute</th>
@@ -305,7 +333,7 @@
 </tr>
 </table><br>
 
-<i>Simple member functions:</i><br>
+<i>Simple member functions:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;">Function</th>
@@ -349,7 +377,7 @@
 </tr>
 </table><br>
 
-<i>Complex member functions:</i><br>
+<i>Complex member functions:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;">Function</th>
@@ -709,40 +737,52 @@ void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
 </li><li><b><code>usage</code></b> <i>(optional)</i> — Rotation mode:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Mode</th>
   <th style="text-align: left;">Pattern</th>
   <th style="text-align: left;">Polarization</th>
   <th style="text-align: left;">Grid adjustment</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>0</td>
   <td>Yes</td>
   <td>Yes</td>
   <td>Yes</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Yes</td>
   <td>No</td>
   <td>Yes</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>No</td>
   <td>Yes</td>
   <td>No</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>Yes</td>
   <td>Yes</td>
   <td>No</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>Yes</td>
   <td>No</td>
   <td>No</td>
+  <td></td>
 </tr>
 </table><br>
 </li><li><b><code>element</code></b> <i>(optional)</i> — 0-based element index to rotate; <code>-1</code> rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX) 
@@ -815,18 +855,21 @@ std::vector&lt;quadriga_lib::arrayant&lt;dtype&gt;&gt; quadriga_lib::arrayant_co
 </li><li>Coupling matrices are assembled block-diagonally — elements from <code>vec1</code> connect only to ports from <code>vec1</code> and vice versa:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Element \ Port</th>
   <th style="text-align: left;">P1…Pp1 (vec1)</th>
   <th style="text-align: left;">Pp1+1…Pp1+p2 (vec2)</th>
   <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>E1…En1 (vec1)</td>
   <td>C1 block</td>
   <td>0</td>
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>En1+1…En1+n2 (vec2)</td>
   <td>0</td>
   <td>C2 block</td>
@@ -1082,39 +1125,53 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_3GPP(
 </li><li><b><code>pol</code></b> <i>(optional)</i> — Polarization mode:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;"><code>pol</code></th>
   <th style="text-align: left;">Description</th>
   <th style="text-align: left;">Elements</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Vertical polarization</td>
   <td>NM</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>H/V polarization</td>
   <td>2NM</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>±45° polarization</td>
   <td>2NM</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>Vertical, vertical elements combined</td>
   <td>N</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
   <td>H/V, vertical elements combined</td>
   <td>2N</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
   <td>±45°, vertical elements combined</td>
   <td>2N</td>
+  <td></td>
 </tr>
 </table><br>
 </li><li><b><code>tilt</code></b> <i>(optional)</i> — Electrical downtilt in degrees; applies to <code>pol</code> 4–6 
@@ -1244,24 +1301,32 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::generate_arrayant_multibeam(
 </li><li><b><code>pol</code></b> <i>(optional)</i> — Polarization mode:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;"><code>pol</code></th>
   <th style="text-align: left;">Description</th>
   <th style="text-align: left;">Elements</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Vertical polarization</td>
   <td>NM</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>H/V polarization</td>
   <td>2NM</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>±45° polarization</td>
   <td>2NM</td>
+  <td></td>
 </tr>
 </table><br>
 </li><li><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing in wavelengths 
@@ -1541,7 +1606,7 @@ void quadriga_lib::qdant_write_multi(
 </li></ul>
 </div>
 
-<i>Attributes:</i><br>
+<i>Attributes:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;">Attribute</th>
@@ -1671,7 +1736,7 @@ void quadriga_lib::qdant_write_multi(
 </tr>
 </table><br>
 
-<i>Simple member functions:</i><br>
+<i>Simple member functions:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;">Method</th>
@@ -1861,100 +1926,124 @@ int quadriga_lib::any_type_id(
 <ul><li>Integer type ID of the contained value:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">ID</th>
   <th style="text-align: left;">Type</th>
   <th style="text-align: left;">ID</th>
   <th style="text-align: left;">Type</th>
   <th style="text-align: left;">ID</th>
   <th style="text-align: left;">Type</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>-2</td>
   <td><code>no value</code></td>
   <td>-1</td>
   <td><code>unsupported type</code></td>
   <td>9</td>
   <td><code>std::string</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>10</td>
   <td><code>float</code></td>
   <td>11</td>
   <td><code>double</code></td>
   <td>12</td>
   <td><code>unsigned long long int</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>13</td>
   <td><code>long long int</code></td>
   <td>14</td>
   <td><code>unsigned int</code></td>
   <td>15</td>
   <td><code>int</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>20</td>
   <td><code>arma::Mat&lt;float&gt;</code></td>
   <td>21</td>
   <td><code>arma::Mat&lt;double&gt;</code></td>
   <td>22</td>
   <td><code>arma::Mat&lt;arma::uword&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>23</td>
   <td><code>arma::Mat&lt;arma::sword&gt;</code></td>
   <td>24</td>
   <td><code>arma::Mat&lt;unsigned&gt;</code></td>
   <td>25</td>
   <td><code>arma::Mat&lt;int&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>30</td>
   <td><code>arma::Cube&lt;float&gt;</code></td>
   <td>31</td>
   <td><code>arma::Cube&lt;double&gt;</code></td>
   <td>32</td>
   <td><code>arma::Cube&lt;arma::uword&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>33</td>
   <td><code>arma::Cube&lt;arma::sword&gt;</code></td>
   <td>34</td>
   <td><code>arma::Cube&lt;unsigned&gt;</code></td>
   <td>35</td>
   <td><code>arma::Cube&lt;int&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>40</td>
   <td><code>arma::Col&lt;float&gt;</code></td>
   <td>41</td>
   <td><code>arma::Col&lt;double&gt;</code></td>
   <td>42</td>
   <td><code>arma::Col&lt;arma::uword&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>43</td>
   <td><code>arma::Col&lt;arma::sword&gt;</code></td>
   <td>44</td>
   <td><code>arma::Col&lt;unsigned&gt;</code></td>
   <td>45</td>
   <td><code>arma::Col&lt;int&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>50</td>
   <td><code>arma::Row&lt;float&gt;</code></td>
   <td>51</td>
   <td><code>arma::Row&lt;double&gt;</code></td>
   <td>52</td>
   <td><code>arma::Row&lt;arma::uword&gt;</code></td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>53</td>
   <td><code>arma::Row&lt;arma::sword&gt;</code></td>
   <td>54</td>
   <td><code>arma::Row&lt;unsigned&gt;</code></td>
   <td>55</td>
   <td><code>arma::Row&lt;int&gt;</code></td>
+  <td></td>
 </tr>
 </table><br>
 </li></ul>
@@ -2526,19 +2615,25 @@ void quadriga_lib::qrt_file_read(
 </li><li><b><code>cache</code></b> <i>(optional)</i> — Pre-populated cache from <a href="#qrt_read_cache_init">qrt_read_cache_init</a><br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;"><code>normalize_M</code></th>
   <th style="text-align: left;"><code>M</code></th>
   <th style="text-align: left;"><code>path_gain</code></th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>0</td>
   <td>As stored in QRT file</td>
   <td>-FSPL</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Max column power = 1</td>
   <td>-FSPL minus material losses</td>
+  <td></td>
 </tr>
 </table><br>
 </li></ul>
@@ -2648,8 +2743,6 @@ void quadriga_lib::quantize_delays(
 </li><li><b><code>max_no_taps</code></b> <i>(optional)</i> — Maximum number of output taps; 0 means unlimited 
 </li><li><b><code>power_exponent</code></b> <i>(optional)</i> — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving 
 </li><li><b><code>fix_taps</code></b> <i>(optional)</i> — Delay grid sharing mode:<br> 
-</li></ul>
- 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -2682,6 +2775,7 @@ void quadriga_lib::quantize_delays(
   <td></td>
 </tr>
 </table><br>
+</li></ul>
 
 <i>Outputs:</i><br>
 <ul><li><b><code>coeff_re_quant</code></b> — Output coefficients, real part; vector of length <code>n_snap</code>, each cube <code>[n_rx, n_tx, n_taps]</code> 
@@ -3248,32 +3342,46 @@ void quadriga_lib::calc_cross_polarization_ratio(
 <ul><li><b><code>xpr</code></b> <i>(optional)</i> — XPR on linear scale; <code>[n_cir, 6]</code>; columns:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Col</th>
   <th style="text-align: left;">Description</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>0</td>
   <td>Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>Aggregate circular XPR (total L+R co-pol / total L+R cross-pol)</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
   <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)</td>
+  <td></td>
 </tr>
 </table><br>
 </li><li><b><code>pg</code></b> <i>(optional)</i> — Total path gain summed over all paths (including LOS) as 
@@ -3904,46 +4012,60 @@ void generate_diffraction_paths(
 </li><li><b><code>lod</code></b> — Level of detail; controls <code>n_path</code> and <code>n_seg</code>:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;"><code>lod</code></th>
   <th style="text-align: left;"><code>n_path</code></th>
   <th style="text-align: left;"><code>n_seg</code></th>
   <th style="text-align: left;">Note</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>7</td>
   <td>3</td>
+  <td>-</td>
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>19</td>
   <td>3</td>
+  <td>-</td>
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>37</td>
   <td>4</td>
+  <td>-</td>
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>61</td>
   <td>5</td>
+  <td>-</td>
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
   <td>1</td>
   <td>2</td>
   <td>debug</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
   <td>2</td>
   <td>2</td>
   <td>debug</td>
+  <td></td>
 </tr>
 </table><br>
 </li></ul>
@@ -4091,112 +4213,148 @@ arma::uword quadriga_lib::obj_file_read(
 </li><li><b><code>bsdf</code></b> <i>(optional)</i> — Principled BSDF values from the <code>.mtl</code> file; <code>[n_mtl, 17]</code>; columns:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Index</th>
   <th style="text-align: left;">Property</th>
   <th style="text-align: left;">Range</th>
   <th style="text-align: left;">Default</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>0</td>
   <td>Base Color Red</td>
   <td>0–1</td>
   <td>0.8</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Base Color Green</td>
   <td>0–1</td>
   <td>0.8</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>Base Color Blue</td>
   <td>0–1</td>
   <td>0.8</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>Transparency (alpha)</td>
   <td>0–1</td>
   <td>1.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>Roughness</td>
   <td>0–1</td>
   <td>0.5</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
   <td>Metallic</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
   <td>Index of refraction (IOR)</td>
   <td>0–4</td>
   <td>1.45</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>7</td>
   <td>Specular IOR adjustment</td>
   <td>0–1</td>
   <td>0.5</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>8</td>
   <td>Emission Red</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>9</td>
   <td>Emission Green</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>10</td>
   <td>Emission Blue</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>11</td>
   <td>Sheen</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>12</td>
   <td>Clearcoat</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>13</td>
   <td>Clearcoat roughness</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>14</td>
   <td>Anisotropic</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>15</td>
   <td>Anisotropic rotation</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>16</td>
   <td>Transmission</td>
   <td>0–1</td>
   <td>0.0</td>
+  <td></td>
 </tr>
 </table><br>
 </li></ul>
@@ -4208,6 +4366,7 @@ arma::uword quadriga_lib::obj_file_read(
 <i>Default material table:<br></i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Name</th>
   <th style="text-align: left;">a</th>
   <th style="text-align: left;">b</th>
@@ -4218,6 +4377,7 @@ arma::uword quadriga_lib::obj_file_read(
   <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>vacuum / air</td>
   <td>1.0</td>
   <td>0.0</td>
@@ -4228,6 +4388,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>textiles</td>
   <td>1.5</td>
   <td>0.0</td>
@@ -4238,6 +4399,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>plastic</td>
   <td>2.44</td>
   <td>0.0</td>
@@ -4248,6 +4410,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>ceramic</td>
   <td>6.5</td>
   <td>0.0</td>
@@ -4258,6 +4421,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>sea_water</td>
   <td>80.0</td>
   <td>-0.25</td>
@@ -4268,6 +4432,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>sea_ice</td>
   <td>3.2</td>
   <td>-0.022</td>
@@ -4278,6 +4443,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>water</td>
   <td>80.0</td>
   <td>-0.18</td>
@@ -4288,6 +4454,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>water_ice</td>
   <td>3.17</td>
   <td>-0.005</td>
@@ -4298,6 +4465,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_concrete</td>
   <td>5.24</td>
   <td>0.0</td>
@@ -4308,6 +4476,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_brick</td>
   <td>3.91</td>
   <td>0.0</td>
@@ -4318,6 +4487,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_plasterboard</td>
   <td>2.73</td>
   <td>0.0</td>
@@ -4328,6 +4498,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_wood</td>
   <td>1.99</td>
   <td>0.0</td>
@@ -4338,6 +4509,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_glass</td>
   <td>6.31</td>
   <td>0.0</td>
@@ -4348,6 +4520,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_ceiling_board</td>
   <td>1.48</td>
   <td>0.0</td>
@@ -4358,6 +4531,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_chipboard</td>
   <td>2.58</td>
   <td>0.0</td>
@@ -4368,6 +4542,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_plywood</td>
   <td>2.71</td>
   <td>0.0</td>
@@ -4378,6 +4553,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_marble</td>
   <td>7.074</td>
   <td>0.0</td>
@@ -4388,6 +4564,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_floorboard</td>
   <td>3.66</td>
   <td>0.0</td>
@@ -4398,6 +4575,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_metal</td>
   <td>1.0</td>
   <td>0.0</td>
@@ -4408,6 +4586,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_very_dry_ground</td>
   <td>3.0</td>
   <td>0.0</td>
@@ -4418,6 +4597,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_medium_dry_ground</td>
   <td>15.0</td>
   <td>-0.1</td>
@@ -4428,6 +4608,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_wet_ground</td>
   <td>30.0</td>
   <td>-0.4</td>
@@ -4438,6 +4619,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>itu_vegetation</td>
   <td>1.0</td>
   <td>0.0</td>
@@ -4448,6 +4630,7 @@ arma::uword quadriga_lib::obj_file_read(
   <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>irr_glass</td>
   <td>6.27</td>
   <td>0.0</td>
@@ -4762,68 +4945,100 @@ void quadriga_lib::ray_mesh_interact(
 </li><li><b><code>out_typeN</code></b> — Interaction type code; <code>[n_rayN]</code><br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
+  <th style="text-align: left;"></th>
   <th style="text-align: left;">Code</th>
   <th style="text-align: left;">Description</th>
+  <th style="text-align: left;"></th>
 </tr>
 <tr>
+  <td></td>
   <td>1</td>
   <td>Single hit, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
   <td>Single hit, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
   <td>Single hit, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>4</td>
   <td>Media-to-media, M2 hit first</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
   <td>Media-to-media, M1 hit first</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
   <td>Media-to-media, M1 hit first, total reflection</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>7</td>
   <td>Overlapping faces, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>8</td>
   <td>Overlapping faces, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>9</td>
   <td>Overlapping faces, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>10</td>
   <td>Edge hit, outside→inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>11</td>
   <td>Edge hit, inside→outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>12</td>
   <td>Edge hit, inside→outside→inside, total reflection</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>13</td>
   <td>Edge hit, outside→inside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>14</td>
   <td>Edge hit, inside→outside</td>
+  <td></td>
 </tr>
 <tr>
+  <td></td>
   <td>15</td>
   <td>Edge hit, inside→outside, total reflection</td>
+  <td></td>
 </tr>
 </table><br>
 </li></ul>

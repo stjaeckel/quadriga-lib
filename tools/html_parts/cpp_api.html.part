@@ -1,2 +1,30 @@
-<big><b>C++ API Documentation for Quadriga-Lib v0.11.1</b></big>
+<big><b>C++ API Documentation for Quadriga-Lib v0.11.2</b></big>
 <br><br><br>
+
+<b>Markdown version of this page:</b>
+<ul><li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_api_cpp.md">quadriga_lib_api_cpp.md</a></li></ul>
+<br>
+
+<b>General usage notes</b>
+<ul>
+<li>Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.</li>
+<li>Array sizes follow in backticks, e.g. <code>[n_rx, n_tx, n_path]</code>.</li>
+<li>All functions and classes live in the <code>quadriga_lib</code> namespace.</li>
+<li>Default include: <code>#include "quadriga_lib.hpp"</code>.</li>
+<li>Template parameter <code>dtype</code> is <code>float</code> or <code>double</code> unless stated.</li>
+<li>Armadillo types are column-major. Shape notation <code>[a, b, c]</code> means <code>[rows, cols, slices]</code> for 
+    <code>arma::Cube</code>; <code>[rows, cols]</code> for <code>arma::Mat</code>; <code>[n]</code> for <code>arma::Col</code>/<code>arma::Row</code>.</li>
+<li>Pointer arguments: <code>nullptr</code> skips optional outputs; required inputs throw on <code>nullptr</code>.</li>
+<li>Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.</li>
+<li>Invalid inputs (shape/domain) cause a <code>std::invalid_argument</code>; I/O failures a <code>std::runtime_error</code>.</li>
+<li>Index conventions: 0-based unless the field is explicitly called "1-based"</li>
+<li>Units: angles in radians (degrees only where stated, e.g. <code>*_deg</code>, <code>*_3dB</code>); distances in meters; frequencies in Hz; time in seconds; powers linear unless <code>_dB</code>.</li>
+<li>Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.</li>
+<li>Polarization transfer matrix M: 8 rows per path, interleaved real/imaginary, order 
+    <code>[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]</code>. A 2-row form <code>[ReVV, ImVV]</code> is used for scalar (acoustic) fields.</li>
+<li>Speed of light/sound defaults: 299792458.0 m/s (EM), 343.0 m/s (acoustic).</li>
+<li>Kernel-selection parameters (<code>use_kernel</code>): 0 = auto (CUDA if available and problem large enough, 
+    else AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2, 3 = CUDA. Throws if the requested kernel is unavailable.</li>
+<li><code>gpu_id</code> is only read when <code>use_kernel</code> resolves to CUDA.</li>
+</ul>
+<br>

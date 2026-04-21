@@ -28,45 +28,45 @@ Class for storing and manipulating array antenna models
 - Field pattern cubes `e_theta_re/im`, `e_phi_re/im` must all be `[n_elevation, n_azimuth, n_elements]`
 - `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
 
-## Attributes:
-| Attribute | Size | Description |
-|-----------|------|-------------|
-| `arma::Cube<dtype> e_theta_re` | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part |
-| `arma::Cube<dtype> e_theta_im` | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part |
-| `arma::Cube<dtype> e_phi_re`   | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part |
-| `arma::Cube<dtype> e_phi_im`   | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part |
-| `arma::Col<dtype> azimuth_grid` | `[n_azimuth]` | Azimuth angles in rad, in [-pi, pi], sorted |
-| `arma::Col<dtype> elevation_grid` | `[n_elevation]` | Elevation angles in rad, in [-pi/2, pi/2], sorted |
-| `arma::Mat<dtype> element_pos` | `[3, n_elements]` or empty | Element positions in local Cartesian coords |
-| `arma::Mat<dtype> coupling_re` | `[n_elements, n_ports]` | Coupling matrix, real part |
-| `arma::Mat<dtype> coupling_im` | `[n_elements, n_ports]` | Coupling matrix, imaginary part |
-| `dtype center_frequency` | scalar | Center frequency |
+## Attributes:<br>
+| Attribute                         | Size                                   | Description                                       |
+| --------------------------------- | -------------------------------------- | ------------------------------------------------- |
+| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part               |
+| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part          |
+| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part               |
+| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part          |
+| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], sorted       |
+| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], sorted |
+| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords       |
+| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                        |
+| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                   |
+| `dtype center_frequency`          | scalar                                 | Center frequency                                  |
 
-## Simple member functions:
-| Function | Description |
-|----------|-------------|
-| `.n_elevation()` | Number of elevation angles |
-| `.n_azimuth()` | Number of azimuth angles |
-| `.n_elements()` | Number of antenna elements |
-| `.n_ports()` | Number of ports (columns of coupling matrix) |
-| `.copy()` | Returns a deep copy of the arrayant object |
-| `.reset()` | Clears all data, resetting size to zero |
-| `.is_valid()` | Returns `""` if valid, or an error message string |
+## Simple member functions:<br>
+| Function         | Description                                       |
+| ---------------- | ------------------------------------------------- |
+| `.n_elevation()` | Number of elevation angles                        |
+| `.n_azimuth()`   | Number of azimuth angles                          |
+| `.n_elements()`  | Number of antenna elements                        |
+| `.n_ports()`     | Number of ports (columns of coupling matrix)      |
+| `.copy()`        | Returns a deep copy of the arrayant object        |
+| `.reset()`       | Clears all data, resetting size to zero           |
+| `.is_valid()`    | Returns `""` if valid, or an error message string |
 
-## Complex member functions:
-| Function | Description |
-|----------|-------------|
-| .[[append]] | Append elements of another arrayant |
-| .[[calc_directivity_dBi]] | Calculate per-element directivity in dBi |
-| .[[combine_pattern]] | Compute effective patterns from elements, positions, and coupling |
-| .[[copy_element]] | Copy a single element to one or more destination slots |
-| .[[export_obj_file]] | Export pattern geometry to Wavefront OBJ |
-| .[[interpolate]] | Interpolate field patterns at given azimuth/elevation angles |
-| .[[qdant_write]] | Write arrayant to QDANT file |
-| .[[remove_zeros]] | Remove zero-valued entries from pattern data |
-| .[[rotate_pattern]] | Rotate pattern and/or polarization via Euler angles |
-| .[[set_size]] | Resize the arrayant to new dimensions |
-| .[[is_valid]] | Validate arrayant integrity |
+## Complex member functions:<br>
+| Function                  | Description                                                       |
+| ------------------------- | ----------------------------------------------------------------- |
+| .[[append]]               | Append elements of another arrayant                               |
+| .[[calc_directivity_dBi]] | Calculate per-element directivity in dBi                          |
+| .[[combine_pattern]]      | Compute effective patterns from elements, positions, and coupling |
+| .[[copy_element]]         | Copy a single element to one or more destination slots            |
+| .[[export_obj_file]]      | Export pattern geometry to Wavefront OBJ                          |
+| .[[interpolate]]          | Interpolate field patterns at given azimuth/elevation angles      |
+| .[[qdant_write]]          | Write arrayant to QDANT file                                      |
+| .[[remove_zeros]]         | Remove zero-valued entries from pattern data                      |
+| .[[rotate_pattern]]       | Rotate pattern and/or polarization via Euler angles               |
+| .[[set_size]]             | Resize the arrayant to new dimensions                             |
+| .[[is_valid]]             | Validate arrayant integrity                                       |
 MD!*/
 
 template <typename dtype>
@@ -1421,13 +1421,13 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
 - **`y_deg`** *(optional)* — Rotation around y-axis (tilt) in degrees
 - **`z_deg`** *(optional)* — Rotation around z-axis (heading) in degrees
 - **`usage`** *(optional)* — Rotation mode:<br><br>
-   Mode | Pattern | Polarization | Grid adjustment
-  ------|---------|--------------|-----------------
-   0    | Yes     | Yes          | Yes
-   1    | Yes     | No           | Yes
-   2    | No      | Yes          | No
-   3    | Yes     | Yes          | No
-   4    | Yes     | No           | No
+   | Mode | Pattern | Polarization | Grid adjustment |
+   | ---- | ------- | ------------ | --------------- |
+   | 0    | Yes     | Yes          | Yes             |
+   | 1    | Yes     | No           | Yes             |
+   | 2    | No      | Yes          | No              |
+   | 3    | Yes     | Yes          | No              |
+   | 4    | Yes     | No           | No              |
 - **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 

@@ -692,10 +692,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
 ## Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports per entry
 - Coupling matrices are assembled block-diagonally — elements from `vec1` connect only to ports from `vec1` and vice versa:<br><br>
-   Element \ Port | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
-  ----------------|:-------------:|:--------------------:|
-   E1…En1 (vec1)  | C1 block      | 0                    |
-   En1+1…En1+n2 (vec2) | 0        | C2 block             |
+   | Element \ Port      | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
+   | ------------------- | :-----------: | :-----------------: |
+   | E1…En1 (vec1)       |   C1 block    |          0          |
+   | En1+1…En1+n2 (vec2) |       0       |      C2 block       |
 
 ## See also:
 - [[arrayant_is_valid_multi]] (validation called on both inputs)

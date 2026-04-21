@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.1</b></big>
+      <!-- CONTENT BEGIN --><big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.2</b></big>
 <br><br><br>
 
 <b>Overview</b>
@@ -129,7 +129,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh</td></tr>
+<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate propagation paths for estimating the diffraction gain</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
@@ -3528,34 +3528,33 @@ execution of this process, several pieces of input data are required:<br><br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="acdf"></a>
 <b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
-<br><br>
-<i>Description:</i><br>
-<ul><li>Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative 
-   sum 
-</li><li>Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from 
-   each column CDF are averaged, then mapped back to the bin grid 
+<div style="margin-bottom: 1.5em;">
+<ul><li>Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum 
+</li><li>Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, 
+   then mapped back to the bin grid 
 </li><li>Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels 
 </li><li><code>Inf</code> and <code>NaN</code> values are excluded from computation 
 </li><li>If <code>bins</code> is empty, equally spaced bins spanning the data range are generated 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-[ Sh, bins_out, Sc, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
+[ cdf_per_set, bins_out, cdf_avg, mu, sig ] = quadriga_lib.acdf( data, bins_in, n_bins );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul><li><b><code>data</code></b> — Input data matrix; each column is one independent data set, <code>[n_samples, n_sets]</code> 
 </li><li><b><code>bins_in</code></b> <i>(optional)</i> — Bin centers; used as-is if non-empty, <code>[n_bins_in]</code> 
 </li><li><b><code>n_bins</code></b> <i>(optional)</i> — Number of bins when auto-generating; must be >= 2; ignored when 
    non-empty <code>bins_in</code> are provided 
 </li></ul>
 
-<i>Output Arguments:</i><br>
-<ul><li><b><code>Sh</code></b> <i>(optional)</i> — Individual CDFs, one per column of data, <code>[n_bins_out, n_sets]</code> 
+<i>Outputs:</i><br>
+<ul><li><b><code>cdf_per_set</code></b> <i>(optional)</i> — Individual CDFs, one per column of data, <code>[n_bins_out, n_sets]</code> 
 </li><li><b><code>bins_out</code></b> <i>(optional)</i> — Auto-generated bins; copy of <code>bins_in</code> when 
    non-empty <code>bins_in</code> are provided, <code>[n_bins_out = n_bins]</code> or <code>[n_bins_out = n_bins_in]</code> 
-</li><li><b><code>Sc</code></b> <i>(optional)</i> — Averaged CDF via quantile-space averaging across data sets, <code>[n_bins]</code> 
+</li><li><b><code>cdf_avg</code></b> <i>(optional)</i> — Averaged CDF via quantile-space averaging across data sets, <code>[n_bins]</code> 
 </li><li><b><code>mu</code></b> <i>(optional)</i> — Mean of the 0.1–0.9 quantiles across data sets, <code>[9]</code> 
 </li><li><b><code>sig</code></b> <i>(optional)</i> — Standard deviation of the 0.1–0.9 quantiles across data sets, <code>[9]</code> 
 </li></ul>
@@ -3869,21 +3868,21 @@ R = reshape( rotation, 3, 3 );
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="cart2geo"></a>
 <b>cart2geo</b> - Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul><li>Computes: <code>len = sqrt(x² + y² + z²)</code>, <code>az = atan2(y, x)</code>, <code>el = asin(clamp(z / len, -1, 1))</code> 
 </li><li>Inputs are arbitrary 3D vectors (not required to be unit-length); <code>len</code> returns the Euclidean norm 
 </li><li><code>z/len</code> is clamped to [-1, 1] before <code>asin</code> to guard against <code>len == 0</code> and rounding artifacts 
    pushing <code>abs(z/len)</code> slightly above 1 
 </li><li>Option to provide a single <code>[3, n, m]</code> cube or separate x, y, z <code>[n, m]</code> inputs 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
 [ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul><li><b><code>x</code></b> — X-coordinates or combined input; <code>[n, m]</code> or <code>[3, n, m]</code> 
 </li><li><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty 
 </li><li><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty 
@@ -3891,7 +3890,7 @@ R = reshape( rotation, 3, 3 );
    1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1 
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul><li><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code> 
 </li><li><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code> 
 </li><li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length <code>sqrt(x² + y² + z²)</code>; <code>[n, m]</code> 
@@ -3962,8 +3961,7 @@ c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="geo2cart"></a>
 <b>geo2cart</b> - Convert elementwise azimuth/elevation angles to Cartesian coordinates
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul><li>Conversion: <code>x = cos(el) cos(az) len</code>, <code>y = cos(el) sin(az) len</code>, <code>z = sin(el) len</code> 
 </li><li>Optional outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; omit from the 
    output list to skip their computation 
@@ -3972,6 +3970,7 @@ c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
 </li><li>Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel 
    computes in single precision internally (inputs narrowed to float, results widened back) 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
@@ -3982,7 +3981,7 @@ split = false;
 cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul><li><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code> 
 </li><li><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code> 
 </li><li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length sqrt(x^2 + y^2 + z^2); <code>[n, m]</code>; default: 1 
@@ -3993,7 +3992,7 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
    in this mode; default: false 
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul><li><b><code>x_or_cart</code></b> — If <code>split=true</code>: X-coordinates <code>[n, m]</code>. If <code>split=false</code>: combined cube 
    with components along the first dim, <code>[3, n, m]</code> 
 </li><li><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty 
@@ -4118,18 +4117,16 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_diffraction_gain"></a>
-<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
-<br><br>
-<i>Description:</i><br>
-<ul><li>Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave 
-   propagation between each TX-RX pair is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), 
-   each approximated by <code>n_seg</code> line segments.  
-</li><li>Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,  
-   generalized to arbitrary 3D shapes. 
-</li><li>Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping 
-   geometry whose bounding box does not intersect the TX-RX path. 
-</li><li>All inputs are cast to double precision internally. 
+<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
+<div style="margin-bottom: 1.5em;">
+<ul><li>Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided  
+   into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), each approximated by <code>n_seg</code> line segments 
+</li><li>Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,  
+   generalized to arbitrary 3D shapes 
+</li><li>Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping  
+   triangles whose bounding box does not intersect the TX-RX path 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
@@ -4137,61 +4134,28 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
     center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
 </pre>
 
-<i>Input Arguments:</i><br>
-<ul><li><code><b>orig</b></code> (input)<br> 
-   TX positions, size <code>[n_pos, 3]</code>, numeric. 
-</li></ul>
- 
-<ul><li><code><b>dest</b></code> (input)<br> 
-   RX positions, size <code>[n_pos, 3]</code>, numeric. 
-</li></ul>
- 
-<ul><li><code><b>mesh</b></code> (input)<br> 
-   Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>, size <code>[n_mesh, 9]</code>, numeric. 
-</li></ul>
- 
-<ul><li><code><b>mtl_prop</b></code> (input)<br> 
-   Material properties per triangle, size <code>[n_mesh, 5]</code>, numeric. See <a href="#obj_file_read">obj_file_read</a>. 
-</li></ul>
- 
-<ul><li><code><b>center_frequency</b></code> (input)<br> 
-   Center frequency in Hz, scalar. 
-</li></ul>
- 
-<ul><li><code><b>lod</b></code> (optional input)<br> 
-   Level of detail (0–6), scalar. Default: <code>2</code>. See <a href="#generate_diffraction_paths">generate_diffraction_paths</a>. 
-</li></ul>
- 
-<ul><li><code><b>verbose</b></code> (optional input)<br> 
-   Verbosity level, scalar. Default: <code>0</code>. 
-</li></ul>
- 
-<ul><li><code><b>sub_mesh_index</b></code> (optional input)<br> 
-   Sub-mesh index for acceleration, 0-based, <code>uint32</code> vector of length <code>[n_mesh]</code>. Pass <code>[]</code> to skip. 
-   See <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>. 
-</li></ul>
- 
-<ul><li><code><b>use_kernel</b></code> (optional input)<br> 
-   Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA. Default: <code>0</code>. Error if unavailable. 
-</li></ul>
- 
-<ul><li><code><b>gpu_id</b></code> (optional input)<br> 
-   CUDA device ID (0-based). Default: <code>0</code>. Ignored for non-CUDA kernels. 
+<i>Inputs:</i><br>
+<ul><li><b><code>orig</code></b> — TX positions; <code>[n_pos, 3]</code> 
+</li><li><b><code>dest</code></b> — RX positions; <code>[n_pos, 3]</code> 
+</li><li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code> 
+</li><li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 5]</code> 
+</li><li><b><code>center_frequency</code></b> — Center frequency 
+</li><li><b><code>lod</code></b> <i>(optional)</i> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a> 
+</li><li><b><code>verbose</code></b> <i>(optional)</i> — Verbosity level 
+</li><li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; <code>[n_mesh, 1]</code> 
+</li><li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable 
+</li><li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored for non-CUDA kernels 
 </li></ul>
 
-<i>Output Arguments:</i><br>
-<ul><li><code><b>gain</b></code><br> 
-   Diffraction gain per TX-RX pair, linear scale, size <code>[n_pos, 1]</code>. 
-</li></ul>
- 
-<ul><li><code><b>coord</b></code><br> 
-   Diffracted path coordinates (excluding endpoints), size <code>[3, n_seg-1, n_pos]</code>. 
+<i>Outputs:</i><br>
+<ul><li><b><code>gain</code></b> <i>(optional)</i> — Diffraction gain per TX-RX pair, linear scale; <code>[n_pos, 1]</code> 
+</li><li><b><code>coord</code></b> <i>(optional)</i> — Diffracted path coordinates excluding endpoints; <code>[3, n_seg-1, n_pos]</code> 
 </li></ul>
 
 <i>See also:</i><br>
-<ul><li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> 
-</li><li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> 
-</li><li><a href="#obj_file_read">obj_file_read</a> 
+<ul><li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (controls path/segment count via <code>lod</code>) 
+</li><li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>) 
+</li><li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format) 
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
