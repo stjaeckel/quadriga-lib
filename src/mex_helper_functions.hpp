@@ -675,9 +675,9 @@ inline mxArray *qd_mex_copy2matlab(const arma::Mat<dtype> *input, // Matrix
 }
 
 template <typename dtype>
-inline mxArray *qd_mex_copy2matlab(arma::Cube<dtype> *input,   // Cube
-                                   size_t ns = 0,              // Number of columns in output
-                                   const size_t *is = nullptr) // List of columns to copy, 0-based
+inline mxArray *qd_mex_copy2matlab(const arma::Cube<dtype> *input, // Cube
+                                   size_t ns = 0,                  // Number of columns in output
+                                   const size_t *is = nullptr)     // List of columns to copy, 0-based
 {
     mxClassID classID;
     if (typeid(dtype).name() == typeid(float).name())
