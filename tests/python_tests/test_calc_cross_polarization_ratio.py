@@ -1,19 +1,6 @@
-## SPDX-License-Identifier: Apache-2.0
-##
-## quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-## Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-##
-## Licensed under the Apache License, Version 2.0 (the "License");
-## you may not use this file except in compliance with the License.
-## You may obtain a copy of the License at
-## http://www.apache.org/licenses/LICENSE-2.0
-##
-## Unless required by applicable law or agreed to in writing, software
-## distributed under the License is distributed on an "AS IS" BASIS,
-## WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-## See the License for the specific language governing permissions and
-## limitations under the License.
-## ------------------------------------------------------------------------
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
 
 import sys
 import os
@@ -39,7 +26,7 @@ class test_case(unittest.TestCase):
         pw = [np.array([1.0, 0.5, 0.5])]
         M_los = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)
         M_nlos1 = np.array([0.9, 0.0, 0.1, 0.0, 0.1, 0.0, 0.8, 0.0]).reshape(8, 1)
-        M_nlos2 = np.array([0.7, 0.0, 0.3, 0.0, 0.2, 0.0, 0.6, 0.0]).reshape(8, 1)
+        M_nlos2 = np.array([0.7, 0.0, 0.2, 0.0, 0.3, 0.0, 0.6, 0.0]).reshape(8, 1)
         M = [np.hstack([M_los, M_nlos1, M_nlos2])]
         pl = [np.array([10.0, 12.0, 15.0])]
 
@@ -89,7 +76,7 @@ class test_case(unittest.TestCase):
         rx = np.array([[10.0], [0.0], [0.0]])
 
         pw = [np.array([1.0])]
-        M = [np.array([0.8, 0.2, 0.1, -0.1, 0.05, 0.05, 0.7, -0.3]).reshape(8, 1)]
+        M = [np.array([0.8, 0.2, 0.05, 0.05, 0.1, -0.1, 0.7, -0.3]).reshape(8, 1)]
         pl = [np.array([20.0])]
 
         xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio(pw, M, pl, tx, rx)
@@ -113,9 +100,9 @@ class test_case(unittest.TestCase):
         pw1 = np.array([0.8, 0.4])
 
         M0_c0 = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)
-        M0_c1 = np.array([0.8, 0.0, 0.2, 0.0, 0.15, 0.0, 0.7, 0.0]).reshape(8, 1)
+        M0_c1 = np.array([0.8, 0.0, 0.15, 0.0, 0.2,  0.0, 0.7, 0.0]).reshape(8, 1)
         M1_c0 = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)
-        M1_c1 = np.array([0.6, 0.0, 0.3, 0.0, 0.25, 0.0, 0.5, 0.0]).reshape(8, 1)
+        M1_c1 = np.array([0.6, 0.0, 0.25, 0.0, 0.3,  0.0, 0.5, 0.0]).reshape(8, 1)
 
         M = [np.hstack([M0_c0, M0_c1]), np.hstack([M1_c0, M1_c1])]
         pl = [np.array([10.0, 14.0]), np.array([10.0, 13.0])]
@@ -156,8 +143,8 @@ class test_case(unittest.TestCase):
 
         pw = [np.array([1.0, 0.8, 0.5])]
         M_los = np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0]).reshape(8, 1)
-        M_near = np.array([0.9, 0.0, 0.15, 0.0, 0.1, 0.0, 0.85, 0.0]).reshape(8, 1)
-        M_far = np.array([0.7, 0.0, 0.3, 0.0, 0.2, 0.0, 0.6, 0.0]).reshape(8, 1)
+        M_near = np.array([0.9, 0.0, 0.1,  0.0, 0.15, 0.0, 0.85, 0.0]).reshape(8, 1)
+        M_far  = np.array([0.7, 0.0, 0.2,  0.0, 0.3,  0.0, 0.6,  0.0]).reshape(8, 1)
         M = [np.hstack([M_los, M_near, M_far])]
         pl = [np.array([10.0, 10.005, 12.0])]
 
