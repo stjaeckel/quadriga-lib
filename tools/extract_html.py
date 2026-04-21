@@ -74,30 +74,43 @@ def format_text(text):
 
 def format_nested_lists(text):
     lines = text.split('\n')
-    formatted_text = ""
-    inside_list = False
+    out = []
+    stack = []  # indent levels of currently-open <ul>s
 
-    for i in range(len(lines)):
-        line = lines[i]
-        if line.startswith("- "):  # Start of a new list item
-            if not inside_list:
-                inside_list = True
-                formatted_text += "<ul>"
-            else:
-                formatted_text += "</li>"
-            formatted_text += '<li>' + line[2:] + '\n'
-        elif (line.startswith("  ") or line.startswith("  ")) and inside_list:  # Continuation of the current list item
-            formatted_text += " " + line + "\n"
-        else:  # End of the list or some other content
-            if inside_list:
-                inside_list = False
-                formatted_text += "</li></ul>\n"
-            formatted_text += line + "\n"
+    for line in lines:
+        rline = line.rstrip()
+        stripped = rline.lstrip(' ')
+        indent = len(rline) - len(stripped)
 
-        if inside_list and i == len(lines) - 1:  # If the last line was part of a list
-            formatted_text += "</li></ul>\n"
+        if stripped.startswith("- "):
+            item = stripped[2:]
+            while stack and stack[-1] > indent:
+                out.append("</li></ul>")
+                stack.pop()
+            if not stack or stack[-1] < indent:
+                out.append("<ul>")
+                stack.append(indent)
+                out.append("<li>" + item)
+            else:  # sibling at same indent
+                out.append("</li>")
+                out.append("<li>" + item)
+        elif stack and indent >= 2 and stripped != "":
+            # Continuation of the current list item
+            out.append(" " + rline)
+        elif stack and stripped == "":
+            # Blank line inside a list — skip, keep list open
+            continue
+        else:
+            while stack:
+                out.append("</li></ul>")
+                stack.pop()
+            out.append(line)
 
-    return formatted_text
+    while stack:
+        out.append("</li></ul>")
+        stack.pop()
+
+    return "\n".join(out) + "\n"
 
 
 def format_tables(text):

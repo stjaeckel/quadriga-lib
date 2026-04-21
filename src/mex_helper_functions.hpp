@@ -1605,21 +1605,21 @@ bool qd_mex_has_field(const mxArray *strct, const std::string &field)
 {
     if (!mxIsStruct(strct))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
-    mxArray *data = mxGetField(strct, 0, field.c_str());
-    if (data == nullptr)
-        return false;
-    return true;
+    return mxGetField(strct, 0, field.c_str()) != nullptr;
 }
 
-inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field)
+inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field, size_t n = 0)
 {
     if (!mxIsStruct(strct))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
 
-    mxArray *data = mxGetField(strct, 0, field.c_str());
-    if (data == nullptr)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + field + "' not found!").c_str());
+    size_t n_elem = (size_t)mxGetNumberOfElements(strct);
+    if (n >= n_elem)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Struct index " + std::to_string(n) + " out of range (size " + std::to_string(n_elem) + ").").c_str());
 
+    mxArray *data = mxGetField(strct, (mwIndex)n, field.c_str());
+    if (data == nullptr)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Field '" + field + "' not found at index " + std::to_string(n) + "!").c_str());
     return data;
 }
 
