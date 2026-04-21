@@ -19,41 +19,39 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 - Each snapshot may have a different number of propagation paths `n_path`
 - Unstructured metadata supported via `par_names` / `par_data`
 
-## Attributes:
+## Attributes:<br>
+| Attribute                                         | Size                                                            | Description                                                 |
+| ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `std::string name`                                | —                                                               | Name of the channel object                                  |
+| `arma::Col<dtype> center_frequency`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
+| `arma::Mat<dtype> tx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Transmitter positions                                       |
+| `arma::Mat<dtype> rx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Receiver positions                                          |
+| `arma::Mat<dtype> tx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Transmitter orientation (Euler angles)                      |
+| `arma::Mat<dtype> rx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Receiver orientation (Euler angles)                         |
+| `std::vector<arma::Cube<dtype>> coeff_re`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, real part                             |
+| `std::vector<arma::Cube<dtype>> coeff_im`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, imaginary part                        |
+| `std::vector<arma::Cube<dtype>> delay`            | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds                                      |
+| `std::vector<arma::Col<dtype>> path_gain`         | per snap `[n_path]`                                             | Path gains before antenna pattern                           |
+| `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
+| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
+| `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
+| `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
+| `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
+| `std::vector<arma::Col<unsigned>> no_interact`    | per snap `[n_path]`                                             | Number of interactions per path                             |
+| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(no_interact)]`                                | Interaction point coordinates                               |
+| `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
+| `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
+| `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
 
-| Attribute | Size | Description |
-|-----------|------|-------------|
-| `std::string name` | — | Name of the channel object |
-| `arma::Col<dtype> center_frequency` | `[1]`; `[n_snap]`, or `[]` | Center frequency |
-| `arma::Mat<dtype> tx_pos` | `[3, n_snap]` or `[3, 1]` = static | Transmitter positions |
-| `arma::Mat<dtype> rx_pos` | `[3, n_snap]` or `[3, 1]` = static | Receiver positions |
-| `arma::Mat<dtype> tx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Transmitter orientation (Euler angles) |
-| `arma::Mat<dtype> rx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Receiver orientation (Euler angles) |
-| `std::vector<arma::Cube<dtype>> coeff_re` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, real part |
-| `std::vector<arma::Cube<dtype>> coeff_im` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, imaginary part |
-| `std::vector<arma::Cube<dtype>> delay` | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds |
-| `std::vector<arma::Col<dtype>> path_gain` | per snap `[n_path]` | Path gains before antenna pattern |
-| `std::vector<arma::Col<dtype>> path_length` | per snap `[n_path]` | Path lengths TX to RX |
-| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]` | Interleaved polarization transfer matrices |
-| `std::vector<arma::Mat<dtype>> path_angles` | per snap `[n_path, 4]` | Angles {AOD, EOD, AOA, EOA} in rad |
-| `std::vector<arma::Mat<dtype>> path_fbs_pos` | per snap `[3, n_path]` | First-bounce scatterer positions |
-| `std::vector<arma::Mat<dtype>> path_lbs_pos` | per snap `[3, n_path]` | Last-bounce scatterer positions |
-| `std::vector<arma::Col<unsigned>> no_interact` | per snap `[n_path]` | Number of interactions per path |
-| `std::vector<arma::Mat<dtype>> interact_coord` | per snap `[3, sum(no_interact)]` | Interaction point coordinates |
-| `std::vector<std::string> par_names` | — | Names of unstructured metadata fields |
-| `std::vector<std::any> par_data` | — | Unstructured metadata values (string, scalar, matrix, etc.) |
-| `int initial_position` | scalar | 0-based index of the reference snapshot |
-
-## Simple member functions:
-
-| Method | Description |
-|---|---|
-| `.n_snap()` | Returns the number of snapshots |
-| `.n_rx()` | Returns number of receive antennas; 0 if coefficients absent |
-| `.n_tx()` | Returns number of transmit antennas; 0 if coefficients absent |
-| `.n_path()` | Returns number of paths per snapshot as a vector |
-| `.empty()` | Returns true if the object contains no channel data |
-| `.is_valid()` | Returns empty string if valid, otherwise an error message |
+## Simple member functions:<br>
+| Method        | Description                                                   |
+| ------------- | ------------------------------------------------------------- |
+| `.n_snap()`   | Returns the number of snapshots                               |
+| `.n_rx()`     | Returns number of receive antennas; 0 if coefficients absent  |
+| `.n_tx()`     | Returns number of transmit antennas; 0 if coefficients absent |
+| `.n_path()`   | Returns number of paths per snapshot as a vector              |
+| `.empty()`    | Returns true if the object contains no channel data           |
+| `.is_valid()` | Returns empty string if valid, otherwise an error message     |
 
 ## Complex member functions:
 - .[[add_paths]]

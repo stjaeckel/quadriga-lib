@@ -52,14 +52,14 @@ void quadriga_lib::calc_cross_polarization_ratio(
 
 ## Outputs:
 - **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
-   Col | Description
-  -----|-------------
-   0 | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)
-   1 | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)
-   2 | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)
-   3 | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol)
-   4 | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)
-   5 | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)
+   | Col | Description                                                     |
+   | --- | --------------------------------------------------------------- |
+   | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
+   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
+   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
+   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
 - **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
   `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 MD!*/

@@ -164,13 +164,12 @@ void quadriga_lib::quantize_delays(
 - **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:<br>
-
-  | Value | Meaning |
-  |-------|---------|
-  | 0 | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]` |
-  | 1 | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot |
-  | 2 | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
-  | 3 | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]` |
+  | Value | Meaning                                                                                                                               |
+  | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+  | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]`                                                                     |
+  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot                 |
+  | 2     | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
+  | 3     | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]`                                                             |
 
 ## Outputs:
 - **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`

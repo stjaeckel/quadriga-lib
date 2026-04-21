@@ -1,8 +1,8 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.11.1"
+title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
 date: "21.04.2026"
-lang: en-EN
+lang: en-US
 ---
 
 # General usage notes
@@ -63,44 +63,44 @@ Class for storing and manipulating array antenna models
 - `element_pos` is optional (empty = all elements at origin); `coupling_re/im` are optional (empty = identity)
 
 ### Attributes:
-| Attribute | Size | Description |
-|-----------|------|-------------|
-| `arma::Cube<dtype> e_theta_re` | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part |
-| `arma::Cube<dtype> e_theta_im` | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part |
-| `arma::Cube<dtype> e_phi_re`   | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part |
-| `arma::Cube<dtype> e_phi_im`   | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part |
-| `arma::Col<dtype> azimuth_grid` | `[n_azimuth]` | Azimuth angles in rad, in [-pi, pi], sorted |
-| `arma::Col<dtype> elevation_grid` | `[n_elevation]` | Elevation angles in rad, in [-pi/2, pi/2], sorted |
-| `arma::Mat<dtype> element_pos` | `[3, n_elements]` or empty | Element positions in local Cartesian coords |
-| `arma::Mat<dtype> coupling_re` | `[n_elements, n_ports]` | Coupling matrix, real part |
-| `arma::Mat<dtype> coupling_im` | `[n_elements, n_ports]` | Coupling matrix, imaginary part |
-| `dtype center_frequency` | scalar | Center frequency |
+| Attribute                         | Size                                   | Description                                       |
+| --------------------------------- | -------------------------------------- | ------------------------------------------------- |
+| `arma::Cube<dtype> e_theta_re`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, real part               |
+| `arma::Cube<dtype> e_theta_im`    | `[n_elevation, n_azimuth, n_elements]` | E-theta (vertical) field, imaginary part          |
+| `arma::Cube<dtype> e_phi_re`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, real part               |
+| `arma::Cube<dtype> e_phi_im`      | `[n_elevation, n_azimuth, n_elements]` | E-phi (horizontal) field, imaginary part          |
+| `arma::Col<dtype> azimuth_grid`   | `[n_azimuth]`                          | Azimuth angles in rad, in [-pi, pi], sorted       |
+| `arma::Col<dtype> elevation_grid` | `[n_elevation]`                        | Elevation angles in rad, in [-pi/2, pi/2], sorted |
+| `arma::Mat<dtype> element_pos`    | `[3, n_elements]` or empty             | Element positions in local Cartesian coords       |
+| `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                        |
+| `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                   |
+| `dtype center_frequency`          | scalar                                 | Center frequency                                  |
 
 ### Simple member functions:
-| Function | Description |
-|----------|-------------|
-| `.n_elevation()` | Number of elevation angles |
-| `.n_azimuth()` | Number of azimuth angles |
-| `.n_elements()` | Number of antenna elements |
-| `.n_ports()` | Number of ports (columns of coupling matrix) |
-| `.copy()` | Returns a deep copy of the arrayant object |
-| `.reset()` | Clears all data, resetting size to zero |
-| `.is_valid()` | Returns `""` if valid, or an error message string |
+| Function         | Description                                       |
+| ---------------- | ------------------------------------------------- |
+| `.n_elevation()` | Number of elevation angles                        |
+| `.n_azimuth()`   | Number of azimuth angles                          |
+| `.n_elements()`  | Number of antenna elements                        |
+| `.n_ports()`     | Number of ports (columns of coupling matrix)      |
+| `.copy()`        | Returns a deep copy of the arrayant object        |
+| `.reset()`       | Clears all data, resetting size to zero           |
+| `.is_valid()`    | Returns `""` if valid, or an error message string |
 
 ### Complex member functions:
-| Function | Description |
-|----------|-------------|
-| .[append](#append) | Append elements of another arrayant |
-| .[calc_directivity_dBi](#calc_directivity_dBi) | Calculate per-element directivity in dBi |
-| .[combine_pattern](#combine_pattern) | Compute effective patterns from elements, positions, and coupling |
-| .[copy_element](#copy_element) | Copy a single element to one or more destination slots |
-| .[export_obj_file](#export_obj_file) | Export pattern geometry to Wavefront OBJ |
-| .[interpolate](#interpolate) | Interpolate field patterns at given azimuth/elevation angles |
-| .[qdant_write](#qdant_write) | Write arrayant to QDANT file |
-| .[remove_zeros](#remove_zeros) | Remove zero-valued entries from pattern data |
-| .[rotate_pattern](#rotate_pattern) | Rotate pattern and/or polarization via Euler angles |
-| .[set_size](#set_size) | Resize the arrayant to new dimensions |
-| .[is_valid](#is_valid) | Validate arrayant integrity |
+| Function                  | Description                                                       |
+| ------------------------- | ----------------------------------------------------------------- |
+| .[append](#append)               | Append elements of another arrayant                               |
+| .[calc_directivity_dBi](#calc_directivity_dBi) | Calculate per-element directivity in dBi                          |
+| .[combine_pattern](#combine_pattern)      | Compute effective patterns from elements, positions, and coupling |
+| .[copy_element](#copy_element)         | Copy a single element to one or more destination slots            |
+| .[export_obj_file](#export_obj_file)      | Export pattern geometry to Wavefront OBJ                          |
+| .[interpolate](#interpolate)          | Interpolate field patterns at given azimuth/elevation angles      |
+| .[qdant_write](#qdant_write)          | Write arrayant to QDANT file                                      |
+| .[remove_zeros](#remove_zeros)         | Remove zero-valued entries from pattern data                      |
+| .[rotate_pattern](#rotate_pattern)       | Rotate pattern and/or polarization via Euler angles               |
+| .[set_size](#set_size)             | Resize the arrayant to new dimensions                             |
+| .[is_valid](#is_valid)             | Validate arrayant integrity                                       |
 
 ---
 ## .append
@@ -355,13 +355,13 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
 - **`y_deg`** *(optional)* — Rotation around y-axis (tilt) in degrees
 - **`z_deg`** *(optional)* — Rotation around z-axis (heading) in degrees
 - **`usage`** *(optional)* — Rotation mode:
-   Mode | Pattern | Polarization | Grid adjustment
-  ------|---------|--------------|-----------------
-   0    | Yes     | Yes          | Yes
-   1    | Yes     | No           | Yes
-   2    | No      | Yes          | No
-   3    | Yes     | Yes          | No
-   4    | Yes     | No           | No
+   | Mode | Pattern | Polarization | Grid adjustment |
+   | ---- | ------- | ------------ | --------------- |
+   | 0    | Yes     | Yes          | Yes             |
+   | 1    | Yes     | No           | Yes             |
+   | 2    | No      | Yes          | No              |
+   | 3    | Yes     | Yes          | No              |
+   | 4    | Yes     | No           | No              |
 - **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 
@@ -438,10 +438,10 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_concat_multi(
 ### Returns:
 - `std::vector<quadriga_lib::arrayant<dtype>>` with `n_elem1 + n_elem2` elements and `n_ports1 + n_ports2` ports per entry
 - Coupling matrices are assembled block-diagonally — elements from `vec1` connect only to ports from `vec1` and vice versa:
-   Element \ Port | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
-  ----------------|:-------------:|:--------------------:|
-   E1…En1 (vec1)  | C1 block      | 0                    |
-   En1+1…En1+n2 (vec2) | 0        | C2 block             |
+   | Element \ Port      | P1…Pp1 (vec1) | Pp1+1…Pp1+p2 (vec2) |
+   | ------------------- | :-----------: | :-----------------: |
+   | E1…En1 (vec1)       |   C1 block    |          0          |
+   | En1+1…En1+n2 (vec2) |       0       |      C2 block       |
 
 ### See also:
 - [arrayant_is_valid_multi](#arrayant_is_valid_multi) (validation called on both inputs)
@@ -663,14 +663,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`N`** *(optional)* — Number of horizontal elements per panel
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:
-   `pol` | Description | Elements 
-  -------|-------------|----------
-   1 | Vertical polarization | NM 
-   2 | H/V polarization | 2NM 
-   3 | ±45° polarization | 2NM 
-   4 | Vertical, vertical elements combined | N 
-   5 | H/V, vertical elements combined | 2N 
-   6 | ±45°, vertical elements combined | 2N 
+   | `pol` | Description                          | Elements |
+   | ----- | ------------------------------------ | -------- |
+   | 1     | Vertical polarization                | NM       |
+   | 2     | H/V polarization                     | 2NM      |
+   | 3     | ±45° polarization                    | 2NM      |
+   | 4     | Vertical, vertical elements combined | N        |
+   | 5     | H/V, vertical elements combined      | 2N       |
+   | 6     | ±45°, vertical elements combined     | 2N       |
 - **`tilt`** *(optional)* — Electrical downtilt in degrees; applies to `pol` 4–6
 - **`spacing`** *(optional)* — Inter-element spacing within a panel in wavelengths
 - **`Mg`** *(optional)* — Number of vertically stacked panels
@@ -780,11 +780,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1); `[n_beams]`
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:
-   `pol` | Description | Elements 
-  -------|-------------|----------
-   1 | Vertical polarization | NM 
-   2 | H/V polarization | 2NM 
-   3 | ±45° polarization | 2NM 
+   | `pol` | Description           | Elements |
+   | ----- | --------------------- | -------- |
+   | 1     | Vertical polarization | NM       |
+   | 2     | H/V polarization      | 2NM      |
+   | 3     | ±45° polarization     | 2NM      |
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
 - **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees
@@ -1031,38 +1031,38 @@ Class for storing and managing MIMO channel data and metadata across multiple sn
 - Unstructured metadata supported via `par_names` / `par_data`
 
 ### Attributes:
-| Attribute | Size | Description |
-|-----------|------|-------------|
-| `std::string name` | — | Name of the channel object |
-| `arma::Col<dtype> center_frequency` | `[1]`; `[n_snap]`, or `[]` | Center frequency |
-| `arma::Mat<dtype> tx_pos` | `[3, n_snap]` or `[3, 1]` = static | Transmitter positions |
-| `arma::Mat<dtype> rx_pos` | `[3, n_snap]` or `[3, 1]` = static | Receiver positions |
-| `arma::Mat<dtype> tx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Transmitter orientation (Euler angles) |
-| `arma::Mat<dtype> rx_orientation` | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation | Receiver orientation (Euler angles) |
-| `std::vector<arma::Cube<dtype>> coeff_re` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, real part |
-| `std::vector<arma::Cube<dtype>> coeff_im` | per snap `[n_rx, n_tx, n_path]` | Channel coefficients, imaginary part |
-| `std::vector<arma::Cube<dtype>> delay` | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds |
-| `std::vector<arma::Col<dtype>> path_gain` | per snap `[n_path]` | Path gains before antenna pattern |
-| `std::vector<arma::Col<dtype>> path_length` | per snap `[n_path]` | Path lengths TX to RX |
-| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]` | Interleaved polarization transfer matrices |
-| `std::vector<arma::Mat<dtype>> path_angles` | per snap `[n_path, 4]` | Angles {AOD, EOD, AOA, EOA} in rad |
-| `std::vector<arma::Mat<dtype>> path_fbs_pos` | per snap `[3, n_path]` | First-bounce scatterer positions |
-| `std::vector<arma::Mat<dtype>> path_lbs_pos` | per snap `[3, n_path]` | Last-bounce scatterer positions |
-| `std::vector<arma::Col<unsigned>> no_interact` | per snap `[n_path]` | Number of interactions per path |
-| `std::vector<arma::Mat<dtype>> interact_coord` | per snap `[3, sum(no_interact)]` | Interaction point coordinates |
-| `std::vector<std::string> par_names` | — | Names of unstructured metadata fields |
-| `std::vector<std::any> par_data` | — | Unstructured metadata values (string, scalar, matrix, etc.) |
-| `int initial_position` | scalar | 0-based index of the reference snapshot |
+| Attribute                                         | Size                                                            | Description                                                 |
+| ------------------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `std::string name`                                | —                                                               | Name of the channel object                                  |
+| `arma::Col<dtype> center_frequency`               | `[1]`; `[n_snap]`, or `[]`                                      | Center frequency                                            |
+| `arma::Mat<dtype> tx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Transmitter positions                                       |
+| `arma::Mat<dtype> rx_pos`                         | `[3, n_snap]` or `[3, 1]` = static                              | Receiver positions                                          |
+| `arma::Mat<dtype> tx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Transmitter orientation (Euler angles)                      |
+| `arma::Mat<dtype> rx_orientation`                 | `[3, n_snap]`; `[3, 1]` = static, or `[]` = no rotation         | Receiver orientation (Euler angles)                         |
+| `std::vector<arma::Cube<dtype>> coeff_re`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, real part                             |
+| `std::vector<arma::Cube<dtype>> coeff_im`         | per snap `[n_rx, n_tx, n_path]`                                 | Channel coefficients, imaginary part                        |
+| `std::vector<arma::Cube<dtype>> delay`            | per snap `[n_rx, n_tx, n_path]` or `[1, 1, n_path]` = broadcast | Path delays in seconds                                      |
+| `std::vector<arma::Col<dtype>> path_gain`         | per snap `[n_path]`                                             | Path gains before antenna pattern                           |
+| `std::vector<arma::Col<dtype>> path_length`       | per snap `[n_path]`                                             | Path lengths TX to RX                                       |
+| `std::vector<arma::Mat<dtype>> path_polarization` | per snap `[8, n_path]`                                          | Interleaved polarization transfer matrices                  |
+| `std::vector<arma::Mat<dtype>> path_angles`       | per snap `[n_path, 4]`                                          | Angles {AOD, EOD, AOA, EOA} in rad                          |
+| `std::vector<arma::Mat<dtype>> path_fbs_pos`      | per snap `[3, n_path]`                                          | First-bounce scatterer positions                            |
+| `std::vector<arma::Mat<dtype>> path_lbs_pos`      | per snap `[3, n_path]`                                          | Last-bounce scatterer positions                             |
+| `std::vector<arma::Col<unsigned>> no_interact`    | per snap `[n_path]`                                             | Number of interactions per path                             |
+| `std::vector<arma::Mat<dtype>> interact_coord`    | per snap `[3, sum(no_interact)]`                                | Interaction point coordinates                               |
+| `std::vector<std::string> par_names`              | —                                                               | Names of unstructured metadata fields                       |
+| `std::vector<std::any> par_data`                  | —                                                               | Unstructured metadata values (string, scalar, matrix, etc.) |
+| `int initial_position`                            | scalar                                                          | 0-based index of the reference snapshot                     |
 
 ### Simple member functions:
-| Method | Description |
-|---|---|
-| `.n_snap()` | Returns the number of snapshots |
-| `.n_rx()` | Returns number of receive antennas; 0 if coefficients absent |
-| `.n_tx()` | Returns number of transmit antennas; 0 if coefficients absent |
-| `.n_path()` | Returns number of paths per snapshot as a vector |
-| `.empty()` | Returns true if the object contains no channel data |
-| `.is_valid()` | Returns empty string if valid, otherwise an error message |
+| Method        | Description                                                   |
+| ------------- | ------------------------------------------------------------- |
+| `.n_snap()`   | Returns the number of snapshots                               |
+| `.n_rx()`     | Returns number of receive antennas; 0 if coefficients absent  |
+| `.n_tx()`     | Returns number of transmit antennas; 0 if coefficients absent |
+| `.n_path()`   | Returns number of paths per snapshot as a vector              |
+| `.empty()`    | Returns true if the object contains no channel data           |
+| `.is_valid()` | Returns empty string if valid, otherwise an error message     |
 
 ### Complex member functions:
 - .[add_paths](#add_paths)
@@ -1212,19 +1212,19 @@ int quadriga_lib::any_type_id(
 
 ### Returns:
 - Integer type ID of the contained value:
-  ID | Type                       | ID | Type                       | ID | Type
-  ---|----------------------------|----|----------------------------|----|------------------------
-  -2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
-  10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
-  13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
-  20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
-  23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
-  30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
-  33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
-  40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
-  43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
-  50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
-  53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
+  | ID  | Type                      | ID  | Type                   | ID  | Type                      |
+  | --- | ------------------------- | --- | ---------------------- | --- | ------------------------- |
+  | -2  | `no value`                | -1  | `unsupported type`     | 9   | `std::string`             |
+  | 10  | `float`                   | 11  | `double`               | 12  | `unsigned long long int`  |
+  | 13  | `long long int`           | 14  | `unsigned int`         | 15  | `int`                     |
+  | 20  | `arma::Mat<float>`        | 21  | `arma::Mat<double>`    | 22  | `arma::Mat<arma::uword>`  |
+  | 23  | `arma::Mat<arma::sword>`  | 24  | `arma::Mat<unsigned>`  | 25  | `arma::Mat<int>`          |
+  | 30  | `arma::Cube<float>`       | 31  | `arma::Cube<double>`   | 32  | `arma::Cube<arma::uword>` |
+  | 33  | `arma::Cube<arma::sword>` | 34  | `arma::Cube<unsigned>` | 35  | `arma::Cube<int>`         |
+  | 40  | `arma::Col<float>`        | 41  | `arma::Col<double>`    | 42  | `arma::Col<arma::uword>`  |
+  | 43  | `arma::Col<arma::sword>`  | 44  | `arma::Col<unsigned>`  | 45  | `arma::Col<int>`          |
+  | 50  | `arma::Row<float>`        | 51  | `arma::Row<double>`    | 52  | `arma::Row<arma::uword>`  |
+  | 53  | `arma::Row<arma::sword>`  | 54  | `arma::Row<unsigned>`  | 55  | `arma::Row<int>`          |
 
 ### See also:
 - [hdf5_read_dset](#hdf5_read_dset) (uses `any_type_id` to read dataset from HDF5 file)
@@ -1731,10 +1731,10 @@ void quadriga_lib::qrt_file_read(
 - **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
-   `normalize_M` | `M` | `path_gain`
-  ---|---|---
-   0 | As stored in QRT file | -FSPL
-   1 | Max column power = 1 | -FSPL minus material losses
+   | `normalize_M` | `M`                   | `path_gain`                 |
+   | ------------- | --------------------- | --------------------------- |
+   | 0             | As stored in QRT file | -FSPL                       |
+   | 1             | Max column power = 1  | -FSPL minus material losses |
 
 ### Outputs:
 - **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`
@@ -1833,13 +1833,12 @@ void quadriga_lib::quantize_delays(
 - **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
 - **`fix_taps`** *(optional)* — Delay grid sharing mode:
-
-  | Value | Meaning |
-  |-------|---------|
-  | 0 | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]` |
-  | 1 | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot |
-  | 2 | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
-  | 3 | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]` |
+  | Value | Meaning                                                                                                                               |
+  | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
+  | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]`                                                                     |
+  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps]`, identical for every snapshot                 |
+  | 2     | Per snapshot; output delays `[1, 1, n_taps]`, but each snapshot has its own independent tap grid — taps do not align across snapshots |
+  | 3     | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps]`                                                             |
 
 ### Outputs:
 - **`coeff_re_quant`** — Output coefficients, real part; vector of length `n_snap`, each cube `[n_rx, n_tx, n_taps]`
@@ -2372,14 +2371,14 @@ void quadriga_lib::calc_cross_polarization_ratio(
 
 ### Outputs:
 - **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:
-   Col | Description
-  -----|-------------
-   0 | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)
-   1 | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)
-   2 | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)
-   3 | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol)
-   4 | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)
-   5 | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)
+   | Col | Description                                                     |
+   | --- | --------------------------------------------------------------- |
+   | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
+   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
+   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
+   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
 - **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
   `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 
@@ -2960,14 +2959,14 @@ void generate_diffraction_paths(
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`center_frequency`** — Center frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:
-   `lod` | `n_path` | `n_seg` | Note 
-  -------|----------|---------|------
-   1     | 7        | 3       | 
-   2     | 19       | 3       | 
-   3     | 37       | 4       | 
-   4     | 61       | 5       | 
-   5     | 1        | 2       | debug 
-   6     | 2        | 2       | debug
+   | `lod` | `n_path` | `n_seg` | Note  |
+   | ----- | -------- | ------- | ----- |
+   | 1     | 7        | 3       | -     |
+   | 2     | 19       | 3       | -     |
+   | 3     | 37       | 4       | -     |
+   | 4     | 61       | 5       | -     |
+   | 5     | 1        | 2       | debug |
+   | 6     | 2        | 2       | debug |
 
 ### Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`
@@ -3096,56 +3095,56 @@ arma::uword quadriga_lib::obj_file_read(
 - **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
 - **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
 - **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:
-   Index | Property | Range | Default 
-  -------|----------|-------|---------
-   0 | Base Color Red | 0–1 | 0.8 
-   1 | Base Color Green | 0–1 | 0.8 
-   2 | Base Color Blue | 0–1 | 0.8 
-   3 | Transparency (alpha) | 0–1 | 1.0 
-   4 | Roughness | 0–1 | 0.5 
-   5 | Metallic | 0–1 | 0.0 
-   6 | Index of refraction (IOR) | 0–4 | 1.45 
-   7 | Specular IOR adjustment | 0–1 | 0.5 
-   8 | Emission Red | 0–1 | 0.0 
-   9 | Emission Green | 0–1 | 0.0 
-   10 | Emission Blue | 0–1 | 0.0 
-   11 | Sheen | 0–1 | 0.0 
-   12 | Clearcoat | 0–1 | 0.0 
-   13 | Clearcoat roughness | 0–1 | 0.0 
-   14 | Anisotropic | 0–1 | 0.0 
-   15 | Anisotropic rotation | 0–1 | 0.0 
-   16 | Transmission | 0–1 | 0.0
+   | Index | Property                  | Range | Default |
+   | ----- | ------------------------- | ----- | ------- |
+   | 0     | Base Color Red            | 0–1   | 0.8     |
+   | 1     | Base Color Green          | 0–1   | 0.8     |
+   | 2     | Base Color Blue           | 0–1   | 0.8     |
+   | 3     | Transparency (alpha)      | 0–1   | 1.0     |
+   | 4     | Roughness                 | 0–1   | 0.5     |
+   | 5     | Metallic                  | 0–1   | 0.0     |
+   | 6     | Index of refraction (IOR) | 0–4   | 1.45    |
+   | 7     | Specular IOR adjustment   | 0–1   | 0.5     |
+   | 8     | Emission Red              | 0–1   | 0.0     |
+   | 9     | Emission Green            | 0–1   | 0.0     |
+   | 10    | Emission Blue             | 0–1   | 0.0     |
+   | 11    | Sheen                     | 0–1   | 0.0     |
+   | 12    | Clearcoat                 | 0–1   | 0.0     |
+   | 13    | Clearcoat roughness       | 0–1   | 0.0     |
+   | 14    | Anisotropic               | 0–1   | 0.0     |
+   | 15    | Anisotropic rotation      | 0–1   | 0.0     |
+   | 16    | Transmission              | 0–1   | 0.0     |
 
 ### Returns:
 - Number of triangular mesh elements (`n_mesh`)
 
-### Default material table:<br>
-Name                  |         a |        b  |         c |         d |       Att |  max fGHz |
-    ----------------------|-----------|-----------|-----------|-----------|-----------|-----------|
-    vacuum / air          |       1.0 |       0.0 |       0.0 |       0.0 |       0.0 |       100 |
-    textiles              |       1.5 |       0.0 |      5e-5 |      0.62 |       0.0 |       100 |
-    plastic               |      2.44 |       0.0 |   2.33e-5 |       1.0 |       0.0 |       100 |
-    ceramic               |       6.5 |       0.0 |    0.0023 |      1.32 |       0.0 |       100 |
-    sea_water             |      80.0 |     -0.25 |       4.0 |      0.58 |       0.0 |       100 |
-    sea_ice               |       3.2 |    -0.022 |       1.1 |       1.5 |       0.0 |       100 |
-    water                 |      80.0 |     -0.18 |       0.6 |      1.52 |       0.0 |        20 |
-    water_ice             |      3.17 |    -0.005 |    5.6e-5 |       1.7 |       0.0 |        20 |
-    itu_concrete          |      5.24 |       0.0 |    0.0462 |    0.7822 |       0.0 |       100 |
-    itu_brick             |      3.91 |       0.0 |    0.0238 |      0.16 |       0.0 |        40 |
-    itu_plasterboard      |      2.73 |       0.0 |    0.0085 |    0.9395 |       0.0 |       100 |
-    itu_wood              |      1.99 |       0.0 |    0.0047 |    1.0718 |       0.0 |       100 |
-    itu_glass             |      6.31 |       0.0 |    0.0036 |    1.3394 |       0.0 |       100 |
-    itu_ceiling_board     |      1.48 |       0.0 |    0.0011 |     1.075 |       0.0 |       100 |
-    itu_chipboard         |      2.58 |       0.0 |    0.0217 |      0.78 |       0.0 |       100 |
-    itu_plywood           |      2.71 |       0.0 |      0.33 |       0.0 |       0.0 |        40 |
-    itu_marble            |     7.074 |       0.0 |    0.0055 |    0.9262 |       0.0 |        60 |
-    itu_floorboard        |      3.66 |       0.0 |    0.0044 |    1.3515 |       0.0 |       100 |
-    itu_metal             |       1.0 |       0.0 |     1.0e7 |       0.0 |       0.0 |       100 |
-    itu_very_dry_ground   |       3.0 |       0.0 |   0.00015 |      2.52 |       0.0 |        10 |
-    itu_medium_dry_ground |      15.0 |      -0.1 |     0.035 |      1.63 |       0.0 |        10 |
-    itu_wet_ground        |      30.0 |      -0.4 |      0.15 |       1.3 |       0.0 |        10 |
-    itu_vegetation        |       1.0 |       0.0 |    1.0e-4 |       1.1 |       0.0 |       100 |
-    irr_glass             |      6.27 |       0.0 |    0.0043 |    1.1925 |      23.0 |       100 |
+### Default material table:
+| Name                  | a     | b      | c       | d      | Att  | max fGHz |
+  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
+  | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
+  | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
+  | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
+  | ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 100      |
+  | sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 100      |
+  | sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 100      |
+  | water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 20       |
+  | water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 20       |
+  | itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 100      |
+  | itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 40       |
+  | itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 100      |
+  | itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 100      |
+  | itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 100      |
+  | itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 100      |
+  | itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 100      |
+  | itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 40       |
+  | itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 60       |
+  | itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 100      |
+  | itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 100      |
+  | itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 10       |
+  | itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 10       |
+  | itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
+  | itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
+  | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ### See also:
 - [obj_overlap_test](#obj_overlap_test) (for testing mesh geometry)
@@ -3413,23 +3412,23 @@ void quadriga_lib::ray_mesh_interact(
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN, 3]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code; `[n_rayN]`
-   Code | Description
-  ------|---------------------------
-      1 | Single hit, outside→inside
-      2 | Single hit, inside→outside
-      3 | Single hit, inside→outside, total reflection
-      4 | Media-to-media, M2 hit first
-      5 | Media-to-media, M1 hit first
-      6 | Media-to-media, M1 hit first, total reflection
-      7 | Overlapping faces, outside→inside
-      8 | Overlapping faces, inside→outside
-      9 | Overlapping faces, inside→outside, total reflection
-     10 | Edge hit, outside→inside→outside
-     11 | Edge hit, inside→outside→inside
-     12 | Edge hit, inside→outside→inside, total reflection
-     13 | Edge hit, outside→inside
-     14 | Edge hit, inside→outside
-     15 | Edge hit, inside→outside, total reflection
+   | Code  | Description                                         |
+   | :---: | --------------------------------------------------- |
+   |   1   | Single hit, outside→inside                          |
+   |   2   | Single hit, inside→outside                          |
+   |   3   | Single hit, inside→outside, total reflection        |
+   |   4   | Media-to-media, M2 hit first                        |
+   |   5   | Media-to-media, M1 hit first                        |
+   |   6   | Media-to-media, M1 hit first, total reflection      |
+   |   7   | Overlapping faces, outside→inside                   |
+   |   8   | Overlapping faces, inside→outside                   |
+   |   9   | Overlapping faces, inside→outside, total reflection |
+   |  10   | Edge hit, outside→inside→outside                    |
+   |  11   | Edge hit, inside→outside→inside                     |
+   |  12   | Edge hit, inside→outside→inside, total reflection   |
+   |  13   | Edge hit, outside→inside                            |
+   |  14   | Edge hit, inside→outside                            |
+   |  15   | Edge hit, inside→outside, total reflection          |
 
 ### See also:
 - [obj_file_read](#obj_file_read) (for loading `mesh` and `mtl_prop` from OBJ file)

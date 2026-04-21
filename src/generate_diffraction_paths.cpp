@@ -35,14 +35,14 @@ void generate_diffraction_paths(
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`center_frequency`** — Center frequency
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
-   `lod` | `n_path` | `n_seg` | Note 
-  -------|----------|---------|------
-   1     | 7        | 3       | 
-   2     | 19       | 3       | 
-   3     | 37       | 4       | 
-   4     | 61       | 5       | 
-   5     | 1        | 2       | debug 
-   6     | 2        | 2       | debug 
+   | `lod` | `n_path` | `n_seg` | Note  |
+   | ----- | -------- | ------- | ----- |
+   | 1     | 7        | 3       | -     |
+   | 2     | 19       | 3       | -     |
+   | 3     | 37       | 4       | -     |
+   | 4     | 61       | 5       | -     |
+   | 5     | 1        | 2       | debug |
+   | 6     | 2        | 2       | debug |
 
 ## Outputs:
 - **`ray_x`** — x-coordinates of path waypoints (excluding endpoints); `[n_pos, n_path, n_seg-1]`

@@ -502,14 +502,14 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_3GPP(
 - **`N`** *(optional)* — Number of horizontal elements per panel
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:<br><br>
-   `pol` | Description | Elements 
-  -------|-------------|----------
-   1 | Vertical polarization | NM 
-   2 | H/V polarization | 2NM 
-   3 | ±45° polarization | 2NM 
-   4 | Vertical, vertical elements combined | N 
-   5 | H/V, vertical elements combined | 2N 
-   6 | ±45°, vertical elements combined | 2N 
+   | `pol` | Description                          | Elements |
+   | ----- | ------------------------------------ | -------- |
+   | 1     | Vertical polarization                | NM       |
+   | 2     | H/V polarization                     | 2NM      |
+   | 3     | ±45° polarization                    | 2NM      |
+   | 4     | Vertical, vertical elements combined | N        |
+   | 5     | H/V, vertical elements combined      | 2N       |
+   | 6     | ±45°, vertical elements combined     | 2N       |
 - **`tilt`** *(optional)* — Electrical downtilt in degrees; applies to `pol` 4–6
 - **`spacing`** *(optional)* — Inter-element spacing within a panel in wavelengths
 - **`Mg`** *(optional)* — Number of vertically stacked panels
@@ -757,11 +757,11 @@ quadriga_lib::arrayant<dtype> quadriga_lib::generate_arrayant_multibeam(
 - **`weight`** *(optional)* — Per-beam scaling factors (normalized to sum = 1); `[n_beams]`
 - **`center_freq`** *(optional)* — Center frequency
 - **`pol`** *(optional)* — Polarization mode:<br><br>
-   `pol` | Description | Elements 
-  -------|-------------|----------
-   1 | Vertical polarization | NM 
-   2 | H/V polarization | 2NM 
-   3 | ±45° polarization | 2NM 
+   | `pol` | Description           | Elements |
+   | ----- | --------------------- | -------- |
+   | 1     | Vertical polarization | NM       |
+   | 2     | H/V polarization      | 2NM      |
+   | 3     | ±45° polarization     | 2NM      |
 - **`spacing`** *(optional)* — Inter-element spacing in wavelengths
 - **`az_3dB`** *(optional)* — Per-element azimuth 3dB beamwidth in degrees
 - **`el_3dB`** *(optional)* — Per-element elevation 3dB beamwidth in degrees

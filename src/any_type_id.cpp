@@ -33,19 +33,19 @@ int quadriga_lib::any_type_id(
 
 ## Returns:
 - Integer type ID of the contained value:<br><br>
-  ID | Type                       | ID | Type                       | ID | Type
-  ---|----------------------------|----|----------------------------|----|------------------------
-  -2 | `no value`                 | -1 | `unsupported type`         |  9 | `std::string`
-  10 | `float`                    | 11 | `double`                   | 12 | `unsigned long long int`
-  13 | `long long int`            | 14 | `unsigned int`             | 15 | `int`
-  20 | `arma::Mat<float>`         | 21 | `arma::Mat<double>`        | 22 | `arma::Mat<arma::uword>`
-  23 | `arma::Mat<arma::sword>`   | 24 | `arma::Mat<unsigned>`      | 25 | `arma::Mat<int>`
-  30 | `arma::Cube<float>`        | 31 | `arma::Cube<double>`       | 32 | `arma::Cube<arma::uword>`
-  33 | `arma::Cube<arma::sword>`  | 34 | `arma::Cube<unsigned>`     | 35 | `arma::Cube<int>`
-  40 | `arma::Col<float>`         | 41 | `arma::Col<double>`        | 42 | `arma::Col<arma::uword>`
-  43 | `arma::Col<arma::sword>`   | 44 | `arma::Col<unsigned>`      | 45 | `arma::Col<int>`
-  50 | `arma::Row<float>`         | 51 | `arma::Row<double>`        | 52 | `arma::Row<arma::uword>`
-  53 | `arma::Row<arma::sword>`   | 54 | `arma::Row<unsigned>`      | 55 | `arma::Row<int>`
+  | ID  | Type                      | ID  | Type                   | ID  | Type                      |
+  | --- | ------------------------- | --- | ---------------------- | --- | ------------------------- |
+  | -2  | `no value`                | -1  | `unsupported type`     | 9   | `std::string`             |
+  | 10  | `float`                   | 11  | `double`               | 12  | `unsigned long long int`  |
+  | 13  | `long long int`           | 14  | `unsigned int`         | 15  | `int`                     |
+  | 20  | `arma::Mat<float>`        | 21  | `arma::Mat<double>`    | 22  | `arma::Mat<arma::uword>`  |
+  | 23  | `arma::Mat<arma::sword>`  | 24  | `arma::Mat<unsigned>`  | 25  | `arma::Mat<int>`          |
+  | 30  | `arma::Cube<float>`       | 31  | `arma::Cube<double>`   | 32  | `arma::Cube<arma::uword>` |
+  | 33  | `arma::Cube<arma::sword>` | 34  | `arma::Cube<unsigned>` | 35  | `arma::Cube<int>`         |
+  | 40  | `arma::Col<float>`        | 41  | `arma::Col<double>`    | 42  | `arma::Col<arma::uword>`  |
+  | 43  | `arma::Col<arma::sword>`  | 44  | `arma::Col<unsigned>`  | 45  | `arma::Col<int>`          |
+  | 50  | `arma::Row<float>`        | 51  | `arma::Row<double>`    | 52  | `arma::Row<arma::uword>`  |
+  | 53  | `arma::Row<arma::sword>`  | 54  | `arma::Row<unsigned>`  | 55  | `arma::Row<int>`          |
 
 ## See also:
 - [[hdf5_read_dset]] (uses `any_type_id` to read dataset from HDF5 file)
