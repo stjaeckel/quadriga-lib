@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
@@ -31,9 +18,9 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
 
     // Path powers
     arma::vec pw(3);
-    pw(0) = 1.0;  // LOS
-    pw(1) = 0.5;  // NLOS
-    pw(2) = 0.5;  // NLOS
+    pw(0) = 1.0; // LOS
+    pw(1) = 0.5; // NLOS
+    pw(2) = 0.5; // NLOS
 
     // Polarization matrices [8, n_path]
     // LOS: M = {{1,0},{0,-1}} => purely diagonal
@@ -45,8 +32,8 @@ TEST_CASE("calc_cross_polarization_ratio - Basic NLOS XPR")
     M.col(1) = arma::vec({0.9, 0.0, 0.1, 0.0, 0.1, 0.0, 0.8, 0.0});
 
     // NLOS path 2: more cross-pol
-    // M_vv=0.7, M_hv=0.3, M_vh=0.2, M_hh=0.6 (all real)
-    M.col(2) = arma::vec({0.7, 0.0, 0.3, 0.0, 0.2, 0.0, 0.6, 0.0});
+    // NLOS path 2: M_vv=0.7, M_vh=0.2, M_hv=0.3, M_hh=0.6 (all real)
+    M.col(2) = arma::vec({0.7, 0.0, 0.2, 0.0, 0.3, 0.0, 0.6, 0.0});
 
     // Path lengths: LOS = 10.0, NLOS = 12.0, 15.0
     arma::vec pl(3);
@@ -229,9 +216,9 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     arma::vec pw(1);
     pw(0) = 1.0;
 
-    // M_vv = 0.8+0.2j, M_hv = 0.1-0.1j, M_vh = 0.05+0.05j, M_hh = 0.7-0.3j
+    // M_vv = 0.8+0.2j, M_vh = 0.05+0.05j, M_hv = 0.1-0.1j, M_hh = 0.7-0.3j
     arma::mat M(8, 1);
-    M.col(0) = arma::vec({0.8, 0.2, 0.1, -0.1, 0.05, 0.05, 0.7, -0.3});
+    M.col(0) = arma::vec({0.8, 0.2, 0.05, 0.05, 0.1, -0.1, 0.7, -0.3});
 
     arma::vec pl(1);
     pl(0) = 20.0; // NLOS
@@ -245,12 +232,12 @@ TEST_CASE("calc_cross_polarization_ratio - Complex M elements")
     quadriga_lib::calc_cross_polarization_ratio(pv, mv, plv, tx, rx, &xpr, &pg);
 
     // Manual calculation
-    double abs2_vv = 0.8 * 0.8 + 0.2 * 0.2;   // 0.68
-    double abs2_hv = 0.1 * 0.1 + 0.1 * 0.1;   // 0.02
+    double abs2_vv = 0.8 * 0.8 + 0.2 * 0.2;     // 0.68
+    double abs2_hv = 0.1 * 0.1 + 0.1 * 0.1;     // 0.02
     double abs2_vh = 0.05 * 0.05 + 0.05 * 0.05; // 0.005
-    double abs2_hh = 0.7 * 0.7 + 0.3 * 0.3;   // 0.58
+    double abs2_hh = 0.7 * 0.7 + 0.3 * 0.3;     // 0.58
 
-    CHECK(std::abs(pg(0) - 0.5*(abs2_vv + abs2_hv + abs2_vh + abs2_hh)) < 1e-14);
+    CHECK(std::abs(pg(0) - 0.5 * (abs2_vv + abs2_hv + abs2_vh + abs2_hh)) < 1e-14);
     CHECK(std::abs(xpr(0, 1) - abs2_vv / abs2_hv) < 1e-10);
     CHECK(std::abs(xpr(0, 2) - abs2_hh / abs2_vh) < 1e-10);
     CHECK(std::abs(xpr(0, 0) - (abs2_vv + abs2_hh) / (abs2_hv + abs2_vh)) < 1e-10);
@@ -273,7 +260,7 @@ TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
     pw0(1) = 0.5;
     arma::mat M0(8, 2);
     M0.col(0) = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}); // LOS
-    M0.col(1) = arma::vec({0.8, 0.0, 0.2, 0.0, 0.15, 0.0, 0.7, 0.0}); // NLOS
+    M0.col(1) = arma::vec({0.8, 0.0, 0.15, 0.0, 0.2, 0.0, 0.7, 0.0}); // NLOS
     arma::vec pl0(2);
     pl0(0) = 10.0;
     pl0(1) = 14.0;
@@ -284,7 +271,7 @@ TEST_CASE("calc_cross_polarization_ratio - Multiple CIRs with mobile TX/RX")
     pw1(1) = 0.4;
     arma::mat M1(8, 2);
     M1.col(0) = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0}); // LOS
-    M1.col(1) = arma::vec({0.6, 0.0, 0.3, 0.0, 0.25, 0.0, 0.5, 0.0}); // NLOS
+    M1.col(1) = arma::vec({0.6, 0.0, 0.25, 0.0, 0.3, 0.0, 0.5, 0.0}); // NLOS
     arma::vec pl1(2);
     pl1(0) = 10.0;
     pl1(1) = 13.0;
@@ -326,8 +313,8 @@ TEST_CASE("calc_cross_polarization_ratio - Window size effect")
 
     arma::mat M(8, 3);
     M.col(0) = arma::vec({1.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0});
-    M.col(1) = arma::vec({0.9, 0.0, 0.15, 0.0, 0.1, 0.0, 0.85, 0.0}); // Near-LOS
-    M.col(2) = arma::vec({0.7, 0.0, 0.3, 0.0, 0.2, 0.0, 0.6, 0.0});   // NLOS
+    M.col(1) = arma::vec({0.9, 0.0, 0.1, 0.0, 0.15, 0.0, 0.85, 0.0}); // Near-LOS
+    M.col(2) = arma::vec({0.7, 0.0, 0.2, 0.0, 0.3, 0.0, 0.6, 0.0});   // NLOS
 
     arma::vec pl(3);
     pl(0) = 10.0;
@@ -471,7 +458,7 @@ TEST_CASE("calc_cross_polarization_ratio - Float precision")
     pw(1) = 0.5f;
     arma::fmat M(8, 2);
     M.col(0) = arma::fvec({1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f});
-    M.col(1) = arma::fvec({0.8f, 0.0f, 0.2f, 0.0f, 0.15f, 0.0f, 0.7f, 0.0f});
+    M.col(1) = arma::fvec({0.8f, 0.0f, 0.15f, 0.0f, 0.2f, 0.0f, 0.7f, 0.0f});
     arma::fvec pl(2);
     pl(0) = 10.0f;
     pl(1) = 15.0f;
@@ -527,7 +514,7 @@ TEST_CASE("calc_cross_polarization_ratio - Circular XPR with known cross-pol")
     // M_RL: re=(0.5-0.5+0+0.5)=0.5, im=(0-0-0.5-0.5)=-1 => |M_RL|²=(0.25+1)/4=0.3125
     // M_LR: re=(0.5-0.5-0-0.5)=-0.5, im=(0-0+0.5+0.5)=1 => |M_LR|²=(0.25+1)/4=0.3125
     // M_RR: re=(0.5+0.5+0-0.5)=0.5, im=(0+0-0.5+0.5)=0 => |M_RR|²=0.25/4=0.0625
-    double co_circ = 0.5625 + 0.0625;   // 0.625
+    double co_circ = 0.5625 + 0.0625;    // 0.625
     double cross_circ = 0.3125 + 0.3125; // 0.625
     CHECK(std::abs(xpr(0, 3) - co_circ / cross_circ) < 1e-10);
 }
