@@ -1536,7 +1536,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], bank, tilt, head, usage,
    responses.
 </li>
 <li>Frequency response is a Butterworth-style bandpass:
-   <code>H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))</code>,
+   <code>H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))</code>,
    where <code>n = slope_dB_per_octave / 6</code>; -3 dB at the cutoff frequencies.
 </li>
 <li>Sensitivity scales amplitude linearly relative to 85 dB SPL:
@@ -1549,7 +1549,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], bank, tilt, head, usage,
 </li>
 <li>Driver models (<code>driver_type</code>):
 <ul>
-<li><code>piston</code> - circular piston in baffle, <code>D(theta) = 2<i>J1(ka</i>sin theta)/(ka*sin theta)</code>,
+<li><code>piston</code> - circular piston in baffle, <code>D(theta) = 2·J1(ka·sin theta)/(ka·sin theta)</code>,
      rotationally symmetric, narrows with increasing <code>ka</code>
 </li>
 <li><code>horn</code> - separable cosine-power <code>cos^n(angle)</code> with frequency-dependent blend toward omni
@@ -1562,14 +1562,14 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], bank, tilt, head, usage,
 <ul>
 <li><code>monopole</code> - no modification
 </li>
-<li><code>hemisphere</code> - sealed box with baffle-step transition, <code>f_baffle = c/(pi<i>sqrt(W</i>H))</code>
+<li><code>hemisphere</code> - sealed box with baffle-step transition, <code>f_baffle = c/(pi·sqrt(W·H))</code>
 </li>
 <li><code>dipole</code> - figure-8, <code>R = abs(cos(theta_off))</code> with sign inversion in rear hemisphere
 </li>
-<li><code>cardioid</code> - <code>R = 0.5*(1+cos(theta_off))</code>
+<li><code>cardioid</code> - <code>R = 0.5·(1+cos(theta_off))</code>
 </li></ul>
 </li>
-<li>For <code>"horn"</code>, if <code>horn_control_freq = 0</code>, it is auto-derived as <code>f_ctrl = c/(2pi*radius)</code>.
+<li>For <code>"horn"</code>, if <code>horn_control_freq = 0</code>, it is auto-derived as <code>f_ctrl = c/(2pi·radius)</code>.
 </li></ul>
 
 <i>Usage:</i><br>

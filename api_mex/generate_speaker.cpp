@@ -19,7 +19,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
 - Frequency response is a Butterworth-style bandpass:
-  `H(f) = 1/sqrt(1+(f_low/f)^(2n)) * 1/sqrt(1+(f/f_high)^(2n))`,
+  `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
 - Sensitivity scales amplitude linearly relative to 85 dB SPL:
   `sens_lin = 10^((sensitivity - 85) / 20)`.
@@ -27,17 +27,17 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
 - Speed of sound assumed to be 344 m/s.
 - Driver models (`driver_type`):
-  - `piston` - circular piston in baffle, `D(theta) = 2*J1(ka*sin theta)/(ka*sin theta)`,
+  - `piston` - circular piston in baffle, `D(theta) = 2·J1(ka·sin theta)/(ka·sin theta)`,
     rotationally symmetric, narrows with increasing `ka`
   - `horn` - separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni
     below `horn_control_freq`
   - `omni` - frequency-independent omnidirectional pattern.
 - Enclosure models (`radiation_type`):
   - `monopole` - no modification
-  - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi*sqrt(W*H))`
+  - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
-  - `cardioid` - `R = 0.5*(1+cos(theta_off))`
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi*radius)`.
+  - `cardioid` - `R = 0.5·(1+cos(theta_off))`
+- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`.
 
 ## Usage:
 ```
