@@ -18,17 +18,19 @@ SECTION!*/
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, 
+  then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; 
+  if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
 
 ## Declaration:
 ```
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::Col<dtype> *bins = nullptr,
-    arma::Mat<dtype> *Sh = nullptr,
-    arma::Col<dtype> *Sc = nullptr,
+    arma::Mat<dtype> *cdf_per_set = nullptr,
+    arma::Col<dtype> *cdf_avg = nullptr,
     arma::Col<dtype> *mu = nullptr,
     arma::Col<dtype> *sig = nullptr,
     arma::uword n_bins = 201);
@@ -36,12 +38,13 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
 ## Inputs:
 - **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
+  used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
 ## Outputs:
-- **`Sh`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
-- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
+- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 MD!*/
@@ -49,8 +52,8 @@ MD!*/
 template <typename dtype>
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                         arma::Col<dtype> *bins,
-                        arma::Mat<dtype> *Sh,
-                        arma::Col<dtype> *Sc,
+                        arma::Mat<dtype> *cdf_per_set,
+                        arma::Col<dtype> *cdf_avg,
                         arma::Col<dtype> *mu,
                         arma::Col<dtype> *sig,
                         arma::uword n_bins)
@@ -117,15 +120,15 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::uword no_bins = bins_local.n_elem;
     const dtype *p_bins = bins_local.memptr();
 
-    // --- Compute individual CDFs (Sh) ---
+    // --- Compute individual CDFs (cdf_per_set) ---
 
-    // We need the individual CDFs for Sc/mu/sig computation regardless of whether Sh is requested
-    arma::Mat<dtype> Sh_local(no_bins, n_sets, arma::fill::zeros);
+    // We need the individual CDFs for cdf_avg/mu/sig computation regardless of whether cdf_per_set is requested
+    arma::Mat<dtype> cdf_per_set_local(no_bins, n_sets, arma::fill::zeros);
 
     for (arma::uword s = 0; s < n_sets; ++s)
     {
         const dtype *p_col = data.colptr(s);
-        dtype *p_sh = Sh_local.colptr(s);
+        dtype *p_cdf = cdf_per_set_local.colptr(s);
         arma::uword n_valid = 0;
 
         // Compute histogram counts
@@ -143,11 +146,11 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
             // Find the appropriate bin using edge midpoints
             if (val <= p_bins[0])
             {
-                p_sh[0] += (dtype)1.0;
+                p_cdf[0] += (dtype)1.0;
             }
             else if (val >= p_bins[no_bins - 1])
             {
-                p_sh[no_bins - 1] += (dtype)1.0;
+                p_cdf[no_bins - 1] += (dtype)1.0;
             }
             else
             {
@@ -165,9 +168,9 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                 // Assign to nearest bin center
                 dtype edge = (p_bins[lo] + p_bins[hi]) / (dtype)2.0;
                 if (val < edge)
-                    p_sh[lo] += (dtype)1.0;
+                    p_cdf[lo] += (dtype)1.0;
                 else
-                    p_sh[hi] += (dtype)1.0;
+                    p_cdf[hi] += (dtype)1.0;
             }
         }
 
@@ -178,30 +181,30 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
             dtype cumsum = (dtype)0.0;
             for (arma::uword b = 0; b < no_bins; ++b)
             {
-                cumsum += p_sh[b];
-                p_sh[b] = cumsum * inv_n;
+                cumsum += p_cdf[b];
+                p_cdf[b] = cumsum * inv_n;
             }
         }
     }
 
-    if (Sh != nullptr)
-        *Sh = Sh_local;
+    if (cdf_per_set != nullptr)
+        *cdf_per_set = cdf_per_set_local;
 
     // --- Compute averaged CDF, mu, sig ---
 
-    if (Sc != nullptr || mu != nullptr || sig != nullptr)
+    if (cdf_avg != nullptr || mu != nullptr || sig != nullptr)
     {
         if (n_sets == 1)
         {
             // No averaging needed
-            if (Sc != nullptr)
-                *Sc = Sh_local.col(0);
+            if (cdf_avg != nullptr)
+                *cdf_avg = cdf_per_set_local.col(0);
 
             if (mu != nullptr || sig != nullptr)
             {
                 arma::Col<dtype> mu_local(9);
                 arma::Col<dtype> sig_local(9, arma::fill::zeros);
-                const dtype *p_cdf = Sh_local.memptr();
+                const dtype *p_cdf = cdf_per_set_local.memptr();
                 for (arma::uword q = 0; q < 9; ++q)
                 {
                     dtype level = (dtype)(q + 1) * (dtype)0.1;
@@ -247,7 +250,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
                 for (arma::uword s = 0; s < n_sets; ++s)
                 {
-                    const dtype *p_cdf = Sh_local.colptr(s);
+                    const dtype *p_cdf = cdf_per_set_local.colptr(s);
                     // Find first bin where CDF > level
                     arma::uword idx = no_bins - 1;
                     for (arma::uword b = 0; b < no_bins; ++b)
@@ -312,7 +315,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
             }
 
             // Map averaged quantile function back to bin grid
-            if (Sc != nullptr)
+            if (cdf_avg != nullptr)
             {
                 arma::Col<dtype> Sc_local(no_bins);
                 for (arma::uword b = 0; b < no_bins; ++b)
@@ -325,7 +328,7 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
                     }
                     Sc_local(b) = (dtype)count / (dtype)n_vals;
                 }
-                *Sc = Sc_local;
+                *cdf_avg = Sc_local;
             }
         }
     }
@@ -333,16 +336,16 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
 template void quadriga_lib::acdf(const arma::Mat<float> &data,
                                  arma::Col<float> *bins,
-                                 arma::Mat<float> *Sh,
-                                 arma::Col<float> *Sc,
+                                 arma::Mat<float> *cdf_per_set,
+                                 arma::Col<float> *cdf_avg,
                                  arma::Col<float> *mu,
                                  arma::Col<float> *sig,
                                  arma::uword n_bins);
 
 template void quadriga_lib::acdf(const arma::Mat<double> &data,
                                  arma::Col<double> *bins,
-                                 arma::Mat<double> *Sh,
-                                 arma::Col<double> *Sc,
+                                 arma::Mat<double> *cdf_per_set,
+                                 arma::Col<double> *cdf_avg,
                                  arma::Col<double> *mu,
                                  arma::Col<double> *sig,
                                  arma::uword n_bins);
