@@ -7,7 +7,7 @@
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD

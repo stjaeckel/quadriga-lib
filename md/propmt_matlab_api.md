@@ -1,5 +1,20 @@
 You are implementing a lightweight API wrapper for MATLAB mex to call my C++ radio channel modelling library (quadriga-lib). You will receive a documentation block for the C++ API. Your task is to implement the mex wrapper function in MATLAB that correctly calls the C++ function, handles input and output arguments, and ensures proper memory management. The mex function should be designed to be user-friendly for MATLAB users while maintaining the performance benefits of the underlying C++ library.
 
+# CPP API DOCUMENTATION BLOCK FORMAT
+- Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.
+- Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
+- All functions and classes live in the `quadriga_lib` namespace.
+- Default include: `#include "quadriga_lib.hpp"`.
+- Template parameter `dtype` is `float` or `double` unless stated.
+- Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.
+- Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
+- Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
+- Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
+- Index conventions: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
+- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
+- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
+- Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
+
 # IMPLEMENTATION GUIDELINES
 - The mex function should be named according to the C++ function it wraps, so quadriga_lib::function_name should be wrapped by a mex function named "function_name.cpp".
 - All wrappers are called from the +quadriga_lib package which will be populated by the build system, so the user calls quadriga_lib.function_name from MATLAB, which maps to function_name.cpp in the source code. 
@@ -30,13 +45,11 @@ You are implementing a lightweight API wrapper for MATLAB mex to call my C++ rad
 #include "mex_helper_functions.hpp"
 ```
 
-## Helper functions and macros
-
+## Helper functions signatures
 - Quadriga-Lib uses Armadillo for data structures, Armadillo headers are pulled in by quadriga_lib.hpp, so you can use Armadillo types directly in the mex wrapper
 - Conversion from MEX to Armadillo can be done by calling the helper functions in mex_helper_functions.hpp. 
 
-HELPER FUNCTION SIGNATURES:
-
+```
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "", dtype default_value = dtype(NAN));
 std::string qd_mex_get_string(const mxArray *input, std::string default_value = "");
 
@@ -45,6 +58,10 @@ arma::Mat<dtype> qd_mex_get_Mat(const mxArray *input, bool copy = false);
 arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false);
 
 std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input);
+
+std::vector<arma::Col<dtype>> qd_mex_matlab2vector_Col(const mxArray *input, size_t vec_dim);
+std::vector<arma::Mat<dtype>> qd_mex_matlab2vector_Mat(const mxArray *input, size_t vec_dim);
+std::vector<arma::Cube<dtype>> qd_mex_matlab2vector_Cube(const mxArray *input, size_t vec_dim);
 
 mxArray *qd_mex_copy2matlab(const dtype *input); // Scalar
 mxArray *qd_mex_copy2matlab(const arma::Row<dtype> *input); // Row Vector
@@ -66,12 +83,23 @@ mxArray *qd_mex_copy2matlab(const std::vector<std::string> *strings); // Cell ar
 
 mxArray *qd_mex_copy2matlab(const std::vector<bool> *bools); // Logical array (column vector)
 
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Col<dtype>> *input, 
+        size_t ns = 0, const size_t *is = nullptr,d dtype padding = (dtype)0);
+
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input, 
+        size_t ns = 0, const size_t *is = nullptr,d dtype padding = (dtype)0);
+
+mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input, 
+        size_t ns = 0, const size_t *is = nullptr,d dtype padding = (dtype)0)
+
 mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem);
 mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool transpose = false); 
 mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols);
 mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size_t n_cols, size_t n_slices); 
+```
 
-CALL_QD MACRO:
+## CALL_QD Macro
+- Use the CALL_QD macro to call the C++ function and catch any exceptions
 
 #define CALL_QD(expr)                                              \
     do                                                             \
@@ -105,7 +133,7 @@ SECTION!*/
 - It should closely match the C++ documentation block, with MATLAB-specific adjustments
 - 1-line summary should be identical to the C++ documentation block
 - Description should be adapted to MATLAB users, e.g. by removing C++-specific details and adding MATLAB-specific usage notes if needed. 
-- It should be in bullet point format, with one concise fact per bullet.
+- It should be in bullet point format, with one concise fact per bullet
 - Lines longer than 100 characters need to be split into multiple lines for better readability, and indent the continued lines by 2 spaces. 
 - You can omit any dtype specifications in the documentation block, as they are not relevant for the MATLAB user. All C++ functions that have a dtype specialization are wrapped with the double version in MATLAB.
 - Instead of the "## Declaration:" section, use a "## Usage:" section that includes the function signature as it should be called from MATLAB, such as:
@@ -116,10 +144,11 @@ SECTION!*/
     ```
 
 - Split the usage block "..." into multiple lines if it exceeds 100 characters, and indent the continued lines by 4 spaces.
-- Input and output arguments should be described in separate sections "## Input Arguments:" and "## Output Arguments:", with the same one-liner style as in the C++ documentation block.
+- Inputs and outputs should be described in separate sections "## Inputs:" and "## Outputs:", with the same one-liner style as in the C++ documentation block.
 - Optional input arguments (C++: const type *name = nullptr) should be marked with "(optional)" directly after the argument name, they are also optional in MATLAB, and the user can simply omit them when calling the function, or provide them as empty arrays (e.g. `[]`) if they want to use the default behavior.
 - Default input values must be added to the argument description as they are not obvious from the declaration, e.g. "; default: 0"
 - Datatypes must only be specified when not `double`
+- Unit must only be specified when not SI (meters, radians, Hz, linear scale), e.g. "angles in degrees", "power in dB"
 - C++ returns get merged into the output arguments section
 - Break lines (in arguments) longer than 100 characters into multiple lines for better readability, and indent the continued lines by 2 spaces.
 
@@ -150,6 +179,18 @@ const auto data = qd_mex_get_Cube<dtype>(prhs[0]);
 - Always assume `copy = false` for input arguments and add const qualifier
 - Adjust the name to match the c++ variable name, and the dtype to match the expected type in the C++ function (e.g. double)
 - dtype can be one of: float, double, int, unsigned, long long, unsigned long long
+
+### std::vector of Armadillo types
+- The C++ function may expect a std::vector of Armadillo types (used for variable-length lists of arrays), e.g. `std::vector<arma::Mat<dtype>>`
+- There are specific helper functions for these types, e.g.:
+```
+const auto data = qd_mex_matlab2vector_Col<dtype>(prhs[0], 1);
+const auto data = qd_mex_matlab2vector_Mat<dtype>(prhs[0], 1);
+const auto data = qd_mex_matlab2vector_Cube<dtype>(prhs[0], 1);
+```
+- dtype can be one of: float, double, int, unsigned, long long, unsigned long long
+- The second argument indicates the dimension used for std::vector, 0-based
+- The input should be a mxArray, missing valued get zero-padded, and the function returns a std::vector of Armadillo types
 
 ### Optional array types
 - Optional array types should be wrapped and mapped to an empty Armadillo type if the input is empty, e.g.:
@@ -213,6 +254,16 @@ if (nlhs > 0)
 - Supports std::vector<std::string> *strings - returned as cell array of strings in MATLAB
 - Supports std::vector<bool> *bools - returned as logical array (Col-vector) in MATLAB
 - prefer init_output when size is known by the wrapper, fall back to copy2matlab when size depends on the C++ call's runtime behavior
+
+### std::vector of Armadillo types
+- If the C++ function returns a std::vector of Armadillo types, use the following helper functions to copy them to MATLAB:
+```
+if (nlhs > 0)
+    plhs[0] = qd_mex_vector2matlab(&std_vector_or_arma_object);
+```
+- Supported are: std::vector of arma::Col, arma::Mat, arma::Cube
+- Optional inputs ns, is should be ignored
+- Data is zero-padded to the maximum size in the vector, so that the output is a regular ND array e.g. 3D for std::vector<arma::Mat> 
 
 ## Pointer wrapper
 - The c++ function might accept `nullptr` for optional inputs and outputs

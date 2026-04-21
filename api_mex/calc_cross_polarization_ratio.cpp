@@ -1,121 +1,95 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
-#include "quadriga_lib.hpp"
+#include "quadriga_tools.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
-# calc_cross_polarization_ratio
+# CALC_CROSS_POLARIZATION_RATIO
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
-## Description:
-- Computes the aggregate cross-polarization ratio (XPR) from the polarization transfer matrices
-  of all channel impulse responses (CIRs) using the total-power-ratio method.
-- For each CIR, the total co-polarized and cross-polarized received powers are accumulated
-  across all qualifying paths, and the XPR is obtained as a single ratio of the totals.
-- In addition to the linear V/H basis, the XPR is also computed in the circular LHCP/RHCP basis.
-- The LOS path is identified by comparing each path's absolute length against the direct
-  TX-RX distance. All paths with `path_length < dTR + window_size` are excluded by default.
-- If the total cross-polarized power is zero, the XPR is set to 0 (undefined).
+- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio
+  method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and
+  XPR is their ratio
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the
+  Jones matrix transform `M_circ = T * M_lin * T^-1`
+- LOS paths are identified by comparing path length against the direct TX-RX distance
+  `dTR`; paths with `path_length < dTR + window_size` are excluded by default
+- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary
+  parts, 8 rows per path:
+  `[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]`
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are
+  zero, XPR is set to 0
+- TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 
 ## Usage:
 ```
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos )
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los )
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size )
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, ...
+    tx_pos, rx_pos, include_los, window_size );
 ```
 
-## Input Arguments:
-- **`powers`** (required)<br>
-  Path powers in Watts. A 2D matrix of size `[n_path_max, n_cir]` where columns are zero-padded
-  if CIRs have different numbers of paths. Alternatively, for a single CIR, a column vector of
-  length `[n_path]`.
+## Inputs:
+- **`powers`** — Path powers in [W]; `[n_path, n_cir]`
+- **`M`** — Polarization transfer matrices with interleaved real/imag parts; `[8, n_path, n_cir]`
+- **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, n_cir]`
+- **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
+- **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
+- **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR
+  calculation; default: false
+- **`window_size`** *(optional)* — LOS exclusion window; paths within `dTR + window_size`
+  are excluded when `include_los = false`; default: 0.01
 
-- **`M`** (required)<br>
-  Polarization transfer matrices. A 3D array of size `[8, n_path_max, n_cir]` with interleaved
-  real/imaginary parts in column-major order.
-
-- **`path_length`** (required)<br>
-  Absolute path length from TX to RX in meters. A 2D matrix of size `[n_path_max, n_cir]`.
-
-- **`tx_pos`** (required)<br>
-  Transmitter position in Cartesian coordinates. Size `[3, 1]` (fixed) or `[3, n_cir]` (mobile).
-
-- **`rx_pos`** (required)<br>
-  Receiver position in Cartesian coordinates. Size `[3, 1]` (fixed) or `[3, n_cir]` (mobile).
-
-- **`include_los`** (optional)<br>
-  Logical flag. If `true`, include LOS paths in XPR calculation. Default: `false`.
-
-- **`window_size`** (optional)<br>
-  LOS window size in meters. Default: `0.01`.
-
-## Output Arguments:
-- **`xpr`** (optional)<br>
-  Cross-polarization ratio in linear scale. Size `[n_cir, 6]` (double).<br>
-  Columns: 1=aggregate linear, 2=V-XPR, 3=H-XPR, 4=aggregate circular, 5=LHCP, 6=RHCP.
-
-- **`pg`** (optional)<br>
-  Total path gain over all paths (including LOS). Column vector of length `[n_cir]` (double).
+## Outputs:
+- **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
+   | Col | Description                                                     |
+   | --- | --------------------------------------------------------------- |
+   | 1   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
+   | 2   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
+   | 3   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 4   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+   | 5   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
+   | 6   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
+- **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
+  `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // --- Validate argument counts ---
-    if (nrhs < 5)
+    // Validate argument counts
+    if (nrhs < 5 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // --- Read required inputs ---
-    // powers: split 2D matrix [n_path_max, n_cir] into vector of columns
-    std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
+    // Read inputs
+    const std::vector<arma::vec> powers = qd_mex_matlab2vector_Col<double>(prhs[0], 1);
+    const std::vector<arma::mat> M = qd_mex_matlab2vector_Mat<double>(prhs[1], 2);
+    const std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
+    const arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
+    const arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
 
-    // M: split 3D array [8, n_path_max, n_cir] into vector of matrices
-    std::vector<arma::mat> M = qd_mex_matlab2vector_Mat<double>(prhs[1], 2);
+    const bool include_los = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "include_los", false);
+    const double window_size = (nrhs < 7) ? 0.01 : qd_mex_get_scalar<double>(prhs[6], "window_size", 0.01);
 
-    // path_length: split 2D matrix [n_path_max, n_cir] into vector of columns
-    std::vector<arma::vec> path_length = qd_mex_matlab2vector_Col<double>(prhs[2], 1);
-
-    // tx_pos, rx_pos
-    arma::mat tx_pos = qd_mex_get_Mat<double>(prhs[3]);
-    arma::mat rx_pos = qd_mex_get_Mat<double>(prhs[4]);
-
-    // --- Read optional inputs ---
-    bool include_los = (nrhs < 6) ? false : qd_mex_get_scalar<bool>(prhs[5], "include_los", false);
-    double window_size = (nrhs < 7) ? 0.01 : qd_mex_get_scalar<double>(prhs[6], "window_size", 0.01);
-
-    // --- Declare outputs ---
+    // Declare outputs
     arma::mat xpr;
     arma::vec pg;
 
     arma::mat *p_xpr = (nlhs > 0) ? &xpr : nullptr;
     arma::vec *p_pg = (nlhs > 1) ? &pg : nullptr;
 
-    // --- Call library function ---
+    // Call library function
     CALL_QD(quadriga_lib::calc_cross_polarization_ratio<double>(
         powers, M, path_length, tx_pos, rx_pos, p_xpr, p_pg, include_los, window_size));
 
-    // --- Write outputs ---
+    // Write outputs
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&xpr);
 
