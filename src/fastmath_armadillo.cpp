@@ -246,12 +246,6 @@ void quadriga_lib::fast_atan2(const arma::Col<dtype> &y, const arma::Col<dtype> 
     const dtype * Xa = x.memptr();
     float * Aa = a.memptr();
 
-    // Check for aliasing
-    const void *inputs[] = {static_cast<const void *>(Ya), static_cast<const void *>(Xa)};
-    for (auto iv : inputs)
-        if (iv == static_cast<const void *>(Aa))
-            throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
-
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check())
     {
@@ -278,7 +272,6 @@ Compute elementwise approximate SLERP interpolation between two complex-valued v
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
 - If both input amplitudes are negligible, output is zero
 - Max error vs. double-precision reference: ~5 ULP
-- Output Xr and Xi cannot alias each other
 - AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
 
 ## Declaration:
@@ -332,16 +325,6 @@ void quadriga_lib::fast_slerp(const arma::Col<dtype> &Ar, const arma::Col<dtype>
     const dtype * pw = w.memptr();
     float * pXr = Xr.memptr();
     float * pXi = Xi.memptr();
-
-    // Check for aliasing between any input and any output
-    const void *inputs[] = {pAr, pAi, pBr, pBi, pw};
-    const void *outputs[] = {pXr, pXi};
-    for (auto iv : inputs)
-        for (auto ov : outputs)
-            if (iv == ov)
-                throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
-    if (pXr == pXi)
-        throw std::invalid_argument("Output Xr and Xi cannot be the same buffer.");
 
 #if BUILD_WITH_AVX2
     if (runtime_AVX2_Check())
@@ -507,7 +490,6 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1
 - All inputs must have the same length
-- In-place and output-output aliasing not allowed (x/y/z cannot alias az, el, or len; az, el, and len cannot alias each other)
 - AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full `dtype` precision
 
 ## Declaration:
@@ -577,16 +559,6 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
     dtype * pAZ = az.memptr();
     dtype * pEL = el.memptr();
     dtype * pLEN = len ? len->memptr() : nullptr;
-
-    // Aliasing check
-    const void *inputs[] = {pX, pY, pZ};
-    const void *outputs[] = {pAZ, pEL, pLEN};
-    for (auto iv : inputs)
-        for (auto ov : outputs)
-            if (ov && iv == ov)
-                throw std::invalid_argument("Input and output cannot be the same (in-place operation not allowed).");
-    if (pAZ == pEL || (pLEN && (pAZ == pLEN || pEL == pLEN)))
-        throw std::invalid_argument("Outputs az, el, and len cannot share buffers.");
 
 #if BUILD_WITH_AVX2
     if (kernel == 2)
