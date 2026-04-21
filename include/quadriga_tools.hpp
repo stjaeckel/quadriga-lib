@@ -28,13 +28,13 @@ namespace quadriga_lib
     // Individual CDFs are computed per column. An averaged CDF is obtained by
     // quantile-space averaging. Inf and NaN values are excluded.
     template <typename dtype>
-    void acdf(const arma::Mat<dtype> &data,     // Input data, Size [n_samples, n_sets]
-              arma::Col<dtype> *bins = nullptr, // Bin centers (in/out), Length [n_bins]
-              arma::Mat<dtype> *Sh = nullptr,   // Individual CDFs, Size [n_bins, n_sets]
-              arma::Col<dtype> *Sc = nullptr,   // Averaged CDF, Length [n_bins]
-              arma::Col<dtype> *mu = nullptr,   // Mean 0.1-0.9 quantiles, Length [9]
-              arma::Col<dtype> *sig = nullptr,  // Std of 0.1-0.9 quantiles, Length [9]
-              arma::uword n_bins = 201);        // Number of auto-generated bins
+    void acdf(const arma::Mat<dtype> &data,            // Input data, Size [n_samples, n_sets]
+              arma::Col<dtype> *bins = nullptr,        // Bin centers (in/out), Length [n_bins]
+              arma::Mat<dtype> *cdf_per_set = nullptr, // Individual CDFs, Size [n_bins, n_sets]
+              arma::Col<dtype> *cdf_avg = nullptr,     // Averaged CDF, Length [n_bins]
+              arma::Col<dtype> *mu = nullptr,          // Mean 0.1-0.9 quantiles, Length [9]
+              arma::Col<dtype> *sig = nullptr,         // Std of 0.1-0.9 quantiles, Length [9]
+              arma::uword n_bins = 201);               // Number of auto-generated bins
 
     // Calculate the RMS delay spread in [s]
     // Returns: RMS delay spread, size: [ n_cir ]

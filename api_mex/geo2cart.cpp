@@ -14,7 +14,6 @@ SECTION!*/
 # GEO2CART
 Convert elementwise azimuth/elevation angles to Cartesian coordinates
 
-## Description:
 - Conversion: `x = cos(el) cos(az) len`, `y = cos(el) sin(az) len`, `z = sin(el) len`
 - Optional outputs `sAZ`, `cAZ`, `sEL`, `cEL` return intermediate sin/cos values; omit from the
   output list to skip their computation
@@ -32,7 +31,7 @@ split = false;
 cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** *(optional)* — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
@@ -42,7 +41,7 @@ cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
   matrices. If false, return a single combined `[3, n, m]` cube; sin/cos outputs unavailable
   in this mode; default: false
 
-## Output Arguments:
+## Outputs:
 - **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube
   with components along the first dim, `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty

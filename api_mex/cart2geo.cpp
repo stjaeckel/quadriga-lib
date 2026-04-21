@@ -14,7 +14,6 @@ SECTION!*/
 # CART2GEO
 Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-## Description:
 - Computes: `len = sqrt(x² + y² + z²)`, `az = atan2(y, x)`, `el = asin(clamp(z / len, -1, 1))`
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - `z/len` is clamped to [-1, 1] before `asin` to guard against `len == 0` and rounding artifacts
@@ -26,14 +25,14 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 [ az, el, len ] = quadriga_lib.cart2geo( x, y, z, use_kernel );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`x`** — X-coordinates or combined input; `[n, m]` or `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty
 - **`z`** — Z-coordinates; `[n, m]` or empty
 - **`use_kernel`** *(optional)* — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
 
-## Output Arguments:
+## Outputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
 - **`len`** *(optional)* — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`

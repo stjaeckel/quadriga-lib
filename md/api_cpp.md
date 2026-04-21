@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.1"
 author: "Stephan Jaeckel"
-date: "20.04.2026"
+date: "21.04.2026"
 lang: en-EN
 ---
 
@@ -174,7 +174,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 Copy a single antenna element to one or more destination slots
 
 - Array is resized if any destination index exceeds the current number of elements
-- Coupling matrix for added elements is set to identity; if not exisiting, it get initialized to identity
+- Coupling matrix for added elements is set to identity; if not existing, it gets initialized to identity
 
 ### Declaration:
 ```
@@ -214,7 +214,7 @@ void quadriga_lib::arrayant<dtype>::export_obj_file(
 - **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh, see [icosphere](#icosphere)
 - **`i_element`** *(optional)* — 0-based element indices to export; `{}` exports all elements
 
-See also:
+### See also:
 - [colormap](#colormap) (Used for setting the colormap)
 - [icosphere](#icosphere) (Used internally to generate icosphere primitive)
 - .[write_paths_to_obj_file](#write_paths_to_obj_file) (function of Channel class to export propagation paths to OBJ 3D visualization)
@@ -362,7 +362,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
    2    | No      | Yes          | No
    3    | Yes     | Yes          | No
    4    | Yes     | No           | No
-- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 relies on wrap-around to UINT_MAX as a sentinel
+- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 
 ### See also:
@@ -1355,7 +1355,7 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`hmat_re`** — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
 - **`hmat_im`** — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
 
-# See also:
+### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot variant)
 - [baseband_freq_response_multi](#baseband_freq_response_multi) (multi-freq counterpart)
 
@@ -2259,17 +2259,19 @@ void quadriga_lib::get_channels_spherical(
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, then mapped back to the bin grid
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged, 
+  then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
-- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
+- If `bins` points to an empty vector, equally spaced bins spanning the data range are generated and stored back; 
+  if non-empty, those bin centers are used; if `nullptr`, bins are auto-generated internally
 
 ### Declaration:
 ```
 void quadriga_lib::acdf(const arma::Mat<dtype> &data,
     arma::Col<dtype> *bins = nullptr,
-    arma::Mat<dtype> *Sh = nullptr,
-    arma::Col<dtype> *Sc = nullptr,
+    arma::Mat<dtype> *cdf_per_set = nullptr,
+    arma::Col<dtype> *cdf_avg = nullptr,
     arma::Col<dtype> *mu = nullptr,
     arma::Col<dtype> *sig = nullptr,
     arma::uword n_bins = 201);
@@ -2277,12 +2279,13 @@ void quadriga_lib::acdf(const arma::Mat<dtype> &data,
 
 ### Inputs:
 - **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
-- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
+- **`bins`** *(optional)* — Bin centers; auto-generated and stored back if pointing to empty vector, 
+  used as-is if non-empty, ignored if `nullptr`; `[n_bins]`
 - **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when non-empty bins are provided
 
 ### Outputs:
-- **`Sh`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
-- **`Sc`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
+- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data; `[n_bins, n_sets]`
+- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
 - **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
 - **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
 
@@ -3479,7 +3482,7 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 ## ray_triangle_intersect
 Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
-- Counts the total number of intersection between `orig` and `dest`
+- Counts the total number of intersections between `orig` and `dest`
 - Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
 - Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has `double` support
 
