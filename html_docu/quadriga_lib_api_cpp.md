@@ -872,15 +872,15 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band below 
   `lower_cutoff` to one band above `upper_cutoff`, clipped to 20–20000 Hz.
 - Speed of sound assumed to be 344 m/s.
-- **Driver models** (`driver_type`): 
-  `"piston"` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`; 
-  `"horn"` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`; 
-  `"omni"` — frequency-independent omnidirectional pattern.
-- **Enclosure models** (`radiation_type`): 
-  `"monopole"` — no modification; 
-  `"hemisphere"` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W*H))`; 
-  `"dipole"` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere; 
-  `"cardioid"` — `R = 0.5·(1+cos(θ_off))`.
+- **Driver models** (`driver_type`):
+  - `piston` — circular piston in baffle, `D(θ) = 2·J1(ka·sinθ)/(ka·sinθ)`, rotationally symmetric, narrows with increasing `ka`
+  - `horn` — separable cosine-power `cos^n(angle)` with frequency-dependent blend toward omni below `horn_control_freq`
+  - `omni` — frequency-independent omnidirectional pattern.
+- **Enclosure models** (`radiation_type`):
+  - `monopole` — no modification
+  - `hemisphere` — sealed box with baffle-step transition, `f_baffle = c/(π·sqrt(W·H))`
+  - `dipole` — figure-8, `R = abs(cos(θ_off))` with sign inversion in rear hemisphere
+  - `cardioid` — `R = 0.5·(1+cos(θ_off))`
 - For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2π·radius)`.
 
 ### Declaration:
