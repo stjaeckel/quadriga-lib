@@ -51,6 +51,7 @@
 <li><a href="#e091e809">Array antenna functions</a></li>
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#6f9553d7">Channel generation functions</a></li>
+<li><a href="#c2d4d113">Channel statistics</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
 <li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 </ul>
@@ -105,15 +106,23 @@
 </table>
 </ul>
 <br>
-<b>Miscellaneous / Tools</b>
+<b>Channel statistics</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
-<tr><td><a href="#calc_angular_spread">calc_angular_spread</a></td><td>Calculate azimuth and elevation angular spread with spherical wrapping</td></tr>
+<tr><td><a href="#calc_angular_spread">calc_angular_spread</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
 <tr><td><a href="#calc_cross_polarization_ratio">calc_cross_polarization_ratio</a></td><td>Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases</td></tr>
-<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculate the RMS delay spread in [s]</td></tr>
+<tr><td><a href="#calc_delay_spread">calc_delay_spread</a></td><td>Calculates RMS delay spread from per-CIR delays and linear-scale powers</td></tr>
 <tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<b>Miscellaneous / Tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculates a 3x3 rotation matrix from a 3-element orientation vector</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
@@ -3521,8 +3530,8 @@ execution of this process, several pieces of input data are required:<br><br>
 <hr class="greyline">
 <br>
 <br>
-<a name="b11e2d16"></a>
-<font size=+1><b>Miscellaneous / Tools</b></font>
+<a name="c2d4d113"></a>
+<font size=+1><b>Channel statistics</b></font>
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -3561,262 +3570,214 @@ execution of this process, several pieces of input data are required:<br><br>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_angular_spread"></a>
-<b>calc_angular_spread</b> - Calculate azimuth and elevation angular spread with spherical wrapping
-<br><br>
-<i>Description:</i><br>
-<ul><li>Calculates the RMS azimuth and elevation angular spread from a set of power-weighted angles. 
-</li><li>Inputs and outputs for angles and powers are provided as 2D matrices where each column 
-   represents a CIR (internally converted to vectors of column vectors to allow variable path 
-   counts per CIR when called from C++). 
-</li><li>Uses optional spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean 
-   direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies 
-   on the equator before computing spreads. 
-</li><li>Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread 
-   despite energy being focused into a small solid angle). This method corrects for that. 
-</li><li>Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes 
-   elevation spread, corresponding to the principal axes of the angular power distribution. 
-</li><li>Setting <code>wrapping</code> to true enables spherical wrapping. 
+<b>calc_angular_spread</b> - Calculate azimuth and elevation angular spreads with spherical wrapping
+<div style="margin-bottom: 1.5em;">
+<ul><li>Computes RMS azimuth and elevation angular spreads from power-weighted angles; each column 
+   of <code>az</code>/<code>el</code>/<code>powers</code> is one CIR; zero-power paths can be used to pad CIRs with fewer paths 
+</li><li>RMS spread formula: <code>sqrt(sum(pw .* d^2))</code> where <code>d</code> are wrapped deviations from the 
+   circular mean (3GPP TR 38.901 second-moment definition) 
+</li><li>When <code>wrapping = true</code>, the power-weighted mean direction is computed in Cartesian 
+   coordinates and all paths are rotated so the centroid lies on the equator before computing 
+   spreads, avoiding pole singularity artifacts 
+</li><li>When <code>wrapping = false</code>, spreads are computed directly from raw angles; <code>orientation</code> is 
+   zero and <code>phi</code>/<code>theta</code> equal the input <code>az</code>/<code>el</code> 
+</li><li>When <code>calc_bank_angle = true</code>, an optimal bank angle maximizing azimuth spread is derived 
+   analytically from eigenvectors of the 2x2 power-weighted covariance matrix of centered 
+   angles; only used when <code>wrapping = true</code> 
+</li><li>When <code>quantize &gt; 0</code>, paths within that angular distance are grouped and their powers 
+   summed before computing spreads 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-[ as, es ] = quadriga_lib.calc_angular_spread( az, el, powers );
-[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize );
+[ as, es, orientation, phi, theta ] = quadriga_lib.calc_angular_spread( az, el, powers, ...
+    wrapping, calc_bank_angle, quantize );
 </pre>
 
-<i>Input Arguments:</i><br>
-<ul><li><b><code>az</code></b><br> 
-   Azimuth angles in [rad], ranging from -pi to pi. Size <code>[n_path, n_cir]</code> (each column is one CIR). 
-</li></ul>
- 
-<ul><li><b><code>el</code></b><br> 
-   Elevation angles in [rad], ranging from -pi/2 to pi/2. Size <code>[n_path, n_cir]</code>. 
-</li></ul>
- 
-<ul><li><b><code>powers</code></b><br> 
-   Path powers in [W]. Size <code>[n_path, n_cir]</code>. 
-</li></ul>
- 
-<ul><li><b><code>wrapping</code></b> (optional)<br> 
-   Logical. If true, enable spherical rotation. Default: false (use raw angles) 
-</li></ul>
- 
-<ul><li><b><code>calc_bank_angle</code></b> (optional)<br> 
-   Logical. If true, compute the optimal bank angle analytically. Only used when 
-   <code>wrapping</code> is true. Default: false. 
-</li></ul>
- 
-<ul><li><b><code>quantize</code></b> (optional)<br> 
-   Angular quantization step in [deg]. Default: 0 (no quantization). 
+<i>Inputs:</i><br>
+<ul><li><b><code>az</code></b> — Azimuth angles; range -pi to pi; <code>[n_path, n_cir]</code> 
+</li><li><b><code>el</code></b> — Elevation angles; range -pi/2 to pi/2; <code>[n_path, n_cir]</code> 
+</li><li><b><code>powers</code></b> — Path powers in [W]; <code>[n_path, n_cir]</code> 
+</li><li><b><code>wrapping</code></b> <i>(optional)</i> — If true, enables spherical rotation; default: false 
+</li><li><b><code>calc_bank_angle</code></b> <i>(optional)</i> — If true, computes optimal bank angle analytically; 
+   only used when <code>wrapping = true</code>; default: false 
+</li><li><b><code>quantize</code></b> <i>(optional)</i> — Angular quantization step in [deg]; paths within this 
+   distance are grouped; default: 0 (no quantization) 
 </li></ul>
 
-<i>Output Arguments:</i><br>
-<ul><li><b><code>as</code></b><br> 
-   RMS azimuth angular spread in [rad]. Type: <code>double</code>. Size <code>[n_cir, 1]</code>. 
+<i>Outputs:</i><br>
+<ul><li><b><code>as</code></b> — RMS azimuth angular spread; <code>[n_cir]</code> 
+</li><li><b><code>es</code></b> — RMS elevation angular spread; <code>[n_cir]</code> 
+</li><li><b><code>orientation</code></b> — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; <code>[3, n_cir]</code> 
+</li><li><b><code>phi</code></b> — Rotated azimuth angles; <code>[n_path, n_cir]</code> 
+</li><li><b><code>theta</code></b> — Rotated elevation angles; <code>[n_path, n_cir]</code> 
 </li></ul>
- 
-<ul><li><b><code>es</code></b><br> 
-   RMS elevation angular spread in [rad]. Type: <code>double</code>. Size <code>[n_cir, 1]</code>. 
-</li></ul>
- 
-<ul><li><b><code>orientation</code></b><br> 
-   Power-weighted mean-angle orientation: row 1 = bank angle, row 2 = tilt angle, row 3 = heading 
-   angle, all in [rad]. Type: <code>double</code>. Size <code>[3, n_cir]</code>. 
-</li></ul>
- 
-<ul><li><b><code>phi</code></b><br> 
-   Rotated azimuth angles in [rad]. Type: <code>double</code>. Size <code>[n_path, n_cir]</code>. 
-</li></ul>
- 
-<ul><li><b><code>theta</code></b><br> 
-   Rotated elevation angles in [rad]. Type: <code>double</code>. Size <code>[n_path, n_cir]</code>. 
-</li></ul>
-
-<i>Example:</i><br>
-<pre>
-az = [0.1, 0.2; -0.1, -0.2; 0.05, 0.0];
-el = [0.0, 0.05; 0.0, -0.05; 0.0, 0.0];
-powers = [1.0, 2.0; 1.0, 1.0; 0.5, 1.5];
-[as, es, orient] = quadriga_lib.calc_angular_spread(az, el, powers);
-</pre>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_cross_polarization_ratio"></a>
 <b>calc_cross_polarization_ratio</b> - Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
-<br><br>
-<i>Description:</i><br>
-<ul><li>Computes the aggregate cross-polarization ratio (XPR) from the polarization transfer matrices 
-   of all channel impulse responses (CIRs) using the total-power-ratio method. 
-</li><li>For each CIR, the total co-polarized and cross-polarized received powers are accumulated 
-   across all qualifying paths, and the XPR is obtained as a single ratio of the totals. 
-</li><li>In addition to the linear V/H basis, the XPR is also computed in the circular LHCP/RHCP basis. 
-</li><li>The LOS path is identified by comparing each path's absolute length against the direct 
-   TX-RX distance. All paths with <code>path_length &lt; dTR + window_size</code> are excluded by default. 
-</li><li>If the total cross-polarized power is zero, the XPR is set to 0 (undefined). 
+<div style="margin-bottom: 1.5em;">
+<ul><li>Computes aggregate XPR from polarization transfer matrices using the total-power-ratio 
+   method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and 
+   XPR is their ratio 
+</li><li>XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the 
+   Jones matrix transform <code>M_circ = T <i> M_lin </i> T^-1</code> 
+</li><li>LOS paths are identified by comparing path length against the direct TX-RX distance 
+   <code>dTR</code>; paths with <code>path_length &lt; dTR + window_size</code> are excluded by default 
+</li><li>Polarization transfer matrix <code>M</code> is stored column-major with interleaved real/imaginary 
+   parts, 8 rows per path: 
+   <code>[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]</code> 
+</li><li>Normalization of <code>M</code> does not affect XPR (cancels in the ratio) but does affect <code>pg</code> 
+</li><li>If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are 
+   zero, XPR is set to 0 
+</li><li>TX/RX positions may be fixed <code>[3, 1]</code> or mobile <code>[3, n_cir]</code> 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos )
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los )
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size )
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, ...
+    tx_pos, rx_pos, include_los, window_size );
 </pre>
 
-<i>Input Arguments:</i><br>
-<ul><li><b><code>powers</code></b> (required)<br> 
-   Path powers in Watts. A 2D matrix of size <code>[n_path_max, n_cir]</code> where columns are zero-padded 
-   if CIRs have different numbers of paths. Alternatively, for a single CIR, a column vector of 
-   length <code>[n_path]</code>. 
-</li></ul>
- 
-<ul><li><b><code>M</code></b> (required)<br> 
-   Polarization transfer matrices. A 3D array of size <code>[8, n_path_max, n_cir]</code> with interleaved 
-   real/imaginary parts in column-major order. 
-</li></ul>
- 
-<ul><li><b><code>path_length</code></b> (required)<br> 
-   Absolute path length from TX to RX in meters. A 2D matrix of size <code>[n_path_max, n_cir]</code>. 
-</li></ul>
- 
-<ul><li><b><code>tx_pos</code></b> (required)<br> 
-   Transmitter position in Cartesian coordinates. Size <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile). 
-</li></ul>
- 
-<ul><li><b><code>rx_pos</code></b> (required)<br> 
-   Receiver position in Cartesian coordinates. Size <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile). 
-</li></ul>
- 
-<ul><li><b><code>include_los</code></b> (optional)<br> 
-   Logical flag. If <code>true</code>, include LOS paths in XPR calculation. Default: <code>false</code>. 
-</li></ul>
- 
-<ul><li><b><code>window_size</code></b> (optional)<br> 
-   LOS window size in meters. Default: <code>0.01</code>. 
+<i>Inputs:</i><br>
+<ul><li><b><code>powers</code></b> — Path powers in [W]; <code>[n_path, n_cir]</code> 
+</li><li><b><code>M</code></b> — Polarization transfer matrices with interleaved real/imag parts; <code>[8, n_path, n_cir]</code> 
+</li><li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>[n_path, n_cir]</code> 
+</li><li><b><code>tx_pos</code></b> — Transmitter position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile) 
+</li><li><b><code>rx_pos</code></b> — Receiver position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile) 
+</li><li><b><code>include_los</code></b> <i>(optional)</i> — If true, includes LOS and near-LOS paths in the XPR 
+   calculation; default: false 
+</li><li><b><code>window_size</code></b> <i>(optional)</i> — LOS exclusion window; paths within <code>dTR + window_size</code> 
+   are excluded when <code>include_los = false</code>; default: 0.01 
 </li></ul>
 
-<i>Output Arguments:</i><br>
-<ul><li><b><code>xpr</code></b> (optional)<br> 
-   Cross-polarization ratio in linear scale. Size <code>[n_cir, 6]</code> (double).<br> 
-   Columns: 1=aggregate linear, 2=V-XPR, 3=H-XPR, 4=aggregate circular, 5=LHCP, 6=RHCP. 
-</li></ul>
- 
-<ul><li><b><code>pg</code></b> (optional)<br> 
-   Total path gain over all paths (including LOS). Column vector of length <code>[n_cir]</code> (double). 
+<i>Outputs:</i><br>
+<ul><li><b><code>xpr</code></b> <i>(optional)</i> — XPR on linear scale; <code>[n_cir, 6]</code>; columns:<br><br> 
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Col</th>
+  <th style="text-align: left;">Description</th>
+  <th style="text-align: left;"></th>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>4</td>
+  <td>Aggregate circular XPR (total L+R co-pol / total L+R cross-pol)</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>5</td>
+  <td>LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)</td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)</td>
+  <td></td>
+</tr>
+</table><br>
+</li><li><b><code>pg</code></b> <i>(optional)</i> — Total path gain summed over all paths (including LOS) as 
+   <code>0.5 <i> sum(powers </i> (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))</code>; <code>[n_cir]</code> 
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_delay_spread"></a>
-<b>calc_delay_spread</b> - Calculate the RMS delay spread in [s]
-<br><br>
-<i>Description:</i><br>
-<ul><li>Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding 
-   linear-scale powers for each channel impulse response (CIR). 
-</li><li>An optional power threshold in [dB] relative to the strongest path can be applied. Paths with 
-   power below <code>p_max(dB) - threshold</code> are excluded. 
-</li><li>An optional granularity parameter in [s] groups paths in the delay domain. 
-</li><li>Optionally returns the mean delay for each CIR. 
+<b>calc_delay_spread</b> - Calculates RMS delay spread from per-CIR delays and linear-scale powers
+<div style="margin-bottom: 1.5em;">
+<ul><li>Paths with power below <code>p_max / 10^(0.1 * threshold)</code> are excluded; the default threshold 
+   of 100 dB effectively includes all paths 
+</li><li>When <code>granularity &gt; 0</code>, paths falling into the same delay bin of width <code>granularity</code> have 
+   their powers summed before computing the spread; function recurses on the binned profile 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-ds = quadriga_lib.calc_delay_spread( delays, powers );
-ds = quadriga_lib.calc_delay_spread( delays, powers, threshold );
-ds = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
 [ ds, mean_delay ] = quadriga_lib.calc_delay_spread( delays, powers, threshold, granularity );
 </pre>
 
-<i>Arguments:</i><br>
-<ul><li><code><b>delays</b></code> (input)<br> 
-   Delays in [s]. A 2D matrix of size <code>[n_path, n_cir]</code>. Each row is one CIR. Rows may be 
-   zero-padded if CIRs have different numbers of paths. 
-</li></ul>
- 
-<ul><li><code><b>powers</b></code> (input)<br> 
-   Path powers on a linear scale [W]. Same size as <code>delays</code>. 
-</li></ul>
- 
-<ul><li><code><b>threshold</b> = 100.0</code> (input)<br> 
-   Power threshold in [dB] relative to the strongest path. Default: 100 dB. 
-</li></ul>
- 
-<ul><li><code><b>granularity</b> = 0.0</code> (input)<br> 
-   Window size in [s] for grouping paths in the delay domain. Default: 0. 
+<i>Inputs:</i><br>
+<ul><li><b><code>delays</code></b> — Delays in [s] per CIR; <code>[n_path, n_cir]</code> 
+</li><li><b><code>powers</code></b> — Path powers on linear scale in [W]; <code>[n_path, n_cir]</code> 
+</li><li><b><code>threshold</code></b> <i>(optional)</i> — Power threshold in [dB] relative to strongest path; paths 
+   below threshold are excluded; default: 100 
+</li><li><b><code>granularity</code></b> <i>(optional)</i> — Bin width in [s] for grouping paths in the delay domain; 
+   default: 0 (no grouping) 
 </li></ul>
 
-<i>Returns:</i><br>
-<ul><li><code>double <b>ds</b></code> (output)<br> 
-   RMS delay spread in [s] for each CIR. Size <code>[n_cir, 1]</code>. 
-</li></ul>
- 
-<ul><li><code>double <b>mean_delay</b></code> (optional output)<br> 
-   Mean delay in [s] for each CIR. Size <code>[n_cir, 1]</code>. 
+<i>Outputs:</i><br>
+<ul><li><b><code>ds</code></b> — RMS delay spread in [s] per CIR; <code>[n_cir]</code> 
+</li><li><b><code>mean_delay</code></b> <i>(optional)</i> — Mean delay in [s] per CIR; <code>[n_cir]</code> 
 </li></ul>
 
-<i>Example:</i><br>
-<pre>
-delays = [0, 1e-6, 2e-6];
-powers = [1.0, 0.5, 0.25];
-[ds, mean_delay] = quadriga_lib.calc_delay_spread( delays, powers );
-</pre>
+<i>See also:</i><br>
+<ul><li><a href="#quantize_delays">quantize_delays</a> (for mapping delays to a fixed tap grid) 
+</li><li><a href="#calc_rician_k_factor">calc_rician_k_factor</a> (for calculating K-factor) 
+</li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_rician_k_factor"></a>
 <b>calc_rician_k_factor</b> - Calculate the Rician K-Factor from channel impulse response data
-<br><br>
-<i>Description:</i><br>
-<ul><li>The Rician K-Factor (KF) is defined as the ratio of signal power in the dominant line-of-sight 
-   (LOS) path to the power in the scattered (non-line-of-sight, NLOS) paths. 
-</li><li>The LOS path is identified by matching the absolute path length with the direct distance between 
-   TX and RX positions (<code>dTR</code>). 
-</li><li>All paths arriving within <code>dTR + window_size</code> are considered LOS and their power is summed. 
-</li><li>Paths arriving after <code>dTR + window_size</code> are considered NLOS and their power is summed. 
-</li><li>If the total NLOS power is zero, the K-Factor is set to infinity. 
-</li><li>If the total LOS power is zero, the K-Factor is set to zero. 
-</li><li>The transmitter and receiver positions can be fixed (size <code>[3, 1]</code>) or mobile (size <code>[3, n_cir]</code>). 
-   Fixed positions are reused for all channel snapshots. 
-</li><li>Optional output <code>pg</code> returns the total path gain (sum of all path powers) for each snapshot. 
+<div style="margin-bottom: 1.5em;">
+<ul><li>KF = LOS power / NLOS power; LOS paths are those with length ≤ <code>dTR + window_size</code>, where 
+   <code>dTR</code> is the direct TX-RX distance 
+</li><li>If total NLOS power is zero, KF is set to infinity; if total LOS power is zero, KF is 
+   set to 0 
+</li><li>TX/RX positions may be fixed <code>[3, 1]</code> (reused for all snapshots) or mobile <code>[3, n_cir]</code> 
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
 [ kf, pg ] = quadriga_lib.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size );
 </pre>
 
-<i>Input Arguments:</i><br>
-<ul><li><b><code>powers</code></b> (required)<br> 
-   Path powers in Watts [W]. A 2D matrix of size <code>[n_path_max, n_cir]</code> where columns correspond to 
-   channel snapshots. Shorter paths are zero-padded. 
-</li></ul>
- 
-<ul><li><b><code>path_length</code></b> (required)<br> 
-   Absolute path lengths from TX to RX phase center in meters. A 2D matrix of size 
-   <code>[n_path_max, n_cir]</code> matching <code>powers</code>. 
-</li></ul>
- 
-<ul><li><b><code>tx_pos</code></b> (required)<br> 
-   Transmitter position in Cartesian coordinates. Size <code>[3, 1]</code> for fixed TX or <code>[3, n_cir]</code> for 
-   mobile TX. Type: double. 
-</li></ul>
- 
-<ul><li><b><code>rx_pos</code></b> (required)<br> 
-   Receiver position in Cartesian coordinates. Size <code>[3, 1]</code> for fixed RX or <code>[3, n_cir]</code> for 
-   mobile RX. Type: double. 
-</li></ul>
- 
-<ul><li><b><code>window_size</code></b> (optional)<br> 
-   LOS window size in meters. Default: <code>0.01</code>. Paths with length ≤ <code>dTR + window_size</code> are 
-   considered LOS. 
+<i>Inputs:</i><br>
+<ul><li><b><code>powers</code></b> — Path powers in [W]; <code>[n_path, n_cir]</code> 
+</li><li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>[n_path, n_cir]</code> 
+</li><li><b><code>tx_pos</code></b> — Transmitter position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile) 
+</li><li><b><code>rx_pos</code></b> — Receiver position [x; y; z]; <code>[3, 1]</code> (fixed) or <code>[3, n_cir]</code> (mobile) 
+</li><li><b><code>window_size</code></b> <i>(optional)</i> — LOS window; paths with length ≤ <code>dTR + window_size</code> are 
+   treated as LOS; default: 0.01 
 </li></ul>
 
-<i>Output Arguments:</i><br>
-<ul><li><b><code>kf</code></b> (optional)<br> 
-   Rician K-Factor on linear scale. Size <code>[n_cir, 1]</code>, type: double. 
-</li></ul>
- 
-<ul><li><b><code>pg</code></b> (optional)<br> 
-   Total path gain (sum of path powers). Size <code>[n_cir, 1]</code>, type: double. 
+<i>Outputs:</i><br>
+<ul><li><b><code>kf</code></b> <i>(optional)</i> — Rician K-Factor on linear scale; <code>[n_cir]</code> 
+</li><li><b><code>pg</code></b> <i>(optional)</i> — Total path gain (sum of all path powers) in [W]; <code>[n_cir]</code> 
 </li></ul>
 
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="b11e2d16"></a>
+<font size=+1><b>Miscellaneous / Tools</b></font>
+<br>
+<br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="calc_rotation_matrix"></a>
 <b>calc_rotation_matrix</b> - Calculates a 3x3 rotation matrix from a 3-element orientation vector
