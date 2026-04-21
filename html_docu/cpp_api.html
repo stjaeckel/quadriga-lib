@@ -2610,9 +2610,7 @@ void quadriga_lib::qrt_file_read(
 </li><li><b><code>i_cir</code></b> — Snapshot index, 0-based 
 </li><li><b><code>i_orig</code></b> — Origin index, 0-based 
 </li><li><b><code>downlink</code></b> — If <code>true</code>, origin=TX, destination=RX; if <code>false</code>, roles are swapped 
-</li><li><b><code>normalize_M</code></b> <i>(optional)</i> — Controls <code>M</code> and <code>path_gain</code> scaling; see table below 
-</li><li><b><code>file</code></b> <i>(optional)</i> — Pre-opened binary <code>std::ifstream</code>; left open on return 
-</li><li><b><code>cache</code></b> <i>(optional)</i> — Pre-populated cache from <a href="#qrt_read_cache_init">qrt_read_cache_init</a><br><br> 
+</li><li><b><code>normalize_M</code></b> <i>(optional)</i> — Controls <code>M</code> and <code>path_gain</code> scaling<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -2636,6 +2634,8 @@ void quadriga_lib::qrt_file_read(
   <td></td>
 </tr>
 </table><br>
+</li><li><b><code>file</code></b> <i>(optional)</i> — Pre-opened binary <code>std::ifstream</code>; left open on return 
+</li><li><b><code>cache</code></b> <i>(optional)</i> — Pre-populated cache from <a href="#qrt_read_cache_init">qrt_read_cache_init</a><br><br> 
 </li></ul>
 
 <i>Outputs:</i><br>
@@ -2742,7 +2742,7 @@ void quadriga_lib::quantize_delays(
 </li><li><b><code>tap_spacing</code></b> <i>(optional)</i> — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate 
 </li><li><b><code>max_no_taps</code></b> <i>(optional)</i> — Maximum number of output taps; 0 means unlimited 
 </li><li><b><code>power_exponent</code></b> <i>(optional)</i> — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving 
-</li><li><b><code>fix_taps</code></b> <i>(optional)</i> — Delay grid sharing mode:<br> 
+</li><li><b><code>fix_taps</code></b> <i>(optional)</i> — Delay grid sharing mode:<br><br> 
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -3587,7 +3587,6 @@ void quadriga_lib::fast_atan2(const arma::vec &amp;y,  const arma::vec &amp;x,  
 </li><li>Inputs are arbitrary 3D vectors (not required to be unit-length); <code>len</code> returns the Euclidean norm 
 </li><li>z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1 
 </li><li>All inputs must have the same length 
-</li><li>In-place and output-output aliasing not allowed (x/y/z cannot alias az, el, or len; az, el, and len cannot alias each other) 
 </li><li>AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full <code>dtype</code> precision 
 </li></ul>
 </div>
@@ -3702,7 +3701,6 @@ void quadriga_lib::fast_sincos(const arma::vec &amp;x,  arma::fvec *s = nullptr,
 </li><li>Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly 
 </li><li>If both input amplitudes are negligible, output is zero 
 </li><li>Max error vs. double-precision reference: ~5 ULP 
-</li><li>Output Xr and Xi cannot alias each other 
 </li><li>AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2 
 </li></ul>
 </div>

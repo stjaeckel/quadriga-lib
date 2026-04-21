@@ -218,18 +218,6 @@ TEST_CASE("fast_atan2 - Error: mismatched input lengths")
     CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, a), std::invalid_argument);
 }
 
-TEST_CASE("fast_atan2 - Error: input-output aliasing")
-{
-    arma::fvec y = {1.0f, 2.0f, 3.0f, 4.0f};
-    arma::fvec x = {1.0f, 1.0f, 1.0f, 1.0f};
-
-    // y and a are the same buffer
-    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, y), std::invalid_argument);
-
-    // x and a are the same buffer
-    CHECK_THROWS_AS(quadriga_lib::fast_atan2(y, x, x), std::invalid_argument);
-}
-
 TEST_CASE("fast_atan2 - Consistency: atan2(sin(t), cos(t)) recovers t")
 {
     // For angles in (-pi, pi], atan2(sin(t), cos(t)) should recover t

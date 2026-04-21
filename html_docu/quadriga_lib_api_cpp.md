@@ -1728,13 +1728,13 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling; see table below
-- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
-- **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling
    | `normalize_M` | `M`                   | `path_gain`                 |
    | ------------- | --------------------- | --------------------------- |
    | 0             | As stored in QRT file | -FSPL                       |
    | 1             | Max column power = 1  | -FSPL minus material losses |
+- **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
+- **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
 - **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`
@@ -2562,7 +2562,6 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 - Inputs are arbitrary 3D vectors (not required to be unit-length); `len` returns the Euclidean norm
 - z/len is clamped to [-1, 1] before asin to guard against len == 0 and FMA rounding artefacts pushing abs(z/len) slightly above 1
 - All inputs must have the same length
-- In-place and output-output aliasing not allowed (x/y/z cannot alias az, el, or len; az, el, and len cannot alias each other)
 - AVX2 kernel computes internally in single precision (double outputs are cast back from float); GENERIC kernel preserves full `dtype` precision
 
 ### Declaration:
@@ -2663,7 +2662,6 @@ Compute elementwise approximate SLERP interpolation between two complex-valued v
 - Near-antipodal inputs (phase difference close to pi) fall back to linear interpolation smoothly
 - If both input amplitudes are negligible, output is zero
 - Max error vs. double-precision reference: ~5 ULP
-- Output Xr and Xi cannot alias each other
 - AVX2-optimized (8 complex pairs/lane); scalar fallback without AVX2
 
 ### Declaration:

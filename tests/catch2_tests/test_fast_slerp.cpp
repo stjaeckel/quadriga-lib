@@ -283,14 +283,6 @@ TEST_CASE("fast_slerp - Error: mismatched input lengths")
     CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Xr, Xi), std::invalid_argument);
 }
 
-TEST_CASE("fast_slerp - Error: input-output aliasing")
-{
-    arma::fvec Ar = {1.0f}, Ai = {0.0f}, Br = {0.0f}, Bi = {1.0f}, w = {0.5f};
-
-    // Xr aliased with Ar
-    CHECK_THROWS_AS(quadriga_lib::fast_slerp(Ar, Ai, Br, Bi, w, Ar, Ai), std::invalid_argument);
-}
-
 TEST_CASE("fast_slerp - Output is resized correctly")
 {
     arma::fvec Ar = {1.0f, 2.0f, 3.0f};

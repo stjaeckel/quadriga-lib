@@ -163,7 +163,7 @@ void quadriga_lib::quantize_delays(
 - **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate
 - **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 means unlimited
 - **`power_exponent`** *(optional)* — Interpolation exponent alpha; 1.0 = narrowband, 0.5 = wideband power-preserving
-- **`fix_taps`** *(optional)* — Delay grid sharing mode:<br>
+- **`fix_taps`** *(optional)* — Delay grid sharing mode:<br><br>
   | Value | Meaning                                                                                                                               |
   | ----- | ------------------------------------------------------------------------------------------------------------------------------------- |
   | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps]`                                                                     |
