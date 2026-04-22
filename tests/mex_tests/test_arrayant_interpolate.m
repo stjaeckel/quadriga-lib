@@ -14,7 +14,7 @@ assertElementsAlmostEqual( ds, [0, 0, 0, 0], 1e-14);
 assertElementsAlmostEqual( az, [0,1,2,3]*pi/4, 1e-14);
 assertElementsAlmostEqual( el, [-0.5, 0, 0, 0.5], 1e-14);
 
-[vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0 );
+[vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0 );
 assertElementsAlmostEqual( vr, [-2, -1, 0, 1], 1e-14);
 assertElementsAlmostEqual( vi, [-1, -0.5, 0, 0.5], 1e-14);
 assertElementsAlmostEqual( hr, [3, 2.5, 2, 1.5], 1e-14);
@@ -119,6 +119,76 @@ assertElementsAlmostEqual( ds, [-1;0;1]/sqrt(2), 1e-14);
 [~,~,~,~,ds] = quadriga_lib.arrayant_interpolate( ant, [-pi,-pi/2,0], [0,0,-pi/2], [1,1,1], [], -eye(3));
 assertElementsAlmostEqual( ds, -eye(3), 1e-14);
 
+% ===================== Multi-frequency mode =====================
+
+% Two isotropic single-element antennas at different center frequencies
+ant1 = struct( 'e_theta_re', 1, 'e_theta_im', 0, ...
+    'e_phi_re', 2, 'e_phi_im', 0, ...
+    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 1e9 );
+ant2 = struct( 'e_theta_re', 3, 'e_theta_im', 0, ...
+    'e_phi_re', 4, 'e_phi_im', 0, ...
+    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 2e9 );
+ant_multi = [ant1, ant2];
+
+% Request at the exact center frequencies -> stored values, cube [1,1,2]
+[vr, vi, hr, hi] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [1e9, 2e9] );
+assertEqual( size(vr), [1, 1, 2] );
+assertEqual( size(hi), [1, 1, 2] );
+assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
+assertElementsAlmostEqual( hr(:,:,1), 2, 1e-14 );
+assertElementsAlmostEqual( hr(:,:,2), 4, 1e-14 );
+assertElementsAlmostEqual( vi, zeros(1,1,2), 1e-14 );
+assertElementsAlmostEqual( hi, zeros(1,1,2), 1e-14 );
+
+% Out-of-range frequencies clamp to nearest center_freq (no extrapolation)
+[vr, ~, hr, ~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [0.5e9, 3e9] );
+assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
+assertElementsAlmostEqual( hr(:,:,1), 2, 1e-14 );
+assertElementsAlmostEqual( hr(:,:,2), 4, 1e-14 );
+
+% Struct array with freq omitted -> multi-freq auto-mode using center_freq values
+[vr, ~, hr, ~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0 );
+assertEqual( size(vr), [1, 1, 2] );
+assertElementsAlmostEqual( vr(:,:,1), 1, 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), 3, 1e-14 );
+
+% Multiple angles + multiple frequencies -> cube [n_out, n_ang, n_freq]
+az_q = [0, 0, 0, 0];
+el_q = [0, 0, 0, 0];
+[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_multi, az_q, el_q, [], [], [], [1e9, 2e9] );
+assertEqual( size(vr), [1, 4, 2] );
+assertElementsAlmostEqual( vr(:,:,1), [1 1 1 1], 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), [3 3 3 3], 1e-14 );
+
+% Multi-freq with element selection and duplication
+ant_me_a = struct( 'e_theta_re', cat(3, 1, 10), 'e_theta_im', cat(3, 0, 0), ...
+    'e_phi_re', cat(3, 0, 0), 'e_phi_im', cat(3, 0, 0), ...
+    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 1e9 );
+ant_me_b = struct( 'e_theta_re', cat(3, 3, 30), 'e_theta_im', cat(3, 0, 0), ...
+    'e_phi_re', cat(3, 0, 0), 'e_phi_im', cat(3, 0, 0), ...
+    'azimuth_grid', 0, 'elevation_grid', 0, 'center_freq', 2e9 );
+ant_me = [ant_me_a, ant_me_b];
+
+% Select only element 2
+[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, 2, [], [], [1e9, 2e9] );
+assertEqual( size(vr), [1, 1, 2] );
+assertElementsAlmostEqual( vr(:,:,1), 10, 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), 30, 1e-14 );
+
+% Duplicate elements: [1, 2, 1] -> n_out = 3
+[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, [1, 2, 1], [], [], [1e9, 2e9] );
+assertEqual( size(vr), [3, 1, 2] );
+assertElementsAlmostEqual( vr(:,:,1), [1;10;1], 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), [3;30;3], 1e-14 );
+
+% Multi-freq with element_pos override
+[vr, ~, ~, ~] = quadriga_lib.arrayant_interpolate( ant_me, 0, 0, [1, 2], [], [0 0; 0 0; 0 1], [1e9, 2e9] );
+assertEqual( size(vr), [2, 1, 2] );
+assertElementsAlmostEqual( vr(:,:,1), [1;10], 1e-14 );
+assertElementsAlmostEqual( vr(:,:,2), [3;30], 1e-14 );
+
 % Exceptins
 
 e = rand( 5,10,3 );
@@ -140,7 +210,7 @@ catch ME
 end
 
 try
-    [vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0, 1 );
+    [vr,vi,hr,hi,ds,az,el] = quadriga_lib.arrayant_interpolate( [], [0,1,2,3]*pi/4, [-0.5,0,0,0.5], [], [], [], [], [-2,2], [-1,1], [3,1], [6,2], [0,pi], 0, 1 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -234,6 +304,28 @@ try
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Input ''orientation'' must have 3 elements on the first dimension.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% >4 outputs in multi-frequency mode
+try
+    [~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0, [], [], [], [1e9, 2e9] );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Multi-frequency mode supports at most 4 outputs';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Struct array without freq -> requesting dist (5th output) must fail: multi-freq auto-selected
+try
+    [~,~,~,~,~] = quadriga_lib.arrayant_interpolate( ant_multi, 0, 0 );
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Multi-frequency mode supports at most 4 outputs';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
