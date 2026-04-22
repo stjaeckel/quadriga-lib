@@ -51,7 +51,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ## Examples:
 ```
 % Generate dipole antenna
-ant = quadriga_lib.arrayant_generate('dipole');
+ant = quadriga_lib.generate_arrayant('dipole');
 
 % Calculate directivity
 directivity = quadriga_lib.arrayant_calc_directivity(ant);
