@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-#
-# Extracts /*!MD ... MD!*/ documentation blocks from quadriga-lib source files
-# and assembles them into a single Markdown document suitable for AI consumption.
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
 
 import os
 import re
@@ -15,6 +14,7 @@ from datetime import date
 #  Version detection (from extract_version.py logic)
 # ---------------------------------------------------------------------------
 
+
 def get_quadriga_lib_version(hpp_path=None):
     """Read the version string from quadriga_lib.hpp."""
     search_paths = [hpp_path] if hpp_path else ["include/quadriga_lib.hpp"]
@@ -22,9 +22,7 @@ def get_quadriga_lib_version(hpp_path=None):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 for line in f:
-                    m = re.search(
-                        r'#define\s+QUADRIGA_LIB_VERSION_STR\s+"([^"]+)"', line
-                    )
+                    m = re.search(r'#define\s+QUADRIGA_LIB_VERSION_STR\s+"([^"]+)"', line)
                     if m:
                         return m.group(1)
             print(
@@ -43,15 +41,15 @@ def get_quadriga_lib_version(hpp_path=None):
 # ---------------------------------------------------------------------------
 
 API_TITLES = {
-    "cpp":    "C++ API Documentation for Quadriga-Lib",
+    "cpp": "C++ API Documentation for Quadriga-Lib",
     "python": "Python API Documentation for Quadriga-Lib",
-    "mex":    "MATLAB / Octave API Documentation for Quadriga-Lib",
+    "mex": "MATLAB / Octave API Documentation for Quadriga-Lib",
 }
 
 API_DEFAULTS = {
-    "cpp":    "src/",
+    "cpp": "src/",
     "python": "api_python/",
-    "mex":    "api_mex/",
+    "mex": "api_mex/",
 }
 
 
@@ -63,13 +61,13 @@ def get_preamble(api_type):
             "- Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.\n"
             "- Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.\n"
             "- All functions and classes live in the `quadriga_lib` namespace.\n"
-            "- Default include: `#include \"quadriga_lib.hpp\"`.\n"
+            '- Default include: `#include "quadriga_lib.hpp"`.\n'
             "- Template parameter `dtype` is `float` or `double` unless stated.\n"
             "- Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.\n"
             "- Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.\n"
             "- Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.\n"
             "- Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.\n"
-            "- Index conventions: 0-based unless the field is explicitly called \"1-based\" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).\n"
+            '- Index conventions: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).\n'
             "- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.\n"
             "- Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.\n"
             "- Polarization transfer matrix `M`: 8 rows per path, interleaved real/imaginary, order `[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]`. A 2-row form `[ReVV, ImVV]` is used for scalar (acoustic) fields.\n"
@@ -96,6 +94,7 @@ def get_preamble(api_type):
 #  Block extraction (same regexes as extract_html.py)
 # ---------------------------------------------------------------------------
 
+
 def extract_sections(content):
     return re.findall(r"/\*!SECTION\n(.*?)\nSECTION!\*/", content, re.DOTALL)
 
@@ -105,14 +104,13 @@ def extract_md_sections(content):
 
 
 def extract_sections_desc(content):
-    return re.findall(
-        r"/\*!SECTION_DESC\n(.*?)\nSECTION_DESC!\*/", content, re.DOTALL
-    )
+    return re.findall(r"/\*!SECTION_DESC\n(.*?)\nSECTION_DESC!\*/", content, re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
 #  Markdown cleanup helpers
 # ---------------------------------------------------------------------------
+
 
 def clean_md(text):
     """
@@ -120,9 +118,7 @@ def clean_md(text):
     the output is valid, self-contained Markdown.
     """
     # Convert <a href="#target">text</a>  →  [text](#target)
-    text = re.sub(
-        r'<a\s+href="(#[^"]*)">(.*?)</a>', r"[\2](\1)", text
-    )
+    text = re.sub(r'<a\s+href="(#[^"]*)">(.*?)</a>', r"[\2](\1)", text)
 
     # Convert [[target]]  →  [target](#target)
     text = re.sub(r"\[\[(.*?)\]\]", r"[\1](#\1)", text)
@@ -149,6 +145,7 @@ def slugify(text):
 #  Main generation
 # ---------------------------------------------------------------------------
 
+
 def generate_markdown(folder_name, api_type, version_path):
     version = get_quadriga_lib_version(version_path)
     title = f"{API_TITLES[api_type]} v{version}"
@@ -173,7 +170,7 @@ def generate_markdown(folder_name, api_type, version_path):
         sys.exit(1)
 
     files = sorted(os.listdir(folder_name))
-    section_dict = {}       # section  →  [(func_name, md_block, add_space), ...]
+    section_dict = {}  # section  →  [(func_name, md_block, add_space), ...]
     section_desc_dict = {}  # section  →  [desc_block, ...]
 
     for file_name in files:
@@ -216,13 +213,19 @@ def generate_markdown(folder_name, api_type, version_path):
     sections = list(section_dict.keys())
 
     # ------------------------------------------------------------------
-    #  Overview (TOC)
+    #  Function index table (line numbers patched in after body gen)
     # ------------------------------------------------------------------
-    md += "# Overview\n\n"
+    md += "# Function Index\n\n"
+    md += "| Function | Section | Line |\n"
+    md += "| --- | --- | --- |\n"
+    line_tokens = {}  # (section, func_name) -> placeholder token
     for section in sections:
-        slug = slugify(section)
-        md += f"- [{section}](#{slug})\n"
+        for func_name, _, _ in section_dict[section]:
+            token = f"__LINE_{len(line_tokens):04d}__"
+            line_tokens[(section, func_name)] = token
+            md += f"| [{func_name}](#{slugify(func_name)}) | {section} | {token} |\n"
     md += "\n"
+    func_lines = {}  # (section, func_name) -> actual line number
 
     # ------------------------------------------------------------------
     #  Per-section content
@@ -235,20 +238,13 @@ def generate_markdown(folder_name, api_type, version_path):
         for desc_block in section_desc_dict[section]:
             md += clean_md(desc_block).strip() + "\n\n"
 
-        # Function list (quick reference table)
-        if len(section_dict[section]) > 0:
-            md += "| Function | Description |\n"
-            md += "| --- | --- |\n"
-            for func_name, md_block, _ in section_dict[section]:
-                lines = md_block.split("\n")
-                short_desc = lines[1] if len(lines) > 1 else ""
-                md += f"| [{func_name}](#{slugify(func_name)}) | {short_desc} |\n"
-            md += "\n"
-
         # Full function documentation
         for func_name, md_block, _ in section_dict[section]:
             lines = md_block.split("\n")
             short_desc = lines[1] if len(lines) > 1 else ""
+
+            # Record line number of the upcoming "## func_name" heading
+            func_lines[(section, func_name)] = md.count("\n") + 2
 
             if short_desc:
                 md += f"---\n## {func_name}\n{short_desc}\n\n"
@@ -280,6 +276,10 @@ def generate_markdown(folder_name, api_type, version_path):
                 else:
                     i += 1
 
+    # Fill in line-number placeholders in the Function Index table
+    for key, token in line_tokens.items():
+        md = md.replace(token, str(func_lines[key]))
+
     return md
 
 
@@ -287,26 +287,27 @@ def generate_markdown(folder_name, api_type, version_path):
 #  CLI
 # ---------------------------------------------------------------------------
 
+
 def get_parser():
-    parser = argparse.ArgumentParser(
-        description="Generate Markdown API documentation from quadriga-lib source files."
-    )
+    parser = argparse.ArgumentParser(description="Generate Markdown API documentation from quadriga-lib source files.")
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         required=True,
         help="Path to the output Markdown file.",
     )
     parser.add_argument(
-        "-a", "--api",
+        "-a",
+        "--api",
         required=True,
         choices=["cpp", "python", "mex"],
         help="API type (determines preamble and default source directory).",
     )
     parser.add_argument(
-        "-d", "--directory",
+        "-d",
+        "--directory",
         default=None,
-        help="Path to folder containing source files. "
-             "Defaults to src/ (cpp), api_mex/ (mex), or api_python/ (python).",
+        help="Path to folder containing source files. " "Defaults to src/ (cpp), api_mex/ (mex), or api_python/ (python).",
     )
     parser.add_argument(
         "--version-path",
