@@ -745,7 +745,8 @@ if (BUILD_PYTHON)
             ARCHIVE DESTINATION ${INSTALL_LIBDIR}
             LIBRARY DESTINATION ${INSTALL_LIBDIR})
     else()
-        # Install to Python dist-packages for system installs
+        # Install to Python dist-packages only if they live under CMAKE_INSTALL_PREFIX.
+        # For custom prefixes (e.g. /sjc/qrt/quadriga_lib), fall back to INSTALL_LIBDIR.
         execute_process(
             COMMAND ${Python3_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_path('platlib', 'deb_system'))"
             OUTPUT_VARIABLE PYTHON3_DIST_PACKAGES
@@ -760,10 +761,16 @@ if (BUILD_PYTHON)
                 OUTPUT_STRIP_TRAILING_WHITESPACE
             )
         endif()
-        # Strip the leading prefix to get a relative path for install(TARGETS)
-        string(REGEX REPLACE "^${CMAKE_INSTALL_PREFIX}/?" "" PYTHON3_DIST_REL "${PYTHON3_DIST_PACKAGES}")
-        message(STATUS "Python install dir: ${PYTHON3_DIST_REL}")
-        install(TARGETS quadriga_py
-            LIBRARY DESTINATION ${PYTHON3_DIST_REL})
+
+        # Only use the Python dist path if it's actually under the install prefix
+        string(FIND "${PYTHON3_DIST_PACKAGES}" "${CMAKE_INSTALL_PREFIX}/" _dist_under_prefix)
+        if(_dist_under_prefix EQUAL 0)
+            string(REGEX REPLACE "^${CMAKE_INSTALL_PREFIX}/?" "" PYTHON3_DIST_REL "${PYTHON3_DIST_PACKAGES}")
+            message(STATUS "Python install dir: ${PYTHON3_DIST_REL}")
+            install(TARGETS quadriga_py LIBRARY DESTINATION ${PYTHON3_DIST_REL})
+        else()
+            message(STATUS "Python install dir: ${INSTALL_LIBDIR} (custom prefix, not system Python)")
+            install(TARGETS quadriga_py LIBRARY DESTINATION ${INSTALL_LIBDIR})
+        endif()
     endif()
 endif()
