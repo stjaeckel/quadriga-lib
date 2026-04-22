@@ -66,7 +66,7 @@ is calculated using `arrayant_combine_pattern`.
 
 ```
 % Generate dipole pattern
-ant = quadriga_lib.arrayant_generate('dipole');
+ant = quadriga_lib.generate_arrayant('dipole');
 
 % Duplicate 4 times
 ant.e_theta_re  = repmat(ant.e_theta_re, [1,1,4]);

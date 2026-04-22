@@ -30,7 +30,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 ## Description:
 - Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions.
 - 2D model: no elevation angles are used; azimuth angles and planar motion are considered.
-- For 3D antenna models (default models from [[arrayant_generate]]), only the azimuth cut at `elevation_grid = 0` is used
+- For 3D antenna models (default models from [[generate_arrayant]]), only the azimuth cut at `elevation_grid = 0` is used
 - Supports channel model types `A, B, C, D, E, F` (as defined by TGn) via `ChannelType`.
 - Can generate MU-MIMO channels (`n_users > 1`) with per-user distances/floors and optional angle
   offsets according to TGac.
