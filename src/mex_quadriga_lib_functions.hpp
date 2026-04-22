@@ -148,6 +148,14 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n)))
             ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n));
     }
+
+    if (validate)
+    {
+        auto error_msg = quadriga_lib::arrayant_is_valid_multi(ant, false);
+        if (!error_msg.empty())
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+    }
+
     return ant;
 }
 
