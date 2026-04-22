@@ -1,24 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex.h"
-#include "quadriga_arrayant.hpp"
-#include "qd_arrayant_functions.hpp"
-#include "mex_helper_functions.hpp"
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -26,120 +10,93 @@ SECTION!*/
 
 /*!MD
 # ARRAYANT_INTERPOLATE
-Interpolate array antenna field patterns
+Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
-## Description:
-This function interpolates polarimetric antenna field patterns for a given set of azimuth and
-elevation angles.
+- Interpolates complex e-theta (V) and e-phi (H) field components at the requested
+  azimuth / elevation angles.
+- Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs);
+  returns up to 8 outputs including the optional `dist`, `azimuth_loc`, `elevation_loc`,
+  and `gamma` as matrices of size `[n_out, n_ang]`
+- Multi-frequency mode is selected automatically when `arrayant` is a struct array with
+  more than one element or when `freq` is non-empty; for each target frequency, the two
+  bracketing `center_freq` entries are located and blended via SLERP.
+- Separate arrayant inputs are accepted in single-frequency mode only
 
 ## Usage:
-
 ```
-% Arrayant as struct
+% Single-frequency, struct input
 [V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
     quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, element, orientation, element_pos );
 
-% Arrayant as separate inputs
+% Single-frequency, separate arrayant inputs
 [V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
-    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos,
+    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos, [], ...
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
+
+% Multi-frequency, struct array input
+[V_re, V_im, H_re, H_im] = ...
+    quadriga_lib.arrayant_interpolate( arrayant_multi, azimuth, elevation, element, orientation, element_pos, freq );
 ```
 
-## Input Arguments:
-- **`arrayant`** [1] (optional)<br>
-  Struct containing the arrayant data with the following fields:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  If an empty array is passed, array antenna data is provided as separate inputs (Inputs 7-12)<br><br>
+## Inputs:
+- **`arrayant`** *(optional)* — Struct (single-frequency) or struct array (multi-frequency)
+  containing the arrayant data; field layout as in [[generate_arrayant]]. Pass `[]` to provide
+  the data via separate inputs (single-frequency only)
+- **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision;
+  `[1, n_ang]` for planar-wave mode (same angles for all elements) or `[n_out, n_ang]` for
+  per-element angles (spherical-wave mode)
+- **`elevation`** — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must
+  match `azimuth`
+- **`element`** *(optional)* — 1-based element indices to interpolate; duplicates allowed;
+  defaults to `[1:n_elements]` when empty; `[1, n_out]`, `[n_out, 1]`, or `[]`; uint32 or double
+- **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad; East is
+  the default broadside; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]`, `[3, n_out, n_ang]`, or `[]`
+- **`element_pos`** *(optional)* — Override element positions in m; `[3, n_out]` or `[]`;
+  falls back to `arrayant.element_pos` (or zeros) when empty
+- **`freq`** *(optional, struct input only)* — Target frequencies in Hz; `[n_freq]`. When passing a
+  struct array, `freq` may be omitted or `[]`, in which case the `center_freq` values of the struct
+  array entries are used as target frequencies (no interpolation between bands, one output slice per entry).
 
-- **`azimuth`** [2] (required)<br>
-  Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be
-  between -pi and pi, single or double precision.
-  Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
-             | Size: `[1, n_ang]`
-  Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
-             | Size: `[n_out, n_ang]`
+## Inputs (separate arrayant data, required when `arrayant` is `[]`, single-frequency only):
+- **`e_theta_re`** — e-theta real part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_theta_im`** — e-theta imaginary part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_phi_re`** — e-phi real part; `[n_elevation, n_azimuth, n_elements]`
+- **`e_phi_im`** — e-phi imaginary part; `[n_elevation, n_azimuth, n_elements]`
+- **`azimuth_grid`** — Azimuth sample grid in rad, sorted, in [-π, π]; `[n_azimuth]`
+- **`elevation_grid`** — Elevation sample grid in rad, sorted, in [-π/2, π/2]; `[n_elevation]`
 
-- **`elevation`** [3] (required)<br>
-  Elevation angles in [rad] for which the field pattern should be interpolated. Values must be
-  between -pi/2 and pi/2, single or double precision.
-  Option 1:  | Use the same angles for all antenna elements (planar wave approximation)
-             | Size: `[1, n_ang]`
-  Option 2:  | Provide different angles for each array element (e.g. for spherical waves)
-             | Size: `[n_out, n_ang]`
-
-- **`element`** [4] (optional)<br>
-  The element indices for which the interpolation should be done. Optional parameter. Values must
-  be between 1 and n_elements. It is possible to duplicate elements, i.e. by passing `[1,1,2]`.
-  If this parameter is not provided (or an empty array is passed), `i_element` is initialized
-  to `[1:n_elements]`. In this case, `n_out = n_elements`. Allowed types: uint32 or double.<br>
-  Size: `[1, n_out]` or `[n_out, 1]` or empty `[]`
-
-- **`orientation`** [5] (optional)<br>
-  This (optional) 3-element vector describes the orientation of the array antenna or of individual
-  array elements. The The first value describes the ”bank angle”, the second value describes the
-  ”tilt angle”, (positive values point upwards), the third value describes the bearing or ”heading
-  angle”, in mathematic sense. Values must be given in [rad]. East corresponds to 0, and the
-  angles increase counter-clockwise, so north is pi/2, south is -pi/2, and west is equal to pi. By
-  default, the orientation is `[0,0,0]`', i.e. the broadside of the antenna points at the horizon
-  towards the East. Single or double precision<br>
-  Size: `[3, 1]` or `[3, n_out]` or `[3, 1, n_ang]` or `[3, n_out, n_ang]` or empty `[]`
-
-- **`element_pos`** [6] (optional)<br>
-  Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]).
-  If this parameter is not given, element positions `arrayant` are used. If the `arrayant` has no
-  positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting
-  `element = [1,1]`, different element positions can be set for the  two elements in the output.
-  Size: `[3, n_out]` or empty `[]`
-
-## Derived inputs:
-  `n_azimuth`      | Number of azimuth angles in the filed pattern
-  `n_elevation`    | Number of elevation angles in the filed pattern
-  `n_elements`     | Number of antenna elements filed pattern of the array antenna
+## Derived sizes:
+  `n_azimuth`      | Number of azimuth samples in the pattern
+  `n_elevation`    | Number of elevation samples in the pattern
+  `n_elements`     | Number of antenna elements in the pattern
   `n_ang`          | Number of interpolation angles
-  `n_out`          | Number of antenna elements in the generated output (may differ from n_elements)
+  `n_out`          | Number of output elements (`n_elements` if `element` is empty, else `numel(element)`)
+  `n_freq`         | Number of target frequencies (multi-frequency mode only)
 
-## Output Arguments:
-- **`vr`**<br>
-  Real part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
+## Outputs:
+- **`V_re`** — Real part of the interpolated e-theta (vertical) field component;
+  `[n_out, n_ang]` in single-freq mode, `[n_out, n_ang, n_freq]` in multi-freq mode
+- **`V_im`** — Imaginary part of the e-theta component; same size as `V_re`
+- **`H_re`** — Real part of the interpolated e-phi (horizontal) field component; same size as `V_re`
+- **`H_im`** — Imaginary part of the e-phi component; same size as `V_re`
+- **`dist`** *(single-frequency only)* — Effective distances between the antenna elements
+  projected onto the wavefront plane; used for phase computation; `[n_out, n_ang]`
+- **`azimuth_loc`** *(single-frequency only)* — Azimuth angles in the local (rotated) element
+  frame in rad; `[n_out, n_ang]`
+- **`elevation_loc`** *(single-frequency only)* — Elevation angles in the local element frame in
+  rad; `[n_out, n_ang]`
+- **`gamma`** *(single-frequency only)* — Polarization rotation angles in rad; `[n_out, n_ang]`
 
-- **`vi`**<br>
-  Imaginary part of the interpolated e-theta (vertical) field component. Size `[n_out, n_ang]`
-
-- **`hr`**<br>
-  Real part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
-
-- **`hi`**<br>
-  Imaginary part of the interpolated e-phi (horizontal) field component. Size `[n_out, n_ang]`
-
-- **`dist`** (optional)<br>
-  The effective distances between the antenna elements when seen from the direction of the
-  incident path. The distance is calculated by an projection of the array positions on the normal
-  plane of the incident path. This is needed for calculating the phase of the antenna response.
-  Size `[n_out, n_ang]`
-
-- **`azimuth_loc`** (optional)<br>
-  The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the
-  'orientation'. If no orientation vector is given, these angles are identical to the input
-  azimuth angles. Size `[n_out, n_ang]`
-
-- **`elevation_loc`** (optional)<br>
-  The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the
-  'orientation'. If no orientation vector is given, these angles are identical to the input
-  elevation angles. Size `[n_out, n_ang]`
-
-- **`gamma`** (optional)<br>
-  Polarization rotation angles in [rad], Size `[n_out, n_ang]`
+## See also:
+- [[qdant_read]] / [[qdant_write]] (load / save arrayant data)
+- [[generate_arrayant]] (arrayant struct layout)
+- [[generate_speaker]] (typical multi-frequency struct array source)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3)
+    // Accepted input count: struct mode = [3, 7], separate single-freq mode = 13
+    if (nrhs < 3 || (nrhs > 7 && nrhs != 13))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 8)
@@ -148,48 +105,85 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs == 0)
         return;
 
-    // Assemble array antenna object
-    auto ant = quadriga_lib::arrayant<double>();
-    if (nrhs <= 6) // Struct
-    {
-        ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
-        ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
-        ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
-        ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
-        ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
-        ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
-
-        if (qd_mex_has_field(prhs[0], "element_pos"))
-            ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
-    }
-    else if (nrhs == 12) // Separate
-    {
-        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[6]);
-        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[7]);
-        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[8]);
-        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[9]);
-        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[10]);
-        ant.elevation_grid = qd_mex_get_Col<double>(prhs[11]);
-    }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-
-    // Parse other inputs
+    // Common inputs
     const auto az = qd_mex_get_Mat<double>(prhs[1]);
     const auto el = qd_mex_get_Mat<double>(prhs[2]);
-    const arma::uvec element_ind = (nrhs > 3) ? qd_mex_typecast_Col<arma::uword>(prhs[3]) - 1 : arma::uvec();
-    const auto ori = (nrhs > 4) ? qd_mex_get_Cube<double>(prhs[4]) : arma::cube();
-    const auto elpos = (nrhs > 5) ? qd_mex_get_Mat<double>(prhs[5]) : arma::mat();
 
     if (az.n_elem == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Azimuth angles cannot be empty.");
 
-    // Allocate output memory
-    arma::uword n_ang = az.n_cols;
-    arma::uword n_out = (element_ind.n_elem == 0) ? ant.n_elements() : element_ind.n_elem;
+    const arma::uvec element_ind = (nrhs > 3) ? qd_mex_typecast_Col<arma::uword>(prhs[3]) - 1 : arma::uvec();
+    const auto ori = (nrhs > 4) ? qd_mex_get_Cube<double>(prhs[4]) : arma::cube();
+    const auto elpos = (nrhs > 5) ? qd_mex_get_Mat<double>(prhs[5]) : arma::mat();
+
+    // Copy required: may be resized below when derived from center_frequency
+    auto freq = (nrhs > 6) ? qd_mex_get_Col<double>(prhs[6], true) : arma::vec();
+
+    // Dispatch logic
+    const bool arrayant_is_struct = mxIsStruct(prhs[0]) && mxGetNumberOfElements(prhs[0]) > 0;
+    bool multifreq = false;
+    if (arrayant_is_struct && !freq.empty())
+        multifreq = true;
+    else if (arrayant_is_struct && mxGetNumberOfElements(prhs[0]) > 1)
+        multifreq = true;
+
+    // Multi-freq branch
+    if (multifreq)
+    {
+        if (nlhs > 4)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode supports at most 4 outputs (V_re, V_im, H_re, H_im).");
+
+        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0], true);
+
+        if (freq.empty())
+        {
+            freq.set_size(ant_multi.size());
+            for (size_t i = 0; i < ant_multi.size(); ++i)
+                freq[i] = ant_multi[i].center_frequency;
+        }
+
+        const arma::uword n_ang = az.n_cols;
+        const arma::uword n_out = (element_ind.n_elem == 0) ? ant_multi[0].n_elements() : element_ind.n_elem;
+        const arma::uword n_freq = freq.n_elem;
+
+        arma::cube V_re, V_im, H_re, H_im;
+        if (nlhs > 0)
+            plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang, n_freq);
+        if (nlhs > 1)
+            plhs[1] = qd_mex_init_output(&V_im, n_out, n_ang, n_freq);
+        if (nlhs > 2)
+            plhs[2] = qd_mex_init_output(&H_re, n_out, n_ang, n_freq);
+        if (nlhs > 3)
+            plhs[3] = qd_mex_init_output(&H_im, n_out, n_ang, n_freq);
+
+        // Validation already done in qd_mex_struct2arrayant_multi(..., true)
+        CALL_QD(quadriga_lib::arrayant_interpolate_multi(ant_multi, &az, &el, &freq,
+                                                         &V_re, &V_im, &H_re, &H_im,
+                                                         element_ind, &ori, &elpos, false));
+        return;
+    }
+
+    // Single-freq branch
+    auto ant = quadriga_lib::arrayant<double>();
+    if (arrayant_is_struct)
+        ant = qd_mex_struct2arrayant(prhs[0]);
+    else if (nrhs == 13)
+    {
+        ant.e_theta_re = qd_mex_get_Cube<double>(prhs[7]);
+        ant.e_theta_im = qd_mex_get_Cube<double>(prhs[8]);
+        ant.e_phi_re = qd_mex_get_Cube<double>(prhs[9]);
+        ant.e_phi_im = qd_mex_get_Cube<double>(prhs[10]);
+        ant.azimuth_grid = qd_mex_get_Col<double>(prhs[11]);
+        ant.elevation_grid = qd_mex_get_Col<double>(prhs[12]);
+    }
+    else
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
+    // Allocate outputs
+    const arma::uword n_ang = az.n_cols;
+    const arma::uword n_out = (element_ind.n_elem == 0) ? ant.n_elements() : element_ind.n_elem;
 
     arma::mat V_re, V_im, H_re, H_im, dist_proj, azimuth_loc, elevation_loc, gamma;
-
     if (nlhs > 0)
         plhs[0] = qd_mex_init_output(&V_re, n_out, n_ang);
     if (nlhs > 1)
