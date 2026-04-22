@@ -9,7 +9,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# ARRAYANT_GENERATE
+# GENERATE_ARRAYANT
 Generates predefined array antenna models
 
 - Dispatches to one of several C++ generator functions based on the `type` string
@@ -21,44 +21,44 @@ Generates predefined array antenna models
 ## Usage:
 ```
 % Simple antennas (v-pol)
-ant = quadriga_lib.arrayant_generate('omni', res);
-ant = quadriga_lib.arrayant_generate('dipole', res);
-ant = quadriga_lib.arrayant_generate('half-wave-dipole', res);
+ant = quadriga_lib.generate_arrayant('omni', res);
+ant = quadriga_lib.generate_arrayant('dipole', res);
+ant = quadriga_lib.generate_arrayant('half-wave-dipole', res);
 
 % Cross-polarized isotropic
-ant = quadriga_lib.arrayant_generate('xpol', res);
+ant = quadriga_lib.generate_arrayant('xpol', res);
 
 % Custom 3dB beamwidth
-ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, rear_gain_lin);
+ant = quadriga_lib.generate_arrayant('custom', res, freq, az_3dB, el_3dB, rear_gain_lin);
 
 % Uniform linear array (N horizontal elements, half-wavelength spacing by default)
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
+ant = quadriga_lib.generate_arrayant('ula', res, freq, [], [], [], [], N, pol, [], spacing);
 
 % Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, ...
+ant = quadriga_lib.generate_arrayant('ula', res, freq, [], [], [], [], N, [], [], spacing, ...
                                      [], [], [], [], pattern);
 
 % 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], 
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, [], [], [], 
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], ...
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, [], [], [], ...
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
 
 % Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+ant = quadriga_lib.generate_arrayant('multibeam', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
                                      M, N, pol, beam_angles, spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+ant = quadriga_lib.generate_arrayant('multibeam_sep', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
                                      M, N, pol, beam_angles, spacing);
 
 % Separate outputs (must request exactly 11)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    element_pos, coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_generate( ... );
+    element_pos, coupling_re, coupling_im, center_freq, name] = quadriga_lib.generate_arrayant( ... );
 ```
 
 ## Inputs (common):

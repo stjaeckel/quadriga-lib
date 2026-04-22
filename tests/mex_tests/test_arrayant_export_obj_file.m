@@ -1,6 +1,6 @@
 function test_arrayant_export_obj_file
 
-ant = quadriga_lib.arrayant_generate('3GPP');
+ant = quadriga_lib.generate_arrayant('3GPP');
 quadriga_lib.arrayant_export_obj_file('test_mex.obj',ant);
 
 assertTrue(exist( 'test_mex.obj','file' )==2);

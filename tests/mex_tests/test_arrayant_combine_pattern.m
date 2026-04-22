@@ -68,7 +68,7 @@ assertElementsAlmostEqual( C, e_phi_re, 'absolute', 1e-14 );
 assertElementsAlmostEqual( D, e_phi_im, 'absolute', 1e-14 );
 
 % Grid inerpolation
-ant = quadriga_lib.arrayant_generate('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
+ant = quadriga_lib.generate_arrayant('3gpp', 10, [], [], [], [], 2, [], [], [], 0.0);
 ant.e_theta_re(:,:,2) = 2 * ant.e_theta_re(:,:,2);
 ant.coupling_re = [1;1];
 ant.coupling_im = [0;0];
