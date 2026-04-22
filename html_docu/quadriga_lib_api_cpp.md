@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
-date: "21.04.2026"
+date: "22.04.2026"
 lang: en-US
 ---
 
@@ -23,35 +23,107 @@ lang: en-US
 - Kernel-selection parameters (`use_kernel`): `0` = auto (CUDA if available and problem large enough, else AVX2 if available, else GENERIC), `1` = GENERIC, `2` = AVX2, `3` = CUDA. Throws if the requested kernel is unavailable.
 - `gpu_id` is only read when `use_kernel` resolves to CUDA.
 
-# Overview
+# Function Index
 
-- [Array antenna class](#array-antenna-class)
-- [Array antenna functions](#array-antenna-functions)
-- [Channel class](#channel-class)
-- [Channel functions](#channel-functions)
-- [Channel generation functions](#channel-generation-functions)
-- [Channel statistics](#channel-statistics)
-- [Math functions](#math-functions)
-- [Site-specific simulation tools](#site-specific-simulation-tools)
+| Function | Section | Line |
+| --- | --- | --- |
+| [arrayant](#arrayant) | Array antenna class | 129 |
+| [.append](#append) | Array antenna class | 178 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 200 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 220 |
+| [.copy_element](#copy_element) | Array antenna class | 245 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 265 |
+| [.interpolate](#interpolate) | Array antenna class | 295 |
+| [.is_valid](#is_valid) | Array antenna class | 347 |
+| [.qdant_write](#qdant_write) | Array antenna class | 365 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 392 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 408 |
+| [.set_size](#set_size) | Array antenna class | 444 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 470 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 504 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 544 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 603 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 630 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 662 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 688 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 738 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 763 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 780 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 797 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 851 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 868 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 896 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 913 |
+| [qdant_read](#qdant_read) | Array antenna functions | 988 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1014 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1041 |
+| [channel](#channel) | Channel class | 1070 |
+| [.add_paths](#add_paths) | Channel class | 1117 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1155 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1174 |
+| [any_type_id](#any_type_id) | Channel functions | 1215 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1258 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1301 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1349 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1387 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1399 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1429 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1461 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1497 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1531 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1557 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1585 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1625 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1664 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1712 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1802 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1825 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1887 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1959 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2053 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2121 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2189 |
+| [acdf](#acdf) | Channel statistics | 2265 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2300 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2342 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2394 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2427 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2462 |
+| [fast_acos](#fast_acos) | Math functions | 2495 |
+| [fast_asin](#fast_asin) | Math functions | 2514 |
+| [fast_atan2](#fast_atan2) | Math functions | 2533 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2554 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2587 |
+| [fast_sincos](#fast_sincos) | Math functions | 2632 |
+| [fast_slerp](#fast_slerp) | Math functions | 2653 |
+| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2688 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2759 |
+| [colormap](#colormap) | Site-specific simulation tools | 2805 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2824 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2867 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2905 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2949 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2983 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3024 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3123 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3154 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3182 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3211 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3250 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3286 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3323 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3408 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3449 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3497 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3541 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3571 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3599 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3640 |
+| [write_png](#write_png) | Site-specific simulation tools | 3675 |
 
 ---
 
 # Array antenna class
-
-| Function | Description |
-| --- | --- |
-| [arrayant](#arrayant) | Class for storing and manipulating array antenna models |
-| [.append](#append) | Append elements of another arrayant to the current one |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Calculate the directivity in dBi of a single array element |
-| [.combine_pattern](#combine_pattern) | Combine element patterns, positions, and coupling weights into effective radiation patterns |
-| [.copy_element](#copy_element) | Copy a single antenna element to one or more destination slots |
-| [.export_obj_file](#export_obj_file) | Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization |
-| [.interpolate](#interpolate) | Interpolate polarimetric antenna field patterns for given azimuth/elevation angles |
-| [.is_valid](#is_valid) | Validate the integrity of an arrayant object |
-| [.qdant_write](#qdant_write) | Write arrayant data to a QDANT (XML) file |
-| [.remove_zeros](#remove_zeros) | Remove zero-valued entries from antenna pattern data, reducing its size |
-| [.rotate_pattern](#rotate_pattern) | Rotate antenna radiation patterns around the principal axes using Euler rotations |
-| [.set_size](#set_size) | Resize an arrayant object to new dimensions |
 
 ---
 ## arrayant
@@ -393,27 +465,6 @@ void quadriga_lib::arrayant<dtype>::set_size(
 ---
 
 # Array antenna functions
-
-| Function | Description |
-| --- | --- |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Concatenate two multi-frequency arrayant vectors into a single multi-element model |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Validate a vector of arrayant objects for multi-frequency consistency |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Apply Euler rotations to all entries in a multi-frequency arrayant vector |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Set element positions for all entries in a multi-frequency arrayant vector |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Generate a 3GPP-NR compliant antenna array model |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Generate an antenna with custom 3dB beamwidth |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Generate a short dipole antenna with vertical polarization |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Generate a half-wave dipole antenna with vertical polarization |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Generate a planar multi-element antenna array with multiple beam directions |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Generate an isotropic radiator with vertical polarization |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Generate a uniform linear array (ULA) |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Generate a cross-polarized isotropic radiator |
-| [generate_speaker](#generate_speaker) | Generate a parametric frequency-dependent loudspeaker directivity model |
-| [qdant_read](#qdant_read) | Read an arrayant object from a QDANT file |
-| [qdant_read_multi](#qdant_read_multi) | Read all arrayant objects from a QDANT file into a vector |
-| [qdant_write_multi](#qdant_write_multi) | Write a vector of arrayant objects to a single QDANT file |
 
 ---
 ## arrayant_concat_multi
@@ -1015,13 +1066,6 @@ void quadriga_lib::qdant_write_multi(
 
 # Channel class
 
-| Function | Description |
-| --- | --- |
-| [channel](#channel) | Class for storing and managing MIMO channel data and metadata across multiple snapshots |
-| [.add_paths](#add_paths) | Append new propagation paths to an existing channel snapshot |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Calculate the effective path gain per snapshot in linear scale |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Export propagation paths to a Wavefront OBJ file for 3D visualization |
-
 ---
 ## channel
 Class for storing and managing MIMO channel data and metadata across multiple snapshots
@@ -1166,26 +1210,6 @@ void quadriga_lib::channel<dtype>::write_paths_to_obj_file(
 ---
 
 # Channel functions
-
-| Function | Description |
-| --- | --- |
-| [any_type_id](#any_type_id) | Get type ID and raw access from a `std::any` object |
-| [baseband_freq_response](#baseband_freq_response) | Compute the baseband frequency response of a MIMO channel |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Compute the baseband frequency response of multiple MIMO channels |
-| [get_HDF5_version](#get_hdf5_version) | Return the HDF5 version string as defined by the compile-time header macros |
-| [hdf5_create](#hdf5_create) | Create a new HDF5 channel file with a defined storage layout |
-| [hdf5_read_channel](#hdf5_read_channel) | Read a channel object from an HDF5 file at a specified 4D index |
-| [hdf5_read_dset](#hdf5_read_dset) | Read an unstructured dataset from an HDF5 file at a specified 4D index |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Read names of unstructured datasets stored at a 4D slot in an HDF5 file |
-| [hdf5_read_layout](#hdf5_read_layout) | Read the storage layout of an HDF5 channel file |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Reshape the 4D storage layout of an existing HDF5 channel file |
-| [hdf5_write](#hdf5_write) | Write a channel object to an HDF5 file at a specified 4D index |
-| [hdf5_write_dset](#hdf5_write_dset) | Write a single unstructured dataset to an HDF5 file at a specified 4D index |
-| [qrt_file_parse](#qrt_file_parse) | Read metadata from a QRT file |
-| [qrt_file_read](#qrt_file_read) | Read ray-tracing CIR data from a QRT file |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Initialize a QRT read cache for fast repeated access |
-| [quantize_delays](#quantize_delays) | Map path delays to a fixed tap grid using two-tap power-weighted interpolation |
 
 ---
 ## any_type_id
@@ -1859,14 +1883,6 @@ quadriga_lib::quantize_delays(&cre, &cim, &dl, &cre_q, &cim_q, &dl_q, 5.0e-9, 48
 
 # Channel generation functions
 
-| Function | Description |
-| --- | --- |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models |
-| [get_channels_irs](#get_channels_irs) | Calculate MIMO channel coefficients for IRS-assisted communication |
-| [get_channels_multifreq](#get_channels_multifreq) | Compute channel coefficients for spherical waves across multiple frequencies |
-| [get_channels_planar](#get_channels_planar) | Calculate MIMO channel coefficients for planar wave paths |
-| [get_channels_spherical](#get_channels_spherical) | Calculate MIMO channel coefficients and delays for spherical wave propagation |
-
 ---
 ## get_channels_ieee_indoor
 Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
@@ -2245,14 +2261,6 @@ void quadriga_lib::get_channels_spherical(
 
 # Channel statistics
 
-| Function | Description |
-| --- | --- |
-| [acdf](#acdf) | Calculate the empirical averaged cumulative distribution function (CDF) |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Calculate azimuth and elevation angular spreads with spherical wrapping |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases |
-| [calc_delay_spread](#calc_delay_spread) | Calculates RMS delay spread from per-CIR delays and linear-scale powers |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Calculate the Rician K-Factor from channel impulse response data |
-
 ---
 ## acdf
 Calculate the empirical averaged cumulative distribution function (CDF)
@@ -2449,18 +2457,6 @@ void quadriga_lib::calc_rician_k_factor(
 ---
 
 # Math functions
-
-| Function | Description |
-| --- | --- |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Calculate rotation matrices from Euler angles |
-| [fast_acos](#fast_acos) | Compute elementwise approximate arc-cosine of a vector |
-| [fast_asin](#fast_asin) | Compute elementwise approximate arc-sine of a vector |
-| [fast_atan2](#fast_atan2) | Compute elementwise approximate two-argument arc-tangent of two vectors |
-| [fast_cart2geo](#fast_cart2geo) | Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length |
-| [fast_geo2cart](#fast_geo2cart) | Convert elementwise azimuth/elevation angles to Cartesian coordinates |
-| [fast_sincos](#fast_sincos) | Compute elementwise approximate sine and/or cosine of a vector |
-| [fast_slerp](#fast_slerp) | Compute elementwise approximate SLERP interpolation between two complex-valued vectors |
-| [interp_1D / interp_2D](#interp_1d-interp_2d) | Perform linear interpolation (1D or 2D) on single or multiple data sets. |
 
 ---
 ## calc_rotation_matrix
@@ -2758,32 +2754,6 @@ auto output = quadriga_lib::interp_1D(input, xi, xo);
 ---
 
 # Site-specific simulation tools
-
-| Function | Description |
-| --- | --- |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh |
-| [colormap](#colormap) | Generate a colormap matrix with RGB values |
-| [combine_irs_coord](#combine_irs_coord) | Combine path interaction coordinates for IRS-assisted TX → RX channels |
-| [coord2path](#coord2path) | Convert path interaction coordinates into FBS/LBS positions, path length, and angles |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Generate elliptic propagation paths and weights for diffraction gain estimation |
-| [icosphere](#icosphere) | Construct a geodesic polyhedron from recursive icosahedron subdivision |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Write a triangular mesh to a Mitsuba 3 XML scene file |
-| [obj_file_read](#obj_file_read) | Read a Wavefront `.obj` file and extract geometry and material information |
-| [obj_overlap_test](#obj_overlap_test) | Detect overlapping 3D objects in a triangular mesh |
-| [path_to_tube](#path_to_tube) | Convert a 3D path into a tube surface mesh for visualization |
-| [point_cloud_aabb](#point_cloud_aabb) | Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Reorganize a point cloud into spatial sub-clouds for efficient processing |
-| [point_cloud_split](#point_cloud_split) | Split a point cloud into two sub-clouds along a spatial axis |
-| [point_inside_mesh](#point_inside_mesh) | Test whether 3D points are inside a triangle mesh using raycasting |
-| [ray_mesh_interact](#ray_mesh_interact) | Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces |
-| [ray_point_intersect](#ray_point_intersect) | Calculate intersections of ray beams with points in 3D space |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm |
-| [subdivide_rays](#subdivide_rays) | Subdivide ray beams into four smaller sub-beams |
-| [subdivide_triangles](#subdivide_triangles) | Subdivide triangles into smaller triangles |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing |
-| [triangle_mesh_split](#triangle_mesh_split) | Split a 3D triangular mesh into two sub-meshes along a given axis |
-| [write_png](#write_png) | Write a data matrix to a color-coded PNG file |
 
 ---
 ## calc_diffraction_gain
