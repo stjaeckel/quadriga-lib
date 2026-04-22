@@ -148,6 +148,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n)))
             ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n));
     }
+    return ant;
 }
 
 #endif

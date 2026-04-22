@@ -1,13 +1,13 @@
 function test_arrayant_calc_directivity
 
-ant = quadriga_lib.arrayant_generate('dipole');
+ant = quadriga_lib.generate_arrayant('dipole');
 directivity = quadriga_lib.arrayant_calc_directivity(ant);
 assertElementsAlmostEqual( directivity, 1.760964, 'absolute', 1e-6 );
 
 directivity = quadriga_lib.arrayant_calc_directivity(ant, [1,1]);
 assertElementsAlmostEqual( directivity, [ 1.760964; 1.760964 ], 'absolute', 1e-6 );
 
-[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.arrayant_generate('dipole');
+[A,B,C,D,E,F,G,H,I,J,K] = quadriga_lib.generate_arrayant('dipole');
 directivity = quadriga_lib.arrayant_calc_directivity(A,B,C,D,E,F);
 assertElementsAlmostEqual( directivity, 1.760964, 'absolute', 1e-6 );
 

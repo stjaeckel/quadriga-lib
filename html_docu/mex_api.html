@@ -64,11 +64,11 @@
 <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
 <tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
-<tr><td><a href="#arrayant_generate">arrayant_generate</a></td><td>Generates predefined array antenna models</td></tr>
 <tr><td><a href="#arrayant_interpolate">arrayant_interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
 <tr><td><a href="#arrayant_qdant_read">arrayant_qdant_read</a></td><td>Reads array antenna data from QDANT files</td></tr>
 <tr><td><a href="#arrayant_qdant_write">arrayant_qdant_write</a></td><td>Writes array antenna data to QDANT files</td></tr>
 <tr><td><a href="#arrayant_rotate_pattern">arrayant_rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
+<tr><td><a href="#generate_arrayant">generate_arrayant</a></td><td>Generates predefined array antenna models</td></tr>
 <tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric frequency-dependent loudspeaker directivity model</td></tr>
 </tbody>
 </table>
@@ -694,239 +694,6 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="arrayant_generate"></a>
-<b>arrayant_generate</b> - Generates predefined array antenna models
-<div style="margin-bottom: 1.5em;">
-<ul>
-<li>Dispatches to one of several C++ generator functions based on the <code>type</code> string
-</li>
-<li>Supported types: <code>omni</code>, <code>dipole</code> (or <code>short-dipole</code>), <code>half-wave-dipole</code>, <code>xpol</code>, <code>custom</code>,
-   <code>ula</code>, <code>3GPP</code> (or <code>3gpp</code>), <code>multibeam</code>, <code>multibeam_sep</code>
-</li>
-<li>All positional arguments after <code>type</code> are optional and type-specific; use <code>[]</code> to skip and fall
-   back to defaults
-</li></ul>
-</div>
-
-<i>Usage:</i><br>
-<pre>
-% Simple antennas (v-pol)
-ant = quadriga_lib.arrayant_generate('omni', res);
-ant = quadriga_lib.arrayant_generate('dipole', res);
-ant = quadriga_lib.arrayant_generate('half-wave-dipole', res);
-
-% Cross-polarized isotropic
-ant = quadriga_lib.arrayant_generate('xpol', res);
-
-% Custom 3dB beamwidth
-ant = quadriga_lib.arrayant_generate('custom', res, freq, az_3dB, el_3dB, rear_gain_lin);
-
-% Uniform linear array (N horizontal elements, half-wavelength spacing by default)
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, pol, [], spacing);
-
-% Uniform linear array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], [], spacing, ...
-                                     [], [], [], [], pattern);
-
-% 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], 
-                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
-
-% 3GPP-NR array with custom element beamwidth
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
-                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
-
-% 3GPP-NR array with custom per-element pattern struct
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], ...
-                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
-
-% Multi-beam M×N array (one combined beam / one beam per direction)
-ant = quadriga_lib.arrayant_generate('multibeam', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
-                                     M, N, pol, beam_angles, spacing);
-ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
-                                     M, N, pol, beam_angles, spacing);
-
-% Separate outputs (must request exactly 11)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
-    element_pos, coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_generate( ... );
-</pre>
-
-<i>Inputs (common):</i><br>
-<ul>
-<li><b><code>type</code></b> — Antenna model type; string (see Usage above)
-</li>
-<li><b><code>res</code></b> <i>(optional)</i> — Pattern sampling grid resolution in degrees; default: 1
-</li>
-<li><b><code>freq</code></b> <i>(optional)</i> — Center frequency in Hz; default: 299792458
-</li></ul>
-
-<i>Inputs (type custom, 3GPP, multibeam, multibeam_sep):</i><br>
-<ul>
-<li><b><code>az_3dB</code></b> <i>(optional)</i> — Azimuth 3dB beamwidth in degrees; default: 90 for <code>custom</code>, else
-   triggers 3GPP / multibeam internal defaults
-</li>
-<li><b><code>el_3dB</code></b> <i>(optional)</i> — Elevation 3dB beamwidth in degrees; default: 90 for <code>custom</code>, else
-   triggers 3GPP / multibeam internal defaults
-</li>
-<li><b><code>rear_gain_lin</code></b> <i>(optional)</i> — Front-to-back gain ratio (linear); default: 0
-</li></ul>
-
-<i>Inputs (type ula, 3GPP, multibeam, multibeam_sep):</i><br>
-<ul>
-<li><b><code>M</code></b> <i>(optional)</i> — Number of vertical elements per panel; default: 1; ignored for <code>ula</code>
-</li>
-<li><b><code>N</code></b> <i>(optional)</i> — Number of horizontal elements per panel; default: 1
-</li>
-<li><b><code>pol</code></b> <i>(optional)</i> — Polarization mode; default: 1:<br><br>
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <th style="text-align: left;"></th>
-  <th style="text-align: left;"><code>pol</code></th>
-  <th style="text-align: left;">Description</th>
-</tr>
-<tr>
-  <td></td>
-  <td>1</td>
-  <td>Vertical polarization</td>
-</tr>
-<tr>
-  <td></td>
-  <td>2</td>
-  <td>H/V polarization (2NM elements)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>3</td>
-  <td>±45° polarization (2NM elements)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>4</td>
-  <td>Vertical, vertical elements combined (N elements)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>5</td>
-  <td>H/V, vertical elements combined (2N elements)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>6</td>
-  <td>±45°, vertical elements combined (2N elements)</td>
-</tr>
-</table><br>
-</li>
-<li><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing in wavelengths; default: 0.5
-</li></ul>
-
-<i>Inputs (type 3GPP only):</i><br>
-<ul>
-<li><b><code>tilt</code></b> <i>(optional)</i> — Electrical downtilt in degrees; applies to <code>pol</code> 4–6; default: 0
-</li>
-<li><b><code>Mg</code></b> <i>(optional)</i> — Number of vertically stacked panels; default: 1
-</li>
-<li><b><code>Ng</code></b> <i>(optional)</i> — Number of horizontally stacked panels; default: 1
-</li>
-<li><b><code>dgv</code></b> <i>(optional)</i> — Panel spacing in vertical direction in wavelengths; default: 0.5
-</li>
-<li><b><code>dgh</code></b> <i>(optional)</i> — Panel spacing in horizontal direction in wavelengths; default: 0.5
-</li></ul>
-
-<i>Inputs (type ula, 3GPP):</i><br>
-<ul>
-<li><b><code>pattern</code></b> <i>(optional)</i> — Custom per-element pattern struct used for 3GPP or ULA; same format as
-   outputs; overrides default 3GPP/ULA element pattern; other struct fields if present are ignored
-</li></ul>
-
-<i>Inputs (type multibeam, multibeam_sep):</i><br>
-<ul>
-<li><b><code>beam_angles</code></b> — Beam steering angles, <code>[3, n_beams]</code>; rows are
-   <code>[azimuth_deg; elevation_deg; weight]</code>; <code>multibeam</code> combines beams via MRT weighting,
-   <code>multibeam_sep</code> produces one independent beam per column (weights ignored)
-</li></ul>
-
-<i>Outputs:</i><br>
-<ul>
-<li><b><code>ant</code></b> — Struct with fields:<br><br>
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <th style="text-align: left;"></th>
-  <th style="text-align: left;">Field</th>
-  <th style="text-align: left;">Description</th>
-  <th style="text-align: left;">Size</th>
-</tr>
-<tr>
-  <td></td>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in rad, -π to π, sorted</td>
-  <td><code>[n_azimuth]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in rad, -π/2 to π/2, sorted</td>
-  <td><code>[n_elevation]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>element_pos</code></td>
-  <td>Element (x,y,z) positions in meters</td>
-  <td><code>[3, n_elements]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part</td>
-  <td><code>[n_elements, n_ports]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part</td>
-  <td><code>[n_elements, n_ports]</code></td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in Hz</td>
-  <td>scalar</td>
-</tr>
-<tr>
-  <td></td>
-  <td><code>name</code></td>
-  <td>Name of the array antenna object</td>
-  <td>string</td>
-</tr>
-</table><br>
-    If <code>ant</code> is used as an input to other fuctions, fields <code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code>, <code>azimuth_grid</code>,
-    <code>elevation_grid</code> are mandatory; remaining fields are optional (defaults: unit coupling, zero positions, 299792458 Hz)."
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="arrayant_interpolate"></a>
 <b>arrayant_interpolate</b> - Interpolate array antenna field patterns
 <br><br>
@@ -1520,6 +1287,239 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], bank, tilt, head, usage,
 </tr>
 </table><br>
    Can be returned as separate outputs.
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="generate_arrayant"></a>
+<b>generate_arrayant</b> - Generates predefined array antenna models
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Dispatches to one of several C++ generator functions based on the <code>type</code> string
+</li>
+<li>Supported types: <code>omni</code>, <code>dipole</code> (or <code>short-dipole</code>), <code>half-wave-dipole</code>, <code>xpol</code>, <code>custom</code>,
+   <code>ula</code>, <code>3GPP</code> (or <code>3gpp</code>), <code>multibeam</code>, <code>multibeam_sep</code>
+</li>
+<li>All positional arguments after <code>type</code> are optional and type-specific; use <code>[]</code> to skip and fall
+   back to defaults
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+% Simple antennas (v-pol)
+ant = quadriga_lib.generate_arrayant('omni', res);
+ant = quadriga_lib.generate_arrayant('dipole', res);
+ant = quadriga_lib.generate_arrayant('half-wave-dipole', res);
+
+% Cross-polarized isotropic
+ant = quadriga_lib.generate_arrayant('xpol', res);
+
+% Custom 3dB beamwidth
+ant = quadriga_lib.generate_arrayant('custom', res, freq, az_3dB, el_3dB, rear_gain_lin);
+
+% Uniform linear array (N horizontal elements, half-wavelength spacing by default)
+ant = quadriga_lib.generate_arrayant('ula', res, freq, [], [], [], [], N, pol, [], spacing);
+
+% Uniform linear array with custom per-element pattern struct
+ant = quadriga_lib.generate_arrayant('ula', res, freq, [], [], [], [], N, [], [], spacing, ...
+                                     [], [], [], [], pattern);
+
+% 3GPP-NR array (default 3GPP element pattern)
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, [], [], [], 
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+
+% 3GPP-NR array with custom element beamwidth
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
+
+% 3GPP-NR array with custom per-element pattern struct
+ant = quadriga_lib.generate_arrayant('3GPP', res, freq, [], [], [], ...
+                                     M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh, pattern);
+
+% Multi-beam M×N array (one combined beam / one beam per direction)
+ant = quadriga_lib.generate_arrayant('multibeam', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+                                     M, N, pol, beam_angles, spacing);
+ant = quadriga_lib.generate_arrayant('multibeam_sep', res, freq, az_3dB, el_3dB, rear_gain_lin, ...
+                                     M, N, pol, beam_angles, spacing);
+
+% Separate outputs (must request exactly 11)
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
+    element_pos, coupling_re, coupling_im, center_freq, name] = quadriga_lib.generate_arrayant( ... );
+</pre>
+
+<i>Inputs (common):</i><br>
+<ul>
+<li><b><code>type</code></b> — Antenna model type; string (see Usage above)
+</li>
+<li><b><code>res</code></b> <i>(optional)</i> — Pattern sampling grid resolution in degrees; default: 1
+</li>
+<li><b><code>freq</code></b> <i>(optional)</i> — Center frequency in Hz; default: 299792458
+</li></ul>
+
+<i>Inputs (type custom, 3GPP, multibeam, multibeam_sep):</i><br>
+<ul>
+<li><b><code>az_3dB</code></b> <i>(optional)</i> — Azimuth 3dB beamwidth in degrees; default: 90 for <code>custom</code>, else
+   triggers 3GPP / multibeam internal defaults
+</li>
+<li><b><code>el_3dB</code></b> <i>(optional)</i> — Elevation 3dB beamwidth in degrees; default: 90 for <code>custom</code>, else
+   triggers 3GPP / multibeam internal defaults
+</li>
+<li><b><code>rear_gain_lin</code></b> <i>(optional)</i> — Front-to-back gain ratio (linear); default: 0
+</li></ul>
+
+<i>Inputs (type ula, 3GPP, multibeam, multibeam_sep):</i><br>
+<ul>
+<li><b><code>M</code></b> <i>(optional)</i> — Number of vertical elements per panel; default: 1; ignored for <code>ula</code>
+</li>
+<li><b><code>N</code></b> <i>(optional)</i> — Number of horizontal elements per panel; default: 1
+</li>
+<li><b><code>pol</code></b> <i>(optional)</i> — Polarization mode; default: 1:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;"><code>pol</code></th>
+  <th style="text-align: left;">Description</th>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>Vertical polarization</td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>H/V polarization (2NM elements)</td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>±45° polarization (2NM elements)</td>
+</tr>
+<tr>
+  <td></td>
+  <td>4</td>
+  <td>Vertical, vertical elements combined (N elements)</td>
+</tr>
+<tr>
+  <td></td>
+  <td>5</td>
+  <td>H/V, vertical elements combined (2N elements)</td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>±45°, vertical elements combined (2N elements)</td>
+</tr>
+</table><br>
+</li>
+<li><b><code>spacing</code></b> <i>(optional)</i> — Inter-element spacing in wavelengths; default: 0.5
+</li></ul>
+
+<i>Inputs (type 3GPP only):</i><br>
+<ul>
+<li><b><code>tilt</code></b> <i>(optional)</i> — Electrical downtilt in degrees; applies to <code>pol</code> 4–6; default: 0
+</li>
+<li><b><code>Mg</code></b> <i>(optional)</i> — Number of vertically stacked panels; default: 1
+</li>
+<li><b><code>Ng</code></b> <i>(optional)</i> — Number of horizontally stacked panels; default: 1
+</li>
+<li><b><code>dgv</code></b> <i>(optional)</i> — Panel spacing in vertical direction in wavelengths; default: 0.5
+</li>
+<li><b><code>dgh</code></b> <i>(optional)</i> — Panel spacing in horizontal direction in wavelengths; default: 0.5
+</li></ul>
+
+<i>Inputs (type ula, 3GPP):</i><br>
+<ul>
+<li><b><code>pattern</code></b> <i>(optional)</i> — Custom per-element pattern struct used for 3GPP or ULA; same format as
+   outputs; overrides default 3GPP/ULA element pattern; other struct fields if present are ignored
+</li></ul>
+
+<i>Inputs (type multibeam, multibeam_sep):</i><br>
+<ul>
+<li><b><code>beam_angles</code></b> — Beam steering angles, <code>[3, n_beams]</code>; rows are
+   <code>[azimuth_deg; elevation_deg; weight]</code>; <code>multibeam</code> combines beams via MRT weighting,
+   <code>multibeam_sep</code> produces one independent beam per column (weights ignored)
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>ant</code></b> — Struct with fields:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Field</th>
+  <th style="text-align: left;">Description</th>
+  <th style="text-align: left;">Size</th>
+</tr>
+<tr>
+  <td></td>
+  <td><code>e_theta_re</code></td>
+  <td>e-theta field component, real part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>e_theta_im</code></td>
+  <td>e-theta field component, imaginary part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>e_phi_re</code></td>
+  <td>e-phi field component, real part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>e_phi_im</code></td>
+  <td>e-phi field component, imaginary part</td>
+  <td><code>[n_elevation, n_azimuth, n_elements]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>azimuth_grid</code></td>
+  <td>Azimuth angles in rad, -π to π, sorted</td>
+  <td><code>[n_azimuth]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>elevation_grid</code></td>
+  <td>Elevation angles in rad, -π/2 to π/2, sorted</td>
+  <td><code>[n_elevation]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>element_pos</code></td>
+  <td>Element (x,y,z) positions in meters</td>
+  <td><code>[3, n_elements]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>coupling_re</code></td>
+  <td>Coupling matrix, real part</td>
+  <td><code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>coupling_im</code></td>
+  <td>Coupling matrix, imaginary part</td>
+  <td><code>[n_elements, n_ports]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in Hz</td>
+  <td>scalar</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>name</code></td>
+  <td>Name of the array antenna object</td>
+  <td>string</td>
+</tr>
+</table><br>
+    If <code>ant</code> is used as an input to other fuctions, fields <code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code>, <code>azimuth_grid</code>,
+    <code>elevation_grid</code> are mandatory; remaining fields are optional (defaults: unit coupling, zero positions, 299792458 Hz)."
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
