@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
-date: "22.04.2026"
+date: "23.04.2026"
 lang: en-US
 ---
 
@@ -76,50 +76,50 @@ lang: en-US
 | [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1625 |
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | 1664 |
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1712 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1802 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1825 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1887 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1959 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2053 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2121 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2189 |
-| [acdf](#acdf) | Channel statistics | 2265 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2300 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2342 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2394 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2427 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2462 |
-| [fast_acos](#fast_acos) | Math functions | 2495 |
-| [fast_asin](#fast_asin) | Math functions | 2514 |
-| [fast_atan2](#fast_atan2) | Math functions | 2533 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2554 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2587 |
-| [fast_sincos](#fast_sincos) | Math functions | 2632 |
-| [fast_slerp](#fast_slerp) | Math functions | 2653 |
-| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2688 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2759 |
-| [colormap](#colormap) | Site-specific simulation tools | 2805 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2824 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2867 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2905 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2949 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2983 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3024 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3123 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3154 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3182 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3211 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3250 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3286 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3323 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3408 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3449 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3497 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3541 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3571 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3599 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3640 |
-| [write_png](#write_png) | Site-specific simulation tools | 3675 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1804 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1827 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1889 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1961 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2055 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2123 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2191 |
+| [acdf](#acdf) | Channel statistics | 2267 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2302 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2344 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2396 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2429 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2464 |
+| [fast_acos](#fast_acos) | Math functions | 2497 |
+| [fast_asin](#fast_asin) | Math functions | 2516 |
+| [fast_atan2](#fast_atan2) | Math functions | 2535 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2556 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2589 |
+| [fast_sincos](#fast_sincos) | Math functions | 2634 |
+| [fast_slerp](#fast_slerp) | Math functions | 2655 |
+| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2690 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2761 |
+| [colormap](#colormap) | Site-specific simulation tools | 2807 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2826 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2869 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2907 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2951 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2985 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3026 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3125 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3156 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3184 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3213 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3252 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3288 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3325 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3410 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3451 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3499 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3543 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3573 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3601 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3642 |
+| [write_png](#write_png) | Site-specific simulation tools | 3677 |
 
 ---
 
@@ -1681,7 +1681,7 @@ void quadriga_lib::qrt_file_parse(
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
     int *version = nullptr,
-    arma::fvec *fGHz = nullptr,
+    arma::fvec *freq = nullptr,
     arma::fmat *cir_pos = nullptr,
     arma::fmat *cir_orientation = nullptr,
     arma::fmat *orig_pos = nullptr,
@@ -1702,7 +1702,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file; `[no_freq]`
+- **`freq`** *(optional)* — Frequencies as stored in the file; usually in GHz; `[no_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
@@ -1752,11 +1752,13 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling
-   | `normalize_M` | `M`                   | `path_gain`                 |
-   | ------------- | --------------------- | --------------------------- |
-   | 0             | As stored in QRT file | -FSPL                       |
-   | 1             | Max column power = 1  | -FSPL minus material losses |
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
+  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm
+  | `normalize_M` | `M`                   | `path_gain`                      |
+  | ------------- | --------------------- | -------------------------------- |
+  | 0             | As stored in QRT file | -PL                              |
+  | 1             | Max column power = 1  | -PL minus material losses        |
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 

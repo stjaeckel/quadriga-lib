@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -25,113 +12,73 @@ SECTION!*/
 
 /*!MD
 # QRT_FILE_READ
-Read ray-tracing data from a QRT file
+Read ray-tracing CIR data from a QRT file
 
-## Description:
-- Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point.
-- Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
-- All output arguments are optional; MATLAB only computes outputs that are requested.
-- The `normalize_M` parameter controls how the polarization transfer matrix `M` and path gains are returned.
+- Reads channel impulse response data for a specific snapshot index and origin point
+- All output arguments are optional; MATLAB only computes outputs that are requested
+- If `downlink = true`, origin is TX and destination is RX; if `false`, roles are swapped
 
 ## Usage:
 ```
-[ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, ...
-  path_gain, path_length, M, aod, eod, aoa, eoa, path_coord ] = ...
-    qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
+[ center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
+    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
 ## Input Arguments:
-- **`fn`**<br>
-  Path to the QRT file, string.
-
-- **`i_cir`** (optional)<br>
-  Snapshot index (1-based), scalar. Default: 1
-
-- **`i_orig`** (optional)<br>
-  Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 1
-
-- **`downlink`** (optional)<br>
-  If `true`, origin is TX and destination is RX (downlink). If `false`, roles are swapped (uplink), 
-  logical scalar. Default: `true`
-
-- **`normalize_M`** (optional)<br>
-  Normalization option for the polarization transfer matrix, scalar integer. Default: 1
-   0 | `M` as stored in QRT file, `path_gain` is -FSPL
-   1 | `M` has sum-column power of 2, `path_gain` is -FSPL minus material losses
+- **`fn`** — Path to the QRT file; string
+- **`i_cir`** *(optional)* — Snapshot index, 1-based; default: 1
+- **`i_orig`** *(optional)* — Origin index, 1-based; default: 1
+- **`downlink`** *(optional)* — If `true`, origin=TX, destination=RX; if `false`, roles are
+  swapped; logical scalar; default: `true`
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
+  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
+  | `normalize_M` | `M`                   | `path_gain`                      |
+  | ------------- | --------------------- | -------------------------------- |
+  | 0             | As stored in QRT file | -PL                              |
+  | 1             | Max column power = 1  | -PL minus material losses        |
 
 ## Output Arguments:
-- **`center_freq`**<br>
-  Center frequency in Hz, double vector of size `[n_freq, 1]`.
-
-- **`tx_pos`**<br>
-  Transmitter position in Cartesian coordinates, double vector of size `[3, 1]`.
-
-- **`tx_orientation`**<br>
-  Transmitter orientation (bank, tilt, heading) in radians, double vector of size `[3, 1]`.
-
-- **`rx_pos`**<br>
-  Receiver position in Cartesian coordinates, double vector of size `[3, 1]`.
-
-- **`rx_orientation`**<br>
-  Receiver orientation (bank, tilt, heading) in radians, double vector of size `[3, 1]`.
-
-- **`fbs_pos`**<br>
-  First-bounce scatterer positions, double matrix of size `[3, n_path]`.
-
-- **`lbs_pos`**<br>
-  Last-bounce scatterer positions, double matrix of size `[3, n_path]`.
-
-- **`path_gain`**<br>
-  Path gain on linear scale, double matrix of size `[n_path, n_freq]`.
-
-- **`path_length`**<br>
-  Absolute path length from TX to RX phase center, double vector of size `[n_path, 1]`.
-
-- **`M`**<br>
-  Polarization transfer matrix, double array of size `[8, n_path, n_freq]` or `[2, n_path, n_freq]` 
-  for v6 files.
-
-- **`aod`**<br>
-  Departure azimuth angles in radians, double vector of size `[n_path, 1]`.
-
-- **`eod`**<br>
-  Departure elevation angles in radians, double vector of size `[n_path, 1]`.
-
-- **`aoa`**<br>
-  Arrival azimuth angles in radians, double vector of size `[n_path, 1]`.
-
-- **`eoa`**<br>
-  Arrival elevation angles in radians, double vector of size `[n_path, 1]`.
-
-- **`path_coord`**<br>
-  Interaction coordinates per path, cell array of length `n_path`. Each cell contains a double matrix 
-  of size `[3, n_interact + 2]`.
-
-## Example:
-```
-[center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
-    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 1, 1, true, 1);
-```
+- **`center_frequency`** — Center frequency in Hz; `[n_freq]`
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3]`
+- **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3]`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `[3]`
+- **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3]`
+- **`fbs_pos`** — First-bounce scatterer positions; `[3, n_path]`
+- **`lbs_pos`** — Last-bounce scatterer positions; `[3, n_path]`
+- **`path_gain`** — Path gain on linear scale; `[n_path, n_freq]`
+- **`path_length`** — Absolute path length TX to RX phase center; `[n_path]`
+- **`M`** — Polarization transfer matrix; `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files
+- **`aod`** — Departure azimuth angles; `[n_path]`
+- **`eod`** — Departure elevation angles; `[n_path]`
+- **`aoa`** — Arrival azimuth angles; `[n_path]`
+- **`eoa`** — Arrival elevation angles; `[n_path]`
+- **`path_coord`** — Interaction coordinates per path; cell array of length `n_path`, each `[3, n_interact + 2]`
+- **`no_int`** — Number of mesh interactions per path; 0 indicates LOS; uint32; `[n_path]`
+- **`coord`** — Interaction coordinates (flat, concatenated across paths); single; `[3, sum(no_int)]`
 MD!*/
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1)
+    // Validate argument counts
+    if (nrhs < 1 || nrhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-
-    if (nlhs > 15)
+    if (nlhs > 17)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
-    std::string fn = qd_mex_get_string(prhs[0]);
+    const std::string fn = qd_mex_get_string(prhs[0]);
     arma::uword i_cir = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "i_cir", 1);
     arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
-    bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
-    int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
+    const bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
+    const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
 
+    // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
+    if (i_cir == 0 || i_orig == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "i_cir and i_orig must be >= 1 (1-based).");
     i_cir -= 1;
-    i_orig -=1;
+    i_orig -= 1;
 
     // Declare outputs
     arma::vec center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation;
@@ -140,8 +87,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube M;
     arma::vec aod, eod, aoa, eoa;
     std::vector<arma::mat> path_coord;
+    arma::u32_vec no_int;
+    arma::fmat coord;
 
-    // Set up optional output pointers based on nlhs
+    // Wrap optional output pointers based on nlhs
     arma::vec *p_center_frequency = (nlhs > 0) ? &center_frequency : nullptr;
     arma::vec *p_tx_pos = (nlhs > 1) ? &tx_pos : nullptr;
     arma::vec *p_tx_orientation = (nlhs > 2) ? &tx_orientation : nullptr;
@@ -157,6 +106,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::vec *p_aoa = (nlhs > 12) ? &aoa : nullptr;
     arma::vec *p_eoa = (nlhs > 13) ? &eoa : nullptr;
     std::vector<arma::mat> *p_path_coord = (nlhs > 14) ? &path_coord : nullptr;
+    arma::u32_vec *p_no_int = (nlhs > 15) ? &no_int : nullptr;
+    arma::fmat *p_coord = (nlhs > 16) ? &coord : nullptr;
 
     // Call library function
     CALL_QD(quadriga_lib::qrt_file_read<double>(fn, i_cir, i_orig, downlink,
@@ -164,9 +115,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                 p_rx_pos, p_rx_orientation,
                                                 p_fbs_pos, p_lbs_pos, p_path_gain, p_path_length, p_M,
                                                 p_aod, p_eod, p_aoa, p_eoa,
-                                                p_path_coord, normalize_M));
+                                                p_path_coord, normalize_M,
+                                                p_no_int, p_coord));
 
-    // Write to MATLAB
+    // Copy to MATLAB
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&center_frequency);
     if (nlhs > 1)
@@ -197,10 +149,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[13] = qd_mex_copy2matlab(&eoa);
     if (nlhs > 14)
     {
-        // path_coord is a vector of matrices - output as cell array
-        mwSize n_path = path_coord.size();
+        // Variable column count per path - cell array preserves per-path structure
+        const mwSize n_path = static_cast<mwSize>(path_coord.size());
         plhs[14] = mxCreateCellMatrix(1, n_path);
-        for (mwSize i = 0; i < n_path; i++)
+        for (mwSize i = 0; i < n_path; ++i)
             mxSetCell(plhs[14], i, qd_mex_copy2matlab(&path_coord[i]));
     }
+    if (nlhs > 15)
+        plhs[15] = qd_mex_copy2matlab(&no_int);
+    if (nlhs > 16)
+        plhs[16] = qd_mex_copy2matlab(&coord);
 }

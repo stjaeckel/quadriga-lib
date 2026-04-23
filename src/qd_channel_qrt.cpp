@@ -30,7 +30,7 @@ void quadriga_lib::qrt_file_parse(
     std::vector<std::string> *orig_names = nullptr,
     std::vector<std::string> *dest_names = nullptr,
     int *version = nullptr,
-    arma::fvec *fGHz = nullptr,
+    arma::fvec *freq = nullptr,
     arma::fmat *cir_pos = nullptr,
     arma::fmat *cir_orientation = nullptr,
     arma::fmat *orig_pos = nullptr,
@@ -51,7 +51,7 @@ void quadriga_lib::qrt_file_parse(
 - **`orig_names`** *(optional)* — Names of origin points; `[no_orig]`
 - **`dest_names`** *(optional)* — Names of destination points; `[no_dest]`
 - **`version`** *(optional)* — QRT file version number
-- **`fGHz`** *(optional)* — Center frequency in GHz as stored in the file; `[no_freq]`
+- **`freq`** *(optional)* — Frequencies as stored in the file; usually in GHz; `[no_freq]`
 - **`cir_pos`** *(optional)* — CIR positions in Cartesian coordinates; `[no_cir, 3]`
 - **`cir_orientation`** *(optional)* — CIR orientations as Euler angles; `[no_cir, 3]`
 - **`orig_pos`** *(optional)* — Origin (TX) positions in Cartesian coordinates; `[no_orig, 3]`
@@ -67,7 +67,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
                                   std::vector<std::string> *orig_names,
                                   std::vector<std::string> *dest_names,
                                   int *version,
-                                  arma::fvec *fGHz,
+                                  arma::fvec *freq,
                                   arma::fmat *cir_pos,
                                   arma::fmat *cir_orientation,
                                   arma::fmat *orig_pos,
@@ -241,7 +241,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
         }
     }
 
-    if (fGHz)
+    if (freq)
     {
         if (ver == 4 && l_no_orig != 0)
         {
@@ -255,7 +255,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
             l_freq.set_size(1);
             fileR.read((char *)l_freq.memptr(), sizeof(float));
         }
-        *fGHz = std::move(l_freq);
+        *freq = std::move(l_freq);
     }
 
     if (cir_pos)
@@ -484,11 +484,13 @@ void quadriga_lib::qrt_file_read(
 - **`i_cir`** — Snapshot index, 0-based
 - **`i_orig`** — Origin index, 0-based
 - **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling<br><br>
-   | `normalize_M` | `M`                   | `path_gain`                 |
-   | ------------- | --------------------- | --------------------------- |
-   | 0             | As stored in QRT file | -FSPL                       |
-   | 1             | Max column power = 1  | -FSPL minus material losses |
+- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+  - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
+  - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
+  | `normalize_M` | `M`                   | `path_gain`                      |
+  | ------------- | --------------------- | -------------------------------- |
+  | 0             | As stored in QRT file | -PL                              |
+  | 1             | Max column power = 1  | -PL minus material losses        |
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; left open on return
 - **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
 
@@ -818,10 +820,55 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     if (own_stream && fileR.is_open())
         fileR.close();
 
-    // === Gain at 1 m (FSPL reference) =======================================
+    // === Gain at 1 m (path-loss reference) ==================================
     arma::vec gain_at_1m(no_freq);
-    for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-        gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)p_freq[i_freq]);
+    if (v6) // Scalar: 1/r spreading, frequency-independent reference at 1 m.
+        gain_at_1m.zeros();
+    else
+        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+            gain_at_1m[i_freq] = -32.45 - 20.0 * std::log10((double)p_freq[i_freq]);
+
+    // === Air absorption α(f) in dB/m (ISO 9613-1) ===========================
+    // Defaults: T = 20 °C, RH = 50 %, p = 1 atm (indoor sea-level).
+    // Zero for v4/v5 (EM) so the per-path loop works uniformly.
+    arma::vec alpha_dB_per_m(no_freq, arma::fill::zeros);
+    if (v6)
+    {
+        auto iso9613_alpha = [](double f_Hz,
+                                double T_celsius = 20.0,
+                                double RH_percent = 50.0,
+                                double p_kPa = 101.325) -> double
+        {
+            constexpr double T0 = 293.15;   // Reference temperature [K]
+            constexpr double T01 = 273.16;  // Triple-point isotherm [K]
+            constexpr double p_r = 101.325; // Reference pressure [kPa]
+
+            const double T = T_celsius + 273.15; // Absolute temperature [K]
+
+            // Saturation vapor pressure ratio and molar concentration of water vapor [%]
+            const double C = -6.8346 * std::pow(T01 / T, 1.261) + 4.6151;
+            const double psat = std::pow(10.0, C);
+            const double h = RH_percent * psat / (p_kPa / p_r);
+
+            // Relaxation frequencies for O2 and N2 [Hz]
+            const double pa_pr = p_kPa / p_r;
+            const double T_T0 = T / T0;
+            const double f_rO = pa_pr * (24.0 + 4.04e4 * h * (0.02 + h) / (0.391 + h));
+            const double f_rN = pa_pr * std::pow(T_T0, -0.5) * (9.0 + 280.0 * h * std::exp(-4.170 * (std::pow(T_T0, -1.0 / 3.0) - 1.0)));
+
+            // Absorption coefficient [dB/m]
+            const double f2 = f_Hz * f_Hz;
+            const double classical = 1.84e-11 / pa_pr * std::sqrt(T_T0);
+            const double rot_O = 0.01275 * std::exp(-2239.1 / T) / (f_rO + f2 / f_rO);
+            const double rot_N = 0.1068 * std::exp(-3352.0 / T) / (f_rN + f2 / f_rN);
+
+            return 8.686 * f2 * (classical + std::pow(T_T0, -2.5) * (rot_O + rot_N));
+        };
+
+        // p_freq is stored in GHz (see center_frequency export) → convert to Hz
+        for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
+            alpha_dB_per_m[i_freq] = iso9613_alpha((double)p_freq[i_freq] * 1e9);
+    }
 
     // === Output: center_frequency ===========================================
     if (center_frequency)
@@ -864,8 +911,8 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
         *coord = coordR;
 
     // === Calculate path gain and polarization matrix M ======================
-    // - xprmatR includes all interaction losses, but not the FSPL
-    // - here we calculate the normalized polarization matrix M and the PG without FSPL
+    // - xprmatR includes all interaction losses, but not the path loss
+    // - here we calculate the normalized polarization matrix M and the PG without path loss
     if (M || path_gain)
     {
         dtype *dst = nullptr;
@@ -959,7 +1006,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     bool want_length = path_gain || path_length;
 
     // === Extract path metadata ==============================================
-    // - here we add the FSPL from path length to the PG
+    // - here we add the path loss from path length to the PG
     if (want_angles || want_length || fbs_pos || lbs_pos || path_coord)
     {
         // Convert interaction coordinates to desired precision (e.g. float to double)
@@ -987,7 +1034,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             quadriga_lib::coord2path<dtype>(Ox, Oy, Oz, Dx, Dy, Dz, &no_intR, &coordD,
                                             nullptr, fbs_pos, lbs_pos, nullptr, path_coord, !downlink);
 
-        // Adjust path gain to include the FSPL
+        // Adjust path gain to include the path loss
         if (want_length)
         {
             if (path_length)
@@ -997,6 +1044,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             dtype *pg = path_gain ? path_gain->memptr() : nullptr;
             dtype *pl = path_length ? path_length->memptr() : nullptr;
             double *p_gain_at_1m = gain_at_1m.memptr();
+            double *p_alpha = alpha_dB_per_m.memptr();
 
             for (arma::uword i_path = 0; i_path < no_path; ++i_path)
             {
@@ -1007,35 +1055,35 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
                 {
                     for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
                     {
-                        double gainFS = p_gain_at_1m[i_freq] - 20.0 * std::log10((double)len);
-                        pg[i_freq * no_path + i_path] *= (dtype)std::pow(10.0, 0.1 * gainFS);
+                        double gainPL = p_gain_at_1m[i_freq] - 20.0 * std::log10((double)len) - p_alpha[i_freq] * (double)len;
+                        pg[i_freq * no_path + i_path] *= (dtype)std::pow(10.0, 0.1 * gainPL);
                     }
                 }
             }
-        }
 
-        if (aod)
-        {
-            aod->set_size(no_path);
-            std::memcpy(aod->memptr(), path_angles.colptr(0), no_path * sizeof(dtype));
-        }
+            if (aod)
+            {
+                aod->set_size(no_path);
+                std::memcpy(aod->memptr(), path_angles.colptr(0), no_path * sizeof(dtype));
+            }
 
-        if (eod)
-        {
-            eod->set_size(no_path);
-            std::memcpy(eod->memptr(), path_angles.colptr(1), no_path * sizeof(dtype));
-        }
+            if (eod)
+            {
+                eod->set_size(no_path);
+                std::memcpy(eod->memptr(), path_angles.colptr(1), no_path * sizeof(dtype));
+            }
 
-        if (aoa)
-        {
-            aoa->set_size(no_path);
-            std::memcpy(aoa->memptr(), path_angles.colptr(2), no_path * sizeof(dtype));
-        }
+            if (aoa)
+            {
+                aoa->set_size(no_path);
+                std::memcpy(aoa->memptr(), path_angles.colptr(2), no_path * sizeof(dtype));
+            }
 
-        if (eoa)
-        {
-            eoa->set_size(no_path);
-            std::memcpy(eoa->memptr(), path_angles.colptr(3), no_path * sizeof(dtype));
+            if (eoa)
+            {
+                eoa->set_size(no_path);
+                std::memcpy(eoa->memptr(), path_angles.colptr(3), no_path * sizeof(dtype));
+            }
         }
     }
 }
