@@ -307,7 +307,7 @@ namespace quadriga_lib
                         std::vector<std::string> *orig_names = nullptr, // Names of the origin points (TXs)
                         std::vector<std::string> *dest_names = nullptr, // Names of the destination points (RXs)
                         int *version = nullptr,                         // QRT file version
-                        arma::fvec *fGHz = nullptr,                     // Center frequency in GHz as stored in the QRT file
+                        arma::fvec *freq = nullptr,                     // Center frequency in GHz as stored in the QRT file
                         arma::fmat *cir_pos = nullptr,                  // CIR positions in Cartesian coordinates, size [no_cir, 3]
                         arma::fmat *cir_orientation = nullptr,          // CIR orientation in Euler angles in rad, size [no_cir, 3]
                         arma::fmat *orig_pos = nullptr,                 // Origin (TX) positions, size [no_orig, 3]

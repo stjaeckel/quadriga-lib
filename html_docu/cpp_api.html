@@ -2977,7 +2977,7 @@ void quadriga_lib::qrt_file_parse(
     std::vector&lt;std::string&gt; *orig_names = nullptr,
     std::vector&lt;std::string&gt; *dest_names = nullptr,
     int *version = nullptr,
-    arma::fvec *fGHz = nullptr,
+    arma::fvec *freq = nullptr,
     arma::fmat *cir_pos = nullptr,
     arma::fmat *cir_orientation = nullptr,
     arma::fmat *orig_pos = nullptr,
@@ -3010,7 +3010,7 @@ void quadriga_lib::qrt_file_parse(
 </li>
 <li><b><code>version</code></b> <i>(optional)</i> — QRT file version number
 </li>
-<li><b><code>fGHz</code></b> <i>(optional)</i> — Center frequency in GHz as stored in the file; <code>[no_freq]</code>
+<li><b><code>freq</code></b> <i>(optional)</i> — Frequencies as stored in the file; usually in GHz; <code>[no_freq]</code>
 </li>
 <li><b><code>cir_pos</code></b> <i>(optional)</i> — CIR positions in Cartesian coordinates; <code>[no_cir, 3]</code>
 </li>
@@ -3077,7 +3077,11 @@ void quadriga_lib::qrt_file_read(
 </li>
 <li><b><code>downlink</code></b> — If <code>true</code>, origin=TX, destination=RX; if <code>false</code>, roles are swapped
 </li>
-<li><b><code>normalize_M</code></b> <i>(optional)</i> — Controls <code>M</code> and <code>path_gain</code> scaling<br><br>
+<li><b><code>normalize_M</code></b> <i>(optional)</i> — Controls <code>M</code> and <code>path_gain</code> scaling where PL is the propagation-only path loss
+<ul>
+<li>v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
+</li>
+<li>v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -3089,15 +3093,16 @@ void quadriga_lib::qrt_file_read(
   <td></td>
   <td>0</td>
   <td>As stored in QRT file</td>
-  <td>-FSPL</td>
+  <td>-PL</td>
 </tr>
 <tr>
   <td></td>
   <td>1</td>
   <td>Max column power = 1</td>
-  <td>-FSPL minus material losses</td>
+  <td>-PL minus material losses</td>
 </tr>
 </table><br>
+</li></ul>
 </li>
 <li><b><code>file</code></b> <i>(optional)</i> — Pre-opened binary <code>std::ifstream</code>; left open on return
 </li>

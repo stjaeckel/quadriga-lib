@@ -64,7 +64,7 @@
 <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
 <tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern</td></tr>
-<tr><td><a href="#arrayant_interpolate">arrayant_interpolate</a></td><td>Interpolate array antenna field patterns</td></tr>
+<tr><td><a href="#arrayant_interpolate">arrayant_interpolate</a></td><td>Interpolate polarimetric array antenna field patterns (single- and multi-frequency)</td></tr>
 <tr><td><a href="#arrayant_rotate_pattern">arrayant_rotate_pattern</a></td><td>Rotates antenna patterns</td></tr>
 <tr><td><a href="#generate_arrayant">generate_arrayant</a></td><td>Generates predefined array antenna models</td></tr>
 <tr><td><a href="#generate_speaker">generate_speaker</a></td><td>Generate a parametric frequency-dependent loudspeaker directivity model</td></tr>
@@ -89,7 +89,7 @@
 <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Writes channel data to HDF5 files</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
-<tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from a QRT file</td></tr>
+<tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
 <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
 </tbody>
 </table>
@@ -695,149 +695,95 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="arrayant_interpolate"></a>
-<b>arrayant_interpolate</b> - Interpolate array antenna field patterns
-<br><br>
-<i>Description:</i><br>
-This function interpolates polarimetric antenna field patterns for a given set of azimuth and 
-elevation angles.
+<b>arrayant_interpolate</b> - Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Interpolates complex e-theta (V) and e-phi (H) field components at the requested
+   azimuth / elevation angles.
+</li>
+<li>Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs);
+   returns up to 8 outputs including the optional <code>dist</code>, <code>azimuth_loc</code>, <code>elevation_loc</code>,
+   and <code>gamma</code> as matrices of size <code>[n_out, n_ang]</code>
+</li>
+<li>Multi-frequency mode is selected automatically when <code>arrayant</code> is a struct array with
+   more than one element or when <code>freq</code> is non-empty; for each target frequency, the two
+   bracketing <code>center_freq</code> entries are located and blended via SLERP.
+</li>
+<li>Separate arrayant inputs are accepted in single-frequency mode only
+</li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-% Arrayant as struct
+% Single-frequency, struct input
 [V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
     quadriga_lib.arrayant_interpolate( arrayant, azimuth, elevation, element, orientation, element_pos );
 
-% Arrayant as separate inputs
+% Single-frequency, separate arrayant inputs
 [V_re, V_im, H_re, H_im, dist, azimuth_loc, elevation_loc, gamma] = ...
-    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos,
+    quadriga_lib.arrayant_interpolate( [], azimuth, elevation, element, orientation, element_pos, [], ...
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
+
+% Multi-frequency, struct array input
+[V_re, V_im, H_re, H_im] = ...
+    quadriga_lib.arrayant_interpolate( arrayant_multi, azimuth, elevation, element, orientation, element_pos, freq );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
-<li><b><code>arrayant</code></b> [1] (optional)<br>
-   Struct containing the arrayant data with the following fields:
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Size: <code>[n_elevation, n_azimuth, n_elements]</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Size: <code>[n_azimuth]</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Size: <code>[n_elevation]</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Size: <code>[3, n_elements]</code></td>
-</tr>
-</table><br>
-   If an empty array is passed, array antenna data is provided as separate inputs (Inputs 7-12)<br><br>
+<li><b><code>arrayant</code></b> <i>(optional)</i> — Struct (single-frequency) or struct array (multi-frequency)
+   containing the arrayant data; field layout as in <a href="#generate_arrayant">generate_arrayant</a>. Pass <code>[]</code> to provide
+   the data via separate inputs (single-frequency only)
 </li>
-<li><b><code>azimuth</code></b> [2] (required)<br>
-   Azimuth angles in [rad] for which the field pattern should be interpolated. Values must be
-   between -pi and pi, single or double precision.
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>Option 1:</td>
-  <td>Use the same angles for all antenna elements (planar wave approximation)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
-</tr>
-<tr>
-  <td>Option 2:</td>
-  <td>Provide different angles for each array element (e.g. for spherical waves)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
-</tr>
-</table><br>
+<li><b><code>azimuth</code></b> — Azimuth angles in rad, in [-π, π]; single or double precision;
+   <code>[1, n_ang]</code> for planar-wave mode (same angles for all elements) or <code>[n_out, n_ang]</code> for
+   per-element angles (spherical-wave mode)
 </li>
-<li><b><code>elevation</code></b> [3] (required)<br>
-   Elevation angles in [rad] for which the field pattern should be interpolated. Values must be
-   between -pi/2 and pi/2, single or double precision.
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>Option 1:</td>
-  <td>Use the same angles for all antenna elements (planar wave approximation)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[1, n_ang]</code></td>
-</tr>
-<tr>
-  <td>Option 2:</td>
-  <td>Provide different angles for each array element (e.g. for spherical waves)</td>
-</tr>
-<tr>
-  <td></td>
-  <td>Size: <code>[n_out, n_ang]</code></td>
-</tr>
-</table><br>
+<li><b><code>elevation</code></b> — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must
+   match <code>azimuth</code>
 </li>
-<li><b><code>element</code></b> [4] (optional)<br>
-   The element indices for which the interpolation should be done. Optional parameter. Values must
-   be between 1 and n_elements. It is possible to duplicate elements, i.e. by passing <code>[1,1,2]</code>.
-   If this parameter is not provided (or an empty array is passed), <code>i_element</code> is initialized
-   to <code>[1:n_elements]</code>. In this case, <code>n_out = n_elements</code>. Allowed types: uint32 or double.<br>
-   Size: <code>[1, n_out]</code> or <code>[n_out, 1]</code> or empty <code>[]</code>
+<li><b><code>element</code></b> <i>(optional)</i> — 1-based element indices to interpolate; duplicates allowed;
+   defaults to <code>[1:n_elements]</code> when empty; <code>[1, n_out]</code>, <code>[n_out, 1]</code>, or <code>[]</code>; uint32 or double
 </li>
-<li><b><code>orientation</code></b> [5] (optional)<br>
-   This (optional) 3-element vector describes the orientation of the array antenna or of individual
-   array elements. The The first value describes the ”bank angle”, the second value describes the
-   ”tilt angle”, (positive values point upwards), the third value describes the bearing or ”heading
-   angle”, in mathematic sense. Values must be given in [rad]. East corresponds to 0, and the
-   angles increase counter-clockwise, so north is pi/2, south is -pi/2, and west is equal to pi. By
-   default, the orientation is <code>[0,0,0]</code>', i.e. the broadside of the antenna points at the horizon
-   towards the East. Single or double precision<br>
-   Size: <code>[3, 1]</code> or <code>[3, n_out]</code> or <code>[3, 1, n_ang]</code> or <code>[3, n_out, n_ang]</code> or empty <code>[]</code>
+<li><b><code>orientation</code></b> <i>(optional)</i> — Antenna orientation (bank, tilt, heading) in rad; East is
+   the default broadside; <code>[3, 1]</code>, <code>[3, n_out]</code>, <code>[3, 1, n_ang]</code>, <code>[3, n_out, n_ang]</code>, or <code>[]</code>
 </li>
-<li><b><code>element_pos</code></b> [6] (optional)<br>
-   Alternative positions of the array antenna elements in local cartesian coordinates (using units of [m]).
-   If this parameter is not given, element positions <code>arrayant</code> are used. If the <code>arrayant</code> has no
-   positions, they are initialzed to [0,0,0]. For example, when duplicating the fist element by setting
-   <code>element = [1,1]</code>, different element positions can be set for the  two elements in the output.
-   Size: <code>[3, n_out]</code> or empty <code>[]</code>
+<li><b><code>element_pos</code></b> <i>(optional)</i> — Override element positions in m; <code>[3, n_out]</code> or <code>[]</code>;
+   falls back to <code>arrayant.element_pos</code> (or zeros) when empty
+</li>
+<li><b><code>freq</code></b> <i>(optional, struct input only)</i> — Target frequencies in Hz; <code>[n_freq]</code>. When passing a
+   struct array, <code>freq</code> may be omitted or <code>[]</code>, in which case the <code>center_freq</code> values of the struct
+   array entries are used as target frequencies (no interpolation between bands, one output slice per entry).
 </li></ul>
 
-<i>Derived inputs:</i><br>
+<i>Inputs (separate arrayant data, required when `arrayant` is `[]`, single-frequency only):</i><br>
+<ul>
+<li><b><code>e_theta_re</code></b> — e-theta real part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_theta_im</code></b> — e-theta imaginary part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_phi_re</code></b> — e-phi real part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_phi_im</code></b> — e-phi imaginary part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>azimuth_grid</code></b> — Azimuth sample grid in rad, sorted, in [-π, π]; <code>[n_azimuth]</code>
+</li>
+<li><b><code>elevation_grid</code></b> — Elevation sample grid in rad, sorted, in [-π/2, π/2]; <code>[n_elevation]</code>
+</li></ul>
+
+<i>Derived sizes:</i><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <td><code>n_azimuth</code></td>
-  <td>Number of azimuth angles in the filed pattern</td>
+  <td>Number of azimuth samples in the pattern</td>
 </tr>
 <tr>
   <td><code>n_elevation</code></td>
-  <td>Number of elevation angles in the filed pattern</td>
+  <td>Number of elevation samples in the pattern</td>
 </tr>
 <tr>
   <td><code>n_elements</code></td>
-  <td>Number of antenna elements filed pattern of the array antenna</td>
+  <td>Number of antenna elements in the pattern</td>
 </tr>
 <tr>
   <td><code>n_ang</code></td>
@@ -845,42 +791,44 @@ elevation angles.
 </tr>
 <tr>
   <td><code>n_out</code></td>
-  <td>Number of antenna elements in the generated output (may differ from n_elements)</td>
+  <td>Number of output elements (<code>n_elements</code> if <code>element</code> is empty, else <code>numel(element)</code>)</td>
+</tr>
+<tr>
+  <td><code>n_freq</code></td>
+  <td>Number of target frequencies (multi-frequency mode only)</td>
 </tr>
 </table><br>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
-<li><b><code>vr</code></b><br>
-   Real part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code>
+<li><b><code>V_re</code></b> — Real part of the interpolated e-theta (vertical) field component;
+   <code>[n_out, n_ang]</code> in single-freq mode, <code>[n_out, n_ang, n_freq]</code> in multi-freq mode
 </li>
-<li><b><code>vi</code></b><br>
-   Imaginary part of the interpolated e-theta (vertical) field component. Size <code>[n_out, n_ang]</code>
+<li><b><code>V_im</code></b> — Imaginary part of the e-theta component; same size as <code>V_re</code>
 </li>
-<li><b><code>hr</code></b><br>
-   Real part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code>
+<li><b><code>H_re</code></b> — Real part of the interpolated e-phi (horizontal) field component; same size as <code>V_re</code>
 </li>
-<li><b><code>hi</code></b><br>
-   Imaginary part of the interpolated e-phi (horizontal) field component. Size <code>[n_out, n_ang]</code>
+<li><b><code>H_im</code></b> — Imaginary part of the e-phi component; same size as <code>V_re</code>
 </li>
-<li><b><code>dist</code></b> (optional)<br>
-   The effective distances between the antenna elements when seen from the direction of the
-   incident path. The distance is calculated by an projection of the array positions on the normal
-   plane of the incident path. This is needed for calculating the phase of the antenna response.
-   Size <code>[n_out, n_ang]</code>
+<li><b><code>dist</code></b> <i>(single-frequency only)</i> — Effective distances between the antenna elements
+   projected onto the wavefront plane; used for phase computation; <code>[n_out, n_ang]</code>
 </li>
-<li><b><code>azimuth_loc</code></b> (optional)<br>
-   The azimuth angles in [rad] for the local antenna coordinate system, i.e., after applying the
-   'orientation'. If no orientation vector is given, these angles are identical to the input
-   azimuth angles. Size <code>[n_out, n_ang]</code>
+<li><b><code>azimuth_loc</code></b> <i>(single-frequency only)</i> — Azimuth angles in the local (rotated) element
+   frame in rad; <code>[n_out, n_ang]</code>
 </li>
-<li><b><code>elevation_loc</code></b> (optional)<br>
-   The elevation angles in [rad] for the local antenna coordinate system, i.e., after applying the
-   'orientation'. If no orientation vector is given, these angles are identical to the input
-   elevation angles. Size <code>[n_out, n_ang]</code>
+<li><b><code>elevation_loc</code></b> <i>(single-frequency only)</i> — Elevation angles in the local element frame in
+   rad; <code>[n_out, n_ang]</code>
 </li>
-<li><b><code>gamma</code></b> (optional)<br>
-   Polarization rotation angles in [rad], Size <code>[n_out, n_ang]</code>
+<li><b><code>gamma</code></b> <i>(single-frequency only)</i> — Polarization rotation angles in rad; <code>[n_out, n_ang]</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#qdant_read">qdant_read</a> / <a href="#qdant_write">qdant_write</a> (load / save arrayant data)
+</li>
+<li><a href="#generate_arrayant">generate_arrayant</a> (arrayant struct layout)
+</li>
+<li><a href="#generate_speaker">generate_speaker</a> (typical multi-frequency struct array source)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -2211,183 +2159,153 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qrt_file_parse"></a>
 <b>qrt_file_parse</b> - Read metadata from a QRT file
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul>
-<li>Parses a QRT file and extracts metadata such as the number of snapshots, origins, destinations, and frequencies.
+<li>Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
+   CIR offsets, names, positions, orientations, and file version
 </li>
-<li>All output arguments are optional; MATLAB only computes outputs that are requested.
+<li>All output arguments are optional; MATLAB only computes outputs that are requested
 </li>
-<li>Can also retrieve CIR offsets per destination, human-readable names for origins and destinations, and the file version.
+<li>When <code>no_dest == 0</code> in the file, one implicit RX named <code>"RX"</code> is assumed; <code>dest_names</code> and
+   <code>cir_offset</code> reflect this
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
-  fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation ] = qrt_file_parse( fn );
-</pre>
-
-<i>Input Argument:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Path to the QRT file, string.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>no_cir</code></b><br>
-   Number of channel snapshots per origin point, scalar.
-</li>
-<li><b><code>no_orig</code></b><br>
-   Number of origin points (TX), scalar.
-</li>
-<li><b><code>no_dest</code></b><br>
-   Number of destinations (RX), scalar.
-</li>
-<li><b><code>no_freq</code></b><br>
-   Number of frequency bands, scalar.
-</li>
-<li><b><code>cir_offset</code></b><br>
-   CIR offset for each destination, uint64 vector of size <code>[no_dest, 1]</code>.
-</li>
-<li><b><code>orig_names</code></b><br>
-   Names of the origin points (TXs), cell array of strings with <code>no_orig</code> entries.
-</li>
-<li><b><code>dest_names</code></b><br>
-   Names of the destination points (RXs), cell array of strings with <code>no_dest</code> entries.
-</li>
-<li><b><code>version</code></b><br>
-   QRT file version number, scalar integer.
-</li>
-<li><b><code>fGHz</code></b><br>
-   Center frequency in GHz, float vector of size <code>[no_freq, 1]</code>.
-</li>
-<li><b><code>cir_pos</code></b><br>
-   CIR positions in Cartesian coordinates, float matrix of size <code>[no_cir, 3]</code>.
-</li>
-<li><b><code>cir_orientation</code></b><br>
-   CIR orientation in Euler angles in rad, float matrix of size <code>[no_cir, 3]</code>.
-</li>
-<li><b><code>orig_pos</code></b><br>
-   Origin (TX) positions in Cartesian coordinates, float matrix of size <code>[no_orig, 3]</code>.
-</li>
-<li><b><code>orig_orientation</code></b><br>
-   Origin (TX) orientations in Euler angles in rad, float matrix of size <code>[no_orig, 3]</code>.
-</li></ul>
-
-<i>Example:</i><br>
-<pre>
-[no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, ...
-    fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation] = ...
-    qrt_file_parse('scene.qrt');
-</pre>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="qrt_file_read"></a>
-<b>qrt_file_read</b> - Read ray-tracing data from a QRT file
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Reads channel impulse response (CIR) data from a QRT file for a specific snapshot and origin point.
-</li>
-<li>Supports both uplink and downlink directions by swapping TX/RX roles accordingly.
-</li>
-<li>All output arguments are optional; MATLAB only computes outputs that are requested.
-</li>
-<li>The <code>normalize_M</code> parameter controls how the polarization transfer matrix <code>M</code> and path gains are returned.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-[ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, ...
-  path_gain, path_length, M, aod, eod, aoa, eoa, path_coord ] = ...
-    qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
+[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, freq, ...
+     cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 </pre>
 
 <i>Input Arguments:</i><br>
 <ul>
-<li><b><code>fn</code></b><br>
-   Path to the QRT file, string.
-</li>
-<li><b><code>i_cir</code></b> (optional)<br>
-   Snapshot index (1-based), scalar. Default: 1
-</li>
-<li><b><code>i_orig</code></b> (optional)<br>
-   Origin index (1-based). For downlink, origin corresponds to the transmitter, scalar. Default: 1
-</li>
-<li><b><code>downlink</code></b> (optional)<br>
-   If <code>true</code>, origin is TX and destination is RX (downlink). If <code>false</code>, roles are swapped (uplink),
-   logical scalar. Default: <code>true</code>
-</li>
-<li><b><code>normalize_M</code></b> (optional)<br>
-   Normalization option for the polarization transfer matrix, scalar integer. Default: 1
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>0</td>
-  <td><code>M</code> as stored in QRT file, <code>path_gain</code> is -FSPL</td>
-</tr>
-<tr>
-  <td>1</td>
-  <td><code>M</code> has sum-column power of 2, <code>path_gain</code> is -FSPL minus material losses</td>
-</tr>
-</table><br>
+<li><b><code>fn</code></b> — Path to the QRT file; string
 </li></ul>
 
 <i>Output Arguments:</i><br>
 <ul>
-<li><b><code>center_freq</code></b><br>
-   Center frequency in Hz, double vector of size <code>[n_freq, 1]</code>.
+<li><b><code>no_cir</code></b> — Number of channel snapshots per origin point; uint64 scalar
 </li>
-<li><b><code>tx_pos</code></b><br>
-   Transmitter position in Cartesian coordinates, double vector of size <code>[3, 1]</code>.
+<li><b><code>no_orig</code></b> — Number of origin points (TX); uint64 scalar
 </li>
-<li><b><code>tx_orientation</code></b><br>
-   Transmitter orientation (bank, tilt, heading) in radians, double vector of size <code>[3, 1]</code>.
+<li><b><code>no_dest</code></b> — Number of destination points (RX); uint64 scalar
 </li>
-<li><b><code>rx_pos</code></b><br>
-   Receiver position in Cartesian coordinates, double vector of size <code>[3, 1]</code>.
+<li><b><code>no_freq</code></b> — Number of frequency bands; uint64 scalar
 </li>
-<li><b><code>rx_orientation</code></b><br>
-   Receiver orientation (bank, tilt, heading) in radians, double vector of size <code>[3, 1]</code>.
+<li><b><code>cir_offset</code></b> — CIR offset per destination; uint64; <code>[no_dest]</code>
 </li>
-<li><b><code>fbs_pos</code></b><br>
-   First-bounce scatterer positions, double matrix of size <code>[3, n_path]</code>.
+<li><b><code>orig_names</code></b> — Names of origin points; cell array of strings; <code>[no_orig]</code>
 </li>
-<li><b><code>lbs_pos</code></b><br>
-   Last-bounce scatterer positions, double matrix of size <code>[3, n_path]</code>.
+<li><b><code>dest_names</code></b> — Names of destination points; cell array of strings; <code>[no_dest]</code>
 </li>
-<li><b><code>path_gain</code></b><br>
-   Path gain on linear scale, double matrix of size <code>[n_path, n_freq]</code>.
+<li><b><code>version</code></b> — QRT file version number; int32 scalar
 </li>
-<li><b><code>path_length</code></b><br>
-   Absolute path length from TX to RX phase center, double vector of size <code>[n_path, 1]</code>.
+<li><b><code>freq</code></b> — Frequencies as stored in the file; usually in GHz; single; <code>[no_freq]</code>
 </li>
-<li><b><code>M</code></b><br>
-   Polarization transfer matrix, double array of size <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code>
-   for v6 files.
+<li><b><code>cir_pos</code></b> — CIR positions in Cartesian coordinates; single; <code>[no_cir, 3]</code>
 </li>
-<li><b><code>aod</code></b><br>
-   Departure azimuth angles in radians, double vector of size <code>[n_path, 1]</code>.
+<li><b><code>cir_orientation</code></b> — CIR orientations as Euler angles; single; <code>[no_cir, 3]</code>
 </li>
-<li><b><code>eod</code></b><br>
-   Departure elevation angles in radians, double vector of size <code>[n_path, 1]</code>.
+<li><b><code>orig_pos</code></b> — Origin (TX) positions in Cartesian coordinates; single; <code>[no_orig, 3]</code>
 </li>
-<li><b><code>aoa</code></b><br>
-   Arrival azimuth angles in radians, double vector of size <code>[n_path, 1]</code>.
-</li>
-<li><b><code>eoa</code></b><br>
-   Arrival elevation angles in radians, double vector of size <code>[n_path, 1]</code>.
-</li>
-<li><b><code>path_coord</code></b><br>
-   Interaction coordinates per path, cell array of length <code>n_path</code>. Each cell contains a double matrix
-   of size <code>[3, n_interact + 2]</code>.
+<li><b><code>orig_orientation</code></b> — Origin (TX) orientations as Euler angles; single; <code>[no_orig, 3]</code>
 </li></ul>
 
-<i>Example:</i><br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="qrt_file_read"></a>
+<b>qrt_file_read</b> - Read ray-tracing CIR data from a QRT file
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Reads channel impulse response data for a specific snapshot index and origin point
+</li>
+<li>All output arguments are optional; MATLAB only computes outputs that are requested
+</li>
+<li>If <code>downlink = true</code>, origin is TX and destination is RX; if <code>false</code>, roles are swapped
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
 <pre>
-[center_freq, tx_pos, ~, rx_pos, ~, fbs_pos, lbs_pos, path_gain, path_length, M, ...
-    aod, eod, aoa, eoa] = qrt_file_read('scene.qrt', 1, 1, true, 1);
+[ center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
+    path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
+    quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 </pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the QRT file; string
+</li>
+<li><b><code>i_cir</code></b> <i>(optional)</i> — Snapshot index, 1-based; default: 1
+</li>
+<li><b><code>i_orig</code></b> <i>(optional)</i> — Origin index, 1-based; default: 1
+</li>
+<li><b><code>downlink</code></b> <i>(optional)</i> — If <code>true</code>, origin=TX, destination=RX; if <code>false</code>, roles are
+   swapped; logical scalar; default: <code>true</code>
+</li>
+<li><b><code>normalize_M</code></b> <i>(optional)</i> — Controls <code>M</code> and <code>path_gain</code> scaling where PL is the propagation-only path loss
+<ul>
+<li>v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
+</li>
+<li>v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;"><code>normalize_M</code></th>
+  <th style="text-align: left;"><code>M</code></th>
+  <th style="text-align: left;"><code>path_gain</code></th>
+</tr>
+<tr>
+  <td></td>
+  <td>0</td>
+  <td>As stored in QRT file</td>
+  <td>-PL</td>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>Max column power = 1</td>
+  <td>-PL minus material losses</td>
+</tr>
+</table><br>
+</li></ul>
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>center_frequency</code></b> — Center frequency in Hz; <code>[n_freq]</code>
+</li>
+<li><b><code>tx_pos</code></b> — Transmitter position in Cartesian coordinates; <code>[3]</code>
+</li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientation (bank, tilt, heading); <code>[3]</code>
+</li>
+<li><b><code>rx_pos</code></b> — Receiver position in Cartesian coordinates; <code>[3]</code>
+</li>
+<li><b><code>rx_orientation</code></b> — Receiver orientation (bank, tilt, heading); <code>[3]</code>
+</li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code>
+</li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code>
+</li>
+<li><b><code>path_gain</code></b> — Path gain on linear scale; <code>[n_path, n_freq]</code>
+</li>
+<li><b><code>path_length</code></b> — Absolute path length TX to RX phase center; <code>[n_path]</code>
+</li>
+<li><b><code>M</code></b> — Polarization transfer matrix; <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code> for v6 files
+</li>
+<li><b><code>aod</code></b> — Departure azimuth angles; <code>[n_path]</code>
+</li>
+<li><b><code>eod</code></b> — Departure elevation angles; <code>[n_path]</code>
+</li>
+<li><b><code>aoa</code></b> — Arrival azimuth angles; <code>[n_path]</code>
+</li>
+<li><b><code>eoa</code></b> — Arrival elevation angles; <code>[n_path]</code>
+</li>
+<li><b><code>path_coord</code></b> — Interaction coordinates per path; cell array of length <code>n_path</code>, each <code>[3, n_interact + 2]</code>
+</li>
+<li><b><code>no_int</code></b> — Number of mesh interactions per path; 0 indicates LOS; uint32; <code>[n_path]</code>
+</li>
+<li><b><code>coord</code></b> — Interaction coordinates (flat, concatenated across paths); single; <code>[3, sum(no_int)]</code>
+</li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="quantize_delays"></a>
