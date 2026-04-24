@@ -6,8 +6,9 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = ON
+octave = OFF
 matlab = ON
+python = OFF
 avx2 = ON
 cuda = OFF
 
@@ -29,8 +30,8 @@ all:
 	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
 		-D ENABLE_MATLAB=$(matlab) \
 		-D ENABLE_OCTAVE=$(octave) \
-		-D ENABLE_MEX_DOC=ON \
-		-D ENABLE_PYTHON=ON \
+		-D ENABLE_MEX_DOC=$(python) \
+		-D ENABLE_PYTHON=$(python) \
 		-D ENABLE_TESTS=OFF \
 		-D ARMA_EXT=$(arma_internal) \
 		-D HDF5_STATIC=$(hdf5_internal) \
