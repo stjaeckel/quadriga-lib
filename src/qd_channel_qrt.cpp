@@ -495,7 +495,7 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [[qrt_read_cache_init]]<br><br>
 
 ## Outputs:
-- **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`
+- **`center_frequency`** *(optional)* — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates; `[3]`
 - **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading); `[3]`
 - **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates; `[3]`
@@ -865,9 +865,9 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
             return 8.686 * f2 * (classical + std::pow(T_T0, -2.5) * (rot_O + rot_N));
         };
 
-        // p_freq is stored in GHz (see center_frequency export) → convert to Hz
+        // p_freq is stored in Hz (see center_frequency export)
         for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            alpha_dB_per_m[i_freq] = iso9613_alpha((double)p_freq[i_freq] * 1e9);
+            alpha_dB_per_m[i_freq] = iso9613_alpha((double)p_freq[i_freq]);
     }
 
     // === Output: center_frequency ===========================================
@@ -875,7 +875,7 @@ void quadriga_lib::qrt_file_read(const std::string &fn, arma::uword i_cir, arma:
     {
         center_frequency->set_size(no_freq);
         for (arma::uword i_freq = 0; i_freq < no_freq; ++i_freq)
-            center_frequency->at(i_freq) = (dtype)p_freq[i_freq] * (dtype)1e9;
+            center_frequency->at(i_freq) = v6 ? (dtype)p_freq[i_freq] : (dtype)p_freq[i_freq] * (dtype)1e9;
     }
 
     // === Output: positions ==================================================
