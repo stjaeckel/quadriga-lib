@@ -402,6 +402,10 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
                                  arma::Col<dtype> *sEL, arma::Col<dtype> *cEL,
                                  const arma::Col<dtype> *len, int use_kernel)
 {
+#if !BUILD_WITH_AVX2
+    (void)use_kernel;
+#endif
+
     const arma::uword n_val = az.n_elem;
 
     if (el.n_elem != n_val)
@@ -412,9 +416,6 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
     // Kernel selection
 #if BUILD_WITH_AVX2
     const bool avx2_ok = runtime_AVX2_Check();
-#else
-    constexpr bool avx2_ok = false;
-#endif
 
     int kernel = 1; // Default to GENERIC
     if (use_kernel == 1)
@@ -427,6 +428,7 @@ void quadriga_lib::fast_geo2cart(const arma::Col<dtype> &az, const arma::Col<dty
     }
     else // Auto-select (use_kernel == 0)
         kernel = avx2_ok ? 2 : 1;
+#endif
 
     // Resize required outputs
     if (x.n_elem != n_val)
@@ -519,6 +521,10 @@ template <typename dtype>
 void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtype> &y, const arma::Col<dtype> &z,
                                  arma::Col<dtype> &az, arma::Col<dtype> &el, arma::Col<dtype> *len, int use_kernel)
 {
+#if !BUILD_WITH_AVX2
+    (void)use_kernel;
+#endif
+
     const arma::uword n_val = x.n_elem;
     if (y.n_elem != n_val || z.n_elem != n_val)
         throw std::invalid_argument("Input vectors 'x', 'y', and 'z' must have the same length.");
@@ -526,9 +532,6 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
     // Kernel selection
 #if BUILD_WITH_AVX2
     const bool avx2_ok = runtime_AVX2_Check();
-#else
-    constexpr bool avx2_ok = false;
-#endif
 
     int kernel = 1; // Default to GENERIC
     if (use_kernel == 1)
@@ -541,6 +544,7 @@ void quadriga_lib::fast_cart2geo(const arma::Col<dtype> &x, const arma::Col<dtyp
     }
     else // Auto-select (use_kernel == 0)
         kernel = avx2_ok ? 2 : 1;
+#endif
 
     // Resize outputs
     if (az.n_elem != n_val)

@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
-date: "23.04.2026"
+date: "24.04.2026"
 lang: en-US
 ---
 
@@ -105,21 +105,21 @@ lang: en-US
 | [icosphere](#icosphere) | Site-specific simulation tools | 2951 |
 | [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2985 |
 | [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3026 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3125 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3156 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3184 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3213 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3252 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3288 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3325 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3410 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3451 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3499 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3543 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3573 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3601 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3642 |
-| [write_png](#write_png) | Site-specific simulation tools | 3677 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3143 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3174 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3202 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3231 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3270 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3306 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3343 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3428 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3469 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3517 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3561 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3591 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3619 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3660 |
+| [write_png](#write_png) | Site-specific simulation tools | 3695 |
 
 ---
 
@@ -1763,7 +1763,7 @@ void quadriga_lib::qrt_file_read(
 - **`cache`** *(optional)* — Pre-populated cache from [qrt_read_cache_init](#qrt_read_cache_init)
 
 ### Outputs:
-- **`center_frequency`** *(optional)* — Center frequency; `[n_freq]`
+- **`center_frequency`** *(optional)* — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** *(optional)* — Transmitter position in Cartesian coordinates; `[3]`
 - **`tx_orientation`** *(optional)* — Transmitter orientation (bank, tilt, heading); `[3]`
 - **`rx_pos`** *(optional)* — Receiver position in Cartesian coordinates; `[3]`
@@ -3027,13 +3027,16 @@ void quadriga_lib::mitsuba_xml_file_write(
 Read a Wavefront `.obj` file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0)
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
 - Material name matching is case-sensitive
 - Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
 - Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::A:B:C:D:att` — ε_r = A * fGHz^B, σ = C * fGHz^D, att = fixed penetration loss in dB
-- `mtl_prop` columns: (a) ε_r at 1 GHz, (b) frequency exponent for ε_r, (c) σ at 1 GHz, (d) frequency exponent for σ, (e) fixed attenuation in dB
-- `obj_ind` and `mtl_ind` are 1-based; `face_ind` is 0-based
+- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef`
+  - ε_r(f)   = a · (f/fRef)^b          (relative permittivity)
+  - σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)
+  - Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)
+  - α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)
+  - Trailing fields are optional; defaults are `b=c=d=att=attB=alpha=alphaB=0`, `fRef=1` GHz
 
 ### Declaration:
 ```
@@ -3053,11 +3056,25 @@ arma::uword quadriga_lib::obj_file_read(
 
 ### Inputs:
 - **`fn`** — Path to the `.obj` file
-- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties; columns: `name, a, b, c, d, att` (order flexible); if empty, ITU-R P.2040-3 defaults are used
+- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
+  Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
+  Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
+  If empty, ITU-R P.2040-3 defaults are used.
 
 ### Outputs:
 - **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
-- **`mtl_prop`** *(optional)* — Material properties (a, b, c, d, att) per triangle; `[n_mesh, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:
+  | Index | Symbol | Property                                      |
+  | ----- | ------ | --------------------------------------------- |
+  | 0     | a      | ε_r at fRef                                   |
+  | 1     | b      | Frequency exponent for ε_r                    |
+  | 2     | c      | σ at fRef [S/m]                               |
+  | 3     | d      | Frequency exponent for σ                      |
+  | 4     | att    | Penetration loss at fRef [dB]                 |
+  | 5     | attB   | Frequency exponent for att                    |
+  | 6     | alpha  | Distance absorption at fRef [dB/m]            |
+  | 7     | alphaB | Frequency exponent for alpha                  |
+  | 8     | fRef   | Reference frequency [GHz]                     |
 - **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** *(optional)* — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
 - **`obj_ind`** *(optional)* — 1-based object index per triangle; `[n_mesh]`
@@ -3089,7 +3106,8 @@ arma::uword quadriga_lib::obj_file_read(
 - Number of triangular mesh elements (`n_mesh`)
 
 ### Default material table:
-| Name                  | a     | b      | c       | d      | Att  | max fGHz |
+- For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:
+  | Name                  | a     | b      | c       | d      | att  | max fGHz |
   | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
   | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
@@ -3560,11 +3578,11 @@ arma::uword quadriga_lib::subdivide_triangles(
 ### Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_triangles_in, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_triangles_in, 9]`
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 5]`
+- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 9]`
 
 ### Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -3623,12 +3641,12 @@ arma::uword triangle_mesh_segmentation(
 - **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
-- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 
 ### Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 5]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 9]`
 - **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
 
 ### Returns:

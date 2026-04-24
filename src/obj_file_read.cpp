@@ -13,18 +13,21 @@
 #include <algorithm>
 #include <stdexcept>
 
-// Define a struct to store the material properties
+// Struct to store the material properties
 struct MaterialProp
 {
-    std::string name;  // Material name
-    double a, b, c, d; // Electromagnetic properties
-    double att;        // Additional fixed  attenuation in dB
-    arma::uword index; // Material index
+    std::string name;
+    double a, b, c, d;    // ε_r and σ models
+    double att, attB;     // Att(f)   = att   * (f/fRef)^attB   [dB]
+    double alpha, alphaB; // α(f)     = alpha * (f/fRef)^alphaB [dB/m]
+    double fRef;          // reference frequency [GHz], default 1.0
+    arma::uword index;
 };
 
-// Minimal CSV parser for material properties - replaces external CSV library
-// Returns vector of MaterialProp entries parsed from CSV file
-// CSV must have header row with columns: name, a, b, c, d, att (order can vary)
+// Minimal CSV parser for material properties
+// Required columns: name, a
+// Optional columns (any order, any subset): b, c, d, att, attB, alpha, alphaB, fRef
+// Missing/empty optional values default to 0.0 (1.0 for fRef)
 static inline std::vector<MaterialProp> parse_materials_csv(const std::string &filename)
 {
     std::ifstream file(filename);
@@ -51,7 +54,6 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
         size_t idx = 0;
         while (std::getline(ss, col, ','))
         {
-            // Trim whitespace and carriage return
             size_t start = col.find_first_not_of(" \t\r\n");
             size_t end = col.find_last_not_of(" \t\r\n");
             if (start != std::string::npos && end != std::string::npos)
@@ -66,19 +68,40 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
     }
 
     // Validate required columns exist
-    std::vector<std::string> required = {"name", "a", "b", "c", "d", "att"};
-    for (const auto &req : required)
+    for (const auto &req : {"name", "a"})
         if (col_idx.find(req) == col_idx.end())
-            throw std::invalid_argument("Error reading CSV file: '" + filename +
-                                        "' is missing required column '" + req + "'.");
+            throw std::invalid_argument("Error reading CSV file: '" + filename + "' is missing required column '" + std::string(req) + "'.");
+
+    // Optional-column bookkeeping
+    struct Col
+    {
+        bool present;
+        size_t idx;
+        double def;
+    };
+    auto make_opt = [&](const char *name, double def) -> Col
+    {
+        auto it = col_idx.find(name);
+        return {it != col_idx.end(), it != col_idx.end() ? it->second : 0, def};
+    };
 
     size_t idx_name = col_idx["name"];
     size_t idx_a = col_idx["a"];
-    size_t idx_b = col_idx["b"];
-    size_t idx_c = col_idx["c"];
-    size_t idx_d = col_idx["d"];
-    size_t idx_att = col_idx["att"];
-    size_t max_idx = std::max({idx_name, idx_a, idx_b, idx_c, idx_d, idx_att});
+
+    Col col_b = make_opt("b", 0.0);
+    Col col_c = make_opt("c", 0.0);
+    Col col_d = make_opt("d", 0.0);
+    Col col_att = make_opt("att", 0.0);
+    Col col_attB = make_opt("attB", 0.0);
+    Col col_alpha = make_opt("alpha", 0.0);
+    Col col_alphaB = make_opt("alphaB", 0.0);
+    Col col_fRef = make_opt("fRef", 1.0);
+
+    // Minimum required row width (covers all columns that *are* declared in the header)
+    size_t max_idx = std::max(idx_name, idx_a);
+    for (const Col *c : {&col_b, &col_c, &col_d, &col_att, &col_attB, &col_alpha, &col_alphaB, &col_fRef})
+        if (c->present)
+            max_idx = std::max(max_idx, c->idx);
 
     // Check for duplicate names while parsing
     std::unordered_set<std::string> seen_names;
@@ -99,7 +122,6 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
         std::string val;
         while (std::getline(ss, val, ','))
         {
-            // Trim whitespace and carriage return
             size_t start = val.find_first_not_of(" \t\r\n");
             size_t end = val.find_last_not_of(" \t\r\n");
             if (start != std::string::npos && end != std::string::npos)
@@ -109,33 +131,59 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
             values.push_back(val);
         }
 
+        // Require name and 'a' to be present in the row
+        size_t required_max = std::max(idx_name, idx_a);
+        if (values.size() <= required_max)
+            throw std::invalid_argument("Error reading CSV file: '" + filename + "' line " +
+                                        std::to_string(line_num) + " has insufficient columns.");
+
+        // std::getline drops truly-trailing empty fields — pad so optional-column
+        // access is in-bounds; padded empties fall through to defaults in parse_opt
+        if (values.size() < max_idx + 1)
+            values.resize(max_idx + 1);
+
         if (values.size() <= max_idx)
-            throw std::invalid_argument("Error reading CSV file: '" + filename +
-                                        "' line " + std::to_string(line_num) + " has insufficient columns.");
+            throw std::invalid_argument("Error reading CSV file: '" + filename + "' line " + std::to_string(line_num) + " has insufficient columns.");
+
+        // Parse optional double: default if column absent OR value cell empty
+        auto parse_opt = [&](const Col &c) -> double
+        {
+            if (!c.present)
+                return c.def;
+            const std::string &s = values[c.idx];
+            if (s.empty())
+                return c.def;
+            return std::stod(s);
+        };
 
         MaterialProp mat;
         mat.name = values[idx_name];
 
         try
         {
-            mat.a = std::stod(values[idx_a]);
-            mat.b = std::stod(values[idx_b]);
-            mat.c = std::stod(values[idx_c]);
-            mat.d = std::stod(values[idx_d]);
-            mat.att = std::stod(values[idx_att]);
+            mat.a = std::stod(values[idx_a]); // required
+            mat.b = parse_opt(col_b);
+            mat.c = parse_opt(col_c);
+            mat.d = parse_opt(col_d);
+            mat.att = parse_opt(col_att);
+            mat.attB = parse_opt(col_attB);
+            mat.alpha = parse_opt(col_alpha);
+            mat.alphaB = parse_opt(col_alphaB);
+            mat.fRef = parse_opt(col_fRef);
         }
         catch (const std::exception &)
         {
-            throw std::invalid_argument("Error reading CSV file: '" + filename +
-                                        "' line " + std::to_string(line_num) + " contains invalid numeric value.");
+            throw std::invalid_argument("Error reading CSV file: '" + filename + "' line " + std::to_string(line_num) + " contains invalid numeric value.");
         }
+
+        if (mat.a <= 0.0)
+            throw std::invalid_argument("Error reading CSV file: '" + filename + "' line " + std::to_string(line_num) + " has non-positive permittivity 'a'.");
 
         mat.index = 0;
 
         // Check for duplicate names
         if (!seen_names.insert(mat.name).second)
-            throw std::invalid_argument("Error reading CSV file: Duplicate material name '" +
-                                        mat.name + "' found.");
+            throw std::invalid_argument("Error reading CSV file: Duplicate material name '" + mat.name + "' found.");
 
         materials.push_back(std::move(mat));
     }
@@ -152,13 +200,16 @@ SECTION!*/
 Read a Wavefront `.obj` file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0)
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
 - Material name matching is case-sensitive
 - Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
 - Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::A:B:C:D:att` — ε_r = A * fGHz^B, σ = C * fGHz^D, att = fixed penetration loss in dB
-- `mtl_prop` columns: (a) ε_r at 1 GHz, (b) frequency exponent for ε_r, (c) σ at 1 GHz, (d) frequency exponent for σ, (e) fixed attenuation in dB
-- `obj_ind` and `mtl_ind` are 1-based; `face_ind` is 0-based
+- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef`<br>
+  - ε_r(f)   = a · (f/fRef)^b          (relative permittivity)<br>
+  - σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)<br>
+  - Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)<br>
+  - α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)<br>
+  - Trailing fields are optional; defaults are `b=c=d=att=attB=alpha=alphaB=0`, `fRef=1` GHz
 
 ## Declaration:
 ```
@@ -178,11 +229,25 @@ arma::uword quadriga_lib::obj_file_read(
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file
-- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties; columns: `name, a, b, c, d, att` (order flexible); if empty, ITU-R P.2040-3 defaults are used
+- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
+  Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
+  Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
+  If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
 - **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
-- **`mtl_prop`** *(optional)* — Material properties (a, b, c, d, att) per triangle; `[n_mesh, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:
+  | Index | Symbol | Property                                      |
+  | ----- | ------ | --------------------------------------------- |
+  | 0     | a      | ε_r at fRef                                   |
+  | 1     | b      | Frequency exponent for ε_r                    |
+  | 2     | c      | σ at fRef [S/m]                               |
+  | 3     | d      | Frequency exponent for σ                      |
+  | 4     | att    | Penetration loss at fRef [dB]                 |
+  | 5     | attB   | Frequency exponent for att                    |
+  | 6     | alpha  | Distance absorption at fRef [dB/m]            |
+  | 7     | alphaB | Frequency exponent for alpha                  |
+  | 8     | fRef   | Reference frequency [GHz]                     |
 - **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** *(optional)* — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
 - **`obj_ind`** *(optional)* — 1-based object index per triangle; `[n_mesh]`
@@ -213,8 +278,9 @@ arma::uword quadriga_lib::obj_file_read(
 ## Returns:
 - Number of triangular mesh elements (`n_mesh`)
 
-## Default material table:<br>
-  | Name                  | a     | b      | c       | d      | Att  | max fGHz |
+## Default material table:
+- For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:<br><br>
+  | Name                  | a     | b      | c       | d      | att  | max fGHz |
   | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
   | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
@@ -244,6 +310,7 @@ arma::uword quadriga_lib::obj_file_read(
 ## See also:
 - [[obj_overlap_test]] (for testing mesh geometry)
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
+- [[ray_mesh_interact]] (calculating interactions between rays and the triangular mesh)
 - [[mitsuba_xml_file_write]] (for exporting to Mitsuba scene file format)
 MD!*/
 
@@ -300,31 +367,31 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     if (materials_csv.empty()) // Use default materials
     {
         // Add default material data, See: Rec. ITU-R P.2040-1, Table 3
-        mtl_lib.push_back({"vacuum", 1.0, 0.0, 0.0, 0.0, 0.0, 0});
-        mtl_lib.push_back({"air", 1.0, 0.0, 0.0, 0.0, 0.0, 0});
-        mtl_lib.push_back({"textiles", 1.5, 0.0, 5e-5, 0.62, 0.0, 0});
-        mtl_lib.push_back({"plastic", 2.44, 0.0, 2.33e-5, 1.0, 0.0, 0});
-        mtl_lib.push_back({"ceramic", 6.5, 0.0, 0.0023, 1.32, 0.0, 0});
-        mtl_lib.push_back({"sea_water", 80.0, -0.25, 4.0, 0.58, 0.0, 0});
-        mtl_lib.push_back({"sea_ice", 3.2, -0.022, 1.1, 1.5, 0.0, 0});
-        mtl_lib.push_back({"water", 80.0, -0.18, 0.6, 1.52, 0.0, 0});
-        mtl_lib.push_back({"water_ice", 3.17, -0.005, 5.6e-5, 1.7, 0.0, 0});
-        mtl_lib.push_back({"itu_concrete", 5.24, 0.0, 0.0462, 0.7822, 0.0, 0});
-        mtl_lib.push_back({"itu_brick", 3.91, 0.0, 0.0238, 0.16, 0.0, 0});
-        mtl_lib.push_back({"itu_plasterboard", 2.73, 0.0, 0.0085, 0.9395, 0.0, 0});
-        mtl_lib.push_back({"itu_wood", 1.99, 0.0, 0.0047, 1.0718, 0.0, 0});
-        mtl_lib.push_back({"itu_glass", 6.31, 0.0, 0.0036, 1.3394, 0.0, 0});
-        mtl_lib.push_back({"itu_ceiling_board", 1.48, 0.0, 0.0011, 1.075, 0.0, 0});
-        mtl_lib.push_back({"itu_chipboard", 2.58, 0.0, 0.0217, 0.78, 0.0, 0});
-        mtl_lib.push_back({"itu_plywood", 2.71, 0.0, 0.33, 0.0, 0.0, 0});
-        mtl_lib.push_back({"itu_marble", 7.074, 0.0, 0.0055, 0.9262, 0.0, 0});
-        mtl_lib.push_back({"itu_floorboard", 3.66, 0.0, 0.0044, 1.3515, 0.0, 0});
-        mtl_lib.push_back({"itu_metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0});
-        mtl_lib.push_back({"itu_very_dry_ground", 3.0, 0.0, 0.00015, 2.52, 0.0, 0});
-        mtl_lib.push_back({"itu_medium_dry_ground", 15.0, -0.1, 0.035, 1.63, 0.0, 0});
-        mtl_lib.push_back({"itu_wet_ground", 30.0, -0.4, 0.15, 1.3, 0.0, 0});
-        mtl_lib.push_back({"itu_vegetation", 1.0, 0.0, 1.0e-4, 1.1, 0.0, 0}); // Rec. ITU-R P.833-9, Figure 2
-        mtl_lib.push_back({"irr_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
+        mtl_lib.push_back({"vacuum", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"air", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"textiles", 1.5, 0.0, 5e-5, 0.62, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"plastic", 2.44, 0.0, 2.33e-5, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"ceramic", 6.5, 0.0, 0.0023, 1.32, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"sea_water", 80.0, -0.25, 4.0, 0.58, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"sea_ice", 3.2, -0.022, 1.1, 1.5, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"water", 80.0, -0.18, 0.6, 1.52, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"water_ice", 3.17, -0.005, 5.6e-5, 1.7, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_concrete", 5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_brick", 3.91, 0.0, 0.0238, 0.16, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_plasterboard", 2.73, 0.0, 0.0085, 0.9395, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_wood", 1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_glass", 6.31, 0.0, 0.0036, 1.3394, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_ceiling_board", 1.48, 0.0, 0.0011, 1.075, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_chipboard", 2.58, 0.0, 0.0217, 0.78, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_plywood", 2.71, 0.0, 0.33, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_marble", 7.074, 0.0, 0.0055, 0.9262, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_floorboard", 3.66, 0.0, 0.0044, 1.3515, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_metal", 1.0, 0.0, 1.0e7, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_very_dry_ground", 3.0, 0.0, 0.00015, 2.52, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_medium_dry_ground", 15.0, -0.1, 0.035, 1.63, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_wet_ground", 30.0, -0.4, 0.15, 1.3, 0.0, 0.0, 0.0, 0.0, 1.0, 0});
+        mtl_lib.push_back({"itu_vegetation", 1.0, 0.0, 1.0e-4, 1.1, 0.0, 0.0, 0.0, 0.0, 1.0, 0}); // Rec. ITU-R P.833-9, Figure 2
+        mtl_lib.push_back({"irr_glass", 6.27, 0.0, 0.0043, 1.1925, 23.0, 0.0, 0.0, 0.0, 1.0, 0}); // 3GPP TR 38.901 V17.0.0, Table 7.4.3-1: Material penetration losses
     }
     else if (!std::filesystem::exists(materials_csv)) // Check if a given CSV file exists
         throw std::invalid_argument("Error opening file: CSV file '" + materials_csv + "' does not exist.");
@@ -338,7 +405,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     // Local data
     arma::uword i_vert = 0, i_face = 0, j_face = 0, i_object = 0, i_mtl = 0; // Counters for vertices, faces, objects, materials
     arma::uword iM = 0;                                                      // Material index
-    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0;               // Default material properties
+    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, fRefM = 1.0;              // Default material properties
+    double attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0;             // Default attenuation properties
     bool simple_face_format = true;                                          // Selector for face format
 
     // Obtain memory for the vertex list
@@ -366,8 +434,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         p_face_ind = face_ind->memptr();
 
     // Set size of "mtl_prop"
-    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 5))
-        mtl_prop->set_size(n_faces, 5);
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 9))
+        mtl_prop->set_size(n_faces, 9);
     dtype *p_mtl_prop = (mtl_prop == nullptr) ? nullptr : mtl_prop->memptr();
 
     // Set size of "mtl_ind"
@@ -428,11 +496,17 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 
             // Store current material properties
             if (p_mtl_prop != nullptr)
-                p_mtl_prop[i_face] = (dtype)aM,
-                p_mtl_prop[i_face + n_faces] = (dtype)bM,
-                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM,
-                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM,
+            {
+                p_mtl_prop[i_face] = (dtype)aM;
+                p_mtl_prop[i_face + n_faces] = (dtype)bM;
+                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM;
+                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM;
                 p_mtl_prop[i_face + 4 * n_faces] = (dtype)attM;
+                p_mtl_prop[i_face + 5 * n_faces] = (dtype)attBM;
+                p_mtl_prop[i_face + 6 * n_faces] = (dtype)alphaM;
+                p_mtl_prop[i_face + 7 * n_faces] = (dtype)alphaBM;
+                p_mtl_prop[i_face + 8 * n_faces] = (dtype)fRefM;
+            }
 
             if (p_mtl_ind != nullptr)
                 p_mtl_ind[i_face] = iM;
@@ -459,7 +533,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             }
 
             // Reset current material
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0;
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0, iM = 0;
             j_face = i_face;
             ++i_object;
         }
@@ -471,7 +545,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             std::string mtl_name = line.substr(7, 255); // Name in OBJ File
             std::string mtl_name_raw = mtl_name;
 
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, iM = 0; // Reset current material
+            // Reset current material
+            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0, iM = 0;
             int found = -1;
 
             // If "mtl_name" does not contain a "::", remove everything after the dot
@@ -491,17 +566,23 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                     cM = mtl_lib[n].c;
                     dM = mtl_lib[n].d;
                     attM = mtl_lib[n].att;
+                    attBM = mtl_lib[n].attB;
+                    alphaM = mtl_lib[n].alpha;
+                    alphaBM = mtl_lib[n].alphaB;
+                    fRefM = mtl_lib[n].fRef;
                     iM = mtl_lib[n].index;
                     found = (int)n;
                 }
 
             if (found == -1) // Add new material
             {
-                sscanf(mtl_name.c_str(), "%*[^:]::%lf:%lf:%lf:%lf:%lf", &aM, &bM, &cM, &dM, &attM);
-                if (aM == 0.0)
-                    mtl_lib.push_back({mtl_name, 1.0, 0.0, 0.0, 0.0, 0.0, 0}); // vacuum / air
-                else
-                    mtl_lib.push_back({mtl_name, aM, bM, cM, dM, attM, 0});
+                aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0;
+                sscanf(mtl_name.c_str(),
+                       "%*[^:]::%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf",
+                       &aM, &bM, &cM, &dM, &attM, &attBM, &alphaM, &alphaBM, &fRefM);
+                if (aM <= 0.0) // ε_r can't be ≤ 0; reset the permittivity pair
+                    aM = 1.0, bM = 0.0;
+                mtl_lib.push_back({mtl_name, aM, bM, cM, dM, attM, attBM, alphaM, alphaBM, fRefM, 0});
                 found = (int)mtl_lib.size() - 1;
             }
 

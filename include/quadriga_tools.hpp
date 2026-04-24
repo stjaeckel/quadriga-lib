@@ -125,7 +125,8 @@ namespace quadriga_lib
                                int verbose = 0,                               // Verbosity level
                                const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based; Length: [ no_mesh ]
                                int use_kernel = 0,                            // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
-                               int gpu_id = 0);                               // CUDA device ID, ignored otherwise
+                               int gpu_id = 0,                               // CUDA device ID, ignored otherwise
+                               bool scalar_mode = false);
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX

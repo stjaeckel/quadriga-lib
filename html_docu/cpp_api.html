@@ -3111,7 +3111,7 @@ void quadriga_lib::qrt_file_read(
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency; <code>[n_freq]</code>
+<li><b><code>center_frequency</code></b> <i>(optional)</i> — Center frequency in Hz; <code>[n_freq]</code>
 </li>
 <li><b><code>tx_pos</code></b> <i>(optional)</i> — Transmitter position in Cartesian coordinates; <code>[3]</code>
 </li>
@@ -5076,7 +5076,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 <ul>
 <li>Parses a triangulated Wavefront <code>.obj</code> file; quads and n-gons are not supported
 </li>
-<li>Materials applied per triangle via <code>usemtl</code> tag; unknown/missing materials default to <code>"vacuum"</code> (ε_r = 1, σ = 0)
+<li>Materials applied per triangle via <code>usemtl</code> tag; unknown/missing materials default to <code>"vacuum"</code> (ε_r = 1, σ = 0, Att = 0, α = 0)
 </li>
 <li>Material name matching is case-sensitive
 </li>
@@ -5084,11 +5084,18 @@ void quadriga_lib::mitsuba_xml_file_write(
 </li>
 <li>Default material tag syntax: <code>usemtl itu_concrete</code> (or <code>itu_brick</code>, <code>itu_wood</code>, etc.)
 </li>
-<li>Custom material tag syntax: <code>usemtl Name::A:B:C:D:att</code> — ε_r = A <i> fGHz^B, σ = C </i> fGHz^D, att = fixed penetration loss in dB
+<li>Custom material tag syntax: <code>usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef</code><br>
+<ul>
+<li>ε_r(f)   = a · (f/fRef)^b          (relative permittivity)<br>
 </li>
-<li><code>mtl_prop</code> columns: (a) ε_r at 1 GHz, (b) frequency exponent for ε_r, (c) σ at 1 GHz, (d) frequency exponent for σ, (e) fixed attenuation in dB
+<li>σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)<br>
 </li>
-<li><code>obj_ind</code> and <code>mtl_ind</code> are 1-based; <code>face_ind</code> is 0-based
+<li>Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)<br>
+</li>
+<li>α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)<br>
+</li>
+<li>Trailing fields are optional; defaults are <code>b=c=d=att=attB=alpha=alphaB=0</code>, <code>fRef=1</code> GHz
+</li></ul>
 </li></ul>
 </div>
 
@@ -5112,14 +5119,79 @@ arma::uword quadriga_lib::obj_file_read(
 <ul>
 <li><b><code>fn</code></b> — Path to the <code>.obj</code> file
 </li>
-<li><b><code>materials_csv</code></b> <i>(optional)</i> — Path to CSV file with custom material properties; columns: <code>name, a, b, c, d, att</code> (order flexible); if empty, ITU-R P.2040-3 defaults are used
+<li><b><code>materials_csv</code></b> <i>(optional)</i> — Path to CSV file with custom material properties.
+   Required columns: <code>name</code>, <code>a</code>. Optional columns: <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code>, <code>attB</code>, <code>alpha</code>, <code>alphaB</code>, <code>fRef</code>.
+   Column order is flexible; missing optional columns default to <code>0</code> (<code>fRef</code> → <code>1</code>).
+   If empty, ITU-R P.2040-3 defaults are used.
 </li></ul>
 
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code> per row; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties (a, b, c, d, att) per triangle; <code>[n_mesh, 5]</code>
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; <code>[n_mesh, 9]</code>; Columns:
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Index</th>
+  <th style="text-align: left;">Symbol</th>
+  <th style="text-align: left;">Property</th>
+</tr>
+<tr>
+  <td></td>
+  <td>0</td>
+  <td>a</td>
+  <td>ε_r at fRef</td>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>b</td>
+  <td>Frequency exponent for ε_r</td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>c</td>
+  <td>σ at fRef [S/m]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>d</td>
+  <td>Frequency exponent for σ</td>
+</tr>
+<tr>
+  <td></td>
+  <td>4</td>
+  <td>att</td>
+  <td>Penetration loss at fRef [dB]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>5</td>
+  <td>attB</td>
+  <td>Frequency exponent for att</td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>alpha</td>
+  <td>Distance absorption at fRef [dB/m]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>7</td>
+  <td>alphaB</td>
+  <td>Frequency exponent for alpha</td>
+</tr>
+<tr>
+  <td></td>
+  <td>8</td>
+  <td>fRef</td>
+  <td>Reference frequency [GHz]</td>
+</tr>
+</table><br>
 </li>
 <li><b><code>vert_list</code></b> <i>(optional)</i> — All vertex positions in the file; <code>[n_vert, 3]</code>
 </li>
@@ -5269,7 +5341,9 @@ arma::uword quadriga_lib::obj_file_read(
 <li>Number of triangular mesh elements (<code>n_mesh</code>)
 </li></ul>
 
-<i>Default material table:<br></i><br>
+<i>Default material table:</i><br>
+<ul>
+<li>For all defaults below: <code>attB = alpha = alphaB = 0</code> and <code>fRef = 1 GHz</code>:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -5278,9 +5352,8 @@ arma::uword quadriga_lib::obj_file_read(
   <th style="text-align: left;">b</th>
   <th style="text-align: left;">c</th>
   <th style="text-align: left;">d</th>
-  <th style="text-align: left;">Att</th>
+  <th style="text-align: left;">att</th>
   <th style="text-align: left;">max fGHz</th>
-  <th style="text-align: left;"></th>
 </tr>
 <tr>
   <td></td>
@@ -5291,7 +5364,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.0</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5302,7 +5374,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.62</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5313,7 +5384,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.0</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5324,7 +5394,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.32</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5335,7 +5404,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.58</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5346,7 +5414,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.5</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5357,7 +5424,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.52</td>
   <td>0.0</td>
   <td>20</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5368,7 +5434,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.7</td>
   <td>0.0</td>
   <td>20</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5379,7 +5444,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.7822</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5390,7 +5454,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.16</td>
   <td>0.0</td>
   <td>40</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5401,7 +5464,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.9395</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5412,7 +5474,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.0718</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5423,7 +5484,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.3394</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5434,7 +5494,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.075</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5445,7 +5504,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.78</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5456,7 +5514,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.0</td>
   <td>0.0</td>
   <td>40</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5467,7 +5524,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.9262</td>
   <td>0.0</td>
   <td>60</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5478,7 +5534,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.3515</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5489,7 +5544,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>0.0</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5500,7 +5554,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>2.52</td>
   <td>0.0</td>
   <td>10</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5511,7 +5564,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.63</td>
   <td>0.0</td>
   <td>10</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5522,7 +5574,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.3</td>
   <td>0.0</td>
   <td>10</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5533,7 +5584,6 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.1</td>
   <td>0.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 <tr>
   <td></td>
@@ -5544,9 +5594,9 @@ arma::uword quadriga_lib::obj_file_read(
   <td>1.1925</td>
   <td>23.0</td>
   <td>100</td>
-  <td></td>
 </tr>
 </table><br>
+</li></ul>
 
 <i>See also:</i><br>
 <ul>
@@ -6274,14 +6324,14 @@ arma::uword quadriga_lib::subdivide_triangles(
 </li>
 <li><b><code>triangles_in</code></b> — Mesh vertices as <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; <code>[n_triangles_in, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_triangles_in, 5]</code>
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_triangles_in, 9]</code>
 </li></ul>
 
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>triangles_out</code></b> — Subdivided mesh vertices, same column layout as <code>triangles_in</code>; <code>[n_triangles_out, 9]</code>
 </li>
-<li><b><code>mtl_prop_out</code></b> <i>(optional)</i> — Material properties for subdivided triangles; <code>[n_triangles_out, 5]</code>
+<li><b><code>mtl_prop_out</code></b> <i>(optional)</i> — Material properties for subdivided triangles; <code>[n_triangles_out, 9]</code>
 </li></ul>
 
 <i>Returns:</i><br>
@@ -6367,7 +6417,7 @@ arma::uword triangle_mesh_segmentation(
 </li>
 <li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
 </li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 5]</code>
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li></ul>
 
 <i>Outputs:</i><br>
@@ -6376,7 +6426,7 @@ arma::uword triangle_mesh_segmentation(
 </li>
 <li><b><code>sub_mesh_index</code></b> — 0-based start indices of sub-meshes in <code>meshR</code>; <code>[n_sub]</code>
 </li>
-<li><b><code>mtl_propR</code></b> <i>(optional)</i> — Reordered and padded material properties; <code>[n_meshR, 5]</code>
+<li><b><code>mtl_propR</code></b> <i>(optional)</i> — Reordered and padded material properties; <code>[n_meshR, 9]</code>
 </li>
 <li><b><code>mesh_index</code></b> <i>(optional)</i> — 1-based mapping from original to reorganized mesh (0 = padding); <code>[n_meshR]</code>
 </li></ul>

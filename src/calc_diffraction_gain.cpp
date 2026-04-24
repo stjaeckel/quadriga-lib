@@ -48,66 +48,48 @@ static inline bool same_materials(const arma::Mat<dtype> *mtl_prop, unsigned iMa
     unsigned iFBS = iMa - 1, iSBS = iMb - 1;
     const dtype *p_mtl_prop = mtl_prop->memptr();
 
-    // std::cout << iFBS << " " << iSBS << std::endl;
-    // std::cout << (p_mtl_prop[iFBS] == p_mtl_prop[iSBS]) << std::endl;
-    // std::cout << (p_mtl_prop[iFBS + n_mesh] == p_mtl_prop[iSBS + n_mesh]) << std::endl;
-    // std::cout << (p_mtl_prop[iFBS + 2 * n_mesh] == p_mtl_prop[iSBS + 2 * n_mesh]) << std::endl;
-    // std::cout << (p_mtl_prop[iFBS + 3 * n_mesh] == p_mtl_prop[iSBS + 3 * n_mesh]) << std::endl;
-    // std::cout << (p_mtl_prop[iFBS + 4 * n_mesh] == p_mtl_prop[iSBS + 4 * n_mesh]) << std::endl;
-    // std::cout << p_mtl_prop[iFBS + 2 * n_mesh] << " " << p_mtl_prop[iSBS + 2 * n_mesh] << std::endl;
-
-    if (p_mtl_prop[iFBS] == p_mtl_prop[iSBS] &&
-        p_mtl_prop[iFBS + n_mesh] == p_mtl_prop[iSBS + n_mesh] &&
-        p_mtl_prop[iFBS + 2 * n_mesh] == p_mtl_prop[iSBS + 2 * n_mesh] &&
-        p_mtl_prop[iFBS + 3 * n_mesh] == p_mtl_prop[iSBS + 3 * n_mesh] &&
-        p_mtl_prop[iFBS + 4 * n_mesh] == p_mtl_prop[iSBS + 4 * n_mesh])
-        return true;
-
-    return false;
+    for (unsigned k = 0; k < 9; ++k)
+        if (p_mtl_prop[iFBS + k * n_mesh] != p_mtl_prop[iSBS + k * n_mesh])
+            return false;
+    return true;
 }
 
 // FUNCTION: Calculate the in-medium gain
 template <typename dtype>
 static inline dtype medium_gain_linear(const arma::Mat<dtype> *mtl_prop, unsigned iM, dtype dist, dtype fGHz)
 {
-    // Input variables:
-    //  mtl_prop        Material properties (entire matrix)
-    //  iM              Index of the material, 1-based
-    //  dist            Length of the path inside the medium
-    //  fGHz            Frequency in GHz
-
-    unsigned no_mesh = (unsigned)mtl_prop->n_elem;
-    if (iM == 0 || iM > no_mesh) // Illegal state
-        return (dtype)0.0;
-
     unsigned iM0 = iM - 1;
-    dtype eta_r = mtl_prop->at(iM0, 0) * std::pow(fGHz, mtl_prop->at(iM0, 1));    // Relative permittivity (real part), Rec. ITU-R P.2040-1, eq. 28
-    dtype sigma = mtl_prop->at(iM0, 2) * std::pow(fGHz, mtl_prop->at(iM0, 3));    // Conductivity, Rec. ITU-R P.2040-1, eq. 29
-    dtype eta_i = sigma * (dtype)17.98 / fGHz;                                    // Relative permittivity (imaginary part), Rec. ITU-R P.2040-1, eq. 9b
-    dtype tan_delta = eta_i / eta_r;                                              // Loss tangent, Rec. ITU-R P.2040-1, eq. 13
-    dtype cos_delta = (dtype)1.0 / std::sqrt((dtype)1.0 + tan_delta * tan_delta); // Trigonometric identity
+    dtype a = mtl_prop->at(iM0, 0);
+    dtype b = mtl_prop->at(iM0, 1);
+    dtype c = mtl_prop->at(iM0, 2);
+    dtype d = mtl_prop->at(iM0, 3);
+    dtype alpha = mtl_prop->at(iM0, 6);
+    dtype alphaB = mtl_prop->at(iM0, 7);
+    dtype fRef = mtl_prop->at(iM0, 8);
+    dtype f_rel = fGHz / fRef;
 
-    // Attenuation distance at which the field amplitude falls by 1/e, ITU-R P.2040-1, eq. 23a
+    dtype eta_r = a * std::pow(f_rel, b);      // ITU-R P.2040-1, eq. 28
+    dtype sigma = c * std::pow(f_rel, d);      // ITU-R P.2040-1, eq. 29
+    dtype eta_i = sigma * (dtype)17.98 / fGHz; // absolute fGHz — physical constant
+    dtype tan_delta = eta_i / eta_r;
+    dtype cos_delta = (dtype)1.0 / std::sqrt((dtype)1.0 + tan_delta * tan_delta);
+
     dtype Delta = (dtype)2.0 * cos_delta / ((dtype)1.0 - cos_delta);
     Delta = std::sqrt(Delta) * (dtype)0.0477135 / (fGHz * std::sqrt(eta_r));
 
-    dtype A = (dtype)8.686 / Delta;             // Attenuation in db/m, ITU-R P.2040-1, eq. 26
-    A *= dist;                                  // Total attenuation in dB
-    A = std::pow((dtype)10.0, (dtype)-0.1 * A); // Linear gain
-    return A;
+    // Combined dB/m: σ-derived + α-derived
+    dtype A_sigma = (dtype)8.686 / Delta;
+    dtype A_alpha = alpha * std::pow(f_rel, alphaB);
+    dtype A = (A_sigma + A_alpha) * dist;
+    return std::pow((dtype)10.0, (dtype)-0.1 * A);
 }
 
 // FUNCTION: Calculate the medium-to-medium transition gain
 template <typename dtype>
-static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, unsigned iMa, unsigned iMb, dtype theta, dtype fGHz)
+static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop,
+                                           unsigned iMa, unsigned iMb,
+                                           dtype theta, dtype fGHz, bool scalar_mode)
 {
-    // Input variables:
-    //  mtl_prop        Material properties (entire matrix)
-    //  iMa             Index of the material 1, 1-based, 0 = Air
-    //  iMb             Index of the material 2, 1-based, 0 = Air
-    //  theta           Incidence angle at material 1 (negative for i-i)
-    //  fGHz            Frequency in GHz
-
     unsigned n_mesh = (unsigned)mtl_prop->n_rows;
     if (iMa > n_mesh || iMb > n_mesh) // Illegal state
         return (dtype)0.0;
@@ -123,10 +105,10 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
     abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
     double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
 
-    // Select the properties of the two materials
-    double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0; // First material properties : air
-    double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0; // Second material properties : air
-    double transition_gain = 1.0;                      // Additional gain for face transition, linear scale
+    // Defaults: air for both media
+    double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0, kR_fRef = 1.0;
+    double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0, kS_fRef = 1.0;
+    double transition_gain = 1.0;
 
     if (iMa != 0)
     {
@@ -136,7 +118,10 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
             kS2 = (double)p_mtl_prop[iFBS + n_mesh];
             kS3 = (double)p_mtl_prop[iFBS + 2 * n_mesh];
             kS4 = (double)p_mtl_prop[iFBS + 3 * n_mesh];
-            transition_gain = std::pow(10.0, -0.1 * (double)p_mtl_prop[iFBS + 4 * n_mesh]);
+            double att = (double)p_mtl_prop[iFBS + 4 * n_mesh];
+            double attB = (double)p_mtl_prop[iFBS + 5 * n_mesh];
+            kS_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh];
+            transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
         else // Ray hits back side of FBS face, set first material to object material
         {
@@ -144,6 +129,7 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
             kR2 = (double)p_mtl_prop[iFBS + n_mesh];
             kR3 = (double)p_mtl_prop[iFBS + 2 * n_mesh];
             kR4 = (double)p_mtl_prop[iFBS + 3 * n_mesh];
+            kR_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh];
         }
     }
 
@@ -155,6 +141,7 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
             kR2 = (double)p_mtl_prop[iSBS + n_mesh];
             kR3 = (double)p_mtl_prop[iSBS + 2 * n_mesh];
             kR4 = (double)p_mtl_prop[iSBS + 3 * n_mesh];
+            kR_fRef = (double)p_mtl_prop[iSBS + 8 * n_mesh];
         }
         else // FBS (back side) is hit first
         {
@@ -162,14 +149,19 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
             kS2 = (double)p_mtl_prop[iSBS + n_mesh];
             kS3 = (double)p_mtl_prop[iSBS + 2 * n_mesh];
             kS4 = (double)p_mtl_prop[iSBS + 3 * n_mesh];
-            transition_gain = std::pow(10.0, -0.1 * (double)p_mtl_prop[iSBS + 4 * n_mesh]);
+            double att = (double)p_mtl_prop[iSBS + 4 * n_mesh];
+            double attB = (double)p_mtl_prop[iSBS + 5 * n_mesh];
+            kS_fRef = (double)p_mtl_prop[iSBS + 8 * n_mesh];
+            transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
     }
 
     // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
-    double scl = -17.98 / (double)fGHz;
-    std::complex<double> eta1(kR1 * std::pow(fGHz, kR2), scl * kR3 * std::pow(fGHz, kR4)); // Material 1
-    std::complex<double> eta2(kS1 * std::pow(fGHz, kS2), scl * kS3 * std::pow(fGHz, kS4)); // Material 2
+    double f1_rel = fGHz / kR_fRef;
+    double f2_rel = fGHz / kS_fRef;
+    double scl = -17.98 / fGHz;
+    std::complex<double> eta1(kR1 * std::pow(f1_rel, kR2), scl * kR3 * std::pow(f1_rel, kR4));
+    std::complex<double> eta2(kS1 * std::pow(f2_rel, kS2), scl * kS3 * std::pow(f2_rel, kS4));
     bool dense_to_light = std::real(eta1) > std::real(eta2);
 
     double reflection_gain = 0.0;
@@ -183,14 +175,17 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop, uns
         eta1 = std::sqrt(eta1); // Complex square root
         eta2 = std::sqrt(eta2); // Complex square root
 
-        // Calculate Reflection coefficients  ITU-R P.2040-1, eq. (31)
-        std::complex<double> R_eTE = 0.0, R_eTM = 0.0;
-
-        R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2),
-        R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2),
-        reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
+        std::complex<double> R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) /
+                                     (eta1 * abs_cos_theta + eta2 * cos_theta2);
+        if (scalar_mode)
+            reflection_gain = std::norm(R_eTE); // TE only, no 1/2 factor
+        else
+        {
+            std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
+                                         (eta2 * abs_cos_theta + eta1 * cos_theta2);
+            reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
+        }
     }
-
     return dtype(transition_gain * (1.0 - reflection_gain));
 }
 
@@ -227,13 +222,16 @@ void calc_diffraction_gain(
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** *(optional)* — Verbosity level
 - **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh]`
 - **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
+  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
+  interaction type passed to [[ray_mesh_interact]] (4 vs. 1).
 
 ## Outputs:
 - **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
@@ -243,6 +241,7 @@ void calc_diffraction_gain(
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)
 - [[triangle_mesh_segmentation]] (generates `sub_mesh_index`)
 - [[obj_file_read]] (defines `mtl_prop` format)
+- [[ray_mesh_interact]] (used for media interactions)
 MD!*/
 
 template <typename dtype>
@@ -250,7 +249,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                          const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
                                          dtype center_frequency, int lod,
                                          arma::Col<dtype> *gain, arma::Cube<dtype> *coord, int verbose,
-                                         const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id)
+                                         const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id, bool scalar_mode)
 {
     // Ray offset is used to detect co-location of points, value in meters
     const dtype ray_offset = (dtype)0.001;
@@ -272,12 +271,13 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mtl_prop->n_cols != 5)
-        throw std::invalid_argument("Input 'mtl_prop' must have 5 columns.");
+    if (mtl_prop->n_cols != 9)
+        throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
 
     const arma::uword n_pos = orig->n_rows;  // Number of positions
     const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
     const size_t n_pos_t = (size_t)n_pos;    // Number of positions as size_t
+    const int interaction_type = scalar_mode ? 4 : 1;
 
     // Check for correct number of rows
     if (dest->n_rows != n_pos)
@@ -433,7 +433,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
             arma::Col<int> typeN;        // Medium to medium transition indicator
 
             if (no_mesh_hit != 0)
-                quadriga_lib::ray_mesh_interact<dtype>(1, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_prop,
+                quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_prop,
                                                        &fbs_ind, &sbs_ind, nullptr, nullptr, nullptr, &origN, nullptr,
                                                        &gainN, nullptr, nullptr, nullptr, nullptr, &fbs_angleN, nullptr,
                                                        nullptr, nullptr, &typeN);
@@ -522,7 +522,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         {
                             dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= medium_gain_linear(mtl_prop, RS, dist, fGHz);
-                            power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
+                            power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
                             dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= medium_gain_linear(mtl_prop, NT, dist, fGHz);
                             p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
@@ -533,7 +533,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     {
                         dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                         power *= medium_gain_linear(mtl_prop, RS, dist, fGHz);
-                        power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz);
+                        power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
                         p_ray_state[iG] = 0;       // Change state to outside
                         p_next_transition[iG] = 0; // Clear next transition buffer
                     }
@@ -603,7 +603,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         else
                         {
                             power *= medium_gain_linear(mtl_prop, RS, dist, fGHz);
-                            power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
+                            power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
                             power *= medium_gain_linear(mtl_prop, NT, ray_offset, fGHz);
                             p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                             p_next_transition[iG] = 0; // Clear next transition buffer
@@ -669,7 +669,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         {
                             dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= medium_gain_linear(mtl_prop, RS, dist, fGHz); // M1 medium defined by RS
-                            power *= transition_gain_linear(mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz);
+                            power *= transition_gain_linear(mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
                             dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= medium_gain_linear(mtl_prop, iM1, dist, fGHz); // M1 medium defined by iM1
                             p_ray_state[iG] = iM1;                                  // Continue in M1
@@ -754,7 +754,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                 else
                                 {
                                     power *= medium_gain_linear(mtl_prop, RS, dist, fGHz);
-                                    power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
+                                    power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
                                     power *= medium_gain_linear(mtl_prop, NT, ray_offset, fGHz);
                                     p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                                     p_next_transition[iG] = 0; // Clear next transition buffer
@@ -785,7 +785,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             {
                                 dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 power *= medium_gain_linear(mtl_prop, RS, dist, fGHz); // M1 medium defined by RS
-                                power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz);
+                                power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
                                 p_ray_state[iG] = 0;       // Change state to outside
                                 p_next_transition[iG] = 0; // Clear next transition buffer
                             }
@@ -808,7 +808,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                 else // Add i-i transition
                                 {
                                     power *= medium_gain_linear(mtl_prop, RS, dist, fGHz); // M1 medium defined by RS
-                                    power *= transition_gain_linear(mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz);
+                                    power *= transition_gain_linear(mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
                                     power *= medium_gain_linear(mtl_prop, iM1, ray_offset, fGHz); // M1 medium defined by iM1
                                     p_ray_state[iG] = iM1;                                        // Continue in M1
                                 }
@@ -824,7 +824,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                 else
                                 {
                                     power *= medium_gain_linear(mtl_prop, RS, dist, fGHz); // M1 medium defined by RS
-                                    power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
+                                    power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
                                     power *= medium_gain_linear(mtl_prop, NT, ray_offset, fGHz); // M2 medium defined by NT
                                     p_ray_state[iG] = NT;                                        // Set ray state to NT (inside state)
                                     p_next_transition[iG] = 0;                                   // Clear next transition buffer
@@ -852,7 +852,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                 else // Add i-i transition
                                 {    // Somewhat fake, since FBS and SBS normals are not aligned
                                     power *= medium_gain_linear(mtl_prop, RS, dist, fGHz);
-                                    power *= transition_gain_linear(mtl_prop, RS, iM2, fbs_angleN.at(iH), fGHz);
+                                    power *= transition_gain_linear(mtl_prop, RS, iM2, fbs_angleN.at(iH), fGHz, scalar_mode);
                                     power *= medium_gain_linear(mtl_prop, iM2, ray_offset, fGHz);
                                     p_ray_state[iG] = iM2;
                                 }
@@ -974,10 +974,10 @@ template void quadriga_lib::calc_diffraction_gain(const arma::Mat<float> *orig, 
                                                   const arma::Mat<float> *mesh, const arma::Mat<float> *mtl_prop,
                                                   float center_frequency, int lod,
                                                   arma::Col<float> *gain, arma::Cube<float> *coord, int verbose,
-                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id);
+                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id, bool scalar_mode);
 
 template void quadriga_lib::calc_diffraction_gain(const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                                   const arma::Mat<double> *mesh, const arma::Mat<double> *mtl_prop,
                                                   double center_frequency, int lod,
                                                   arma::Col<double> *gain, arma::Cube<double> *coord, int verbose,
-                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id);
+                                                  const arma::u32_vec *sub_mesh_index, int use_kernel, int gpu_id, bool scalar_mode);

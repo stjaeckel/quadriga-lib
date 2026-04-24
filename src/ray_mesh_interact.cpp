@@ -53,7 +53,7 @@ void quadriga_lib::ray_mesh_interact(
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; ee [[obj_file_read]]; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
@@ -180,8 +180,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         throw std::invalid_argument("Input 'sbs' must have 3 columns containing x,y,z coordinates.");
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mtl_prop->n_cols != 5)
-        throw std::invalid_argument("Input 'mtl_prop' must have 5 columns.");
+    if (mtl_prop->n_cols != 9)
+        throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
 
     const arma::uword n_ray = orig->n_rows;     // Number of rays
     const arma::uword n_mesh = mesh->n_rows;    // Number of mesh elements
@@ -430,9 +430,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         double abs_cos_theta = std::abs(cos_theta);
 
         // Select the properties of the two materials
-        double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0; // First material properties : air
-        double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0; // Second material properties : air
-        double transition_gain = 1.0;                      // Additional gain for face transition, linear scale
+        double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0;     // medium 1: a, b, c, d
+        double kR_alpha = 0.0, kR_alphaB = 0.0, kR_fRef = 1.0; // medium 1: alpha, alphaB, fRef
+        double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0;     // medium 2: a, b, c, d
+        double kS_alpha = 0.0, kS_alphaB = 0.0, kS_fRef = 1.0; // medium 2: alpha, alphaB, fRef
+        double transition_gain = 1.0;
 
         if (theta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
         {
@@ -440,7 +442,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             kS2 = (double)p_mtl_prop[iFBS + n_mesh_t];
             kS3 = (double)p_mtl_prop[iFBS + 2 * n_mesh_t];
             kS4 = (double)p_mtl_prop[iFBS + 3 * n_mesh_t];
-            transition_gain = std::pow(10.0, -0.1 * (double)p_mtl_prop[iFBS + 4 * n_mesh_t]);
+            double att = (double)p_mtl_prop[iFBS + 4 * n_mesh_t];
+            double attB = (double)p_mtl_prop[iFBS + 5 * n_mesh_t];
+            kS_alpha = (double)p_mtl_prop[iFBS + 6 * n_mesh_t];
+            kS_alphaB = (double)p_mtl_prop[iFBS + 7 * n_mesh_t];
+            kS_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh_t];
+            transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
         else // Ray hits back side of FBS face, set first material to object material
         {
@@ -448,6 +455,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
             kR2 = (double)p_mtl_prop[iFBS + n_mesh_t];
             kR3 = (double)p_mtl_prop[iFBS + 2 * n_mesh_t];
             kR4 = (double)p_mtl_prop[iFBS + 3 * n_mesh_t];
+            kR_alpha = (double)p_mtl_prop[iFBS + 6 * n_mesh_t];
+            kR_alphaB = (double)p_mtl_prop[iFBS + 7 * n_mesh_t];
+            kR_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh_t];
         }
 
         if (material_to_material) // Material to material transition
@@ -458,6 +468,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                 kR2 = (double)p_mtl_prop[iSBS - 1 + n_mesh_t];
                 kR3 = (double)p_mtl_prop[iSBS - 1 + 2 * n_mesh_t];
                 kR4 = (double)p_mtl_prop[iSBS - 1 + 3 * n_mesh_t];
+                kR_alpha = (double)p_mtl_prop[iSBS - 1 + 6 * n_mesh_t];
+                kR_alphaB = (double)p_mtl_prop[iSBS - 1 + 7 * n_mesh_t];
+                kR_fRef = (double)p_mtl_prop[iSBS - 1 + 8 * n_mesh_t];
             }
             else // FBS (back side) is hit first
             {
@@ -465,14 +478,21 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
                 kS2 = (double)p_mtl_prop[iSBS - 1 + n_mesh_t];
                 kS3 = (double)p_mtl_prop[iSBS - 1 + 2 * n_mesh_t];
                 kS4 = (double)p_mtl_prop[iSBS - 1 + 3 * n_mesh_t];
-                transition_gain = std::pow(10.0, -0.1 * (double)p_mtl_prop[iSBS - 1 + 4 * n_mesh_t]);
+                double att = (double)p_mtl_prop[iSBS - 1 + 4 * n_mesh_t];
+                double attB = (double)p_mtl_prop[iSBS - 1 + 5 * n_mesh_t];
+                kS_alpha = (double)p_mtl_prop[iSBS - 1 + 6 * n_mesh_t];
+                kS_alphaB = (double)p_mtl_prop[iSBS - 1 + 7 * n_mesh_t];
+                kS_fRef = (double)p_mtl_prop[iSBS - 1 + 8 * n_mesh_t];
+                transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
             }
         }
 
-        // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
-        scl = -17.98 / fGHz;
-        std::complex<double> eta1(kR1 * std::pow(fGHz, kR2), scl * kR3 * std::pow(fGHz, kR4)); // Material 1
-        std::complex<double> eta2(kS1 * std::pow(fGHz, kS2), scl * kS3 * std::pow(fGHz, kS4)); // Material 2
+        // Complex-valued relative permittivity, ITU-R P.2040-1 eq. (9b)
+        const double f1_rel = fGHz / kR_fRef; // (f / fRef) for medium 1
+        const double f2_rel = fGHz / kS_fRef; // (f / fRef) for medium 2
+        scl = -17.98 / fGHz;                  // physics prefactor keeps absolute fGHz
+        std::complex<double> eta1(kR1 * std::pow(f1_rel, kR2), scl * kR3 * std::pow(f1_rel, kR4));
+        std::complex<double> eta2(kS1 * std::pow(f2_rel, kS2), scl * kS3 * std::pow(f2_rel, kS4));
         bool dense_to_light = std::real(eta1) > std::real(eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
@@ -666,27 +686,39 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         }
 
         // Determine the in-medium gain
-        double gain = 1.0;     // Initial gain
-        if (ray_starts_inside) // First medium attenuation, from origin to FBS
+        double gain = 1.0; // Initial gain
+        if (ray_starts_inside)
         {
-            // First medium attenuation, from origin to FBS
-            // in case of reflection, ray continues in the same medium (account for ray offset)
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
+
+            // σ-derived loss
             scl = std::real(eta1);
-            double tan_delta = std::imag(eta1) / scl;                        // Loss tangent
-            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
-            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);              // Attenuation distance (1)
-            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));  // Attenuation distance (2)
-            gain *= std::pow(10.0, -0.1 * thickness * 8.686 / Delta);        // Gain update
+            double tan_delta = std::imag(eta1) / scl;
+            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
+            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));
+            double loss_dB = thickness * 8.686 / Delta;
+
+            // α-derived loss (dB/m, frequency-scaled)
+            loss_dB += thickness * kR_alpha * std::pow(fGHz / kR_fRef, kR_alphaB);
+
+            gain *= std::pow(10.0, -0.1 * loss_dB);
         }
-        if (geometry_type != 0) // Attenuation caused by the medium after transition
+
+        if (geometry_type != 0)
         {
+            // σ-derived loss
             scl = std::real(eta2);
-            double tan_delta = std::imag(eta2) / scl;                        // Loss tangent
-            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta); // Trigonometric identity
-            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);              // Attenuation distance (1)
-            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));  // Attenuation distance (2)
-            gain *= std::pow(10.0, -0.1 * ray_offset * 8.686 / Delta);       // Gain update
+            double tan_delta = std::imag(eta2) / scl;
+            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
+            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(scl));
+            double loss_dB = ray_offset * 8.686 / Delta;
+
+            // α-derived loss (dB/m, frequency-scaled)
+            loss_dB += ray_offset * kS_alpha * std::pow(fGHz / kS_fRef, kS_alphaB);
+
+            gain *= std::pow(10.0, -0.1 * loss_dB);
         }
 
         // Add additional transition gain
