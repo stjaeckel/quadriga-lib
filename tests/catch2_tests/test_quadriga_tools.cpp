@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -106,7 +93,7 @@ TEST_CASE("Quadriga tools - Icosphere")
 {
     arma::fmat center, vert, direction;
     arma::fvec length;
-    
+
     // Number of subdivisions cannot be zero
     REQUIRE_THROWS_AS(quadriga_lib::icosphere<float>(0, 1.0, &center), std::invalid_argument);
 
@@ -182,7 +169,7 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
                        {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
                        {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
 
-    arma::fmat mtl_prop = {{1.5, 0.1, 0.2, 0.3, 0.4}};
+    arma::fmat mtl_prop = {{1.5, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8}};
     mtl_prop = repmat(mtl_prop, 12, 1);
     mtl_prop.col(0) = arma::regspace<arma::fvec>(1.1f, 0.1f, 2.2f);
 
@@ -199,6 +186,7 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     CHECK(n_sub == 1);
     CHECK(cube_re.n_rows == 112);     // Multiple of 8
     CHECK(mtl_prop_re.n_rows == 112); // Multiple of 8
+    CHECK(mtl_prop_re.n_cols == 9);
     CHECK(cube_index.n_elem == 1);
     CHECK(cube_index.at(0) == 0);
 
@@ -206,10 +194,11 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     CHECK(arma::approx_equal(cube_re.submat(0, 0, 107, 8), cube_sub, "absdiff", 1e-14));
     CHECK(arma::approx_equal(cube_re.submat(108, 0, 111, 8), T, "absdiff", 1e-14));
 
-    T.zeros(4, 5);
+    T.zeros(4, 9);
     T.col(0).ones();
-    CHECK(arma::approx_equal(mtl_prop_re.submat(0, 0, 107, 4), mtl_prop_sub, "absdiff", 1e-14));
-    CHECK(arma::approx_equal(mtl_prop_re.submat(108, 0, 111, 4), T, "absdiff", 1e-14));
+    T.col(8).ones();
+    CHECK(arma::approx_equal(mtl_prop_re.submat(0, 0, 107, 8), mtl_prop_sub, "absdiff", 1e-14));
+    CHECK(arma::approx_equal(mtl_prop_re.submat(108, 0, 111, 8), T, "absdiff", 1e-14));
 
     auto U = arma::regspace<arma::u32_vec>(1, 108);
     CHECK(arma::all(mesh_index.subvec(0, 107) == U));

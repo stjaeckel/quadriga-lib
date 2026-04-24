@@ -13,7 +13,7 @@ mesh = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
            1     1     1   ,    1    -1     1   ,    1    -1    -1;   % 11 East Upper
           -1     1     1   ,    1     1     1   ,    1     1    -1 ]; % 12 North Upper
 
-mtl_prop = repmat([1.0, 0.0, 0.0, 0.0, 0.0],12,1); % Air
+mtl_prop = repmat([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],12,1); % Air
 mtl_prop(:,1) = 1.1:0.1:2.2;
 
 [mesh_sub, mtl_prop_sub] = quadriga_lib.subdivide_triangles(mesh, 3, mtl_prop);
@@ -30,7 +30,7 @@ assertElementsAlmostEqual( mesh_seg(1:108,:), mesh_sub, 'absolute', 1e-14 );
 assertElementsAlmostEqual( mesh_seg(109:end,:), zeros(4,9), 'absolute', 1e-14 );
 
 assertElementsAlmostEqual( mtl_prop_seg(1:108,:), mtl_prop_sub, 'absolute', 1e-14 );
-assertElementsAlmostEqual( mtl_prop_seg(109:end,:), [ones(4,1), zeros(4,4)], 'absolute', 1e-14 );
+assertElementsAlmostEqual( mtl_prop_seg(109:end,:), [ones(4,1), zeros(4,7), ones(4,1)], 'absolute', 1e-14 );
 
 assertEqual( mesh_index(1:108), uint32(1:108)' );
 

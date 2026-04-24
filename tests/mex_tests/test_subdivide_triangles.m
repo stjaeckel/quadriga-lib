@@ -14,7 +14,7 @@ tros = quadriga_lib.subdivide_triangles(single(tri),2);
 assertTrue( isa(tros,'single') );
 assertElementsAlmostEqual( single(tro), tros, 'absolute', 1e-7 );
 
-mtli = rand(12,5);
+mtli = rand(12,9);
 [tros, mtlo] = quadriga_lib.subdivide_triangles(tri,2, mtli);
 
 % 0 outputs

@@ -34,12 +34,12 @@ arma::uword triangle_mesh_segmentation(
 - **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
-- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 5]`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
 
 ## Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 5]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 9]`
 - **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
 
 ## Returns:
@@ -79,8 +79,8 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
     if (process_mtl_prop)
     {
-        if (mtl_prop->n_cols != 5)
-            throw std::invalid_argument("Input 'mtl_prop' must have 5 columns.");
+        if (mtl_prop->n_cols != 9)
+            throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
 
         if (mtl_prop->n_rows != mesh->n_rows)
             throw std::invalid_argument("Number of rows in 'mesh' and 'mtl_prop' dont match.");
@@ -202,7 +202,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
     dtype *p_mtl_out = nullptr;
     if (process_mtl_prop)
     {
-        mtl_propR->set_size(n_out, 5);
+        mtl_propR->set_size(n_out, 9);
         p_mtl_out = mtl_propR->memptr();
     }
 
@@ -228,7 +228,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
         // Copy material data
         if (process_mtl_prop)
-            for (arma::uword i_col = 0; i_col < 5; ++i_col)
+            for (arma::uword i_col = 0; i_col < 9; ++i_col)
             {
                 arma::uword offset_out = i_col * n_out + (arma::uword)p_sub_ind[i_sub];
                 arma::uword offset_in = i_col * n_mesh;
@@ -269,9 +269,9 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
                     else
                         p_mesh_out[offset] = z;
 
-                    if (process_mtl_prop && i_col == 0)
+                    if (process_mtl_prop && (i_col == 0 || i_col == 8))
                         p_mtl_out[offset] = (dtype)1.0;
-                    else if (process_mtl_prop && i_col < 5)
+                    else if (process_mtl_prop && i_col < 8)
                         p_mtl_out[offset] = (dtype)0.0;
                 }
         }

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
@@ -102,7 +89,7 @@ TEST_CASE("Calc Diffraction Gain")
     arma::vec gain, tv;
     arma::cube coord, tc;
 
-    mtl_prop = {{1.5, 0.0, 0.001, 0.0, 0.0}};
+    mtl_prop = {{1.5, 0.0, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
 
     // Entire path outside
@@ -157,4 +144,142 @@ TEST_CASE("Calc Diffraction Gain")
     dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 5, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
+}
+
+TEST_CASE("Calc Diffraction Gain - Alpha in-medium absorption")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+
+    // ε_r = 1 (no Fresnel), σ = 0, α = 4 dB/m, all exponents 0, fRef = 1
+    arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0}};
+    mtl_prop = repmat(mtl_prop, 12, 1);
+
+    arma::mat orig = {{-10.0, 0.0, 0.5}};
+    arma::mat dest = {{0.5, 0.0, 0.5}};
+
+    arma::vec gain;
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain);
+
+    // 1.5 m × 4 dB/m = 6 dB  →  gain = 10^-0.6
+    arma::vec tv = {std::pow(10.0, -0.1 * 4.0 * 1.5)};
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+}
+
+TEST_CASE("Calc Diffraction Gain - Penetration loss frequency scaling")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+
+    // ε_r = 1 (no Fresnel), σ = 0, α = 0
+    // att = 3 dB @ fRef = 2 GHz, attB = 1  →  at 10 GHz:  Att = 3·(10/2)^1 = 15 dB
+    arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 2.0}};
+    mtl_prop = repmat(mtl_prop, 12, 1);
+
+    arma::mat orig = {{-10.0, 0.0, 0.5}};
+    arma::mat dest = {{0.5, 0.0, 0.5}};
+
+    arma::vec gain;
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain);
+
+    arma::vec tv = {std::pow(10.0, -1.5)}; // 10^-1.5
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+}
+
+TEST_CASE("Calc Diffraction Gain - fRef parameterization equivalence")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+
+    // At every f:  ε_r = 1.5·f,  σ = 0.001·f,  Att = 2·f dB,  α = 0.5·f dB/m
+    arma::mat mat_A = {{1.5, 1.0, 0.001, 1.0, 2.0, 1.0, 0.5, 1.0, 1.0}}; // fRef = 1
+    arma::mat mat_B = {{3.0, 1.0, 0.002, 1.0, 4.0, 1.0, 1.0, 1.0, 2.0}}; // fRef = 2
+    mat_A = repmat(mat_A, 12, 1);
+    mat_B = repmat(mat_B, 12, 1);
+
+    arma::mat orig = {{-10.0, 0.0, 0.5}};
+    arma::mat dest = {{0.5, 0.0, 0.5}};
+
+    arma::vec gain_A, gain_B;
+    // Use lod=3 to exercise the full ray-state machine with multi-path + multi-hit logic
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mat_A, 10.0e9, 3, &gain_A);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mat_B, 10.0e9, 3, &gain_B);
+
+    CHECK(arma::approx_equal(gain_A, gain_B, "absdiff", 1e-12));
+}
+
+TEST_CASE("Calc Diffraction Gain - Scalar mode")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+
+    // ε_r = 2 → non-trivial reflection contrast
+    arma::mat mtl_prop = {{2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl_prop = repmat(mtl_prop, 12, 1);
+
+    arma::vec gain_em, gain_scalar;
+
+    // --- Normal incidence: ray along +x axis ---
+    arma::mat orig = {{-10.0, 0.0, 0.5}};
+    arma::mat dest = {{0.5, 0.0, 0.5}};
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+                                                &gain_em, nullptr, 0, nullptr, 0, 0, false);
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+                                                &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
+    CHECK(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-12));
+
+    // --- Oblique incidence: ray hits west wall at ~23° off-normal ---
+    orig = {{-3.0, 0.0, 0.5}};
+    dest = {{0.5, 1.5, 0.5}};
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+                                                &gain_em, nullptr, 0, nullptr, 0, 0, false);
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+                                                &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
+    // Scalar uses |R_TE|²; EM uses ½(|R_TE|² + |R_TM|²). These differ at oblique hits.
+    CHECK_FALSE(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-4));
+    // Sanity
+    CHECK(gain_em(0) > 0.0);
+    CHECK(gain_em(0) < 1.0);
+    CHECK(gain_scalar(0) > 0.0);
+    CHECK(gain_scalar(0) < 1.0);
 }

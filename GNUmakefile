@@ -7,9 +7,9 @@ arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
 octave = OFF
-matlab = ON
+matlab = OFF
 python = OFF
-avx2 = ON
+avx2 = OFF
 cuda = OFF
 
 CMAKE_BUILD_DIR = build_linux
