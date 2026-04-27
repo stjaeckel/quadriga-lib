@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
-date: "24.04.2026"
+date: "27.04.2026"
 lang: en-US
 ---
 
@@ -98,28 +98,28 @@ lang: en-US
 | [fast_slerp](#fast_slerp) | Math functions | 2655 |
 | [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2690 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2761 |
-| [colormap](#colormap) | Site-specific simulation tools | 2807 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2826 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2869 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2907 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2951 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2985 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3026 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3143 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3174 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3202 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3231 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3270 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3306 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3343 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3428 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3469 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3517 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3561 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3591 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3619 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3660 |
-| [write_png](#write_png) | Site-specific simulation tools | 3695 |
+| [colormap](#colormap) | Site-specific simulation tools | 2811 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2830 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2873 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2911 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2955 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2989 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3030 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3148 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3179 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3207 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3236 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3275 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3311 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3348 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3433 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3474 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3522 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3566 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3596 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3624 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3665 |
+| [write_png](#write_png) | Site-specific simulation tools | 3700 |
 
 ---
 
@@ -2786,13 +2786,16 @@ void calc_diffraction_gain(
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 5]`
+- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** *(optional)* — Verbosity level
 - **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
 - **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
+  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
+  interaction type passed to [ray_mesh_interact](#ray_mesh_interact) (4 vs. 1).
 
 ### Outputs:
 - **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
@@ -2802,6 +2805,7 @@ void calc_diffraction_gain(
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
 - [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
+- [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
 
 ---
 ## colormap
@@ -3137,6 +3141,7 @@ arma::uword quadriga_lib::obj_file_read(
 ### See also:
 - [obj_overlap_test](#obj_overlap_test) (for testing mesh geometry)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (used to calculate indexed mesh for faster processing)
+- [ray_mesh_interact](#ray_mesh_interact) (calculating interactions between rays and the triangular mesh)
 - [mitsuba_xml_file_write](#mitsuba_xml_file_write) (for exporting to Mitsuba scene file format)
 
 ---
@@ -3382,7 +3387,7 @@ void quadriga_lib::ray_mesh_interact(
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; ee [obj_file_read](#obj_file_read); `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 5]`
+- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
