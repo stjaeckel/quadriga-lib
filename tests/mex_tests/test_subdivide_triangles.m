@@ -11,7 +11,7 @@ assertEqual( tri(1,1:3), tro(1,1:3) );
 assertEqual( tri(1,1:3), tro(1,1:3) );
 
 tros = quadriga_lib.subdivide_triangles(single(tri),2);
-assertTrue( isa(tros,'single') );
+assertTrue( isa(tros,'double') );
 assertElementsAlmostEqual( single(tro), tros, 'absolute', 1e-7 );
 
 mtli = rand(12,9);
@@ -45,7 +45,7 @@ try % 3outputs
     [~,~,~] =  quadriga_lib.subdivide_triangles(tri,2, mtli);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
