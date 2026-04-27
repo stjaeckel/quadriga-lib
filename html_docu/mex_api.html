@@ -146,7 +146,7 @@
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
-<tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates interactions (reflection, transmission, refraction) of radio waves with objects</td></tr>
+<tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
 <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates the intersection of ray beams with points in three dimensions</td></tr>
 <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#subdivide_triangles">subdivide_triangles</a></td><td>Subdivide the faces of a triangle mesh into smaller faces</td></tr>
@@ -4897,423 +4897,169 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="ray_mesh_interact"></a>
-<b>ray_mesh_interact</b> - Calculates interactions (reflection, transmission, refraction) of radio waves with objects
+<b>ray_mesh_interact</b> - Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 <br><br>
 <i>Description:</i><br>
 <ul>
-<li>Radio waves that interact with a building, or other objects in the environment, will produce losses
-   that depend on the electrical properties of the materials and material structure.
+<li>Computes interaction of plane waves with planar interfaces between homogeneous isotropic media
 </li>
-<li>This function calculates the interactions of radio-waves with objects in a 3D environment.
+<li>Supports beam-based modeling via triangular ray tubes (<code>trivec</code>, <code>tridir</code>)
 </li>
-<li>It considers a plane wave incident upon a planar interface between two homogeneous and isotropic
-   media of differing electric properties. The media extend sufficiently far from the interface such
-   that the effect of any other interface is negligible.
+<li>Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
+   front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
+   FBS=SBS with opposing normals → media-to-media
 </li>
-<li>Air to media transition is assumed if front side of a face is hit and FBS != SBS
+<li>Rays with <code>fbs_ind = 0</code> (no interaction) are omitted from output, so <code>n_rayN ≤ n_ray</code>
 </li>
-<li>Media to air transition is assumed if back side of a face is hit and FBS != SBS
+<li>Output direction encoding (spherical/Cartesian) matches input <code>tridir</code> format
 </li>
-<li>Media to media transition is assumed if FBS = SBS with opposing face orientations
+<li>Overlapping mesh geometry must be avoided (materials are transparent to radio waves)
 </li>
-<li>Order of the vertices determines side (front or back) of a mesh element
-</li>
-<li>Overlapping geometry in the triangle mesh must be avoided, since materials are transparent to radio
-   waves.
-</li>
-<li>Implementation is done according to ITU-R P.2040-1.
-</li>
-<li>Rays that do not interact with the environment (i.e. for which <code>fbs_ind = 0</code>) are omitted from
-   the output.
-</li></ul>
-
-<i>Material properties:</i><br>
-Each material is defined by its electrical properties. Radio waves that interact with a building will 
-produce losses that depend on the electrical properties of the building materials, the material 
-structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical 
-permittivity (ϵ) and the conductivity (σ). The five parameters returned in <code>mtl_prop</code> then are: 
- 
-<ul>
-<li>Real part of relative permittivity at f = 1 GHz (a)
-</li>
-<li>Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b
-</li>
-<li>Conductivity at f = 1 GHz (c)
-</li>
-<li>Frequency dependence of conductivity (d) such that σ = c· f^d
-</li>
-<li>Fixed attenuation in dB applied to each transition
+<li>Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for
+   acoustic simulation with impedance-mapped material parameters (ε derived from Z)
 </li></ul>
 
 <i>Usage:</i><br>
 <pre>
-[ origN, destN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, normal_vecN] = ...
-    quadriga_lib.ray_mesh_interact(  interaction_type, center_freq, orig, dest, fbs, sbs, mesh, mtl_prop,
-    fbs_ind, sbs_ind, trivec, tridir, orig_length );
+[ origN, destN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, ...
+    normal_vecN, out_typeN ] = quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, ...
+    orig, dest, fbs, sbs, mesh, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
-<li><b><code>interaction_type</code></b><br>
-   Interaction type: (0) Reflection, (1) Transmission, (2) Refraction
+<li><b><code>interaction_type</code></b> — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
 </li>
-<li><b><code>center_freq</code></b><br>
-   Center frequency in [Hz]; Scalar value
+<li><b><code>center_frequency</code></b> — Center frequency
 </li>
-<li><b><code>orig</code></b><br>
-   Ray origins in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code>
+<li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code>
 </li>
-<li><b><code>dest</code></b><br>
-   Ray destinations in 3D Cartesian coordinates; Size: <code>[ no_ray, 3 ]</code>
+<li><b><code>fbs</code></b>, <b><code>sbs</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code>
 </li>
-<li><b><code>fbs</code></b><br>
-   First interaction point between the rays and the triangular mesh. Size: <code>[ no_ray, 3 ]</code>
+<li><b><code>mesh</code></b> — Triangle mesh faces; see <code>obj_file_read</code>; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>sbs</code></b><br>
-   Second interaction point between the rays and the triangular mesh. Size: <code>[ no_ray, 3 ]</code>
+<li><b><code>mtl_prop</code></b> — Material properties; see <code>obj_file_read</code>; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mesh</code></b><br>
-   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
-   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ];
-   Size: <code>[ no_mesh, 9 ]</code>
+<li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); uint32; <code>[n_ray]</code>
 </li>
-<li><b><code>mtl_prop</code></b><br>
-   Material properties of each mesh element (see above); Size: <code>[ no_mesh, 5 ]</code>
+<li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin;
+    order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code>; <code>[n_ray, 9]</code>
 </li>
-<li><b><code>fbs_ind</code></b><br>
-   Index of the triangle that was hit by the ray at the FBS location; 1-based; Length: <code>[ no_ray ]</code>
+<li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions; <code>[n_ray, 6]</code> for spherical
+   <code>[v1az v1el v2az v2el v3az v3el]</code> or <code>[n_ray, 9]</code> for Cartesian
 </li>
-<li><b><code>sbs_ind</code></b><br>
-   Index of the triangle that was hit by the ray at the SBS location; 1-based; Length: <code>[ no_ray ]</code>
-</li>
-<li><b><code>trivec</code></b> (optional)<br>
-   The 3 vectors pointing from the center point of the ray at the <code>origin</code> to the vertices of a triangular
-   propagation tube, the values are in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>;
-   Size: <code>[ no_ray, 9 ]</code>
-</li>
-<li><b><code>tridir</code></b> (optional)<br>
-   The directions of the vertex-rays. Size: <code>[ n_ray, 6 ]</code> or <code>[ n_ray, 9 ]</code><br>
-   For 6 columns, values are in geographic coordinates (azimuth and elevation angle in rad); the
-   values are in the order <code>[ v1az, v1el, v2az, v2el, v3az, v3el ]</code>;
-   For 9 columns, the input is in Cartesian coordinates and the values are in the  order
-   <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>
-</li>
-<li><b><code>orig_length</code></b> (optional)<br>
-   Path length at origin point, default is 0, Size: [ n_ray ]
+<li><b><code>orig_length</code></b> <i>(optional)</i> — Accumulated path length at origin; default: 0; <code>[n_ray]</code>
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
-<li><b><code>origN</code></b><br>
-   New ray origins after the interaction with the medium, usually placed close to the FBS location.
-   A small offset of 0.001 m in the direction of travel after the interaction with the medium is added
-   to avoid getting stuct inside a mesh element. Size: <code>[ no_rayN, 3 ]</code>
+<li><b><code>origN</code></b> — New origins after interaction (offset 0.001 m along travel direction); <code>[n_rayN, 3]</code>
 </li>
-<li><b><code>destN</code></b><br>
-   New ray destinaion after the interaction with the medium, taking the change of direction into account;
-   Size: <code>[ no_rayN, 3 ]</code>
+<li><b><code>destN</code></b> — New destinations accounting for direction change; <code>[n_rayN, 3]</code>
 </li>
-<li><b><code>gainN</code></b><br>
-   Gain (negative loss) caused by the interaction with the medium, averaged over both polarization
-   directions. This value includes the in-medium attenuation, but does not account for FSPL. Linear scale.
-   Size: <code>[ no_rayN ]</code>
+<li><b><code>gainN</code></b> — Interaction gain (linear, includes in-medium attenuation, excludes FSPL);
+   averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; <code>[n_rayN]</code>
 </li>
-<li><b><code>xprmatN</code></b><br>
-   Polarization transfer matrix;
-   Interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH);
-   The values account for the following effects: (1) gain caused by the interaction with the medium,
-   (2) different reflection/transmission coefficients for transverse electric (TE) and transverse
-   magnetic (TM) polarisation, (3) orientation of the incidence plane, (4) in-medium attenuation.
-   FSPL is excluded.  Size: <code>[ no_rayN, 8 ]</code>
+<li><b><code>xprmatN</code></b> — For types 0–2: polarization transfer matrix, interleaved complex
+   <code>[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]</code>; for types 3–4 (scalar):
+   <code>[Re Im 0 0 0 0 0 0]</code> where Re+jIm is the scalar pressure coefficient; includes
+   interaction gain, TE/TM coefficients, incidence plane orientation, in-medium
+   attenuation (excludes FSPL); <code>[n_rayN, 8]</code>
 </li>
-<li><b><code>trivecN</code></b><br>
-   The 3 vectors pointing from the center point of the ray at <code>origN</code> to the vertices of a triangular
-   propagation tube.  Size: <code>[ no_rayN, 9 ]</code>
+<li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input);
+   empty if <code>trivec</code>/<code>tridir</code> not provided
 </li>
-<li><b><code>tridirN</code></b><br>
-   The directions of the vertex-rays after interaction with the medium;
-   Size: <code>[ no_rayN, 6 ]</code> or <code>[ no_rayN, 9 ]</code> depending on input size
+<li><b><code>orig_lengthN</code></b> — Path length from <code>orig</code> to <code>origN</code>, added to input <code>orig_length</code> if given; <code>[n_rayN]</code>
 </li>
-<li><b><code>orig_lengthN</code></b><br>
-   Length of the ray from <code>orig</code> to <code>origN</code>. If <code>orig_length</code> is given as input, its value is added.
-   Size: <code>[ no_rayN ]</code>
+<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS; <code>[n_rayN]</code>
 </li>
-<li><b><code>fbs_angleN</code></b><br>
-   Angle between incoming ray and FBS in [rad], Size <code>[ n_rayN ]</code>
+<li><b><code>thicknessN</code></b> — Material thickness (FBS-to-SBS distance); <code>[n_rayN]</code>
 </li>
-<li><b><code>thicknessN</code></b><br>
-   Material thickness in meters calculated from the difference between FBS and SBS, Size <code>[ n_rayN ]</code>
+<li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (Inf if partial hit); <code>[n_rayN]</code>
 </li>
-<li><b><code>edge_lengthN</code></b><br>
-   Max. edge length of the ray tube triangle at the new origin. A value of infinity indicates that only
-   a part of the ray tube hits the object. Size <code>[ n_rayN, 3 ]</code>
+<li><b><code>normal_vecN</code></b> — FBS and SBS normal vectors <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>; <code>[n_rayN, 6]</code>
 </li>
-<li><b><code>normal_vecN</code></b><br>
-   Normal vector of FBS and SBS, Size <code>[ n_rayN, 6 ]</code>
-</li>
-<li><b><code>out_typeN</code></b><br>
-   A numeric indicator describing the type of the interaction. The total refection indicator is only
-   set in refraction mode.<br><br>
+<li><b><code>out_typeN</code></b> — Interaction type code (int32); <code>[n_rayN]</code><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
-  <th style="text-align: left;">No</th>
-  <th style="text-align: left;">θF<0</th>
-  <th style="text-align: left;">θS<0</th>
-  <th style="text-align: left;">dFS=0</th>
-  <th style="text-align: left;">TotRef</th>
-  <th style="text-align: left;">iSBS=0</th>
-  <th style="text-align: left;">NF=-NS</th>
-  <th style="text-align: left;">NF=NS</th>
-  <th style="text-align: left;">startIn</th>
-  <th style="text-align: left;">endIn</th>
-  <th style="text-align: left;">Meaning</th>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Code</th>
+  <th style="text-align: left;">Description</th>
 </tr>
 <tr>
-  <td>0</td>
   <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td></td>
-  <td>Undefined</td>
-</tr>
-<tr>
   <td>1</td>
-  <td>no</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Single Hit o-i</td>
+  <td>Single hit, outside→inside</td>
 </tr>
 <tr>
+  <td></td>
   <td>2</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Single Hit i-o</td>
+  <td>Single hit, inside→outside</td>
 </tr>
 <tr>
+  <td></td>
   <td>3</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>N/A</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Single Hit i-o, TR</td>
+  <td>Single hit, inside→outside, total reflection</td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>4</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M2 hit first</td>
+  <td>Media-to-media, M2 hit first</td>
 </tr>
 <tr>
+  <td></td>
   <td>5</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M1 hit first</td>
+  <td>Media-to-media, M1 hit first</td>
 </tr>
 <tr>
+  <td></td>
   <td>6</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>M2M, M1 hit first, TR</td>
+  <td>Media-to-media, M1 hit first, total reflection</td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>7</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Overlapping Faces, o-i</td>
+  <td>Overlapping faces, outside→inside</td>
 </tr>
 <tr>
+  <td></td>
   <td>8</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Overlapping Faces, i-o</td>
+  <td>Overlapping faces, inside→outside</td>
 </tr>
 <tr>
+  <td></td>
   <td>9</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Overlapping Faces, i-o, TR</td>
+  <td>Overlapping faces, inside→outside, total reflection</td>
 </tr>
 <tr>
-  <td>---</td>
-  <td>-----</td>
-  <td>------</td>
-  <td>-------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>--------</td>
-  <td>-------</td>
-  <td>---------</td>
-  <td>-------</td>
-  <td>----------------------------</td>
-</tr>
-<tr>
+  <td></td>
   <td>10</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>Edge Hit, o-i-o</td>
+  <td>Edge hit, outside→inside→outside</td>
 </tr>
 <tr>
+  <td></td>
   <td>11</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>Edge Hit, i-o-i</td>
+  <td>Edge hit, inside→outside→inside</td>
 </tr>
 <tr>
+  <td></td>
   <td>12</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>Edge Hit, i-o-i, TR</td>
+  <td>Edge hit, inside→outside→inside, total reflection</td>
 </tr>
 <tr>
+  <td></td>
   <td>13</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>N/A</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>Edge Hit, o-i</td>
+  <td>Edge hit, outside→inside</td>
 </tr>
 <tr>
+  <td></td>
   <td>14</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Edge Hit, i-o</td>
+  <td>Edge hit, inside→outside</td>
 </tr>
 <tr>
+  <td></td>
   <td>15</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>no</td>
-  <td>no</td>
-  <td>yes</td>
-  <td>no</td>
-  <td>Edge Hit, i-o, TR</td>
+  <td>Edge hit, inside→outside, total reflection</td>
 </tr>
 </table><br>
 </li></ul>
