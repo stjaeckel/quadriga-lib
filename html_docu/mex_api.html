@@ -4056,7 +4056,7 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 </li>
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 5]</code>
+<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>center_frequency</code></b> — Center frequency
 </li>
@@ -4850,49 +4850,45 @@ hierarchies or GPU batch execution.
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="point_inside_mesh"></a>
 <b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul>
-<li>Uses raycasting to determine whether each 3D point lies inside a triangle mesh.
+<li>Always casts 4 rays per point in near-tetrahedral directions (rotated regular tetrahedron,
+   scaled to 1000 m) for inside/outside detection
 </li>
-<li>Requires that the mesh is watertight and all normals are pointing outwards.
+<li>When <code>distance &gt; 0</code>, adds icosphere-sampled rays at subdivision level ⌈distance⌉ + 1
+   (e.g. subdiv 2 for distance ≤ 1 m, subdiv 3 for ≤ 2 m), substantially increasing ray count
 </li>
-<li>For each point, multiple rays are cast in various directions.
+<li>A point is inside if any ray hits a face with a negative incidence angle, or if the ray
+   thickness at FBS is below 1 mm (surface proximity)
 </li>
-<li>If any ray intersects a mesh element with a negative incidence angle, the point is classified as <b>inside</b>.
+<li>Mesh must be watertight with all normals pointing outward
 </li>
-<li>Output can be binary (0 = outside, 1 = inside) or labeled with object indices.
+<li>If <code>obj_ind</code> is provided, returns the 1-based enclosing object index instead of binary 0/1
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance )
+result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
-<li><code><b>points</b></code> (input)<br>
-   3D point coordinates to test, size <code>[n_points, 3]</code>.
+<li><b><code>points</code></b> — 3D coordinates of test points; <code>[n_points, 3]</code>
 </li>
-<li><code><b>mesh</b></code> (input)<br>
-   Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format
-   (x1,y1,z1,x2,y2,z2,x3,y3,z3), size <code>[n_mesh, 9]</code>.
+<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); <code>[n_mesh, 9]</code>
 </li>
-<li><code><b>obj_ind</b></code> (optional input)<br>
-   Optional object index for each mesh element (1-based), size <code>[n_mesh]</code>. If provided, the return
-   vector will contain the index of the enclosing object instead of binary values.
+<li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per mesh element; enables per-object output; <code>[n_mesh]</code>
 </li>
-<li><code><b>distance</b></code> (optional input)<br>
-   Optional distance in meters from objects that should be considered as <i>inside</i> the object.
-   Possible range: 0 - 20 m. Using this parameter significantly increases computation time.
+<li><b><code>distance</code></b> <i>(optional)</i> — Surface proximity threshold; points within this distance
+   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
+   range: 0–20 m; Default: 0
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Output:</i><br>
 <ul>
-<li><code><b>result</b></code><br>
-   For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside
-   (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b>
-   if <code>obj_ind</code> is provided. Size: <code>[n_points]</code>
+<li><code><b>result</b></code>— Indicator: <code>0</code> = outside, <code>1</code> = inside any object (no <code>obj_ind</code>), or 1-based object
+   index (with <code>obj_ind</code>); size <code>[n_points]</code>
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
