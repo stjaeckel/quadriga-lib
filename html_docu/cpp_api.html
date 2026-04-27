@@ -4675,7 +4675,7 @@ void calc_diffraction_gain(
 </li>
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 5]</code>
+<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>center_frequency</code></b> — Center frequency
 </li>
@@ -4688,6 +4688,10 @@ void calc_diffraction_gain(
 <li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 </li>
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored for non-CUDA kernels
+</li>
+<li><b><code>scalar_mode</code></b> <i>(optional)</i> — If <code>true</code>, uses scalar transmission (TE-only reflection coefficient,
+   energy-conservation transmission) instead of EM TE/TM averaging. Default <code>false</code> (EM mode). Selects
+   interaction type passed to <a href="#ray_mesh_interact">ray_mesh_interact</a> (4 vs. 1).
 </li></ul>
 
 <i>Outputs:</i><br>
@@ -4704,6 +4708,8 @@ void calc_diffraction_gain(
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)
 </li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format)
+</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (used for media interactions)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -5604,6 +5610,8 @@ arma::uword quadriga_lib::obj_file_read(
 </li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (used to calculate indexed mesh for faster processing)
 </li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (calculating interactions between rays and the triangular mesh)
+</li>
 <li><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a> (for exporting to Mitsuba scene file format)
 </li></ul>
 
@@ -5964,7 +5972,7 @@ void quadriga_lib::ray_mesh_interact(
 </li>
 <li><b><code>mesh</code></b> — Triangle mesh faces; ee <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 5]</code>
+<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); <code>[n_ray]</code>
 </li>
