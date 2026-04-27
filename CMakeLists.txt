@@ -556,30 +556,26 @@ if(BUILD_OCTAVE)
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
         endif()
 
-        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared") # Shared lib: use direct g++ (CUDA already resolved inside the .so)
-            add_custom_command(
-                OUTPUT ${octave_output}
-                COMMAND ${CMAKE_CXX_COMPILER}
-                        -std=c++17 -O3 -shared -fPIC -DMATLAB_MEX_FILE ${OCTAVE_INCFLAGS}
-                        -I${OCTAVE_OCTINCLUDEDIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} $<TARGET_FILE:${QUADRIGA_LINK_TARGET}>
-                        -L${OCTAVE_LIBDIR} -loctinterp -loctave -lgomp
-                        -Wl,-rpath,$ORIGIN -o ${octave_output}
-                DEPENDS ${mex_deps}
-                COMMENT "Building Octave MEX file ${octave_output}"
-                VERBATIM
-            )
-        else() # Static lib: must use mkoctfile to handle CUDA correctly
-            add_custom_command(
-                OUTPUT ${octave_output}
-                COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE" ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output}
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${CUDA_MEX_LINK_LIBS}
-                        -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS} -s
-                DEPENDS ${mex_deps}
-                COMMENT "Building Octave MEX file ${octave_output}"
-                VERBATIM
-            )
+        if(QUADRIGA_LINK_TARGET STREQUAL "quadriga_shared")
+            set(QD_MEX_EXTRA_LIBS "")
+            set(QD_MEX_EXTRA_LDFLAGS "-Wl,-rpath,\\$ORIGIN")  # find libquadriga.so next to the .mex
+        else()
+            set(QD_MEX_EXTRA_LIBS ${CUDA_MEX_LINK_LIBS})       # static: pull CUDA in explicitly
+            set(QD_MEX_EXTRA_LDFLAGS "")
         endif()
+
+        add_custom_command(
+            OUTPUT ${octave_output}
+            COMMAND env "CXXFLAGS=${MEX_CXXFLAGS} -U_FORTIFY_SOURCE"
+                    ${MKOCTFILE_EXECUTABLE} --mex -o ${octave_output} ${mex_src}
+                    -L$<TARGET_FILE_DIR:${QUADRIGA_LINK_TARGET}> -lquadriga
+                    ${QD_MEX_EXTRA_LIBS}
+                    -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
+                    ${QD_MEX_EXTRA_LDFLAGS} -s
+            DEPENDS ${mex_deps}
+            COMMENT "Building Octave MEX file ${octave_output}"
+            VERBATIM
+        )
 
         list(APPEND MEX_OCTAVE_TARGETS ${octave_output})
     endforeach()
