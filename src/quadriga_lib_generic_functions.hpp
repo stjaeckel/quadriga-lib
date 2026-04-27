@@ -12,6 +12,7 @@
 #include <cmath>
 #include <climits>
 #include <stdexcept>
+#include <cstdint>
 
 // Generic C++ implementation of RayTriangleIntersect
 template <typename dtype>
