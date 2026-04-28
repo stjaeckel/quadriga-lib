@@ -204,7 +204,7 @@ class test_case(unittest.TestCase):
             orig, trivec, tridir, points
         )
         pointsR, sub_cloud_index, _, reverse_index = (
-            quadriga_lib.RTtools.point_cloud_segmentation(points, 4, 1)
+            quadriga_lib.RTtools.point_cloud_segmentation(points, 4, 8)
         )
         hit_R, _ = quadriga_lib.RTtools.ray_point_intersect(
             orig, trivec, tridir, pointsR, sub_cloud_ind=sub_cloud_index

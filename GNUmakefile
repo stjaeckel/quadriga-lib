@@ -6,11 +6,11 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = ON
+octave = OFF
 matlab = OFF
 python = ON
-avx2 = OFF
-cuda = OFF
+avx2 = ON
+cuda = ON
 
 CMAKE_BUILD_DIR = build_linux
 
