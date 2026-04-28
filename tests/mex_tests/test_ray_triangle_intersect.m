@@ -205,8 +205,7 @@ assertEqual( isbs2, isbs );
 [ cube_seg, smi ] = quadriga_lib.triangle_mesh_segmentation( cube, 4 );
 aabb_seg = quadriga_lib.triangle_mesh_aabb( cube_seg, smi );
 
-[ fbs_seg, sbs_seg, no_hit_seg, ifbs_seg, isbs_seg ] = ...
-    quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi );
+[ fbs_seg, sbs_seg, no_hit_seg, ifbs_seg, isbs_seg ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube_seg, smi );
 
 % Segmentation reorders the mesh, so FBS/SBS coordinates must match but indices may differ.
 % Verify intersection points and hit counts match the unsegmented result.
@@ -224,7 +223,7 @@ assertElementsAlmostEqual( fbs2, fbs_seg, 'absolute', 1e-6 );
 
 % ---- Sub-mesh index validation: first index not 0 ----
 try
-    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([1; 6]) );
+    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([2; 6]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'First sub-mesh must start at index 0.';
@@ -235,7 +234,7 @@ end
 
 % ---- Sub-mesh index validation: not sorted ----
 try
-    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([0; 6; 3]) );
+    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([1; 6; 3]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-mesh indices must be sorted in ascending order.';
@@ -246,7 +245,7 @@ end
 
 % ---- Sub-mesh index validation: exceeds mesh size ----
 try
-    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([0; 99]) );
+    quadriga_lib.ray_triangle_intersect( orig, dest, cube, uint32([1; 99]) );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-mesh indices cannot exceed number of mesh elements.';

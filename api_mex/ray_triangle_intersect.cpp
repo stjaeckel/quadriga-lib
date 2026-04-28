@@ -1,39 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_tools.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # RAY_TRIANGLE_INTERSECT
-Calculates the intersection of rays and triangles in three dimensions
+Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
-## Description:
-- Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 triangles in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_ray >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
+- Counts the total number of intersections between `orig` and `dest`
+- Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
+- Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has `double` support
 
 ## Usage:
 ```
@@ -42,52 +25,31 @@ Calculates the intersection of rays and triangles in three dimensions
 ```
 
 ## Input Arguments:
-- **`orig`**<br>
-  Ray origins in global coordinate system (GCS). Size: `[ n_ray, 3 ]`
-
-- **`dest`**<br>
-  Ray destinations in GCS. Size: `[ n_ray, 3 ]`
-
-- **`mesh`**<br>
-  Triangular surface mesh. Each row contains the 3 vertices
-  `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`. Size: `[ n_mesh, 9 ]`
-
-- **`sub_mesh_index`** (optional)<br>
-  Indexes indicating start of sub-meshes in `mesh`. Enables faster processing via segmentation.
-  0-based; Type: uint32; Length: `[ n_sub ]`
-
-- **`aabb`** (optional)<br>
-  Pre-computed axis-aligned bounding boxes per sub-mesh. Each row contains
-  `{x_min, x_max, y_min, y_max, z_min, z_max}`. Size: `[ n_sub, 6 ]`.
-  If not provided, AABBs are computed internally from `mesh`.
-
-- **`use_kernel`** (optional)<br>
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- **`gpu_id`** (optional)<br>
-  GPU device ID for CUDA kernel (default: 0). Ignored when not using CUDA.
+- **`orig`** — Ray origins in GCS; `[n_ray, 3]`
+- **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
+- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated
+  traversal; 1-based; `[n_sub]`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
+  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `[n_sub, 6]`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
+  throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2,
+  else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ## Output Arguments:
-- **`fbs`**<br>
-  First-bounce surface intersection points (FBS). Size: `[ n_ray, 3 ]`
+- **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
+- **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
+- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
+- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
+- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
 
-- **`sbs`**<br>
-  Second-bounce surface intersection points (SBS). Size: `[ n_ray, 3 ]`
-
-- **`no_interact`**<br>
-  Number of intersections per ray (0, 1, or 2); uint32; Length: `[ n_ray ]`
-
-- **`fbs_ind`**<br>
-  1-based index of the first intersected mesh element, 0 = no intersection; uint32; Length: `[ n_ray ]`
-
-- **`sbs_ind`**<br>
-  1-based index of the second intersected mesh element, 0 = no second intersection; uint32; Length: `[ n_ray ]`
-
-## Caveat:
-- Inputs can be provided in any numeric type; they are converted to double precision internally.
-- The AVX2 and CUDA kernels always compute in single precision. Only the GENERIC kernel has full
-  double precision support.
+## See also:
+- [[obj_file_read]] (load mesh from OBJ file)
+- [[triangle_mesh_segmentation]] (compute sub-mesh indices)
+- [[triangle_mesh_aabb]] (compute AABBs)
+- [[ray_point_intersect]] (beam interactions with sampling points)
+- [[icosphere]] (generate ray beams)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -103,20 +65,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
     arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
 
-    // Optional: sub_mesh_index
-    arma::u32_vec sub_mesh_index;
-    if (nrhs > 3 && !mxIsEmpty(prhs[3]))
-    {
-        if (mxIsUint32(prhs[3]))
-            sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[3]);
-        else
-            sub_mesh_index = qd_mex_typecast_Col<unsigned>(prhs[3]);
-    }
-
-    // Optional: aabb, use_kernel and gpu_id
+    // Optional inputs
+    arma::u32_vec sub_mesh_index = (nrhs < 4) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[3], true);
     arma::mat aabb = (nrhs < 5) ? arma::mat() : qd_mex_get_Mat<double>(prhs[4]);
     int use_kernel = (nrhs < 6) ? 0 : qd_mex_get_scalar<int>(prhs[5], "use_kernel", 0);
     int gpu_id = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "gpu_id", 0);
+
+    // Convert sub_mesh_index to 0-based
+    for (unsigned &val : sub_mesh_index)
+    {
+        if (val == 0)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_mesh_index' cannot be 0.");
+        --val;
+    }
 
     // Number of rays
     arma::uword n_rays = orig.n_rows;

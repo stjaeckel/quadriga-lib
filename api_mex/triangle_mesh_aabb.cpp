@@ -1,131 +1,72 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2024 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
-#include "quadriga_tools.hpp"
+#include "quadriga_lib.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
 # TRIANGLE_MESH_AABB
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
-## Description:
-The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum
-bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian)
-coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of
-triangles. In order to find intersections with the triangles (e.g. using ray tracing), the
-initial check is the intersections between the rays and the AABBs. Since it is usually a much
-less expensive operation than the check of the actual intersection (because it only requires
-comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
+- Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding
+  non-intersecting geometry
+- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
+- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
 
 ## Usage:
-
 ```
-aabb = quadriga_lib. triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
+aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 ```
 
-## Input Arguments:
+## Inputs:
+- **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
+- **`sub_mesh_index`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
+  of the entire mesh is returned; `[n_sub]`
+- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32`
+  for CUDA); default: 1
 
-- **`triangles`**<br>
-  Vertices of the triangle mesh in global Cartesian coordinates. Each face is described by 3
-  points in 3D-space: `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; single or double precision;
-  Size: `[ n_triangles, 9 ]`
-
-- **`sub_mesh_index`** (optional)<br>
-  Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
-  the entire triangle mesh is returned. Type: uint32; Vector of length `[ n_sub_mesh ]`
-
-- **`vec_size`** (optional)<br>
-  Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1,
-  the number of rows in the output is increased to a multiple of `vec_size`, padded with zeros.
-
-## Output Argument:
-
-- **`aabb`**<br>
-  Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values:
-  `[ x_min, x_max, y_min, y_max, z_min, z_max ]`; Size: `[ n_sub_mesh, 6 ]`
+## Outputs:
+- **`aabb`** — Axis-aligned bounding boxes, one row per sub-mesh; `[n_sub_aligned, 6]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - triangle_mesh   Faces of the triangular mesh (input), Size: [ n_mesh_in, 9 ]
-    //  1 - sub_mesh_index  Sub-mesh index, 0-based, Length: [ n_sub ]
-    //  2 - vec_size        Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA), default = 1
-
-    // Output:
-    //  0 - aabb            Axis-aligned bounding box (AABB) of the 3D mesh
-
+    // Validate argument counts
     if (nrhs < 1 || nrhs > 3)
-        mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:IO_error", "Wrong number of input arguments.");
-
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:IO_error", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Validate data types
-    bool use_single = false;
-    if (mxIsSingle(prhs[0]) || mxIsDouble(prhs[0]))
-        use_single = mxIsSingle(prhs[0]);
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:IO_error",
-                          "Input 'triangle_mesh' must be provided in 'single' or 'double' precision.");
+    // Read input data
+    const arma::mat mesh = qd_mex_get_Mat<double>(prhs[0]);
+    arma::u32_vec sub_mesh_index = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1], true);
+    const arma::uword vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "vec_size", 1);
 
-    arma::fmat mesh_in_single;
-    arma::mat mesh_in_double;
-    if (use_single)
-        mesh_in_single = qd_mex_reinterpret_Mat<float>(prhs[0]);
-    else
-        mesh_in_double = qd_mex_reinterpret_Mat<double>(prhs[0]);
-
-    arma::u32_vec sub_mesh_index;
-    if (nrhs > 1 && !mxIsEmpty(prhs[1]))
+    // Convert sub_mesh_index to 0-based
+    for (unsigned &val : sub_mesh_index)
     {
-        if (!mxIsUint32(prhs[1]))
-            mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:IO_error", "Input 'sub_mesh_index' must be provided as 'uint32'.");
-
-        sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[1]);
+        if (val == 0)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Values in 'sub_mesh_index' cannot be 0.");
+        --val;
     }
 
-    size_t vec_size = (nrhs < 3) ? 1 : qd_mex_get_scalar<size_t>(prhs[2], "vec_size", 1);
+    // Wrap optional input pointer
+    const arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
-    // Call the quadriga-lib function
-    try
-    {
-        if (use_single)
-        {
-            arma::fmat aabb = quadriga_lib::triangle_mesh_aabb(&mesh_in_single, &sub_mesh_index, vec_size);
-            plhs[0] = qd_mex_copy2matlab(&aabb);
-        }
-        else
-        {
-            arma::mat aabb = quadriga_lib::triangle_mesh_aabb(&mesh_in_double, &sub_mesh_index, vec_size);
-            plhs[0] = qd_mex_copy2matlab(&aabb);
-        }
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:triangle_mesh_aabb:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    // Output (returned by value, size determined at runtime)
+    arma::mat aabb;
+
+    // Call library function
+    CALL_QD(aabb = quadriga_lib::triangle_mesh_aabb<double>(&mesh, p_sub_mesh_index, vec_size));
+
+    // Copy to MATLAB
+    if (nlhs > 0)
+        plhs[0] = qd_mex_copy2matlab(&aabb);
 }

@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.2"
 author: "Stephan Jaeckel"
-date: "27.04.2026"
+date: "28.04.2026"
 lang: en-US
 ---
 
@@ -113,13 +113,13 @@ lang: en-US
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3311 |
 | [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3348 |
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3433 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3474 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3522 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3566 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3596 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3624 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3665 |
-| [write_png](#write_png) | Site-specific simulation tools | 3700 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3476 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3524 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3568 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3598 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3626 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3667 |
+| [write_png](#write_png) | Site-specific simulation tools | 3702 |
 
 ---
 
@@ -3456,9 +3456,11 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
 - **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
 - **`sub_cloud_index`** *(optional)* — Segment boundary indices for the point cloud (see [point_cloud_segmentation](#point_cloud_segmentation)); `[n_sub]`
-- **`hit_count`** *(optional)* — Output: number of rays intersecting each point; `[n_points]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 10000` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
+
+### Optional output:
+- **`hit_count`** — Number of rays intersecting each point; `[n_points]`
 
 ### Returns:
 - `std::vector<arma::u32_vec>` — Per-point list of 0-based ray indices that intersected that point; length `n_points`
