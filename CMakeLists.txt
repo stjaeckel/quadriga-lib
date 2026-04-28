@@ -262,6 +262,8 @@ if (BUILD_HDF5) # Compile HDF5 library
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
             -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
             -DBUILD_SHARED_LIBS=OFF
             -DHDF5_ENABLE_Z_LIB_SUPPORT=OFF
             -DHDF5_ENABLE_SZIP_SUPPORT=OFF
@@ -311,7 +313,11 @@ if (ENABLE_TESTS)
             URL ${CATCH2_ZIP}
             BINARY_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_build"
             INSTALL_DIR "${CMAKE_BINARY_DIR}/catch2-${catch2_version}_bin"
-            CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR> -DCMAKE_BUILD_TYPE=Release
+            CMAKE_ARGS
+                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                -DCMAKE_BUILD_TYPE=Release
+                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         )
         if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
             list(APPEND CATCH2_EP_ARGS DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
@@ -418,7 +424,7 @@ if(BUILD_STATIC_LIB)
         target_link_libraries(quadriga_static PUBLIC OpenMP::OpenMP_CXX)
     endif()
     if(BUILD_WITH_CUDA)
-        target_link_libraries(quadriga_static PUBLIC ${CUDA_LINK_LIBS})
+        target_link_libraries(quadriga_static PRIVATE ${CUDA_LINK_LIBS})
         set_target_properties(quadriga_static PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     endif()
     if (BUILD_HDF5)
