@@ -6,11 +6,22 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = OFF
+octave = ON
 matlab = OFF
 python = ON
 avx2 = ON
 cuda = ON
+
+# GCC version override. Empty = use system default. Auto-set to 13 when CUDA is on (current nvcc max).
+# Override on the command line: `make gcc_version=14`
+gcc_version =
+ifeq ($(cuda),ON)
+  gcc_version = 13
+endif
+
+ifneq ($(gcc_version),)
+  CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
+endif
 
 CMAKE_BUILD_DIR = build_linux
 
@@ -27,7 +38,7 @@ OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 QUADRIGA_VERSION := $(shell grep -oP '(?<=#define QUADRIGA_LIB_VERSION_STR ")[^"]+' include/quadriga_lib.hpp)
 
 all:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
 		-D ENABLE_MATLAB=$(matlab) \
 		-D ENABLE_OCTAVE=$(octave) \
 		-D ENABLE_MEX_DOC=$(python) \
