@@ -197,7 +197,7 @@ SECTION!*/
 
 /*!MD
 # obj_file_read
-Read a Wavefront `.obj` file and extract geometry and material information
+Read a Wavefront .obj file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
 - Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
@@ -236,7 +236,7 @@ arma::uword quadriga_lib::obj_file_read(
 
 ## Outputs:
 - **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:
+- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
   | ----- | ------ | --------------------------------------------- |
   | 0     | a      | ε_r at fRef                                   |

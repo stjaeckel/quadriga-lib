@@ -81,6 +81,7 @@ import quadriga_lib
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
 <li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
+<li><a href="#386370db">Site-specific simulation tools</a></li>
 </ul>
 <br>
 <b>Array antenna functions</b>
@@ -108,17 +109,17 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#HDF5_CREATE_FILE">HDF5_CREATE_FILE</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
-<tr><td><a href="#HDF5_READ_CHANNEL">HDF5_READ_CHANNEL</a></td><td>Reads channel data from HDF5 files</td></tr>
-<tr><td><a href="#HDF5_READ_DSET">HDF5_READ_DSET</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
-<tr><td><a href="#HDF5_READ_DSET_NAMES">HDF5_READ_DSET_NAMES</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
-<tr><td><a href="#HDF5_READ_LAYOUT">HDF5_READ_LAYOUT</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
-<tr><td><a href="#HDF5_RESHAPE_LAYOUT">HDF5_RESHAPE_LAYOUT</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
-<tr><td><a href="#HDF5_WRITE_CHANNEL">HDF5_WRITE_CHANNEL</a></td><td>Writes channel data to HDF5 files</td></tr>
-<tr><td><a href="#HDF5_WRITE_DSET">HDF5_WRITE_DSET</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the frequency-domain channel response from time-domain coefficients</td></tr>
 <tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
 <tr><td><a href="#get_ieee_indoor">get_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
+<tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
+<tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
+<tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
+<tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Writes channel data to HDF5 files</td></tr>
+<tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
 <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
@@ -130,7 +131,6 @@ import quadriga_lib
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#VERSION">VERSION</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#acdf">acdf</a></td><td>Calculate the empirical averaged cumulative distribution function (CDF)</td></tr>
 <tr><td><a href="#calc_angular_spread">calc_angular_spread</a></td><td>Calculate azimuth and elevation angular spreads with spherical wrapping</td></tr>
 <tr><td><a href="#calc_cross_polarization_ratio">calc_cross_polarization_ratio</a></td><td>Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases</td></tr>
@@ -138,6 +138,7 @@ import quadriga_lib
 <tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
 <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
 <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
+<tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
@@ -148,16 +149,24 @@ import quadriga_lib
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#ICOSPHERE">ICOSPHERE</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
-<tr><td><a href="#OBJ_FILE_READ">OBJ_FILE_READ</a></td><td>Reads a triangulated 3D polygon mesh from a Wavefront OBJ file</td></tr>
 <tr><td><a href="#RAY_TRIANGLE_INTERSECT">RAY_TRIANGLE_INTERSECT</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
 <tr><td><a href="#TRIANGLE_MESH_AABB">TRIANGLE_MESH_AABB</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
-<tr><td><a href="#TRIANGLE_MESH_SEGMENTATION">TRIANGLE_MESH_SEGMENTATION</a></td><td>Rearranges elements of a triangle mesh into smaller sub-meshes</td></tr>
-<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
 <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
 <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
 <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates which 3D points are intersected by volumetric ray beams</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<b>Site-specific simulation tools</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh</td></tr>
+<tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
+<tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2568,575 +2577,6 @@ speaker_out = arrayant.rotate_pattern(speaker, y_deg=10.0)
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_CREATE_FILE"></a>
-<b>HDF5_CREATE_FILE</b> - Create a new HDF5 channel file with a custom storage layout
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this 
-library is its ability to organize multiple channels within a single HDF5 file while enabling access 
-to individual data sets without the need to read the entire file. In this system, channels can be 
-structured in a multi-dimensional array. For instance, the first dimension might represent the Base 
-Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important 
-to note that the dimensions of the storage layout must be defined when the file is initially created 
-and cannot be altered thereafter. The function <code>quadriga_lib.channel.hdf5_create_file</code> is used to create an 
-empty file with a predetermined custom storage layout.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-channel.hdf5_create_file( fn, nx, ny, nz, nw )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>nx</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 65536
-</li>
-<li><b><code>ny</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li>
-<li><b><code>nz</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li>
-<li><b><code>nw</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_READ_CHANNEL"></a>
-<b>HDF5_READ_CHANNEL</b> - Reads channel data from HDF5 files
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 
-comprises various well-defined sets, including channel coefficients, positions of transmitters and 
-receivers, as well as path data that reflects the interaction of radio waves with the environment. 
-Typically, these datasets are multi-dimensional, encompassing data for <code>n_rx</code> receive antennas, 
-<code>n_tx</code> transmit antennas, <code>n_path</code> propagation paths, and <code>n_snap</code> snapshots. Snapshots are 
-particularly useful for recording data across different locations (such as along a trajectory) or 
-various frequencies. It is important to note that not all datasets include all these dimensions.<br><br> 
- 
-The library also supports the addition of extra datasets of any type or shape, which can be useful 
-for incorporating descriptive data or analysis results. To facilitate data access, the function 
-<code>quadriga_lib.channel.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
-file.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>ix</code></b><br>
-   Storage index for x-dimension, Default = 0
-</li>
-<li><b><code>iy</code></b><br>
-   Storage index for y-dimension, Default = 0
-</li>
-<li><b><code>iz</code></b><br>
-   Storage index for z-dimension, Default = 0
-</li>
-<li><b><code>iw</code></b><br>
-   Storage index for w-dimension, Default = 0
-</li>
-<li><b><code>snap</code></b> (optional)<br>
-   Snapshot range, 0-based notation; optional; vector, default: empty = read all
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>data</code></b><br>
-   Dictionary containing the data in the HDF file with the following keys:
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>par</code></td>
-  <td>Dictionary of unstructured data</td>
-  <td>Variable</td>
-</tr>
-<tr>
-  <td><code>rx_position</code></td>
-  <td>Receiver positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
-</tr>
-<tr>
-  <td><code>tx_position</code></td>
-  <td>Transmitter positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
-</tr>
-<tr>
-  <td><code>coeff</code></td>
-  <td>Channel coefficients, complex valued</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>delay</code></td>
-  <td>Propagation delays in seconds</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz]</td>
-  <td><code>[n_snap]</code> or scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the channel</td>
-  <td>String</td>
-</tr>
-<tr>
-  <td><code>initial_pos</code></td>
-  <td>Index of reference position, 1-based</td>
-  <td>uint32, scalar</td>
-</tr>
-<tr>
-  <td><code>path_gain</code></td>
-  <td>Path gain before antenna, linear scale</td>
-  <td>list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_length</code></td>
-  <td>Path length from TX to RX phase center in m</td>
-  <td>list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>polarization</code></td>
-  <td>Polarization transfer function, complex valued</td>
-  <td>list of <code>[4, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_angles</code></td>
-  <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
-  <td>list of <code>[n_path, 4_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_fbs_pos</code></td>
-  <td>First-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_lbs_pos</code></td>
-  <td>Last-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>no_interact</code></td>
-  <td>Number interaction points of paths with the environment</td>
-  <td>uint32, list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>interact_coord</code></td>
-  <td>Interaction coordinates</td>
-  <td>list of <code>[3, max(sum(no_interact))]</code></td>
-</tr>
-<tr>
-  <td><code>rx_orientation</code></td>
-  <td>Receiver orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
-</tr>
-<tr>
-  <td><code>tx_orientation</code></td>
-  <td>Transmitter orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
-</tr>
-</table><br>
-</li></ul>
-
-<i>Caveat:</i><br>
-<ul>
-<li>Only datasets that are present in the HDF file are returned in the dictionary.
-</li>
-<li>Although the data is stored in single precision, it is converted to double precision by default.
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_READ_DSET"></a>
-<b>HDF5_READ_DSET</b> - Read a single unstructured dataset from an HDF5 file
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function <code>quadriga_lib.channel.hdf5_read_dset</code> retrieves a single unstructured dataset. 
-The output type of the function is defined by the datatype in the file. An empty matrix is returned 
-if the dataset does not exist in the file.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-dset = channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>ix</code></b><br>
-   Storage index for x-dimension, Default = 0
-</li>
-<li><b><code>iy</code></b><br>
-   Storage index for y-dimension, Default = 0
-</li>
-<li><b><code>iz</code></b><br>
-   Storage index for z-dimension, Default = 0
-</li>
-<li><b><code>iw</code></b><br>
-   Storage index for w-dimension, Default = 0
-</li>
-<li><b><code>name</code></b><br>
-   Name of the dataset; String
-</li></ul>
-
-<i>Output Argument:</i><br>
-<ul>
-<li><b><code>dset</code></b><br>
-   Output data. Type and size is defined by the dataspace in the file
-</li></ul>
-
-<i>Caveat:</i><br>
-<ul>
-<li>Only datasets that are present in the HDF file are returned in the dictionary.
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_READ_DSET_NAMES"></a>
-<b>HDF5_READ_DSET_NAMES</b> - Read the names of unstructured data fields from an HDF5 file
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. Users can add any number of such unstructured datasets, each identified by a unique 
-dataset name. The function <code>quadriga_lib.channel.hdf5_read_dset_names</code> retrieves the names of all  
-these datasets, returning them as a list of strings.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-names = channel.hdf5_read_dset_names( fn, ix, iy, iz, iw );
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>ix</code></b><br>
-   Storage index for x-dimension, Default = 0
-</li>
-<li><b><code>iy</code></b><br>
-   Storage index for y-dimension, Default = 0
-</li>
-<li><b><code>iz</code></b><br>
-   Storage index for z-dimension, Default = 0
-</li>
-<li><b><code>iw</code></b><br>
-   Storage index for w-dimension, Default = 0
-</li></ul>
-
-<i>Output Argument:</i><br>
-<ul>
-<li><b><code>names</code></b><br>
-   List of names of all these at the given location in the files; Cell array of strings
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_READ_LAYOUT"></a>
-<b>HDF5_READ_LAYOUT</b> - Read the storage layout of channel data inside an HDF5 file
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
-file. In this framework, channels can be arranged in a multi-dimensional array format. 
- 
-The function <code>quadriga_lib.channel.hdf5_read_layout</code> is designed to read the storage layout from an 
-existing file. Furthermore, it also generates an array that marks the locations within the layout 
-where data already exists. This functionality aids in efficiently managing and accessing channel 
-data within the HDF5 file structure.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-storage_dims, has_data = channel.hdf5_read_layout( fn )
-</pre>
-
-<i>Input Argument:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>storage_dims</code></b><br>
-   Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>.
-</li>
-<li><b><code>has_data</code></b><br>
-   Array indicating if data exists (value 1) or not (value 0); uint32; Size: <code>[nx,ny,nz,nw]</code>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_RESHAPE_LAYOUT"></a>
-<b>HDF5_RESHAPE_LAYOUT</b> - Reshapes the storage layout inside an existing HDF5 file
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
-file. In this framework, channels can be arranged in a multi-dimensional array format. 
-Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
-However, it is possible to reshape the layout using <code>quadriga_lib.channel.hdf5_reshape_layout</code>.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-channel.hdf5_reshape_layout( fn, storage_dims );
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>nx</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 65536
-</li>
-<li><b><code>ny</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li>
-<li><b><code>nz</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li>
-<li><b><code>nw</code></b> (optional)<br>
-   Number of elements on the x-dimension, Default = 1
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_WRITE_CHANNEL"></a>
-<b>HDF5_WRITE_CHANNEL</b> - Writes channel data to HDF5 files
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This function 
-can be used to write structured and unstructured data to an HDF5 file.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-
-storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, par, rx_pos, tx_pos, ...
-   coeff, delay, center_freq, name, initial_pos, path_gain, path_length, ...
-   polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
-   rx_orientation, tx_orientation )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>ix</code></b><br>
-   Storage index for x-dimension, Default = 0
-</li>
-<li><b><code>iy</code></b><br>
-   Storage index for y-dimension, Default = 0
-</li>
-<li><b><code>iz</code></b><br>
-   Storage index for z-dimension, Default = 0
-</li>
-<li><b><code>iw</code></b><br>
-   Storage index for w-dimension, Default = 0
-</li>
-<li><b><code>par</code></b><br>
-   Dictionary of unstructured data, can be empty if no unstructured data should be written
-</li>
-<li><b>Structured data:</b> (double precision)<br>
-   Each snapshot may have a different number of paths <code>n_path_s</code>. Variable-length data is provided as lists.
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>rx_pos</code></td>
-  <td>Receiver positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
-</tr>
-<tr>
-  <td><code>tx_pos</code></td>
-  <td>Transmitter positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
-</tr>
-<tr>
-  <td><code>coeff</code></td>
-  <td>Channel coefficients, complex valued</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>delay</code></td>
-  <td>Propagation delays in seconds</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>center_freq</code></td>
-  <td>Center frequency in [Hz]</td>
-  <td><code>[n_snap]</code> or scalar</td>
-</tr>
-<tr>
-  <td><code>name</code></td>
-  <td>Name of the channel</td>
-  <td>String</td>
-</tr>
-<tr>
-  <td><code>initial_pos</code></td>
-  <td>Index of reference position, 1-based</td>
-  <td>uint32, scalar</td>
-</tr>
-<tr>
-  <td><code>path_gain</code></td>
-  <td>Path gain before antenna, linear scale</td>
-  <td>list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_length</code></td>
-  <td>Path length from TX to RX phase center in m</td>
-  <td>list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>polarization</code></td>
-  <td>Polarization transfer function, complex valued</td>
-  <td>list of <code>[4, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_angles</code></td>
-  <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
-  <td>list of <code>[n_path, 4_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_fbs_pos</code></td>
-  <td>First-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_lbs_pos</code></td>
-  <td>Last-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>no_interact</code></td>
-  <td>Number interaction points of paths with the environment</td>
-  <td>uint32, list of <code>[n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>interact_coord</code></td>
-  <td>Interaction coordinates</td>
-  <td>list of <code>[3, max(sum(no_interact))]</code></td>
-</tr>
-<tr>
-  <td><code>rx_orientation</code></td>
-  <td>Transmitter orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
-</tr>
-<tr>
-  <td><code>tx_orientation</code></td>
-  <td>Receiver orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
-</tr>
-</table><br>
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>storage_dims</code></b><br>
-   Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>.
-</li></ul>
-
-<i>Caveat:</i><br>
-<ul>
-<li>If the file exists already, the new data is added to the exisiting file
-</li>
-<li>If a new file is created, a storage layout is created to store the location of datasets in the file
-</li>
-<li>For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix &gt; 65536</code>)
-</li>
-<li>For <code>location = [ix,iy]</code> storage layout is <code>[1024,64,1,1]</code>
-</li>
-<li>For <code>location = [ix,iy,iz]</code> storage layout is <code>[256,16,16,1]</code>
-</li>
-<li>For <code>location = [ix,iy,iz,iw]</code> storage layout is <code>[128,8,8,8]</code>
-</li>
-<li>You can create a custom storage layout by creating the file first using "<code>hdf5_create_file</code>"
-</li>
-<li>You can reshape the storage layout by using "<code>hdf5_reshape_storage</code>", but the total number of elements must not change
-</li>
-<li>Inputs can be empty or missing.
-</li>
-<li>All structured data is written in single precision (but can can be provided as single or double)
-</li>
-<li>Unstructured datatypes are maintained in the HDF file
-</li>
-<li>Supported unstructured types: string, double, float, (u)int32, (u)int64
-</li>
-<li>Supported unstructured size: up to 3 dimensions
-</li>
-<li>Storage order of the unstructured data is maintained
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="HDF5_WRITE_DSET"></a>
-<b>HDF5_WRITE_DSET</b> - Writes unstructured data to a HDF5 file
-<br><br>
-<i>Description:</i><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function <code>quadriga_lib.channel.hdf5_write_dset</code> writes a single unstructured dataset.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import channel
-channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the HDF5 file, string
-</li>
-<li><b><code>ix</code></b><br>
-   Storage index for x-dimension, Default = 0
-</li>
-<li><b><code>iy</code></b><br>
-   Storage index for y-dimension, Default = 0
-</li>
-<li><b><code>iz</code></b><br>
-   Storage index for z-dimension, Default = 0
-</li>
-<li><b><code>iw</code></b><br>
-   Storage index for w-dimension, Default = 0
-</li>
-<li><b><code>name</code></b><br>
-   Name of the dataset; String
-</li>
-<li><b><code>data</code></b><br>
-   Data to be written
-</li></ul>
-
-<i>Caveat:</i><br>
-<ul>
-<li>Throws an error if dataset already exists at this location
-</li>
-<li>Throws an error if file does not exist (use hdf5_create_file)
-</li>
-<li>Supported types: string, double, float, (u)int32, (u)int64
-</li>
-<li>Supported size: up to 3 dimensions
-</li>
-<li>Storage order is maintained
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="baseband_freq_response"></a>
 <b>baseband_freq_response</b> - Compute the frequency-domain channel response from time-domain coefficients
 <br><br>
@@ -3564,6 +3004,575 @@ chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz,
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_create_file"></a>
+<b>hdf5_create_file</b> - Create a new HDF5 channel file with a custom storage layout
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this 
+library is its ability to organize multiple channels within a single HDF5 file while enabling access 
+to individual data sets without the need to read the entire file. In this system, channels can be 
+structured in a multi-dimensional array. For instance, the first dimension might represent the Base 
+Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important 
+to note that the dimensions of the storage layout must be defined when the file is initially created 
+and cannot be altered thereafter. The function <code>quadriga_lib.channel.hdf5_create_file</code> is used to create an 
+empty file with a predetermined custom storage layout.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+channel.hdf5_create_file( fn, nx, ny, nz, nw )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>nx</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 65536
+</li>
+<li><b><code>ny</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li>
+<li><b><code>nz</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li>
+<li><b><code>nw</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_channel"></a>
+<b>hdf5_read_channel</b> - Reads channel data from HDF5 files
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 
+comprises various well-defined sets, including channel coefficients, positions of transmitters and 
+receivers, as well as path data that reflects the interaction of radio waves with the environment. 
+Typically, these datasets are multi-dimensional, encompassing data for <code>n_rx</code> receive antennas, 
+<code>n_tx</code> transmit antennas, <code>n_path</code> propagation paths, and <code>n_snap</code> snapshots. Snapshots are 
+particularly useful for recording data across different locations (such as along a trajectory) or 
+various frequencies. It is important to note that not all datasets include all these dimensions.<br><br> 
+ 
+The library also supports the addition of extra datasets of any type or shape, which can be useful 
+for incorporating descriptive data or analysis results. To facilitate data access, the function 
+<code>quadriga_lib.channel.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
+file.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>ix</code></b><br>
+   Storage index for x-dimension, Default = 0
+</li>
+<li><b><code>iy</code></b><br>
+   Storage index for y-dimension, Default = 0
+</li>
+<li><b><code>iz</code></b><br>
+   Storage index for z-dimension, Default = 0
+</li>
+<li><b><code>iw</code></b><br>
+   Storage index for w-dimension, Default = 0
+</li>
+<li><b><code>snap</code></b> (optional)<br>
+   Snapshot range, 0-based notation; optional; vector, default: empty = read all
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>data</code></b><br>
+   Dictionary containing the data in the HDF file with the following keys:
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>par</code></td>
+  <td>Dictionary of unstructured data</td>
+  <td>Variable</td>
+</tr>
+<tr>
+  <td><code>rx_position</code></td>
+  <td>Receiver positions</td>
+  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+</tr>
+<tr>
+  <td><code>tx_position</code></td>
+  <td>Transmitter positions</td>
+  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+</tr>
+<tr>
+  <td><code>coeff</code></td>
+  <td>Channel coefficients, complex valued</td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>delay</code></td>
+  <td>Propagation delays in seconds</td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz]</td>
+  <td><code>[n_snap]</code> or scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the channel</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>initial_pos</code></td>
+  <td>Index of reference position, 1-based</td>
+  <td>uint32, scalar</td>
+</tr>
+<tr>
+  <td><code>path_gain</code></td>
+  <td>Path gain before antenna, linear scale</td>
+  <td>list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_length</code></td>
+  <td>Path length from TX to RX phase center in m</td>
+  <td>list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>polarization</code></td>
+  <td>Polarization transfer function, complex valued</td>
+  <td>list of <code>[4, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_angles</code></td>
+  <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
+  <td>list of <code>[n_path, 4_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_fbs_pos</code></td>
+  <td>First-bounce scatterer positions</td>
+  <td>list of <code>[3, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_lbs_pos</code></td>
+  <td>Last-bounce scatterer positions</td>
+  <td>list of <code>[3, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>no_interact</code></td>
+  <td>Number interaction points of paths with the environment</td>
+  <td>uint32, list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>interact_coord</code></td>
+  <td>Interaction coordinates</td>
+  <td>list of <code>[3, max(sum(no_interact))]</code></td>
+</tr>
+<tr>
+  <td><code>rx_orientation</code></td>
+  <td>Receiver orientation</td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>tx_orientation</code></td>
+  <td>Transmitter orientation</td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
+</tr>
+</table><br>
+</li></ul>
+
+<i>Caveat:</i><br>
+<ul>
+<li>Only datasets that are present in the HDF file are returned in the dictionary.
+</li>
+<li>Although the data is stored in single precision, it is converted to double precision by default.
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_dset"></a>
+<b>hdf5_read_dset</b> - Read a single unstructured dataset from an HDF5 file
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. The function <code>quadriga_lib.channel.hdf5_read_dset</code> retrieves a single unstructured dataset. 
+The output type of the function is defined by the datatype in the file. An empty matrix is returned 
+if the dataset does not exist in the file.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+dset = channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>ix</code></b><br>
+   Storage index for x-dimension, Default = 0
+</li>
+<li><b><code>iy</code></b><br>
+   Storage index for y-dimension, Default = 0
+</li>
+<li><b><code>iz</code></b><br>
+   Storage index for z-dimension, Default = 0
+</li>
+<li><b><code>iw</code></b><br>
+   Storage index for w-dimension, Default = 0
+</li>
+<li><b><code>name</code></b><br>
+   Name of the dataset; String
+</li></ul>
+
+<i>Output Argument:</i><br>
+<ul>
+<li><b><code>dset</code></b><br>
+   Output data. Type and size is defined by the dataspace in the file
+</li></ul>
+
+<i>Caveat:</i><br>
+<ul>
+<li>Only datasets that are present in the HDF file are returned in the dictionary.
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_dset_names"></a>
+<b>hdf5_read_dset_names</b> - Read the names of unstructured data fields from an HDF5 file
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. Users can add any number of such unstructured datasets, each identified by a unique 
+dataset name. The function <code>quadriga_lib.channel.hdf5_read_dset_names</code> retrieves the names of all  
+these datasets, returning them as a list of strings.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+names = channel.hdf5_read_dset_names( fn, ix, iy, iz, iw );
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>ix</code></b><br>
+   Storage index for x-dimension, Default = 0
+</li>
+<li><b><code>iy</code></b><br>
+   Storage index for y-dimension, Default = 0
+</li>
+<li><b><code>iz</code></b><br>
+   Storage index for z-dimension, Default = 0
+</li>
+<li><b><code>iw</code></b><br>
+   Storage index for w-dimension, Default = 0
+</li></ul>
+
+<i>Output Argument:</i><br>
+<ul>
+<li><b><code>names</code></b><br>
+   List of names of all these at the given location in the files; Cell array of strings
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_read_layout"></a>
+<b>hdf5_read_layout</b> - Read the storage layout of channel data inside an HDF5 file
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
+notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+file. In this framework, channels can be arranged in a multi-dimensional array format. 
+ 
+The function <code>quadriga_lib.channel.hdf5_read_layout</code> is designed to read the storage layout from an 
+existing file. Furthermore, it also generates an array that marks the locations within the layout 
+where data already exists. This functionality aids in efficiently managing and accessing channel 
+data within the HDF5 file structure.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+storage_dims, has_data = channel.hdf5_read_layout( fn )
+</pre>
+
+<i>Input Argument:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>storage_dims</code></b><br>
+   Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>.
+</li>
+<li><b><code>has_data</code></b><br>
+   Array indicating if data exists (value 1) or not (value 0); uint32; Size: <code>[nx,ny,nz,nw]</code>
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_reshape_layout"></a>
+<b>hdf5_reshape_layout</b> - Reshapes the storage layout inside an existing HDF5 file
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
+notable feature of this library is its capacity to manage multiple channels within a single HDF5 
+file. In this framework, channels can be arranged in a multi-dimensional array format. 
+Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
+However, it is possible to reshape the layout using <code>quadriga_lib.channel.hdf5_reshape_layout</code>.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+channel.hdf5_reshape_layout( fn, storage_dims );
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>nx</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 65536
+</li>
+<li><b><code>ny</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li>
+<li><b><code>nz</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li>
+<li><b><code>nw</code></b> (optional)<br>
+   Number of elements on the x-dimension, Default = 1
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_write_channel"></a>
+<b>hdf5_write_channel</b> - Writes channel data to HDF5 files
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This function 
+can be used to write structured and unstructured data to an HDF5 file.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+
+storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, par, rx_pos, tx_pos, ...
+   coeff, delay, center_freq, name, initial_pos, path_gain, path_length, ...
+   polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
+   rx_orientation, tx_orientation )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>ix</code></b><br>
+   Storage index for x-dimension, Default = 0
+</li>
+<li><b><code>iy</code></b><br>
+   Storage index for y-dimension, Default = 0
+</li>
+<li><b><code>iz</code></b><br>
+   Storage index for z-dimension, Default = 0
+</li>
+<li><b><code>iw</code></b><br>
+   Storage index for w-dimension, Default = 0
+</li>
+<li><b><code>par</code></b><br>
+   Dictionary of unstructured data, can be empty if no unstructured data should be written
+</li>
+<li><b>Structured data:</b> (double precision)<br>
+   Each snapshot may have a different number of paths <code>n_path_s</code>. Variable-length data is provided as lists.
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <td><code>rx_pos</code></td>
+  <td>Receiver positions</td>
+  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+</tr>
+<tr>
+  <td><code>tx_pos</code></td>
+  <td>Transmitter positions</td>
+  <td><code>[3, n_snap]</code> or <code>[3, 1]</code></td>
+</tr>
+<tr>
+  <td><code>coeff</code></td>
+  <td>Channel coefficients, complex valued</td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>delay</code></td>
+  <td>Propagation delays in seconds</td>
+  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>center_freq</code></td>
+  <td>Center frequency in [Hz]</td>
+  <td><code>[n_snap]</code> or scalar</td>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Name of the channel</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>initial_pos</code></td>
+  <td>Index of reference position, 1-based</td>
+  <td>uint32, scalar</td>
+</tr>
+<tr>
+  <td><code>path_gain</code></td>
+  <td>Path gain before antenna, linear scale</td>
+  <td>list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_length</code></td>
+  <td>Path length from TX to RX phase center in m</td>
+  <td>list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>polarization</code></td>
+  <td>Polarization transfer function, complex valued</td>
+  <td>list of <code>[4, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_angles</code></td>
+  <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
+  <td>list of <code>[n_path, 4_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_fbs_pos</code></td>
+  <td>First-bounce scatterer positions</td>
+  <td>list of <code>[3, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>path_lbs_pos</code></td>
+  <td>Last-bounce scatterer positions</td>
+  <td>list of <code>[3, n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>no_interact</code></td>
+  <td>Number interaction points of paths with the environment</td>
+  <td>uint32, list of <code>[n_path_s]</code></td>
+</tr>
+<tr>
+  <td><code>interact_coord</code></td>
+  <td>Interaction coordinates</td>
+  <td>list of <code>[3, max(sum(no_interact))]</code></td>
+</tr>
+<tr>
+  <td><code>rx_orientation</code></td>
+  <td>Transmitter orientation</td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
+</tr>
+<tr>
+  <td><code>tx_orientation</code></td>
+  <td>Receiver orientation</td>
+  <td><code>[3, n_snap]</code> or <code>[3]</code></td>
+</tr>
+</table><br>
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>storage_dims</code></b><br>
+   Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>.
+</li></ul>
+
+<i>Caveat:</i><br>
+<ul>
+<li>If the file exists already, the new data is added to the exisiting file
+</li>
+<li>If a new file is created, a storage layout is created to store the location of datasets in the file
+</li>
+<li>For <code>location = [ix]</code> storage layout is <code>[65536,1,1,1]</code> or <code>[ix,1,1,1]</code> if (<code>ix &gt; 65536</code>)
+</li>
+<li>For <code>location = [ix,iy]</code> storage layout is <code>[1024,64,1,1]</code>
+</li>
+<li>For <code>location = [ix,iy,iz]</code> storage layout is <code>[256,16,16,1]</code>
+</li>
+<li>For <code>location = [ix,iy,iz,iw]</code> storage layout is <code>[128,8,8,8]</code>
+</li>
+<li>You can create a custom storage layout by creating the file first using "<code>hdf5_create_file</code>"
+</li>
+<li>You can reshape the storage layout by using "<code>hdf5_reshape_storage</code>", but the total number of elements must not change
+</li>
+<li>Inputs can be empty or missing.
+</li>
+<li>All structured data is written in single precision (but can can be provided as single or double)
+</li>
+<li>Unstructured datatypes are maintained in the HDF file
+</li>
+<li>Supported unstructured types: string, double, float, (u)int32, (u)int64
+</li>
+<li>Supported unstructured size: up to 3 dimensions
+</li>
+<li>Storage order of the unstructured data is maintained
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="hdf5_write_dset"></a>
+<b>hdf5_write_dset</b> - Writes unstructured data to a HDF5 file
+<br><br>
+<i>Description:</i><br>
+Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
+to structured datasets, the library facilitates the inclusion of extra datasets of various types 
+and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
+results. The function <code>quadriga_lib.channel.hdf5_write_dset</code> writes a single unstructured dataset.
+
+<i>Usage:</i><br>
+<pre>
+from quadriga_lib import channel
+channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b><br>
+   Filename of the HDF5 file, string
+</li>
+<li><b><code>ix</code></b><br>
+   Storage index for x-dimension, Default = 0
+</li>
+<li><b><code>iy</code></b><br>
+   Storage index for y-dimension, Default = 0
+</li>
+<li><b><code>iz</code></b><br>
+   Storage index for z-dimension, Default = 0
+</li>
+<li><b><code>iw</code></b><br>
+   Storage index for w-dimension, Default = 0
+</li>
+<li><b><code>name</code></b><br>
+   Name of the dataset; String
+</li>
+<li><b><code>data</code></b><br>
+   Data to be written
+</li></ul>
+
+<i>Caveat:</i><br>
+<ul>
+<li>Throws an error if dataset already exists at this location
+</li>
+<li>Throws an error if file does not exist (use hdf5_create_file)
+</li>
+<li>Supported types: string, double, float, (u)int32, (u)int64
+</li>
+<li>Supported size: up to 3 dimensions
+</li>
+<li>Storage order is maintained
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="qrt_file_parse"></a>
 <b>qrt_file_parse</b> - Read metadata from a QRT file
 <br><br>
@@ -3823,21 +3832,6 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays(
 <font size=+1><b>Miscellaneous / Tools</b></font>
 <br>
 <br>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="VERSION"></a>
-<b>VERSION</b> - Returns the quadriga-lib version number
-<br><br>
-<i>Usage:</i><br>
-<pre>
-version = quadriga_lib.version();
-</pre>
-
-<i>Caveat:</i><br>
-<ul>
-<li>If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
-   an suffix <code>_AVX2</code> is added after the version number
-</li></ul>
-
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="acdf"></a>
 <b>acdf</b> - Calculate the empirical averaged cumulative distribution function (CDF)
@@ -4203,6 +4197,21 @@ components = quadriga_lib.components()
 </pre>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="version"></a>
+<b>version</b> - Returns the quadriga-lib version number
+<br><br>
+<i>Usage:</i><br>
+<pre>
+version = quadriga_lib.version();
+</pre>
+
+<i>Caveat:</i><br>
+<ul>
+<li>If Quadriga-Lib was compiled with AVX2 support and the CPU supports intrinsic AVX2 instructions,
+   an suffix <code>_AVX2</code> is added after the version number
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="write_png"></a>
 <b>write_png</b> - Write data to a PNG file
 <br><br>
@@ -4305,475 +4314,6 @@ center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_x
    <code>direction_xyz</code> is set to <code>1</code>, the output is in Cartesian coordinates and the values are in the
    order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Shape: <code>( no_face, 9 )</code>
 </li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="OBJ_FILE_READ"></a>
-<b>OBJ_FILE_READ</b> - Reads a triangulated 3D polygon mesh from a Wavefront OBJ file
-<br><br>
-<i>Description:</i><br>
-The function imports a polygon mesh from an OBJ file. The OBJ file format is a straightforward data 
-format, representing 3D geometry. It details the position of each vertex and defines polygons as lists 
-of these vertices. By default, vertices are arranged in a counter-clockwise order, eliminating the 
-need for explicit declaration of face normals. When exporting the mesh from software like Blender, 
-it's essential to triangulate the mesh and include material definitions. If the material name 
-exists in the material database, the function loads the corresponding properties. 
-Otherwise, it defaults to using standard properties.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-# Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = RTtools.obj_file_read( fn )
-
-# Return as tuple with 8 elements
-data = RTtools.obj_file_read( fn )
-
-# Use a custom material definition file
-data = RTtools.obj_file_read( fn, materials_csv )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the OBJ file, string
-</li>
-<li><b><code>materials_csv</code></b> (optional)<br>
-    Path to optional CSV file containing custom material properties. If empty, default ITU-R P.2040-3
-    materials are used. CSV format: Header row with columns 'name', 'a', 'b', 'c', 'd', 'att' (order can vary).
-    Each row defines a material with: name (string), electromagnetic parameters a,b,c,d (doubles),
-    and additional attenuation att (dB). Relative permittivity: eta = a * f_GHz^b; Conductivity:
-    sigma = c * f_GHz^d
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>mesh</code></b>, <code>data[0]</code><br>
-   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3 points
-   in 3D-space. Hence, a face has 9 values in the order [ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]; <br>
-   Size: <code>[ no_mesh, 9 ]</code>
-</li>
-<li><b><code>mtl_prop</code></b>, <code>data[1]</code><br>
-   Material properties of each mesh element; If no material is defined for an object, the properties
-   for vacuum are used. Size: <code>[ no_mesh, 5 ]</code>
-</li>
-<li><b><code>vert_list</code></b>, <code>data[2]</code><br>
-   List of vertices found in the OBJ file; Size: <code>[ no_vert, 3 ]</code>
-</li>
-<li><b><code>face_ind</code></b>, <code>data[3]</code><br>
-   Triangular faces are defined by three vertices. Vertex indices match the corresponding vertex elements
-   of the previously defined <code>vert_list</code> (<b>0-based</b>). <br>
-   uint32; Size: <code>[ no_mesh, 3 ]</code>
-</li>
-<li><b><code>obj_id</code></b>, <code>data[4]</code><br>
-   Mesh elements in the OBJ file can be grouped into objects (e.g. 12 triangles define the walls of a
-   cube). Each object is identified by a unique ID (<b>1-based</b> index of <code>obj_names</code>). <br>
-   uint32; Size: <code>[ no_mesh, 1 ]</code>
-</li>
-<li><b><code>mtl_id</code></b>, <code>data[5]</code><br>
-   Each mesh element gets assigned a material and each unique material gets assigned an ID (<b>1-based</b>
-   index of <code>mtl_names</code>). Different faces of an object can have different materials. If no material is
-   defined in the OBJ file, the id is set to <code>0</code> and no entry is made in <code>mtl_names</code>. <br>
-   uint32; Size: <code>[ no_mesh, 1 ]</code>
-</li>
-<li><b><code>obj_names</code></b>, <code>data[6]</code><br>
-   Names of the objects in the OBJ file; List of strings
-</li>
-<li><b><code>mtl_names</code></b>, <code>data[7]</code><br>
-   Names of the materials in the OBJ file; List of strings
-</li>
-<li><b><code>bsdf</code></b>, <code>data[8]</code><br>
-   Principled BSDF (Bidirectional Scattering Distribution Function) values extracted from the
-   .MTL file. Size <code>[mtl_names.size(), 17]</code>. Values are:
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td>0</td>
-  <td>Base Color Red</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.8</td>
-</tr>
-<tr>
-  <td>1</td>
-  <td>Base Color Green</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.8</td>
-</tr>
-<tr>
-  <td>2</td>
-  <td>Base Color Blue</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.8</td>
-</tr>
-<tr>
-  <td>3</td>
-  <td>Transparency (alpha)</td>
-  <td>Range 0-1</td>
-  <td>Default = 1.0 (fully opaque)</td>
-</tr>
-<tr>
-  <td>4</td>
-  <td>Roughness</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.5</td>
-</tr>
-<tr>
-  <td>5</td>
-  <td>Metallic</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>6</td>
-  <td>Index of refraction (IOR)</td>
-  <td>Range 0-4</td>
-  <td>Default = 1.45</td>
-</tr>
-<tr>
-  <td>7</td>
-  <td>Specular Adjustment to the IOR</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.5 (no adjustment)</td>
-</tr>
-<tr>
-  <td>8</td>
-  <td>Emission Color Red</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>9</td>
-  <td>Emission Color Green</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>10</td>
-  <td>Emission Color Blue</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>11</td>
-  <td>Sheen</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>12</td>
-  <td>Clearcoat</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>13</td>
-  <td>Clearcoat roughness</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>14</td>
-  <td>Anisotropic</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>15</td>
-  <td>Anisotropic rotation</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-<tr>
-  <td>16</td>
-  <td>Transmission</td>
-  <td>Range 0-1</td>
-  <td>Default = 0.0</td>
-</tr>
-</table><br>
-</li></ul>
-
-<i>Material properties:</i><br>
-Each material is defined by its electrical properties. Radio waves that interact with a building will 
-produce losses that depend on the electrical properties of the building materials, the material 
-structure and the frequency of the radio wave. The fundamental quantities of interest are the electrical 
-permittivity (ϵ) and the conductivity (σ). A simple regression model for the frequency dependence is 
-obtained by fitting measured values of the permittivity and the conductivity at a number of frequencies. 
-The five parameters returned in <code>mtl_prop</code> then are: 
- 
-<ul>
-<li>Real part of relative permittivity at f = 1 GHz (a)
-</li>
-<li>Frequency dependence of rel. permittivity (b) such that ϵ = a · f^b
-</li>
-<li>Conductivity at f = 1 GHz (c)
-</li>
-<li>Frequency dependence of conductivity (d) such that σ = c· f^d
-</li>
-<li>Fixed attenuation in dB applied to each transition
-</li></ul>
-A more detailed explanation together with a derivation can be found in ITU-R P.2040. The following 
-list of material is currently supported and the material can be selected by using the <code>usemtl</code> tag 
-in the OBJ file. When using Blender, the simply assign a material with that name to an object or face. 
-In addition, custom properties can be set by assigning adding the 5 properties after the material 
-name, separated by <code>:</code>, e.g.: 
- 
-<pre>
-usemtl custom::2.1:0.1:0.1:0.5:20
-</pre>
- 
-The following materials are defined by default: 
- 
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <th style="text-align: left;">Name</th>
-  <th style="text-align: left;">a</th>
-  <th style="text-align: left;">b</th>
-  <th style="text-align: left;">c</th>
-  <th style="text-align: left;">d</th>
-  <th style="text-align: left;">Att</th>
-  <th style="text-align: left;">max fGHz</th>
-  <th style="text-align: left;"></th>
-</tr>
-<tr>
-  <td>vacuum / air</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>textiles</td>
-  <td>1.5</td>
-  <td>0.0</td>
-  <td>5e-5</td>
-  <td>0.62</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>plastic</td>
-  <td>2.44</td>
-  <td>0.0</td>
-  <td>2.33e-5</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>ceramic</td>
-  <td>6.5</td>
-  <td>0.0</td>
-  <td>0.0023</td>
-  <td>1.32</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>sea_water</td>
-  <td>80.0</td>
-  <td>-0.25</td>
-  <td>4.0</td>
-  <td>0.58</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>sea_ice</td>
-  <td>3.2</td>
-  <td>-0.022</td>
-  <td>1.1</td>
-  <td>1.5</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>water</td>
-  <td>80.0</td>
-  <td>-0.18</td>
-  <td>0.6</td>
-  <td>1.52</td>
-  <td>0.0</td>
-  <td>20</td>
-  <td></td>
-</tr>
-<tr>
-  <td>water_ice</td>
-  <td>3.17</td>
-  <td>-0.005</td>
-  <td>5.6e-5</td>
-  <td>1.7</td>
-  <td>0.0</td>
-  <td>20</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_concrete</td>
-  <td>5.24</td>
-  <td>0.0</td>
-  <td>0.0462</td>
-  <td>0.7822</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_brick</td>
-  <td>3.91</td>
-  <td>0.0</td>
-  <td>0.0238</td>
-  <td>0.16</td>
-  <td>0.0</td>
-  <td>40</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_plasterboard</td>
-  <td>2.73</td>
-  <td>0.0</td>
-  <td>0.0085</td>
-  <td>0.9395</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_wood</td>
-  <td>1.99</td>
-  <td>0.0</td>
-  <td>0.0047</td>
-  <td>1.0718</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_glass</td>
-  <td>6.31</td>
-  <td>0.0</td>
-  <td>0.0036</td>
-  <td>1.3394</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_ceiling_board</td>
-  <td>1.48</td>
-  <td>0.0</td>
-  <td>0.0011</td>
-  <td>1.075</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_chipboard</td>
-  <td>2.58</td>
-  <td>0.0</td>
-  <td>0.0217</td>
-  <td>0.78</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_plywood</td>
-  <td>2.71</td>
-  <td>0.0</td>
-  <td>0.33</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>40</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_marble</td>
-  <td>7.074</td>
-  <td>0.0</td>
-  <td>0.0055</td>
-  <td>0.9262</td>
-  <td>0.0</td>
-  <td>60</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_floorboard</td>
-  <td>3.66</td>
-  <td>0.0</td>
-  <td>0.0044</td>
-  <td>1.3515</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_metal</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>1.0e7</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_very_dry_ground</td>
-  <td>3.0</td>
-  <td>0.0</td>
-  <td>0.00015</td>
-  <td>2.52</td>
-  <td>0.0</td>
-  <td>10</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_medium_dry_ground</td>
-  <td>15.0</td>
-  <td>-0.1</td>
-  <td>0.035</td>
-  <td>1.63</td>
-  <td>0.0</td>
-  <td>10</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_wet_ground</td>
-  <td>30.0</td>
-  <td>-0.4</td>
-  <td>0.15</td>
-  <td>1.3</td>
-  <td>0.0</td>
-  <td>10</td>
-  <td></td>
-</tr>
-<tr>
-  <td>itu_vegetation</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>1.0e-4</td>
-  <td>1.1</td>
-  <td>0.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-<tr>
-  <td>irr_glass</td>
-  <td>6.27</td>
-  <td>0.0</td>
-  <td>0.0043</td>
-  <td>1.1925</td>
-  <td>23.0</td>
-  <td>100</td>
-  <td></td>
-</tr>
-</table><br>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="RAY_TRIANGLE_INTERSECT"></a>
@@ -4920,154 +4460,6 @@ aabb = RTtools.triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
 <i>See also:</i><br>
 <ul>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="TRIANGLE_MESH_SEGMENTATION"></a>
-<b>TRIANGLE_MESH_SEGMENTATION</b> - Rearranges elements of a triangle mesh into smaller sub-meshes
-<br><br>
-<i>Description:</i><br>
-This function processes the elements of a large triangle mesh by clustering those that are 
-closely spaced. The resulting mesh retains the same elements but rearranges their order. 
-The function aims to minimize the size of the axis-aligned bounding box around each cluster, 
-referred to as a sub-mesh, while striving to maintain a specific number of elements within 
-each cluster.<br><br> 
- 
-This approach is particularly useful in computer graphics and simulation applications where 
-managing computational resources efficiently is crucial. By organizing the mesh elements into 
-compact clusters, the function enhances rendering performance and accelerates computational 
-tasks, such as collision detection and physics simulations. It allows for quicker processing 
-and reduced memory usage, making it an essential technique in both real-time graphics rendering 
-and complex simulation environments.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-# Output as tuple
-data = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
-
-# Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_prop_out = RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>triangles</code></b><br>
-   Vertices of the triangular mesh in global Cartesian coordinates. Each face is described by 3
-   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles, 9 ]</code>
-</li>
-<li><b><code>target_size</code></b> (optional)<br>
-   The target number of elements of each sub-mesh. Default value = 1024. For best performance, the
-   value should be around <code>sgrt( n_triangles )</code>
-</li>
-<li><b><code>vec_size</code></b> (optional)<br>
-   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1.
-   For values > 1,the number of rows for each sub-mesh in the output is increased to a multiple
-   of <code>vec_size</code>. For padding, zero-sized triangles are placed at the center of the AABB of
-   the corresponding sub-mesh.
-</li>
-<li><b><code>mtl_prop_in</code></b> (optional)<br>
-   Material properties of each mesh element; Size: <code>[ n_triangles, 5 ]</code>
-   If this is not provided, the corresponding <code>mtl_prop_out</code> will be empty.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>triangles_out</code></b>, <code>data[0]</code><br>
-   Vertices of the clustered mesh in global Cartesian coordinates; Size: <code>[ n_triangles_out, 9 ]</code>
-</li>
-<li><b><code>sub_mesh_index</code></b>, <code>data[1]</code><br>
-   Start indices of the sub-meshes in 0-based notation. Type: int; Vector of length <code>[ n_sub_mesh ]</code>
-</li>
-<li><b><code>mesh_index</code></b>, <code>data[2]</code><br>
-   Indices for mapping elements of "triangles_in" to "triangles_out"; 1-based;
-   Length: <code>[ n_triangles_out ]</code>; For <code>vec_size &gt; 1</code>, the added elements not contained in the input
-   are indicated by zeros.
-</li>
-<li><b><code>mtl_prop_out</code></b>, <code>data[3]</code><br>
-   Material properties for the sub-divided triangle mesh elements. The values for the new faces are
-   copied from <code>mtl_prop_in</code>; Size: <code>[ n_triangles_out, 5 ]</code>; For <code>vec_size &gt; 1</code>, the added elements
-   will contain the vacuum / air material.
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="calc_diffraction_gain"></a>
-<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple transmit and receive positions using a 3D triangular mesh
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction from mesh geometry. The wave
-   propagation between each TX-RX pair is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>),
-   each approximated by <code>n_seg</code> line segments.
-</li>
-<li>Individual segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,
-   generalized to arbitrary 3D shapes.
-</li>
-<li>Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping
-   geometry whose bounding box does not intersect the TX-RX path.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-# Output as tuple
-data = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id )
-
-# Unpacked outputs
-gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li>ndarray <b><code>orig</code></b><br>
-   TX positions in global coordinate system (GCS); dtype: float64; shape: <code>(n_pos, 3)</code>.
-</li>
-<li>ndarray <b><code>dest</code></b><br>
-   RX positions in global coordinate system (GCS); dtype: float64; shape: <code>(n_pos, 3)</code>.
-</li>
-<li>ndarray <b><code>mesh</code></b><br>
-   Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; dtype: float64; shape: <code>(n_mesh, 9)</code>.
-</li>
-<li>ndarray <b><code>mtl_prop</code></b><br>
-   Material properties per triangle; dtype: float64; shape: <code>(n_mesh, 5)</code>. See <a href="#obj_file_read">obj_file_read</a>.
-</li>
-<li>float <b><code>center_frequency</code></b> (optional)<br>
-   Center frequency in Hz. Default: <code>1e9</code>.
-</li>
-<li>int <b><code>lod</code></b> (optional)<br>
-   Level of detail (0–6). Controls <code>n_path</code> and <code>n_seg</code>. Default: <code>2</code>
-</li>
-<li>int <b><code>verbose</code></b> (optional)<br>
-   Verbosity level. Default: <code>0</code>.
-</li>
-<li>ndarray <b><code>sub_mesh_index</code></b> (optional)<br>
-   Sub-mesh index for acceleration, 0-based; dtype: uint32; shape: <code>(n_mesh,)</code>. Pass empty array to skip.
-   See <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>.
-</li>
-<li>int <b><code>use_kernel</code></b> (optional)<br>
-   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-</li>
-<li>int <b><code>gpu_id</code></b> (optional)<br>
-   GPU device ID for CUDA kernel (0-based). Default: <code>0</code>. Ignored for non-CUDA kernels.
-</li></ul>
-
-<i>Output Arguments (tuple):</i><br>
-<ul>
-<li>ndarray <b><code>gain</code></b><br>
-   Diffraction gain per TX-RX pair, linear scale; dtype: float64; shape: <code>(n_pos,)</code>.
-</li>
-<li>ndarray <b><code>coord</code></b><br>
-   Diffracted path coordinates (excluding endpoints); dtype: float64; shape: <code>(3, n_seg-1, n_pos)</code>.
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>
-</li>
-<li><a href="#obj_file_read">obj_file_read</a>
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -5391,6 +4783,665 @@ hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, 
 <li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for generating point cloud segments)
 </li>
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating intersection of rays and triangles)
+</li></ul>
+
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="386370db"></a>
+<font size=+1><b>Site-specific simulation tools</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="calc_diffraction_gain"></a>
+<b>calc_diffraction_gain</b> - Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided
+   into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), each approximated by <code>n_seg</code> line segments
+</li>
+<li>Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,
+   generalized to arbitrary 3D shapes
+</li>
+<li>Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping
+   triangles whose bounding box does not intersect the TX-RX path
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Output as tuple
+data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency,
+    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+
+# Unpacked outputs
+gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency,
+    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>orig</code></b> — TX positions; <code>(n_pos, 3)</code>
+</li>
+<li><b><code>dest</code></b> — RX positions; <code>(n_pos, 3)</code>
+</li>
+<li><b><code>mesh</code></b> — Triangle vertices, each row [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>center_frequency</code></b> — Center frequency
+</li>
+<li><b><code>lod</code></b> <i>(optional)</i> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a>
+</li>
+<li><b><code>verbose</code></b> <i>(optional)</i> — Verbosity level
+</li>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; <code>(n_mesh,)</code>
+</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+</li>
+<li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored for non-CUDA kernels
+</li>
+<li><b><code>scalar_mode</code></b> <i>(optional)</i> — If <code>true</code>, uses scalar transmission (TE-only reflection coefficient,
+   energy-conservation transmission) instead of EM TE/TM averaging. Default <code>false</code> (EM mode).
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>gain</code></b> <i>(optional)</i> — Diffraction gain per TX-RX pair, linear scale; <code>(n_pos,)</code>
+</li>
+<li><b><code>coord</code></b> <i>(optional)</i> — Diffracted path coordinates excluding endpoints; <code>(3, n_seg-1, n_pos)</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (controls path/segment count via <code>lod</code>)
+</li>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)
+</li>
+<li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="obj_file_read"></a>
+<b>obj_file_read</b> - Read a Wavefront .obj file and extract geometry and material information
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Parses a triangulated Wavefront <code>.obj</code> file; quads and n-gons are not supported
+</li>
+<li>Materials applied per triangle via <code>usemtl</code> tag; unknown/missing materials default to <code>"vacuum"</code> (ε_r = 1, σ = 0, Att = 0, α = 0)
+</li>
+<li>Material name matching is case-sensitive
+</li>
+<li>Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
+</li>
+<li>Default material tag syntax: <code>usemtl itu_concrete</code> (or <code>itu_brick</code>, <code>itu_wood</code>, etc.)
+</li>
+<li>Custom material tag syntax: <code>usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef</code><br>
+<ul>
+<li>ε_r(f)   = a · (f/fRef)^b          (relative permittivity)<br>
+</li>
+<li>σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)<br>
+</li>
+<li>Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)<br>
+</li>
+<li>α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)<br>
+</li>
+<li>Trailing fields are optional; defaults are <code>b=c=d=att=attB=alpha=alphaB=0</code>, <code>fRef=1</code> GHz
+</li></ul>
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Return as separate variables
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = 
+    quadriga_lib.RTtools.obj_file_read( fn )
+
+# Return as tuple with 9 elements
+data = RTtools.obj_file_read( fn )
+
+# Use a custom material definition file
+data = RTtools.obj_file_read( fn, materials_csv )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the <code>.obj</code> file
+</li>
+<li><b><code>materials_csv</code></b> <i>(optional)</i> — Path to CSV file with custom material properties.
+   Required columns: <code>name</code>, <code>a</code>. Optional columns: <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code>, <code>attB</code>, <code>alpha</code>, <code>alphaB</code>, <code>fRef</code>.
+   Column order is flexible; missing optional columns default to <code>0</code> (<code>fRef</code> → <code>1</code>).
+   If empty, ITU-R P.2040-3 defaults are used.
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>mesh</code></b> — Triangle vertex coordinates as [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3] per row; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>mtl_prop</code></b> — Material properties; <code>(n_mesh, 9)</code>; Columns:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Index</th>
+  <th style="text-align: left;">Symbol</th>
+  <th style="text-align: left;">Property</th>
+</tr>
+<tr>
+  <td></td>
+  <td>0</td>
+  <td>a</td>
+  <td>ε_r at fRef</td>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>b</td>
+  <td>Frequency exponent for ε_r</td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>c</td>
+  <td>σ at fRef [S/m]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>d</td>
+  <td>Frequency exponent for σ</td>
+</tr>
+<tr>
+  <td></td>
+  <td>4</td>
+  <td>att</td>
+  <td>Penetration loss at fRef [dB]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>5</td>
+  <td>attB</td>
+  <td>Frequency exponent for att</td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>alpha</td>
+  <td>Distance absorption at fRef [dB/m]</td>
+</tr>
+<tr>
+  <td></td>
+  <td>7</td>
+  <td>alphaB</td>
+  <td>Frequency exponent for alpha</td>
+</tr>
+<tr>
+  <td></td>
+  <td>8</td>
+  <td>fRef</td>
+  <td>Reference frequency [GHz]</td>
+</tr>
+</table><br>
+</li>
+<li><b><code>vert_list</code></b> — All vertex positions in the file; <code>(n_vert, 3)</code>
+</li>
+<li><b><code>face_ind</code></b> — 0-based indices into <code>vert_list</code> per triangle; <code>(n_mesh, 3)</code>
+</li>
+<li><b><code>obj_ind</code></b> — 1-based object index per triangle; <code>(n_mesh, )</code>
+</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; <code>(n_mesh, )</code>
+</li>
+<li><b><code>obj_names</code></b> — Object names; length = <code>max(obj_ind)</code>
+</li>
+<li><b><code>mtl_names</code></b> — Material names; length = <code>max(mtl_ind)</code>
+</li>
+<li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code> file; <code>(n_mtl, 17)</code>; columns:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Index</th>
+  <th style="text-align: left;">Property</th>
+  <th style="text-align: left;">Range</th>
+  <th style="text-align: left;">Default</th>
+</tr>
+<tr>
+  <td></td>
+  <td>0</td>
+  <td>Base Color Red</td>
+  <td>0–1</td>
+  <td>0.8</td>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>Base Color Green</td>
+  <td>0–1</td>
+  <td>0.8</td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>Base Color Blue</td>
+  <td>0–1</td>
+  <td>0.8</td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>Transparency (alpha)</td>
+  <td>0–1</td>
+  <td>1.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>4</td>
+  <td>Roughness</td>
+  <td>0–1</td>
+  <td>0.5</td>
+</tr>
+<tr>
+  <td></td>
+  <td>5</td>
+  <td>Metallic</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>6</td>
+  <td>Index of refraction (IOR)</td>
+  <td>0–4</td>
+  <td>1.45</td>
+</tr>
+<tr>
+  <td></td>
+  <td>7</td>
+  <td>Specular IOR adjustment</td>
+  <td>0–1</td>
+  <td>0.5</td>
+</tr>
+<tr>
+  <td></td>
+  <td>8</td>
+  <td>Emission Red</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>9</td>
+  <td>Emission Green</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>10</td>
+  <td>Emission Blue</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>11</td>
+  <td>Sheen</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>12</td>
+  <td>Clearcoat</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>13</td>
+  <td>Clearcoat roughness</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>14</td>
+  <td>Anisotropic</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>15</td>
+  <td>Anisotropic rotation</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+<tr>
+  <td></td>
+  <td>16</td>
+  <td>Transmission</td>
+  <td>0–1</td>
+  <td>0.0</td>
+</tr>
+</table><br>
+</li></ul>
+
+<i>Default material table:</i><br>
+<ul>
+<li>For all defaults below: <code>attB = alpha = alphaB = 0</code> and <code>fRef = 1 GHz</code>:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Name</th>
+  <th style="text-align: left;">a</th>
+  <th style="text-align: left;">b</th>
+  <th style="text-align: left;">c</th>
+  <th style="text-align: left;">d</th>
+  <th style="text-align: left;">att</th>
+  <th style="text-align: left;">max fGHz</th>
+</tr>
+<tr>
+  <td></td>
+  <td>vacuum / air</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>textiles</td>
+  <td>1.5</td>
+  <td>0.0</td>
+  <td>5e-5</td>
+  <td>0.62</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>plastic</td>
+  <td>2.44</td>
+  <td>0.0</td>
+  <td>2.33e-5</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>ceramic</td>
+  <td>6.5</td>
+  <td>0.0</td>
+  <td>0.0023</td>
+  <td>1.32</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>sea_water</td>
+  <td>80.0</td>
+  <td>-0.25</td>
+  <td>4.0</td>
+  <td>0.58</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>sea_ice</td>
+  <td>3.2</td>
+  <td>-0.022</td>
+  <td>1.1</td>
+  <td>1.5</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>water</td>
+  <td>80.0</td>
+  <td>-0.18</td>
+  <td>0.6</td>
+  <td>1.52</td>
+  <td>0.0</td>
+  <td>20</td>
+</tr>
+<tr>
+  <td></td>
+  <td>water_ice</td>
+  <td>3.17</td>
+  <td>-0.005</td>
+  <td>5.6e-5</td>
+  <td>1.7</td>
+  <td>0.0</td>
+  <td>20</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_concrete</td>
+  <td>5.24</td>
+  <td>0.0</td>
+  <td>0.0462</td>
+  <td>0.7822</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_brick</td>
+  <td>3.91</td>
+  <td>0.0</td>
+  <td>0.0238</td>
+  <td>0.16</td>
+  <td>0.0</td>
+  <td>40</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_plasterboard</td>
+  <td>2.73</td>
+  <td>0.0</td>
+  <td>0.0085</td>
+  <td>0.9395</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_wood</td>
+  <td>1.99</td>
+  <td>0.0</td>
+  <td>0.0047</td>
+  <td>1.0718</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_glass</td>
+  <td>6.31</td>
+  <td>0.0</td>
+  <td>0.0036</td>
+  <td>1.3394</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_ceiling_board</td>
+  <td>1.48</td>
+  <td>0.0</td>
+  <td>0.0011</td>
+  <td>1.075</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_chipboard</td>
+  <td>2.58</td>
+  <td>0.0</td>
+  <td>0.0217</td>
+  <td>0.78</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_plywood</td>
+  <td>2.71</td>
+  <td>0.0</td>
+  <td>0.33</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>40</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_marble</td>
+  <td>7.074</td>
+  <td>0.0</td>
+  <td>0.0055</td>
+  <td>0.9262</td>
+  <td>0.0</td>
+  <td>60</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_floorboard</td>
+  <td>3.66</td>
+  <td>0.0</td>
+  <td>0.0044</td>
+  <td>1.3515</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_metal</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>1.0e7</td>
+  <td>0.0</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_very_dry_ground</td>
+  <td>3.0</td>
+  <td>0.0</td>
+  <td>0.00015</td>
+  <td>2.52</td>
+  <td>0.0</td>
+  <td>10</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_medium_dry_ground</td>
+  <td>15.0</td>
+  <td>-0.1</td>
+  <td>0.035</td>
+  <td>1.63</td>
+  <td>0.0</td>
+  <td>10</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_wet_ground</td>
+  <td>30.0</td>
+  <td>-0.4</td>
+  <td>0.15</td>
+  <td>1.3</td>
+  <td>0.0</td>
+  <td>10</td>
+</tr>
+<tr>
+  <td></td>
+  <td>itu_vegetation</td>
+  <td>1.0</td>
+  <td>0.0</td>
+  <td>1.0e-4</td>
+  <td>1.1</td>
+  <td>0.0</td>
+  <td>100</td>
+</tr>
+<tr>
+  <td></td>
+  <td>irr_glass</td>
+  <td>6.27</td>
+  <td>0.0</td>
+  <td>0.0043</td>
+  <td>1.1925</td>
+  <td>23.0</td>
+  <td>100</td>
+</tr>
+</table><br>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#obj_overlap_test">obj_overlap_test</a> (for testing mesh geometry)
+</li>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (used to calculate indexed mesh for faster processing)
+</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (calculating interactions between rays and the triangular mesh)
+</li>
+<li><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a> (for exporting to Mitsuba scene file format)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="triangle_mesh_segmentation"></a>
+<b>triangle_mesh_segmentation</b> - Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than <code>target_size</code> triangles
+</li>
+<li>Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to <code>vec_size</code>
+</li>
+<li>Dummy triangles are placed at the AABB center of their sub-mesh; <code>mesh_index</code> uses 0 to mark padding entries
+</li>
+<li>If <code>mtl_prop</code> is provided, material rows are reordered and padded in the same way
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Output as tuple
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+
+# Unpacked outputs
+triangles_out, sub_mesh_index, mesh_index, mtl_propR = 
+    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>triangles</code></b> — Triangle vertices, each row [v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set
+   near sqrt(n_mesh); default: 1024
+</li>
+<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
+   sub-mesh row count is rounded up to a multiple of this value; default: 1
+</li>
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, 9)</code>
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>triangles_out</code></b> — Reordered and padded triangle vertices; <code>(n_triangles_out, 9)</code>
+</li>
+<li><b><code>sub_mesh_index</code></b> — 1-based start indices of sub-meshes in <code>triangles_out</code>; <code>(n_sub)</code>
+</li>
+<li><b><code>mesh_index</code></b> <i>(optional)</i> — 1-based mapping from original to reorganized mesh (0 = padding); <code>(n_triangles_out, )</code>
+</li>
+<li><b><code>mtl_prop_out</code></b> <i>(optional)</i> — Reordered and padded material properties; <code>(n_triangles_out, 9)</code>
 </li></ul>
 
     <!-- CONTENT END -->

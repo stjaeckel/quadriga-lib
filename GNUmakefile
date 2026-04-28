@@ -6,9 +6,9 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = ON
+octave = OFF
 matlab = OFF
-python = OFF
+python = ON
 avx2 = OFF
 cuda = OFF
 
