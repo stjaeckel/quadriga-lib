@@ -7,7 +7,7 @@
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Site-Specific Simulations
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD

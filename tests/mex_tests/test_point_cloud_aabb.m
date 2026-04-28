@@ -30,7 +30,7 @@ aabb = quadriga_lib.point_cloud_aabb(points);
 T = [0.0, 40.3, -50.0, 50.0, 1.0, 1.0];
 assertElementsAlmostEqual( aabb, T, 'absolute', 1e-14 );
 
-sub_cloud_index =  uint32([0 8])';
+sub_cloud_index =  uint32([1 9])';
 
 % Calculate bounding box
 aabb = quadriga_lib.point_cloud_aabb(points, sub_cloud_index);
@@ -42,7 +42,7 @@ try % 2 outputs
     [~,~] = quadriga_lib.point_cloud_aabb( points, sub_cloud_index );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

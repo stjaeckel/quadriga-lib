@@ -6139,11 +6139,14 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 </li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — Segment boundary indices for the point cloud (see <a href="#point_cloud_segmentation">point_cloud_segmentation</a>); <code>[n_sub]</code>
 </li>
-<li><b><code>hit_count</code></b> <i>(optional)</i> — Output: number of rays intersecting each point; <code>[n_points]</code>
-</li>
 <li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 10000</code> and CUDA is available, else AVX2, else GENERIC.
 </li>
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA
+</li></ul>
+
+<i>Optional output:</i><br>
+<ul>
+<li><b><code>hit_count</code></b> — Number of rays intersecting each point; <code>[n_points]</code>
 </li></ul>
 
 <i>Returns:</i><br>

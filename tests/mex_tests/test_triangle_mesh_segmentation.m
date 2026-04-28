@@ -24,7 +24,7 @@ mtl_prop(:,1) = 1.1:0.1:2.2;
 assertTrue( size(mesh_seg,1) == 112 );
 assertTrue( size(mtl_prop_seg,1) == 112 );
 assertTrue( numel(sub_mesh_index) == 1 );
-assertTrue( sub_mesh_index == uint32(0) );
+assertTrue( sub_mesh_index == uint32(1) );
 
 assertElementsAlmostEqual( mesh_seg(1:108,:), mesh_sub, 'absolute', 1e-14 );
 assertElementsAlmostEqual( mesh_seg(109:end,:), zeros(4,9), 'absolute', 1e-14 );
@@ -40,7 +40,7 @@ assertEqual( mesh_index(1:108), uint32(1:108)' );
 assertTrue( numel(sub_mesh_index) == 3 );
 assertTrue( size(mesh_seg,1) == 108 );
 assertTrue( size(mtl_prop_seg,1) == 108 );
-assertTrue( sub_mesh_index(1) == uint32(0) );
+assertTrue( sub_mesh_index(1) == uint32(1) );
 
 % No outputs
 quadriga_lib.triangle_mesh_segmentation(mesh_sub, 64, 1, mtl_prop_sub);
@@ -73,7 +73,7 @@ try % 5 outputs
     [~,~,~,~,~] = quadriga_lib.triangle_mesh_segmentation(mesh_sub);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

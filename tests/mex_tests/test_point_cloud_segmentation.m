@@ -15,7 +15,7 @@ points(:, 3) = points(:, 3) + 1.0;
 assertTrue( size(points_out,1) == 20 );
 assertTrue( size(reverse_index,1) == 16 );
 assertTrue( numel(sub_cloud_index) == 1 );
-assertTrue( sub_cloud_index == uint32(0) );
+assertTrue( sub_cloud_index == uint32(1) );
 assertTrue( forward_index(1) == uint32(1) );
 assertTrue( reverse_index(1) == uint32(1) );
 
@@ -34,7 +34,7 @@ assertTrue( numel(sub_cloud_index) == 4 );
 assertTrue( size(points_out,1) == 20 );
 assertTrue( size(reverse_index,1) == 16 );
 
-assertTrue( all(sub_cloud_index == uint32([0,5,10,15])') );
+assertTrue( all(sub_cloud_index == uint32([1,6,11,16])') );
 assertTrue( all(forward_index == uint32([1,2,3,4,0,9,10,11,12,0,5,6,7,8,0,13,14,15,16,0])') );
 assertTrue( all(reverse_index == uint32([1,2,3,4,11,12,13,14,6,7,8,9,16,17,18,19])') );
 
@@ -69,7 +69,7 @@ try % 5 outputs
     [~,~,~,~,~] = quadriga_lib.point_cloud_segmentation(points);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
