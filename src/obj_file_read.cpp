@@ -235,7 +235,7 @@ arma::uword quadriga_lib::obj_file_read(
   If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
-- **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
+- **`mesh`** *(optional)* — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
   | ----- | ------ | --------------------------------------------- |

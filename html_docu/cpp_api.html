@@ -4673,7 +4673,7 @@ void calc_diffraction_gain(
 </li>
 <li><b><code>dest</code></b> — RX positions; <code>[n_pos, 3]</code>
 </li>
-<li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
@@ -5133,7 +5133,7 @@ arma::uword quadriga_lib::obj_file_read(
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code> per row; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code> per row; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; <code>[n_mesh, 9]</code>; Columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -5643,7 +5643,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> — Triangular mesh; each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangular mesh; each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>obj_ind</code></b> — 1-based object index mapping triangles to objects; output of <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh]</code>
 </li>
@@ -5893,7 +5893,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 <ul>
 <li><b><code>points</code></b> — 3D coordinates of test points; <code>[n_points, 3]</code>
 </li>
-<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format  <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per mesh element; enables per-object output; <code>[n_mesh]</code>
 </li>
@@ -5909,9 +5909,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 
 <i>See also:</i><br>
 <ul>
-<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (used internally to build BVH for ray queries)
-</li>
-<li><a href="#icosphere">icosphere</a> (generates icosphere ray directions for distance proximity check; subdivision level = ⌈distance⌉ + 1)
+<li><a href="#obj_file_read">obj_file_read</a> (for reading <code>mesh</code> and <code>obj_ind</code> from an .obj file)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -6333,7 +6331,7 @@ arma::uword quadriga_lib::subdivide_triangles(
 <ul>
 <li><b><code>n_div</code></b> — Number of subdivisions per edge
 </li>
-<li><b><code>triangles_in</code></b> — Mesh vertices as <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; <code>[n_triangles_in, 9]</code>
+<li><b><code>triangles_in</code></b> — Mesh vertices as <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_triangles_in, 9]</code>
 </li>
 <li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_triangles_in, 9]</code>
 </li></ul>
@@ -6357,9 +6355,9 @@ arma::uword quadriga_lib::subdivide_triangles(
 <ul>
 <li>Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
 </li>
-<li>Each triangle row: <code>[x1, y1, z1, x2, y2, z2, x3, y3, z3]</code>
+<li>Each triangle row: <code>{x1, y1, z1, x2, y2, z2, x3, y3, z3}</code>
 </li>
-<li>Output columns: <code>[x_min, x_max, y_min, y_max, z_min, z_max]</code>
+<li>Output columns: <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>
 </li>
 <li>If <code>vec_size &gt; 1</code>, output rows are padded to the next multiple of <code>vec_size</code>
 </li></ul>
@@ -6422,7 +6420,7 @@ arma::uword triangle_mesh_segmentation(
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> — Triangle vertices, each row <code>[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]</code>; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set near <code>sqrt(n_mesh)</code>
 </li>
@@ -6482,7 +6480,7 @@ int triangle_mesh_split(
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> — Triangle vertices, each row <code>[x1,y1,z1, x2,y2,z2, x3,y3,z3]</code>; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>axis</code></b> <i>(optional)</i> — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 </li></ul>

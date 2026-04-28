@@ -102,10 +102,10 @@ class test_case(unittest.TestCase):
             self.assertEqual(len(mesh_idx), tri_out.shape[0])
             self.assertEqual(mtl_out.shape, (tri_out.shape[0], 9))
             self.assertEqual(
-                np.asarray(sub_idx).dtype.kind, "i"
+                np.asarray(sub_idx).dtype.kind, "u"
             )  # integer start indices
             self.assertEqual(
-                np.asarray(mesh_idx).dtype.kind, "i"
+                np.asarray(mesh_idx).dtype.kind, "u"
             )  # integer mapping indices
 
             # No padding expected when vec_size == 1

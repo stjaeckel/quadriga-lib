@@ -33,7 +33,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 
 ## Inputs:
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
-- **`mesh`** — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); `[n_mesh, 9]`
+- **`mesh`** — Triangle faces in row-major vertex format  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
 - **`distance`** *(optional)* — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
@@ -43,8 +43,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 - `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
 
 ## See also:
-- [[triangle_mesh_segmentation]] (used internally to build BVH for ray queries)
-- [[icosphere]] (generates icosphere ray directions for distance proximity check; subdivision level = ⌈distance⌉ + 1)
+- [[obj_file_read]] (for reading `mesh` and `obj_ind` from an .obj file)
 MD!*/
 
 template <typename dtype>

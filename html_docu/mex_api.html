@@ -4054,7 +4054,7 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 </li>
 <li><b><code>dest</code></b> — RX positions; <code>[n_pos, 3]</code>
 </li>
-<li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code>; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li>
@@ -4219,10 +4219,10 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 <li><b><code>length</code></b> <i>(optional)</i> — Distance from origin to face plane; equals the magnitude of each
    <code>center</code> vector; <code>[n_faces]</code>
 </li>
-<li><b><code>vert</code></b> <i>(optional)</i> — Vertex offsets from face center [x1,y1,z1,x2,y2,z2,x3,y3,z3]; <code>[n_faces, 9]</code>
+<li><b><code>vert</code></b> <i>(optional)</i> — Vertex offsets from face center <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_faces, 9]</code>
 </li>
-<li><b><code>direction</code></b> <i>(optional)</i> — Edge directions; spherical [az1,el1,az2,el2,az3,el3] or Cartesian
-   [x1,y1,z1,x2,y2,z2,x3,y3,z3] per <code>direction_xyz</code> flag; <code>[n_faces, 6]</code> or <code>[n_faces, 9]</code>
+<li><b><code>direction</code></b> <i>(optional)</i> — Edge directions; spherical <code>{az1,el1,az2,el2,az3,el3}</code> or Cartesian
+   <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code> per <code>direction_xyz</code> flag; <code>[n_faces, 6]</code> or <code>[n_faces, 9]</code>
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -4278,7 +4278,7 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code> per row; <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code> per row; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; <code>[n_mesh, 9]</code>; Columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -4346,15 +4346,15 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 </li>
 <li><b><code>vert_list</code></b> <i>(optional)</i> — All vertex positions in the file; <code>[n_vert, 3]</code>
 </li>
-<li><b><code>face_ind</code></b> <i>(optional)</i> — 1-based indices into <code>vert_list</code> per triangle; <code>[n_mesh, 3]</code>
+<li><b><code>face_ind</code></b> <i>(optional)</i> — 1-based indices into <code>vert_list</code> per triangle; uint64; <code>[n_mesh, 3]</code>
 </li>
-<li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per triangle; <code>[n_mesh]</code>
+<li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per triangle; uint64; <code>[n_mesh]</code>
 </li>
-<li><b><code>mtl_ind</code></b> <i>(optional)</i> — 1-based material index per triangle; <code>[n_mesh]</code>
+<li><b><code>mtl_ind</code></b> <i>(optional)</i> — 1-based material index per triangle; uint64; <code>[n_mesh]</code>
 </li>
-<li><b><code>obj_names</code></b> <i>(optional)</i> — Object names; length = <code>max(obj_ind)</code>
+<li><b><code>obj_names</code></b> <i>(optional)</i> — Object names; cell array of strings; length = <code>max(obj_ind)</code>
 </li>
-<li><b><code>mtl_names</code></b> <i>(optional)</i> — Material names; length = <code>max(mtl_ind)</code>
+<li><b><code>mtl_names</code></b> <i>(optional)</i> — Material names; cell array of strings; length = <code>max(mtl_ind)</code>
 </li>
 <li><b><code>bsdf</code></b> <i>(optional)</i> — Principled BSDF values from the <code>.mtl</code> file; <code>[n_mtl, 17]</code>; columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -4749,7 +4749,7 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
 <b>point_cloud_aabb</b> - Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
 <div style="margin-bottom: 1.5em;">
 <ul>
-<li>Each row of the output contains <code>[x_min, x_max, y_min, y_max, z_min, z_max]</code> for one sub-cloud
+<li>Each row of the output contains <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code> for one sub-cloud
 </li>
 <li>If <code>sub_cloud_index</code> is empty or omitted, the entire input is treated as a single cloud; last
    index spans to end of <code>points</code>
@@ -4768,7 +4768,7 @@ aabb = quadriga_lib.point_cloud_aabb( points, sub_cloud_index, vec_size );
 <li><b><code>points</code></b> — 3D point coordinates; <code>[n_points, 3]</code>
 </li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — 1-based row indices marking the start of each sub-cloud;
-   use <code>quadriga_lib.point_cloud_segmentation</code> to generate; <code>[n_sub]</code>
+   use <a href="#point_cloud_segmentation">point_cloud_segmentation</a> to generate; uint32; <code>[n_sub]</code>
 </li>
 <li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
 </li></ul>
@@ -4858,7 +4858,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <ul>
 <li><b><code>points</code></b> — 3D coordinates of test points; <code>[n_points, 3]</code>
 </li>
-<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); <code>[n_mesh, 9]</code>
+<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per mesh element; enables per-object output; <code>[n_mesh]</code>
 </li>
@@ -5067,15 +5067,15 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <li><b><code>orig</code></b> — Ray origin positions in global Cartesian coordinates; <code>[n_ray, 3]</code>
 </li>
 <li><b><code>trivec</code></b> — Vectors from ray origin center to triangular wavefront vertices, order
-   <code>[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]</code>; <code>[n_ray, 9]</code>
+   <code>{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}</code>; <code>[n_ray, 9]</code>
 </li>
-<li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates (need not
-   be normalized), order <code>[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]</code>; <code>[n_ray, 9]</code>
+<li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
+   order <code>{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}</code>; <code>[n_ray, 9]</code>
 </li>
 <li><b><code>points</code></b> — 3D point cloud coordinates; <code>[n_points, 3]</code>
 </li>
 <li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — 1-based segment boundary indices for the point cloud
-   (see <code>quadriga_lib.point_cloud_segmentation</code>); <code>[n_sub]</code>
+   (see <code>quadriga_lib.point_cloud_segmentation</code>); uint32; <code>[n_sub]</code>
 </li>
 <li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
    3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 10000</code> and CUDA is
@@ -5086,10 +5086,10 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>hit_count</code></b> <i>(optional)</i> — Number of rays intersecting each point; <code>[n_points, 1]</code>
+<li><b><code>hit_count</code></b> — Number of beams intersecting each point; <code>[n_points, 1]</code>
 </li>
-<li><b><code>ray_ind</code></b> <i>(optional)</i> — Per-point list of 1-based ray indices that intersected that
-   point; zero-padded to a regular 2D array (zero entries indicate unused slots); <code>[max_hits, n_points]</code>
+<li><b><code>ray_ind</code></b> — Per-point list of 1-based ray indices that intersected that point; zero-padded to
+   a regular 2D array (zero entries indicate unused slots); uint32; <code>[max_hits, n_points]</code>
 </li></ul>
 
 <i>See also:</i><br>
@@ -5124,7 +5124,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
     orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
 <li><b><code>orig</code></b> — Ray origins in GCS; <code>[n_ray, 3]</code>
 </li>
@@ -5145,17 +5145,17 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
-<li><b><code>fbs</code></b> (optional) — First-bounce intersection points in GCS; <code>[n_ray, 3]</code>
+<li><b><code>fbs</code></b> — First-bounce intersection points in GCS; <code>[n_ray, 3]</code>
 </li>
-<li><b><code>sbs</code></b> (optional) — Second-bounce intersection points in GCS; <code>[n_ray, 3]</code>
+<li><b><code>sbs</code></b> — Second-bounce intersection points in GCS; <code>[n_ray, 3]</code>
 </li>
-<li><b><code>no_interact</code></b> (optional) — Total number of intersections per ray between <code>orig</code> and <code>dest</code>; <code>[n_ray]</code>
+<li><b><code>no_interact</code></b> — Total number of intersections per ray between <code>orig</code> and <code>dest</code>; uint32; <code>[n_ray]</code>
 </li>
-<li><b><code>fbs_ind</code></b> (optional) — 1-based index of first intersected mesh element; 0 = none; <code>[n_ray]</code>
+<li><b><code>fbs_ind</code></b> — 1-based index of first intersected mesh element; 0 = none; uint32; <code>[n_ray]</code>
 </li>
-<li><b><code>sbs_ind</code></b> (optional) — 1-based index of second intersected mesh element; 0 = none; <code>[n_ray]</code>
+<li><b><code>sbs_ind</code></b> — 1-based index of second intersected mesh element; 0 = none; uint32; <code>[n_ray]</code>
 </li></ul>
 
 <i>See also:</i><br>
@@ -5213,9 +5213,9 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <li>Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding
    non-intersecting geometry
 </li>
-<li>Each triangle row: <code>[x1, y1, z1, x2, y2, z2, x3, y3, z3]</code>
+<li>Each triangle row: <code>{x1, y1, z1, x2, y2, z2, x3, y3, z3}</code>
 </li>
-<li>Output columns: <code>[x_min, x_max, y_min, y_max, z_min, z_max]</code>
+<li>Output columns: <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>
 </li>
 <li>If <code>vec_size &gt; 1</code>, output rows are padded to the next multiple of <code>vec_size</code>
 </li></ul>
@@ -5231,15 +5231,20 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 <li><b><code>mesh</code></b> — Triangle mesh vertices in global Cartesian coordinates; <code>[n_triangles, 9]</code>
 </li>
 <li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 1-based start indices of sub-meshes; if omitted, the AABB
-   of the entire mesh is returned; <code>[n_sub]</code>
+   of the entire mesh is returned; uint32; <code>[n_sub]</code>
 </li>
 <li><b><code>vec_size</code></b> <i>(optional)</i> — Alignment size for SIMD/CUDA padding (e.g., <code>8</code> for AVX2, <code>32</code>
    for CUDA); default: 1
 </li></ul>
 
-<i>Outputs:</i><br>
+<i>Output:</i><br>
 <ul>
 <li><b><code>aabb</code></b> — Axis-aligned bounding boxes, one row per sub-mesh; <code>[n_sub_aligned, 6]</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -5268,7 +5273,7 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>triangles_in</code></b> — Triangle vertices, each row [v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]; <code>[n_mesh, 9]</code>
+<li><b><code>triangles_in</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code>
 </li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set
    near sqrt(n_mesh); default: 1024
@@ -5276,19 +5281,19 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 <li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
    sub-mesh row count is rounded up to a multiple of this value; default: 1
 </li>
-<li><b><code>mtl_prop_in</code></b> <i>(optional)</i> — Material properties; see obj_file_read; <code>[n_mesh, 9]</code>
+<li><b><code>mtl_prop_in</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code>
 </li></ul>
 
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>triangles_out</code></b> — Reordered and padded triangle vertices; <code>[n_meshR, 9]</code>
 </li>
-<li><b><code>sub_mesh_index</code></b> — 1-based start indices of sub-meshes in <code>triangles_out</code>; <code>[n_sub]</code>
+<li><b><code>sub_mesh_index</code></b> — 1-based start indices of sub-meshes in <code>triangles_out</code>; uint32; <code>[n_sub]</code>
 </li>
-<li><b><code>mesh_index</code></b> <i>(optional)</i> — 1-based mapping from original to reorganized mesh
-   (0 = padding); <code>[n_meshR]</code>
+<li><b><code>mesh_index</code></b> — 1-based mapping from original to reorganized mesh
+   (0 = padding); uint32; <code>[n_meshR]</code>
 </li>
-<li><b><code>mtl_prop_out</code></b> <i>(optional)</i> — Reordered and padded material properties; <code>[n_meshR, 9]</code>
+<li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>[n_meshR, 9]</code>
 </li></ul>
 
     <!-- CONTENT END -->

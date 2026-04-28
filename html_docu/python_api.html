@@ -80,7 +80,6 @@ import quadriga_lib
 <li><a href="#e091e809">Array antenna functions</a></li>
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
-<li><a href="#2c1fd9e4">Site-Specific Simulation Tools</a></li>
 <li><a href="#386370db">Site-specific simulation tools</a></li>
 </ul>
 <br>
@@ -144,28 +143,20 @@ import quadriga_lib
 </table>
 </ul>
 <br>
-<b>Site-Specific Simulation Tools</b>
-<ul>
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tbody>
-<tr><td><a href="#ICOSPHERE">ICOSPHERE</a></td><td>Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles</td></tr>
-<tr><td><a href="#RAY_TRIANGLE_INTERSECT">RAY_TRIANGLE_INTERSECT</a></td><td>Calculates the intersection of rays and triangles in three dimensions</td></tr>
-<tr><td><a href="#TRIANGLE_MESH_AABB">TRIANGLE_MESH_AABB</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
-<tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write geometry and material data to a Mitsuba 3 XML scene file.</td></tr>
-<tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds</td></tr>
-<tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Rearranges elements of a point cloud into smaller sub-clouds</td></tr>
-<tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
-<tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculates which 3D points are intersected by volumetric ray beams</td></tr>
-</tbody>
-</table>
-</ul>
-<br>
 <b>Site-specific simulation tools</b>
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh</td></tr>
+<tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
+<tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
+<tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
+<tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
+<tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
+<tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
+<tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
+<tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
 <tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing</td></tr>
 </tbody>
 </table>
@@ -4261,535 +4252,6 @@ quadriga_lib.tools.write_png( fn, data, colormap, min_val, max_val, log_transfor
 <hr class="greyline">
 <br>
 <br>
-<a name="2c1fd9e4"></a>
-<font size=+1><b>Site-Specific Simulation Tools</b></font>
-<br>
-<br>
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="ICOSPHERE"></a>
-<b>ICOSPHERE</b> - Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
-<br><br>
-<i>Description:</i><br>
-An icosphere is constructed by subdividing faces of an icosahedron, a polyhedron with 20 faces, 
-12 vertices and 30 edges, and then projecting the new vertices onto the surface of a sphere. The 
-resulting mesh has 6 triangles at each vertex, except for 12 vertices which have 5 triangles. 
-The approximate equilateral triangles have roughly the same edge length and surface area.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_xyz )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>no_div</code></b><br>
-   Number of divisions per edge of the generating icosahedron. The resulting number of faces is
-   equal to <code>no_face = 20 · no_div^2</code>
-</li>
-<li><b><code>radius</code></b><br>
-   Radius of the sphere in meters
-</li>
-<li><b><code>direction_xyz</code></b><br>
-   Direction format indicator: 0 = Spherical (default), 1 = Cartesian
-</li></ul>
-
-<i>Output Arguments (tuple containing 4 values):</i><br>
-<ul>
-<li><b><code>center</code></b><br>
-   Position of the center point of each triangle; Shape: <code>( no_face, 3 )</code>
-</li>
-<li><b><code>length</code></b><br>
-   Length of the vector pointing from the origin to the center point. This number is smaller than
-   1 since the triangles are located inside the unit sphere; Shape: <code>( no_face )</code>
-</li>
-<li><b><code>vert</code></b><br>
-   The 3 vectors pointing from the center point to the vertices of each triangle; the values are
-   in the order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Shape: <code>( no_face, 9 )</code>
-</li>
-<li><b><code>direction</code></b><br>
-   The directions of the vertex-rays. If the format indicator <code>direction_xyz</code> is set to <code>0</code>, the
-   output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the
-   order <code>( v1az, v1el, v2az, v2el, v3az, v3el ]</code>;Shape: <code>( no_face, 6 )</code> If the format indicator
-   <code>direction_xyz</code> is set to <code>1</code>, the output is in Cartesian coordinates and the values are in the
-   order <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]</code>; Shape: <code>( no_face, 9 )</code>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="RAY_TRIANGLE_INTERSECT"></a>
-<b>RAY_TRIANGLE_INTERSECT</b> - Calculates the intersection of rays and triangles in three dimensions
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
-</li>
-<li>Supports three compute kernels: <b>GENERIC</b> (scalar), <b>AVX2</b> (SIMD, 8 triangles in parallel), and <b>CUDA</b> (GPU).
-</li>
-<li>The <code>use_kernel</code> parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-</li>
-<li>In auto mode (0), CUDA is selected only when <code>n_ray &gt;= 10000</code> and a CUDA-capable GPU is available;
-   otherwise AVX2 is preferred if available, falling back to GENERIC.
-</li>
-<li>Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-# Output as tuple
-data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
-
-# Unpacked outputs
-fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li>ndarray <b><code>orig</code></b><br>
-   Ray origins in global coordinate system (GCS); dtype: float64; shape: <code>(n_ray, 3)</code>
-</li>
-<li>ndarray <b><code>dest</code></b><br>
-   Ray destinations in GCS; dtype: float64; shape: <code>(n_ray, 3)</code>
-</li>
-<li>ndarray <b><code>mesh</code></b><br>
-   Triangular surface mesh. Each row contains the 3 vertices
-   <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; dtype: float64; shape: <code>(n_mesh, 9)</code>
-</li>
-<li>ndarray <b><code>sub_mesh_index</code></b> (optional)<br>
-   Indexes indicating start of sub-meshes in <code>mesh</code>. Enables faster processing via segmentation.
-   0-based; dtype: uint32; shape: <code>(n_sub,)</code>
-</li>
-<li>ndarray <b><code>aabb</code></b> (optional)<br>
-   Pre-computed axis-aligned bounding boxes per sub-mesh. Each row contains
-   <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>; dtype: float64; shape: <code>(n_sub, 6)</code>.
-   If not provided, AABBs are computed internally from <code>mesh</code>.
-</li>
-<li>int <b><code>use_kernel</code></b> (optional)<br>
-   Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-   3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-</li>
-<li>int <b><code>gpu_id</code></b> (optional)<br>
-   GPU device ID for CUDA kernel (default: 0). Ignored when not using CUDA.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li>ndarray <b><code>fbs</code></b>, <code>data[0]</code><br>
-   First-bounce surface intersection points (FBS); dtype: float64; shape: <code>(n_ray, 3)</code>
-</li>
-<li>ndarray <b><code>sbs</code></b>, <code>data[1]</code><br>
-   Second-bounce surface intersection points (SBS); dtype: float64; shape: <code>(n_ray, 3)</code>
-</li>
-<li>ndarray <b><code>no_interact</code></b>, <code>data[2]</code><br>
-   Number of intersections per ray (0, 1, or 2); dtype: uint32; shape: <code>(n_ray,)</code>
-</li>
-<li>ndarray <b><code>fbs_ind</code></b>, <code>data[3]</code><br>
-   Index of the triangle that was hit by the ray at the FBS location; 1-based; 0 = no intersection;
-   dtype: uint32; shape: <code>(n_ray,)</code>
-</li>
-<li>ndarray <b><code>sbs_ind</code></b>, <code>data[4]</code><br>
-   Index of the triangle that was hit by the ray at the SBS location; 1-based; 0 = no second
-   intersection; dtype: uint32; shape: <code>(n_ray,)</code>
-</li></ul>
-
-<i>Caveats:</i><br>
-<ul>
-<li>The AVX2 and CUDA kernels always compute in single precision. Only the GENERIC kernel has full
-   double precision support.
-</li>
-<li>Zero-copy input mapping (no data duplication) is only used for Fortran-contiguous (column-major)
-   NumPy arrays. C-contiguous inputs are silently copied and transposed.
-</li>
-<li>All outputs are Fortran-contiguous
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#obj_file_read">obj_file_read</a> (for loading mesh from an OBJ file)
-</li>
-<li><a href="#icosphere">icosphere</a> (for generating beams)
-</li>
-<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
-</li>
-<li><a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="TRIANGLE_MESH_AABB"></a>
-<b>TRIANGLE_MESH_AABB</b> - Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
-<br><br>
-<i>Description:</i><br>
-The axis-aligned minimum bounding box (or AABB) for a given set of triangles is its minimum 
-bounding box subject to the constraint that the edges of the box are parallel to the (Cartesian) 
-coordinate axes. Axis-aligned bounding boxes are used as an approximate location of the set of 
-triangles. In order to find intersections with the triangles (e.g. using ray tracing), the 
-initial check is the intersections between the rays and the AABBs. Since it is usually a much 
-less expensive operation than the check of the actual intersection (because it only requires 
-comparisons of coordinates), it allows quickly excluding checks of the pairs that are far apart.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-aabb = RTtools.triangle_mesh_aabb( triangle_mesh, sub_mesh_index, vec_size );
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>triangle_mesh</code></b><br>
-   Vertices of the triangle mesh in global Cartesian coordinates. Each face is described by 3
-   points in 3D-space: <code>[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]</code>; Size: <code>[ n_triangles, 9 ]</code>
-</li>
-<li><b><code>sub_mesh_index</code></b> (optional)<br>
-   Start indices of the sub-meshes in 0-based notation. If this parameter is not given, the AABB of
-   the entire triangle mesh is returned. Vector of length <code>[ n_sub_mesh ]</code>
-</li>
-<li><b><code>vec_size</code></b> (optional)<br>
-   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1,
-   the number of rows in the output is increased to a multiple of <code>vec_size</code>, padded with zeros.
-</li></ul>
-
-<i>Output Argument:</i><br>
-<ul>
-<li><b><code>aabb</code></b><br>
-   Axis-aligned bounding box of each sub-mesh. Each box is described by 6 values:
-   <code>[ x_min, x_max, y_min, y_max, z_min, z_max ]</code>; Size: <code>[ n_sub_mesh, 6 ]</code>
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="mitsuba_xml_file_write"></a>
-<b>mitsuba_xml_file_write</b> - Write geometry and material data to a Mitsuba 3 XML scene file.
-<br><br>
-<i>Description:</i><br>
-Converts a triangular surface mesh into the XML format understood by <b>Mitsuba 3</b> 
-<a href="https://www.mitsuba-renderer.org">www.mitsuba-renderer.org</a>. 
-The generated file can be loaded directly by <b>NVIDIA Sionna RT</b> for differentiable radio-propagation 
-simulations.<br><br> 
- 
-<ul>
-<li>Converts a 3D geometry mesh into Mitsuba 3 XML format for use with rendering tools.
-</li>
-<li>Enables exporting models from <code>quadriga-lib</code> to be used with <b>Mitsuba 3</b> or <b>Sionna RT</b>:
-</li>
-<li><a href="https://www.mitsuba-renderer.org">Mitsuba 3</a>: Research-oriented retargetable rendering system.
-</li>
-<li><a href="https://developer.nvidia.com/sionna">NVIDIA Sionna</a>: Hardware-accelerated differentiable ray tracer for wireless propagation, built on Mitsuba 3.
-</li>
-<li>Supports grouping faces into named objects and assigning materials by name.
-</li>
-<li>Optionally maps materials to ITU default presets used by Sionna RT.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Output file name (including path and <code>.xml</code> extension).
-</li>
-<li><b><code>vert_list</code></b><br>
-   Vertex list, size <code>[n_vert, 3]</code>, each row is a vertex (x, y, z) in Cartesian coordinates [m].
-</li>
-<li><b><code>face_ind</code></b><br>
-   Face indices (0-based), size <code>[n_mesh, 3]</code>, each row defines a triangle via vertex indices.
-</li>
-<li><b><code>obj_id</code></b> (input)<br>
-   Object indices (1-based), size <code>[n_mesh]</code>. Assigns each triangle to an object.
-</li>
-<li><b><code>mtl_id</code></b> (input)<br>
-   Material indices (1-based), size <code>[n_mesh]</code>. Assigns each triangle to a material.
-</li>
-<li><b><code>obj_names</code></b><br>
-   List of object names. Length must be equal to <code>max(obj_ind)</code>.
-</li>
-<li><b><code>mtl_names</code></b><br>
-   List of material names. Length must be equal to <code>max(mtl_ind)</code>.
-</li>
-<li><code><b>bsdf</b> = []</code> (optional input)<br>
-   Material reflectivity data (BSDF parameters), size <code>[len(mtl_names), 17]</code>. If omitted, the <code>null</code> BSDF is used.
-   Note that Sionna RT ignores all BSDF parameters. They are only used by the Mitsuma rendering system.
-   See <a href="#obj_file_read">obj_file_read</a> for a definition of the data fields.
-</li>
-<li><code><b>map_to_itu</b> = false</code> (optional input)<br>
-   If true, maps material names to ITU-defined presets used by Sionna RT. Default: <code>false</code>
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#obj_file_read">obj_file_read</a>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="point_cloud_aabb"></a>
-<b>point_cloud_aabb</b> - Calculates the axis-aligned bounding box (AABB) for a 3D point cloud or a set of sub-clouds
-<br><br>
-<i>Description:</i><br>
-The axis-aligned bounding box (AABB) of a set of points is the smallest bounding box whose edges 
-are parallel to the Cartesian coordinate axes and that fully contains all points in the set. 
-This function computes the AABB for either: 
-<ul>
-<li>an entire point cloud, or
-</li>
-<li>multiple sub-clouds defined by their starting indices.
-</li></ul>
-For each cloud, the function returns the minimum and maximum extents along the x, y, and z 
-dimensions, producing a matrix where each row corresponds to one sub-cloud’s bounding box. When 
-SIMD-friendly alignment is required, the output is zero-padded to the nearest multiple of vec_size; 
-these padding rows should be ignored if the number of sub-clouds is known externally.<br><br> 
- 
-If a sub_cloud_index is provided, the last index is assumed to extend to the end of the 
-points matrix. This functionality is particularly useful for preprocessing in geometry analysis, 
-rendering pipelines, and spatial acceleration structures such as BVHs or octrees. Sub-clouds 
-can be conveniently generated using <a href="#point_cloud_segmentation">point_cloud_segmentation</a>.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-aabb = RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>points</code></b><br>
-   Points in 3D-Cartesian space; Size: [ n_points, 3 ]
-</li>
-<li><b><code>sub_cloud_ind</code></b> (optional)<br>
-   Start indices of the sub-clouds in 0-based notation. If this parameter is not given, the AABB of
-   the entire point cloud is returned. Vector of length <code>[ n_sub_cloud ]</code>
-</li>
-<li><b><code>vec_size</code></b> (optional)<br>
-   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1. For values > 1,
-   the number of rows in the output is increased to a multiple of <code>vec_size</code>, padded with zeros.
-</li></ul>
-
-<i>Output Argument:</i><br>
-<ul>
-<li><b><code>aabb</code></b><br>
-   Axis-aligned bounding box of each sub-cloud. Each box is described by 6 values:
-   <code>[ x_min, x_max, y_min, y_max, z_min, z_max ]</code>; Size: <code>[ n_sub_cloud, 6 ]</code>
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for calculating sub clouds)
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="point_cloud_segmentation"></a>
-<b>point_cloud_segmentation</b> - Rearranges elements of a point cloud into smaller sub-clouds
-<br><br>
-<i>Description:</i><br>
-This function processes a large 3D point cloud by clustering closely spaced points and recursively 
-partitioning it into smaller sub-clouds, each below a specified size threshold. It minimizes the 
-axis-aligned bounding box of each sub-cloud while striving to maintain a target number of points 
-per cluster.<br><br> 
- 
-Sub-clouds are aligned to a specified SIMD vector size (e.g., for AVX or CUDA), with padding applied 
-as needed. The function outputs a reorganized version of the input points (pointsR), where points 
-are grouped by sub-cloud, and provides forward and reverse index maps to track the reordering. This 
-organization is particularly useful for optimizing spatial processing tasks such as bounding volume 
-hierarchies or GPU batch execution.
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-# Output as tuple
-data = RTtools.point_cloud_segmentation( points, target_size, vec_size )
-
-# Unpacked outputs
-points_out, sub_cloud_ind, forward_ind, reverse_ind = RTtools.point_cloud_segmentation( points, target_size, vec_size )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>points</code></b><br>
-   Points in 3D-Cartesian space; Size: <code>[ n_points, 3 ]</code>
-</li>
-<li><b><code>target_size</code></b> (optional)<br>
-   The target number of elements of each sub-cloud. Default value = 1024. For best performance, the
-   value should be around 10 * sgrt( n_points )
-</li>
-<li><b><code>vec_size</code></b> (optional)<br>
-   Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA). Default value = 1.
-   For values > 1,the number of rows for each sub-cloud in the output is increased to a multiple
-   of <code>vec_size</code>. For padding, zero-sized triangles are placed at the center of the AABB of
-   the corresponding sub-cloud.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>points_out</code></b>, <code>data[0]</code><br>
-   Points in 3D-Cartesian space; singe or double precision;  Size: <code>[ n_points_out, 3 ]</code>
-</li>
-<li><b><code>sub_cloud_ind</code></b>, <code>data[1]</code><br>
-   Start indices of the sub-clouds in 0-based notation. Type: uint32; Vector of length <code>[ n_sub_cloud ]</code>
-</li>
-<li><b><code>forward_ind</code></b>, <code>data[2]</code><br>
-   Indices for mapping elements of "points_in" to "points_out"; 1-based;
-   Length: <code>[ n_points_out ]</code>; For <code>vec_size &gt; 1</code>, the added elements not contained in the input
-   are indicated by zeros.
-</li>
-<li><b><code>reverse_ind</code></b>, <code>data[3]</code><br>
-   Indices for mapping elements of "points_out" to "points"; 0-based; Length: <code>[ n_points ]</code>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="point_inside_mesh"></a>
-<b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Uses raycasting to determine whether each 3D point lies inside a triangle mesh.
-</li>
-<li>Requires that the mesh is watertight and all normals are pointing outwards.
-</li>
-<li>For each point, multiple rays are cast in various directions.
-</li>
-<li>If any ray intersects a mesh element with a negative incidence angle, the point is classified as <b>inside</b>.
-</li>
-<li>Output can be binary (0 = outside, 1 = inside) or labeled with object indices.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-result = RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><code><b>points</b></code> (input)<br>
-   3D point coordinates to test, size <code>[n_points, 3]</code>.
-</li>
-<li><code><b>mesh</b></code> (input)<br>
-   Triangular mesh faces. Each row represents a triangle using 3 vertices in row-major format
-   (x1,y1,z1,x2,y2,z2,x3,y3,z3), size <code>[n_mesh, 9]</code>.
-</li>
-<li><code><b>obj_ind</b></code> (optional input)<br>
-   Optional object index for each mesh element (1-based), size <code>[n_mesh]</code>. If provided, the return
-   vector will contain the index of the enclosing object instead of binary values.
-</li>
-<li><code><b>distance</b></code> (optional input)<br>
-   Optional distance in meters from objects that should be considered as <i>inside</i> the object.
-   Possible range: 0 - 20 m. Using this parameter significantly increases computation time.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><code><b>result</b></code><br>
-   For each point: Returns <code>0</code> if the point is outside the mesh (or all objects), <code>1</code> if inside
-   (or close to) any mesh object (if <code>obj_ind</code> not given), or returns the <b>1-based object index</b>
-   if <code>obj_ind</code> is provided. Size: <code>[n_points]</code>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="ray_point_intersect"></a>
-<b>ray_point_intersect</b> - Calculates which 3D points are intersected by volumetric ray beams
-<br><br>
-<i>Description:</i><br>
-Unlike traditional ray tracing (rays are infinitesimal lines), <b>beam tracing</b> models rays as 
-volumes. Each beam is defined by a triangular wavefront whose three vertices diverge as the 
-beam propagates, capturing real-world spread (e.g., radio-wave divergence) and enabling realistic 
-energy distribution across the beam’s cross-section. Because beams have volume, intersection tests 
-are volumetric rather than line-to-geometry.<br><br> 
- 
-A ray beam is specified by: 
-<ul>
-<li>An origin point.
-</li>
-<li>Three aperture vectors from the origin to the vertices of an initial triangular wavefront
-   that defines the beam’s cross-section at the origin.
-</li>
-<li>Three per-vertex direction vectors (one per vertex) that govern how each vertex, and thus the
-   triangle, diverges as the beam extends. Directions need not be normalized.<br><br>
-</li></ul>
-What the function does 
-<ul>
-<li>Tests whether each point in a 3D Cartesian point cloud lies inside any of the defined ray beams.
-</li>
-<li>For every input point, returns a list of 0-based ray indices of beams that intersect that point.<br><br>
-</li></ul>
-Performance & usage notes 
-<ul>
-<li>Optional support for pre-segmented point clouds (e.g., from <a href="#point_cloud_segmentation">point_cloud_segmentation</a>) to reduce computation.
-</li>
-<li>All internal computations use single-precision floats for speed.
-</li>
-<li>Utilizes AVX2 vectorization when supported by the CPU.
-</li>
-<li>For best accuracy, use a small tube radius and well-distributed points.
-</li></ul>
-
-<i>Usage:</i><br>
-<pre>
-from quadriga_lib import RTtools
-
-hit_count, ray_ind = RTtools.ray_point_intersect( orig, trivec, tridir, points, sub_cloud_ind, target_size )
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>orig</code></b><br>
-   Ray origins in 3D Cartesian coordinates; Shape: <code>(n_ray, 3)</code>
-</li>
-<li><b><code>trivec</code></b><br>
-   Three vectors from each ray’s origin to the vertices of the triangular propagation tube (beam);
-   Order per row: [v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]; Shape: <code>(n_ray, 9)</code>
-</li>
-<li><b><code>tridir</code></b><br>
-   Directions of the three vertex rays in Cartesian coordinates. Normalization not required.
-   Order per row: [d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]; Shape: <code>(n_ray, 9)</code>
-</li>
-<li><b><code>points</code></b><br>
-   3D Cartesian coordinates of the point cloud to test. Shape: <code>(n_points, 3)</code>
-</li>
-<li><b><code>sub_cloud_ind</code></b> (optional)<br>
-   0-based start indices of sub-clouds used to partition points for performance. If not provided
-   (empty array), sub-clouds may be computed automatically. Passing a scalar 0 disables sub-cloud calculation.
-   Shape: (n_sub_cloud,) (strictly increasing; typically starts with 0)
-</li>
-<li><b><code>target_size</code></b> (optional)<br>
-   Desired sub-cloud size used only if <code>sub_cloud_ind</code> is not given or empty (guides automatic segmentation).
-   If it is not given (set to 0) and <code>sub_cloud_ind</code> is empty or also not given, the optimal valued is computed
-   from the number of points.
-</li></ul>
-
-<i>Output Arguments:</i><br>
-<ul>
-<li><b><code>hit_count</code></b><br>
-   Number of ray beams that hit a point. Shape: <code>(n_points, )</code>
-</li>
-<li><b><code>ray_ind</code></b><br>
-   List of length n_points; each list entry is a 1-D array of 0-based ray indices that hit that point.
-   Entries may be empty if no hit was detected.
-</li></ul>
-
-<i>See also:</i><br>
-<ul>
-<li><a href="#icosphere">icosphere</a> (for generating beams)
-</li>
-<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for generating point cloud segments)
-</li>
-<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating intersection of rays and triangles)
-</li></ul>
-
-<div class="pagebreak"></div>
-<hr class="greyline">
-<hr class="greyline">
-<br>
-<br>
 <a name="386370db"></a>
 <font size=+1><b>Site-specific simulation tools</b></font>
 <br>
@@ -4827,7 +4289,7 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 </li>
 <li><b><code>dest</code></b> — RX positions; <code>(n_pos, 3)</code>
 </li>
-<li><b><code>mesh</code></b> — Triangle vertices, each row [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]; <code>(n_mesh, 9)</code>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code>; <code>(n_mesh, 9)</code>
 </li>
 <li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, 9)</code>
 </li>
@@ -4837,7 +4299,7 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 </li>
 <li><b><code>verbose</code></b> <i>(optional)</i> — Verbosity level
 </li>
-<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; <code>(n_mesh,)</code>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; uint32; <code>(n_mesh,)</code>
 </li>
 <li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 </li>
@@ -4861,6 +4323,103 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)
 </li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="icosphere"></a>
+<b>icosphere</b> - Construct a geodesic polyhedron from recursive icosahedron subdivision
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Produces 20 · n_div² triangular faces, each pointing outward from origin
+</li>
+<li>All vertices lie on a sphere of specified radius
+</li>
+<li>Suitable for uniform angular sampling (ray tracing, antenna patterns, spatial grids)
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Output as tuple
+data = quadriga_lib.RTtools.icosphere( no_div, radius, direction_xyz )
+
+# Unpacked outputs
+center, length, vert, direction = quadriga_lib.RTtools.icosphere( no_div, radius, direction_xyz )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>n_div</code></b> — Number of subdivisions; generates 20 · n_div² faces; default: 1
+</li>
+<li><b><code>radius</code></b> — Radius of icosphere in meters; default: 1
+</li>
+<li><b><code>direction_xyz</code></b> <i>(optional)</i> — Output directions in Cartesian (true) or spherical
+   azimuth/elevation (false); default: false
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>center</code></b> — Face center coordinates in Cartesian space; each vector points radially outward
+   from origin with magnitude equal to the inradius of the face; <code>(n_faces, 3)</code>
+</li>
+<li><b><code>length</code></b> — Distance from origin to face plane; equals the magnitude of each
+   <code>center</code> vector; <code>(n_faces,)</code>
+</li>
+<li><b><code>vert</code></b> — Vertex offsets from face center <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>(n_faces, 9)</code>
+</li>
+<li><b><code>direction</code></b> — Edge directions; spherical <code>{az1,el1,az2,el2,az3,el3}</code> or Cartesian
+   <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code> per <code>direction_xyz</code> flag; <code>(n_faces, 6)</code> or <code>[n_faces, 9)</code>
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="mitsuba_xml_file_write"></a>
+<b>mitsuba_xml_file_write</b> - Write a triangular mesh to a Mitsuba 3 XML scene file
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
+   differentiable radio-propagation simulations
+</li>
+<li>Supports grouping faces into named objects with per-face material assignments
+</li>
+<li>Optionally maps material names to ITU-defined presets used by Sionna RT
+</li>
+<li>Creates a subdirectory <code>&lt;stem&gt;_meshes/</code> next to the XML file and writes one binary PLY file per object into it;
+   both the XML and the mesh folder must be distributable together
+</li>
+<li>Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
+   and renamed <code>&lt;obj_name&gt;_&lt;mtl_name&gt;</code>; the effective object count in the output may therefore exceed the length of <code>obj_names</code>
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>fn</code></b> — Output file path including <code>.xml</code> extension
+</li>
+<li><b><code>vert_list</code></b> — Vertex coordinates (x, y, z); <code>(n_vert, 3)</code>
+</li>
+<li><b><code>face_ind</code></b> — Triangle definitions as 0-based vertex indices; uint64; <code>(n_mesh, 3)</code>
+</li>
+<li><b><code>obj_ind</code></b> — 1-based object index per triangle; length must match <code>obj_names</code>; uint64; <code>(n_mesh,)</code>
+</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; length must match <code>mtl_names</code>; uint64; <code>(n_mesh,)</code>
+</li>
+<li><b><code>obj_names</code></b> — Object names; list of strings; length must equal <code>max(obj_ind)</code>
+</li>
+<li><b><code>mtl_names</code></b> — Material names; list of strings; length must equal <code>max(mtl_ind)</code>
+</li>
+<li><b><code>bsdf</code></b> <i>(optional)</i> — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see <a href="#obj_file_read">obj_file_read</a> for field definitions; <code>(mtl_names.size(), 17)</code>
+</li>
+<li><b><code>map_to_itu_materials</code></b> <i>(optional)</i> — If <code>true</code>, maps material names to ITU presets recognised by Sionna RT
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#obj_file_read">obj_file_read</a> (source for mesh data and BSDF field layout)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -4918,7 +4477,7 @@ data = RTtools.obj_file_read( fn, materials_csv )
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>mesh</code></b> — Triangle vertex coordinates as [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3] per row; <code>(n_mesh, 9)</code>
+<li><b><code>mesh</code></b> — Triangle vertex coordinates as <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code> per row; <code>(n_mesh, 9)</code>
 </li>
 <li><b><code>mtl_prop</code></b> — Material properties; <code>(n_mesh, 9)</code>; Columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -4986,15 +4545,15 @@ data = RTtools.obj_file_read( fn, materials_csv )
 </li>
 <li><b><code>vert_list</code></b> — All vertex positions in the file; <code>(n_vert, 3)</code>
 </li>
-<li><b><code>face_ind</code></b> — 0-based indices into <code>vert_list</code> per triangle; <code>(n_mesh, 3)</code>
+<li><b><code>face_ind</code></b> — 0-based indices into <code>vert_list</code> per triangle; uint64; <code>(n_mesh, 3)</code>
 </li>
-<li><b><code>obj_ind</code></b> — 1-based object index per triangle; <code>(n_mesh, )</code>
+<li><b><code>obj_ind</code></b> — 1-based object index per triangle; uint64; <code>(n_mesh, )</code>
 </li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; <code>(n_mesh, )</code>
+<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; uint64; <code>(n_mesh, )</code>
 </li>
-<li><b><code>obj_names</code></b> — Object names; length = <code>max(obj_ind)</code>
+<li><b><code>obj_names</code></b> — Object names; list of strings; length = <code>max(obj_ind)</code>
 </li>
-<li><b><code>mtl_names</code></b> — Material names; length = <code>max(mtl_ind)</code>
+<li><b><code>mtl_names</code></b> — Material names; list os strings; length = <code>max(mtl_ind)</code>
 </li>
 <li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code> file; <code>(n_mtl, 17)</code>; columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
@@ -5396,6 +4955,304 @@ data = RTtools.obj_file_read( fn, materials_csv )
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_cloud_aabb"></a>
+<b>point_cloud_aabb</b> - Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Each row of the output contains <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code> for one sub-cloud
+</li>
+<li>If <code>sub_cloud_index</code> is empty or omitted, the entire input is treated as a single cloud; last
+   index spans to end of <code>points</code>
+</li>
+<li>Output row count is zero-padded to the nearest multiple of <code>vec_size</code>; padding rows are zeros
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+aabb = quadriga_lib.RTtools.point_cloud_aabb( points, sub_cloud_ind, vec_size )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>points</code></b> — 3D point coordinates; <code>(n_points, 3)</code>
+</li>
+<li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — 0-based row indices marking the start of each sub-cloud;
+   use <a href="#point_cloud_segmentation">point_cloud_segmentation</a> to generate; uint32; <code>(n_sub,)</code>
+</li>
+<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD alignment padding factor (e.g. 4, 8, 16); default: 1
+</li></ul>
+
+<i>Output Argument:</i><br>
+<ul>
+<li><b><code>aabb</code></b> — Bounding box matrix; <code>(n_out, 6)</code> where <code>n_out</code> is <code>n_sub</code> padded to a multiple of <code>vec_size</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (generate sub-cloud indices)
+</li>
+<li><a href="#ray_point_intersect">ray_point_intersect</a> (use AABBs for intersection)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_cloud_segmentation"></a>
+<b>point_cloud_segmentation</b> - Reorganize a point cloud into spatial sub-clouds for efficient processing
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Recursively partitions a 3D point cloud into sub-clouds by splitting along bounding box axes at the midpoint
+</li>
+<li>Sub-clouds can be padded to a multiple of <code>vec_size</code> for SIMD alignment; padding points are placed at the sub-cloud AABB center
+</li>
+<li>Produces a reorganized point array and index maps to track reordering
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Output as tuple
+data = quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+
+# Unpacked outputs
+points_out, sub_cloud_ind, forward_ind, reverse_ind =
+    quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>points</code></b> — Original 3D point cloud; <code>(n_points, 3)</code>
+</li>
+<li><b><code>target_size</code></b> <i>(optional)</i> — Maximum points per sub-cloud before padding; default: 1024
+</li>
+<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/CUDA alignment; sub-cloud size is padded to a multiple of
+   this value; no padding when <code>1</code>; default: 1
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>points_out</code></b> — Reorganized point cloud with points grouped by sub-cloud; <code>(n_points_out, 3)</code>
+</li>
+<li><b><code>sub_cloud_index</code></b> — 0-based starting index of each sub-cloud within <code>points_out</code>; uint32; <code>(n_sub,)</code>
+</li>
+<li><b><code>forward_index</code></b> <i>(optional)</i> — 1-based index map from <code>points</code> to <code>points_out</code>; padding entries are <code>0</code>; uint32; <code>(n_points_out,)</code>
+</li>
+<li><b><code>reverse_index</code></b> <i>(optional)</i> — 0-based index map from <code>points_out</code> back to <code>points</code>; uint32; <code>(n_points,)</code>
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="point_inside_mesh"></a>
+<b>point_inside_mesh</b> - Test whether 3D points are inside a triangle mesh using raycasting
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Always casts 4 rays per point in near-tetrahedral directions (rotated regular tetrahedron,
+   scaled to 1000 m) for inside/outside detection
+</li>
+<li>When <code>distance &gt; 0</code>, adds icosphere-sampled rays at subdivision level ⌈distance⌉ + 1
+   (e.g. subdiv 2 for distance ≤ 1 m, subdiv 3 for ≤ 2 m), substantially increasing ray count
+</li>
+<li>A point is inside if any ray hits a face with a negative incidence angle, or if the ray
+   thickness at FBS is below 1 mm (surface proximity)
+</li>
+<li>Mesh must be watertight with all normals pointing outward
+</li>
+<li>If <code>obj_ind</code> is provided, returns the 1-based enclosing object index instead of binary 0/1
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance )
+</pre>
+
+<i>Input Arguments:</i><br>
+<ul>
+<li><b><code>points</code></b> — 3D coordinates of test points; <code>(n_points, 3)</code>
+</li>
+<li><b><code>mesh</code></b> — Triangle faces in row-major vertex format <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per mesh element; enables per-object output; <code>(n_mesh,)</code>
+</li>
+<li><b><code>distance</code></b> <i>(optional)</i> — Surface proximity threshold; points within this distance
+   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
+   range: 0–20 m; Default: 0
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><code><b>result</b></code>— Indicator: <code>0</code> = outside, <code>1</code> = inside any object (no <code>obj_ind</code>), or 1-based object
+   index (with <code>obj_ind</code>); uint32; size <code>(n_points,)</code>
+</li></ul>
+See also: 
+<ul>
+<li><a href="#obj_file_read">obj_file_read</a> (for reading <code>mesh</code> and <code>obj_ind</code> from an .obj file)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="ray_point_intersect"></a>
+<b>ray_point_intersect</b> - Calculate intersections of ray beams with points in 3D space
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Models rays as volumetric beams defined by a triangular wavefront that diverges from the origin, enabling energy spread simulation
+</li>
+<li>Returns, for each point, the list of ray indices whose beam intersects that point
+</li>
+<li>All internal computations use single precision
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+hit_count, ray_ind = quadriga_lib.RTtools.ray_point_intersect( orig, trivec, tridir, points, sub_cloud_ind, use_kernel, gpu_id )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>orig</code></b> — Ray origin positions in global Cartesian coordinates; <code>(n_ray, 3)</code>
+</li>
+<li><b><code>trivec</code></b> — Vectors from ray origin center to triangular wavefront vertices, order
+   <code>{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}</code>; <code>(n_ray, 9)</code>
+</li>
+<li><b><code>tridir</code></b> — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized;
+   order <code>{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}</code>; <code>(n_ray, 9)</code>
+</li>
+<li><b><code>points</code></b> — 3D point cloud coordinates; <code>(n_points, 3)</code>
+</li>
+<li><b><code>sub_cloud_index</code></b> <i>(optional)</i> — 0-based segment boundary indices for the point cloud
+   (see <code>quadriga_lib.point_cloud_segmentation</code>); uint32; <code>(n_sub,)</code>
+</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
+   3 = CUDA; throws if unavailable; auto mode selects CUDA when <code>n_points &gt;= 10000</code> and CUDA is
+   available, else AVX2, else GENERIC; default: 0
+</li>
+<li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA; default: 0
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>hit_count</code></b> — Number of beams intersecting each point; uint32; <code>(n_points,)</code>
+</li>
+<li><b><code>ray_ind</code></b> — List of length <code>(n_points,)</code>; each list entry is a 1-D array of 0-based ray indices
+   that hit that point. Entries may be empty if no hit was detected; uint32
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#icosphere">icosphere</a> (for generating beams)
+</li>
+<li><a href="#point_cloud_segmentation">point_cloud_segmentation</a> (for generating point cloud segments)
+</li>
+<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for calculating intersection of rays and triangles)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="ray_triangle_intersect"></a>
+<b>ray_triangle_intersect</b> - Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Counts the total number of intersections between <code>orig</code> and <code>dest</code>
+</li>
+<li>Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
+</li>
+<li>Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has <code>double</code> support
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+# Output as tuple
+data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
+
+# Unpacked outputs
+fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>orig</code></b> — Ray origins in GCS; <code>(n_ray, 3)</code>
+</li>
+<li><b><code>dest</code></b> — Ray destinations in GCS; <code>(n_ray, 3)</code>
+</li>
+<li><b><code>mesh</code></b> — Triangular mesh; each row: <code>{x1 y1 z1 x2 y2 z2 x3 y3 z3}</code>; <code>(n_mesh, 9)</code>
+</li>
+<li><b><code>sub_mesh_index</code></b> (optional) — Start indices of sub-meshes in <code>mesh</code>; enables AABB-accelerated traversal; 0-based; uint32; <code>(n_sub)</code>
+</li>
+<li><b><code>aabb</code></b> (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
+   <code>{x_min x_max y_min y_max z_min z_max}</code>; if empty or omitted, AABBs are computed from <code>mesh</code>; <code>(n_sub, 6)</code>
+</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
+   throws if unavailable; auto mode selects CUDA when <code>n_ray &gt;= 10000</code> and CUDA is available, else AVX2,
+   else GENERIC.
+</li>
+<li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored when not using CUDA
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>fbs</code></b> — First-bounce intersection points in GCS; <code>(n_ray, 3)</code>
+</li>
+<li><b><code>sbs</code></b> — Second-bounce intersection points in GCS; <code>(n_ray, 3)</code>
+</li>
+<li><b><code>no_interact</code></b> — Total number of intersections per ray between <code>orig</code> and <code>dest</code>; uint32; <code>(n_ray,)</code>
+</li>
+<li><b><code>fbs_ind</code></b> — 1-based index of first intersected mesh element; 0 = none; uint32; <code>(n_ray,)</code>
+</li>
+<li><b><code>sbs_ind</code></b> — 1-based index of second intersected mesh element; 0 = none; uint32; <code>(n_ray,)</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#obj_file_read">obj_file_read</a> (load mesh from OBJ file)
+</li>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (compute sub-mesh indices)
+</li>
+<li><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a> (compute AABBs)
+</li>
+<li><a href="#ray_point_intersect">ray_point_intersect</a> (beam interactions with sampling points)
+</li>
+<li><a href="#icosphere">icosphere</a> (generate ray beams)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="triangle_mesh_aabb"></a>
+<b>triangle_mesh_aabb</b> - Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
+</li>
+<li>Each triangle row: <code>{x1, y1, z1, x2, y2, z2, x3, y3, z3}</code>
+</li>
+<li>Output columns: <code>{x_min, x_max, y_min, y_max, z_min, z_max}</code>
+</li>
+<li>If <code>vec_size &gt; 1</code>, output rows are padded to the next multiple of <code>vec_size</code>
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_index, vec_size )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>triangles</code></b> — Triangle mesh vertices in global Cartesian coordinates; <code>(n_triangles, 9)</code>
+</li>
+<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 1-based start indices of sub-meshes; if omitted, the AABB
+   of the entire mesh is returned; uint32; <code>(n_sub,)</code>
+</li>
+<li><b><code>vec_size</code></b> <i>(optional)</i> — Alignment size for SIMD/CUDA padding (e.g., <code>8</code> for AVX2, <code>32</code> for CUDA); default: 1
+</li></ul>
+
+<i>Output:</i><br>
+<ul>
+<li><b><code>aabb</code></b> — Axis-aligned bounding boxes, one row per sub-mesh; <code>(n_sub_aligned, 6)</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="triangle_mesh_segmentation"></a>
 <b>triangle_mesh_segmentation</b> - Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
 <div style="margin-bottom: 1.5em;">
@@ -5422,7 +5279,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR =
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>triangles</code></b> — Triangle vertices, each row [v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]; <code>(n_mesh, 9)</code>
+<li><b><code>triangles</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>(n_mesh, 9)</code>
 </li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set
    near sqrt(n_mesh); default: 1024
@@ -5437,11 +5294,11 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR =
 <ul>
 <li><b><code>triangles_out</code></b> — Reordered and padded triangle vertices; <code>(n_triangles_out, 9)</code>
 </li>
-<li><b><code>sub_mesh_index</code></b> — 1-based start indices of sub-meshes in <code>triangles_out</code>; <code>(n_sub)</code>
+<li><b><code>sub_mesh_index</code></b> — 0-based start indices of sub-meshes in <code>triangles_out</code>; uint32; <code>(n_sub,)</code>
 </li>
-<li><b><code>mesh_index</code></b> <i>(optional)</i> — 1-based mapping from original to reorganized mesh (0 = padding); <code>(n_triangles_out, )</code>
+<li><b><code>mesh_index</code></b> — 1-based mapping from original to reorganized mesh (0 = padding); uint32; <code>(n_triangles_out, )</code>
 </li>
-<li><b><code>mtl_prop_out</code></b> <i>(optional)</i> — Reordered and padded material properties; <code>(n_triangles_out, 9)</code>
+<li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>(n_triangles_out, 9)</code>
 </li></ul>
 
     <!-- CONTENT END -->

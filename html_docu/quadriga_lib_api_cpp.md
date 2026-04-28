@@ -111,15 +111,15 @@ lang: en-US
 | [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3236 |
 | [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3275 |
 | [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3311 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3348 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3433 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3476 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3524 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3568 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3598 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3626 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3667 |
-| [write_png](#write_png) | Site-specific simulation tools | 3702 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3347 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3432 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3475 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3523 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3567 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3597 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3625 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3666 |
+| [write_png](#write_png) | Site-specific simulation tools | 3701 |
 
 ---
 
@@ -2785,7 +2785,7 @@ void calc_diffraction_gain(
 ### Inputs:
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
-- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
@@ -3066,7 +3066,7 @@ arma::uword quadriga_lib::obj_file_read(
   If empty, ITU-R P.2040-3 defaults are used.
 
 ### Outputs:
-- **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
+- **`mesh`** *(optional)* — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:
   | Index | Symbol | Property                                      |
   | ----- | ------ | --------------------------------------------- |
@@ -3164,7 +3164,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ```
 
 ### Inputs:
-- **`mesh`** — Triangular mesh; each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
+- **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — 1-based object index mapping triangles to objects; output of [obj_file_read](#obj_file_read); `[n_mesh]`
 - **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored
@@ -3331,7 +3331,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 
 ### Inputs:
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
-- **`mesh`** — Triangle faces in row-major vertex format (x1,y1,z1,x2,y2,z2,x3,y3,z3); `[n_mesh, 9]`
+- **`mesh`** — Triangle faces in row-major vertex format  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
 - **`distance`** *(optional)* — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
@@ -3341,8 +3341,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 - `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
 
 ### See also:
-- [triangle_mesh_segmentation](#triangle_mesh_segmentation) (used internally to build BVH for ray queries)
-- [icosphere](#icosphere) (generates icosphere ray directions for distance proximity check; subdivision level = ⌈distance⌉ + 1)
+- [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
 
 ---
 ## ray_mesh_interact
@@ -3584,7 +3583,7 @@ arma::uword quadriga_lib::subdivide_triangles(
 
 ### Inputs:
 - **`n_div`** — Number of subdivisions per edge
-- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_triangles_in, 9]`
 
 ### Outputs:
@@ -3599,8 +3598,8 @@ arma::uword quadriga_lib::subdivide_triangles(
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
 - Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
-- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
-- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- Each triangle row: `{x1, y1, z1, x2, y2, z2, x3, y3, z3}`
+- Output columns: `{x_min, x_max, y_min, y_max, z_min, z_max}`
 - If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
 
 ### Declaration:
@@ -3645,7 +3644,7 @@ arma::uword triangle_mesh_segmentation(
 ```
 
 ### Inputs:
-- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
 - **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
@@ -3684,7 +3683,7 @@ int triangle_mesh_split(
 ```
 
 ### Inputs:
-- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
 ### Outputs:

@@ -34,12 +34,12 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 ## Inputs:
 - **`orig`** — TX positions; `(n_pos, 3)`
 - **`dest`** — RX positions; `(n_pos, 3)`
-- **`mesh`** — Triangle vertices, each row [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]; `(n_mesh, 9)`
+- **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `(n_mesh, 9)`
 - **`mtl_prop`** — Material properties; see [[obj_file_read]]; `(n_mesh, 9)`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** *(optional)* — Verbosity level
-- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `(n_mesh,)`
+- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; uint32; `(n_mesh,)`
 - **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
 - **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,

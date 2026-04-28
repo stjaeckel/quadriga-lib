@@ -29,7 +29,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 ```
 
 ## Inputs:
-- **`triangles_in`** — Triangle vertices, each row [v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]; `[n_mesh, 9]`
+- **`triangles_in`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set
   near sqrt(n_mesh); default: 1024
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
@@ -38,10 +38,10 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
-- **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; `[n_sub]`
-- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh
-  (0 = padding); `[n_meshR]`
-- **`mtl_prop_out`** *(optional)* — Reordered and padded material properties; `[n_meshR, 9]`
+- **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; uint32; `[n_sub]`
+- **`mesh_index`** — 1-based mapping from original to reorganized mesh
+  (0 = padding); uint32; `[n_meshR]`
+- **`mtl_prop_out`** — Reordered and padded material properties; `[n_meshR, 9]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

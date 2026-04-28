@@ -46,7 +46,7 @@ data = RTtools.obj_file_read( fn, materials_csv )
   If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
-- **`mesh`** — Triangle vertex coordinates as [X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3] per row; `(n_mesh, 9)`
+- **`mesh`** — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `(n_mesh, 9)`
 - **`mtl_prop`** — Material properties; `(n_mesh, 9)`; Columns:<br><br>
   | Index | Symbol | Property                                      |
   | ----- | ------ | --------------------------------------------- |
@@ -60,11 +60,11 @@ data = RTtools.obj_file_read( fn, materials_csv )
   | 7     | alphaB | Frequency exponent for alpha                  |
   | 8     | fRef   | Reference frequency [GHz]                     |
 - **`vert_list`** — All vertex positions in the file; `(n_vert, 3)`
-- **`face_ind`** — 0-based indices into `vert_list` per triangle; `(n_mesh, 3)`
-- **`obj_ind`** — 1-based object index per triangle; `(n_mesh, )`
-- **`mtl_ind`** — 1-based material index per triangle; `(n_mesh, )`
-- **`obj_names`** — Object names; length = `max(obj_ind)`
-- **`mtl_names`** — Material names; length = `max(mtl_ind)`
+- **`face_ind`** — 0-based indices into `vert_list` per triangle; uint64; `(n_mesh, 3)`
+- **`obj_ind`** — 1-based object index per triangle; uint64; `(n_mesh, )`
+- **`mtl_ind`** — 1-based material index per triangle; uint64; `(n_mesh, )`
+- **`obj_names`** — Object names; list of strings; length = `max(obj_ind)`
+- **`mtl_names`** — Material names; list os strings; length = `max(mtl_ind)`
 - **`bsdf`** — Principled BSDF values from the `.mtl` file; `(n_mtl, 17)`; columns:<br><br>
    | Index | Property                  | Range | Default |
    | ----- | ------------------------- | ----- | ------- |

@@ -24,7 +24,7 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
     orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`orig`** — Ray origins in GCS; `[n_ray, 3]`
 - **`dest`** — Ray destinations in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
@@ -37,12 +37,12 @@ Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
   else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-## Output Arguments:
-- **`fbs`** (optional) — First-bounce intersection points in GCS; `[n_ray, 3]`
-- **`sbs`** (optional) — Second-bounce intersection points in GCS; `[n_ray, 3]`
-- **`no_interact`** (optional) — Total number of intersections per ray between `orig` and `dest`; `[n_ray]`
-- **`fbs_ind`** (optional) — 1-based index of first intersected mesh element; 0 = none; `[n_ray]`
-- **`sbs_ind`** (optional) — 1-based index of second intersected mesh element; 0 = none; `[n_ray]`
+## Outputs:
+- **`fbs`** — First-bounce intersection points in GCS; `[n_ray, 3]`
+- **`sbs`** — Second-bounce intersection points in GCS; `[n_ray, 3]`
+- **`no_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `[n_ray]`
+- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `[n_ray]`
+- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `[n_ray]`
 
 ## See also:
 - [[obj_file_read]] (load mesh from OBJ file)

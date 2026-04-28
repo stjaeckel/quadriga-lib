@@ -75,7 +75,8 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("tridir") = py::array_t<double>(),
           py::arg("points") = py::array_t<double>(),
           py::arg("sub_cloud_ind") = py::array_t<unsigned>(),
-          py::arg("target_size") = 0);
+          py::arg("use_kernel") = 0,
+          py::arg("gpu_id") = 0);
 
     m.def("ray_triangle_intersect", &ray_triangle_intersect,
           py::arg("orig") = py::array_t<double>(),
