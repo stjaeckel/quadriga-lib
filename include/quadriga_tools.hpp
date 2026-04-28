@@ -125,7 +125,7 @@ namespace quadriga_lib
                                int verbose = 0,                               // Verbosity level
                                const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based; Length: [ no_mesh ]
                                int use_kernel = 0,                            // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
-                               int gpu_id = 0,                               // CUDA device ID, ignored otherwise
+                               int gpu_id = 0,                                // CUDA device ID, ignored otherwise
                                bool scalar_mode = false);
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
@@ -345,6 +345,13 @@ namespace quadriga_lib
                            arma::Col<dtype> *edge_lengthN = nullptr,      // Max beam triangle edge length at new origin, [n_rayN, 3]
                            arma::Mat<dtype> *normal_vecN = nullptr,       // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
                            arma::s32_vec *out_typeN = nullptr);           // Interaction type code, [n_rayN]
+
+    // Calculate in-medium gain
+    template <typename dtype>
+    dtype medium_attenuation_linear(const arma::Mat<dtype> &mtl_prop, // Material properties, [n_mesh, 9]
+                                    arma::uword iM,                   // Material index, 0-based
+                                    dtype dist,                       // Length of the ray inside the medium
+                                    dtype fGHz);                      // Frequency in GHz
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point

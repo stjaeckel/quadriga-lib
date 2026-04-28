@@ -989,3 +989,68 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN);
+
+/*!MD
+# medium_attenuation_linear
+Linear attenuation of a ray traversing a homogeneous lossy medium
+
+- Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
+  of length `dist` inside the medium. The per-meter loss combines two contributions:
+  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1
+    (eqs. 28, 29): `ε_r = a·(f/fRef)^b`, `σ = c·(f/fRef)^d`. These give an attenuation
+    distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess
+    loss not captured by `σ` (e.g. foliage, scattering media).
+- The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
+  thin-slab transmission loss, not propagation through a finite-thickness medium.
+
+## Declaration:
+```
+dtype quadriga_lib::medium_attenuation_linear(
+        const arma::Mat<dtype> &mtl_prop,
+        arma::uword iM,
+        dtype dist,
+        dtype fGHz);
+```
+
+## Inputs:
+- **`mtl_prop`** — Material properties; see [[obj_file_read]] for the column layout; `[n_mesh, 9]`
+- **`iM`** — Row index selecting the material from `mtl_prop`
+- **`dist`** — Path length of the ray inside the medium
+- **`center_frequency`** — Center frequency; Hu
+
+## Returns:
+- Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::medium_attenuation_linear(const arma::Mat<dtype> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
+{
+    dtype fGHz = center_frequency * 1e-9;
+    dtype a = mtl_prop.at(iM, 0);
+    dtype b = mtl_prop.at(iM, 1);
+    dtype c = mtl_prop.at(iM, 2);
+    dtype d = mtl_prop.at(iM, 3);
+    dtype alpha = mtl_prop.at(iM, 6);
+    dtype alphaB = mtl_prop.at(iM, 7);
+    dtype fRef = mtl_prop.at(iM, 8);
+    dtype f_rel = fGHz / fRef;
+
+    dtype eta_r = a * std::pow(f_rel, b);      // ITU-R P.2040-1, eq. 28
+    dtype sigma = c * std::pow(f_rel, d);      // ITU-R P.2040-1, eq. 29
+    dtype eta_i = sigma * (dtype)17.98 / fGHz; // absolute fGHz — physical constant
+    dtype tan_delta = eta_i / eta_r;
+    dtype cos_delta = (dtype)1.0 / std::sqrt((dtype)1.0 + tan_delta * tan_delta);
+
+    dtype Delta = (dtype)2.0 * cos_delta / ((dtype)1.0 - cos_delta);
+    Delta = std::sqrt(Delta) * (dtype)0.0477135 / (fGHz * std::sqrt(eta_r));
+
+    // Combined dB/m: σ-derived + α-derived
+    dtype A_sigma = (dtype)8.686 / Delta;
+    dtype A_alpha = alpha * std::pow(f_rel, alphaB);
+    dtype A = (A_sigma + A_alpha) * dist;
+    return std::pow((dtype)10.0, (dtype)-0.1 * A);
+}
+
+template float quadriga_lib::medium_attenuation_linear(const arma::Mat<float> &mtl_prop, arma::uword iM, float dist, float fGHz);
+template double quadriga_lib::medium_attenuation_linear(const arma::Mat<double> &mtl_prop, arma::uword iM, double dist, double fGHz);

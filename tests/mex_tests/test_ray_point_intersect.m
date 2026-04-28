@@ -37,7 +37,7 @@ assertEqual( ray_ind, ray_ind_s );
 
 % Integration with point_cloud_segmentation: results must match after un-permuting
 [pointsR, sub_cloud_index, ~, reverse_index] = ...
-    quadriga_lib.point_cloud_segmentation( points, 4, 1 );
+    quadriga_lib.point_cloud_segmentation( points, 4, 8 );
 hit_count_R = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_index );
 assertEqual( hit_count, hit_count_R(reverse_index) );
 

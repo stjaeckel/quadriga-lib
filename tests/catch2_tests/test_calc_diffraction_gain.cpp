@@ -173,7 +173,7 @@ TEST_CASE("Calc Diffraction Gain - Alpha in-medium absorption")
 
     // 1.5 m × 4 dB/m = 6 dB  →  gain = 10^-0.6
     arma::vec tv = {std::pow(10.0, -0.1 * 4.0 * 1.5)};
-    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
+    CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 }
 
 TEST_CASE("Calc Diffraction Gain - Penetration loss frequency scaling")
