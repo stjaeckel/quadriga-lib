@@ -12,6 +12,7 @@
 #include <cmath>
 #include <climits>
 #include <stdexcept>
+#include <cstdint>
 
 // Perform a simple test calculation
 void qd_TEST_AVX2(const float *X, // Aligned memory, 16 floats
