@@ -29,7 +29,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR =
 ```
 
 ## Inputs:
-- **`triangles`** — Triangle vertices, each row [v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]; `(n_mesh, 9)`
+- **`triangles`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set
   near sqrt(n_mesh); default: 1024
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
@@ -38,9 +38,9 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR =
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
-- **`sub_mesh_index`** — 1-based start indices of sub-meshes in `triangles_out`; `(n_sub)`
-- **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `(n_triangles_out, )`
-- **`mtl_prop_out`** *(optional)* — Reordered and padded material properties; `(n_triangles_out, 9)`
+- **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
+- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out, )`
+- **`mtl_prop_out`** — Reordered and padded material properties; `(n_triangles_out, 9)`
 MD!*/
 
 py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles, // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
@@ -59,8 +59,8 @@ py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles, // Fa
                                              &mtl_prop_arma, &mtl_prop_out_arma, &mesh_index);
 
     auto triangles_p = qd_python_copy2numpy(triangles_out_arma);
-    auto sub_mesh_index_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(sub_mesh_index);
-    auto mesh_index_p = qd_python_copy2numpy<arma::u32, py::ssize_t>(mesh_index);
+    auto sub_mesh_index_p = qd_python_copy2numpy(sub_mesh_index);
+    auto mesh_index_p = qd_python_copy2numpy(mesh_index);
     auto mtl_prop_p = qd_python_copy2numpy(mtl_prop_out_arma);
 
     return py::make_tuple(triangles_p, sub_mesh_index_p, mesh_index_p, mtl_prop_p);

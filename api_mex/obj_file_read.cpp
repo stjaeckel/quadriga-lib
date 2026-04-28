@@ -45,7 +45,7 @@ Read a Wavefront .obj file and extract geometry and material information
   If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
-- **`mesh`** *(optional)* — Triangle vertex coordinates as `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]` per row; `[n_mesh, 9]`
+- **`mesh`** *(optional)* — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
   | ----- | ------ | --------------------------------------------- |
@@ -59,11 +59,11 @@ Read a Wavefront .obj file and extract geometry and material information
   | 8     | alphaB | Frequency exponent for alpha                  |
   | 9     | fRef   | Reference frequency [GHz]                     |
 - **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** *(optional)* — 1-based indices into `vert_list` per triangle; `[n_mesh, 3]`
-- **`obj_ind`** *(optional)* — 1-based object index per triangle; `[n_mesh]`
-- **`mtl_ind`** *(optional)* — 1-based material index per triangle; `[n_mesh]`
-- **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
-- **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
+- **`face_ind`** *(optional)* — 1-based indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
+- **`obj_ind`** *(optional)* — 1-based object index per triangle; uint64; `[n_mesh]`
+- **`mtl_ind`** *(optional)* — 1-based material index per triangle; uint64; `[n_mesh]`
+- **`obj_names`** *(optional)* — Object names; cell array of strings; length = `max(obj_ind)`
+- **`mtl_names`** *(optional)* — Material names; cell array of strings; length = `max(mtl_ind)`
 - **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
    | Index | Property                  | Range | Default |
    | ----- | ------------------------- | ----- | ------- |

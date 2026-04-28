@@ -28,7 +28,7 @@ arma::uword quadriga_lib::subdivide_triangles(
 
 ## Inputs:
 - **`n_div`** — Number of subdivisions per edge
-- **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
+- **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_triangles_in, 9]`
 
 ## Outputs:

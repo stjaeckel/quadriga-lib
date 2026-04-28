@@ -29,7 +29,7 @@ int triangle_mesh_split(
 ```
 
 ## Inputs:
-- **`mesh`** — Triangle vertices, each row `[x1,y1,z1, x2,y2,z2, x3,y3,z3]`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`axis`** *(optional)* — Split axis: 0 = longest extent, 1 = x, 2 = y, 3 = z
 
 ## Outputs:

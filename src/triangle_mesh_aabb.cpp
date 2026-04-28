@@ -13,8 +13,8 @@ SECTION!*/
 Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes
 
 - Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding non-intersecting geometry
-- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
-- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- Each triangle row: `{x1, y1, z1, x2, y2, z2, x3, y3, z3}`
+- Output columns: `{x_min, x_max, y_min, y_max, z_min, z_max}`
 - If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
 
 ## Declaration:

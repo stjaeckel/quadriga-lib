@@ -16,8 +16,8 @@ Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-me
 
 - Computes the AABB for each sub-mesh; used to accelerate ray tracing by cheaply excluding
   non-intersecting geometry
-- Each triangle row: `[x1, y1, z1, x2, y2, z2, x3, y3, z3]`
-- Output columns: `[x_min, x_max, y_min, y_max, z_min, z_max]`
+- Each triangle row: `{x1, y1, z1, x2, y2, z2, x3, y3, z3}`
+- Output columns: `{x_min, x_max, y_min, y_max, z_min, z_max}`
 - If `vec_size > 1`, output rows are padded to the next multiple of `vec_size`
 
 ## Usage:
@@ -28,12 +28,15 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 ## Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
 - **`sub_mesh_index`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; `[n_sub]`
+  of the entire mesh is returned; uint32; `[n_sub]`
 - **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32`
   for CUDA); default: 1
 
-## Outputs:
+## Output:
 - **`aabb`** — Axis-aligned bounding boxes, one row per sub-mesh; `[n_sub_aligned, 6]`
+
+## See also:
+- [[triangle_mesh_segmentation]] (for calculating sub-meshes)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

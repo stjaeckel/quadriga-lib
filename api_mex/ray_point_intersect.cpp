@@ -28,21 +28,21 @@ Calculate intersections of ray beams with points in 3D space
 ## Inputs:
 - **`orig`** — Ray origin positions in global Cartesian coordinates; `[n_ray, 3]`
 - **`trivec`** — Vectors from ray origin center to triangular wavefront vertices, order
-  `[v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z]`; `[n_ray, 9]`
-- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates (need not
-  be normalized), order `[d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z]`; `[n_ray, 9]`
+  `{v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z}`; `[n_ray, 9]`
+- **`tridir`** — Direction vectors of the three vertex-rays in Cartesian coordinates; not normalized; 
+  order `{d1x, d1y, d1z, d2x, d2y, d2z, d3x, d3y, d3z}`; `[n_ray, 9]`
 - **`points`** — 3D point cloud coordinates; `[n_points, 3]`
 - **`sub_cloud_index`** *(optional)* — 1-based segment boundary indices for the point cloud
-  (see `quadriga_lib.point_cloud_segmentation`); `[n_sub]`
+  (see `quadriga_lib.point_cloud_segmentation`); uint32; `[n_sub]`
 - **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2,
   3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_points >= 10000` and CUDA is
   available, else AVX2, else GENERIC; default: 0
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA; default: 0
 
 ## Outputs:
-- **`hit_count`** *(optional)* — Number of rays intersecting each point; `[n_points, 1]`
-- **`ray_ind`** *(optional)* — Per-point list of 1-based ray indices that intersected that
-  point; zero-padded to a regular 2D array (zero entries indicate unused slots); `[max_hits, n_points]`
+- **`hit_count`** — Number of beams intersecting each point; `[n_points, 1]`
+- **`ray_ind`** — Per-point list of 1-based ray indices that intersected that point; zero-padded to 
+  a regular 2D array (zero entries indicate unused slots); uint32; `[max_hits, n_points]`
 
 ## See also:
 - [[icosphere]] (generate ray beams)

@@ -1,43 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
-# RAY_TRIANGLE_INTERSECT
-Calculates the intersection of rays and triangles in three dimensions
+# ray_triangle_intersect
+Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm
 
-## Description:
-- Implements the Möller–Trumbore algorithm to compute intersections between rays and triangles in 3D.
-- Supports three compute kernels: **GENERIC** (scalar), **AVX2** (SIMD, 8 triangles in parallel), and **CUDA** (GPU).
-- The `use_kernel` parameter selects the kernel: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA.
-- In auto mode (0), CUDA is selected only when `n_ray >= 10000` and a CUDA-capable GPU is available;
-  otherwise AVX2 is preferred if available, falling back to GENERIC.
-- Can detect first and second intersections (FBS/SBS), number of intersections, and intersection indices.
+- Counts the total number of intersections between `orig` and `dest`
+- Computes the coordinates and object IDs of the first two intersections per ray (FBS/SBS)
+- Internal computations always use single precision for AVX2 and CUDA kernels; only GENERIC has `double` support
 
 ## Usage:
 ```
-from quadriga_lib import RTtools
-
 # Output as tuple
 data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 
@@ -45,72 +26,40 @@ data = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, u
 fbs, sbs, no_interact, fbs_ind, sbs_ind = RTtools.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index, aabb, use_kernel, gpu_id )
 ```
 
-## Input Arguments:
-- ndarray **`orig`**<br>
-  Ray origins in global coordinate system (GCS); dtype: float64; shape: `(n_ray, 3)`
+## Inputs:
+- **`orig`** — Ray origins in GCS; `(n_ray, 3)`
+- **`dest`** — Ray destinations in GCS; `(n_ray, 3)`
+- **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `(n_mesh, 9)`
+- **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; 0-based; uint32; `(n_sub)`
+- **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row:
+  `{x_min x_max y_min y_max z_min z_max}`; if empty or omitted, AABBs are computed from `mesh`; `(n_sub, 6)`
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA;
+  throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2,
+  else GENERIC.
+- **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
-- ndarray **`dest`**<br>
-  Ray destinations in GCS; dtype: float64; shape: `(n_ray, 3)`
-
-- ndarray **`mesh`**<br>
-  Triangular surface mesh. Each row contains the 3 vertices
-  `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; dtype: float64; shape: `(n_mesh, 9)`
-
-- ndarray **`sub_mesh_index`** (optional)<br>
-  Indexes indicating start of sub-meshes in `mesh`. Enables faster processing via segmentation.
-  0-based; dtype: uint32; shape: `(n_sub,)`
-
-- ndarray **`aabb`** (optional)<br>
-  Pre-computed axis-aligned bounding boxes per sub-mesh. Each row contains
-  `{x_min, x_max, y_min, y_max, z_min, z_max}`; dtype: float64; shape: `(n_sub, 6)`.
-  If not provided, AABBs are computed internally from `mesh`.
-
-- int **`use_kernel`** (optional)<br>
-  Selects the compute kernel: 0 = auto (default), 1 = GENERIC (scalar CPU), 2 = AVX2 (SIMD),
-  3 = CUDA (GPU). An error is thrown if the requested kernel is not available at runtime.
-
-- int **`gpu_id`** (optional)<br>
-  GPU device ID for CUDA kernel (default: 0). Ignored when not using CUDA.
-
-## Output Arguments:
-- ndarray **`fbs`**, `data[0]`<br>
-  First-bounce surface intersection points (FBS); dtype: float64; shape: `(n_ray, 3)`
-
-- ndarray **`sbs`**, `data[1]`<br>
-  Second-bounce surface intersection points (SBS); dtype: float64; shape: `(n_ray, 3)`
-
-- ndarray **`no_interact`**, `data[2]`<br>
-  Number of intersections per ray (0, 1, or 2); dtype: uint32; shape: `(n_ray,)`
-
-- ndarray **`fbs_ind`**, `data[3]`<br>
-  Index of the triangle that was hit by the ray at the FBS location; 1-based; 0 = no intersection;
-  dtype: uint32; shape: `(n_ray,)`
-
-- ndarray **`sbs_ind`**, `data[4]`<br>
-  Index of the triangle that was hit by the ray at the SBS location; 1-based; 0 = no second
-  intersection; dtype: uint32; shape: `(n_ray,)`
-
-## Caveats:
-- The AVX2 and CUDA kernels always compute in single precision. Only the GENERIC kernel has full
-  double precision support.
-- Zero-copy input mapping (no data duplication) is only used for Fortran-contiguous (column-major)
-  NumPy arrays. C-contiguous inputs are silently copied and transposed.
-- All outputs are Fortran-contiguous
+## Outputs:
+- **`fbs`** — First-bounce intersection points in GCS; `(n_ray, 3)`
+- **`sbs`** — Second-bounce intersection points in GCS; `(n_ray, 3)`
+- **`no_interact`** — Total number of intersections per ray between `orig` and `dest`; uint32; `(n_ray,)`
+- **`fbs_ind`** — 1-based index of first intersected mesh element; 0 = none; uint32; `(n_ray,)`
+- **`sbs_ind`** — 1-based index of second intersected mesh element; 0 = none; uint32; `(n_ray,)`
 
 ## See also:
-- [[obj_file_read]] (for loading mesh from an OBJ file)
-- [[icosphere]] (for generating beams)
-- [[triangle_mesh_segmentation]] (for calculating sub-meshes)
-- [[ray_point_intersect]] (for calculating beam interactions with sampling points)
+- [[obj_file_read]] (load mesh from OBJ file)
+- [[triangle_mesh_segmentation]] (compute sub-mesh indices)
+- [[triangle_mesh_aabb]] (compute AABBs)
+- [[ray_point_intersect]] (beam interactions with sampling points)
+- [[icosphere]] (generate ray beams)
 MD!*/
 
-py::tuple ray_triangle_intersect(const py::array_t<double> &orig,             // Ray origin points in GCS, Size [ n_ray, 3 ]
-                                 const py::array_t<double> &dest,             // Ray destination points in GCS, Size [ n_ray, 3 ]
-                                 const py::array_t<double> &mesh,             // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
-                                 const py::array_t<unsigned> &sub_mesh_index, // Start indices of the sub-meshes in 0-based notation
-                                 const py::array_t<double> &aabb,             // Pre-computed AABBs per sub-mesh, Size: [ n_sub, 6 ]
-                                 int use_kernel,                              // Kernel selector: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
-                                 int gpu_id)                                  // GPU device ID for CUDA kernel
+py::tuple ray_triangle_intersect(const py::array_t<double> &orig,
+                                 const py::array_t<double> &dest,
+                                 const py::array_t<double> &mesh,
+                                 const py::array_t<unsigned> &sub_mesh_index,
+                                 const py::array_t<double> &aabb,
+                                 int use_kernel,
+                                 int gpu_id)
 {
     const auto orig_arma = qd_python_numpy2arma_Mat(orig, true);
     const auto dest_arma = qd_python_numpy2arma_Mat(dest, true);

@@ -291,7 +291,7 @@ arma::uvec quadriga_lib::obj_overlap_test(
 ```
 
 ## Inputs:
-- **`mesh`** — Triangular mesh; each row `[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]`; `[n_mesh, 9]`
+- **`mesh`** — Triangular mesh; each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — 1-based object index mapping triangles to objects; output of [[obj_file_read]]; `[n_mesh]`
 - **`reason`** *(optional)* — Human-readable overlap descriptions per overlapping object; `[n_overlap]`
 - **`tolerance`** *(optional)* — Geometric tolerance; intersections smaller than this are ignored

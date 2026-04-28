@@ -1,83 +1,61 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
-Site-Specific Simulation Tools
+Site-specific simulation tools
 SECTION!*/
 
 /*!MD
-# ICOSPHERE
-Construct a geodesic polyhedron (icosphere), a convex polyhedron made from triangles
+# icosphere
+Construct a geodesic polyhedron from recursive icosahedron subdivision
 
-## Description:
-An icosphere is constructed by subdividing faces of an icosahedron, a polyhedron with 20 faces,
-12 vertices and 30 edges, and then projecting the new vertices onto the surface of a sphere. The
-resulting mesh has 6 triangles at each vertex, except for 12 vertices which have 5 triangles.
-The approximate equilateral triangles have roughly the same edge length and surface area.
+- Produces 20 · n_div² triangular faces, each pointing outward from origin
+- All vertices lie on a sphere of specified radius
+- Suitable for uniform angular sampling (ray tracing, antenna patterns, spatial grids)
 
 ## Usage:
 ```
-from quadriga_lib import RTtools
-center, length, vert, direction = RTtools.icosphere( no_div, radius, direction_xyz )
+# Output as tuple
+data = quadriga_lib.RTtools.icosphere( no_div, radius, direction_xyz )
+
+# Unpacked outputs
+center, length, vert, direction = quadriga_lib.RTtools.icosphere( no_div, radius, direction_xyz )
 ```
 
-## Input Arguments:
-- **`no_div`**<br>
-  Number of divisions per edge of the generating icosahedron. The resulting number of faces is
-  equal to `no_face = 20 · no_div^2`
+## Inputs:
+- **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
+- **`radius`** — Radius of icosphere in meters; default: 1
+- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
+  azimuth/elevation (false); default: false
 
-- **`radius`**<br>
-  Radius of the sphere in meters
-
-- **`direction_xyz`**<br>
-  Direction format indicator: 0 = Spherical (default), 1 = Cartesian
-
-
-## Output Arguments (tuple containing 4 values):
-- **`center`**<br>
-  Position of the center point of each triangle; Shape: `( no_face, 3 )`
-
-- **`length`**<br>
-  Length of the vector pointing from the origin to the center point. This number is smaller than
-  1 since the triangles are located inside the unit sphere; Shape: `( no_face )`
-
-- **`vert`**<br>
-  The 3 vectors pointing from the center point to the vertices of each triangle; the values are
-  in the order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; Shape: `( no_face, 9 )`
-
-- **`direction`**<br>
-  The directions of the vertex-rays. If the format indicator `direction_xyz` is set to `0`, the
-  output is in geographic coordinates (azimuth and elevation angle in rad); the values are in the
-  order `( v1az, v1el, v2az, v2el, v3az, v3el ]`;Shape: `( no_face, 6 )` If the format indicator
-  `direction_xyz` is set to `1`, the output is in Cartesian coordinates and the values are in the
-  order `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z  ]`; Shape: `( no_face, 9 )`
+## Outputs:
+- **`center`** — Face center coordinates in Cartesian space; each vector points radially outward
+  from origin with magnitude equal to the inradius of the face; `(n_faces, 3)`
+- **`length`** — Distance from origin to face plane; equals the magnitude of each
+  `center` vector; `(n_faces,)`
+- **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_faces, 9)`
+- **`direction`** — Edge directions; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
+  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `(n_faces, 6)` or `[n_faces, 9)`
 MD!*/
 
-py::tuple icosphere(unsigned long long n_div, double radius, bool direction_xyz)
+py::tuple icosphere(arma::uword n_div, double radius, bool direction_xyz)
 {
+    const arma::uword n_faces = 20 * n_div * n_div;
+    const arma::uword n_dir_cols = direction_xyz ? 9 : 6;
+
     arma::mat center, vert, direction;
     arma::vec length;
-    unsigned long long n_faces = quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
 
-    return py::make_tuple(py::array_t<double>({n_faces, 3ULL}, center.memptr()),
-                          py::array_t<double>(n_faces, length.memptr()),
-                          py::array_t<double>({n_faces, 9ULL}, vert.memptr()),
-                          py::array_t<double>({n_faces, (unsigned long long)direction.n_cols}, direction.memptr()));
+    auto center_p = qd_python_init_output(n_faces, 3, &center);
+    auto length_p = qd_python_init_output(n_faces, &length);
+    auto vert_p = qd_python_init_output(n_faces, 9, &vert);
+    auto cdirection_p = qd_python_init_output(n_faces, n_dir_cols, &direction);
+
+    quadriga_lib::icosphere<double>(n_div, radius, &center, &length, &vert, &direction, direction_xyz);
+
+    return py::make_tuple(center_p, length_p, vert_p, cdirection_p);
 }

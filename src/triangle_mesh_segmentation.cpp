@@ -31,7 +31,7 @@ arma::uword triangle_mesh_segmentation(
 ```
 
 ## Inputs:
-- **`mesh`** — Triangle vertices, each row `[v1x,v1y,v1z, v2x,v2y,v2z, v3x,v3y,v3z]`; `[n_mesh, 9]`
+- **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
 - **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
