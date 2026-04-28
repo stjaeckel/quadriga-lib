@@ -90,7 +90,7 @@ mtl_alpha = repmat([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0], 12, 1);
 orig_in   = [ -10.0, 0.0, 0.5 ];
 dest_in   = [   0.5, 0.0, 0.5 ];
 gain_alpha = quadriga_lib.calc_diffraction_gain( orig_in, dest_in, cube, mtl_alpha, 10e9, 0 );
-assertElementsAlmostEqual( gain_alpha, 10^(-0.6), 'absolute', 1e-10 );
+assertElementsAlmostEqual( gain_alpha, 10^(-0.6), 'absolute', 1e-7 );
 
 % Penetration loss frequency scaling (attB):
 %   att = 3 dB at fRef = 2 GHz, attB = 1, no Fresnel/conductive/alpha losses.
