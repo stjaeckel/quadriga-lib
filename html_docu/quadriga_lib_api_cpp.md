@@ -3028,7 +3028,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 
 ---
 ## obj_file_read
-Read a Wavefront `.obj` file and extract geometry and material information
+Read a Wavefront .obj file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
 - Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)

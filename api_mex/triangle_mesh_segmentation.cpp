@@ -34,7 +34,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
   near sqrt(n_mesh); default: 1024
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
   sub-mesh row count is rounded up to a multiple of this value; default: 1
-- **`mtl_prop_in`** *(optional)* — Material properties; see obj_file_read; `[n_mesh, 9]`
+- **`mtl_prop_in`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `[n_meshR, 9]`

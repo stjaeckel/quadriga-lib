@@ -223,7 +223,7 @@
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
-<tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry and material information</td></tr>
+<tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
 <tr><td><a href="#obj_overlap_test">obj_overlap_test</a></td><td>Detect overlapping 3D objects in a triangular mesh</td></tr>
 <tr><td><a href="#path_to_tube">path_to_tube</a></td><td>Convert a 3D path into a tube surface mesh for visualization</td></tr>
 <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
@@ -5077,7 +5077,7 @@ void quadriga_lib::mitsuba_xml_file_write(
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="obj_file_read"></a>
-<b>obj_file_read</b> - Read a Wavefront `.obj` file and extract geometry and material information
+<b>obj_file_read</b> - Read a Wavefront .obj file and extract geometry and material information
 <div style="margin-bottom: 1.5em;">
 <ul>
 <li>Parses a triangulated Wavefront <code>.obj</code> file; quads and n-gons are not supported
@@ -5135,7 +5135,7 @@ arma::uword quadriga_lib::obj_file_read(
 <ul>
 <li><b><code>mesh</code></b> <i>(optional)</i> — Triangle vertex coordinates as <code>[X1,Y1,Z1, X2,Y2,Z2, X3,Y3,Z3]</code> per row; <code>[n_mesh, 9]</code>
 </li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; <code>[n_mesh, 9]</code>; Columns:
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; <code>[n_mesh, 9]</code>; Columns:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>

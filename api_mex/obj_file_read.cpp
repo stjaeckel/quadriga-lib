@@ -12,7 +12,7 @@ SECTION!*/
 
 /*!MD
 # OBJ_FILE_READ
-Read a Wavefront `.obj` file and extract geometry and material information
+Read a Wavefront .obj file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
 - Materials applied per triangle via `usemtl` tag; unknown or missing materials default to

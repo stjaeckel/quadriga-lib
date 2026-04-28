@@ -6,14 +6,16 @@ import numpy.testing as npt
 
 # Append the directory containing your package to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-package_path = os.path.join(current_dir, '../../lib')
+package_path = os.path.join(current_dir, "../../lib")
 if package_path not in sys.path:
     sys.path.append(package_path)
 
 from quadriga_lib import RTtools
 
 
-def make_grid_triangles(nx: int, ny: int, spacing: float = 1.0, z: float = 0.0, dtype=np.float64):
+def make_grid_triangles(
+    nx: int, ny: int, spacing: float = 1.0, z: float = 0.0, dtype=np.float64
+):
     """
     Create a regular (nx x ny) grid of points in the XY plane and split each cell into 2 triangles.
     Returns an array of shape [n_triangles, 9] with dtype=float64 by default.
@@ -45,8 +47,10 @@ class test_case(unittest.TestCase):
     def test(self):
         rng = np.random.default_rng(0)
 
-        # --- Prepare a reproducible input mesh (float64) ---
-        triangles_f64 = make_grid_triangles(nx=20, ny=15, spacing=1.0, z=0.0, dtype=np.float64)
+        # Prepare a reproducible input mesh (float64)
+        triangles_f64 = make_grid_triangles(
+            nx=20, ny=15, spacing=1.0, z=0.0, dtype=np.float64
+        )
         n_in = triangles_f64.shape[0]
         self.assertEqual(triangles_f64.dtype, np.float64)
 
@@ -56,27 +60,36 @@ class test_case(unittest.TestCase):
 
         # Create material properties with identifiable mapping (shape [n, 5], float64)
         # Col0 is a unique id encoded as float64 to keep everything in double precision.
-        mtl_prop_in = np.column_stack([
-            np.arange(n_in, dtype=np.float64),                 # unique id (as float64)
-            rng.integers(0, 4, size=n_in).astype(np.float64),  # category (as float64)
-            rng.random(n_in, dtype=np.float64),                # value1
-            rng.random(n_in, dtype=np.float64),                # value2
-            rng.random(n_in, dtype=np.float64)                 # value3
-        ])
+        mtl_prop_in = np.column_stack(
+            [
+                np.arange(n_in, dtype=np.float64),  # unique id (col 0 = a)
+                rng.integers(0, 4, size=n_in).astype(np.float64),  # b
+                rng.random(n_in, dtype=np.float64),  # c
+                rng.random(n_in, dtype=np.float64),  # d
+                rng.random(n_in, dtype=np.float64),  # att
+                rng.random(n_in, dtype=np.float64),  # attB
+                rng.random(n_in, dtype=np.float64),  # alpha
+                rng.random(n_in, dtype=np.float64),  # alphaB
+                np.ones(n_in, dtype=np.float64),  # fRef = 1 GHz
+            ]
+        )
         self.assertEqual(mtl_prop_in.dtype, np.float64)
 
         # Helper to compute per-submesh start/end indices and sizes
         def submesh_ranges(sub_idx: np.ndarray, n_out: int):
             sub_idx = np.asarray(sub_idx, dtype=np.int64)
             self.assertGreaterEqual(sub_idx.min(initial=0), 0)
-            self.assertTrue(np.all(np.diff(sub_idx) > 0), "sub_mesh_index must be strictly increasing")
+            self.assertTrue(
+                np.all(np.diff(sub_idx) > 0),
+                "sub_mesh_index must be strictly increasing",
+            )
             starts = sub_idx
             ends = np.append(sub_idx[1:], n_out)
             sizes = ends - starts
             self.assertTrue(np.all(sizes > 0), "All submeshes must be non-empty")
             return starts, ends, sizes
 
-        # ---------- Case A: Default usage with materials (vec_size=1 to avoid padding) ----------
+        # Case A: Default usage with materials (vec_size=1 to avoid padding)
         with self.subTest("default_args_with_materials"):
             tri_out, sub_idx, mesh_idx, mtl_out = RTtools.triangle_mesh_segmentation(
                 triangles_f64, mtl_prop=mtl_prop_in
@@ -87,12 +100,19 @@ class test_case(unittest.TestCase):
             self.assertEqual(mtl_out.dtype, np.float64)
             self.assertEqual(tri_out.shape[1], 9)
             self.assertEqual(len(mesh_idx), tri_out.shape[0])
-            self.assertEqual(mtl_out.shape, (tri_out.shape[0], 5))
-            self.assertEqual(np.asarray(sub_idx).dtype.kind, 'i')  # integer start indices
-            self.assertEqual(np.asarray(mesh_idx).dtype.kind, 'i') # integer mapping indices
+            self.assertEqual(mtl_out.shape, (tri_out.shape[0], 9))
+            self.assertEqual(
+                np.asarray(sub_idx).dtype.kind, "i"
+            )  # integer start indices
+            self.assertEqual(
+                np.asarray(mesh_idx).dtype.kind, "i"
+            )  # integer mapping indices
 
             # No padding expected when vec_size == 1
-            self.assertTrue(np.all(mesh_idx > 0), "No zeros expected in mesh_index for vec_size == 1")
+            self.assertTrue(
+                np.all(mesh_idx > 0),
+                "No zeros expected in mesh_index for vec_size == 1",
+            )
 
             # Mapping correctness: triangles_out must be a reordering of triangles_in
             npt.assert_allclose(tri_out, triangles_f64[mesh_idx - 1], rtol=0, atol=0)
@@ -104,7 +124,7 @@ class test_case(unittest.TestCase):
             starts, ends, sizes = submesh_ranges(sub_idx, tri_out.shape[0])
             self.assertEqual(starts[0], 0)
 
-        # ---------- Case B: Explicit target_size (force multiple submeshes, vec_size=1) ----------
+        # Case B: Explicit target_size (force multiple submeshes, vec_size=1)
         with self.subTest("target_size_only"):
             target_size = 50
             tri_out, sub_idx, mesh_idx, mtl_out = RTtools.triangle_mesh_segmentation(
@@ -122,12 +142,15 @@ class test_case(unittest.TestCase):
             starts, ends, sizes = submesh_ranges(sub_idx, tri_out.shape[0])
             self.assertGreater(len(starts), 1)
 
-        # ---------- Case C: vec_size > 1 triggers padding to multiples per submesh ----------
+        # Case C: vec_size > 1 triggers padding to multiples per submesh
         with self.subTest("vec_size_padding_and_aabb_center"):
             vec_size = 8
             target_size = 33  # deliberately not a multiple of vec_size
             tri_out, sub_idx, mesh_idx, mtl_out = RTtools.triangle_mesh_segmentation(
-                triangles_f64, target_size=target_size, vec_size=vec_size, mtl_prop=mtl_prop_in
+                triangles_f64,
+                target_size=target_size,
+                vec_size=vec_size,
+                mtl_prop=mtl_prop_in,
             )
 
             self.assertEqual(tri_out.dtype, np.float64)
@@ -135,17 +158,29 @@ class test_case(unittest.TestCase):
 
             # Submesh sizes must be multiples of vec_size
             starts, ends, sizes = submesh_ranges(sub_idx, tri_out.shape[0])
-            self.assertTrue(np.all(sizes % vec_size == 0), "Each submesh size must be a multiple of vec_size")
+            self.assertTrue(
+                np.all(sizes % vec_size == 0),
+                "Each submesh size must be a multiple of vec_size",
+            )
 
             # Identify padded rows via mesh_index == 0
             mesh_idx = np.asarray(mesh_idx)
-            pad_mask = (mesh_idx == 0)
-            self.assertTrue(np.any(pad_mask), "Expected some padding rows when vec_size > 1")
+            pad_mask = mesh_idx == 0
+            self.assertTrue(
+                np.any(pad_mask), "Expected some padding rows when vec_size > 1"
+            )
 
             # For non-padded rows: geometry/material mapping correctness
             nonpad_idx = np.where(~pad_mask)[0]
-            npt.assert_allclose(tri_out[nonpad_idx], triangles_f64[mesh_idx[nonpad_idx] - 1], rtol=0, atol=0)
-            npt.assert_array_equal(mtl_out[nonpad_idx], mtl_prop_in[mesh_idx[nonpad_idx] - 1])
+            npt.assert_allclose(
+                tri_out[nonpad_idx],
+                triangles_f64[mesh_idx[nonpad_idx] - 1],
+                rtol=0,
+                atol=0,
+            )
+            npt.assert_array_equal(
+                mtl_out[nonpad_idx], mtl_prop_in[mesh_idx[nonpad_idx] - 1]
+            )
 
             # For padded rows: triangles must be zero-sized, placed at submesh AABB center
             tri_out_v = triangles_to_vertices(tri_out)
@@ -155,7 +190,11 @@ class test_case(unittest.TestCase):
             for s, e in zip(starts, ends):
                 sel = np.arange(s, e)
                 sel_np = sel[~pad_mask[sel]]
-                self.assertGreater(len(sel_np), 0, "Submesh should contain at least one non-padded triangle")
+                self.assertGreater(
+                    len(sel_np),
+                    0,
+                    "Submesh should contain at least one non-padded triangle",
+                )
                 verts = tri_out_v[sel_np].reshape((-1, 3))  # stack all vertices
                 vmin = verts.min(axis=0)
                 vmax = verts.max(axis=0)
@@ -165,7 +204,7 @@ class test_case(unittest.TestCase):
             # Check each padded triangle row
             for i in np.where(pad_mask)[0]:
                 # Determine which submesh the row i belongs to
-                k = np.searchsorted(starts, i, side='right') - 1
+                k = np.searchsorted(starts, i, side="right") - 1
                 c = centers[k]
                 v = tri_out_v[i]  # shape (3,3)
                 # Zero-sized: all three vertices identical
@@ -174,27 +213,40 @@ class test_case(unittest.TestCase):
                 # Located at AABB center (tight tolerance in double precision)
                 npt.assert_allclose(v[0], c, rtol=0, atol=1e-12)
 
-        # ---------- Case D: Without materials (mtl_prop_out should be empty) ----------
+        # Case D: Without materials (mtl_prop_out should be empty)
         with self.subTest("no_materials_provided"):
             tri_out, sub_idx, mesh_idx, mtl_out = RTtools.triangle_mesh_segmentation(
                 triangles_f64, target_size=64, vec_size=1
             )
             self.assertEqual(tri_out.dtype, np.float64)
-            empty = (mtl_out is None) or (isinstance(mtl_out, np.ndarray) and mtl_out.size == 0)
-            self.assertTrue(empty, "mtl_prop_out should be empty when mtl_prop is not provided")
+            empty = (mtl_out is None) or (
+                isinstance(mtl_out, np.ndarray) and mtl_out.size == 0
+            )
+            self.assertTrue(
+                empty, "mtl_prop_out should be empty when mtl_prop is not provided"
+            )
 
-        # ---------- Case E: Determinism (same inputs -> same outputs) ----------
+        # Case E: Determinism (same inputs -> same outputs)
         with self.subTest("deterministic_results"):
             args = dict(target_size=64, vec_size=8, mtl_prop=mtl_prop_in)
             out1 = RTtools.triangle_mesh_segmentation(triangles_f64, **args)
             out2 = RTtools.triangle_mesh_segmentation(triangles_f64, **args)
 
             for a, b in zip(out1, out2):
-                if isinstance(a, np.ndarray) and a.dtype.kind in ('f',):
+                if isinstance(a, np.ndarray) and a.dtype.kind in ("f",):
                     self.assertEqual(a.dtype, np.float64)
                     npt.assert_allclose(a, b, rtol=0, atol=0)
                 else:
                     npt.assert_array_equal(a, b)
+
+    def test_error_wrong_mtl_prop_columns(self):
+        triangles = make_grid_triangles(nx=5, ny=5, dtype=np.float64)
+        bad_mtl = np.zeros(
+            (triangles.shape[0], 5), dtype=np.float64
+        )  # old 5-col format
+        with self.assertRaises(ValueError) as ctx:
+            RTtools.triangle_mesh_segmentation(triangles, mtl_prop=bad_mtl)
+        self.assertIn("mtl_prop", str(ctx.exception).lower())
 
 
 if __name__ == "__main__":
