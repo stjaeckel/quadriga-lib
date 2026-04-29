@@ -1,7 +1,7 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.11.2"
+title: "C++ API Documentation for Quadriga-Lib v0.11.3"
 author: "Stephan Jaeckel"
-date: "28.04.2026"
+date: "29.04.2026"
 lang: en-US
 ---
 
@@ -103,24 +103,24 @@ lang: en-US
 | [coord2path](#coord2path) | Site-specific simulation tools | 2874 |
 | [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2912 |
 | [icosphere](#icosphere) | Site-specific simulation tools | 2956 |
-| [medium_attenuation_linear](#medium_attenuation_linear) | Site-specific simulation tools | 2990 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3022 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3063 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3181 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3212 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3240 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3269 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3308 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3344 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3380 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3465 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3508 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3556 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3600 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3630 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3658 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3699 |
-| [write_png](#write_png) | Site-specific simulation tools | 3734 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 2990 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3025 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3066 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3184 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3215 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3243 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3272 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3311 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3347 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3383 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3468 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3511 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3559 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3603 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3633 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3661 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3702 |
+| [write_png](#write_png) | Site-specific simulation tools | 3737 |
 
 ---
 
@@ -2805,7 +2805,7 @@ void calc_diffraction_gain(
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
-- [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
+- [obj_file_read](#obj_file_read) (defines mtl_prop format)
 - [ray_mesh_interact](#ray_mesh_interact) (used for media interactions)
 
 ---
@@ -2987,22 +2987,21 @@ arma::uword quadriga_lib::icosphere(
 - Number of generated triangular faces (20 × n_div²)
 
 ---
-## medium_attenuation_linear
-Linear attenuation of a ray traversing a homogeneous lossy medium
+## medium_gain
+Linear gain of a ray traversing a homogeneous lossy medium
 
 - Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
   of length `dist` inside the medium. The per-meter loss combines two contributions:
-  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1
-    (eqs. 28, 29): `ε_r = a·(f/fRef)^b`, `σ = c·(f/fRef)^d`. These give an attenuation
-    distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
-  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess
-    loss not captured by `σ` (e.g. foliage, scattering media).
+  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`, 
+    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured 
+    by `σ` (e.g. foliage, scattering media).
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
 ### Declaration:
 ```
-dtype quadriga_lib::medium_attenuation_linear(
+dtype quadriga_lib::medium_gain(
         const arma::Mat<dtype> &mtl_prop,
         arma::uword iM,
         dtype dist,
@@ -3017,6 +3016,10 @@ dtype quadriga_lib::medium_attenuation_linear(
 
 ### Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
+
+### See also:
+- [ray_mesh_interact](#ray_mesh_interact) (for complex ray-material interactions)
+- [obj_file_read](#obj_file_read) (defines mtl_prop format)
 
 ---
 ## mitsuba_xml_file_write

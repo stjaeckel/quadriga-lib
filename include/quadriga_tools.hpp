@@ -348,10 +348,10 @@ namespace quadriga_lib
 
     // Calculate in-medium gain
     template <typename dtype>
-    dtype medium_attenuation_linear(const arma::Mat<dtype> &mtl_prop, // Material properties, [n_mesh, 9]
-                                    arma::uword iM,                   // Material index, 0-based
-                                    dtype dist,                       // Length of the ray inside the medium
-                                    dtype fGHz);                      // Frequency in GHz
+    dtype medium_gain(const arma::Mat<dtype> &mtl_prop, // Material properties, [n_mesh, 9]
+                      arma::uword iM,                   // Material index, 0-based
+                      dtype dist,                       // Length of the ray inside the medium
+                      dtype center_frequency);          // Frequency in Hz
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point

@@ -43,7 +43,7 @@
 
   <div id="quadriga-lib_content">
 
-      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.11.2</b></big>
+      <!-- CONTENT BEGIN --><big><b>C++ API Documentation for Quadriga-Lib v0.11.3</b></big>
 <br><br><br>
 
 <b>Markdown version of this page:</b>
@@ -222,7 +222,7 @@
 <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length, and angles</td></tr>
 <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
 <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
-<tr><td><a href="#medium_attenuation_linear">medium_attenuation_linear</a></td><td>Linear attenuation of a ray traversing a homogeneous lossy medium</td></tr>
+<tr><td><a href="#medium_gain">medium_gain</a></td><td>Linear gain of a ray traversing a homogeneous lossy medium</td></tr>
 <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
 <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
 <tr><td><a href="#obj_overlap_test">obj_overlap_test</a></td><td>Detect overlapping 3D objects in a triangular mesh</td></tr>
@@ -4708,7 +4708,7 @@ void calc_diffraction_gain(
 </li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)
 </li>
-<li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format)
+<li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)
 </li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (used for media interactions)
 </li></ul>
@@ -5017,19 +5017,18 @@ arma::uword quadriga_lib::icosphere(
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="medium_attenuation_linear"></a>
-<b>medium_attenuation_linear</b> - Linear attenuation of a ray traversing a homogeneous lossy medium
+<a name="medium_gain"></a>
+<b>medium_gain</b> - Linear gain of a ray traversing a homogeneous lossy medium
 <div style="margin-bottom: 1.5em;">
 <ul>
 <li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the total attenuation accumulated over a path
    of length <code>dist</code> inside the medium. The per-meter loss combines two contributions:
 <ul>
-<li>Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1
-     (eqs. 28, 29): <code>ε_r = a·(f/fRef)^b</code>, <code>σ = c·(f/fRef)^d</code>. These give an attenuation
-     distance <code>Δ</code> and a per-meter power loss <code>8.686 / Δ</code> dB/m.
+<li>Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: <code>ε_r = a·(f/fRef)^b</code>,
+     <code>σ = c·(f/fRef)^d</code>. These give an gain distance <code>Δ</code> and a per-meter power loss <code>8.686 / Δ</code> dB/m.
 </li>
-<li>Distance absorption of the form <code>α·(f/fRef)^αB</code> dB/m, intended to model excess
-     loss not captured by <code>σ</code> (e.g. foliage, scattering media).
+<li>Distance absorption of the form <code>α·(f/fRef)^αB</code> dB/m, intended to model excess loss not captured
+     by <code>σ</code> (e.g. foliage, scattering media).
 </li></ul>
 </li>
 <li>The penetration-loss columns (<code>att</code>, <code>attB</code>) of <code>mtl_prop</code> are not used — they describe
@@ -5039,7 +5038,7 @@ arma::uword quadriga_lib::icosphere(
 
 <i>Declaration:</i><br>
 <pre>
-dtype quadriga_lib::medium_attenuation_linear(
+dtype quadriga_lib::medium_gain(
         const arma::Mat&lt;dtype&gt; &amp;mtl_prop,
         arma::uword iM,
         dtype dist,
@@ -5060,6 +5059,13 @@ dtype quadriga_lib::medium_attenuation_linear(
 <i>Returns:</i><br>
 <ul>
 <li>Linear in-medium gain in <code>[0, 1]</code>; multiply by the incident field/power gain to get the value after the medium
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)
+</li>
+<li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
