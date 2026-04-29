@@ -10,18 +10,10 @@ octave = ON
 matlab = OFF
 python = ON
 avx2 = ON
-cuda = ON
+cuda = OFF
 
-# GCC version override. Empty = use system default. Auto-set to 13 when CUDA is on (current nvcc max).
-# Override on the command line: `make gcc_version=14`
-gcc_version =
-ifeq ($(cuda),ON)
-  gcc_version = 13
-endif
-
-ifneq ($(gcc_version),)
-  CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
-endif
+# GCC version override. Empty for system default. Note: NVCC max is 13
+gcc_version = 13
 
 CMAKE_BUILD_DIR = build_linux
 
@@ -36,6 +28,10 @@ OCTAVE_VERSION := $(shell mkoctfile -v 2>/dev/null)
 
 # Get Quadriga-Lib version
 QUADRIGA_VERSION := $(shell grep -oP '(?<=#define QUADRIGA_LIB_VERSION_STR ")[^"]+' include/quadriga_lib.hpp)
+
+ifneq ($(gcc_version),)
+  CMAKE_CXX_ARG = -D CMAKE_C_COMPILER=gcc-$(gcc_version) -D CMAKE_CXX_COMPILER=g++-$(gcc_version)
+endif
 
 all:
 	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
@@ -54,7 +50,7 @@ all:
 	cmake --install $(CMAKE_BUILD_DIR)
 
 python:
-	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. \
+	cmake -B $(CMAKE_BUILD_DIR) -D CMAKE_INSTALL_PREFIX=. $(CMAKE_CXX_ARG) \
 		-D ENABLE_MATLAB=OFF \
 		-D ENABLE_OCTAVE=OFF \
 		-D ENABLE_MEX_DOC=OFF \

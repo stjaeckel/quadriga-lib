@@ -991,22 +991,21 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN);
 
 /*!MD
-# medium_attenuation_linear
-Linear attenuation of a ray traversing a homogeneous lossy medium
+# medium_gain
+Linear gain of a ray traversing a homogeneous lossy medium
 
 - Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
   of length `dist` inside the medium. The per-meter loss combines two contributions:
-  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1
-    (eqs. 28, 29): `ε_r = a·(f/fRef)^b`, `σ = c·(f/fRef)^d`. These give an attenuation
-    distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
-  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess
-    loss not captured by `σ` (e.g. foliage, scattering media).
+  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`, 
+    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured 
+    by `σ` (e.g. foliage, scattering media).
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
 ## Declaration:
 ```
-dtype quadriga_lib::medium_attenuation_linear(
+dtype quadriga_lib::medium_gain(
         const arma::Mat<dtype> &mtl_prop,
         arma::uword iM,
         dtype dist,
@@ -1021,11 +1020,22 @@ dtype quadriga_lib::medium_attenuation_linear(
 
 ## Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
+
+## See also:
+- [[ray_mesh_interact]] (for complex ray-material interactions)
+- [[obj_file_read]] (defines mtl_prop format)
 MD!*/
 
 template <typename dtype>
-dtype quadriga_lib::medium_attenuation_linear(const arma::Mat<dtype> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
+dtype quadriga_lib::medium_gain(const arma::Mat<dtype> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
 {
+    if (mtl_prop.n_cols != 9)
+        throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
+    if (iM >= mtl_prop.n_rows)
+        throw std::invalid_argument("Material index  out of bound.");
+    if (center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+
     dtype fGHz = center_frequency * 1e-9;
     dtype a = mtl_prop.at(iM, 0);
     dtype b = mtl_prop.at(iM, 1);
@@ -1052,5 +1062,5 @@ dtype quadriga_lib::medium_attenuation_linear(const arma::Mat<dtype> &mtl_prop, 
     return std::pow((dtype)10.0, (dtype)-0.1 * A);
 }
 
-template float quadriga_lib::medium_attenuation_linear(const arma::Mat<float> &mtl_prop, arma::uword iM, float dist, float fGHz);
-template double quadriga_lib::medium_attenuation_linear(const arma::Mat<double> &mtl_prop, arma::uword iM, double dist, double fGHz);
+template float quadriga_lib::medium_gain(const arma::Mat<float> &mtl_prop, arma::uword iM, float dist, float fGHz);
+template double quadriga_lib::medium_gain(const arma::Mat<double> &mtl_prop, arma::uword iM, double dist, double fGHz);
