@@ -79,6 +79,7 @@ import quadriga_lib
 <ul>
 <li><a href="#e091e809">Array antenna functions</a></li>
 <li><a href="#eab50272">Channel functions</a></li>
+<li><a href="#6f9553d7">Channel generation functions</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
 <li><a href="#386370db">Site-specific simulation tools</a></li>
 </ul>
@@ -110,7 +111,6 @@ import quadriga_lib
 <tbody>
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the frequency-domain channel response from time-domain coefficients</td></tr>
 <tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
-<tr><td><a href="#get_ieee_indoor">get_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
@@ -122,6 +122,15 @@ import quadriga_lib
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
 <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
+</tbody>
+</table>
+</ul>
+<br>
+<b>Channel generation functions</b>
+<ul>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tbody>
+<tr><td><a href="#get_ieee_indoor">get_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2744,257 +2753,6 @@ channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap,
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="get_ieee_indoor"></a>
-<b>get_ieee_indoor</b> - Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions.
-</li>
-<li>2D model: no elevation angles are used; azimuth angles and planar motion are considered.
-</li>
-<li>For 3D antenna models (default models from arrayant <a href="#generate">generate</a>), only the azimuth cut at <code>elevation_grid = 0</code> is used
-</li>
-<li>Supports channel model types <code>A, B, C, D, E, F</code> (as defined by TGn) via <code>ChannelType</code>.
-</li>
-<li>Can generate MU-MIMO channels (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle
-   offsets according to TGac.
-</li>
-<li>Optional time evolution via <code>observation_time</code>, <code>update_rate</code>, and mobility parameters.
-</li></ul>
-
-<i>Declaration:</i><br>
-<pre>
-from quadriga_lib import channel
-
-chan = channel.get_ieee_indoor(ap_array, sta_array, ChannelType, CarrierFreq_Hz, 
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, 
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m );
-</pre>
-
-<i>Input Arguments:</i><br>
-<ul>
-<li><b><code>ap_array</code></b><br>
-   Dictionary containing the access point array antenna with <code>n_tx</code> elements (= ports after element coupling)
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation_ap, n_azimuth_ap, n_elements_ap)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation_ap, n_azimuth_ap, n_elements_ap)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation_ap, n_azimuth_ap, n_elements_ap)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation_ap, n_azimuth_ap, n_elements_ap)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth_ap)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation_ap)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements_ap)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elements_ap, n_ports_ap)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elements_ap, n_ports_ap)</code></td>
-</tr>
-</table><br>
-</li>
-<li><b><code>sta_array</code></b><br>
-   Dictionary containing the mobile station array antenna with <code>n_rx</code> elements (= ports after element coupling)
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_elevation_sta, n_azimuth_sta, n_elements_sta)</code></td>
-</tr>
-<tr>
-  <td><code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation_sta, n_azimuth_sta, n_elements_sta)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_elevation_sta, n_azimuth_sta, n_elements_sta)</code></td>
-</tr>
-<tr>
-  <td><code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_elevation_sta, n_azimuth_sta, n_elements_sta)</code></td>
-</tr>
-<tr>
-  <td><code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth_sta)</code></td>
-</tr>
-<tr>
-  <td><code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation_sta)</code></td>
-</tr>
-<tr>
-  <td><code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements_sta)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_re</code></td>
-  <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elements_sta, n_ports_sta)</code></td>
-</tr>
-<tr>
-  <td><code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elements_sta, n_ports_sta)</code></td>
-</tr>
-</table><br>
-</li>
-<li><code><b>ChannelType</b></code><br>
-   Channel model type as defined by TGn. String. Supported: <code>A, B, C, D, E, F</code>.
-</li>
-<li><code><b>CarrierFreq_Hz</b> = 5.25e9</code> (optional)<br>
-   Carrier frequency in Hz.
-</li>
-<li><code><b>tap_spacing_s</b> = 10e-9</code> (optional)<br>
-   Tap spacing in seconds. Must be equal to <code>10 ns / 2^k</code> (TGn default = <code>10e-9</code>).
-</li>
-<li><code><b>n_users</b> = 1</code> (optional)<br>
-   Number of users (only for TGac, TGah). Output struct array length equals <code>n_users</code>.
-</li>
-<li><code><b>observation_time</b> = 0</code> (optional)<br>
-   Channel observation time in seconds. <code>0</code> creates a static channel.
-</li>
-<li><code><b>update_rate</b> = 1e-3</code> (optional)<br>
-   Channel update interval in seconds (only relevant when <code>observation_time &gt; 0</code>).
-</li>
-<li><code><b>speed_station_kmh</b> = 0</code> (optional)<br>
-   Station movement speed in km/h. Movement direction is <code>AoA_offset</code>. Only relevant when <code>observation_time &gt; 0</code>.
-</li>
-<li><code><b>speed_env_kmh</b> = 1.2</code> (optional)<br>
-   Environment movement speed in km/h. Default <code>1.2</code> for TGn, use <code>0.089</code> for TGac. Only relevant when <code>observation_time &gt; 0</code>.
-</li>
-<li><code>vector <b>Dist_m</b> = [4.99]</code> (optional)<br>
-   TX-to-RX distance(s) in meters. Length <code>n_users</code> or length <code>1</code> (same distance for all users).
-</li>
-<li><code>vector <b>n_floors</b> = [0]</code> (optional)<br>
-   Number of floors for TGah model (per user), up to 4 floors. Length <code>n_users</code> or length <code>1</code>.
-</li>
-<li><code><b>uplink</b> = false</code> (optional)<br>
-   Channel direction flag. Default is downlink; set to <code>true</code> to generate reverse (uplink) direction.
-</li>
-<li><code><b>offset_angles</b> = []</code> (optional)<br>
-   Offset angles in degree for MU-MIMO channels. Empty uses model defaults (TGac auto for <code>n_users &gt; 1</code>).
-   Shape <code>[4, n_users]</code> with rows: <code>AoD LOS, AoD NLOS, AoA LOS, AoA NLOS</code>.
-</li>
-<li><code><b>n_subpath</b> = 20</code> (optional)<br>
-   Number of sub-paths per path/cluster used for Laplacian angular spread mapping.
-</li>
-<li><code><b>Doppler_effect</b> = 50</code> (optional)<br>
-   Special Doppler effects: models <code>D, E</code> (fluorescent lights, value = mains freq.) and <code>F</code> (moving vehicle speed in km/h).
-   Use <code>0</code> to disable.
-</li>
-<li><code><b>seed</b> = -1</code> (optional)<br>
-   Numeric seed for repeatability. <code>-1</code> disables the fixed seed and uses the system random device.
-</li>
-<li><code><b>KF_linear</b> = NAN</code> (optional)<br>
-   Overwrites the model-specific KF-value. If this parameter is NAN (default) or negative, model defaults are used:
-   A/B/C (KF = 1 for d < dBP, 0 otherwise); D (KF = 2 for d < dBP, 0 otherwise); E/F (KF = 4 for d < dBP, 0 otherwise).
-   KF is applied to the first tap only. Breakpoint distance is ignored for <code>KF_linear &gt;= 0</code>.
-</li>
-<li><code><b>XPR_NLOS_linear</b> = NAN</code> (optional)<br>
-   Overwrites the model-specific Cross-polarization ratio. If this parameter is NAN (default) or negative,
-   the model default of 2 (3 dB) is used. XPR is applied to all NLOS taps.
-</li>
-<li><code><b>SF_std_dB_LOS</b> = NAN</code> (optional)<br>
-   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),
-   the model default of 3 dB is used. <code>SF_std_dB_LOS</code> is applied to all LOS channels, where the
-   AP-STA distance d < dBP.
-</li>
-<li><code><b>SF_std_dB_NLOS</b> = NAN</code> (optional)<br>
-   Overwrites the model-specific shadow fading for LOS channels. If this parameter is NAN (default),
-   the model defaults are A/B: 4 dB, C/D: 5 dB, E/F: 6 dB. <code>SF_std_dB_NLOS</code> is applied to all NLOS channels,
-   where the AP-STA distance d >= dBP.
-</li>
-<li><code><b>dBP_m</b> = NAN</code> (optional)<br>
-   Overwrites the model-specific breakpoint distance. If this parameter is NAN (default) or negative,
-   the model defaults are A/B/C: 5 m, D: 10 m, E: 20 m, F: 30 m.
-</li></ul>
-
-<i>Output Argument:</i><br>
-<ul>
-<li><b><code>chan</code></b><br>
-   List of length <code>n_users</code> containing dictionaries of channel data with the following keys.
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>name</code></td>
-  <td>Channel name</td>
-  <td>String</td>
-</tr>
-<tr>
-  <td><code>tx_position</code></td>
-  <td>Transmitter positions (AP for downlink, STA for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
-</tr>
-<tr>
-  <td><code>rx_position</code></td>
-  <td>Receiver positions (STA for downlink, AP for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
-</tr>
-<tr>
-  <td><code>tx_orientation</code></td>
-  <td>Transmitter orientation, Euler angles (AP for downlink, STA for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
-</tr>
-<tr>
-  <td><code>rx_orientation</code></td>
-  <td>Receiver orientation, Euler angles (STA for downlink, AP for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
-</tr>
-<tr>
-  <td><code>coeff</code></td>
-  <td>Channel coefficients, complex valued</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>delay</code></td>
-  <td>Propagation delays in seconds</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code></td>
-</tr>
-<tr>
-  <td><code>path_gain</code></td>
-  <td>Path gain before antenna, linear scale</td>
-  <td>list of <code>[n_path_s]</code></td>
-</tr>
-</table><br>
-</li></ul>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_create_file"></a>
 <b>hdf5_create_file</b> - Create a new HDF5 channel file with a custom storage layout
 <br><br>
@@ -3812,6 +3570,174 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays(
 <li><code>np.ndarray <b>delay_q</b></code> (output)<br>
    Output delays in seconds. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code> or
    <code>[1, 1, n_taps, n_snap]</code>.
+</li></ul>
+
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="6f9553d7"></a>
+<font size=+1><b>Channel generation functions</b></font>
+<br>
+<br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_ieee_indoor"></a>
+<b>get_ieee_indoor</b> - Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Generates one or multiple indoor channel realizations based on IEEE TGn/TGac/TGax/TGah model definitions
+</li>
+<li>2D model: azimuth angles and planar motion only, no elevation
+</li>
+<li>Supported channel types: <code>A, B, C, D, E, F</code> (TGn definitions)
+</li>
+<li>MU-MIMO supported (<code>n_users &gt; 1</code>) with per-user distances/floors and optional angle offsets per TGac
+</li>
+<li>Time-evolving channels via <code>observation_time</code>, <code>update_rate</code>, and mobility parameters; <code>observation_time = 0.0</code> yields a static channel
+</li>
+<li>Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when <code>KF_linear &gt;= 0</code>
+</li>
+<li>Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
+</li>
+<li>Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+</li>
+<li>Floor floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz
+</li>
+<li>NAN or negative value for any override parameter restores the model default
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz,
+   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh,
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss )
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>ap_array</code></b> — Access point array antenna; <code>n_tx</code> = number of ports after element coupling, see arrayant-<a href="#generate">generate</a>
+</li>
+<li><b><code>sta_array</code></b> — Mobile station array antenna; <code>n_rx</code> = number of ports after element coupling, see arrayant-<a href="#generate">generate</a>
+</li>
+<li><b><code>ChannelType</code></b> — Model type string; one of <code>"A"</code>, <code>"B"</code>, <code>"C"</code>, <code>"D"</code>, <code>"E"</code>, <code>"F"</code>
+</li>
+<li><b><code>CarrierFreq_Hz</code></b> <i>(optional)</i> — Carrier frequency; default: 5.25e9
+</li>
+<li><b><code>tap_spacing_s</code></b> <i>(optional)</i> — Tap spacing in seconds; must equal <code>10 ns / 2^k</code>; default: 10e-9
+</li>
+<li><b><code>n_users</code></b> <i>(optional)</i> — Number of users (TGac/TGah/TGax only); output vector length equals <code>n_users</code>; default: 1
+</li>
+<li><b><code>observation_time</code></b> <i>(optional)</i> — Channel observation time in seconds; default: 0
+</li>
+<li><b><code>update_rate</code></b> <i>(optional)</i> — Channel update interval in seconds; relevant only when <code>observation_time &gt; 0</code>; default: 1e-3
+</li>
+<li><b><code>speed_station_kmh</code></b> <i>(optional)</i> — Station speed in km/h; movement direction is <code>AoA_offset</code>; relevant only when <code>observation_time &gt; 0</code>; default: 0
+</li>
+<li><b><code>speed_env_kmh</code></b> <i>(optional)</i> — Environment speed in km/h; use <code>0.089</code> for TGac; relevant only when <code>observation_time &gt; 0</code>; default: 1.2 (TGn)
+</li>
+<li><b><code>Dist_m</code></b> <i>(optional)</i> — TX-to-RX distance(s); <code>(n_users,)</code> or <code>(1,)</code>; default: 4.99
+</li>
+<li><b><code>n_floors</code></b> <i>(optional)</i> — Number of floors per user for TGah or TGax models; <code>(n_users,)</code> or <code>(1,)</code>; default: 0
+</li>
+<li><b><code>uplink</code></b> <i>(optional)</i> — Set <code>true</code> to generate uplink (reverse) direction; default: false
+</li>
+<li><b><code>offset_angles</code></b> <i>(optional)</i> — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS;
+   empty uses TGac auto-defaults for <code>n_users &gt; 1</code>; <code>(4, n_users)</code>; default: [] (auto-generate)
+</li>
+<li><b><code>n_subpath</code></b> <i>(optional)</i> — Sub-paths per cluster for Laplacian angular spread mapping; default: 20
+</li>
+<li><b><code>Doppler_effect</code></b> <i>(optional)</i> — Special Doppler: models D/E use mains frequency (Hz), model F uses vehicle speed (km/h); 0 disables; default: 50
+</li>
+<li><b><code>seed</code></b> <i>(optional)</i> — RNG seed for repeatability; <code>-1</code> uses the system random device; default: -1
+</li>
+<li><b><code>KF_linear</code></b> <i>(optional)</i> — Overrides model KF (linear scale); NAN or negative restores model default; default: NAN
+</li>
+<li><b><code>XPR_NLOS_linear</code></b> <i>(optional)</i> — Overrides NLOS cross-polarization ratio (linear scale); NAN or negative restores model default; default: NAN
+</li>
+<li><b><code>SF_std_dB_LOS</code></b> <i>(optional)</i> — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default; default: NAN
+</li>
+<li><b><code>SF_std_dB_NLOS</code></b> <i>(optional)</i> — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default; default: NAN
+</li>
+<li><b><code>dBP_m</code></b> <i>(optional)</i> — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
+</li>
+<li><b><code>n_walls</code></b> <i>(optional)</i> — Number of walls per user TGax models; <code>(n_users,)</code> or <code>(1,)</code>; default: 0
+</li>
+<li><b><code>wall_loss</code></b> <i>(optional)</i> — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
+</li></ul>
+
+<i>Output:</i><br>
+<ul>
+<li><b><code>chan</code></b><br>
+   List of length <code>n_users</code> containing dictionaries of channel data with the following keys.<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Key</th>
+  <th style="text-align: left;">Description</th>
+  <th style="text-align: left;">Type</th>
+</tr>
+<tr>
+  <td></td>
+  <td><code>name</code></td>
+  <td>Channel name</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>tx_position</code></td>
+  <td>Transmitter positions (AP for downlink, STA for uplink)</td>
+  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>rx_position</code></td>
+  <td>Receiver positions (STA for downlink, AP for uplink)</td>
+  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>tx_orientation</code></td>
+  <td>Transmitter orientation, Euler angles (AP for downlink, STA for uplink)</td>
+  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>rx_orientation</code></td>
+  <td>Receiver orientation, Euler angles (STA for downlink, AP for uplink)</td>
+  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>coeff</code></td>
+  <td>Channel coefficients, complex valued</td>
+  <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>delay</code></td>
+  <td>Propagation delays in seconds</td>
+  <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>path_gain</code></td>
+  <td>Path gain before antenna, linear scale</td>
+  <td>list of <code>(n_path_s)</code></td>
+</tr>
+</table><br>
+</li></ul>
+See also: 
+<ul>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
 </li></ul>
 
 <div class="pagebreak"></div>

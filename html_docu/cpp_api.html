@@ -3331,6 +3331,8 @@ quadriga_lib::quantize_delays(&amp;cre, &amp;cim, &amp;dl, &amp;cre_q, &amp;cim_
 </li>
 <li>Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
 </li>
+<li>Floor floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz
+</li>
 <li>NAN or negative value for any override parameter restores the model default
 </li></ul>
 </div>
@@ -3359,7 +3361,9 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
     double XPR_NLOS_linear = NAN,
     double SF_std_dB_LOS = NAN,
     double SF_std_dB_NLOS = NAN,
-    double dBP_m = NAN );
+    double dBP_m = NAN,
+    arma::uvec n_walls = {0},
+    double wall_loss = 5.0);
 </pre>
 
 <i>Inputs:</i><br>
@@ -3374,7 +3378,7 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
 </li>
 <li><b><code>tap_spacing_s</code></b> <i>(optional)</i> — Tap spacing in seconds; must equal <code>10 ns / 2^k</code>
 </li>
-<li><b><code>n_users</code></b> <i>(optional)</i> — Number of users (TGac/TGah only); output vector length equals <code>n_users</code>
+<li><b><code>n_users</code></b> <i>(optional)</i> — Number of users (TGac/TGah/TGax only); output vector length equals <code>n_users</code>
 </li>
 <li><b><code>observation_time</code></b> <i>(optional)</i> — Channel observation time in seconds
 </li>
@@ -3386,7 +3390,7 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
 </li>
 <li><b><code>Dist_m</code></b> <i>(optional)</i> — TX-to-RX distance(s); <code>[n_users]</code> or <code>[1]</code>
 </li>
-<li><b><code>n_floors</code></b> <i>(optional)</i> — Number of floors per user for TGah (max 4); <code>[n_users]</code> or <code>[1]</code>
+<li><b><code>n_floors</code></b> <i>(optional)</i> — Number of floors per user for TGah or TGax models; <code>[n_users]</code> or <code>[1]</code>
 </li>
 <li><b><code>uplink</code></b> <i>(optional)</i> — Set <code>true</code> to generate uplink (reverse) direction
 </li>
@@ -3407,6 +3411,10 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
 <li><b><code>SF_std_dB_NLOS</code></b> <i>(optional)</i> — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
 </li>
 <li><b><code>dBP_m</code></b> <i>(optional)</i> — Overrides breakpoint distance; NAN or negative restores model default
+</li>
+<li><b><code>n_walls</code></b> <i>(optional)</i> — Number of walls per user TGax models; <code>[n_users]</code> or <code>[1]</code>
+</li>
+<li><b><code>wall_loss</code></b> <i>(optional)</i> — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
 </li></ul>
 
 <i>Returns:</i><br>
@@ -3419,6 +3427,14 @@ std::vector&lt;quadriga_lib::channel&lt;double&gt;&gt; quadriga_lib::get_channel
 <li><a href="#get_channels_planar">get_channels_planar</a> (used internally to compute MIMO coefficients per user)
 </li>
 <li><a href="#arrayant">arrayant</a> (antenna array type for ap_array and sta_array)
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
+</li>
+<li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
