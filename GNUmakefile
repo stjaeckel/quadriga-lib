@@ -6,14 +6,14 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = ON
-matlab = OFF
-python = ON
+octave = OFF
+matlab = ON
+python = OFF
 avx2 = ON
-cuda = OFF
+cuda = ON
 
-# GCC version override. Empty for system default. Note: NVCC max is 13
-gcc_version = 13
+# GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
+gcc_version = 12
 
 CMAKE_BUILD_DIR = build_linux
 

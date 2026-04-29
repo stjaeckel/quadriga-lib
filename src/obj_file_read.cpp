@@ -409,29 +409,35 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     double attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0;             // Default attenuation properties
     bool simple_face_format = true;                                          // Selector for face format
 
-    // Obtain memory for the vertex list
+    // Obtain memory for the vertex list (scratch buffer if caller doesn't request it)
+    std::vector<dtype> vert_scratch;
     dtype *p_vert;
     if (vert_list == nullptr)
-        p_vert = new dtype[n_vert * 3];
-    else if (vert_list->n_rows != n_vert || vert_list->n_cols != 3)
     {
-        vert_list->set_size(n_vert, 3);
-        p_vert = vert_list->memptr();
+        vert_scratch.resize(n_vert * 3);
+        p_vert = vert_scratch.data();
     }
     else
+    {
+        if (vert_list->n_rows != n_vert || vert_list->n_cols != 3)
+            vert_list->set_size(n_vert, 3);
         p_vert = vert_list->memptr();
+    }
 
-    // Obtain memory for face indices
+    // Obtain memory for face indices (scratch buffer if caller doesn't request it)
+    std::vector<arma::uword> face_ind_scratch;
     arma::uword *p_face_ind;
     if (face_ind == nullptr)
-        p_face_ind = new arma::uword[n_faces * 3];
-    else if (face_ind->n_rows != n_faces || face_ind->n_cols != 3)
     {
-        face_ind->set_size(n_faces, 3);
-        p_face_ind = face_ind->memptr();
+        face_ind_scratch.resize(n_faces * 3);
+        p_face_ind = face_ind_scratch.data();
     }
     else
+    {
+        if (face_ind->n_rows != n_faces || face_ind->n_cols != 3)
+            face_ind->set_size(n_faces, 3);
         p_face_ind = face_ind->memptr();
+    }
 
     // Set size of "mtl_prop"
     if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 9))
@@ -637,13 +643,6 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 
     // Clean up and return
     mtl_lib.clear();
-
-    if (vert_list == nullptr)
-        delete[] p_vert;
-
-    if (face_ind == nullptr)
-        delete[] p_face_ind;
-
     fileR.close();
 
     // Read BSDF data from MTL file
