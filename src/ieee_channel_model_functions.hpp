@@ -37,7 +37,10 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
                                  double XPR_NLOS_linear_overwrite = NAN, // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
                                  double SF_std_dB_LOS_overwrite = NAN,   // Overwrites the default Shadow Fading STD for LOS channels in dB
                                  double SF_std_dB_NLOS_overwrite = NAN,  // Overwrites the default Shadow Fading STD for NLOS channels in dB
-                                 double dBP_m_overwrite = NAN)           // Overwrites the default breakpoint distance in meters
+                                 double dBP_m_overwrite = NAN,           // Overwrites the default breakpoint distance in meters
+                                 arma::uvec n_walls = {0},               // Number of walls per user TGax models; [n_users] or [1]
+                                 double wall_loss = 5.0)                 // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
+
 {
     // Input validation
     if (n_users == 0)
@@ -63,6 +66,13 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         throw std::invalid_argument("Number of floors cannot exceed 4.");
     if (n_floors.n_elem == 1 && n_users != 1)
         n_floors = arma::uvec(n_users, arma::fill::value(n_floors[0]));
+
+    if (n_walls.n_elem == 0)
+        n_walls = {0};
+    if (n_walls.n_elem != 1 && n_walls.n_elem != n_users)
+        throw std::invalid_argument("Number of walls must be a vector of length 1 or length n_users.");
+    if (n_walls.n_elem == 1 && n_users != 1)
+        n_walls = arma::uvec(n_users, arma::fill::value(n_walls[0]));
 
     if (CarrierFreq_Hz <= 0.1e9)
         throw std::invalid_argument("Invalid carrier frequency, mut be at least 100 MHz.");
@@ -591,16 +601,29 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         else
             Pathloss_dB[i_user] += 20.0 * std::log10(dBP_m) + 35.0 * std::log10(Dist_m[i_user] / dBP_m);
 
-        // Add floor attenuation factor from TGah model
-        // See: IEEE 802.11-968r4 TGah Channel Model, Table 3
-        if (n_floors[i_user] == 1)
-            Pathloss_dB[i_user] += 12.9;
-        else if (n_floors[i_user] == 2)
-            Pathloss_dB[i_user] += 18.7;
-        else if (n_floors[i_user] == 3)
-            Pathloss_dB[i_user] += 24.4;
-        else if (n_floors[i_user] == 4)
-            Pathloss_dB[i_user] += 27.7;
+        // Add floor attenuation
+        if (CarrierFreq_Hz < 1e9) // TGah model
+        {
+            // See: IEEE 802.11-968r4 TGah Channel Model, Table 3
+            if (n_floors[i_user] == 1)
+                Pathloss_dB[i_user] += 12.9;
+            else if (n_floors[i_user] == 2)
+                Pathloss_dB[i_user] += 18.7;
+            else if (n_floors[i_user] == 3)
+                Pathloss_dB[i_user] += 24.4;
+            else if (n_floors[i_user] == 4)
+                Pathloss_dB[i_user] += 27.7;
+        }
+        else // TGax model
+        {
+            // See: IEEE 802.11-14/0882r4, Section 3.1.1 Indoor floor and wall penetration loss
+            double nn = (double)n_floors[i_user];
+            Pathloss_dB[i_user] += 18.3 * std::pow(nn, (nn + 2.0) / (nn + 1.0) - 0.46);
+        }
+
+        // Add wall attenuation
+        // See: IEEE 802.11-14/0882r4, Section 3.1.1 Indoor floor and wall penetration loss
+        Pathloss_dB[i_user] += wall_loss * (double)n_walls[i_user];
     }
 
     // Generate Shadow Fading for each user
@@ -611,16 +634,19 @@ static void qd_ieee_indoor_param(arma::mat &rx_pos,                      // Outp
         // Use LOS SF for distances blow break point, and NLOS SF above
         double SF_std_dB = (Dist_m[i_user] < dBP_m) ? SF_std_dB_LOS : SF_std_dB_NLOS;
 
-        // Overwrite SF std if user is on a different floor (TGah model)
-        // See: IEEE 802.11-968r4 TGah Channel Model, Table 3
-        if (n_floors[i_user] == 1)
-            SF_std_dB = 7.0;
-        else if (n_floors[i_user] == 2)
-            SF_std_dB = 2.8;
-        else if (n_floors[i_user] == 3)
-            SF_std_dB = 1.7;
-        else if (n_floors[i_user] == 4)
-            SF_std_dB = 1.5;
+        // Overwrite SF std if user is on a different floor
+        if (CarrierFreq_Hz < 1e9) // TGah model
+        {
+            // See: IEEE 802.11-968r4 TGah Channel Model, Table 3
+            if (n_floors[i_user] == 1)
+                SF_std_dB = 7.0;
+            else if (n_floors[i_user] == 2)
+                SF_std_dB = 2.8;
+            else if (n_floors[i_user] == 3)
+                SF_std_dB = 1.7;
+            else if (n_floors[i_user] == 4)
+                SF_std_dB = 1.5;
+        }
 
         Shadow_Fading_dB[i_user] = N(rng);     // standard normal sample
         Shadow_Fading_dB[i_user] *= SF_std_dB; // Multiply by SF STD

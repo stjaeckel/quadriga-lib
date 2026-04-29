@@ -79,48 +79,48 @@ lang: en-US
 | [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1805 |
 | [quantize_delays](#quantize_delays) | Channel functions | 1828 |
 | [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1890 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1962 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2056 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2124 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2192 |
-| [acdf](#acdf) | Channel statistics | 2268 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2303 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2345 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2397 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2430 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2465 |
-| [fast_acos](#fast_acos) | Math functions | 2498 |
-| [fast_asin](#fast_asin) | Math functions | 2517 |
-| [fast_atan2](#fast_atan2) | Math functions | 2536 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2557 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2590 |
-| [fast_sincos](#fast_sincos) | Math functions | 2635 |
-| [fast_slerp](#fast_slerp) | Math functions | 2656 |
-| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2691 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2762 |
-| [colormap](#colormap) | Site-specific simulation tools | 2812 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2831 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2874 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2912 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2956 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 2990 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3025 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3066 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3184 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3215 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3243 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3272 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3311 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3347 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3383 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3468 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3511 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3559 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3603 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3633 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3661 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3702 |
-| [write_png](#write_png) | Site-specific simulation tools | 3737 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1971 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2065 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2133 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2201 |
+| [acdf](#acdf) | Channel statistics | 2277 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2312 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2354 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2406 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2439 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2474 |
+| [fast_acos](#fast_acos) | Math functions | 2507 |
+| [fast_asin](#fast_asin) | Math functions | 2526 |
+| [fast_atan2](#fast_atan2) | Math functions | 2545 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2566 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2599 |
+| [fast_sincos](#fast_sincos) | Math functions | 2644 |
+| [fast_slerp](#fast_slerp) | Math functions | 2665 |
+| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2700 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2771 |
+| [colormap](#colormap) | Site-specific simulation tools | 2821 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2840 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2883 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2921 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2965 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 2999 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3034 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3075 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3193 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3224 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3252 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3281 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3320 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3356 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3392 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3477 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3520 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3568 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3612 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3642 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3670 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3711 |
+| [write_png](#write_png) | Site-specific simulation tools | 3746 |
 
 ---
 
@@ -1898,6 +1898,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 - Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
 - Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
 - Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+- Floor floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz
 - NAN or negative value for any override parameter restores the model default
 
 ### Declaration:
@@ -1924,7 +1925,9 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double XPR_NLOS_linear = NAN,
     double SF_std_dB_LOS = NAN,
     double SF_std_dB_NLOS = NAN,
-    double dBP_m = NAN );
+    double dBP_m = NAN,
+    arma::uvec n_walls = {0},
+    double wall_loss = 5.0);
 ```
 
 ### Inputs:
@@ -1933,13 +1936,13 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`CarrierFreq_Hz`** *(optional)* — Carrier frequency
 - **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
-- **`n_users`** *(optional)* — Number of users (TGac/TGah only); output vector length equals `n_users`
+- **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds
 - **`update_rate`** *(optional)* — Channel update interval in seconds; relevant only when `observation_time > 0`
 - **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
 - **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
 - **`Dist_m`** *(optional)* — TX-to-RX distance(s); `[n_users]` or `[1]`
-- **`n_floors`** *(optional)* — Number of floors per user for TGah (max 4); `[n_users]` or `[1]`
+- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models; `[n_users]` or `[1]`
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
@@ -1950,6 +1953,8 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
 - **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
+- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`
+- **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
 
 ### Returns:
 - `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
@@ -1957,6 +1962,10 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 ### See also:
 - [get_channels_planar](#get_channels_planar) (used internally to compute MIMO coefficients per user)
 - [arrayant](#arrayant) (antenna array type for ap_array and sta_array)
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
 
 ---
 ## get_channels_irs

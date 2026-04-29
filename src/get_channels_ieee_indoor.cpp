@@ -21,6 +21,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 - Default KF (linear): A/B/C → 1 (LOS) / 0 (NLOS), D → 2/0, E/F → 4/0; applied to first tap only; breakpoint ignored when `KF_linear >= 0`
 - Default XPR NLOS: 2 (3 dB); default SF LOS: 3 dB; default SF NLOS: A/B → 4 dB, C/D → 5 dB, E/F → 6 dB
 - Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
+- Floor floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz
 - NAN or negative value for any override parameter restores the model default
 
 ## Declaration:
@@ -47,7 +48,9 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
     double XPR_NLOS_linear = NAN,
     double SF_std_dB_LOS = NAN,
     double SF_std_dB_NLOS = NAN,
-    double dBP_m = NAN );
+    double dBP_m = NAN,
+    arma::uvec n_walls = {0},
+    double wall_loss = 5.0);
 ```
 
 ## Inputs:
@@ -56,13 +59,13 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`ChannelType`** — Model type string; one of `"A"`, `"B"`, `"C"`, `"D"`, `"E"`, `"F"`
 - **`CarrierFreq_Hz`** *(optional)* — Carrier frequency
 - **`tap_spacing_s`** *(optional)* — Tap spacing in seconds; must equal `10 ns / 2^k`
-- **`n_users`** *(optional)* — Number of users (TGac/TGah only); output vector length equals `n_users`
+- **`n_users`** *(optional)* — Number of users (TGac/TGah/TGax only); output vector length equals `n_users`
 - **`observation_time`** *(optional)* — Channel observation time in seconds
 - **`update_rate`** *(optional)* — Channel update interval in seconds; relevant only when `observation_time > 0`
 - **`speed_station_kmh`** *(optional)* — Station speed in km/h; movement direction is `AoA_offset`; relevant only when `observation_time > 0`
 - **`speed_env_kmh`** *(optional)* — Environment speed in km/h; use `0.089` for TGac; relevant only when `observation_time > 0`
 - **`Dist_m`** *(optional)* — TX-to-RX distance(s); `[n_users]` or `[1]`
-- **`n_floors`** *(optional)* — Number of floors per user for TGah (max 4); `[n_users]` or `[1]`
+- **`n_floors`** *(optional)* — Number of floors per user for TGah or TGax models; `[n_users]` or `[1]`
 - **`uplink`** *(optional)* — Set `true` to generate uplink (reverse) direction
 - **`offset_angles`** *(optional)* — Azimuth offset angles in degrees; rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS; empty uses TGac auto-defaults for `n_users > 1`; `[4, n_users]`
 - **`n_subpath`** *(optional)* — Sub-paths per cluster for Laplacian angular spread mapping
@@ -73,6 +76,8 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 - **`SF_std_dB_LOS`** *(optional)* — Overrides LOS shadow fading std in dB (applied when d < dBP); NAN restores model default
 - **`SF_std_dB_NLOS`** *(optional)* — Overrides NLOS shadow fading std in dB (applied when d >= dBP); NAN restores model default
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default
+- **`n_walls`** *(optional)* — Number of walls per user TGax models; `[n_users]` or `[1]`
+- **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
 
 ## Returns:
 - `std::vector<quadriga_lib::channel<double>>` of length `n_users`; each entry is one user's channel realization with direction set by `uplink`
@@ -80,31 +85,37 @@ std::vector<quadriga_lib::channel<double>> quadriga_lib::get_channels_ieee_indoo
 ## See also:
 - [[get_channels_planar]] (used internally to compute MIMO coefficients per user)
 - [[arrayant]] (antenna array type for ap_array and sta_array)
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
 MD!*/
 
 std::vector<quadriga_lib::channel<double>>
-quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_array,  // Access point array antenna with 'n_tx' elements (= ports after element coupling)
-                                       const quadriga_lib::arrayant<double> &sta_array, // Mobile station array antenna with 'n_rx' elements (= ports after element coupling)
-                                       std::string ChannelType,                         // Channel Model Type (A, B, C, D, E, F) as defined by TGn
-                                       double CarrierFreq_Hz,                           // Carrier frequency
-                                       double tap_spacing_s,                            // Taps spacing in seconds, must be equal to 10 ns divided by a power of 2, TGn = 10e-9
-                                       arma::uword n_users,                             // Number of user (only for TGac, TGah)
-                                       double observation_time,                         // Channel observation time in seconds (0.0 = static channel)
-                                       double update_rate,                              // Channel update interval in seconds
-                                       double speed_station_kmh,                        // Movement speed of the station in km/h (optional feature, default = 0), movement direction = AoA_offset
-                                       double speed_env_kmh,                            // Movement speed of the environment in km/h (default = 1.2 for TGn) use 0.089 for TGac
-                                       arma::vec Dist_m,                                // Distance between TX and RX in meters, length n_users or length 1 (if same for all users)
-                                       arma::uvec n_floors,                             // Number of floors for the TGah model, adjusted for each user, up to 4 floors, length n_users or length 1 (if same for all users)
-                                       bool uplink,                                     // Default channel direction is downlink, set uplink to true to get reverse direction
-                                       arma::mat offset_angles,                         // Offset angles in degree for MU-MIMO channels, empty (TGac auto for n_users > 1), Size: [4, n_users] with rows: AoD LOS, AoD NLOS, AoA LOS, AoA NLOS
-                                       arma::uword n_subpath,                           // Number of sub-paths per path and cluster for Laplacian AS mapping
-                                       double Doppler_effect,                           // Special Doppler effects in models D, E (fluorescent lights, value = mains freq.) and F (moving vehicle speed in kmh), use 0.0 to disable
-                                       arma::sword seed,                                // Numeric seed, optional, value -1 disabled seed and uses system random device
-                                       double KF_linear,                                // Overwrites the default KF (linear scale)
-                                       double XPR_NLOS_linear,                          // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
-                                       double SF_std_dB_LOS,                            // Overwrites the default Shadow Fading STD for LOS channels in dB
-                                       double SF_std_dB_NLOS,                           // Overwrites the default Shadow Fading STD for NLOS channels in dB
-                                       double dBP_m)                                    // Overwrites the default breakpoint distance in meters
+quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_array,
+                                       const quadriga_lib::arrayant<double> &sta_array,
+                                       std::string ChannelType,
+                                       double CarrierFreq_Hz,
+                                       double tap_spacing_s,
+                                       arma::uword n_users,
+                                       double observation_time,
+                                       double update_rate,
+                                       double speed_station_kmh,
+                                       double speed_env_kmh,
+                                       arma::vec Dist_m,
+                                       arma::uvec n_floors,
+                                       bool uplink,
+                                       arma::mat offset_angles,
+                                       arma::uword n_subpath,
+                                       double Doppler_effect,
+                                       arma::sword seed,
+                                       double KF_linear,
+                                       double XPR_NLOS_linear,
+                                       double SF_std_dB_LOS,
+                                       double SF_std_dB_NLOS,
+                                       double dBP_m,
+                                       arma::uvec n_walls,
+                                       double wall_loss)
 
 {
     // Check if the antennas are valid
@@ -145,7 +156,7 @@ quadriga_lib::get_channels_ieee_indoor(const quadriga_lib::arrayant<double> &ap_
     qd_ieee_indoor_param(rx_pos, rx_orientation, aod, aoa, pow, delay, M,
                          ChannelType, CarrierFreq_Hz, tap_spacing_s, n_users, Dist_m, n_floors,
                          offset_angles, n_subpath, seed,
-                         KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m);
+                         KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss);
 
     arma::uword n_tx = ap_array.n_ports();
     arma::uword n_rx = sta_array.n_ports();

@@ -6,11 +6,11 @@ hdf5_internal = OFF
 arma_internal = OFF
 static_lib = ON
 shared_lib = OFF
-octave = OFF
-matlab = ON
-python = OFF
-avx2 = ON
-cuda = ON
+octave = ON
+matlab = OFF
+python = ON
+avx2 = OFF
+cuda = OFF
 
 # GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12
 gcc_version = 12

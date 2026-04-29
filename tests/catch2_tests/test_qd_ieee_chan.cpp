@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include <catch2/catch_test_macros.hpp>
 #include "ieee_channel_model_functions.hpp"
@@ -32,6 +19,8 @@
 // - Delay, Powers and RMSDS for TGn and TGac
 // - Doppler from moving vehicle in Model F
 // - Uplink-downlink reciprocity for MIMO channels
+// - Wall penetration loss (default 5 dB, custom 7 dB, per-user vector)
+// - TGax floor penetration loss formula (n=2,3,4 vs n=1 reference)
 
 static arma::mat calc_Doppler_profile(quadriga_lib::channel<double> chan, double update_rate_s, double BW = 100e6)
 {
@@ -910,4 +899,105 @@ TEST_CASE("IEEE Chan - Reciprocity")
     }
 
     REQUIRE(max_err < 1e-10);
+}
+
+TEST_CASE("IEEE Chan - B + Wall loss")
+{
+    // Wall loss is a deterministic additive term in the path loss. With a fixed
+    // seed and otherwise identical inputs, walls don't change path structure or
+    // RNG draws, so the SF realisation is identical and the total power ratio
+    // in dB equals -n_walls * wall_loss exactly (per user).
+
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    arma::sword seed = 42;
+
+    // ---- Single user, default wall_loss = 5.0 dB ----------------------------
+    auto chan_ref = quadriga_lib::get_channels_ieee_indoor(
+        ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
+        {3.0}, {0}, false, {}, 20, 50.0, seed,
+        NAN, NAN, NAN, NAN, NAN, {0}, 5.0);
+
+    auto chan_w3 = quadriga_lib::get_channels_ieee_indoor(
+        ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
+        {3.0}, {0}, false, {}, 20, 50.0, seed,
+        NAN, NAN, NAN, NAN, NAN, {3}, 5.0);
+
+    REQUIRE(arma::all(chan_ref[0].n_path() == chan_w3[0].n_path()));
+
+    double P_ref = arma::accu(chan_ref[0].path_gain[0]);
+    double P_w3 = arma::accu(chan_w3[0].path_gain[0]);
+    CHECK(std::abs(10.0 * std::log10(P_w3 / P_ref) + 15.0) < 1e-10); // -3 * 5 dB
+
+    // ---- Single user, custom wall_loss = 7.0 dB (alternative TGax value) ----
+    auto chan_w2_7 = quadriga_lib::get_channels_ieee_indoor(
+        ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
+        {3.0}, {0}, false, {}, 20, 50.0, seed,
+        NAN, NAN, NAN, NAN, NAN, {2}, 7.0);
+
+    REQUIRE(arma::all(chan_ref[0].n_path() == chan_w2_7[0].n_path()));
+    double P_w2_7 = arma::accu(chan_w2_7[0].path_gain[0]);
+    CHECK(std::abs(10.0 * std::log10(P_w2_7 / P_ref) + 14.0) < 1e-10); // -2 * 7 dB
+
+    // ---- Per-user n_walls vector --------------------------------------------
+    arma::vec Dist3 = {3.0, 3.0, 3.0};
+    arma::uvec Floors3 = {0, 0, 0};
+    arma::uvec Walls0 = {0, 0, 0};
+    arma::uvec WallsN = {1, 2, 3};
+
+    auto chan3_ref = quadriga_lib::get_channels_ieee_indoor(
+        ant, ant, "B", 5.25e9, 10e-9, 3, 0.0, 1e-3, 0.0, 1.2,
+        Dist3, Floors3, false, {}, 20, 50.0, seed,
+        NAN, NAN, NAN, NAN, NAN, Walls0, 5.0);
+
+    auto chan3_w = quadriga_lib::get_channels_ieee_indoor(
+        ant, ant, "B", 5.25e9, 10e-9, 3, 0.0, 1e-3, 0.0, 1.2,
+        Dist3, Floors3, false, {}, 20, 50.0, seed,
+        NAN, NAN, NAN, NAN, NAN, WallsN, 5.0);
+
+    REQUIRE(chan3_ref.size() == 3);
+    for (arma::uword u = 0; u < 3; ++u)
+    {
+        REQUIRE(arma::all(chan3_ref[u].n_path() == chan3_w[u].n_path()));
+        double pr = arma::accu(chan3_ref[u].path_gain[0]);
+        double pw = arma::accu(chan3_w[u].path_gain[0]);
+        double expected = -static_cast<double>(u + 1) * 5.0; // 1, 2, 3 walls
+        CHECK(std::abs(10.0 * std::log10(pw / pr) - expected) < 1e-10);
+    }
+}
+
+TEST_CASE("IEEE Chan - B + TGax floor loss formula")
+{
+    // For TGax (CarrierFreq >= 1 GHz) the per-floor penetration loss is
+    //   FL(n) = 18.3 * n^((n+2)/(n+1) - 0.46)   [dB], for n_floors >= 1
+    // (See IEEE 802.11-14/0882r4, Section 3.1.1.) Comparing two runs that both
+    // have n_floors > 0 ensures both lose the LOS path, so the path structure
+    // and SF realisation are identical at a fixed seed; the total power ratio
+    // is then determined purely by the floor-loss term.
+
+    auto ant = quadriga_lib::generate_arrayant_omni<double>(30.0);
+    arma::sword seed = 7;
+
+    auto FL = [](double n)
+    {
+        return 18.3 * std::pow(n, (n + 2.0) / (n + 1.0) - 0.46);
+    };
+
+    auto run = [&](arma::uword nf)
+    {
+        return quadriga_lib::get_channels_ieee_indoor(
+            ant, ant, "B", 5.25e9, 10e-9, 1, 0.0, 1e-3, 0.0, 1.2,
+            {3.0}, arma::uvec{nf}, false, {}, 20, 50.0, seed);
+    };
+
+    auto chan1 = run(1);
+    double P1 = arma::accu(chan1[0].path_gain[0]);
+
+    for (arma::uword nf : {2u, 3u, 4u})
+    {
+        auto chan_n = run(nf);
+        REQUIRE(arma::all(chan_n[0].n_path() == chan1[0].n_path()));
+        double Pn = arma::accu(chan_n[0].path_gain[0]);
+        double expected = -(FL(static_cast<double>(nf)) - FL(1.0));
+        CHECK(std::abs(10.0 * std::log10(Pn / P1) - expected) < 1e-10);
+    }
 }

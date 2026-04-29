@@ -61,8 +61,9 @@ namespace quadriga_lib
                              double XPR_NLOS_linear = NAN,      // Overwrites the default Cross-polarization ratio (linear scale) for NLOS paths
                              double SF_std_dB_LOS = NAN,        // Overwrites the default Shadow Fading STD for LOS channels in dB
                              double SF_std_dB_NLOS = NAN,       // Overwrites the default Shadow Fading STD for NLOS channels in dB
-                             double dBP_m = NAN);               // Overwrites the default breakpoint distance in meters
-
+                             double dBP_m = NAN,                // Overwrites the default breakpoint distance in meters
+                             arma::uvec n_walls = {0},          // Number of walls per user TGax models; [n_users] or [1]
+                             double wall_loss = 5.0);           // Penetration loss for a single wall; TGax defines 5.0 (default) or 7.0
 }
 
 #endif
