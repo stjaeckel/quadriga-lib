@@ -489,6 +489,7 @@ if(BUILD_MATLAB)
     # Compiles MEX files directly with g++ (Linux) or cl.exe (Windows). No MATLAB installation required
     # Note: MATLAB always links quadriga_static regardless of QUADRIGA_LINK_TARGET to avoid conflicts with MATLAB's own bundled libhdf5.so
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
+    set(MEX_COMPAT_SHIM ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_MATLAB_TARGETS "")
 
@@ -497,7 +498,7 @@ if(BUILD_MATLAB)
 
         # Uniform dependency: all MEX files depend on the link target
         set(mex_deps ${mex_src})
-        list(APPEND mex_deps quadriga_static)
+        list(APPEND mex_deps quadriga_static ${MEX_COMPAT_SHIM})
         if(mex_basename STREQUAL "ieee_chan_indoor")
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
         endif()
@@ -509,7 +510,7 @@ if(BUILD_MATLAB)
                 COMMAND ${CMAKE_CXX_COMPILER}
                         /nologo /std:c++17 /EHs /O2 /MT /LD /DMATLAB_MEX_FILE
                         /I${MATLAB_MEX_INCLUDE_DIR} /I${CMAKE_SOURCE_DIR}/include /I${CMAKE_SOURCE_DIR}/src /I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} /link $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
+                        ${mex_src} ${MEX_COMPAT_SHIM} /link $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS}
                         shlwapi.lib "${MATLAB_MEX_LIB_DIR}/libmex.lib" "${MATLAB_MEX_LIB_DIR}/libmx.lib"
                         /OUT:${mex_output} /DLL /EXPORT:mexFunction
                 DEPENDS ${mex_deps}
@@ -523,7 +524,7 @@ if(BUILD_MATLAB)
                 COMMAND ${CMAKE_CXX_COMPILER}
                         -std=c++17 -O3 -shared -fPIC -DMATLAB_MEX_FILE
                         -I${MATLAB_MEX_INCLUDE_DIR} -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/src -I${ARMADILLO_INCLUDE_DIRS}
-                        ${mex_src} $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS} -lgomp
+                        ${mex_src} ${MEX_COMPAT_SHIM} $<TARGET_FILE:quadriga_static> ${HDF5_LINK_LIBS} ${CUDA_MEX_LINK_LIBS} -lgomp
                         -Wl,--version-script,${MATLAB_MEX_VERSION_SCRIPT} -Wl,--no-undefined-version -Wl,--unresolved-symbols=ignore-all
                         -o ${mex_output}
                 DEPENDS ${mex_deps}
