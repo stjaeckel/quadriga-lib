@@ -48,7 +48,7 @@ void quadriga_lib::ray_triangle_intersect(
 - **`mesh`** — Triangular mesh; each row: `{x1 y1 z1 x2 y2 z2 x3 y3 z3}`; `[n_mesh, 9]`
 - **`sub_mesh_index`** (optional) — Start indices of sub-meshes in `mesh`; enables AABB-accelerated traversal; `[n_sub]`
 - **`aabb`** (optional) — Pre-computed axis-aligned bounding boxes per sub-mesh; each row: `{x_min x_max y_min y_max z_min z_max}`; if `nullptr`, AABBs are computed from `mesh`; `[n_sub, 6]`
-- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_ray >= 10000` and CUDA is available, else AVX2, else GENERIC.
+- **`use_kernel`** *(optional)* — Compute kernel selector: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; throws if unavailable; auto mode selects CUDA when `n_ray >= 500` and CUDA is available, else AVX2, else GENERIC.
 - **`gpu_id`** *(optional)* — CUDA device ID; ignored when not using CUDA
 
 ## Outputs:
@@ -125,7 +125,7 @@ void quadriga_lib::ray_triangle_intersect(const arma::Mat<dtype> *orig, const ar
     }
     else // Auto-select (use_kernel == 0)
     {
-        if (n_ray >= 10000 && quadriga_lib::quadriga_lib_has_CUDA())
+        if (n_ray >= 500 && quadriga_lib::quadriga_lib_has_CUDA())
             kernel = 3;
         else if (quadriga_lib::quadriga_lib_has_AVX2())
             kernel = 2;
