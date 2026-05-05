@@ -1,6 +1,6 @@
 function test_arrayant_rotate_pattern
 
-ant = quadriga_lib.generate_arrayant('custom',[],[],5,20,0);
+ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
 
 out = quadriga_lib.arrayant_rotate_pattern(ant, 0, 0, 90);
 

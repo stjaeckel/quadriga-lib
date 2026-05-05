@@ -9,7 +9,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# QDANT_READ
+# ARRAYANT_QDANT_READ
 Reads array antenna data from QDANT files
 
 - The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna
@@ -24,14 +24,14 @@ Reads array antenna data from QDANT files
 ## Usage:
 ```
 % Multi-frequency read (struct array, all entries)
-[ ant, layout ] = quadriga_lib.qdant_read( fn );
+[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn );
 
 % Single-frequency read (struct output)
-[ ant, layout ] = quadriga_lib.qdant_read( fn, id );
+[ ant, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
 
 % Single-frequency read (separate fields)
 [ e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name, layout ] = quadriga_lib.qdant_read( fn, id );
+    coupling_re, coupling_im, center_freq, name, layout ] = quadriga_lib.arrayant_qdant_read( fn, id );
 ```
 
 ## Inputs:

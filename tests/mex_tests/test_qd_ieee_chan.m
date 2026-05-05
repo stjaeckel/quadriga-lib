@@ -17,7 +17,7 @@ function test_qd_ieee_chan
 % ---------------------------------------------------------------------
 % 1) Type A, single user, cross-polarised antenna
 % ---------------------------------------------------------------------
-ant = quadriga_lib.generate_arrayant('xpol');
+ant = quadriga_lib.arrayant_generate('xpol');
 chan = quadriga_lib.get_channels_ieee_indoor(ant, ant, 'A');
 
 assertEqual(numel(chan), 1);
@@ -68,7 +68,7 @@ assertElementsAlmostEqual(p00, p11, 'absolute', 0);
 % ---------------------------------------------------------------------
 % 2) Type A, two users, default TGac offset angles
 % ---------------------------------------------------------------------
-ant = quadriga_lib.generate_arrayant('omni', 30.0);
+ant = quadriga_lib.arrayant_generate('omni', 30.0);
 chan = call_ieee(ant, ant, 'A', ...
     'CarrierFreq_Hz', 2.4e9, ...
     'tap_spacing_s', 1e-8, ...
@@ -320,7 +320,7 @@ assertElementsAlmostEqual(abs(f_peak), fD_expected, 'absolute', 5.0);
 % equal the conjugate transpose of the downlink channel per path, with
 % identical (transposed) delays.
 % ---------------------------------------------------------------------
-ant = quadriga_lib.generate_arrayant('xpol');   % 2 elements at each end
+ant = quadriga_lib.arrayant_generate('xpol');   % 2 elements at each end
 
 common = {'CarrierFreq_Hz', 2.4e9, 'tap_spacing_s', 5e-9, ...
           'n_users', 2, 'Doppler_effect', 40.0, 'seed', 1234};

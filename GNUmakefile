@@ -9,7 +9,7 @@ shared_lib = OFF
 octave = ON
 matlab = ON
 python = ON
-avx2 = OFF
+avx2 = ON
 cuda = OFF
 
 # GCC version override. Empty for system default. Note: NVCC max is 13, MATLAB max is 12

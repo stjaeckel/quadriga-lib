@@ -1,7 +1,7 @@
 function test_get_channels_planar
 
 % Generate test antenna
-ant = quadriga_lib.generate_arrayant('omni');
+ant = quadriga_lib.arrayant_generate('omni');
 ant.e_theta_re(:,:,2) = 2;
 ant.e_theta_im(:,:,2) = 0;
 ant.e_phi_re(:,:,2) = 0;
