@@ -9,7 +9,7 @@ Array antenna functions
 SECTION!*/
 
 /*!MD
-# QDANT_WRITE
+# ARRAYANT_QDANT_WRITE
 Writes array antenna data to QDANT files
 
 - The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
@@ -23,10 +23,10 @@ Writes array antenna data to QDANT files
 ## Usage:
 ```
 % Arrayant as struct
-id_in_file = quadriga_lib.qdant_write( fn, arrayant, id, layout );
+id_in_file = quadriga_lib.arrayant_qdant_write( fn, arrayant, id, layout );
 
 % Arrayant as separate inputs
-id_in_file = quadriga_lib.qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
+id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, e_theta_im, e_phi_re, ...
     e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 ```
 

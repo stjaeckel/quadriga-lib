@@ -17,13 +17,13 @@ coupling_im     = 0.1;
 center_freq     = 2e9;
 name            = 'name';
 
-id_file = quadriga_lib.qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
     azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 
 assert( id_file == 1 );
 
 [e_theta_reI, e_theta_imI, e_phi_reI, e_phi_imI, azimuth_gridI, elevation_gridI, element_posI, ...
-    coupling_reI, coupling_imI, center_frequencyI, nameI, layout] = quadriga_lib.qdant_read('testm.qdant');
+    coupling_reI, coupling_imI, center_frequencyI, nameI, layout] = quadriga_lib.arrayant_qdant_read('testm.qdant');
 
 assertElementsAlmostEqual( azimuth_grid, azimuth_gridI, 'absolute', 1e-6 );
 assertElementsAlmostEqual( elevation_grid, elevation_gridI, 'absolute', 1e-6 );
@@ -64,11 +64,11 @@ ant.coupling_im     = 0.1;
 ant.center_freq     = 2e9;
 ant.name            = 'name';
 
-id_file = quadriga_lib.qdant_write( 'testm.qdant', ant );
+id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', ant );
 
 assertEqual( id_file, uint32(2) );
 
-[A,B,C,D,E,F,G,H,I,J, nameI, layout] = quadriga_lib.qdant_read('testm.qdant',2);
+[A,B,C,D,E,F,G,H,I,J, nameI, layout] = quadriga_lib.arrayant_qdant_read('testm.qdant',2);
 
 assertElementsAlmostEqual( A, ant.e_theta_re, 'absolute', 1e-4 );
 assertElementsAlmostEqual( B, ant.e_theta_im, 'absolute', 1e-4 );
@@ -83,10 +83,10 @@ assertElementsAlmostEqual( J, ant.center_freq, 'absolute', 1e-4 );
 assertTrue( strcmp(nameI,ant.name) );
 assertEqual(layout, uint32([1,2]));
 
-[~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.qdant_read('testm.qdant',1);
+[~,~,~,~,~,~,~,~,~,~, nameI] = quadriga_lib.arrayant_qdant_read('testm.qdant',1);
 assertTrue( strcmp(nameI,'bla') );
 
-id_file = quadriga_lib.qdant_write('testm.qdant', ant, 112);
+id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 112);
 
 assertEqual( id_file, uint32(112) );
 
@@ -94,7 +94,7 @@ layout = uint32([1,2,112 ; 112, 112, 6]);
 
 % Try setting a layout that contains an ID that is not in the file
 try
-    id_file = quadriga_lib.qdant_write('testm.qdant', ant, 5, layout);
+    id_file = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 5, layout);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Layout contains reference to non-existing array antenna!';
@@ -103,15 +103,15 @@ catch ME
     end
 end
 
-quadriga_lib.qdant_write('testm.qdant', ant, 6, layout);
+quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 6, layout);
 
 % Check if the layout can be restored
-[~, layoutI] = quadriga_lib.qdant_read('testm.qdant');
+[~, layoutI] = quadriga_lib.arrayant_qdant_read('testm.qdant');
 assertEqual(layout,layoutI);
 
 % Test error: multiple outputs
 try
-    [~, ~] = quadriga_lib.qdant_write('testm.qdant', ant, 999);
+    [~, ~] = quadriga_lib.arrayant_qdant_write('testm.qdant', ant, 999);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
@@ -127,7 +127,7 @@ ant.elevation_grid  = [-0.9,0,0.9] * pi/2;
 ant.e_theta_re      = reshape(1:12,3,[])/2;
 ant.e_theta_im      = -reshape(1:12,3,[])*0.002;
 try
-    quadriga_lib.qdant_write('testm.qdant', ant);
+    quadriga_lib.arrayant_qdant_write('testm.qdant', ant);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Field ''e_phi_re'' not found at index 0!';
@@ -137,7 +137,7 @@ catch ME
 end
 
 try
-    quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im);
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of input arguments.';
@@ -148,7 +148,7 @@ end
 
 % Test error: elevation_grid mismatch
 try
-    id_file = quadriga_lib.qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    id_file = quadriga_lib.arrayant_qdant_write( 'testm.qdant', [], [], [], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
         azimuth_grid, elevation_grid(1:end-1));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -160,7 +160,7 @@ end
 
 % Test error: azimuth_grid mismatch
 try
-    quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im, e_phi_re, e_phi_im, ...
         azimuth_grid(1:end-1), elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -172,7 +172,7 @@ end
 
 % Test error: pattern mismatch
 try
-    quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
+    quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, e_theta_im(:,:,[1 1]), e_phi_re, e_phi_im, ...
         azimuth_grid, elevation_grid);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
@@ -182,7 +182,7 @@ catch ME
     end
 end
 
-quadriga_lib.qdant_write('testm.qdant', [],[],[], e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
+quadriga_lib.arrayant_qdant_write('testm.qdant', [],[],[], e_theta_re, single(e_theta_im), e_phi_re, e_phi_im, azimuth_grid, elevation_grid);
 
 %% Multi-frequency write & read-back
 if exist('testm.qdant','file'), delete('testm.qdant'); end
@@ -207,10 +207,10 @@ ant3(2).e_theta_re = 2 * base.e_theta_re;
 ant3(3) = base; ant3(3).center_freq = 3e9; ant3(3).name = 'f3';
 ant3(3).e_theta_re = 3 * base.e_theta_re;
 
-quadriga_lib.qdant_write('testm.qdant', ant3);   % void call, no id requested
+quadriga_lib.arrayant_qdant_write('testm.qdant', ant3);   % void call, no id requested
 
 % Read back as struct array, no id
-[ant_read, layout] = quadriga_lib.qdant_read('testm.qdant');
+[ant_read, layout] = quadriga_lib.arrayant_qdant_read('testm.qdant');
 assertEqual(numel(ant_read), 3);
 assertEqual(layout, uint32([1;2;3]));            % [n_entries, 1] per qdant_write_multi
 
@@ -221,14 +221,14 @@ for k = 1:3
 end
 
 % Pick one entry by id from the multi-freq file
-ant_pick = quadriga_lib.qdant_read('testm.qdant', 2);
+ant_pick = quadriga_lib.arrayant_qdant_read('testm.qdant', 2);
 assertTrue(isstruct(ant_pick) && numel(ant_pick) == 1);
 assertTrue(strcmp(ant_pick.name, 'f2'));
 assertElementsAlmostEqual(ant_pick.center_freq, 2e9, 'absolute', 1e-4);
 
 % Error: id not allowed for multi-element struct
 try
-    quadriga_lib.qdant_write('testm.qdant', ant3, 5);
+    quadriga_lib.arrayant_qdant_write('testm.qdant', ant3, 5);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = '''id'' and ''layout'' are not allowed for multi-frequency arrays';
@@ -239,7 +239,7 @@ end
 
 % Error: layout not allowed for multi-element struct
 try
-    quadriga_lib.qdant_write('testm.qdant', ant3, 0, uint32([1;2;3]));
+    quadriga_lib.arrayant_qdant_write('testm.qdant', ant3, 0, uint32([1;2;3]));
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = '''id'' and ''layout'' are not allowed for multi-frequency arrays';
