@@ -40,7 +40,7 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 
 ## Inputs:
 - **`arrayant`** *(optional)* — Struct (single-frequency) or struct array (multi-frequency)
-  containing the arrayant data; field layout as in [[generate_arrayant]]. Pass `[]` to provide
+  containing the arrayant data; field layout as in [[arrayant_generate]]. Pass `[]` to provide
   the data via separate inputs (single-frequency only)
 - **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision;
   `[1, n_ang]` for planar-wave mode (same angles for all elements) or `[n_out, n_ang]` for
@@ -88,8 +88,8 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 - **`gamma`** *(single-frequency only)* — Polarization rotation angles in rad; `[n_out, n_ang]`
 
 ## See also:
-- [[qdant_read]] / [[qdant_write]] (load / save arrayant data)
-- [[generate_arrayant]] (arrayant struct layout)
+- [[arrayant_qdant_read]] / [[arrayant_qdant_write]] (load / save arrayant data)
+- [[arrayant_generate]] (arrayant struct layout)
 - [[generate_speaker]] (typical multi-frequency struct array source)
 MD!*/
 

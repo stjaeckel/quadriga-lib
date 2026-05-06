@@ -192,11 +192,11 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 
 <i>Inputs (struct mode):</i><br>
 <ul>
-<li><b><code>arrayant</code></b> — Struct containing the arrayant data; field layout as documented in <a href="#generate_arrayant">generate_arrayant</a>;
+<li><b><code>arrayant</code></b> — Struct containing the arrayant data; field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>;
    a struct array may contain a frequency-dependent model
 </li>
 <li><b><code>i_element</code></b> <i>(optional)</i> — Element index; 1-based; if not provided or empty, the directivity is
-   calculated for all elements; <code>[n_out]</code> or empty
+   calculated for all elements; uint64; <code>[n_out]</code> or empty
 </li></ul>
 
 <i>Inputs (split mode):</i><br>
@@ -213,8 +213,8 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 </li>
 <li><b><code>elevation_grid</code></b> — Elevation angles in rad, -π/2 to π/2, sorted; <code>[n_elevation]</code>
 </li>
-<li><b><code>i_element</code></b> <i>(optional)</i> — Element index, 1-based. If not provided or empty, the directivity is
-   calculated for all elements in the array antenna; uint64; <code>[n_out]</code> or empty
+<li><b><code>i_element</code></b> <i>(optional)</i> — Element index; 1-based; if not provided or empty, the directivity is
+   calculated for all elements; uint64; <code>[n_out]</code> or empty
 </li></ul>
 
 <i>Output Argument:</i><br>
@@ -922,7 +922,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 <i>Inputs:</i><br>
 <ul>
 <li><b><code>arrayant</code></b> <i>(optional)</i> — Struct (single-frequency) or struct array (multi-frequency)
-   containing the arrayant data; field layout as in <a href="#generate_arrayant">generate_arrayant</a>. Pass <code>[]</code> to provide
+   containing the arrayant data; field layout as in <a href="#arrayant_generate">arrayant_generate</a>. Pass <code>[]</code> to provide
    the data via separate inputs (single-frequency only)
 </li>
 <li><b><code>azimuth</code></b> — Azimuth angles in rad, in [-π, π]; single or double precision;
@@ -1014,9 +1014,9 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 
 <i>See also:</i><br>
 <ul>
-<li><a href="#qdant_read">qdant_read</a> / <a href="#qdant_write">qdant_write</a> (load / save arrayant data)
+<li><a href="#arrayant_qdant_read">arrayant_qdant_read</a> / <a href="#arrayant_qdant_write">arrayant_qdant_write</a> (load / save arrayant data)
 </li>
-<li><a href="#generate_arrayant">generate_arrayant</a> (arrayant struct layout)
+<li><a href="#arrayant_generate">arrayant_generate</a> (arrayant struct layout)
 </li>
 <li><a href="#generate_speaker">generate_speaker</a> (typical multi-frequency struct array source)
 </li></ul>
@@ -1064,22 +1064,22 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>ant</code></b> — Arrayant struct (single entry) or struct array (multiple entries); field layout
-   as documented in <a href="#generate_arrayant">generate_arrayant</a>
+   as documented in <a href="#arrayant_generate">arrayant_generate</a>
 </li>
 <li><b><code>layout</code></b> <i>(optional)</i> — Matrix of element IDs describing how entries are arranged in the
    file; datatype: uint32
 </li>
 <li><i></i><code>e_theta_re</code>, <code>e_theta_im</code>, <code>e_phi_re</code>, <code>e_phi_im</code>, <code>azimuth_grid</code>, <code>elevation_grid</code>,
    <code>element_pos</code>, <code>coupling_re</code>, <code>coupling_im</code>, <code>center_freq</code>, <code>name</code><i></i> — Separate-field
-   outputs with contents and sizes as in <a href="#generate_arrayant">generate_arrayant</a>; only available when the result
+   outputs with contents and sizes as in <a href="#arrayant_generate">arrayant_generate</a>; only available when the result
    is a single entry
 </li></ul>
 
 <i>See also:</i><br>
 <ul>
-<li><a href="#qdant_write">qdant_write</a> (for writing QDANT data)
+<li><a href="#arrayant_qdant_write">arrayant_qdant_write</a> (for writing QDANT data)
 </li>
-<li><a href="#generate_arrayant">generate_arrayant</a> (for the arrayant struct layout)
+<li><a href="#arrayant_generate">arrayant_generate</a> (for the arrayant struct layout)
 </li>
 <li>QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
 </li></ul>
@@ -1118,7 +1118,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 <li><b><code>fn</code></b> — Output QDANT filename; string; must not be empty
 </li>
 <li><b><code>arrayant</code></b> <i>(optional)</i> — Struct containing the arrayant data; field layout as documented
-   in <a href="#generate_arrayant">generate_arrayant</a>; pass <code>[]</code> to provide the data via separate inputs instead; a struct
+   in <a href="#arrayant_generate">arrayant_generate</a>; pass <code>[]</code> to provide the data via separate inputs instead; a struct
    array writes a frequency-dependent model and requires <code>id</code> and <code>layout</code> to be omitted
 </li>
 <li><b><code>id</code></b> <i>(optional)</i> — Target ID of the antenna inside the file; default: max-ID in existing
@@ -1161,9 +1161,9 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 
 <i>See also:</i><br>
 <ul>
-<li><a href="#qdant_read">qdant_read</a> (for reading QDANT data)
+<li><a href="#arrayant_qdant_read">arrayant_qdant_read</a> (for reading QDANT data)
 </li>
-<li><a href="#generate_arrayant">generate_arrayant</a> (for the arrayant struct layout)
+<li><a href="#arrayant_generate">arrayant_generate</a> (for the arrayant struct layout)
 </li>
 <li>QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
 </li></ul>
@@ -1465,7 +1465,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 <ul>
 <li><b><code>arrayant</code></b> - Struct array with one arrayant per frequency sample; directivity is stored in
    <code>e_theta_re</code>; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion;
-   see <a href="#generate_arrayant">generate_arrayant</a> for struct fields; <code>[n_freq]</code>
+   see <a href="#arrayant_generate">arrayant_generate</a> for struct fields; <code>[n_freq]</code>
 </li></ul>
 
 <div class="pagebreak"></div>
@@ -2373,9 +2373,9 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, ChannelType, 
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>ap_array</code></b> — Access point array antenna; <code>n_tx</code> = number of ports after element coupling, see <a href="#generate_arrayant">generate_arrayant</a>
+<li><b><code>ap_array</code></b> — Access point array antenna; <code>n_tx</code> = number of ports after element coupling, see <a href="#arrayant_generate">arrayant_generate</a>
 </li>
-<li><b><code>sta_array</code></b> — Mobile station array antenna; <code>n_rx</code> = number of ports after element coupling, see <a href="#generate_arrayant">generate_arrayant</a>
+<li><b><code>sta_array</code></b> — Mobile station array antenna; <code>n_rx</code> = number of ports after element coupling, see <a href="#arrayant_generate">arrayant_generate</a>
 </li>
 <li><b><code>ChannelType</code></b> — Model type string; one of <code>"A"</code>, <code>"B"</code>, <code>"C"</code>, <code>"D"</code>, <code>"E"</code>, <code>"F"</code>
 </li>

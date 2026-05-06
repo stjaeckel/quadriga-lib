@@ -41,17 +41,17 @@ Reads array antenna data from QDANT files
 
 ## Outputs:
 - **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout
-  as documented in [[generate_arrayant]]
+  as documented in [[arrayant_generate]]
 - **`layout`** *(optional)* — Matrix of element IDs describing how entries are arranged in the
   file; datatype: uint32
 - **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`,
   `element_pos`, `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field
-  outputs with contents and sizes as in [[generate_arrayant]]; only available when the result
+  outputs with contents and sizes as in [[arrayant_generate]]; only available when the result
   is a single entry
 
 ## See also:
-- [[qdant_write]] (for writing QDANT data)
-- [[generate_arrayant]] (for the arrayant struct layout)
+- [[arrayant_qdant_write]] (for writing QDANT data)
+- [[arrayant_generate]] (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 
