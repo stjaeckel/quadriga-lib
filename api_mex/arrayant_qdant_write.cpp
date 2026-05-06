@@ -33,7 +33,7 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 ## Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
 - **`arrayant`** *(optional)* — Struct containing the arrayant data; field layout as documented
-  in [[generate_arrayant]]; pass `[]` to provide the data via separate inputs instead; a struct
+  in [[arrayant_generate]]; pass `[]` to provide the data via separate inputs instead; a struct
   array writes a frequency-dependent model and requires `id` and `layout` to be omitted
 - **`id`** *(optional)* — Target ID of the antenna inside the file; default: max-ID in existing
   file + 1 (or 1 if the file does not exist)
@@ -58,8 +58,8 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
   multi-frequency (struct array) mode
 
 ## See also:
-- [[qdant_read]] (for reading QDANT data)
-- [[generate_arrayant]] (for the arrayant struct layout)
+- [[arrayant_qdant_read]] (for reading QDANT data)
+- [[arrayant_generate]] (for the arrayant struct layout)
 - QuaDRiGa Array Antenna Exchange Format (<a href="formats.html#6cab4884">QDANT</a>)
 MD!*/
 

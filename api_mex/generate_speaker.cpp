@@ -77,7 +77,7 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 ## Outputs:
 - **`arrayant`** - Struct array with one arrayant per frequency sample; directivity is stored in
   `e_theta_re`; dipole rear hemisphere encoded with negative sign for 180 degree phase inversion; 
-  see [[generate_arrayant]] for struct fields; `[n_freq]`
+  see [[arrayant_generate]] for struct fields; `[n_freq]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

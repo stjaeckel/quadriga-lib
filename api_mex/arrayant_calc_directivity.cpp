@@ -31,10 +31,10 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ```
 
 ## Inputs (struct mode):
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[generate_arrayant]];
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
 - **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the directivity is
-  calculated for all elements; `[n_out]` or empty
+  calculated for all elements; uint64; `[n_out]` or empty
 
 ## Inputs (split mode):
 - **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
@@ -43,8 +43,8 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
 - **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
-- **`i_element`** *(optional)* — Element index, 1-based. If not provided or empty, the directivity is
-  calculated for all elements in the array antenna; uint64; `[n_out]` or empty
+- **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the directivity is
+  calculated for all elements; uint64; `[n_out]` or empty
 
 ## Output Argument:
 - **`directivity`** - Directivity of the antenna pattern in dBi; `[n_out, n_freq]`;
