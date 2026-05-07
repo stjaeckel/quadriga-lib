@@ -27,7 +27,7 @@ Read ray-tracing CIR data from a QRT file
 
 ## Input Arguments:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** *(optional)* — Snapshot indices; 1-based; uint64; `[n_out]`; default: 1
+- **`i_cir`** *(optional)* — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: read all
 - **`i_orig`** *(optional)* — Origin index; 1-based; uint64; scalar; default: 1
 - **`downlink`** *(optional)* — If `true`, origin=TX, destination=RX; if `false`, roles are
   swapped; logical scalar; default: `true`
@@ -73,27 +73,35 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Read inputs
     const std::string fn = qd_mex_get_string(prhs[0]);
-    arma::uvec i_cir = (nrhs < 2 || mxIsEmpty(prhs[1])) ? arma::uvec({1}) : qd_mex_get_Col<arma::uword>(prhs[1]);
+    arma::uvec i_cir = (nrhs < 2) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[1]);
     arma::uword i_orig = (nrhs < 3) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[2], "i_orig", 1);
     const bool downlink = (nrhs < 4) ? true : qd_mex_get_scalar<bool>(prhs[3], "downlink", true);
     const int normalize_M = (nrhs < 5) ? 1 : qd_mex_get_scalar<int>(prhs[4], "normalize_M", 1);
 
     // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
-    if (arma::any(i_cir == 0) || i_orig == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_cir' or 'i_orig' must be >= 1 (1-based indices).");
-    i_cir -= 1;
+    if (i_orig == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'i_orig' must be >= 1 (1-based indices).");
     i_orig -= 1;
-
-    // Flag to enable reading mutiple entries at once
-    arma::uword no_out = i_cir.n_elem;
 
     // Initialize cache and file access
     std::ifstream stream(fn, std::ios::in | std::ios::binary);
     quadriga_lib::qrt_read_cache cache;
     CALL_QD(cache = quadriga_lib::qrt_read_cache_init(fn, &stream));
 
-    if (arma::any(i_cir >= (arma::uword)cache.no_cir))
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "CIR index exceeds number of CIRs in file.");
+    if (i_cir.empty()) // Default: read all CIRs
+        i_cir = arma::regspace<arma::uvec>(0, arma::uword(cache.no_cir - 1));
+    else // Convert 1-based (MATLAB) to 0-based (C++); guard against unsigned underflow
+    {
+        if (arma::any(i_cir == 0))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_cir' must be >= 1 (1-based indices).");
+        i_cir -= 1;
+
+        if (arma::any(i_cir >= (arma::uword)cache.no_cir))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "CIR index exceeds number of CIRs in file.");
+    }
+
+    // Flag to enable reading mutiple entries at once
+    arma::uword no_out = i_cir.n_elem;
 
     // Return frequencies in Hz
     if (nlhs > 0)
