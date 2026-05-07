@@ -499,9 +499,11 @@ if(BUILD_MATLAB)
         # Uniform dependency: all MEX files depend on the link target
         set(mex_deps ${mex_src})
         list(APPEND mex_deps quadriga_static ${MEX_COMPAT_SHIM})
+        list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/mex_helper_functions.hpp ${CMAKE_SOURCE_DIR}/src/mex_quadriga_lib_functions.hpp)
         if(mex_basename STREQUAL "ieee_chan_indoor")
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
         endif()
+        list(APPEND mex_deps ${MATLAB_MEX_DIR}/.stamp)
 
         if(MSVC)
             set(mex_output "${MEX_OUTPUT_DIR}/${mex_basename}.mexw64")
@@ -534,7 +536,6 @@ if(BUILD_MATLAB)
         endif()
 
         add_custom_target(mex_${mex_basename} ALL DEPENDS ${mex_output})
-        list(APPEND mex_deps ${MATLAB_MEX_DIR}/.stamp)
         list(APPEND MEX_MATLAB_TARGETS mex_${mex_basename})
     endforeach()
 
@@ -559,6 +560,7 @@ if(BUILD_OCTAVE)
 
         set(mex_deps ${mex_src})
         list(APPEND mex_deps ${QUADRIGA_LINK_TARGET})
+        list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/mex_helper_functions.hpp ${CMAKE_SOURCE_DIR}/src/mex_quadriga_lib_functions.hpp)
         if(mex_basename STREQUAL "ieee_chan_indoor")
             list(APPEND mex_deps ${CMAKE_SOURCE_DIR}/src/ieee_channel_models.hpp)
         endif()
