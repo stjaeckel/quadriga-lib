@@ -104,6 +104,7 @@ documentation:
 	python3 tools/extract_html.py -o html_docu/python_api.html -p tools/html_parts/python_api.html.part -d api_python/ 
 	python3 tools/extract_html.py -o html_docu/formats.html -p tools/html_parts/formats.html.part -d tools/data_formats_md/
 	python3 tools/extract_html.py -o html_docu/faq.html -p tools/html_parts/faq.html.part -d tools/questions_md/ -c
+	python3 tools/extract_html.py -o html_docu/publications.html -p tools/html_parts/publications.html.part
 	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
 
 	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
