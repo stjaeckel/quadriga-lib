@@ -3201,7 +3201,87 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 
 <i>Returns:</i><br>
 <ul>
-<li>Populated <code>quadriga_lib::qrt_read_cache</code> struct
+<li>Populated <code>quadriga_lib::qrt_read_cache</code> struct with the following members:<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Member</th>
+  <th style="text-align: left;">Type</th>
+  <th style="text-align: left;">Description</th>
+</tr>
+<tr>
+  <td></td>
+  <td><code>version</code></td>
+  <td><code>int</code></td>
+  <td>QRT file version</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>no_orig</code></td>
+  <td><code>unsigned</code></td>
+  <td>Number of origin (TX) positions</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>no_cir</code></td>
+  <td><code>unsigned</code></td>
+  <td>Number of CIRs per origin</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>no_dest</code></td>
+  <td><code>unsigned</code></td>
+  <td>Number of destinations (RX)</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>no_freq</code></td>
+  <td><code>unsigned</code></td>
+  <td>Number of frequency bands</td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>freq</code></td>
+  <td><code>arma::fvec</code></td>
+  <td>Frequency in GHz; <code>[no_freq]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>cir_pos</code></td>
+  <td><code>arma::fmat</code></td>
+  <td>CIR positions; <code>[no_cir, 3]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>cir_orientation</code></td>
+  <td><code>arma::fmat</code></td>
+  <td>CIR orientations (Euler); <code>[no_cir, 3]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>orig_pos_all</code></td>
+  <td><code>arma::fmat</code></td>
+  <td>Origin positions; <code>[no_orig, 3]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>orig_orientation</code></td>
+  <td><code>arma::fmat</code></td>
+  <td>Origin orientations (Euler); <code>[no_orig, 3]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>orig_index</code></td>
+  <td><code>arma::uvec</code></td>
+  <td>Byte offsets from BOF to each origin data block; <code>[no_orig]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td><code>path_data_offset</code></td>
+  <td><code>arma::uvec</code></td>
+  <td>Absolute offset to path_data_index array per origin; <code>[no_orig]</code></td>
+</tr>
+</table><br>
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
