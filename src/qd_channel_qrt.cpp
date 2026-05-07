@@ -293,7 +293,21 @@ quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(
 - **`file`** *(optional)* — Pre-opened binary `std::ifstream`; pass `nullptr` to let the function open/close the file internally
 
 ## Returns:
-- Populated `quadriga_lib::qrt_read_cache` struct
+- Populated `quadriga_lib::qrt_read_cache` struct with the following members:<br><br>
+  | Member             | Type         | Description                                                      |
+  | ------------------ | ------------ | ---------------------------------------------------------------- |
+  | `version`          | `int`        | QRT file version                                                 |
+  | `no_orig`          | `unsigned`   | Number of origin (TX) positions                                  |
+  | `no_cir`           | `unsigned`   | Number of CIRs per origin                                        |
+  | `no_dest`          | `unsigned`   | Number of destinations (RX)                                      |
+  | `no_freq`          | `unsigned`   | Number of frequency bands                                        |
+  | `freq`             | `arma::fvec` | Frequency in GHz; `[no_freq]`                                    |
+  | `cir_pos`          | `arma::fmat` | CIR positions; `[no_cir, 3]`                                     |
+  | `cir_orientation`  | `arma::fmat` | CIR orientations (Euler); `[no_cir, 3]`                          |
+  | `orig_pos_all`     | `arma::fmat` | Origin positions; `[no_orig, 3]`                                 |
+  | `orig_orientation` | `arma::fmat` | Origin orientations (Euler); `[no_orig, 3]`                      |
+  | `orig_index`       | `arma::uvec` | Byte offsets from BOF to each origin data block; `[no_orig]`     |
+  | `path_data_offset` | `arma::uvec` | Absolute offset to path_data_index array per origin; `[no_orig]` |
 MD!*/
 
 quadriga_lib::qrt_read_cache quadriga_lib::qrt_read_cache_init(const std::string &fn,

@@ -96,10 +96,10 @@ assertElementsAlmostEqual(rx_orientation, T, 'absolute', 1.5e-4);
 
 % ---------- qrt_file_read: uplink (i_cir=2, i_orig=2, downlink=false) ----------
 % aoa, eoa still hold values from the downlink call above
-aoa_dl = aoa;
-eoa_dl = eoa;
-fbs_dl = fbs_pos;
-lbs_dl = lbs_pos;
+aoa_dl = aoa{1};
+eoa_dl = eoa{1};
+fbs_dl = fbs_pos{1};
+lbs_dl = lbs_pos{1};
 
 % Uplink call: only request up to eod (12 outputs), matching C++ test
 [~, tx_pos_ul, tx_ori_ul, rx_pos_ul, rx_ori_ul, fbs_ul, lbs_ul, ...
@@ -119,12 +119,12 @@ T = [0; 0; pi];
 assertElementsAlmostEqual(rx_ori_ul, T, 'absolute', 1.5e-4);
 
 % fbs/lbs swapped between uplink and downlink
-assertElementsAlmostEqual(fbs_ul, lbs_dl, 'absolute', 1.5e-4);
-assertElementsAlmostEqual(lbs_ul, fbs_dl, 'absolute', 1.5e-4);
+assertElementsAlmostEqual(fbs_ul{1}, lbs_dl, 'absolute', 1.5e-4);
+assertElementsAlmostEqual(lbs_ul{1}, fbs_dl, 'absolute', 1.5e-4);
 
 % uplink aod/eod match downlink aoa/eoa
-assertElementsAlmostEqual(aod_ul, aoa_dl, 'absolute', 1.5e-4);
-assertElementsAlmostEqual(eod_ul, eoa_dl, 'absolute', 1.5e-4);
+assertElementsAlmostEqual(aod_ul{1}, aoa_dl, 'absolute', 1.5e-4);
+assertElementsAlmostEqual(eod_ul{1}, eoa_dl, 'absolute', 1.5e-4);
 
 % ---------- qrt_file_parse: v5 file ----------
 fn5 = 'data/test_v5.qrt';
@@ -151,6 +151,9 @@ assertEqual(size(orig_orientation5), [double(no_orig5), 3]);
 [center_freq5, ~, ~, ~, ~, ~, ~, path_gain5, ~, M5] = ...
     quadriga_lib.qrt_file_read(fn5, 2, 1, true, 0);
 
+M5 = M5{1};
+path_gain5 = path_gain5{1};
+
 assertEqual(numel(center_freq5), 2);
 assertElementsAlmostEqual(center_freq5(1), 1.0e9, 'absolute', 1e-4);
 assertElementsAlmostEqual(center_freq5(2), 1.5e9, 'absolute', 1e-4);
@@ -169,7 +172,101 @@ assertElementsAlmostEqual(M5(:, 1, 2), T, 'absolute', 1.5e-4);
 [~, ~, ~, ~, ~, ~, ~, ~, ~, M5n] = ...
     quadriga_lib.qrt_file_read(fn5, 2, 1, true, 1);
 
+M5n = M5n{1};
+
 T = [1; 0; 0; 0; 0; 0; -1; 0];
 assertElementsAlmostEqual(M5n(:, 1, 2), T, 'absolute', 1.5e-4);
+
+
+% ---------- qrt_file_read: multiple CIRs in one call ----------
+[~, tx_pos_m, tx_ori_m, rx_pos_m, rx_ori_m, fbs_m, lbs_m, ...
+    pg_m, plen_m, M_m, aod_m, eod_m, aoa_m, eoa_m, pc_m, no_int_m, coord_m] = ...
+    quadriga_lib.qrt_file_read(fn, [1, 2, 3], 1, true, 1);
+
+% Scalar-per-CIR outputs: [3, n_out] matrices
+assertEqual(size(tx_pos_m), [3, 3]);
+assertEqual(size(tx_ori_m), [3, 3]);
+assertEqual(size(rx_pos_m), [3, 3]);
+assertEqual(size(rx_ori_m), [3, 3]);
+
+% Variable-per-CIR outputs: cells of length n_out
+assertEqual(numel(fbs_m),    3);
+assertEqual(numel(lbs_m),    3);
+assertEqual(numel(pg_m),     3);
+assertEqual(numel(plen_m),   3);
+assertEqual(numel(M_m),      3);
+assertEqual(numel(aod_m),    3);
+assertEqual(numel(eod_m),    3);
+assertEqual(numel(aoa_m),    3);
+assertEqual(numel(eoa_m),    3);
+assertEqual(numel(pc_m),     3);
+assertEqual(numel(no_int_m), 3);
+assertEqual(numel(coord_m),  3);
+
+% Cross-check vs individual single-CIR reads for i_cir = 1 and 2
+[~, tx1, ~, rx1, ~, fbs1, ~, pg1, plen1, M1, aod1] = ...
+    quadriga_lib.qrt_file_read(fn, 1, 1, true, 1);
+[~, tx2, ~, rx2, ~, fbs2, ~, pg2, plen2, M2, aod2] = ...
+    quadriga_lib.qrt_file_read(fn, 2, 1, true, 1);
+
+assertElementsAlmostEqual(tx_pos_m(:, 1), tx1, 'absolute', 1e-6);
+assertElementsAlmostEqual(tx_pos_m(:, 2), tx2, 'absolute', 1e-6);
+assertElementsAlmostEqual(rx_pos_m(:, 1), rx1, 'absolute', 1e-6);
+assertElementsAlmostEqual(rx_pos_m(:, 2), rx2, 'absolute', 1e-6);
+
+assertElementsAlmostEqual(fbs_m{1},  fbs1{1},  'absolute', 1e-6);
+assertElementsAlmostEqual(fbs_m{2},  fbs2{1},  'absolute', 1e-6);
+assertElementsAlmostEqual(pg_m{1},   pg1{1},   'absolute', 1e-6);
+assertElementsAlmostEqual(pg_m{2},   pg2{1},   'absolute', 1e-6);
+assertElementsAlmostEqual(plen_m{1}, plen1{1}, 'absolute', 1e-6);
+assertElementsAlmostEqual(plen_m{2}, plen2{1}, 'absolute', 1e-6);
+assertElementsAlmostEqual(M_m{1},    M1{1},    'absolute', 1e-6);
+assertElementsAlmostEqual(M_m{2},    M2{1},    'absolute', 1e-6);
+assertElementsAlmostEqual(aod_m{1},  aod1{1},  'absolute', 1e-6);
+assertElementsAlmostEqual(aod_m{2},  aod2{1},  'absolute', 1e-6);
+
+% path_coord is cell-of-cells
+assertTrue(iscell(pc_m{1}));
+assertEqual(numel(pc_m{1}), numel(aod_m{1}));   % one entry per path
+
+% ---------- qrt_file_read: default arguments ----------
+[~, tx_pos_d] = quadriga_lib.qrt_file_read(fn);
+assertEqual(size(tx_pos_d), [3, 1]);
+assertElementsAlmostEqual(tx_pos_d, tx1, 'absolute', 1e-6);
+
+[~, tx_pos_e] = quadriga_lib.qrt_file_read(fn, []);
+assertEqual(size(tx_pos_e), [3, 1]);
+
+% ---------- qrt_file_read: out-of-range i_cir errors ----------
+try
+    quadriga_lib.qrt_file_read(fn, 999, 1, true, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'CIR index exceeds number of CIRs in file.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+
+% ---------- qrt_file_read: zero (1-based) index errors ----------
+try
+    quadriga_lib.qrt_file_read(fn, 0, 1, true, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Entries in ''i_cir'' or ''i_orig'' must be >= 1';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
+
+try
+    quadriga_lib.qrt_file_read(fn, 1, 0, true, 1);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Entries in ''i_cir'' or ''i_orig'' must be >= 1';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
+    end
+end
 
 end

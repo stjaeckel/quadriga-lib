@@ -91,20 +91,18 @@ A copy of the License is included in the "LICENSE" file. Unless required by appl
 ## Software Structure
 ### Folders
 
-| Folder | Content |
-|:---|:---|
-`+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave
-`api_mex`       | Source files for the MATLAB / Octave MEX interface
-`api_python`    | Source files for the Python API
-`build*`        | Folder(s) for temporary build files
-`external`      | External tools used in the project
-`html_docu`     | Documentation of the API functions (aka: [quadriga-lib.org](http://quadriga-lib.org))
-`include`       | Public header files for the `quadriga-lib` library
-`lib`           | Library files for static and dynamic linking, Python package
-`references`    | Relevant external documents and papers
-`release`       | Folder for source packages and compiled binary packages
-`src`           | C++ source files and private header files
-`tests`         | Test files
-`tools`         | Other tools used in the project (e.g. the website generator)
-
-
+| Folder          | Content                                                                               |
+| :-------------- | :------------------------------------------------------------------------------------ |
+| `+quadriga_lib` | Compiled mex files for usage in MATLAB and Octave                                     |
+| `api_mex`       | Source files for the MATLAB / Octave MEX interface                                    |
+| `api_python`    | Source files for the Python API                                                       |
+| `build*`        | Folder(s) for temporary build files                                                   |
+| `external`      | External tools used in the project                                                    |
+| `html_docu`     | Documentation of the API functions (aka: [quadriga-lib.org](http://quadriga-lib.org)) |
+| `include`       | Public header files for the `quadriga-lib` library                                    |
+| `lib`           | Library files for static and dynamic linking, Python package                          |
+| `references`    | Relevant external documents and papers                                                |
+| `release`       | Folder for source packages and compiled binary packages                               |
+| `src`           | C++ source files and private header files                                             |
+| `tests`         | Test files                                                                            |
+| `tools`         | Other tools used in the project (e.g. the website generator)                          |
