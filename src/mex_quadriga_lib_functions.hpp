@@ -81,7 +81,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
 
     if (qd_mex_has_field(input, "coupling_re") && !mxIsEmpty(qd_mex_get_field(input, "coupling_re")))
         ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re"), copy);
-    else
+    else if (!qd_mex_has_field(input, "coupling_im"))
         ant.coupling_re.eye(n_elements, n_elements);
 
     if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im")))
@@ -137,7 +137,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
 
         if (has_coupling_re && !mxIsEmpty(qd_mex_get_field(input, "coupling_re", n)))
             ant[n].coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_re", n), copy);
-        else
+        else if (!(has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n))))
             ant[n].coupling_re.eye(n_elements, n_elements);
 
         if (has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n)))
