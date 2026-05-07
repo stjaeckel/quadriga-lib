@@ -20,7 +20,7 @@ Read ray-tracing CIR data from a QRT file
 
 ## Usage:
 ```
-[ center_frequency, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
+[ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, ...
     path_length, M, aod, eod, aoa, eoa, path_coord, no_int, coord ] = ...
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
@@ -40,7 +40,7 @@ Read ray-tracing CIR data from a QRT file
   | 1             | Max column power = 1  | -PL minus material losses        |
 
 ## Output Arguments:
-- **`center_frequency`** — Center frequency in Hz; `[n_freq]`
+- **`center_freq`** — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`
 - **`rx_pos`** — Receiver position in Cartesian coordinates; `[3, n_out]`
@@ -61,6 +61,11 @@ Read ray-tracing CIR data from a QRT file
   Cell of length `n_out`; elements `[n_path]`
 - **`coord`** — Interaction coordinates (flat, concatenated across paths); single;
   Cell of length `n_out`; elements `[3, sum(no_int)]`
+
+## See also:
+- [[arrayant_generate]] (for generating antenna arrays)
+- [[get_channels_planar]] (for embedding antennas using departure and arrival angles)
+- [[get_channels_spherical]] (for embedding antennas using FBS/LBS positions)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -106,13 +111,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Return frequencies in Hz
     if (nlhs > 0)
     {
-        arma::vec center_frequency;
-        plhs[0] = qd_mex_init_output(&center_frequency, cache.no_freq);
+        arma::vec center_freq;
+        plhs[0] = qd_mex_init_output(&center_freq, cache.no_freq);
         for (unsigned i_freq = 0; i_freq < cache.no_freq; ++i_freq)
             if (cache.version == 6) // Scalar mode, stored in Hz
-                center_frequency[i_freq] = (double)cache.freq[i_freq];
+                center_freq[i_freq] = (double)cache.freq[i_freq];
             else // EM Mode, stored in GHz
-                center_frequency[i_freq] = 1.0e9 * (double)cache.freq[i_freq];
+                center_freq[i_freq] = 1.0e9 * (double)cache.freq[i_freq];
     }
 
     // Initialize output data structures

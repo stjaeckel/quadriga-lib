@@ -47,13 +47,13 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
   ignored when not supported; Default: `false`
 
 ## Outputs:
-- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path]`
-- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path]`
-- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path]`
-- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path]`
-- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path]`
-- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path]`
-- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path]`
+- **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
+- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path(+1)]`
+- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
 
 ## See also:
 - [[get_channels_planar]] (planar wave variant)
@@ -99,7 +99,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Derived inputs
     arma::uword n_ports_tx = ant_tx.n_ports();
     arma::uword n_ports_rx = ant_rx.n_ports();
-    arma::uword n_path = fbs_pos.n_cols;
+    arma::uword n_path = add_fake_los_path ? fbs_pos.n_cols + 1 : fbs_pos.n_cols;
 
     // Initialize output memory
     arma::cube coeff_re, coeff_im, delay, aod, eod, aoa, eoa;
@@ -121,7 +121,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[6] = qd_mex_init_output(&eoa, n_ports_rx, n_ports_tx, n_path), p_eoa = &eoa;
 
     // Call member function
-    if (n_path)
+    if ((add_fake_los_path && n_path > 1) || (!add_fake_los_path && n_path > 0))
         CALL_QD(quadriga_lib::get_channels_spherical<double>(&ant_tx, &ant_rx,
                                                              Tx, Ty, Tz, Tb, Tt, Th, Rx, Ry, Rz, Rb, Rt, Rh,
                                                              &fbs_pos, &lbs_pos, &path_gain, &path_length, &M,
