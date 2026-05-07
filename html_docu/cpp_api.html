@@ -93,6 +93,7 @@
 <tbody>
 <tr><td style="padding-bottom: 10px;"><a href="#arrayant">arrayant</a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
 <tr><td><a href="#.append">.append</a></td><td>Append elements of another arrayant to the current one</td></tr>
+<tr><td><a href="#.calc_beamwidth_deg">.calc_beamwidth_deg</a></td><td>Calculate the beam width of an antenna element in degree</td></tr>
 <tr><td><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a></td><td>Calculate the directivity in dBi of a single array element</td></tr>
 <tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
 <tr><td><a href="#.copy_element">.copy_element</a></td><td>Copy a single antenna element to one or more destination slots</td></tr>
@@ -480,11 +481,61 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::append(
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name=".calc_beamwidth_deg"></a>
+<b>.calc_beamwidth_deg</b> - Calculate the beam width of an antenna element in degree
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
+</li>
+<li>Also returns the azimuth and elevation pointing angles of the main beam
+</li>
+<li>Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
+</li>
+<li>Ignores element coupling
+</li></ul>
+</div>
+
+<i>Declaration:</i><br>
+<pre>
+void calc_beamwidth_deg(arma::uword i_element,
+    dtype threshold_dB = 3.0,
+    dtype *beamwidth_az = nullptr,
+    dtype *beamwidth_el = nullptr,
+    dtype *z_point_ang = nullptr,
+    dtype *el_point_ang = nullptr) const;
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>i_element</code></b> — Element index; 0-based
+</li>
+<li><b><code>threshold_dB</code></b> — Threshold in dB; 3 dB = FWHM
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>beamwidth_az</code></b> — Azimuth beamwidth in degree
+</li>
+<li><b><code>beamwidth_el</code></b> — Elevation beamwidth in degree
+</li>
+<li><b><code>az_point_ang</code></b> — Azimuth pointing angle for the main beam in degree
+</li>
+<li><b><code>el_point_ang</code></b> — Elevation pointing angle for the main beam in degree
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a> (directivity in dBi of a single array element)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name=".calc_directivity_dBi"></a>
 <b>.calc_directivity_dBi</b> - Calculate the directivity in dBi of a single array element
 <div style="margin-bottom: 1.5em;">
 <ul>
 <li>Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+</li>
+<li>Ignores element coupling
 </li></ul>
 </div>
 

@@ -61,6 +61,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#arrayant_calc_beamwidth">arrayant_calc_beamwidth</a></td><td>Calculates the beam width of array antenna elements in degree</td></tr>
 <tr><td><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a></td><td>Calculates the directivity in dBi of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Calculate effective radiation patterns for array antennas</td></tr>
 <tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
@@ -166,6 +167,84 @@
 <font size=+1><b>Array antenna functions</b></font>
 <br>
 <br>
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_calc_beamwidth"></a>
+<b>arrayant_calc_beamwidth</b> - Calculates the beam width of array antenna elements in degree
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
+</li>
+<li>Also returns the azimuth and elevation pointing angles of the main beam
+</li>
+<li>Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in
+   each direction than the antenna sampling grid)
+</li>
+<li>Calculated per element, not per port; ignores element coupling
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+% Input as struct (struct mode)
+[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant );
+
+[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = quadriga_lib.arrayant_calc_beamwidth( arrayant, i_element, threshold_dB );
+
+% Separate inputs (split mode)
+[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
+    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
+
+[ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
+    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, i_element, threshold_dB );
+</pre>
+
+<i>Inputs (struct mode):</i><br>
+<ul>
+<li><b><code>arrayant</code></b> — Struct containing the arrayant data; field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>;
+   a struct array may contain a frequency-dependent model
+</li>
+<li><b><code>i_element</code></b> <i>(optional)</i> — Element index; 1-based; if not provided or empty, the beamwidth is
+   calculated for all elements; uint64; <code>[n_out]</code> or empty
+</li>
+<li><b><code>threshold_dB</code></b> <i>(optional)</i> — Threshold in dB; default: 3 (equivalent to FWHM)
+</li></ul>
+
+<i>Inputs (split mode):</i><br>
+<ul>
+<li><b><code>e_theta_re</code></b> — e-theta field component, real part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_theta_im</code></b> — e-theta field component, imaginary part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_phi_re</code></b> — e-phi field component, real part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>e_phi_im</code></b> — e-phi field component, imaginary part; <code>[n_elevation, n_azimuth, n_elements]</code>
+</li>
+<li><b><code>azimuth_grid</code></b> — Azimuth angles in rad, -π to π, sorted; <code>[n_azimuth]</code>
+</li>
+<li><b><code>elevation_grid</code></b> — Elevation angles in rad, -π/2 to π/2, sorted; <code>[n_elevation]</code>
+</li>
+<li><b><code>i_element</code></b> <i>(optional)</i> — Element index; 1-based; if not provided or empty, the beamwidth
+   is calculated for all elements; uint64; <code>[n_out]</code> or empty
+</li>
+<li><b><code>threshold_dB</code></b> <i>(optional)</i> — Threshold in dB; default: 3 (equivalent to FWHM)
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>beamwidth_az</code></b> — Azimuth beamwidth in degree; <code>[n_out, n_freq]</code>; with <code>n_out = n_elements</code> when <code>i_element</code> is omitted/empty
+</li>
+<li><b><code>beamwidth_el</code></b> <i>(optional)</i> — Elevation beamwidth in degree; <code>[n_out, n_freq]</code>
+</li>
+<li><b><code>az_point_ang</code></b> <i>(optional)</i> — Azimuth pointing angle of the main beam in degree; <code>[n_out, n_freq]</code>
+</li>
+<li><b><code>el_point_ang</code></b> <i>(optional)</i> — Elevation pointing angle of the main beam in degree; <code>[n_out, n_freq]</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a> (directivity in dBi of array antenna elements)
+</li></ul>
+
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="arrayant_calc_directivity"></a>
 <b>arrayant_calc_directivity</b> - Calculates the directivity in dBi of array antenna elements
