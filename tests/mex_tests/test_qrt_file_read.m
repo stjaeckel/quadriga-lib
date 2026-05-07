@@ -230,12 +230,14 @@ assertTrue(iscell(pc_m{1}));
 assertEqual(numel(pc_m{1}), numel(aod_m{1}));   % one entry per path
 
 % ---------- qrt_file_read: default arguments ----------
+% Default i_cir reads ALL CIRs in the file (no_cir entries)
 [~, tx_pos_d] = quadriga_lib.qrt_file_read(fn);
-assertEqual(size(tx_pos_d), [3, 1]);
-assertElementsAlmostEqual(tx_pos_d, tx1, 'absolute', 1e-6);
+assertEqual(size(tx_pos_d), [3, double(no_cir)]);
+assertElementsAlmostEqual(tx_pos_d(:, 1), tx1, 'absolute', 1e-6);
 
 [~, tx_pos_e] = quadriga_lib.qrt_file_read(fn, []);
-assertEqual(size(tx_pos_e), [3, 1]);
+assertEqual(size(tx_pos_e), [3, double(no_cir)]);
+assertElementsAlmostEqual(tx_pos_e(:, 1), tx1, 'absolute', 1e-6);
 
 % ---------- qrt_file_read: out-of-range i_cir errors ----------
 try
@@ -253,7 +255,7 @@ try
     quadriga_lib.qrt_file_read(fn, 0, 1, true, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Entries in ''i_cir'' or ''i_orig'' must be >= 1';
+    expectedErrorMessage = 'Entries in ''i_cir'' must be >= 1';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end
@@ -263,7 +265,7 @@ try
     quadriga_lib.qrt_file_read(fn, 1, 0, true, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Entries in ''i_cir'' or ''i_orig'' must be >= 1';
+    expectedErrorMessage = '''i_orig'' must be >= 1';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "', ME.message, '"']);
     end
