@@ -45,12 +45,13 @@ namespace quadriga_lib
         // Calculate the directivity of an antenna element in dBi
         dtype calc_directivity_dBi(arma::uword i_element) const;
 
-        // Calculates the beam width for each antenna element in [deg]
-        void calc_beamwidth_deg(arma::uword i_element, // 
-                                dtype *beamwidth_az,
-                                dtype *beamwidth_el,
-                                adtype *z_point_ang,
-                                dtype *el_point_ang) const;
+        // Calculate the beam width of an antenna element in degree
+        void calc_beamwidth_deg(arma::uword i_element,                // Element index, 0-based
+                                dtype threshold_dB = 3.0,             // Threshold in dB
+                                dtype *beamwidth_az = nullptr,        // Azimuth beamwidth in degree
+                                dtype *beamwidth_el = nullptr,        // Elevation beamwidth in degree
+                                dtype *az_point_ang = nullptr,         // Azimuth pointing angle for the main beam in degree
+                                dtype *el_point_ang = nullptr) const; // Elevation pointing angle for the main beam in degree
 
         // Calculates a virtual pattern of the given array by applying coupling and element positions
         // If called without arguments, 'azimuth_grid' and 'elevation_grid' from the calling object are used

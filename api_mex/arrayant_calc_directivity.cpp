@@ -16,7 +16,6 @@ Calculates the directivity in dBi of array antenna elements
 - Calculated per element, not per port; ignores element coupling
 
 ## Usage:
-
 ```
 % Input as struct (struct mode)
 directivity = quadriga_lib.arrayant_calc_directivity(arrayant);
@@ -56,7 +55,6 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-
     if (!(nrhs == 1 || nrhs == 2 || nrhs == 6 || nrhs == 7))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 

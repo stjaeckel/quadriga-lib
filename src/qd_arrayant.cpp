@@ -191,6 +191,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
 Calculate the directivity in dBi of a single array element
 
 - Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Ignores element coupling
 
 ## Declaration:
 ```
@@ -273,6 +274,194 @@ dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element)
 
     double directivity = p_max < 1.0e-14 ? 0.0 : 10.0 * std::log10(p_max / p_sum);
     return dtype(directivity);
+}
+
+/*!MD
+# .calc_beamwidth_deg
+Calculate the beam width of an antenna element in degree
+
+- Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
+- Also returns the azimuth and elevation pointing angles of the main beam
+- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in each direction than the antenna sampling grid)
+- Ignores element coupling
+
+## Declaration:
+```
+void calc_beamwidth_deg(arma::uword i_element,
+    dtype threshold_dB = 3.0,
+    dtype *beamwidth_az = nullptr,
+    dtype *beamwidth_el = nullptr,
+    dtype *z_point_ang = nullptr,
+    dtype *el_point_ang = nullptr) const;
+```
+
+## Inputs:
+- **`i_element`** — Element index; 0-based
+- **`threshold_dB`** — Threshold in dB; 3 dB = FWHM
+
+## Outputs:
+- **`beamwidth_az`** — Azimuth beamwidth in degree
+- **`beamwidth_el`** — Elevation beamwidth in degree
+- **`az_point_ang`** — Azimuth pointing angle for the main beam in degree
+- **`el_point_ang`** — Elevation pointing angle for the main beam in degree
+
+## See also:
+- .[[calc_directivity_dBi]] (directivity in dBi of a single array element)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dtype threshold_dB,
+                                                       dtype *beamwidth_az, dtype *beamwidth_el,
+                                                       dtype *az_point_ang, dtype *el_point_ang) const
+{
+    // Validate arrayant
+    std::string error_message = is_valid();
+    if (error_message.length() == 0 && i_element >= n_elements())
+        error_message = "Element index out of bound.";
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    const bool need_az = (beamwidth_az != nullptr) || (az_point_ang != nullptr);
+    const bool need_el = (beamwidth_el != nullptr) || (el_point_ang != nullptr);
+    if (!need_az && !need_el)
+        return;
+
+    const double rad2deg = 180.0 / arma::datum::pi;
+    const double thres_lin = std::pow(10.0, -0.1 * double(threshold_dB));
+
+    const arma::uword nEl = e_theta_re.n_rows;
+    const arma::uword nAz = e_theta_re.n_cols;
+
+    // Find (iEl, iAz) of the maximum on the coarse grid
+    const dtype *p_tre = e_theta_re.slice_memptr(i_element);
+    const dtype *p_tim = e_theta_im.slice_memptr(i_element);
+    const dtype *p_pre = e_phi_re.slice_memptr(i_element);
+    const dtype *p_pim = e_phi_im.slice_memptr(i_element);
+
+    double p_max_coarse = -1.0;
+    arma::uword i_max = 0;
+    for (arma::uword i = 0; i < nEl * nAz; ++i)
+    {
+        double a = double(p_tre[i]), b = double(p_tim[i]);
+        double c = double(p_pre[i]), d = double(p_pim[i]);
+        double v = a * a + b * b + c * c + d * d;
+        if (v > p_max_coarse)
+        {
+            p_max_coarse = v;
+            i_max = i;
+        }
+    }
+    const arma::uword iEl_max = i_max % nEl; // column-major: idx = iEl + iAz*nEl
+    const arma::uword iAz_max = i_max / nEl;
+
+    arma::uvec i_el_vec(1);
+    i_el_vec(0) = i_element;
+
+    // Azimuth pass
+    if (need_az)
+    {
+        const dtype az_first = azimuth_grid(0);
+        const dtype az_last = azimuth_grid(nAz - 1);
+        const dtype az_step = (az_last - az_first) / dtype(100 * nAz);
+        const arma::uword nAzi = 100 * nAz + 1;
+
+        arma::Mat<dtype> az_q(1, nAzi), el_q(1, nAzi);
+        for (arma::uword i = 0; i < nAzi - 1; ++i)
+            az_q(0, i) = az_first + dtype(i) * az_step;
+        az_q(0, nAzi - 1) = az_last;
+        el_q.fill(elevation_grid(iEl_max));
+
+        arma::Mat<dtype> V_re, V_im, H_re, H_im;
+        this->interpolate(&az_q, &el_q, &V_re, &V_im, &H_re, &H_im, i_el_vec);
+
+        double Pi_max = 0.0;
+        arma::uword iM = 0;
+        arma::Col<double> Pi(nAzi);
+        for (arma::uword i = 0; i < nAzi; ++i)
+        {
+            double a = double(V_re(0, i)), b = double(V_im(0, i));
+            double c = double(H_re(0, i)), d = double(H_im(0, i));
+            double v = a * a + b * b + c * c + d * d;
+            Pi(i) = v;
+            if (v > Pi_max)
+            {
+                Pi_max = v;
+                iM = i;
+            }
+        }
+        const double thres_abs = Pi_max * thres_lin;
+        arma::uword iS = 0, iL = nAzi - 1;
+        for (arma::uword i = 0; i < nAzi; ++i)
+            if (Pi(i) > thres_abs)
+            {
+                iS = i;
+                break;
+            }
+        for (arma::uword i = nAzi; i-- > 0;)
+            if (Pi(i) > thres_abs)
+            {
+                iL = i;
+                break;
+            }
+
+        if (beamwidth_az != nullptr)
+            *beamwidth_az = dtype(double(az_q(0, iL) - az_q(0, iS)) * rad2deg);
+        if (az_point_ang != nullptr)
+            *az_point_ang = dtype(double(az_q(0, iM)) * rad2deg);
+    }
+
+    // Elevation pass
+    if (need_el)
+    {
+        const dtype el_first = elevation_grid(0);
+        const dtype el_last = elevation_grid(nEl - 1);
+        const dtype el_step = (el_last - el_first) / dtype(100 * nEl);
+        const arma::uword nEli = 100 * nEl + 1;
+
+        arma::Mat<dtype> az_q(1, nEli), el_q(1, nEli);
+        for (arma::uword i = 0; i < nEli - 1; ++i)
+            el_q(0, i) = el_first + dtype(i) * el_step;
+        el_q(0, nEli - 1) = el_last;
+        az_q.fill(azimuth_grid(iAz_max));
+
+        arma::Mat<dtype> V_re, V_im, H_re, H_im;
+        this->interpolate(&az_q, &el_q, &V_re, &V_im, &H_re, &H_im, i_el_vec);
+
+        double Pi_max = 0.0;
+        arma::uword iM = 0;
+        arma::Col<double> Pi(nEli);
+        for (arma::uword i = 0; i < nEli; ++i)
+        {
+            double a = double(V_re(0, i)), b = double(V_im(0, i));
+            double c = double(H_re(0, i)), d = double(H_im(0, i));
+            double v = a * a + b * b + c * c + d * d;
+            Pi(i) = v;
+            if (v > Pi_max)
+            {
+                Pi_max = v;
+                iM = i;
+            }
+        }
+        const double thres_abs = Pi_max * thres_lin;
+        arma::uword iS = 0, iL = nEli - 1;
+        for (arma::uword i = 0; i < nEli; ++i)
+            if (Pi(i) > thres_abs)
+            {
+                iS = i;
+                break;
+            }
+        for (arma::uword i = nEli; i-- > 0;)
+            if (Pi(i) > thres_abs)
+            {
+                iL = i;
+                break;
+            }
+
+        if (beamwidth_el != nullptr)
+            *beamwidth_el = dtype(double(el_q(0, iL) - el_q(0, iS)) * rad2deg);
+        if (el_point_ang != nullptr)
+            *el_point_ang = dtype(double(el_q(0, iM)) * rad2deg);
+    }
 }
 
 /*!MD
