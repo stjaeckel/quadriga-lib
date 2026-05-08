@@ -92,7 +92,7 @@ RUN dpkg -i /build/quadriga-lib_*.deb || apt-get install -f -y
 
 # ---- 7. Run tests against the installed package ----
 RUN /build/quadriga-lib/obj-x86_64-linux-gnu/test_bin
-RUN unzip /build/quadriga-lib/external/MOxUnit.zip -d /build/quadriga-lib/external/
+RUN unzip -o /build/quadriga-lib/external/MOxUnit.zip -d /build/quadriga-lib/external/
 RUN octave --no-gui --eval "cd /build/quadriga-lib/tests; quadriga_lib_mex_tests;"
 RUN python3 -m pytest /build/quadriga-lib/tests/python_tests -x -s
 

@@ -120,8 +120,8 @@ package:
 # Python targets:
 #
 # PyPI packaging requires conda env "quadriga-pip": 
-#   sudo apt install qemu-user-static binfmt-support
-#   conda create --name quadriga-pip -c conda-forge python=3.13 numpy cmake compilers make pytest
+#   sudo apt install qemu-user-binfmt-hwe binfmt-support
+#   conda create --name quadriga-pip -c conda-forge python=3.14 numpy cmake compilers make pytest pip
 #   conda activate quadriga-pip
 #   pip install scikit-build-core build twine cibuildwheel
 #
@@ -187,9 +187,17 @@ release/$(DEB_PLUCKY):
 	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-plucky
 	cp /tmp/quadriga_docker_out/$(DEB_PLUCKY) release/
 
+DEB_RECOLUTE := quadriga-lib_$(QUADRIGA_VERSION)-1+resolute_amd64.deb
+release/$(DEB_RECOLUTE):
+	mkdir -p release
+	docker build --build-arg UBUNTU_VERSION=26.04 --progress=plain -f Dockerfile.ubuntu -t quadriga-deb-resolute . 2>&1 | tee build_resolute.log
+	docker run --rm -v /tmp/quadriga_docker_out:/out quadriga-deb-resolute
+	cp /tmp/quadriga_docker_out/$(DEB_RECOLUTE) release/
+
 deb-jammy:  release/$(DEB_JAMMY)
 deb-noble:  release/$(DEB_NOBLE)
 deb-plucky: release/$(DEB_PLUCKY)
+deb-resolute: release/$(DEB_RECOLUTE)
 
 deb: 
 	$(MAKE) -j deb-jammy deb-noble deb-plucky

@@ -15,9 +15,11 @@ SECTION!*/
 - **Ubuntu 24.04 (Noble)**<br>
   <a href="download/quadriga-lib___VERSION__-1+noble_amd64.deb">quadriga-lib___VERSION__-1+noble_amd64.deb</a>
 
-- **Ubuntu 25.10 (Plucky)**<br>
-  <a href="download/quadriga-lib___VERSION__-1+plucky_amd64.deb">quadriga-lib___VERSION__-1+plucky_amd64.deb</a>
+- **Ubuntu 26.04 (Resolute)**<br>
+  <a href="download/quadriga-lib___VERSION__-1+resolute_amd64.deb">quadriga-lib___VERSION__-1+resolute_amd64.deb</a>
 
 - **Python**<br>
   `pip install quadriga-lib`
+
+- <a href="releases/">Older versions</a>
 SECTION_DESC!*/

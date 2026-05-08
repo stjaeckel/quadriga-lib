@@ -1,0 +1,11 @@
+build/
+release/
+html_docu/releases/
+html_docu/publications/
+lib/*
+.vscode/*
++quadriga_lib/
+dist/
+wheelhouse/
+tests/test*
+deploy.py

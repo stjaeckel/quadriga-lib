@@ -13,6 +13,7 @@
 #include <any>
 #include <string>
 #include <type_traits>
+#include <array>
 
 // Macro to redirect any exception to stderr
 #define CALL_QD(expr)                                              \
