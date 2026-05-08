@@ -489,7 +489,11 @@ if(BUILD_MATLAB)
     # Compiles MEX files directly with g++ (Linux) or cl.exe (Windows). No MATLAB installation required
     # Note: MATLAB always links quadriga_static regardless of QUADRIGA_LINK_TARGET to avoid conflicts with MATLAB's own bundled libhdf5.so
     file(MAKE_DIRECTORY ${MEX_OUTPUT_DIR})
-    set(MEX_COMPAT_SHIM ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
+    if(MSVC)
+        set(MEX_COMPAT_SHIM "")
+    else()
+        set(MEX_COMPAT_SHIM ${CMAKE_SOURCE_DIR}/src/mex_compat_shim.cpp)
+    endif()
     file(GLOB API_MEX_FILES "${CMAKE_SOURCE_DIR}/api_mex/*.cpp")
     set(MEX_MATLAB_TARGETS "")
 
