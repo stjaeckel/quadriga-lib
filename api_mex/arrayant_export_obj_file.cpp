@@ -1,23 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex.h"
-#include "quadriga_arrayant.hpp"
-#include "mex_helper_functions.hpp"
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -25,77 +10,77 @@ SECTION!*/
 
 /*!MD
 # ARRAYANT_EXPORT_OBJ_FILE
-Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
+Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
+
+- Pattern is mapped onto an icosphere; higher `icosphere_n_div` gives a finer mesh
+- Supports multi-frequency arrayant models: pass a struct array and select the entry to export
+  via the `freq` argument
 
 ## Usage:
-
 ```
-quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap, ...
-                object_radius, icosphere_n_div, i_element );
+quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap,  object_radius, ...
+   icosphere_n_div, i_element, i_freq );
 ```
 
-## Input Arguments:
-- **`fn`** [1]<br>
-  Filename of the OBJ file, string
+## Inputs:
+- **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in
+  [[arrayant_generate]]; a struct array may contain a frequency-dependent model
+- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB; default: 30
+- **`colormap`** *(optional)* — Colormap name; default: jet; Available: jet, parula, winter, 
+  hot, turbo, copper, spring, cool, gray, autumn, summer
+- **`object_radius`** *(optional)* — Radius of the exported object; default: 1
+- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
+- **`i_element`** *(optional)* — Element indices to export; 1-based; uint64; empty = export all elements
+- **`i_freq`** *(optional)* — Frequency index to export from a multi-frequency arrayant struct
+  array; 1-based; uint64; default: 1; must satisfy `1 <= freq <= n_freq`
 
-- **`arrayant`** [2]<br>
-  Struct containing the arrayant data with the following fields:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  `name`           | Name of the array antenna object, optional            | String
-
-- **`directivity_range`** [3]<br>
-  Directivity range of the antenna pattern visualization in dB
-
-- **`colormap`** [4]<br>
-  Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',
-  'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', Optional, default = 'jet'
-
-- **`object_radius`** [5]<br>
-  Radius in meters of the exported object
-
-- **`icosphere_n_div`** [6]<br>
-  Map pattern to an Icosphere with given number of subdivisions
-
-- **`element`** [7]<br>
-  Antenna element indices, 1-based, empty = export all
+## See also:
+- [[icosphere]] (icosphere primitive used internally)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 2)
+    // Validate argument counts
+    if (nrhs < 2 || nrhs > 8)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-        
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Parse inputs
+    if (!mxIsStruct(prhs[1]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant' must be a struct.");
+
+    // Parse scalar / string inputs
     std::string fn = qd_mex_get_string(prhs[0]);
     double directivity_range = (nrhs < 3) ? 30.0 : qd_mex_get_scalar<double>(prhs[2], "directivity_range", 30.0);
-    std::string colormap = (nrhs < 4) ? "jet" : qd_mex_get_string(prhs[3]);
+    std::string colormap = (nrhs < 4) ? "jet" : qd_mex_get_string(prhs[3], "jet");
     double object_radius = (nrhs < 5) ? 1.0 : qd_mex_get_scalar<double>(prhs[4], "object_radius", 1.0);
-    unsigned icosphere_n_div = (nrhs < 6) ? 4 : qd_mex_get_scalar<unsigned>(prhs[5], "icosphere_n_div", 4);
-    const arma::uvec element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_typecast_Col<arma::uword>(prhs[6]) - 1;
+    arma::uword icosphere_n_div = (nrhs < 6) ? 4 : qd_mex_get_scalar<arma::uword>(prhs[5], "icosphere_n_div", 4);
 
-    // Assemble array antenna object (copy input data)
+    // i_element: 1-based input, convert to 0-based
+    arma::uvec element_ind = (nrhs < 7) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[6], "i_element");
+    if (!element_ind.empty())
+    {
+        if (arma::any(element_ind == 0))
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'i_element' cannot be 0 (1-based index).");
+        element_ind -= 1;
+    }
+
+    // freq: 1-based frequency index for multi-frequency models
+    size_t n_freq = (size_t)mxGetNumberOfElements(prhs[1]);
+    size_t freq = (nrhs < 8) ? 1 : qd_mex_get_scalar<size_t>(prhs[7], "freq", 1);
+    if (freq < 1 || freq > n_freq)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'freq' is out of bound.");
+
+    // Load arrayant (single entry for the requested frequency)
     auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_re"), true);
-    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_theta_im"), true);
-    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_re"), true);
-    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[1], "e_phi_im"), true);
-    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "azimuth_grid"), true);
-    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[1], "elevation_grid"), true);
-
-    if (qd_mex_has_field(prhs[1], "element_pos"))
-        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[1], "element_pos"), true);
-
-    if (qd_mex_has_field(prhs[1], "name"))
-        ant.name = qd_mex_get_string(qd_mex_get_field(prhs[1], "name"));
+    if (n_freq > 1)
+    {
+        auto ant_multi = qd_mex_struct2arrayant_multi(prhs[1], true);
+        ant = ant_multi[freq - 1];
+    }
+    else
+        ant = qd_mex_struct2arrayant(prhs[1], true);
 
     CALL_QD(ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, element_ind));
 
