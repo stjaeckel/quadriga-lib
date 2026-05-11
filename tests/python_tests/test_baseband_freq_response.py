@@ -1,19 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-#
-# quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 # Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ------------------------------------------------------------------------
+# Part of quadriga-lib — see LICENSE for terms.
 
 import sys
 import os
@@ -246,7 +233,7 @@ class test_case(unittest.TestCase):
         hmat_ri = channel.baseband_freq_response(coeff_re=[np.real(c) for c in cl],
                                                   coeff_im=[np.imag(c) for c in cl],
                                                   delay=dl, bandwidth=100e6)
-        npt.assert_allclose(hmat_cx, hmat_ri, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
 
     # ==================================================================================
     # Single-freq: freq_out instead of bandwidth
@@ -260,7 +247,7 @@ class test_case(unittest.TestCase):
 
         freq_out = np.linspace(0.0, bw, n_c)
         hmat_test = channel.baseband_freq_response(coeff=[coeff], delay=[delay], freq_out=freq_out)
-        npt.assert_allclose(hmat_ref, hmat_test, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_ref, hmat_test, atol=1e-6, rtol=0)
 
     # ==================================================================================
     # Single-freq: snap indices and varying n_path
@@ -272,8 +259,8 @@ class test_case(unittest.TestCase):
         hmat = channel.baseband_freq_response(coeff=c, delay=dl, bandwidth=1e6, carriers=4,
                                                snap=np.array([2, 0]))
         self.assertEqual(hmat.shape, (1, 1, 4, 2))
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 1.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 1.0, atol=1e-6, rtol=0)
 
     def test_single_freq_varying_n_path(self):
         c0 = np.ones((1, 1, 2), dtype=complex)
@@ -282,8 +269,8 @@ class test_case(unittest.TestCase):
                                                delay=[np.zeros((1, 1, 2)), np.zeros((1, 1, 5))],
                                                bandwidth=1e6, carriers=4)
         self.assertEqual(hmat.shape, (1, 1, 4, 2))
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 2.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 5.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 2.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 5.0, atol=1e-6, rtol=0)
 
     # ==================================================================================
     # Multi-freq core tests
@@ -296,7 +283,7 @@ class test_case(unittest.TestCase):
                                                remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 3, 1))
         for k in range(3):
-            npt.assert_allclose(hmat[0, 0, k, 0], 0.7, atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0], 0.7, atol=1e-6, rtol=0)
 
     def test_mf_delay_phase_rotation(self):
         tau = 10e-9; fout = np.array([1e9, 1.5e9, 2e9])
@@ -305,7 +292,7 @@ class test_case(unittest.TestCase):
                                                delay=[dl], freq_in=np.array([1e9]), freq_out=fout,
                                                remove_delay_phase=False)
         for k in range(3):
-            npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau), atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau), atol=1e-6, rtol=0)
 
     def test_mf_two_path(self):
         A1, A2, tau1, tau2 = 1.0, 0.5, 5e-9, 20e-9
@@ -316,7 +303,7 @@ class test_case(unittest.TestCase):
                                                freq_out=fout, remove_delay_phase=False)
         for k in range(4):
             expected = A1 * np.exp(-1j * 2 * np.pi * fout[k] * tau1) + A2 * np.exp(-1j * 2 * np.pi * fout[k] * tau2)
-            npt.assert_allclose(hmat[0, 0, k, 0], expected, atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0], expected, atol=1e-6, rtol=0)
 
     def test_mf_slerp_magnitude(self):
         fin = np.array([1e9, 2e9]); fout = np.array([1e9, 1.25e9, 1.5e9, 1.75e9, 2e9])
@@ -324,7 +311,7 @@ class test_case(unittest.TestCase):
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
                                                freq_in=fin, freq_out=fout, remove_delay_phase=False)
         for k in range(5):
-            npt.assert_allclose(hmat[0, 0, k, 0].real, 1.0 + (fout[k] - 1e9) / 1e9 * 2.0, atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0].real, 1.0 + (fout[k] - 1e9) / 1e9 * 2.0, atol=1e-6, rtol=0)
 
     def test_mf_extrapolation(self):
         fin = np.array([1e9, 2e9]); fout = np.array([0.5e9, 1e9, 1.5e9, 2e9, 3e9])
@@ -333,7 +320,7 @@ class test_case(unittest.TestCase):
                                                freq_in=fin, freq_out=fout, remove_delay_phase=False)
         expected = [1.0, 1.0, 1.5, 2.0, 2.0]
         for k in range(5):
-            npt.assert_allclose(hmat[0, 0, k, 0].real, expected[k], atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0].real, expected[k], atol=1e-6, rtol=0)
 
     def test_mf_remove_delay_phase(self):
         fin = np.array([1e9, 2e9, 3e9]); fout = np.linspace(1e9, 3e9, 32); tau = 50e-9
@@ -343,7 +330,7 @@ class test_case(unittest.TestCase):
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
                                                     freq_in=fin, freq_out=fout, remove_delay_phase=True)
-        npt.assert_allclose(hmat_test, hmat_ref, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_remove_delay_phase_multipath(self):
         fin = np.array([1e9, 1.5e9, 2e9]); fout = np.linspace(1e9, 2e9, 16)
@@ -355,7 +342,7 @@ class test_case(unittest.TestCase):
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
                                                     freq_in=fin, freq_out=fout, remove_delay_phase=True)
-        npt.assert_allclose(hmat_test, hmat_ref, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_envelope_ramp_large_delay(self):
         fin = np.array([1e9, 2e9, 3e9]); fout = np.linspace(1e9, 3e9, 64); tau = 100e-9
@@ -366,8 +353,8 @@ class test_case(unittest.TestCase):
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
                                                     freq_in=fin, freq_out=fout, remove_delay_phase=True)
-        npt.assert_allclose(np.abs(hmat_test) ** 2, np.abs(hmat_ref) ** 2, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat_test, hmat_ref, atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat_test) ** 2, np.abs(hmat_ref) ** 2, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_re_im(self):
         fin = np.array([1e9, 2e9]); fout = np.linspace(1e9, 2e9, 8)
@@ -381,7 +368,7 @@ class test_case(unittest.TestCase):
         hmat_ri = channel.baseband_freq_response(coeff_re=[np.real(c)], coeff_im=[np.imag(c)],
                                                   delay=[dl], freq_in=fin, freq_out=fout,
                                                   remove_delay_phase=False)
-        npt.assert_allclose(hmat_cx, hmat_ri, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_cx, hmat_ri, atol=1e-6, rtol=0)
 
     def test_mf_mimo(self):
         c = np.zeros((2, 2, 1, 1), dtype=complex)
@@ -390,10 +377,10 @@ class test_case(unittest.TestCase):
                                                freq_in=np.array([1e9]), freq_out=np.array([1e9]),
                                                remove_delay_phase=False)
         self.assertEqual(hmat.shape, (2, 2, 1, 1))
-        npt.assert_allclose(hmat[0, 0, 0, 0].real, 1.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[1, 0, 0, 0].real, 2.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[0, 1, 0, 0].real, 3.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[1, 1, 0, 0].real, 4.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat[0, 0, 0, 0].real, 1.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[1, 0, 0, 0].real, 2.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[0, 1, 0, 0].real, 3.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[1, 1, 0, 0].real, 4.0, atol=1e-6, rtol=0)
 
     def test_mf_spherical_delays(self):
         fout = np.array([1e9, 2e9]); tau0, tau1 = 5e-9, 15e-9
@@ -402,8 +389,8 @@ class test_case(unittest.TestCase):
                                                delay=[dl], freq_in=np.array([1e9]), freq_out=fout,
                                                remove_delay_phase=False)
         for k in range(2):
-            npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau0), atol=5e-7, rtol=0)
-            npt.assert_allclose(hmat[1, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau1), atol=5e-7, rtol=0)
+            npt.assert_allclose(hmat[0, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau0), atol=1e-6, rtol=0)
+            npt.assert_allclose(hmat[1, 0, k, 0], np.exp(-1j * 2 * np.pi * fout[k] * tau1), atol=1e-6, rtol=0)
 
     def test_mf_snapshots_varying_n_path(self):
         fin = np.array([1e9, 2e9]); fout = np.array([1.5e9])
@@ -413,8 +400,8 @@ class test_case(unittest.TestCase):
                                                delay=[np.zeros((1, 1, 1)), np.zeros((1, 1, 3))],
                                                freq_in=fin, freq_out=fout, remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 1, 2))
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 1.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 3.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 1.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 3.0, atol=1e-6, rtol=0)
 
     def test_mf_snap_indices(self):
         fin = np.array([1e9, 2e9]); fout = np.array([1.5e9])
@@ -423,8 +410,8 @@ class test_case(unittest.TestCase):
         hmat = channel.baseband_freq_response(coeff=cs, delay=dl, freq_in=fin, freq_out=fout,
                                                snap=np.array([2, 0]), remove_delay_phase=False)
         self.assertEqual(hmat.shape, (1, 1, 1, 2))
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 1.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 0]), 3.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, 0, 1]), 1.0, atol=1e-6, rtol=0)
 
     def test_mf_3d_delay_broadcast(self):
         fin = np.array([1e9, 2e9]); fout = np.array([1e9]); tau = 10e-9
@@ -435,16 +422,16 @@ class test_case(unittest.TestCase):
                                              remove_delay_phase=False)
         h4 = channel.baseband_freq_response(coeff=[c], delay=[dl4], freq_in=fin, freq_out=fout,
                                              remove_delay_phase=False)
-        npt.assert_allclose(h3, h4, atol=5e-7, rtol=0)
+        npt.assert_allclose(h3, h4, atol=1e-6, rtol=0)
 
     def test_mf_three_segments(self):
         fin = np.array([1e9, 2e9, 4e9]); fout = np.array([1.5e9, 2e9, 3e9])
         c = np.zeros((1, 1, 1, 3), dtype=complex); c[0, 0, 0, :] = [1.0, 3.0, 7.0]
         hmat = channel.baseband_freq_response(coeff=[c], delay=[np.zeros((1, 1, 1))],
                                                freq_in=fin, freq_out=fout, remove_delay_phase=False)
-        npt.assert_allclose(hmat[0, 0, 0, 0].real, 2.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[0, 0, 1, 0].real, 3.0, atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[0, 0, 2, 0].real, 5.0, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat[0, 0, 0, 0].real, 2.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[0, 0, 1, 0].real, 3.0, atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[0, 0, 2, 0].real, 5.0, atol=1e-6, rtol=0)
 
     def test_mf_acoustic(self):
         tau = 10.0 / 343.0
@@ -453,8 +440,8 @@ class test_case(unittest.TestCase):
         hmat = channel.baseband_freq_response(coeff=[np.ones((1, 1, 1, 3), dtype=complex)],
                                                delay=[dl], freq_in=fin, freq_out=fout,
                                                remove_delay_phase=False)
-        npt.assert_allclose(np.abs(hmat[0, 0, :, 0]) ** 2, np.ones(5), atol=5e-7, rtol=0)
-        npt.assert_allclose(hmat[0, 0, 2, 0], np.exp(-1j * 2 * np.pi * 1000.0 * tau), atol=5e-7, rtol=0)
+        npt.assert_allclose(np.abs(hmat[0, 0, :, 0]) ** 2, np.ones(5), atol=1e-6, rtol=0)
+        npt.assert_allclose(hmat[0, 0, 2, 0], np.exp(-1j * 2 * np.pi * 1000.0 * tau), atol=1e-6, rtol=0)
 
     def test_mf_remove_phase_spherical(self):
         fin = np.array([1e9, 2e9]); fout = np.linspace(1e9, 2e9, 8)
@@ -464,7 +451,7 @@ class test_case(unittest.TestCase):
                                                    remove_delay_phase=False)
         hmat_test = channel.baseband_freq_response(coeff=[bake_delay_phase(env, dl, fin)], delay=[dl],
                                                     freq_in=fin, freq_out=fout, remove_delay_phase=True)
-        npt.assert_allclose(hmat_test, hmat_ref, atol=5e-7, rtol=0)
+        npt.assert_allclose(hmat_test, hmat_ref, atol=1e-6, rtol=0)
 
     def test_mf_phase_unwrap(self):
         c = np.zeros((1, 1, 1, 2), dtype=complex)

@@ -23,6 +23,28 @@
             "configurationProvider": "ms-vscode.makefile-tools",
             "compilerPath": "/usr/bin/g++"
         },
+                {
+            "name": "Ubuntu24",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "include/",
+                "src/",
+                "external/armadillo-14.2.2/include",
+                "external/pybind11-3.0.0/include",
+                "external/Catch2-3.8.1-Linux/include",
+                "/usr/include/python3.12/",
+                "/usr/include/octave-8.4.0/octave",
+                "${default}"
+            ],
+            "defines": [
+                "${default}"
+            ],
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "compilerPath": "/usr/bin/g++"
+        },
         {
             "name": "Windows",
             "includePath": [
