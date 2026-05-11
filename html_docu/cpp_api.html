@@ -112,6 +112,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
+<tr><td><a href="#arrayant_combine_pattern_multi">arrayant_combine_pattern_multi</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency)</td></tr>
 <tr><td><a href="#arrayant_concat_multi">arrayant_concat_multi</a></td><td>Concatenate two multi-frequency arrayant vectors into a single multi-element model</td></tr>
 <tr><td><a href="#arrayant_copy_element_multi">arrayant_copy_element_multi</a></td><td>Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector</td></tr>
 <tr><td><a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a></td><td>Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies</td></tr>
@@ -590,9 +591,9 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::combine
 
 <i>Inputs:</i><br>
 <ul>
-<li><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+<li><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
 </li>
-<li><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+<li><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
 </li></ul>
 
 <i>Returns:</i><br>
@@ -965,6 +966,59 @@ void quadriga_lib::arrayant&lt;dtype&gt;::set_size(
 <br>
 <br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_combine_pattern_multi"></a>
+<b>arrayant_combine_pattern_multi</b> - Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency)
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Multi-frequency counterpart to <a href="#.combine_pattern">.combine_pattern</a>
+</li>
+<li>Integrates <code>e_theta_re/im</code>, <code>e_phi_re/im</code>, <code>element_pos</code>, and <code>coupling_re/im</code> across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
+</li>
+<li>Output length = <code>freq_grid_new-&gt;n_elem</code> if provided; otherwise one entry per input arrayant
+</li>
+<li>Field interpolation across frequency is delegated to <a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a> (SLERP with linear-interpolation fallback)
+</li>
+<li>Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
+</li>
+<li>Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
+</li></ul>
+</div>
+
+<i>Declaration:</i><br>
+<pre>
+std::vector&lt;arrayant&lt;dtype&gt;&gt; arrayant_combine_pattern_multi(
+    const std::vector&lt;arrayant&lt;dtype&gt;&gt; &amp;arrayant_vec,
+    const arma::Col&lt;dtype&gt; *azimuth_grid_new = nullptr,
+    const arma::Col&lt;dtype&gt; *elevation_grid_new = nullptr,
+    const arma::Col&lt;dtype&gt; *freq_grid_new = nullptr);
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>arrayant_vec</code></b> — Non-empty vector of valid arrayant objects (must pass <a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a>)
+</li>
+<li><b><code>azimuth_grid_new</code></b> <i>(optional)</i> — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to <code>arrayant_vec[0].azimuth_grid</code>
+</li>
+<li><b><code>elevation_grid_new</code></b> <i>(optional)</i> — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to <code>arrayant_vec[0].elevation_grid</code>
+</li>
+<li><b><code>freq_grid_new</code></b> <i>(optional)</i> — Alternative frequency grid in Hz; defaults to per-entry <code>center_frequency</code>
+</li></ul>
+
+<i>Returns:</i><br>
+<ul>
+<li>Vector of arrayant objects (length = <code>n_freq_out</code>), each with <code>n_ports</code> elements equal to the number of columns in the coupling matrix
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#.combine_pattern">.combine_pattern</a> (single-frequency counterpart)
+</li>
+<li><a href="#arrayant_interpolate_multi">arrayant_interpolate_multi</a> (used internally for spatial+frequency field interpolation)
+</li>
+<li><a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a> (input validation)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="arrayant_concat_multi"></a>
 <b>arrayant_concat_multi</b> - Concatenate two multi-frequency arrayant vectors into a single multi-element model
 <div style="margin-bottom: 1.5em;">
@@ -1126,13 +1180,13 @@ void quadriga_lib::arrayant_interpolate_multi(
 </li>
 <li><b><code>elevation</code></b> — Elevation angles in rad; must not be NULL; size must match <code>azimuth</code>
 </li>
-<li><b><code>frequency</code></b> — Target frequencies; must not be NULL or empty; <code>[n_freq]</code>
+<li><b><code>frequency</code></b> — Target frequencies in Hz; must not be NULL or empty; <code>[n_freq]</code>
 </li>
-<li><b><code>i_element</code></b> <i>(optional)</i> — 0-based element indices to interpolate; if empty, all elements are used (<code>n_out = n_elements</code>)
+<li><b><code>i_element</code></b> <i>(optional)</i> — Element indices to interpolate; if empty, all elements are used (<code>n_out = n_elements</code>)
 </li>
 <li><b><code>orientation</code></b> <i>(optional)</i> — Antenna orientation (bank, tilt, heading) in rad, applied at all frequencies; <code>[3,1,1]</code>; <code>[3,n_out,1]</code>; <code>[3,1,n_ang]</code>, or <code>[3,n_out,n_ang]</code>
 </li>
-<li><b><code>element_pos_i</code></b> <i>(optional)</i> — Override element positions in m; if <code>nullptr</code>, positions from entry 0 are used; <code>[3, n_out]</code>
+<li><b><code>element_pos_i</code></b> <i>(optional)</i> — Override element positions; if <code>nullptr</code>, positions from freq index 0 are used; <code>[3, n_out]</code>
 </li>
 <li><b><code>validate_input</code></b> <i>(optional)</i> — If <code>true</code>, validates <code>arrayant_vec</code> with <a href="#arrayant_is_valid_multi">arrayant_is_valid_multi</a> before processing
 </li></ul>

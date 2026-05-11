@@ -120,18 +120,24 @@ namespace quadriga_lib
 
     // ---- Multi-frequency array antenna functions ----
 
+    // Combine element patterns, positions, and coupling weights into effective radiation patterns
+    template <typename dtype>
+    std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(const std::vector<arrayant<dtype>> &arrayant_vec,     // Non-empty vector of valid arrayant objects
+                                                                const arma::Col<dtype> *azimuth_grid_new = nullptr,   // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+                                                                const arma::Col<dtype> *elevation_grid_new = nullptr, // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+                                                                const arma::Col<dtype> *freq_grid_new = nullptr);     // Output frequency grid in Hz; defaults to input grid
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
     // - Both inputs must have equal entry counts, identical angular grids, and matching center_frequency values at each index.
     // - Per frequency entry: pattern cubes are joined along the element (slice) dimension; element_pos matrices are horizontally concatenated (empty positions treated as zeros).
     // - Both inputs are validated with arrayant_is_valid_multi before processing; each output entry is validated before returning.
-    // - Output inherits name, azimuth/elevation grids, and center_frequency from arrayant_vec1. 
+    // - Output inherits name, azimuth/elevation grids, and center_frequency from arrayant_vec1.
     template <typename dtype>
     std::vector<arrayant<dtype>> arrayant_concat_multi(const std::vector<arrayant<dtype>> &arrayant_vec1,  // First validated, mutually consistent arrayant vector
                                                        const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector; must match entry count, grids, and center frequencies of arrayant_vec1
 
     // Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
     // - Calls .copy_element on every entry in the vector with the same source and destination indices.
-    // - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry. 
+    // - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry.
     template <typename dtype>
     void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
                                      arma::uword source,                         // Index of the element to copy from; must be within current element count
@@ -147,7 +153,7 @@ namespace quadriga_lib
     // - Frequency blending uses SLERP of complex field values with automatic fallback to linear interpolation when phase difference exceeds a threshold.
     // - Out-of-range frequencies are clamped to the nearest entry (no extrapolation).
     // - Consecutive frequency requests sharing the same bracketing entries reuse cached spatial interpolation results; sort frequency ascending or descending for best cache utilization.
-    // - If validate_input is true, calls arrayant_is_valid_multi once before processing; set to false in performance-critical loops after initial validation. 
+    // - If validate_input is true, calls arrayant_is_valid_multi once before processing; set to false in performance-critical loops after initial validation.
     template <typename dtype>
     void arrayant_interpolate_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Multi-frequency arrayant vector; entries need not be sorted by frequency
                                     const arma::Mat<dtype> *azimuth,                  // Azimuth angles in rad; must not be NULL, [1, n_ang] or [n_out, n_ang]
@@ -166,7 +172,7 @@ namespace quadriga_lib
     // - Each entry is validated individually via its is_valid member; quick_check is forwarded to that call.
     // - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
     // - Pattern data, center_frequency, and coupling matrix values are not compared (expected to vary).
-    // - Stops at first error and returns a message identifying the failing entry and property. 
+    // - Stops at first error and returns a message identifying the failing entry and property.
     template <typename dtype>
     std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects to validate
                                         bool quick_check = true);                         // If true, uses fast pointer-based per-entry validation; if false, performs full deep validation
@@ -174,7 +180,7 @@ namespace quadriga_lib
     // Apply Euler rotations to all entries in a multi-frequency arrayant vector
     // - Calls .rotate_pattern on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
     // - If i_element is empty, all elements are rotated; otherwise only the specified indices are affected.
-    // - For scalar acoustic fields (pressure stored in e_theta_re only), use usage = 1 to avoid spurious polarization effects. 
+    // - For scalar acoustic fields (pressure stored in e_theta_re only), use usage = 1 to avoid spurious polarization effects.
     template <typename dtype>
     void arrayant_rotate_pattern_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
                                        dtype x_deg = 0.0,                          // Rotation angle around x-axis (bank) in [deg]
@@ -187,23 +193,23 @@ namespace quadriga_lib
     // - Updates element_pos in-place on every entry in the vector identically.
     // - If i_element is empty, all positions are replaced and element_pos must have n_elements columns.
     // - If i_element is provided, only those indexed columns are updated; element_pos column count must match i_element length.
-    // - All entries must have the same element count; uninitialized element_pos fields are zero-initialized before update. 
+    // - All entries must have the same element count; uninitialized element_pos fields are zero-initialized before update.
     template <typename dtype>
     void arrayant_set_element_pos_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
                                         const arma::Mat<dtype> &element_pos,        // New (x, y, z) positions; [3, n_update]
                                         arma::uvec i_element = arma::uvec());       // Indices of elements to update; if empty, all elements are replaced
 
-    // Read an arrayant object from a QDANT file 
+    // Read an arrayant object from a QDANT file
     // - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
     template <typename dtype>
     arrayant<dtype> qdant_read(std::string fn,                   // Path to the QDANT file; must not be empty
                                unsigned id = 1,                  // 1-based ID of the antenna entry to read
-                               arma::u32_mat *layout = nullptr); // Output pointer filled with the file's layout matrix of element IDs 
+                               arma::u32_mat *layout = nullptr); // Output pointer filled with the file's layout matrix of element IDs
 
     // Read all arrayant objects from a QDANT file into a vector
     // - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
     // - Each unique ID is read exactly once regardless of how many times it appears in the layout.
-    // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_frequency on each entry identifies the corresponding frequency. 
+    // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_frequency on each entry identifies the corresponding frequency.
     template <typename dtype>
     std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
                                                   arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file

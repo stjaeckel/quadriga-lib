@@ -2,9 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex.h"
-#include "quadriga_arrayant.hpp"
-#include "mex_helper_functions.hpp"
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -14,7 +12,7 @@ SECTION!*/
 # ARRAYANT_COMBINE_PATTERN
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output 
+- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output
   element per port (column) of the coupling matrix
 - Useful for beamforming and MIMO channel computation speedup
 
@@ -22,79 +20,91 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 % Input as struct (struct mode)
 arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in);
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid, elevation_grid);
+arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid_new, elevation_grid_new);
 
 % Separate outputs, struct input
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid_new, elevation_grid_new, element_pos, ...
     coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern(arrayant_in);
 
-% Separate inputs
-arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid, elevation_grid, ...
+% Separate inputs (single-freq only)
+arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid_new, elevation_grid_new, ...
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, freq, name);
+    coupling_re, coupling_im, center_freq, name);
 ```
 
 ## Input Arguments:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`freq`** [2] —  An alternative value for the center frequency. Overwrites the value given in `arrayant_in`. If
-  neither `freq` not `arrayant_in["center_freq"]` are given, an error is thrown.
-
-- **`azimuth_grid`** [3] (optional)<br>
-  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Size: `[n_azimuth_out]`,
-  If not given, `arrayant_in.azimuth_grid` is used instead.
-
-- **`elevation_grid`** [4] (optional)<br>
-  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Size: `[n_elevation_out]`,
-  If not given, `arrayant_in.elevation_grid` is used instead.
+- **`freq`** *(optional)* —  Alternative frequency (grid) in Hz; defaults to per-entry `center_frequency`
+- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted;
+  defaults to input grid
+- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted;
+  defaults to input grid
 
 ## Output Arguments:
-- **`arrayant_out`**<br>
-  Struct containing the arrayant data with the following fields:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions                     | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
-  `center_freq`    | Center frequency in [Hz], default = 0.3 GHz           | Scalar
-  `name`           | Name of the array antenna object                      | String
-  Can be returned as separate outputs.
+- **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
+  result); field layout as documented in [[arrayant_generate]]. Single struct when both input and
+  `freq` describe a single frequency; struct array of size `numel(freq)` (or `numel(arrayant_in)`
+  when `freq` is omitted) otherwise.
+- **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
+  results** (single-struct input with scalar/omitted `freq`, or separate-input mode).
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1)
+    // Validate argument counts: struct mode = 1..4, separate-input mode = 10..15
+    if (nrhs < 1 || (nrhs > 4 && nrhs < 10) || nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-
+    if (nlhs > 11)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
     if (nlhs == 0)
         return;
 
-    // Assemble array antenna object
-    auto ant = quadriga_lib::arrayant<double>();
-    if (nrhs <= 4) // Struct
+    // Common optional inputs
+    const arma::vec freq = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
+    const arma::vec az = (nrhs < 3) ? arma::vec() : qd_mex_get_Col<double>(prhs[2]);
+    const arma::vec el = (nrhs < 4) ? arma::vec() : qd_mex_get_Col<double>(prhs[3]);
+
+    // Dispatch
+    const bool arrayant_is_struct = mxIsStruct(prhs[0]) && mxGetNumberOfElements(prhs[0]) > 0;
+    const bool separate_inputs = !arrayant_is_struct && nrhs >= 10;
+
+    if (!arrayant_is_struct && !separate_inputs)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "First input must be an arrayant struct/struct array, or [] with separate inputs (>=10 args).");
+
+    if (separate_inputs && freq.n_elem > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency mode (vector freq) requires struct input.");
+
+    bool multifreq = false;
+    if (arrayant_is_struct && freq.n_elem > 1)
+        multifreq = true;
+    else if (arrayant_is_struct && mxGetNumberOfElements(prhs[0]) > 1)
+        multifreq = true;
+
+    // Multi-frequency branch
+    if (multifreq)
     {
-        ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"));
-        ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"));
-        ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"));
-        ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"));
-        ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"));
-        ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"));
-        if (qd_mex_has_field(prhs[0], "element_pos"))
-            ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"));
-        if (qd_mex_has_field(prhs[0], "coupling_re"))
-            ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_re"));
-        if (qd_mex_has_field(prhs[0], "coupling_im"))
-            ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_im"));
-        if (qd_mex_has_field(prhs[0], "center_freq"))
-            ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(prhs[0], "center_freq"));
-        if (qd_mex_has_field(prhs[0], "name"))
-            ant.name = qd_mex_get_string(qd_mex_get_field(prhs[0], "name"));
+        if (nlhs > 1)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Multi-frequency output supports only struct output (1 lhs).");
+
+        // Helper validates internally; arrayant_combine_pattern_multi validates again — cheap.
+        const auto ant_multi = qd_mex_struct2arrayant_multi(prhs[0]);
+
+        std::vector<quadriga_lib::arrayant<double>> out;
+        CALL_QD(out = quadriga_lib::arrayant_combine_pattern_multi(ant_multi, &az, &el, &freq));
+
+        if (out.size() == 1)
+            plhs[0] = qd_mex_arrayant2struct(out[0]);
+        else
+            plhs[0] = qd_mex_arrayant2struct_multi(out);
+        return;
     }
-    else if (nrhs >= 10) // Separate
+
+    // Single-frequency branch
+    auto ant = quadriga_lib::arrayant<double>();
+    if (arrayant_is_struct)
+        ant = qd_mex_struct2arrayant(prhs[0]);
+    else // separate_inputs (nrhs >= 10)
     {
         ant.e_theta_re = qd_mex_get_Cube<double>(prhs[4]);
         ant.e_theta_im = qd_mex_get_Cube<double>(prhs[5]);
@@ -109,48 +119,23 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nrhs > 12)
             ant.coupling_im = qd_mex_get_Mat<double>(prhs[12]);
         if (nrhs > 13)
-            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13]);
+            ant.center_frequency = qd_mex_get_scalar<double>(prhs[13], "center_freq", 299792458.0);
         if (nrhs > 14)
             ant.name = qd_mex_get_string(prhs[14]);
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    // Frequency
-    ant.center_frequency = (nrhs < 2) ? ant.center_frequency : qd_mex_get_scalar<double>(prhs[1], "freq", ant.center_frequency);
-
-    // Parse grid
-    arma::vec az, el;
-    if (nrhs > 2)
-        az = qd_mex_get_Col<double>(prhs[2]);
-    if (nrhs > 3)
-        el = qd_mex_get_Col<double>(prhs[3]);
+    // Optional scalar freq override (single-freq path only)
+    if (freq.n_elem == 1)
+        ant.center_frequency = freq[0];
 
     // Call member function
     auto arrayant_out = quadriga_lib::arrayant<double>();
     CALL_QD(arrayant_out = ant.combine_pattern(&az, &el));
 
     // Return to MATLAB
-    if (nlhs == 1) // Output as struct
-    {
-        std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
-                                           "azimuth_grid", "elevation_grid", "element_pos",
-                                           "coupling_re", "coupling_im", "center_freq", "name"};
-
-        plhs[0] = qd_mex_make_struct(fields);
-        qd_mex_set_field(plhs[0], fields[0], qd_mex_copy2matlab(&arrayant_out.e_theta_re));
-        qd_mex_set_field(plhs[0], fields[1], qd_mex_copy2matlab(&arrayant_out.e_theta_im));
-        qd_mex_set_field(plhs[0], fields[2], qd_mex_copy2matlab(&arrayant_out.e_phi_re));
-        qd_mex_set_field(plhs[0], fields[3], qd_mex_copy2matlab(&arrayant_out.e_phi_im));
-        qd_mex_set_field(plhs[0], fields[4], qd_mex_copy2matlab(&arrayant_out.azimuth_grid, true));
-        qd_mex_set_field(plhs[0], fields[5], qd_mex_copy2matlab(&arrayant_out.elevation_grid, true));
-        qd_mex_set_field(plhs[0], fields[6], qd_mex_copy2matlab(&arrayant_out.element_pos));
-        qd_mex_set_field(plhs[0], fields[7], qd_mex_copy2matlab(&arrayant_out.coupling_re));
-        qd_mex_set_field(plhs[0], fields[8], qd_mex_copy2matlab(&arrayant_out.coupling_im));
-        qd_mex_set_field(plhs[0], fields[9], qd_mex_copy2matlab(&arrayant_out.center_frequency));
-        qd_mex_set_field(plhs[0], fields[10], mxCreateString(arrayant_out.name.c_str()));
-    }
-    else if (nlhs == 11) // Separate outputs
+    if (nlhs == 1)
+        plhs[0] = qd_mex_arrayant2struct(arrayant_out);
+    else if (nlhs == 11)
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant_out.e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&arrayant_out.e_theta_im);
