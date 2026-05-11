@@ -111,7 +111,8 @@ pip-win-cp314: wheelhouse\quadriga_lib-$(QUADRIGA_VERSION)-cp314-cp314-win_amd64
 pip-win: pip-win-cp310 pip-win-cp311 pip-win-cp312 pip-win-cp313 pip-win-cp314
 
 # Release
-release: external all pip-win
+# Make these first: external all pip-win
+release: 
 	- rmdir /s /q $(DIST_DIR)
 	cmake --install $(CMAKE_BUILD_DIR) --config Release --prefix $(DIST_DIR)
 	mkdir $(DIST_DIR)\wheels
@@ -120,7 +121,7 @@ release: external all pip-win
 	copy LICENSE "$(DIST_DIR)\" 2>nul || echo No LICENSE file
 	xcopy /E /I "include" "$(DIST_DIR)\include"
 	xcopy /E /I "$(CMAKE_BUILD_DIR)\armadillo-$(armadillo_version)\include" "$(DIST_DIR)\include"
-	if exist html_docu xcopy /E /I "html_docu" "$(DIST_DIR)\html_docu"
+	if exist html_docu xcopy /Y /I "html_docu\*" "release\quadriga_lib_0.11.5_win64\html_docu\"
 	powershell -Command "Compress-Archive -Path $(DIST_DIR) -DestinationPath $(DIST_DIR).zip -Force"
 	- rmdir /s /q $(DIST_DIR)
 
