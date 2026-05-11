@@ -41,6 +41,7 @@ Class for storing and manipulating array antenna models
 | `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                        |
 | `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                   |
 | `dtype center_frequency`          | scalar                                 | Center frequency                                  |
+| `std::string name`                | string                                 | Name of the array antenna object                  |
 
 ## Simple member functions:<br>
 | Function         | Description                                       |
@@ -57,7 +58,8 @@ Class for storing and manipulating array antenna models
 | Function                  | Description                                                       |
 | ------------------------- | ----------------------------------------------------------------- |
 | .[[append]]               | Append elements of another arrayant                               |
-| .[[calc_directivity_dBi]] | Calculate per-element directivity in dBi                          |
+| .[[calc_beamwidth_deg]]   | Calculate the beam width of an antenna element in degree          |
+| .[[calc_directivity_dBi]] | Calculate the directivity in dBi of a single array element        |
 | .[[combine_pattern]]      | Compute effective patterns from elements, positions, and coupling |
 | .[[copy_element]]         | Copy a single element to one or more destination slots            |
 | .[[export_obj_file]]      | Export pattern geometry to Wavefront OBJ                          |
@@ -184,96 +186,6 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
         }
 
     return output;
-}
-
-/*!MD
-# .calc_directivity_dBi
-Calculate the directivity in dBi of a single array element
-
-- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
-- Ignores element coupling
-
-## Declaration:
-```
-dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const;
-```
-
-## Inputs:
-- **`i_element`** — Element index, 0-based
-
-## Returns:
-- Directivity of the specified element in dBi
-
-## See also:
-- .[[combine_pattern]] (the per-port directivity is a typical follow-up)
-MD!*/
-
-template <typename dtype>
-dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const
-{
-    // Check if arrayant object is valid
-    std::string error_message = is_valid();
-    if (error_message.length() == 0 && i_element >= n_elements())
-        error_message = "Element index out of bound.";
-    if (error_message.length() != 0)
-        throw std::invalid_argument(error_message.c_str());
-
-    // Constants
-    double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
-    arma::uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
-
-    // Az and El grid as double
-    arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
-    arma::vec el = arma::conv_to<arma::vec>::from(elevation_grid);
-
-    // Calculate the azimuth weights
-    arma::vec waz(naz, arma::fill::none);
-    double *ptr = waz.memptr();
-    for (arma::uword i = 0; i < naz; ++i)
-    {
-        double x = i == 0 ? az.at(naz - 1) - pi2 : az.at(i - 1);
-        double y = i == naz - 1 ? az.at(0) + pi2 : az.at(i + 1);
-        ptr[i] = y - x;
-    }
-
-    // Calculate the elevation weights
-    arma::vec wel(nel, arma::fill::none);
-    ptr = wel.memptr();
-    for (arma::uword i = 0; i < nel; ++i)
-    {
-        double x = i == 0 ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
-        double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * el.at(i + 1);
-        arma::vec tmp = arma::linspace<arma::vec>(x, y, 21);
-        double val = arma::accu(arma::cos(tmp));
-        ptr[i] = val * (y - x);
-    }
-
-    // Combine weights
-    arma::mat W(nel, naz, arma::fill::none);
-    ptr = W.memptr();
-    double norm = 0.0;
-    for (double *col = waz.begin(); col != waz.end(); ++col)
-        for (double *row = wel.begin(); row != wel.end(); ++row)
-            *ptr = *row * *col, norm += *ptr++;
-    ptr = W.memptr();
-    norm = 1.0 / norm;
-    for (arma::uword i = 0; i < naz * nel; ++i)
-        ptr[i] *= norm;
-
-    // Calculate the directivity
-    double p_sum = 0.0, p_max = 0.0;
-    const dtype *p_theta_re = e_theta_re.slice_memptr(i_element), *p_theta_im = e_theta_im.slice_memptr(i_element);
-    const dtype *p_phi_re = e_phi_re.slice_memptr(i_element), *p_phi_im = e_phi_im.slice_memptr(i_element);
-    for (arma::uword i = 0; i < naz * nel; ++i)
-    {
-        double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
-        double pow = a * a + b * b + c * c + d * d;
-        p_max = pow > p_max ? pow : p_max;
-        p_sum += pow * ptr[i];
-    }
-
-    double directivity = p_max < 1.0e-14 ? 0.0 : 10.0 * std::log10(p_max / p_sum);
-    return dtype(directivity);
 }
 
 /*!MD
@@ -462,6 +374,96 @@ void quadriga_lib::arrayant<dtype>::calc_beamwidth_deg(arma::uword i_element, dt
         if (el_point_ang != nullptr)
             *el_point_ang = dtype(double(el_q(0, iM)) * rad2deg);
     }
+}
+
+/*!MD
+# .calc_directivity_dBi
+Calculate the directivity in dBi of a single array element
+
+- Directivity = 10 log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Ignores element coupling
+
+## Declaration:
+```
+dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const;
+```
+
+## Inputs:
+- **`i_element`** — Element index, 0-based
+
+## Returns:
+- Directivity of the specified element in dBi
+
+## See also:
+- .[[combine_pattern]] (the per-port directivity is a typical follow-up)
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::arrayant<dtype>::calc_directivity_dBi(arma::uword i_element) const
+{
+    // Check if arrayant object is valid
+    std::string error_message = is_valid();
+    if (error_message.length() == 0 && i_element >= n_elements())
+        error_message = "Element index out of bound.";
+    if (error_message.length() != 0)
+        throw std::invalid_argument(error_message.c_str());
+
+    // Constants
+    double pi2 = 2.0 * arma::datum::pi, pi_half = 0.5 * arma::datum::pi;
+    arma::uword naz = azimuth_grid.n_elem, nel = elevation_grid.n_elem;
+
+    // Az and El grid as double
+    arma::vec az = arma::conv_to<arma::vec>::from(azimuth_grid);
+    arma::vec el = arma::conv_to<arma::vec>::from(elevation_grid);
+
+    // Calculate the azimuth weights
+    arma::vec waz(naz, arma::fill::none);
+    double *ptr = waz.memptr();
+    for (arma::uword i = 0; i < naz; ++i)
+    {
+        double x = i == 0 ? az.at(naz - 1) - pi2 : az.at(i - 1);
+        double y = i == naz - 1 ? az.at(0) + pi2 : az.at(i + 1);
+        ptr[i] = y - x;
+    }
+
+    // Calculate the elevation weights
+    arma::vec wel(nel, arma::fill::none);
+    ptr = wel.memptr();
+    for (arma::uword i = 0; i < nel; ++i)
+    {
+        double x = i == 0 ? -pi_half : 0.5 * el.at(i - 1) + 0.5 * el.at(i);
+        double y = i == nel - 1 ? pi_half : 0.5 * el.at(i) + 0.5 * el.at(i + 1);
+        arma::vec tmp = arma::linspace<arma::vec>(x, y, 21);
+        double val = arma::accu(arma::cos(tmp));
+        ptr[i] = val * (y - x);
+    }
+
+    // Combine weights
+    arma::mat W(nel, naz, arma::fill::none);
+    ptr = W.memptr();
+    double norm = 0.0;
+    for (double *col = waz.begin(); col != waz.end(); ++col)
+        for (double *row = wel.begin(); row != wel.end(); ++row)
+            *ptr = *row * *col, norm += *ptr++;
+    ptr = W.memptr();
+    norm = 1.0 / norm;
+    for (arma::uword i = 0; i < naz * nel; ++i)
+        ptr[i] *= norm;
+
+    // Calculate the directivity
+    double p_sum = 0.0, p_max = 0.0;
+    const dtype *p_theta_re = e_theta_re.slice_memptr(i_element), *p_theta_im = e_theta_im.slice_memptr(i_element);
+    const dtype *p_phi_re = e_phi_re.slice_memptr(i_element), *p_phi_im = e_phi_im.slice_memptr(i_element);
+    for (arma::uword i = 0; i < naz * nel; ++i)
+    {
+        double a = double(p_theta_re[i]), b = double(p_theta_im[i]), c = double(p_phi_re[i]), d = double(p_phi_im[i]);
+        double pow = a * a + b * b + c * c + d * d;
+        p_max = pow > p_max ? pow : p_max;
+        p_sum += pow * ptr[i];
+    }
+
+    double directivity = p_max < 1.0e-14 ? 0.0 : 10.0 * std::log10(p_max / p_sum);
+    return dtype(directivity);
 }
 
 /*!MD
@@ -1617,7 +1619,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
    | 2    | No      | Yes          | No              |
    | 3    | Yes     | Yes          | No              |
    | 4    | Yes     | No           | No              |
-- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
+- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements (implemented as wrap-around to UINT_MAX)
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 
 ## See also:

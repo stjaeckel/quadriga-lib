@@ -145,5 +145,6 @@
         "ranges": "cpp",
         "barrier": "cpp"
     },
-    "git.ignoreLimitWarning": true
+    "git.ignoreLimitWarning": true,
+    "editor.rulers": [100]
 }

@@ -48,10 +48,10 @@ void quadriga_lib::arrayant_interpolate_multi(
 - **`arrayant_vec`** — Multi-frequency arrayant vector; entries need not be sorted by frequency
 - **`azimuth`** — Azimuth angles in rad; must not be NULL, `[1, n_ang]` or `[n_out, n_ang]`
 - **`elevation`** — Elevation angles in rad; must not be NULL; size must match `azimuth`
-- **`frequency`** — Target frequencies; must not be NULL or empty; `[n_freq]`
-- **`i_element`** *(optional)* — 0-based element indices to interpolate; if empty, all elements are used (`n_out = n_elements`)
+- **`frequency`** — Target frequencies in Hz; must not be NULL or empty; `[n_freq]`
+- **`i_element`** *(optional)* — Element indices to interpolate; if empty, all elements are used (`n_out = n_elements`)
 - **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad, applied at all frequencies; `[3,1,1]`; `[3,n_out,1]`; `[3,1,n_ang]`, or `[3,n_out,n_ang]`
-- **`element_pos_i`** *(optional)* — Override element positions in m; if `nullptr`, positions from entry 0 are used; `[3, n_out]`
+- **`element_pos_i`** *(optional)* — Override element positions; if `nullptr`, positions from freq index 0 are used; `[3, n_out]`
 - **`validate_input`** *(optional)* — If `true`, validates `arrayant_vec` with [[arrayant_is_valid_multi]] before processing
 
 ## Outputs:
