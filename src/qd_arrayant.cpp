@@ -481,8 +481,8 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(
 ```
 
 ## Inputs:
-- **`azimuth_grid_new`** *(optional)* — Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
-- **`elevation_grid_new`** *(optional)* — Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
+- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
 
 ## Returns:
 - New `arrayant` with `n_ports` elements (= number of columns in `coupling_re/im`), each holding the combined effective pattern for that port
@@ -546,7 +546,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::combine_pattern(con
                             V_re, V_im, H_re, H_im, &dist);
 
     // Apply phase shift caused by element positions
-    double lambda = 299792448.0 / (double)this->center_frequency;
+    double lambda = 299792458.0 / (double)this->center_frequency;
     dtype wave_no = dtype(2.0 * arma::datum::pi / lambda);
     arma::Mat<std::complex<dtype>> phase(arma::cos(wave_no * dist), arma::sin(-wave_no * dist));
     arma::Mat<std::complex<dtype>> Vi(V_re, V_im), Hi(H_re, H_im);

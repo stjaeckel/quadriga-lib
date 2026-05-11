@@ -14,10 +14,8 @@
 #include "qd_arrayant_interpolate.hpp"
 #include "slerp.h"
 
-// ------------------------------------------------------------------------------------------------
 // Find bracketing indices and weight for frequency interpolation
 // Returns: i_lo, i_hi, weight (0=lo, 1=hi), exact_match flag
-// ------------------------------------------------------------------------------------------------
 template <typename dtype>
 static inline void find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype freq,
                                      arma::uword &i_lo, arma::uword &i_hi, dtype &w, bool &exact)
@@ -67,10 +65,8 @@ static inline void find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype
     w = (freq - center_freqs[i_lo]) / (center_freqs[i_hi] - center_freqs[i_lo]);
 }
 
-// ------------------------------------------------------------------------------------------------
 // Interpolate a complex-valued matrix pair using SLERP per element
 // Handles empty imaginary matrices (treated as zeros)
-// ------------------------------------------------------------------------------------------------
 template <typename dtype>
 static inline void interpolate_complex_matrix(const arma::Mat<dtype> &re_lo, const arma::Mat<dtype> &im_lo,
                                               const arma::Mat<dtype> &re_hi, const arma::Mat<dtype> &im_hi,
@@ -190,10 +186,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const dtype rC = one / propagation_speed;
     const dtype two_pi = dtype(2.0) * dtype(arma::datum::pi);
 
-    // ============================================================================================
     // Input validation
-    // ============================================================================================
-
     if (tx_array.empty())
         throw std::invalid_argument("get_channels_multifreq: TX array vector is empty.");
     if (rx_array.empty())
@@ -249,10 +242,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     const arma::uword n_rx_ports = rx_array[0].n_ports();
     const arma::uword n_ports = n_tx_ports * n_rx_ports;
 
-    // ============================================================================================
     // Resize outputs (only if needed, preserves externally borrowed memory)
-    // ============================================================================================
-
     if (coeff_re.size() != n_freq_out)
         coeff_re.resize(n_freq_out);
     if (coeff_im.size() != n_freq_out)
@@ -269,10 +259,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             delay[f].set_size(n_rx_ports, n_tx_ports, n_out);
     }
 
-    // ============================================================================================
     // Build center-frequency vectors for TX, RX, and freq_in grids
-    // ============================================================================================
-
     arma::Col<dtype> tx_center_freqs((arma::uword)tx_array.size());
     arma::Col<dtype> rx_center_freqs((arma::uword)rx_array.size());
     for (arma::uword i = 0; i < tx_center_freqs.n_elem; ++i)
@@ -280,10 +267,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
     for (arma::uword i = 0; i < rx_center_freqs.n_elem; ++i)
         rx_center_freqs[i] = (dtype)rx_array[i].center_frequency;
 
-    // ============================================================================================
     // Phase 1: Geometry computation (frequency-independent, sequential)
-    // ============================================================================================
-
     // Transmitter and receiver orientation
     arma::Cube<dtype> tx_orientation(3, 1, 1, arma::fill::zeros);
     arma::Cube<dtype> rx_orientation(3, 1, 1, arma::fill::zeros);
@@ -431,10 +415,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
     }
 
-    // ============================================================================================
     // Prepare TX/RX element indices and interpolation positions (frequency-independent)
-    // ============================================================================================
-
     arma::Col<unsigned> i_tx_element(n_links);
     arma::Mat<dtype> tx_element_pos_interp(3, n_links);
     {
@@ -463,10 +444,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 *pe++ = r + 1, *pp++ = prl[3 * r], *pp++ = prl[3 * r + 1], *pp++ = prl[3 * r + 2];
     }
 
-    // ============================================================================================
     // Determine if element coupling is needed (check ALL entries across frequencies)
-    // ============================================================================================
-
     const bool different_output_size = (n_tx != n_tx_ports || n_rx != n_rx_ports);
     bool apply_element_coupling = different_output_size;
 
@@ -523,10 +501,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         }
     }
 
-    // ============================================================================================
     // Phase 2: Per-frequency processing (parallelized over output frequencies)
-    // ============================================================================================
-
     const int n_freq_out_i = (int)n_freq_out;
 #pragma omp parallel for schedule(static)
     for (int f_i = 0; f_i < n_freq_out_i; ++f_i)
@@ -536,10 +511,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         const dtype wavelength = (freq > zero) ? propagation_speed / freq : one;
         const dtype wave_number = (freq > zero) ? two_pi * freq / propagation_speed : zero;
 
-        // ------------------------------------------------------------------------------------
         // Find frequency brackets for TX, RX, and freq_in grids
-        // ------------------------------------------------------------------------------------
-
         arma::uword tx_lo, tx_hi, rx_lo, rx_hi, fin_lo, fin_hi;
         dtype tx_w, rx_w, fin_w;
         bool tx_exact, rx_exact, fin_exact;
@@ -548,10 +520,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         find_freq_bracket(rx_center_freqs, freq, rx_lo, rx_hi, rx_w, rx_exact);
         find_freq_bracket(freq_in, freq, fin_lo, fin_hi, fin_w, fin_exact);
 
-        // ------------------------------------------------------------------------------------
         // Interpolate path gain at this frequency (linear interpolation)
-        // ------------------------------------------------------------------------------------
-
         const dtype *p_gain_in = path_gain.memptr(); // Column-major [n_path, n_freq_in]
         arma::Col<dtype> gain_f(n_path);
         if (fin_exact)
@@ -568,10 +537,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 pg[p] = wA * col_lo[p] + wB * col_hi[p];
         }
 
-        // ------------------------------------------------------------------------------------
         // Interpolate M (Jones matrix) at this frequency (SLERP per complex entry)
-        // ------------------------------------------------------------------------------------
-
         const arma::uword M_rows = M.n_rows; // 8 or 2
         arma::Mat<dtype> M_f(M_rows, n_path);
         if (fin_exact)
@@ -598,17 +564,14 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             }
         }
 
-        // ------------------------------------------------------------------------------------
         // Interpolate coupling matrices at this frequency (SLERP per complex entry)
-        // ------------------------------------------------------------------------------------
-
         arma::Mat<dtype> tx_cpl_re_f, tx_cpl_im_f;
         arma::Mat<dtype> rx_cpl_re_f, rx_cpl_im_f;
         arma::Mat<dtype> tx_coupling_pwr_f, rx_coupling_pwr_f;
 
         if (apply_element_coupling)
         {
-            // --- TX coupling interpolation ---
+            // TX coupling interpolation
             const arma::Mat<dtype> &tx_cpl_re_lo = tx_array[tx_lo].coupling_re;
             const arma::Mat<dtype> &tx_cpl_im_lo = tx_array[tx_lo].coupling_im;
 
@@ -649,7 +612,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                                            tx_w, tx_cpl_re_f, tx_cpl_im_f);
             }
 
-            // --- RX coupling interpolation ---
+            // RX coupling interpolation
             const arma::Mat<dtype> &rx_cpl_re_lo = rx_array[rx_lo].coupling_re;
             const arma::Mat<dtype> &rx_cpl_im_lo = rx_array[rx_lo].coupling_im;
 
@@ -695,10 +658,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                          rx_cpl_re_f.memptr(), rx_cpl_im_f.memptr());
         }
 
-        // ------------------------------------------------------------------------------------
         // Internal storage for this frequency (if output size differs from element size)
-        // ------------------------------------------------------------------------------------
-
         arma::Cube<dtype> CR, CI, DL;
         if (different_output_size)
         {
@@ -714,16 +674,13 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
         // Copy geometric path delays (same for all frequencies, in meters)
         std::memcpy(p_delays_f, p_path_dl, n_links * n_out * sizeof(dtype));
 
-        // ------------------------------------------------------------------------------------
         // MIMO coefficient calculation — sequential loop over paths
-        // ------------------------------------------------------------------------------------
-
         for (arma::uword j = 0; j < n_out; ++j)
         {
             const arma::uword i = add_fake_los_path ? (j == 0 ? 0 : j - 1) : j;
             const arma::uword o_slice = j * n_links;
 
-            // --- Interpolate TX antenna at departure angles ---
+            // Interpolate TX antenna at departure angles
             const arma::Mat<dtype> AOD_j(&p_aod[o_slice], n_links, 1, false, true);
             const arma::Mat<dtype> EOD_j(&p_eod[o_slice], n_links, 1, false, true);
 
@@ -771,7 +728,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 }
             }
 
-            // --- Interpolate RX antenna at arrival angles ---
+            // Interpolate RX antenna at arrival angles
             const arma::Mat<dtype> AOA_j(&p_aoa[o_slice], n_links, 1, false, true);
             const arma::Mat<dtype> EOA_j(&p_eoa[o_slice], n_links, 1, false, true);
 
@@ -820,7 +777,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
                 }
             }
 
-            // --- Compute MIMO coefficients for this path ---
+            // Compute MIMO coefficients for this path
             const dtype *pM = M_f.colptr(i);
             const dtype *pVrr = Vr_re.memptr(), *pVri = Vr_im.memptr();
             const dtype *pHrr = Hr_re.memptr(), *pHri = Hr_im.memptr();
@@ -869,10 +826,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
 
         } // End path loop
 
-        // ------------------------------------------------------------------------------------
         // Apply antenna element coupling (using interpolated coupling matrices)
-        // ------------------------------------------------------------------------------------
-
         if (apply_element_coupling)
         {
             dtype *tempX = new dtype[n_ports];
@@ -924,10 +878,7 @@ void quadriga_lib::get_channels_multifreq(const std::vector<quadriga_lib::arraya
             delete[] tempT;
         }
 
-        // ------------------------------------------------------------------------------------
         // Move true LOS path to slot 0 if fake LOS was added
-        // ------------------------------------------------------------------------------------
-
         if (add_fake_los_path && true_los_path != 0)
         {
             dtype *ptrR = coeff_re[f].slice_memptr(true_los_path);

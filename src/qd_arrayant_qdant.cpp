@@ -95,7 +95,7 @@ std::string qd_arrayant_qdant_read(const std::string fn, const int id,
     // Read center frequency
     node_name = pfx + "CenterFrequency";
     node = node_arrayant.child(node_name.c_str());
-    *center_frequency = node.empty() ? dtype(299792448.0) : dtype(node.text().as_double());
+    *center_frequency = node.empty() ? dtype(299792458.0) : dtype(node.text().as_double());
 
     // Read the number of elements
     node_name = pfx + "NoElements";

@@ -4,6 +4,8 @@
 
 #include "quadriga_arrayant.hpp"
 #include "qd_arrayant_functions.hpp"
+#include "quadriga_lib_helper_functions.hpp"
+#include "slerp.h"
 
 #include <stdexcept>
 #include <filesystem>
@@ -176,7 +178,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
     if (fn.empty())
         throw std::invalid_argument("qdant_read_multi: Filename cannot be empty.");
 
-    // --- Step 1: Probe the file with id=1 to obtain the layout ---
+    // Step 1: Probe the file with id=1 to obtain the layout
     // Even if id=1 does not exist, qd_arrayant_qdant_read still returns the layout
     arma::u32_mat file_layout;
     {
@@ -198,7 +200,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
     if (file_layout.is_empty())
         throw std::invalid_argument("qdant_read_multi: Could not read layout from file '" + fn + "'.");
 
-    // --- Step 2: Extract unique IDs from the layout in order of first appearance ---
+    // Step 2: Extract unique IDs from the layout in order of first appearance
     std::vector<unsigned> unique_ids;
     unique_ids.reserve(file_layout.n_elem);
 
@@ -224,7 +226,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
     if (unique_ids.empty())
         throw std::invalid_argument("qdant_read_multi: Layout contains no valid (non-zero) IDs in file '" + fn + "'.");
 
-    // --- Step 3: Read each unique ID ---
+    // Step 3: Read each unique ID
     std::vector<quadriga_lib::arrayant<dtype>> result;
     result.reserve(unique_ids.size());
 
@@ -255,7 +257,7 @@ std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::qdant_read_multi(const 
         result.push_back(std::move(ant));
     }
 
-    // --- Step 4: Optionally return the layout ---
+    // Step 4: Optionally return the layout
     if (layout != nullptr)
         *layout = file_layout;
 
@@ -826,3 +828,278 @@ template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_conca
 
 template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_concat_multi(
     const std::vector<quadriga_lib::arrayant<double>> &, const std::vector<quadriga_lib::arrayant<double>> &);
+
+/*!MD
+# arrayant_combine_pattern_multi
+Combine element patterns, positions, and coupling weights into effective radiation patterns (multi-frequency)
+
+- Multi-frequency counterpart to .[[combine_pattern]]
+- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` across all entries to produce one output element per port (column of the coupling matrix) at each requested output frequency
+- Output length = `freq_grid_new->n_elem` if provided; otherwise one entry per input arrayant
+- Field interpolation across frequency is delegated to [[arrayant_interpolate_multi]] (SLERP with linear-interpolation fallback)
+- Coupling matrices are SLERP-interpolated between bracketing input entries; out-of-range output frequencies are clamped to the nearest input entry
+- Each output arrayant has identity coupling and zero element positions (patterns are pre-combined)
+
+## Declaration:
+```
+std::vector<arrayant<dtype>> arrayant_combine_pattern_multi(
+    const std::vector<arrayant<dtype>> &arrayant_vec,
+    const arma::Col<dtype> *azimuth_grid_new = nullptr,
+    const arma::Col<dtype> *elevation_grid_new = nullptr,
+    const arma::Col<dtype> *freq_grid_new = nullptr);
+```
+
+## Inputs:
+- **`arrayant_vec`** — Non-empty vector of valid arrayant objects (must pass [[arrayant_is_valid_multi]])
+- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted; defaults to `arrayant_vec[0].azimuth_grid`
+- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to `arrayant_vec[0].elevation_grid`
+- **`freq_grid_new`** *(optional)* — Alternative frequency grid in Hz; defaults to per-entry `center_frequency`
+
+## Returns:
+- Vector of arrayant objects (length = `n_freq_out`), each with `n_ports` elements equal to the number of columns in the coupling matrix
+
+## See also:
+- .[[combine_pattern]] (single-frequency counterpart)
+- [[arrayant_interpolate_multi]] (used internally for spatial+frequency field interpolation)
+- [[arrayant_is_valid_multi]] (input validation)
+MD!*/
+
+template <typename dtype>
+std::vector<quadriga_lib::arrayant<dtype>> quadriga_lib::arrayant_combine_pattern_multi(
+    const std::vector<arrayant<dtype>> &arrayant_vec,
+    const arma::Col<dtype> *azimuth_grid_new,
+    const arma::Col<dtype> *elevation_grid_new,
+    const arma::Col<dtype> *freq_grid_new)
+{
+    if (arrayant_vec.empty())
+        throw std::invalid_argument("arrayant_combine_pattern_multi: Input vector is empty.");
+
+    // Validate input vector (deep check)
+    std::string err = quadriga_lib::arrayant_is_valid_multi(arrayant_vec, false);
+    if (!err.empty())
+        throw std::invalid_argument("arrayant_combine_pattern_multi: Input validation failed: " + err);
+
+    arma::uword n_freq_in = (arma::uword)arrayant_vec.size();
+
+    // Validate optional output grids
+    bool new_azgrid = azimuth_grid_new != nullptr && azimuth_grid_new->n_elem != 0;
+    bool new_elgrid = elevation_grid_new != nullptr && elevation_grid_new->n_elem != 0;
+    bool new_fgrid = freq_grid_new != nullptr && freq_grid_new->n_elem != 0;
+
+    if (new_azgrid && !qd_in_range(azimuth_grid_new->memptr(), azimuth_grid_new->n_elem, dtype(-3.1415930), dtype(3.1415930), true, true))
+        throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'azimuth_grid_new' must be sorted and in [-pi, pi].");
+
+    if (new_elgrid && !qd_in_range(elevation_grid_new->memptr(), elevation_grid_new->n_elem, dtype(-1.5707965), dtype(1.5707965), true, true))
+        throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'elevation_grid_new' must be sorted and in [-pi/2, pi/2].");
+
+    if (new_fgrid)
+    {
+        const dtype *p_freq = freq_grid_new->memptr();
+        for (arma::uword i = 0; i < freq_grid_new->n_elem; ++i)
+            if (!(p_freq[i] > dtype(0.0)))
+                throw std::invalid_argument("arrayant_combine_pattern_multi: Values of 'freq_grid_new' must be positive.");
+    }
+
+    // Output grids
+    const dtype *p_azimuth_grid = new_azgrid ? azimuth_grid_new->memptr() : arrayant_vec[0].azimuth_grid.memptr();
+    const dtype *p_elevation_grid = new_elgrid ? elevation_grid_new->memptr() : arrayant_vec[0].elevation_grid.memptr();
+    arma::uword n_azimuth_out = new_azgrid ? azimuth_grid_new->n_elem : arrayant_vec[0].azimuth_grid.n_elem;
+    arma::uword n_elevation_out = new_elgrid ? elevation_grid_new->n_elem : arrayant_vec[0].elevation_grid.n_elem;
+    arma::uword n_ang = n_azimuth_out * n_elevation_out;
+
+    // Output frequency grid: default = per-entry center_frequency in input order
+    arma::Col<dtype> freq_grid;
+    if (new_fgrid)
+        freq_grid = *freq_grid_new;
+    else
+    {
+        freq_grid.set_size(n_freq_in);
+        for (arma::uword i = 0; i < n_freq_in; ++i)
+            freq_grid(i) = arrayant_vec[i].center_frequency;
+    }
+    arma::uword n_freq_out = freq_grid.n_elem;
+
+    // Build flat (azimuth, elevation) pair list (elevation varies fastest)
+    arma::Mat<dtype> azimuth(1, n_ang, arma::fill::none);
+    arma::Mat<dtype> elevation(1, n_ang, arma::fill::none);
+    {
+        dtype *p_az = azimuth.memptr(), *p_el = elevation.memptr();
+        for (arma::uword ia = 0; ia < n_azimuth_out; ++ia)
+            for (arma::uword ie = 0; ie < n_elevation_out; ++ie)
+                *p_az++ = p_azimuth_grid[ia], *p_el++ = p_elevation_grid[ie];
+    }
+
+    // Element positions (identical across input entries per arrayant_is_valid_multi)
+    arma::uword n_elements = arrayant_vec[0].n_elements();
+    arma::Mat<dtype> element_pos_used = arrayant_vec[0].element_pos.is_empty()
+                                            ? arma::Mat<dtype>(3, n_elements, arma::fill::zeros)
+                                            : arrayant_vec[0].element_pos;
+
+    // Interpolate fields across angles and freq; pass zero element_pos so no phase is baked in
+    arma::Mat<dtype> zero_pos(3, n_elements, arma::fill::zeros);
+    arma::Cube<dtype> V_re, V_im, H_re, H_im;
+    quadriga_lib::arrayant_interpolate_multi<dtype>(arrayant_vec, &azimuth, &elevation, &freq_grid,
+                                                    &V_re, &V_im, &H_re, &H_im, arma::uvec{}, nullptr, &zero_pos, false);
+
+    // Geometric dist matrix: dist(e, a) = element_pos[:,e] · wave_direction(az[a], el[a])
+    arma::Mat<dtype> dist(n_elements, n_ang, arma::fill::none);
+    {
+        const dtype *p_pos = element_pos_used.memptr();
+        const dtype *p_az = azimuth.memptr();
+        const dtype *p_el = elevation.memptr();
+        dtype *p_dist = dist.memptr(); // column-major: dist(e, a)
+        for (arma::uword a = 0; a < n_ang; ++a)
+        {
+            dtype caz = std::cos(p_az[a]), saz = std::sin(p_az[a]);
+            dtype cel = std::cos(p_el[a]), sel = std::sin(p_el[a]);
+            dtype dx = cel * caz, dy = cel * saz, dz = sel;
+            for (arma::uword e = 0; e < n_elements; ++e)
+            {
+                dtype x = p_pos[3 * e + 0], y = p_pos[3 * e + 1], z = p_pos[3 * e + 2];
+                *p_dist++ = -(x * dx + y * dy + z * dz);
+            }
+        }
+    }
+
+    // Coupling setup
+    bool no_coupling = arrayant_vec[0].coupling_re.is_empty();
+    arma::uword n_ports_out = no_coupling ? n_elements : arrayant_vec[0].coupling_re.n_cols;
+
+    // Input center frequencies and sort order (for coupling interpolation)
+    arma::Col<double> f_in_d(n_freq_in);
+    for (arma::uword i = 0; i < n_freq_in; ++i)
+        f_in_d(i) = (double)arrayant_vec[i].center_frequency;
+    arma::uvec sort_idx = arma::sort_index(f_in_d);
+    arma::Col<double> f_in_sorted(n_freq_in);
+    for (arma::uword i = 0; i < n_freq_in; ++i)
+        f_in_sorted(i) = f_in_d(sort_idx(i));
+
+    // Build output entries
+    std::vector<quadriga_lib::arrayant<dtype>> output(n_freq_out);
+    constexpr double C0 = 299792458.0;
+
+    for (arma::uword f = 0; f < n_freq_out; ++f)
+    {
+        double freq_out = (double)freq_grid(f);
+        dtype wave_no = dtype(2.0 * arma::datum::pi * freq_out / C0);
+
+        // Coupling for this output frequency (linear interp of complex coupling, clamped)
+        arma::Mat<std::complex<dtype>> coupling;
+        if (no_coupling)
+        {
+            coupling = arma::Mat<std::complex<dtype>>(n_elements, n_ports_out, arma::fill::zeros);
+            for (arma::uword k = 0; k < n_elements; ++k)
+                coupling(k, k) = std::complex<dtype>(dtype(1.0), dtype(0.0));
+        }
+        else
+        {
+            arma::uword i_lo = sort_idx(0), i_hi = sort_idx(0);
+            double w = 0.0;
+            if (freq_out <= f_in_sorted(0))
+                i_lo = i_hi = sort_idx(0), w = 0.0;
+            else if (freq_out >= f_in_sorted(n_freq_in - 1))
+                i_lo = i_hi = sort_idx(n_freq_in - 1), w = 0.0;
+            else
+                for (arma::uword i = 1; i < n_freq_in; ++i)
+                    if (f_in_sorted(i) >= freq_out)
+                    {
+                        i_lo = sort_idx(i - 1);
+                        i_hi = sort_idx(i);
+                        double f_lo = f_in_sorted(i - 1), f_hi = f_in_sorted(i);
+                        w = (freq_out - f_lo) / (f_hi - f_lo);
+                        break;
+                    }
+
+            const arma::Mat<dtype> &cre_lo = arrayant_vec[i_lo].coupling_re;
+            const arma::Mat<dtype> &cre_hi = arrayant_vec[i_hi].coupling_re;
+            arma::Mat<dtype> cim_lo = arrayant_vec[i_lo].coupling_im.is_empty()
+                                          ? arma::Mat<dtype>(n_elements, n_ports_out, arma::fill::zeros)
+                                          : arrayant_vec[i_lo].coupling_im;
+            arma::Mat<dtype> cim_hi = arrayant_vec[i_hi].coupling_im.is_empty()
+                                          ? arma::Mat<dtype>(n_elements, n_ports_out, arma::fill::zeros)
+                                          : arrayant_vec[i_hi].coupling_im;
+
+            arma::Mat<dtype> cre(n_elements, n_ports_out);
+            arma::Mat<dtype> cim(n_elements, n_ports_out);
+            const dtype *p_rlo = cre_lo.memptr(), *p_rhi = cre_hi.memptr();
+            const dtype *p_ilo = cim_lo.memptr(), *p_ihi = cim_hi.memptr();
+            dtype *p_ro = cre.memptr(), *p_io = cim.memptr();
+            const arma::uword nE = n_elements * n_ports_out;
+            for (arma::uword k = 0; k < nE; ++k)
+                slerp_complex_mf(p_rlo[k], p_ilo[k], p_rhi[k], p_ihi[k], dtype(w), p_ro[k], p_io[k]);
+            coupling = arma::Mat<std::complex<dtype>>(cre, cim);
+        }
+
+        // Apply element-position phase shift: exp(-j * k * dist)
+        arma::Mat<dtype> wd = wave_no * dist; // [n_elements, n_ang]
+        arma::Mat<std::complex<dtype>> phase(arma::cos(wd), arma::sin(-wd));
+
+        arma::Mat<dtype> V_re_s = V_re.slice(f); // [n_elements, n_ang]
+        arma::Mat<dtype> V_im_s = V_im.slice(f);
+        arma::Mat<dtype> H_re_s = H_re.slice(f);
+        arma::Mat<dtype> H_im_s = H_im.slice(f);
+        arma::Mat<std::complex<dtype>> Vi(V_re_s, V_im_s);
+        arma::Mat<std::complex<dtype>> Hi(H_re_s, H_im_s);
+        Vi = Vi % phase;
+        Hi = Hi % phase;
+
+        // Apply coupling: Vo(ang, port) = sum_e coupling(e, port) * Vi(e, ang)
+        arma::Mat<std::complex<dtype>> Vo(n_ang, n_ports_out, arma::fill::zeros);
+        arma::Mat<std::complex<dtype>> Ho(n_ang, n_ports_out, arma::fill::zeros);
+        for (arma::uword i = 0; i < n_elements; ++i)
+        {
+            arma::Col<std::complex<dtype>> vi = Vi.row(i).as_col();
+            arma::Col<std::complex<dtype>> hi = Hi.row(i).as_col();
+            for (arma::uword o = 0; o < n_ports_out; ++o)
+            {
+                std::complex<dtype> cpl = coupling.at(i, o);
+                Vo.col(o) += vi * cpl;
+                Ho.col(o) += hi * cpl;
+            }
+        }
+
+        // Write output entry
+        quadriga_lib::arrayant<dtype> &out = output[f];
+        out.set_size(n_elevation_out, n_azimuth_out, n_ports_out, n_ports_out);
+
+        std::memcpy(out.azimuth_grid.memptr(), p_azimuth_grid, n_azimuth_out * sizeof(dtype));
+        std::memcpy(out.elevation_grid.memptr(), p_elevation_grid, n_elevation_out * sizeof(dtype));
+
+        arma::uword n_bytes = n_elevation_out * n_azimuth_out * n_ports_out * sizeof(dtype);
+        arma::Mat<dtype> cpy = arma::real(Vo);
+        std::memcpy(out.e_theta_re.memptr(), cpy.memptr(), n_bytes);
+        cpy = arma::imag(Vo);
+        std::memcpy(out.e_theta_im.memptr(), cpy.memptr(), n_bytes);
+        cpy = arma::real(Ho);
+        std::memcpy(out.e_phi_re.memptr(), cpy.memptr(), n_bytes);
+        cpy = arma::imag(Ho);
+        std::memcpy(out.e_phi_im.memptr(), cpy.memptr(), n_bytes);
+
+        out.element_pos.zeros();
+        out.coupling_re.eye();
+        out.coupling_im.zeros();
+        out.center_frequency = dtype(freq_out);
+        out.name = arrayant_vec[0].name;
+
+        // Quick-check pointers
+        out.check_ptr[0] = out.e_theta_re.memptr();
+        out.check_ptr[1] = out.e_theta_im.memptr();
+        out.check_ptr[2] = out.e_phi_re.memptr();
+        out.check_ptr[3] = out.e_phi_im.memptr();
+        out.check_ptr[4] = out.azimuth_grid.memptr();
+        out.check_ptr[5] = out.elevation_grid.memptr();
+        out.check_ptr[6] = out.element_pos.memptr();
+        out.check_ptr[7] = out.coupling_re.memptr();
+        out.check_ptr[8] = out.coupling_im.memptr();
+    }
+
+    return output;
+}
+
+template std::vector<quadriga_lib::arrayant<float>> quadriga_lib::arrayant_combine_pattern_multi(
+    const std::vector<quadriga_lib::arrayant<float>> &,
+    const arma::Col<float> *, const arma::Col<float> *, const arma::Col<float> *);
+
+template std::vector<quadriga_lib::arrayant<double>> quadriga_lib::arrayant_combine_pattern_multi(
+    const std::vector<quadriga_lib::arrayant<double>> &,
+    const arma::Col<double> *, const arma::Col<double> *, const arma::Col<double> *);

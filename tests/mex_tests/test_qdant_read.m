@@ -34,7 +34,7 @@ assertElementsAlmostEqual( elevation_grid, [-pi/2,-pi/4,0,pi/4,pi/2], 'absolute'
 assertElementsAlmostEqual( element_pos, [0;0;0], 'absolute', 1e-13 );
 assertElementsAlmostEqual( coupling_re, 1, 'absolute', 1e-13 );
 assertElementsAlmostEqual( coupling_im, 0, 'absolute', 1e-13 );
-assertElementsAlmostEqual( center_frequency, 299792448, 'absolute', 1e-13 );
+assertElementsAlmostEqual( center_frequency, 299792458, 'absolute', 1e-13 );
 assertTrue( strcmp(name,'bla') );
 assertEqual( layout, uint32(1) );
 
