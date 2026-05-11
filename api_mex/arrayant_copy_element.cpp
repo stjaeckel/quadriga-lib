@@ -1,23 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
-#include "mex.h"
-#include "quadriga_arrayant.hpp"
-#include "mex_helper_functions.hpp"
+#include "mex_quadriga_lib_functions.hpp"
 
 /*!SECTION
 Array antenna functions
@@ -27,112 +12,87 @@ SECTION!*/
 # ARRAYANT_COPY_ELEMENT
 Create copies of array antenna elements
 
+- Copies a source element to one or more destination slots within an arrayant
+- Array is resized if any destination index exceeds the current number of elements
+- Coupling matrix entries for newly added elements are set to identity; existing coupling is preserved
+- Supports multi-frequency arrayant models: when `arrayant_in` is a struct array, the same copy is
+  applied to every entry and a struct array of equal size is returned
+- If `source_element` is a vector, `dest_element` must have the same length; copies are performed
+  pairwise as `source_element(i)` to `dest_element(i)`
+
 ## Usage:
-
 ```
-arrayant_out = quadriga_lib.arrayant_copy_element(arrayant_in, source_element, dest_element);
+arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, dest_element );
 ```
 
-## Input Arguments:
-- **`arrayant_in`** [1] (required)<br>
-  Struct containing the arrayant data with the following fields:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Size: `[n_elements, n_ports]`
-  `center_freq`    | Center frequency in [Hz], optional                    | Scalar
-  `name`           | Name of the array antenna object, optional            | String
-
-- **`source_element`** [2] (required)<br>
-  Index of the source elements (1-based), scalar or vector
-
-- **`dest_element`** [3] (optional)<br>
-  Index of the destination elements (1-based), either as a vector or as a scalar. If `source_element`
-  is also a vector, `dest_element` must have the same length.
+## Inputs:
+- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in
+  [[arrayant_generate]]; a struct array may contain a frequency-dependent model
+- **`source_element`** — Index of the source element(s); 1-based; uint64; scalar or `[n_copy]`
+- **`dest_element`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
+  if `source_element` is a vector, must have the same length
 
 ## Output Arguments:
-- **`arrayant_out`**<br>
-  Struct containing the arrayant data with the following fields:
-  `e_theta_re`     | e-theta field component, real part                    | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_theta_im`     | e-theta field component, imaginary part               | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_re`       | e-phi field component, real part                      | Size: `[n_elevation, n_azimuth, n_elements]`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Size: `[n_elevation, n_azimuth, n_elements]`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted             | Size: `[n_azimuth]`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Size: `[n_elevation]`
-  `element_pos`    | Antenna element (x,y,z) positions                     | Size: `[3, n_elements]`
-  `coupling_re`    | Coupling matrix, real part                            | Size: `[n_elements, n_ports]`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Size: `[n_elements, n_ports]`
-  `center_freq`    | Center frequency in [Hz], default = 0.3 GHz           | Scalar
-  `name`           | Name of the array antenna object                      | String
+- **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
+  `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 3)
+    // Validate argument counts
+    if (nrhs != 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+    if (nlhs > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (nlhs == 0)
-        return;
+    if (!mxIsStruct(prhs[0]))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in' must be a struct.");
 
-    // Assemble array antenna object (copy input data)
+    // Assemble array antenna object (single or multi-frequency)
     auto ant = quadriga_lib::arrayant<double>();
-    ant.e_theta_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_re"), true);
-    ant.e_theta_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_theta_im"), true);
-    ant.e_phi_re = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_re"), true);
-    ant.e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(prhs[0], "e_phi_im"), true);
-    ant.azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "azimuth_grid"), true);
-    ant.elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(prhs[0], "elevation_grid"), true);
-    if (qd_mex_has_field(prhs[0], "element_pos"))
-        ant.element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "element_pos"), true);
-    if (qd_mex_has_field(prhs[0], "coupling_re"))
-        ant.coupling_re = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_re"), true);
-    if (qd_mex_has_field(prhs[0], "coupling_im"))
-        ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(prhs[0], "coupling_im"), true);
-    if (qd_mex_has_field(prhs[0], "center_frequency"))
-        ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(prhs[0], "center_frequency"));
-    if (qd_mex_has_field(prhs[0], "name"))
-        ant.name = qd_mex_get_string(qd_mex_get_field(prhs[0], "name"));
+    auto ant_multi = std::vector<quadriga_lib::arrayant<double>>();
+    size_t n_freq = (size_t)mxGetNumberOfElements(prhs[0]);
 
-    arma::uvec source = qd_mex_typecast_Col<arma::uword>(prhs[1]) - 1;
-    arma::uvec dest = qd_mex_typecast_Col<arma::uword>(prhs[2]) - 1;
+    if (n_freq > 1)
+        ant_multi = qd_mex_struct2arrayant_multi(prhs[0], true, true);
+    else
+        ant = qd_mex_struct2arrayant(prhs[0], true, true);
+
+    // Read source and destination indices (1-based -> 0-based)
+    arma::uvec source = qd_mex_get_Col<arma::uword>(prhs[1], true);
+    arma::uvec dest = qd_mex_get_Col<arma::uword>(prhs[2], true);
 
     if (source.n_elem == 0 || dest.n_elem == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Copy element: source and dest cannot be empty.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "'source_element' and 'dest_element' cannot be empty.");
 
-    if (source.n_elem == 1)
-        CALL_QD(ant.copy_element(source.at(0), dest));
-    else if (source.n_elem == dest.n_elem)
+    if (arma::any(source == 0) || arma::any(dest == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'source_element' / 'dest_element' cannot be 0 (1-based index).");
+
+    source -= 1;
+    dest -= 1;
+
+    if (source.n_elem > 1 && source.n_elem != dest.n_elem)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "When copying multiple elements, 'source_element' and 'dest_element' must have the same length.");
+
+    // Dispatch
+    if (n_freq > 1)
     {
-        for (arma::uword i = 0; i < source.n_elem; ++i)
-            CALL_QD(ant.copy_element(source.at(i), dest.at(i)));
+        if (source.n_elem == 1)
+            CALL_QD(quadriga_lib::arrayant_copy_element_multi(ant_multi, source.at(0), dest));
+        else
+            for (arma::uword i = 0; i < source.n_elem; ++i)
+                CALL_QD(quadriga_lib::arrayant_copy_element_multi(ant_multi, source.at(i), dest.at(i)));
     }
     else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Copy element: when copying multiple elements, source and dest must be of same length.");
-
-    if (nlhs == 1) // Output as struct
     {
-        std::vector<std::string> fields = {"e_theta_re", "e_theta_im", "e_phi_re", "e_phi_im",
-                                           "azimuth_grid", "elevation_grid", "element_pos",
-                                           "coupling_re", "coupling_im", "center_freq", "name"};
-
-        plhs[0] = qd_mex_make_struct(fields);
-        qd_mex_set_field(plhs[0], fields[0], qd_mex_copy2matlab(&ant.e_theta_re));
-        qd_mex_set_field(plhs[0], fields[1], qd_mex_copy2matlab(&ant.e_theta_im));
-        qd_mex_set_field(plhs[0], fields[2], qd_mex_copy2matlab(&ant.e_phi_re));
-        qd_mex_set_field(plhs[0], fields[3], qd_mex_copy2matlab(&ant.e_phi_im));
-        qd_mex_set_field(plhs[0], fields[4], qd_mex_copy2matlab(&ant.azimuth_grid, true));
-        qd_mex_set_field(plhs[0], fields[5], qd_mex_copy2matlab(&ant.elevation_grid, true));
-        qd_mex_set_field(plhs[0], fields[6], qd_mex_copy2matlab(&ant.element_pos));
-        qd_mex_set_field(plhs[0], fields[7], qd_mex_copy2matlab(&ant.coupling_re));
-        qd_mex_set_field(plhs[0], fields[8], qd_mex_copy2matlab(&ant.coupling_im));
-        qd_mex_set_field(plhs[0], fields[9], qd_mex_copy2matlab(&ant.center_frequency));
-        qd_mex_set_field(plhs[0], fields[10], mxCreateString(ant.name.c_str()));
+        if (source.n_elem == 1)
+            CALL_QD(ant.copy_element(source.at(0), dest));
+        else
+            for (arma::uword i = 0; i < source.n_elem; ++i)
+                CALL_QD(ant.copy_element(source.at(i), dest.at(i)));
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
+
+    // Output as struct (or struct array for multi-frequency)
+    if (nlhs == 1)
+        plhs[0] = (n_freq > 1) ? qd_mex_arrayant2struct_multi(ant_multi) : qd_mex_arrayant2struct(ant);
 }
