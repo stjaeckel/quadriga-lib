@@ -418,8 +418,8 @@ void quadriga_lib::arrayant_copy_element_multi(
 
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
-- **`source`** — 0-based index of the element to copy from; must be within current element count
-- **`destination`** — 0-based index or indices of target elements; enlarges all entries if any index exceeds current count
+- **`source`** — Index of the element to copy from; must be within current element count
+- **`destination`** — Index or indices of target elements; enlarges all entries if any index exceeds current count
 
 ## Example:
 ```
@@ -482,7 +482,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 
 - Updates `element_pos` in-place on every entry in the vector identically.
 - If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is provided, only those 0-based indexed columns are updated; `element_pos` column count must match `i_element` length.
+- If `i_element` is provided, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
 ## Declaration:
@@ -496,7 +496,7 @@ void quadriga_lib::arrayant_set_element_pos_multi(
 ## Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — 0-based indices of elements to update; if empty, all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; if empty, all elements are replaced
 
 ## See also:
 - [[arrayant_copy_element_multi]] (replicate elements before setting positions)
@@ -577,7 +577,7 @@ template void quadriga_lib::arrayant_set_element_pos_multi(std::vector<quadriga_
 Apply Euler rotations to all entries in a multi-frequency arrayant vector
 
 - Calls .[[rotate_pattern]] on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
-- If `i_element` is empty, all elements are rotated; otherwise only the specified 0-based indices are affected.
+- If `i_element` is empty, all elements are rotated; otherwise only the specified indices are affected.
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects.
 
 ## Declaration:
@@ -597,7 +597,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 - **`y_deg`** *(optional)* — Tilt angle in degrees
 - **`z_deg`** *(optional)* — Heading angle in degrees
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — 0-based indices of elements to rotate; if empty, all elements are rotated
+- **`i_element`** *(optional)* — Indices of elements to rotate; if empty, all elements are rotated
 
 ## See also:
 - .[[rotate_pattern]] (per-entry operation called internally)

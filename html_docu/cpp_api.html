@@ -338,6 +338,12 @@
   <td>Center frequency</td>
   <td></td>
 </tr>
+<tr>
+  <td><code>std::string name</code></td>
+  <td>string</td>
+  <td>Name of the array antenna object</td>
+  <td></td>
+</tr>
 </table><br>
 
 <i>Simple member functions:<br></i><br>
@@ -397,8 +403,13 @@
   <td></td>
 </tr>
 <tr>
+  <td><a href="#.calc_beamwidth_deg">.calc_beamwidth_deg</a></td>
+  <td>Calculate the beam width of an antenna element in degree</td>
+  <td></td>
+</tr>
+<tr>
   <td><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a></td>
-  <td>Calculate per-element directivity in dBi</td>
+  <td>Calculate the directivity in dBi of a single array element</td>
   <td></td>
 </tr>
 <tr>
@@ -903,7 +914,7 @@ void quadriga_lib::arrayant&lt;dtype&gt;::rotate_pattern(
 </tr>
 </table><br>
 </li>
-<li><b><code>element</code></b> <i>(optional)</i> — 0-based element index to rotate; <code>-1</code> rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
+<li><b><code>element</code></b> <i>(optional)</i> — 0-based element index to rotate; <code>-1</code> rotates all elements (implemented as wrap-around to UINT_MAX)
 </li>
 <li><b><code>output</code></b> <i>(optional)</i> — Target arrayant; <code>nullptr</code> modifies in-place
 </li></ul>
@@ -1050,9 +1061,9 @@ void quadriga_lib::arrayant_copy_element_multi(
 <ul>
 <li><b><code>arrayant_vec</code></b> — Non-empty vector of valid arrayant objects; modified in-place
 </li>
-<li><b><code>source</code></b> — 0-based index of the element to copy from; must be within current element count
+<li><b><code>source</code></b> — Index of the element to copy from; must be within current element count
 </li>
-<li><b><code>destination</code></b> — 0-based index or indices of target elements; enlarges all entries if any index exceeds current count
+<li><b><code>destination</code></b> — Index or indices of target elements; enlarges all entries if any index exceeds current count
 </li></ul>
 
 <i>Example:</i><br>
@@ -1206,7 +1217,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 <ul>
 <li>Calls <a href="#.rotate_pattern">.rotate_pattern</a> on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
 </li>
-<li>If <code>i_element</code> is empty, all elements are rotated; otherwise only the specified 0-based indices are affected.
+<li>If <code>i_element</code> is empty, all elements are rotated; otherwise only the specified indices are affected.
 </li>
 <li>For scalar acoustic fields (pressure stored in <code>e_theta_re</code> only), use <code>usage = 1</code> to avoid spurious polarization effects.
 </li></ul>
@@ -1235,7 +1246,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 </li>
 <li><b><code>usage</code></b> <i>(optional)</i> — Rotation mode: <code>0</code> = pattern + polarization, <code>1</code> = pattern only, <code>2</code> = polarization only
 </li>
-<li><b><code>i_element</code></b> <i>(optional)</i> — 0-based indices of elements to rotate; if empty, all elements are rotated
+<li><b><code>i_element</code></b> <i>(optional)</i> — Indices of elements to rotate; if empty, all elements are rotated
 </li></ul>
 
 <i>See also:</i><br>
@@ -1256,7 +1267,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 </li>
 <li>If <code>i_element</code> is empty, all positions are replaced and <code>element_pos</code> must have <code>n_elements</code> columns.
 </li>
-<li>If <code>i_element</code> is provided, only those 0-based indexed columns are updated; <code>element_pos</code> column count must match <code>i_element</code> length.
+<li>If <code>i_element</code> is provided, only those indexed columns are updated; <code>element_pos</code> column count must match <code>i_element</code> length.
 </li>
 <li>All entries must have the same element count; uninitialized <code>element_pos</code> fields are zero-initialized before update.
 </li></ul>
@@ -1276,7 +1287,7 @@ void quadriga_lib::arrayant_set_element_pos_multi(
 </li>
 <li><b><code>element_pos</code></b> — New (x, y, z) positions; <code>[3, n_update]</code>
 </li>
-<li><b><code>i_element</code></b> <i>(optional)</i> — 0-based indices of elements to update; if empty, all elements are replaced
+<li><b><code>i_element</code></b> <i>(optional)</i> — Indices of elements to update; if empty, all elements are replaced
 </li></ul>
 
 <i>See also:</i><br>

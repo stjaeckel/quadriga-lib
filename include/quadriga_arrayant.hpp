@@ -10,6 +10,7 @@
 
 namespace quadriga_lib
 {
+    // Class for storing and manipulating array antenna models
     template <typename dtype> // float or double
     class arrayant
     {
@@ -17,16 +18,16 @@ namespace quadriga_lib
         std::string name = "empty"; // Name of the array antenna object
 
         // Electric field of the array antenna elements in polar-spheric coordinates: Size [n_elevation, n_azimuth, n_elements]
-        arma::Cube<dtype> e_theta_re;                // Vertical component of the electric field, real part
-        arma::Cube<dtype> e_theta_im;                // Vertical component of the electric field, imaginary part
-        arma::Cube<dtype> e_phi_re;                  // Horizontal component of the electric field, real part
-        arma::Cube<dtype> e_phi_im;                  // Horizontal component of the electric field, imaginary part
-        arma::Col<dtype> azimuth_grid;               // Azimuth angles in pattern (theta) in [rad], between -pi and pi, sorted
-        arma::Col<dtype> elevation_grid;             // Elevation angles in pattern (phi) in [rad], between -pi/2 and pi/2, sorted
-        arma::Mat<dtype> element_pos;                // Element positions (optional), Size: Empty or [3, n_elements]
-        arma::Mat<dtype> coupling_re;                // Coupling matrix, real part (optional), Size: [n_elements, n_ports]
-        arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part (optional), Size: [n_elements, n_ports]
-        dtype center_frequency = dtype(299792458.0); // Center frequency in [Hz] (optional)
+        arma::Cube<dtype> e_theta_re;                // E-theta (vertical) field, real part; [n_elevation, n_azimuth, n_elements]
+        arma::Cube<dtype> e_theta_im;                // E-theta (vertical) field, imaginary part; [n_elevation, n_azimuth, n_elements]
+        arma::Cube<dtype> e_phi_re;                  // E-phi (horizontal) field, real part; [n_elevation, n_azimuth, n_elements]
+        arma::Cube<dtype> e_phi_im;                  // E-phi (horizontal) field, imaginary part; [n_elevation, n_azimuth, n_elements]
+        arma::Col<dtype> azimuth_grid;               // Azimuth angles in rad, in [-pi, pi], sorted; [n_azimuth]
+        arma::Col<dtype> elevation_grid;             // Elevation angles in rad, in [-pi/2, pi/2], sorted; [n_elevation]
+        arma::Mat<dtype> element_pos;                // Element positions in local Cartesian coords; [3, n_elements] or empty
+        arma::Mat<dtype> coupling_re;                // Coupling matrix, real part; [n_elements, n_ports]
+        arma::Mat<dtype> coupling_im;                // Coupling matrix, imaginary part; [n_elements, n_ports]
+        dtype center_frequency = dtype(299792458.0); // Center frequency
         bool read_only = false;                      // Prevent member functions from writing to the properties
         dtype *check_ptr[9];                         // Data pointers for quick validation
         arrayant() {};                               // Default constructor
@@ -37,98 +38,76 @@ namespace quadriga_lib
         arma::uword n_elements() const;  // Number of antenna elements
         arma::uword n_ports() const;     // Number of ports (after coupling of elements)
 
-        // Adds elements of "new_arrayant" to the current one
-        // - Returns an arrayant object that is a combination of the calling object and the "new_arrayant"
-        // - Throws an error if sampling grids don't match
+        // Append elements of another arrayant to the current one
         arrayant<dtype> append(const arrayant<dtype> *new_arrayant) const;
-
-        // Calculate the directivity of an antenna element in dBi
-        dtype calc_directivity_dBi(arma::uword i_element) const;
 
         // Calculate the beam width of an antenna element in degree
         void calc_beamwidth_deg(arma::uword i_element,                // Element index, 0-based
                                 dtype threshold_dB = 3.0,             // Threshold in dB
                                 dtype *beamwidth_az = nullptr,        // Azimuth beamwidth in degree
                                 dtype *beamwidth_el = nullptr,        // Elevation beamwidth in degree
-                                dtype *az_point_ang = nullptr,         // Azimuth pointing angle for the main beam in degree
+                                dtype *az_point_ang = nullptr,        // Azimuth pointing angle for the main beam in degree
                                 dtype *el_point_ang = nullptr) const; // Elevation pointing angle for the main beam in degree
 
-        // Calculates a virtual pattern of the given array by applying coupling and element positions
-        // If called without arguments, 'azimuth_grid' and 'elevation_grid' from the calling object are used
-        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,
-                                        const arma::Col<dtype> *elevation_grid_new = nullptr) const;
+        // Calculate the directivity in dBi of a single array element
+        dtype calc_directivity_dBi(arma::uword i_element) const;
+
+        // Combine element patterns, positions, and coupling weights into effective radiation patterns
+        // Returns new arrayant with n_ports elements (= number of columns in coupling_re/im), each holding the combined effective pattern for that port
+        arrayant<dtype> combine_pattern(const arma::Col<dtype> *azimuth_grid_new = nullptr,          // Output azimuth grid in rad, in [-pi, pi], sorted; defaults to input grid
+                                        const arma::Col<dtype> *elevation_grid_new = nullptr) const; // Output elevation grid in rad, in [-pi/2, pi/2], sorted; defaults to input grid
 
         // Creates a copy of the array antenna object
         arrayant<dtype> copy() const;
 
-        // Copy antenna elements, enlarges array size if needed (0-based indices)
+        // Copy a single antenna element to one or more destination slots
         void copy_element(arma::uword source, arma::uvec destination);
         void copy_element(arma::uword source, arma::uword destination);
 
-        // Export the antenna pattern geometry to a Wavefront OBJ file, e.g. for visualization in Blender
-        // Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
-        void export_obj_file(std::string fn,                   // Filename of the OBJ file
-                             dtype directivity_range = 30.0,   // Directivity range of the antenna pattern visualization in dB
+        // Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
+        void export_obj_file(std::string fn,                   // Output OBJ filename; must not be empty; filename must end in .obj
+                             dtype directivity_range = 30.0,   // Dynamic range of the visualized directivity pattern in dB
                              std::string colormap = "jet",     // Colormap for the visualization
-                             dtype object_radius = 1.0,        // Radius in meters of the exported object
-                             arma::uword icosphere_n_div = 4,  // Map pattern to an Icosphere with given number of subdivisions
-                             arma::uvec i_element = {}) const; // Antenna element indices, 0-based, empty = export all
+                             dtype object_radius = 1.0,        // Radius of the exported object
+                             arma::uword icosphere_n_div = 4,  // Icosphere subdivision count; higher = finer mesh
+                             arma::uvec i_element = {}) const; // 0-based element indices to export
 
-        // Interpolation of the antenna pattern
-        // - Takes azimuth and elevation angles as input and calculates the complex-valued antenna response
-        // - "n_out" corresponds to the number of antenna elements
-        // - "orientation" and "element_pos_i" are optional inputs
-        void interpolate(const arma::Mat<dtype> *azimuth,                 // Azimuth angles [rad],                                  Size [1, n_ang] or [n_out, n_ang]
-                         const arma::Mat<dtype> *elevation,               // Elevation angles [rad],                                Size [1, n_ang] or [n_out, n_ang]
-                         arma::Mat<dtype> *V_re,                          // Interpolated vertical (e_theta) field, real part,      Size [n_out, n_ang]
-                         arma::Mat<dtype> *V_im,                          // Interpolated vertical (e_theta) field, imaginary part, Size [n_out, n_ang]
-                         arma::Mat<dtype> *H_re,                          // Interpolated horizontal (e_phi) field, real part,      Size [n_out, n_ang]
-                         arma::Mat<dtype> *H_im,                          // Interpolated horizontal (e_phi) field, imaginary part, Size [n_out, n_ang]
-                         arma::uvec i_element = {},                       // Element indices, 0-based, optional,                    Vector of length "n_out"
-                         const arma::Cube<dtype> *orientation = nullptr,  // Orientation (bank, tilt, head) in [rad], optional,     Size [3, 1, 1] or [3, n_out, 1] or [3, 1, n_ang] or [3, n_out, n_ang]
-                         const arma::Mat<dtype> *element_pos_i = nullptr, // Alternative element positions, optional,               Size [3, n_out] or Empty (= use element_pos from arrayant object)
-                         arma::Mat<dtype> *dist = nullptr,                // Projected element distances for phase offset,          Size [n_out, n_ang]
-                         arma::Mat<dtype> *azimuth_loc = nullptr,         // Azimuth angles [rad] in local antenna coordinates,     Size [n_out, n_ang]
-                         arma::Mat<dtype> *elevation_loc = nullptr,       // Elevation angles [rad] in local antenna coordinates,   Size [n_out, n_ang]
-                         arma::Mat<dtype> *gamma = nullptr) const;        // Polarization rotation angles in [rad],                 Size [n_out, n_ang]
+        // Interpolate polarimetric antenna field patterns for given azimuth/elevation angles
+        void interpolate(const arma::Mat<dtype> *azimuth,                 // Azimuth angles in rad, in [-pi, pi]; [1, n_ang] or [n_out, n_ang]
+                         const arma::Mat<dtype> *elevation,               // Elevation angles in rad, in [-pi/2, pi/2]; [1, n_ang] or [n_out, n_ang]
+                         arma::Mat<dtype> *V_re,                          // Real e-theta (vertical) field component; [n_out, n_ang]
+                         arma::Mat<dtype> *V_im,                          // Imaginary e-theta (vertical) field component; [n_out, n_ang]
+                         arma::Mat<dtype> *H_re,                          // Real/imaginary e-phi (horizontal) field component; [n_out, n_ang]
+                         arma::Mat<dtype> *H_im,                          // Imaginary e-phi (horizontal) field component; [n_out, n_ang]
+                         arma::uvec i_element = {},                       // Element indices to interpolate; duplicates allowed; defaults to all elements; [n_out] or {}
+                         const arma::Cube<dtype> *orientation = nullptr,  // Euler angles in rad; nullptr; [3, 1]; [3, n_out]; [3, 1, n_ang], or [3, n_out, n_ang]
+                         const arma::Mat<dtype> *element_pos_i = nullptr, // Override element positions in m; nullptr uses arrayant.element_pos; [3, n_out]
+                         arma::Mat<dtype> *dist = nullptr,                // Distance from the wavefront plane to each element; nullptr or [n_out, n_ang]
+                         arma::Mat<dtype> *azimuth_loc = nullptr,         // Azimuth angles in local (rotated) element frame in rad; nullptr or [n_out, n_ang]
+                         arma::Mat<dtype> *elevation_loc = nullptr,       // Elevation angles in local element frame in rad; nullptr or [n_out, n_ang]
+                         arma::Mat<dtype> *gamma = nullptr) const;        // Polarization rotation angles in rad; nullptr or [n_out, n_ang]
 
-        // Write array antenna object and layout to QDANT file
-        // - The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern
-        //   data in XML. This function writes pattern data to the specified file.
-        // - Multiple array antennas can be stored in the same file using the `id` parameter.
-        // - If writing to an exisiting file without specifying an `id`, the data gests appended at the end.
-        //   The output `id_in_file` identifies the location inside the file.
-        // - An optional storage `layout` can be provided to organize data inside the file.
-        // - Returns id in file after writing
-        unsigned qdant_write(std::string fn,                   // Filename of the QDANT file, string
-                             unsigned id = 0,                  // ID of the antenna to be written to the file, optional, Default: Max-ID in existing file + 1
-                             arma::u32_mat layout = {}) const; // Layout of multiple array antennas. Must only contain element ids that are present in the file. optional
+        // Write arrayant data to a QDANT (XML) file
+        unsigned qdant_write(std::string fn,                   // Output QDANT filename; must not be empty
+                             unsigned id = 0,                  // Target ID in file; 0 appends with auto-assigned ID
+                             arma::u32_mat layout = {}) const; // Matrix organizing multiple antenna IDs within the file; must reference only IDs present in the file
 
-        // Remove zeros from the pattern data. Changes that size of the pattern.
+        // Remove zero-valued entries from antenna pattern data, reducing its size
         // Calling this function without an argument updates the arrayant properties inplace
         void remove_zeros(arrayant<dtype> *output = nullptr);
 
         // Reset the size to zero (the arrayant object will contain no data)
         void reset();
 
-        // Adjusts the orientation of antenna patterns
-        // - Transforms the radiation patterns of array antenna elements, allowing for precise
-        //   rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system
-        // - Also adjusts the sampling grid for non-uniformly sampled antennas, such as parabolic antennas with small apertures
-        // - Uses Euler rotations
-        // - Usage models : 0: Rotate both (pattern+polarization), 1: Rotate only pattern, 2: Rotate only polarization, 3: as (0), but w/o grid adjusting, 4: as (1), but w/o grid adjusting
-        // - Calling this function without the argument "output" updates the arrayant properties inplace
-        void rotate_pattern(dtype x_deg = 0.0,                  // The rotation angle around x-axis (bank angle) in [degrees]
-                            dtype y_deg = 0.0,                  // The rotation angle around y-axis (tilt angle) in [degrees]
-                            dtype z_deg = 0.0,                  // The rotation angle around z-axis (heading angle) in [degrees]
-                            unsigned usage = 0,                 // The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization
+        // Rotate antenna radiation patterns around the principal axes using Euler rotations
+        void rotate_pattern(dtype x_deg = 0.0,                  // Rotation around x-axis (bank) in degrees
+                            dtype y_deg = 0.0,                  // Rotation around y-axis (tilt) in degrees
+                            dtype z_deg = 0.0,                  // Rotation around z-axis (heading) in degrees
+                            unsigned usage = 0,                 // Rotation mode, see docs
                             unsigned element = -1,              // Element index, 0-bases, default (-1) =  update all elements
-                            arrayant<dtype> *output = nullptr); // Pointer to an antenna array object where the modified pattern data is should be written
+                            arrayant<dtype> *output = nullptr); // Target arrayant; nullptr modifies in-place
 
-        // Change the size of an arrayant, without explicitly preserving data
-        // - "element_pos" is set to zero, "coupling_re/im" is set to the identity matrix
-        // - Data in other properties may contain garbage
-        // - Only performs a size update if exisiting size is different from new size
+        // Resize an arrayant object to new dimensions
         void set_size(arma::uword n_elevation, // Number of elevation angles
                       arma::uword n_azimuth,   // Number of azimuth angles
                       arma::uword n_elements,  // Number of antenna elements
@@ -139,56 +118,95 @@ namespace quadriga_lib
         std::string validate();                              // Same, but sets the "valid" property in the object and initializes the element positions and coupling matrix
     };
 
-    // Validate a vector of array antenna objects for multi-frequency consistency
-    // - Validates each individual arrayant entry
-    // - Checks that all entries share the same angular grids, element positions, and coupling matrix shape
-    // - Returns an empty string if valid, or an error message describing the first inconsistency found
-    template <typename dtype>
-    std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to validate
-                                        bool quick_check = true);
-
-    // Copy antenna elements across all entries in a multi-frequency arrayant vector
-    // - Calls the arrayant member function copy_element for each frequency entry
-    // - Enlarges the array size if the destination index exceeds the current element count
-    // - Source and destination indices are 0-based
-    template <typename dtype>
-    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
-                                     arma::uword source,                         // Source element index (0-based)
-                                     arma::uvec destination);                    // Destination element indices (0-based)
-
-    template <typename dtype>
-    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
-                                     arma::uword source,                         // Source element index (0-based)
-                                     arma::uword destination);                   // Destination element index (0-based)
+    // ---- Multi-frequency array antenna functions ----
 
     // Concatenate two multi-frequency arrayant vectors into a single multi-element model
-    // - Both inputs must have the same number of frequency entries, angular grids, and center frequencies
-    // - Patterns are concatenated along the element dimension (3rd cube dimension)
-    // - Element positions are horizontally concatenated
-    // - Coupling matrices are assembled in block-diagonal form (independent port sets)
+    // - Both inputs must have equal entry counts, identical angular grids, and matching center_frequency values at each index.
+    // - Per frequency entry: pattern cubes are joined along the element (slice) dimension; element_pos matrices are horizontally concatenated (empty positions treated as zeros).
+    // - Both inputs are validated with arrayant_is_valid_multi before processing; each output entry is validated before returning.
+    // - Output inherits name, azimuth/elevation grids, and center_frequency from arrayant_vec1. 
     template <typename dtype>
-    std::vector<arrayant<dtype>> arrayant_concat_multi(const std::vector<arrayant<dtype>> &arrayant_vec1,  // First arrayant vector (e.g. woofer)
-                                                       const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector (e.g. tweeter)
+    std::vector<arrayant<dtype>> arrayant_concat_multi(const std::vector<arrayant<dtype>> &arrayant_vec1,  // First validated, mutually consistent arrayant vector
+                                                       const std::vector<arrayant<dtype>> &arrayant_vec2); // Second arrayant vector; must match entry count, grids, and center frequencies of arrayant_vec1
 
-    // Interpolate multi-frequency array antenna patterns at arbitrary frequencies
-    // - For each requested frequency, finds the two bracketing entries by center_frequency
-    // - Interpolates the pattern spatially using qd_arrayant_interpolate (no input validation)
-    // - Interpolates between the two frequency samples using spherical interpolation with linear fallback
-    // - Clamps to nearest entry for out-of-range frequencies (extrapolation)
-    // - Outputs are cubes of size [n_out, n_ang, n_freq]
+    // Copy an antenna element to one or more destinations across all entries in a multi-frequency arrayant vector
+    // - Calls .copy_element on every entry in the vector with the same source and destination indices.
+    // - If any destination index exceeds the current element count, all entries are enlarged; new elements receive an identity coupling entry. 
     template <typename dtype>
-    void arrayant_interpolate_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Multi-frequency arrayant vector
-                                    const arma::Mat<dtype> *azimuth,                  // Azimuth angles [rad],          Size [1, n_ang] or [n_out, n_ang]
-                                    const arma::Mat<dtype> *elevation,                // Elevation angles [rad],        Size [1, n_ang] or [n_out, n_ang]
-                                    const arma::Col<dtype> *frequency,                // Target frequencies [Hz],       Size [n_freq]
-                                    arma::Cube<dtype> *V_re,                          // Output e_theta real,           Size [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *V_im,                          // Output e_theta imaginary,      Size [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *H_re,                          // Output e_phi real,             Size [n_out, n_ang, n_freq]
-                                    arma::Cube<dtype> *H_im,                          // Output e_phi imaginary,        Size [n_out, n_ang, n_freq]
-                                    arma::uvec i_element = {},                        // Element indices (0-based),     Length n_out, empty = all
-                                    const arma::Cube<dtype> *orientation = nullptr,   // Orientation [rad],             Size [3,1,1] or [3,n_out,1] or [3,1,n_ang] or [3,n_out,n_ang]
-                                    const arma::Mat<dtype> *element_pos_i = nullptr,  // Alt. element positions,        Size [3, n_out] or nullptr
-                                    bool validate_input = true);                      // Validate arrayant_vec before use
+    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
+                                     arma::uword source,                         // Index of the element to copy from; must be within current element count
+                                     arma::uvec destination);                    // Index or indices of target element; enlarges all entries if any index exceeds current count
+
+    template <typename dtype>
+    void arrayant_copy_element_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of valid arrayant objects; modified in-place
+                                     arma::uword source,                         // Index of the element to copy from; must be within current element count
+                                     arma::uword destination);                   // Index or indices of target elements; enlarges all entries if any index exceeds current count
+
+    // Interpolate multi-frequency arrayant patterns at arbitrary angles and frequencies
+    // - For each requested frequency, finds the two bracketing center_frequency entries, runs spatial interpolation on both via qd_arrayant_interpolate, then blends results in the frequency dimension.
+    // - Frequency blending uses SLERP of complex field values with automatic fallback to linear interpolation when phase difference exceeds a threshold.
+    // - Out-of-range frequencies are clamped to the nearest entry (no extrapolation).
+    // - Consecutive frequency requests sharing the same bracketing entries reuse cached spatial interpolation results; sort frequency ascending or descending for best cache utilization.
+    // - If validate_input is true, calls arrayant_is_valid_multi once before processing; set to false in performance-critical loops after initial validation. 
+    template <typename dtype>
+    void arrayant_interpolate_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Multi-frequency arrayant vector; entries need not be sorted by frequency
+                                    const arma::Mat<dtype> *azimuth,                  // Azimuth angles in rad; must not be NULL, [1, n_ang] or [n_out, n_ang]
+                                    const arma::Mat<dtype> *elevation,                // Elevation angles in rad; must not be NULL; size must match azimuth
+                                    const arma::Col<dtype> *frequency,                // Target frequencies in Hz; must not be NULL or empty; [n_freq]
+                                    arma::Cube<dtype> *V_re,                          // Real part of interpolated e-theta field; must not be NULL; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *V_im,                          // Imaginary part of interpolated e-theta field; must not be NULL; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *H_re,                          // Real part of interpolated e-phi field; must not be NULL; [n_out, n_ang, n_freq]
+                                    arma::Cube<dtype> *H_im,                          // Imaginary part of interpolated e-phi field; must not be NULL; [n_out, n_ang, n_freq]
+                                    arma::uvec i_element = {},                        // Element indices to interpolate; if empty, all elements are used (n_out = n_elements)
+                                    const arma::Cube<dtype> *orientation = nullptr,   // Antenna orientation; Euler angles; applied at all frequencies; [3,1,1]; [3,n_out,1]; [3,1,n_ang], or [3,n_out,n_ang]
+                                    const arma::Mat<dtype> *element_pos_i = nullptr,  // Override element positions; if nullptr, positions from freq index 0 are used; [3, n_out]
+                                    bool validate_input = true);                      // If true, validates arrayant_vec before processing
+
+    // Validate a vector of arrayant objects for multi-frequency consistency
+    // - Each entry is validated individually via its is_valid member; quick_check is forwarded to that call.
+    // - Cross-entry checks (all vs. entry 0): azimuth/elevation grid sizes and values, number of elements, element positions, coupling_re shape, and coupling_im presence and size.
+    // - Pattern data, center_frequency, and coupling matrix values are not compared (expected to vary).
+    // - Stops at first error and returns a message identifying the failing entry and property. 
+    template <typename dtype>
+    std::string arrayant_is_valid_multi(const std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects to validate
+                                        bool quick_check = true);                         // If true, uses fast pointer-based per-entry validation; if false, performs full deep validation
+
+    // Apply Euler rotations to all entries in a multi-frequency arrayant vector
+    // - Calls .rotate_pattern on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
+    // - If i_element is empty, all elements are rotated; otherwise only the specified indices are affected.
+    // - For scalar acoustic fields (pressure stored in e_theta_re only), use usage = 1 to avoid spurious polarization effects. 
+    template <typename dtype>
+    void arrayant_rotate_pattern_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
+                                       dtype x_deg = 0.0,                          // Rotation angle around x-axis (bank) in [deg]
+                                       dtype y_deg = 0.0,                          // Rotation angle around y-axis (tilt) in [deg]
+                                       dtype z_deg = 0.0,                          // Rotation angle around z-axis (heading) in [deg]
+                                       unsigned usage = 0,                         // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
+                                       arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
+
+    // Set element positions for all entries in a multi-frequency arrayant vector
+    // - Updates element_pos in-place on every entry in the vector identically.
+    // - If i_element is empty, all positions are replaced and element_pos must have n_elements columns.
+    // - If i_element is provided, only those indexed columns are updated; element_pos column count must match i_element length.
+    // - All entries must have the same element count; uninitialized element_pos fields are zero-initialized before update. 
+    template <typename dtype>
+    void arrayant_set_element_pos_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Non-empty vector of arrayant objects; modified in-place
+                                        const arma::Mat<dtype> &element_pos,        // New (x, y, z) positions; [3, n_update]
+                                        arma::uvec i_element = arma::uvec());       // Indices of elements to update; if empty, all elements are replaced
+
+    // Read an arrayant object from a QDANT file 
+    // - Parses a QuaDRiGa Array Antenna Exchange Format (QDANT) XML file and returns the arrayant for the given ID.
+    template <typename dtype>
+    arrayant<dtype> qdant_read(std::string fn,                   // Path to the QDANT file; must not be empty
+                               unsigned id = 1,                  // 1-based ID of the antenna entry to read
+                               arma::u32_mat *layout = nullptr); // Output pointer filled with the file's layout matrix of element IDs 
+
+    // Read all arrayant objects from a QDANT file into a vector
+    // - Reads all entries from a QDANT file by probing ID 1 to obtain the layout, then reading each unique non-zero ID in order of first appearance (column-major scan).
+    // - Each unique ID is read exactly once regardless of how many times it appears in the layout.
+    // - Counterpart to qdant_write_multi; primary mechanism for loading frequency-dependent models where center_frequency on each entry identifies the corresponding frequency. 
+    template <typename dtype>
+    std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
+                                                  arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
 
     // Write a vector of array antenna objects to a single QDANT file
     // - Each arrayant is stored with a sequential ID (1-based) in the file
@@ -198,42 +216,7 @@ namespace quadriga_lib
     void qdant_write_multi(const std::string &fn,                             // Filename of the QDANT file
                            const std::vector<arrayant<dtype>> &arrayant_vec); // Vector of arrayant objects to write
 
-    // Read array antenna object and layout from QDANT file
-    // - The QuaDRiGa array antenna exchange format (QDANT) is a file format used to store antenna pattern data in XML
-    template <typename dtype>
-    arrayant<dtype> qdant_read(std::string fn,                   // Filename of the QDANT file, string
-                               unsigned id = 1,                  // ID of the antenna to be read from the file
-                               arma::u32_mat *layout = nullptr); // Layout of multiple array antennas. Contain element ids that are present in the file
-
-    // Read all array antenna objects from a QDANT file
-    // - Reads the layout from the file to determine which IDs are stored
-    // - Returns a vector of arrayant objects, one per unique ID found in the layout
-    // - Entries are returned in the order they first appear in the layout (row-major scan)
-    // - Optionally returns the layout matrix via the layout pointer
-    template <typename dtype>
-    std::vector<arrayant<dtype>> qdant_read_multi(const std::string &fn,            // Filename of the QDANT file
-                                                  arma::u32_mat *layout = nullptr); // Optional output: layout of entries in the file
-
-    // Set element positions for all entries in a multi-frequency arrayant vector
-    // - Updates element_pos in-place for every arrayant in the vector
-    // - If i_element is empty, all elements are updated and element_pos must have n_elements columns
-    // - If i_element is provided, only the specified elements (0-based) are updated
-    template <typename dtype>
-    void arrayant_set_element_pos_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
-                                        const arma::Mat<dtype> &element_pos,        // New element positions, size [3, n_update]
-                                        arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
-
-    // Rotate antenna patterns across all entries in a multi-frequency arrayant vector
-    // - Applies rotate_pattern to every frequency entry in the vector
-    // - Usage modes 0, 1, 2 are supported; grid adjustment is always disabled (0→3, 1→4)
-    // - If i_element is empty, all elements are rotated; otherwise only the specified elements
-    template <typename dtype>
-    void arrayant_rotate_pattern_multi(std::vector<arrayant<dtype>> &arrayant_vec, // Vector of arrayant objects to update
-                                       dtype x_deg = 0.0,                          // Rotation angle around x-axis (bank) in [deg]
-                                       dtype y_deg = 0.0,                          // Rotation angle around y-axis (tilt) in [deg]
-                                       dtype z_deg = 0.0,                          // Rotation angle around z-axis (heading) in [deg]
-                                       unsigned usage = 0,                         // Usage: 0 = pattern+polarization, 1 = pattern only, 2 = polarization only
-                                       arma::uvec i_element = arma::uvec());       // Element indices (0-based), empty = all
+    // ---- Array antenna generators ----
 
     // Generate isotropic radiator with vertical polarization
     // - Optional input res is the resolutions of the antenna pattern sampling grid in degree
@@ -343,6 +326,8 @@ namespace quadriga_lib
                                                   dtype baffle_height = 0.25,                        // Enclosure baffle height in [m], piston only
                                                   arma::Col<dtype> frequencies = arma::Col<dtype>(), // Frequency sample points in [Hz], empty = auto third-octave
                                                   dtype angular_resolution = 5.0);                   // Angular grid resolution in [deg]
+
+    // ---- Channel generation functions ----
 
     // Calculate channel coefficients for spherical waves
     // - Interpolates the transmit antenna pattern (including orientation and polarization)

@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.5"
 author: "Stephan Jaeckel"
-date: "08.05.2026"
+date: "11.05.2026"
 lang: en-US
 ---
 
@@ -28,100 +28,100 @@ lang: en-US
 | Function | Section | Line |
 | --- | --- | --- |
 | [arrayant](#arrayant) | Array antenna class | 131 |
-| [.append](#append) | Array antenna class | 180 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 202 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 234 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 255 |
-| [.copy_element](#copy_element) | Array antenna class | 280 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 300 |
-| [.interpolate](#interpolate) | Array antenna class | 330 |
-| [.is_valid](#is_valid) | Array antenna class | 382 |
-| [.qdant_write](#qdant_write) | Array antenna class | 400 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 427 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 443 |
-| [.set_size](#set_size) | Array antenna class | 479 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 505 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 539 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 579 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 638 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 665 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 697 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 723 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 773 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 798 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 815 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 832 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 886 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 903 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 931 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 948 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1023 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1049 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1076 |
-| [channel](#channel) | Channel class | 1105 |
-| [.add_paths](#add_paths) | Channel class | 1152 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1190 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1209 |
-| [any_type_id](#any_type_id) | Channel functions | 1250 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1293 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1336 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1384 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1422 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1434 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1464 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1496 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1532 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1566 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1592 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1620 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1660 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1699 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1747 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1839 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1876 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1938 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2019 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2113 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2181 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2249 |
-| [acdf](#acdf) | Channel statistics | 2325 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2360 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2402 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2454 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2487 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2522 |
-| [fast_acos](#fast_acos) | Math functions | 2555 |
-| [fast_asin](#fast_asin) | Math functions | 2574 |
-| [fast_atan2](#fast_atan2) | Math functions | 2593 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2614 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2647 |
-| [fast_sincos](#fast_sincos) | Math functions | 2692 |
-| [fast_slerp](#fast_slerp) | Math functions | 2713 |
-| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2748 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2819 |
-| [colormap](#colormap) | Site-specific simulation tools | 2869 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2888 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2931 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2969 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3013 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3047 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3082 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3123 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3241 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3272 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3300 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3329 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3368 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3404 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3440 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3525 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3568 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3616 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3660 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3690 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3718 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3759 |
-| [write_png](#write_png) | Site-specific simulation tools | 3794 |
+| [.append](#append) | Array antenna class | 182 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 204 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 236 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 257 |
+| [.copy_element](#copy_element) | Array antenna class | 282 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 302 |
+| [.interpolate](#interpolate) | Array antenna class | 332 |
+| [.is_valid](#is_valid) | Array antenna class | 384 |
+| [.qdant_write](#qdant_write) | Array antenna class | 402 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 429 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 445 |
+| [.set_size](#set_size) | Array antenna class | 481 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 507 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 541 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 581 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 640 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 667 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 699 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 725 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 775 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 800 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 817 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 834 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 888 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 905 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 933 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 950 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1025 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1051 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1078 |
+| [channel](#channel) | Channel class | 1107 |
+| [.add_paths](#add_paths) | Channel class | 1154 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1192 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1211 |
+| [any_type_id](#any_type_id) | Channel functions | 1252 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1295 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1338 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1386 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1424 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1436 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1466 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1498 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1534 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1568 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1594 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1622 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1662 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1701 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1749 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1841 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1878 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1940 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2021 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2115 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2183 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2251 |
+| [acdf](#acdf) | Channel statistics | 2327 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2362 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2404 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2456 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2489 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2524 |
+| [fast_acos](#fast_acos) | Math functions | 2557 |
+| [fast_asin](#fast_asin) | Math functions | 2576 |
+| [fast_atan2](#fast_atan2) | Math functions | 2595 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2616 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2649 |
+| [fast_sincos](#fast_sincos) | Math functions | 2694 |
+| [fast_slerp](#fast_slerp) | Math functions | 2715 |
+| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2750 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2821 |
+| [colormap](#colormap) | Site-specific simulation tools | 2871 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2890 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2933 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2971 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3015 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3049 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3084 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3125 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3243 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3274 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3302 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3331 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3370 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3406 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3442 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3527 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3570 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3618 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3662 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3692 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3720 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3761 |
+| [write_png](#write_png) | Site-specific simulation tools | 3796 |
 
 ---
 
@@ -149,6 +149,7 @@ Class for storing and manipulating array antenna models
 | `arma::Mat<dtype> coupling_re`    | `[n_elements, n_ports]`                | Coupling matrix, real part                        |
 | `arma::Mat<dtype> coupling_im`    | `[n_elements, n_ports]`                | Coupling matrix, imaginary part                   |
 | `dtype center_frequency`          | scalar                                 | Center frequency                                  |
+| `std::string name`                | string                                 | Name of the array antenna object                  |
 
 ### Simple member functions:
 | Function         | Description                                       |
@@ -165,7 +166,8 @@ Class for storing and manipulating array antenna models
 | Function                  | Description                                                       |
 | ------------------------- | ----------------------------------------------------------------- |
 | .[append](#append)               | Append elements of another arrayant                               |
-| .[calc_directivity_dBi](#calc_directivity_dBi) | Calculate per-element directivity in dBi                          |
+| .[calc_beamwidth_deg](#calc_beamwidth_deg)   | Calculate the beam width of an antenna element in degree          |
+| .[calc_directivity_dBi](#calc_directivity_dBi) | Calculate the directivity in dBi of a single array element        |
 | .[combine_pattern](#combine_pattern)      | Compute effective patterns from elements, positions, and coupling |
 | .[copy_element](#copy_element)         | Copy a single element to one or more destination slots            |
 | .[export_obj_file](#export_obj_file)      | Export pattern geometry to Wavefront OBJ                          |
@@ -469,7 +471,7 @@ void quadriga_lib::arrayant<dtype>::rotate_pattern(
    | 2    | No      | Yes          | No              |
    | 3    | Yes     | Yes          | No              |
    | 4    | Yes     | No           | No              |
-- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements; -1 rotates all elements (implemented as wrap-around to UINT_MAX)
+- **`element`** *(optional)* — 0-based element index to rotate; `-1` rotates all elements (implemented as wrap-around to UINT_MAX)
 - **`output`** *(optional)* — Target arrayant; `nullptr` modifies in-place
 
 ### See also:
@@ -558,8 +560,8 @@ void quadriga_lib::arrayant_copy_element_multi(
 
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of valid arrayant objects; modified in-place
-- **`source`** — 0-based index of the element to copy from; must be within current element count
-- **`destination`** — 0-based index or indices of target elements; enlarges all entries if any index exceeds current count
+- **`source`** — Index of the element to copy from; must be within current element count
+- **`destination`** — Index or indices of target elements; enlarges all entries if any index exceeds current count
 
 ### Example:
 ```
@@ -666,7 +668,7 @@ std::string quadriga_lib::arrayant_is_valid_multi(
 Apply Euler rotations to all entries in a multi-frequency arrayant vector
 
 - Calls .[rotate_pattern](#rotate_pattern) on every entry with grid adjustment always disabled (required for uniform-grid consistency across frequencies).
-- If `i_element` is empty, all elements are rotated; otherwise only the specified 0-based indices are affected.
+- If `i_element` is empty, all elements are rotated; otherwise only the specified indices are affected.
 - For scalar acoustic fields (pressure stored in `e_theta_re` only), use `usage = 1` to avoid spurious polarization effects.
 
 ### Declaration:
@@ -686,7 +688,7 @@ void quadriga_lib::arrayant_rotate_pattern_multi(
 - **`y_deg`** *(optional)* — Tilt angle in degrees
 - **`z_deg`** *(optional)* — Heading angle in degrees
 - **`usage`** *(optional)* — Rotation mode: `0` = pattern + polarization, `1` = pattern only, `2` = polarization only
-- **`i_element`** *(optional)* — 0-based indices of elements to rotate; if empty, all elements are rotated
+- **`i_element`** *(optional)* — Indices of elements to rotate; if empty, all elements are rotated
 
 ### See also:
 - .[rotate_pattern](#rotate_pattern) (per-entry operation called internally)
@@ -699,7 +701,7 @@ Set element positions for all entries in a multi-frequency arrayant vector
 
 - Updates `element_pos` in-place on every entry in the vector identically.
 - If `i_element` is empty, all positions are replaced and `element_pos` must have `n_elements` columns.
-- If `i_element` is provided, only those 0-based indexed columns are updated; `element_pos` column count must match `i_element` length.
+- If `i_element` is provided, only those indexed columns are updated; `element_pos` column count must match `i_element` length.
 - All entries must have the same element count; uninitialized `element_pos` fields are zero-initialized before update.
 
 ### Declaration:
@@ -713,7 +715,7 @@ void quadriga_lib::arrayant_set_element_pos_multi(
 ### Inputs:
 - **`arrayant_vec`** — Non-empty vector of arrayant objects; modified in-place
 - **`element_pos`** — New (x, y, z) positions; `[3, n_update]`
-- **`i_element`** *(optional)* — 0-based indices of elements to update; if empty, all elements are replaced
+- **`i_element`** *(optional)* — Indices of elements to update; if empty, all elements are replaced
 
 ### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (replicate elements before setting positions)
