@@ -115,6 +115,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     bool has_coupling_re = qd_mex_has_field(input, "coupling_re");
     bool has_coupling_im = qd_mex_has_field(input, "coupling_im");
     bool has_name = qd_mex_has_field(input, "name");
+    bool has_center_freq = qd_mex_has_field(input, "center_freq");
 
     size_t n_elem = (size_t)mxGetNumberOfElements(input);
     std::vector<quadriga_lib::arrayant<double>> ant(n_elem);
@@ -126,9 +127,11 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         ant[n].e_phi_im = qd_mex_get_Cube<double>(qd_mex_get_field(input, "e_phi_im", n), copy);
         ant[n].azimuth_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "azimuth_grid", n), copy);
         ant[n].elevation_grid = qd_mex_get_Col<double>(qd_mex_get_field(input, "elevation_grid", n), copy);
-        ant[n].center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n), "center_freq", 299792458.0);
 
         arma::uword n_elements = ant[n].e_theta_re.n_slices;
+
+        if (has_center_freq && !mxIsEmpty(qd_mex_get_field(input, "center_freq", n)))
+            ant[n].center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq", n), "center_freq", 299792458.0);
 
         if (has_element_pos && !mxIsEmpty(qd_mex_get_field(input, "element_pos", n)))
             ant[n].element_pos = qd_mex_get_Mat<double>(qd_mex_get_field(input, "element_pos", n), copy);

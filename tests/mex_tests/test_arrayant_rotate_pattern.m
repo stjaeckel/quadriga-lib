@@ -1,5 +1,7 @@
 function test_arrayant_rotate_pattern
 
+% --- Single-frequency tests ---
+
 ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
 
 out = quadriga_lib.arrayant_rotate_pattern(ant, 0, 0, 90);
@@ -136,7 +138,7 @@ try
     [~, ~] = quadriga_lib.arrayant_rotate_pattern( e_theta_re );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input must be a struct.';
+    expectedErrorMessage = 'First input must be an arrayant struct/struct array';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -151,6 +153,109 @@ catch ME
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
 end
+
+% --- Multi-frequency (struct-array) tests ---
+
+% Build a 2-entry frequency-dependent struct array
+mf_ant = quadriga_lib.arrayant_generate('custom',[],[],5,20,0);
+mf_ant.center_freq = 1e9;  % ensure field exists for struct-array assembly
+
+clear mf_multi
+mf_multi(1) = mf_ant;
+mf_multi(2) = mf_ant;
+mf_multi(1).center_freq = 3.5e9;
+mf_multi(2).center_freq = 28e9;
+
+% --- Basic dispatch: struct array in -> struct array out ---
+out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi, 0, 0, 90);
+assertEqual(numel(out_mf), 2);
+
+for k = 1:2
+    [~,ii] = max(out_mf(k).e_theta_re(:));
+    [s0,s1] = ind2sub(size(out_mf(k).e_theta_re), ii);
+    assertEqual(s0, 91);
+    assertEqual(s1, 271);
+end
+
+% Per-entry center_freq preserved
+assertElementsAlmostEqual(out_mf(1).center_freq, 3.5e9, 'absolute', 1e-3);
+assertElementsAlmostEqual(out_mf(2).center_freq, 28e9,  'absolute', 1e-3);
+
+% Input struct array not mutated (copy=true in wrapper)
+assertElementsAlmostEqual(mf_multi(1).e_theta_re, mf_ant.e_theta_re, 'absolute', 1e-14);
+assertElementsAlmostEqual(mf_multi(2).e_theta_re, mf_ant.e_theta_re, 'absolute', 1e-14);
+
+% Grid not adjusted in multi-freq mode (always no-grid-adj internally)
+assertElementsAlmostEqual(out_mf(1).azimuth_grid,   mf_ant.azimuth_grid,   'absolute', 1e-14);
+assertElementsAlmostEqual(out_mf(1).elevation_grid, mf_ant.elevation_grid, 'absolute', 1e-14);
+assertElementsAlmostEqual(out_mf(2).azimuth_grid,   mf_ant.azimuth_grid,   'absolute', 1e-14);
+assertElementsAlmostEqual(out_mf(2).elevation_grid, mf_ant.elevation_grid, 'absolute', 1e-14);
+
+% --- Equivalence with single-freq no-grid-adj modes ---
+% multi usage=0 maps internally to single-freq usage=3 (both, no grid adj)
+% multi usage=1 maps internally to single-freq usage=4 (pattern only, no grid adj)
+% multi usage=2 stays at single-freq usage=2 (pol only, no grid adj)
+ref_0 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 3);
+ref_1 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 4);
+ref_2 = quadriga_lib.arrayant_rotate_pattern(mf_ant, 30, 45, 60, 2);
+
+out_0 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 0);
+out_1 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 1);
+out_2 = quadriga_lib.arrayant_rotate_pattern(mf_multi, 30, 45, 60, 2);
+
+for k = 1:2
+    assertElementsAlmostEqual(out_0(k).e_theta_re, ref_0.e_theta_re, 'absolute', 1e-12);
+    assertElementsAlmostEqual(out_0(k).e_theta_im, ref_0.e_theta_im, 'absolute', 1e-12);
+    assertElementsAlmostEqual(out_0(k).e_phi_re,   ref_0.e_phi_re,   'absolute', 1e-12);
+    assertElementsAlmostEqual(out_0(k).e_phi_im,   ref_0.e_phi_im,   'absolute', 1e-12);
+
+    assertElementsAlmostEqual(out_1(k).e_theta_re, ref_1.e_theta_re, 'absolute', 1e-12);
+    assertElementsAlmostEqual(out_1(k).e_phi_re,   ref_1.e_phi_re,   'absolute', 1e-12);
+
+    assertElementsAlmostEqual(out_2(k).e_theta_re, ref_2.e_theta_re, 'absolute', 1e-12);
+    assertElementsAlmostEqual(out_2(k).e_phi_re,   ref_2.e_phi_re,   'absolute', 1e-12);
+end
+
+% --- Element selection in multi-freq mode ---
+mf_ant3 = quadriga_lib.arrayant_copy_element(mf_ant, 1, [2,3]);  % 3-element antenna
+clear mf_multi3
+mf_multi3(1) = mf_ant3;
+mf_multi3(2) = mf_ant3;
+mf_multi3(1).center_freq = 3.5e9;
+mf_multi3(2).center_freq = 28e9;
+
+% Rotate only elements 2 and 3 (element 1 stays put)
+out_mf = quadriga_lib.arrayant_rotate_pattern(mf_multi3, 0, 0, 90, 0, [2,3]);
+
+for k = 1:2
+    % Element 1 unrotated
+    tmp = out_mf(k).e_theta_re(:,:,1);
+    [~,ii] = max(tmp(:));
+    [s0,s1] = ind2sub(size(tmp), ii);
+    assertEqual(s0, 91);
+    assertEqual(s1, 181);
+
+    % Elements 2, 3 rotated
+    for e = 2:3
+        tmp = out_mf(k).e_theta_re(:,:,e);
+        [~,ii] = max(tmp(:));
+        [s0,s1] = ind2sub(size(tmp), ii);
+        assertEqual(s0, 91);
+        assertEqual(s1, 271);
+    end
+end
+
+% --- Error: multi-freq with multiple outputs ---
+try
+    [~, ~] = quadriga_lib.arrayant_rotate_pattern(mf_multi, 0, 0, 90);
+    error('moxunit:exceptionNotRaised', 'Expected an error!');
+catch ME
+    expectedErrorMessage = 'Multi-frequency output supports only struct output';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
 
 end
 
