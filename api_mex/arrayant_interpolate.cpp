@@ -57,7 +57,7 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
   struct array, `freq` may be omitted or `[]`, in which case the `center_freq` values of the struct
   array entries are used as target frequencies (no interpolation between bands, one output slice per entry).
 
-## Inputs (separate arrayant data, required when `arrayant` is `[]`, single-frequency only):
+## Inputs (separate arrayant data, required when arrayant is [], single-frequency only):
 - **`e_theta_re`** — e-theta real part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_theta_im`** — e-theta imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`e_phi_re`** — e-phi real part; `[n_elevation, n_azimuth, n_elements]`
