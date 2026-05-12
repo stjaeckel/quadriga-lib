@@ -162,4 +162,173 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     return ant;
 }
 
+inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<double>> &chan)
+{
+    const size_t n_chan = chan.size();
+    if (n_chan == 0) // Return empty struct with no fields
+    {
+        std::vector<std::string> empty_fields;
+        return qd_mex_make_struct(empty_fields, 0);
+    }
+
+    // Determine which fields are populated (based on chan[0])
+    const auto &c0 = chan[0];
+    const bool h_txp = !c0.tx_pos.is_empty();
+    const bool h_rxp = !c0.rx_pos.is_empty();
+    const bool h_txo = !c0.tx_orientation.is_empty();
+    const bool h_rxo = !c0.rx_orientation.is_empty();
+    const bool h_cre = !c0.coeff_re.empty();
+    const bool h_cim = !c0.coeff_im.empty();
+    const bool h_del = !c0.delay.empty();
+    const bool h_pg = !c0.path_gain.empty();
+    const bool h_pl = !c0.path_length.empty();
+    const bool h_pp = !c0.path_polarization.empty();
+    const bool h_pa = !c0.path_angles.empty();
+    const bool h_fbs = !c0.path_fbs_pos.empty();
+    const bool h_lbs = !c0.path_lbs_pos.empty();
+    const bool h_ni = !c0.no_interact.empty();
+    const bool h_ic = !c0.interact_coord.empty();
+    const bool h_cf = !c0.center_frequency.is_empty();
+
+    // Build the field list (name is always present)
+    std::vector<std::string> fields;
+    fields.push_back("name");
+    if (h_txp)
+        fields.push_back("tx_position");
+    if (h_rxp)
+        fields.push_back("rx_position");
+    if (h_txo)
+        fields.push_back("tx_orientation");
+    if (h_rxo)
+        fields.push_back("rx_orientation");
+    if (h_cre)
+        fields.push_back("coeff_re");
+    if (h_cim)
+        fields.push_back("coeff_im");
+    if (h_del)
+        fields.push_back("delay");
+    if (h_pg)
+        fields.push_back("path_gain");
+    if (h_pl)
+        fields.push_back("path_length");
+    if (h_pp)
+        fields.push_back("path_polarization");
+    if (h_pa)
+        fields.push_back("path_angles");
+    if (h_fbs)
+        fields.push_back("fbs_pos");
+    if (h_lbs)
+        fields.push_back("lbs_pos");
+    if (h_ni)
+        fields.push_back("no_interact");
+    if (h_ic)
+        fields.push_back("interact_coord");
+    if (h_cf)
+        fields.push_back("center_frequency");
+
+    mxArray *output = qd_mex_make_struct(fields, n_chan);
+
+    for (size_t n = 0; n < n_chan; ++n)
+    {
+        const auto &c = chan[n];
+        qd_mex_set_field(output, "name", mxCreateString(c.name.c_str()), n);
+        if (h_txp)
+            qd_mex_set_field(output, "tx_position", qd_mex_copy2matlab(&c.tx_pos), n);
+        if (h_rxp)
+            qd_mex_set_field(output, "rx_position", qd_mex_copy2matlab(&c.rx_pos), n);
+        if (h_txo)
+            qd_mex_set_field(output, "tx_orientation", qd_mex_copy2matlab(&c.tx_orientation), n);
+        if (h_rxo)
+            qd_mex_set_field(output, "rx_orientation", qd_mex_copy2matlab(&c.rx_orientation), n);
+        if (h_cre)
+            qd_mex_set_field(output, "coeff_re", qd_mex_vector2matlab(&c.coeff_re), n);
+        if (h_cim)
+            qd_mex_set_field(output, "coeff_im", qd_mex_vector2matlab(&c.coeff_im), n);
+        if (h_del)
+            qd_mex_set_field(output, "delay", qd_mex_vector2matlab(&c.delay), n);
+        if (h_pg)
+            qd_mex_set_field(output, "path_gain", qd_mex_vector2matlab(&c.path_gain), n);
+        if (h_pl)
+            qd_mex_set_field(output, "path_length", qd_mex_vector2matlab(&c.path_length), n);
+        if (h_pp)
+            qd_mex_set_field(output, "path_polarization", qd_mex_vector2matlab(&c.path_polarization), n);
+        if (h_pa)
+            qd_mex_set_field(output, "path_angles", qd_mex_vector2matlab(&c.path_angles), n);
+        if (h_fbs)
+            qd_mex_set_field(output, "fbs_pos", qd_mex_vector2matlab(&c.path_fbs_pos), n);
+        if (h_lbs)
+            qd_mex_set_field(output, "lbs_pos", qd_mex_vector2matlab(&c.path_lbs_pos), n);
+        if (h_ni)
+            qd_mex_set_field(output, "no_interact", qd_mex_vector2matlab(&c.no_interact), n);
+        if (h_ic)
+            qd_mex_set_field(output, "interact_coord", qd_mex_vector2matlab(&c.interact_coord), n);
+        if (h_cf)
+            qd_mex_set_field(output, "center_frequency", qd_mex_copy2matlab(&c.center_frequency), n);
+    }
+    return output;
+}
+
+inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool copy = false)
+{
+    if (!mxIsStruct(input))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
+
+    const size_t n_chan = (size_t)mxGetNumberOfElements(input);
+    std::vector<quadriga_lib::channel<double>> chan;
+    if (n_chan == 0)
+        return chan;
+
+    chan.reserve(n_chan);
+
+    for (size_t i = 0; i < n_chan; ++i)
+    {
+        quadriga_lib::channel<double> c;
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "name"))
+            c.name = qd_mex_get_string(fp);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_position"))
+            c.tx_pos = qd_mex_get_Mat<double>(fp, copy);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_position"))
+            c.rx_pos = qd_mex_get_Mat<double>(fp, copy);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "tx_orientation"))
+            c.tx_orientation = qd_mex_get_Mat<double>(fp, copy);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "rx_orientation"))
+            c.rx_orientation = qd_mex_get_Mat<double>(fp, copy);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_re"))
+            c.coeff_re = qd_mex_matlab2vector_Cube<double>(fp, 3);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "coeff_im"))
+            c.coeff_im = qd_mex_matlab2vector_Cube<double>(fp, 3);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "delay"))
+            c.delay = qd_mex_matlab2vector_Cube<double>(fp, 3);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_gain"))
+            c.path_gain = qd_mex_matlab2vector_Col<double>(fp, 1);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_length"))
+            c.path_length = qd_mex_matlab2vector_Col<double>(fp, 1);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_polarization"))
+            c.path_polarization = qd_mex_matlab2vector_Mat<double>(fp, 2);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "path_angles"))
+            c.path_angles = qd_mex_matlab2vector_Mat<double>(fp, 2);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "fbs_pos"))
+            c.path_fbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "lbs_pos"))
+            c.path_lbs_pos = qd_mex_matlab2vector_Mat<double>(fp, 2);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "no_interact"))
+            c.no_interact = qd_mex_matlab2vector_Col<unsigned>(fp, 1);
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "interact_coord"))
+            c.interact_coord = qd_mex_matlab2vector_Mat<double>(fp, 2);
+
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "center_frequency"))
+            c.center_frequency = qd_mex_get_Col<double>(fp, copy);
+
+        chan.push_back(std::move(c));
+    }
+
+    return chan;
+}
+
 #endif
