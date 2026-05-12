@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -25,151 +12,76 @@ SECTION!*/
 
 /*!MD
 # HDF5_WRITE_DSET
-Writes unstructured data to a HDF5 file
+Write a single unstructured dataset to an HDF5 file
 
-## Description:
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function `quadriga_lib.hdf5_write_dset` writes a single unstructured dataset. 
+- Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
+- `name` must contain only alphanumeric characters and underscores
+- The file must already exist (use [[hdf5_create_file]] first)
+- A dataset of the same name at the same slot is not overwritten; an error is thrown instead
+- Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
+  types: single, double, int32, uint32, int64, uint64
+- Row vectors are stored as column vectors
 
 ## Usage:
-
 ```
-storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data );
+storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Filename of the HDF5 file; string
+- **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`,
+  `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; pass `[]` for default `[1, 1, 1, 1]`
+- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; string
+- **`data`** — Data to be written; type must be supported (see above); cannot be empty
+- **`prefix`** *(optional)* — Prefix prepended to `name` in the HDF5 file; string; default: `'par_'`
 
-- **`location`** (optional)<br>
-  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`, 
-  `[ix,iy,iz]` or `[ix,iy,iz,iw]`; Default: `ix = iy = iz = iw = 1`
-
-- **`name`**<br>
-  Name of the dataset; String
-
-- **`data`**<br>
-  Data to be written
-
-## Output Argument:
-- **`storage_dims`**<br>
-  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
-
-## Caveat:
-- Throws an error if dataset already exists at this location
-- Throws an error if file does not exist (use hdf5_create_file)
-- Supported types: string, double, float, (u)int32, (u)int64
-- Supported size: up to 3 dimensions
-- Storage order is maintained
+## Outputs:
+- **`storage_dims`** *(optional)* — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
 MD!*/
-
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the HDF5 file
-    //  1 - location        Storage location, 1-based, vector with 1-4 elements, i.e. [ix], [ix, iy], [ix,iy,iz] or [ix,iy,iz,iw]
-    //  2 - name            Names of the dataset, string
-    //  3 - data            Dataset to be written
-
-    // Output:
-    //  0 - storage_dims    Dimensions of the storage layout in the file, 4-element vector
-
-    // Notes:
-    // - Throws an error if dataset already exists at this location
-    // - Throws an error if file does not exist (use hdf5_create_file)
-    // - Supported types: string, double, float, (u)int32, (u)int64
-    // - Supported size: up to 3 dimensions
-    // - Storage order is maintained
-
-    // Number of in and outputs
-    if (nrhs < 4)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:no_input", "Need at least 4 inputs (file name, location, dataset name and data).");
-
+    if (nrhs < 4 || nrhs > 5)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:no_output", "Incorrect number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset:wrong_type", "Input 'fn' must be a string");
+    // Read inputs
+    const std::string fn = qd_mex_get_string(prhs[0]);
+    const arma::Col<unsigned> location = qd_mex_get_Col<unsigned>(prhs[1]);
+    const std::string name = qd_mex_get_string(prhs[2]);
+    const std::string prefix = (nrhs < 5) ? std::string("par_") : qd_mex_get_string(prhs[4], "par_");
 
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
-
-    // Read location (1-based)
-    arma::Col<unsigned> location = qd_mex_typecast_Col<unsigned>(prhs[1], "location");
-
-    unsigned ix = location.empty() ? 1 : location.at(0);
-    unsigned iy = location.n_elem > 1ULL ? location.at(1) : 1;
-    unsigned iz = location.n_elem > 2ULL ? location.at(2) : 1;
-    unsigned iw = location.n_elem > 3ULL ? location.at(3) : 1;
+    unsigned ix = location.is_empty() ? 1 : location.at(0);
+    unsigned iy = location.n_elem > 1 ? location.at(1) : 1;
+    unsigned iz = location.n_elem > 2 ? location.at(2) : 1;
+    unsigned iw = location.n_elem > 3 ? location.at(3) : 1;
 
     if (ix == 0 || iy == 0 || iz == 0 || iw == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:wrong_type", "Input 'location' cannot contain zeros (1-based indexing)");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'location' cannot contain zeros (1-based indexing).");
+
+    // Convert to 0-based indices for the C++ call
     --ix, --iy, --iz, --iw;
 
-    // Read dataset name
-    if (!mxIsClass(prhs[2], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:wrong_type", "Input 'name' must be a string");
+    // Validate data is non-empty
+    if (mxGetNumberOfElements(prhs[3]) == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'data' cannot be empty.");
 
-    auto mx_dn = mxArrayToString(prhs[2]);
-    std::string name = std::string(mx_dn);
-    mxFree(mx_dn);
-
-    // Read the storage space from the file - returns [0,0,0,0] if file does not exist
-    arma::Col<unsigned> storage_space;
-    try
-    {
-        storage_space = quadriga_lib::hdf5_read_layout(fn);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
-
-    if (storage_space.at(0) == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:no_output", "File does not exist.");
-
-    // Throw error if location exceeds storage space
-    if (ix > storage_space.at(0) || iy > storage_space.at(1) || iz > storage_space.at(2) || iw > storage_space.at(3))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:wrong_type", "Location exceeds storage space in HDF file.");
-
-    // Construct data
+    // Wrap data into std::any (strings need special handling)
     std::any data;
-    if (mxGetNumberOfElements(prhs[3]) != 0)
-    {
-        if (mxIsClass(prhs[3], "char"))
-        {
-            auto chr = mxArrayToString(prhs[3]);
-            data = std::any(std::string(chr));
-            mxFree(chr);
-        }
-        else
-            data = qd_mex_anycast(prhs[3], "data", false);
-    }
+    if (mxIsClass(prhs[3], "char"))
+        data = std::any(qd_mex_get_string(prhs[3]));
     else
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:wrong_type", "Data cannot be empty.");
+        data = qd_mex_anycast(prhs[3], "data", false);
 
-    // Write to file
-    try
-    {
-        quadriga_lib::hdf5_write_dset(fn, name, &data, ix, iy, iz, iw);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_write_dset:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    // Read layout for "file exists" check and to populate storage_dims output
+    arma::Col<unsigned> storage_space;
+    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn));
+    if (storage_space.at(0) == 0U)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File does not exist (use quadriga_lib.hdf5_create_file).");
+
+    // Write dataset
+    CALL_QD(quadriga_lib::hdf5_write_dset(fn, name, &data, ix, iy, iz, iw, prefix));
 
     // Return storage space
     if (nlhs > 0)

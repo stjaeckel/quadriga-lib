@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -25,105 +12,55 @@ SECTION!*/
 
 /*!MD
 # HDF5_READ_DSET_NAMES
-Read the names of unstructured data fields from an HDF5 file
+Read names of unstructured datasets stored at a 4D slot in an HDF5 file
 
-## Description:
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. Users can add any number of such unstructured datasets, each identified by a unique 
-dataset name. The function `quadriga_lib.hdf5_read_dset_names` retrieves the names of all these 
-datasets, returning them as a cell array of strings.
+- Finds all datasets whose HDF5 name starts with `prefix` at slot `(ix, iy, iz, iw)`
+- Returned names have the prefix stripped
+- Returns an empty cell array if no matching datasets are present at the slot
 
 ## Usage:
-
 ```
-names = quadriga_lib.hdf5_read_dset_names( fn, location );
+names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Path to the HDF5 file; string
+- **`location`** *(optional)* — Slot location inside the file; 1-based; vector with 1-4
+  elements, i.e. `[ix]`, `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; default:  `[1, 1, 1, 1]`
+- **`prefix`** *(optional)* — Prefix used to identify unstructured datasets; string; default: `'par_'`
 
-- **`location`** (optional)<br>
-  Storage location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`, 
-  `[ix,iy,iz]` or `[ix,iy,iz,iw]`; Default: `ix = iy = iz = iw = 1`
-
-## Output Argument:
-- **`names`**<br>
-  List of names of all these at the given location in the files; Cell array of strings
+## Outputs:
+- **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the QDANT file
-    //  1 - location        Storage location, 1-based, vector with 1-4 elements, i.e. [ix], [ix, iy], [ix,iy,iz] or [ix,iy,iz,iw]
-
-    // Outputs:
-    //  0 - names           Names of the unstructured datasets, Cell array of strings
-
-    // Number of in and outputs
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:no_input", "Filename is missing.");
-
+    if (nrhs < 1 || nrhs > 3)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:no_input", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read filename
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:wrong_type", "Input 'fn' must be a string");
+    // Read inputs
+    const std::string fn = qd_mex_get_string(prhs[0]);
+    const arma::u32_vec location = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1]);
+    const std::string prefix = (nrhs < 3) ? std::string("par_") : qd_mex_get_string(prhs[2], "par_");
 
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
+    unsigned ix = location.is_empty() ? 1U : location.at(0);
+    unsigned iy = location.n_elem > 1ULL ? location.at(1) : 1U;
+    unsigned iz = location.n_elem > 2ULL ? location.at(2) : 1U;
+    unsigned iw = location.n_elem > 3ULL ? location.at(3) : 1U;
 
-    // Read location (1-based)
-    arma::Col<unsigned> location;
-    if (nrhs > 1)
-        location = qd_mex_typecast_Col<unsigned>(prhs[1], "location");
+    if (ix == 0U || iy == 0U || iz == 0U || iw == 0U)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'location' cannot contain zeros (1-based indexing).");
 
-    unsigned ix = location.empty() ? 1 : location.at(0);
-    unsigned iy = location.n_elem > 1ULL ? location.at(1) : 1;
-    unsigned iz = location.n_elem > 2ULL ? location.at(2) : 1;
-    unsigned iw = location.n_elem > 3ULL ? location.at(3) : 1;
-
-    if (ix == 0 || iy == 0 || iz == 0 || iw == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:wrong_type", "Input 'location' cannot contain zeros (1-based indexing)");
+    // Convert to 0-based indices for the C++ call
     --ix, --iy, --iz, --iw;
 
-    // Read names of the unstructured data fields from file
-    quadriga_lib::channel<float> channel;
+    // Read dataset names
     std::vector<std::string> par_names;
-    unsigned long long n_par = 0ULL;
-    try
-    {
-        n_par = quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_dset_names:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    CALL_QD(quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw, prefix));
 
-    if (nlhs > 0 && n_par == 0ULL) // Nothing there
-        plhs[0] = mxCreateCellMatrix(0, 0);
-    else if (nlhs > 0)
-    {
-        // Create the cell array
-         mxArray *cellArray = mxCreateCellMatrix((mwSize)n_par, 1);
-         
-        // Fill in the cell array
-        for (size_t i = 0; i < par_names.size(); ++i)
-        {
-            mxArray *mxStr = mxCreateString(par_names[i].c_str());
-            mxSetCell(cellArray, i, mxStr);
-        }
-
-        // Set the output
-        plhs[0] = cellArray;
-    }
+    // Return cell array
+    if (nlhs > 0)
+        plhs[0] = qd_mex_copy2matlab(&par_names);
 }
