@@ -15,8 +15,7 @@ inline mxArray *qd_mex_arrayant2struct(const quadriga_lib::arrayant<double> &ant
                                        "azimuth_grid", "elevation_grid", "element_pos",
                                        "coupling_re", "coupling_im", "center_freq", "name"};
 
-    mxArray *output;
-    output = qd_mex_make_struct(fields);
+    mxArray *output = qd_mex_make_struct(fields);
     qd_mex_set_field(output, fields[0], qd_mex_copy2matlab(&ant.e_theta_re));
     qd_mex_set_field(output, fields[1], qd_mex_copy2matlab(&ant.e_theta_im));
     qd_mex_set_field(output, fields[2], qd_mex_copy2matlab(&ant.e_phi_re));
@@ -37,8 +36,7 @@ inline mxArray *qd_mex_arrayant2struct_multi(const std::vector<quadriga_lib::arr
                                        "azimuth_grid", "elevation_grid", "element_pos",
                                        "coupling_re", "coupling_im", "center_freq", "name"};
 
-    mxArray *output;
-    output = qd_mex_make_struct(fields, ant.size());
+    mxArray *output = qd_mex_make_struct(fields, ant.size());
     for (size_t n = 0; n < ant.size(); ++n)
     {
         qd_mex_set_field(output, fields[0], qd_mex_copy2matlab(&ant[n].e_theta_re), n);
@@ -164,6 +162,8 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
 
 inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<double>> &chan)
 {
+    mxArray *output = nullptr;
+
     const size_t n_chan = chan.size();
     if (n_chan == 0) // Return empty struct with no fields
     {
@@ -189,6 +189,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     const bool h_ni = !c0.no_interact.empty();
     const bool h_ic = !c0.interact_coord.empty();
     const bool h_cf = !c0.center_frequency.is_empty();
+    const bool h_ini = c0.initial_position != 0;
 
     // Build the field list (name is always present)
     std::vector<std::string> fields;
@@ -225,8 +226,10 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
         fields.push_back("interact_coord");
     if (h_cf)
         fields.push_back("center_frequency");
+    if (h_ini)
+        fields.push_back("initial_position");
 
-    mxArray *output = qd_mex_make_struct(fields, n_chan);
+    output = qd_mex_make_struct(fields, n_chan);
 
     for (size_t n = 0; n < n_chan; ++n)
     {
@@ -264,6 +267,8 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
             qd_mex_set_field(output, "interact_coord", qd_mex_vector2matlab(&c.interact_coord), n);
         if (h_cf)
             qd_mex_set_field(output, "center_frequency", qd_mex_copy2matlab(&c.center_frequency), n);
+        if (h_ini)
+            qd_mex_set_field(output, "initial_position", qd_mex_copy2matlab(&c.initial_position), n);
     }
     return output;
 }
@@ -325,10 +330,104 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "center_frequency"))
             c.center_frequency = qd_mex_get_Col<double>(fp, copy);
 
+        if (mxArray *fp = mxGetField(input, (mwIndex)i, "initial_position"))
+            c.initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 0);
+
         chan.push_back(std::move(c));
     }
 
     return chan;
+}
+
+inline mxArray *qd_mex_any2matlab(const std::any &dset)
+{
+    mxArray *output = nullptr;
+
+    // Missing dataset -> return []
+    if (!dset.has_value())
+        return mxCreateNumericMatrix(0, 0, mxDOUBLE_CLASS, mxREAL);
+
+    // Dispatch on the std::any contents
+    unsigned long long dims[3];
+    void *dataptr = nullptr;
+    int type_id = quadriga_lib::any_type_id(&dset, dims, &dataptr);
+
+#define CASE_ARMA(id, ARMA_TYPE)                    \
+    case id:                                        \
+    {                                               \
+        auto data = std::any_cast<ARMA_TYPE>(dset); \
+        output = qd_mex_copy2matlab(&data);         \
+        break;                                      \
+    }
+
+    switch (type_id)
+    {
+    case 9:
+    { // std::string
+        auto data = std::any_cast<std::string>(dset);
+        output = mxCreateString(data.c_str());
+        break;
+    }
+
+    // Scalars
+    case 10:
+        output = qd_mex_copy2matlab((float *)dataptr);
+        break;
+    case 11:
+        output = qd_mex_copy2matlab((double *)dataptr);
+        break;
+    case 12:
+        output = qd_mex_copy2matlab((unsigned long long *)dataptr);
+        break;
+    case 13:
+        output = qd_mex_copy2matlab((long long *)dataptr);
+        break;
+    case 14:
+        output = qd_mex_copy2matlab((unsigned *)dataptr);
+        break;
+    case 15:
+        output = qd_mex_copy2matlab((int *)dataptr);
+        break;
+
+        // Matrices
+        CASE_ARMA(20, arma::Mat<float>)
+        CASE_ARMA(21, arma::Mat<double>)
+        CASE_ARMA(22, arma::Mat<unsigned long long>)
+        CASE_ARMA(23, arma::Mat<long long>)
+        CASE_ARMA(24, arma::Mat<unsigned>)
+        CASE_ARMA(25, arma::Mat<int>)
+
+        // Cubes
+        CASE_ARMA(30, arma::Cube<float>)
+        CASE_ARMA(31, arma::Cube<double>)
+        CASE_ARMA(32, arma::Cube<unsigned long long>)
+        CASE_ARMA(33, arma::Cube<long long>)
+        CASE_ARMA(34, arma::Cube<unsigned>)
+        CASE_ARMA(35, arma::Cube<int>)
+
+        // Column vectors
+        CASE_ARMA(40, arma::Col<float>)
+        CASE_ARMA(41, arma::Col<double>)
+        CASE_ARMA(42, arma::Col<unsigned long long>)
+        CASE_ARMA(43, arma::Col<long long>)
+        CASE_ARMA(44, arma::Col<unsigned>)
+        CASE_ARMA(45, arma::Col<int>)
+
+        // Row vectors
+        CASE_ARMA(50, arma::Row<float>)
+        CASE_ARMA(51, arma::Row<double>)
+        CASE_ARMA(52, arma::Row<unsigned long long>)
+        CASE_ARMA(53, arma::Row<long long>)
+        CASE_ARMA(54, arma::Row<unsigned>)
+        CASE_ARMA(55, arma::Row<int>)
+
+    default:
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Unsupported dataset type.");
+    }
+
+#undef CASE_ARMA
+
+    return output;
 }
 
 #endif

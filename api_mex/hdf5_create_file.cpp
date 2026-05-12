@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -27,107 +14,60 @@ SECTION!*/
 # HDF5_CREATE_FILE
 Create a new HDF5 channel file with a custom storage layout
 
-## Description:
-Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this
-library is its ability to organize multiple channels within a single HDF5 file while enabling access
-to individual data sets without the need to read the entire file. In this system, channels can be
-structured in a multi-dimensional array. For instance, the first dimension might represent the Base
-Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important
-to note that the dimensions of the storage layout must be defined when the file is initially created
-and cannot be altered thereafter. The function `quadriga_lib.hdf5_create_file` is used to create an
-empty file with a predetermined custom storage layout.
+- Initializes a new HDF5 file for storing wireless channel data
+- Defines a 4D layout `(nx, ny, nz, nw)` where each index combination maps to one channel storage slot
+- Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition
+- Storage layout is fixed at creation and cannot be altered later, except by reshaping while
+  keeping the total slot count constant
+- Errors if the target file already exists; delete it first to recreate it
 
 ## Usage:
-
 ```
-quadriga_lib.hdf5_create_file( fn, storage_dims );
+storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Filename of the HDF5 file to create; string
+- **`storage_dims`** *(optional)* — Size of the storage layout; vector with 1-4 elements,
+  i.e. `[nx]`, `[nx, ny]`, `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
 
-- **`storage_dims`** (optional)<br>
-  Size of the dimensions of the storage space, vector with 1-4 elements, i.e. `[nx]`, `[nx, ny]`, 
-  `[nx,ny,nz]` or `[nx,ny,nz,nw]`. By default, `nx = 65536, ny = 1, nz = 1, nw = 1`
+## Output:
+- **`storage_space`** *(optional)* — Actual storage dimensions used; `[4]`; uint32
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the HDF5 file
-    //  1 - storage_dims    Dimensions of the storage space, vector with 1-4 elements, i.e. [nx], [nx, ny], [nx,ny,nz] or [nx,ny,nz,nw]
-
-    // Output:
-    //  0 - storage_dims    Dimensions of the storage space in the file, 4-element vector
+    if (nrhs < 1 || nrhs > 2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:no_output", "Incorrect number of output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:no_input", "Filename is missing.");
+    // Read inputs
+    const std::string fn = qd_mex_get_string(prhs[0]);
+    const arma::u32_vec storage_dims = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1]);
 
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:wrong_type", "Input 'fn' must be a string");
+    unsigned nx = storage_dims.is_empty() ? 65536 : storage_dims.at(0);
+    unsigned ny = storage_dims.n_elem > 1 ? storage_dims.at(1) : 1;
+    unsigned nz = storage_dims.n_elem > 2 ? storage_dims.at(2) : 1;
+    unsigned nw = storage_dims.n_elem > 3 ? storage_dims.at(3) : 1;
 
-    // Read file name
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:IO_error", "Input 'fn' must be a string.");
+    if (nx == 0 || ny == 0 || nz == 0 || nw == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'storage_dims' cannot contain zeros.");
 
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
-
-    // Read storage_dims
-    arma::Col<unsigned> storage_dims;
-    if (nrhs > 1)
-        storage_dims = qd_mex_typecast_Col<unsigned>(prhs[1], "storage_dims");
-
-    unsigned ix = storage_dims.empty() ? 65536U : storage_dims.at(0);
-    unsigned iy = storage_dims.n_elem > 1ULL ? storage_dims.at(1) : 1U;
-    unsigned iz = storage_dims.n_elem > 2ULL ? storage_dims.at(2) : 1U;
-    unsigned iw = storage_dims.n_elem > 3ULL ? storage_dims.at(3) : 1U;
-
-    if (ix == 0 || iy == 0 || iz == 0 || iw == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:wrong_type", "Input 'storage_dims' cannot contain zeros (1-based indexing)");
-
-    // Read the storage space from the file - returns [0,0,0,0] if file does not exist
-    arma::Col<unsigned> storage_space(4);
-    try
-    {
-        storage_space = quadriga_lib::hdf5_read_layout(fn);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
-
-    if (storage_space.at(0) != 0)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:files_exists", "File already exists.");
+    // Fail if file already exists - hdf5_read_layout returns [0,0,0,0] if the file is missing
+    arma::u32_vec existing;
+    CALL_QD(existing = quadriga_lib::hdf5_read_layout(fn));
+    if (existing.at(0) != 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File already exists.");
 
     // Create file
-    try
-    {
-        quadriga_lib::hdf5_create(fn, ix, iy, iz, iw);
-        storage_space.at(0) = ix;
-        storage_space.at(1) = iy;
-        storage_space.at(2) = iz;
-        storage_space.at(3) = iw;
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:create_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_create_file:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    CALL_QD(quadriga_lib::hdf5_create(fn, nx, ny, nz, nw));
 
     // Return storage space
     if (nlhs > 0)
+    {
+        arma::u32_vec storage_space = {nx, ny, nz, nw};
         plhs[0] = qd_mex_copy2matlab(&storage_space, true);
+    }
 }

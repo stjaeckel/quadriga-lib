@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -27,75 +14,46 @@ SECTION!*/
 # HDF5_READ_LAYOUT
 Read the storage layout of channel data inside an HDF5 file
 
-## Description:
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
-file. In this framework, channels can be arranged in a multi-dimensional array format.
-
-The function `quadriga_lib.hdf5_read_layout` is designed to read the storage layout from an 
-existing file. Furthermore, it also generates an array that marks the locations within the layout 
-where data already exists. This functionality aids in efficiently managing and accessing channel 
-data within the HDF5 file structure.
+- Returns the dimensions of the 4D channel slot grid stored inside an HDF5 file
+- Returns `[0, 0, 0, 0]` if the file does not exist; errors if the file exists but is not a valid HDF5 file
+- Also reports which slots already contain data, so callers can locate free slots without scanning the file
 
 ## Usage:
-
 ```
 [ storage_dims, has_data ] = quadriga_lib.hdf5_read_layout( fn );
 ```
 
-## Input Argument:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Input:
+- **`fn`** — Filename of the HDF5 file; string
 
-## Output Arguments:
-- **`storage_dims`**<br>
-  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
-
-- **`has_data`**<br>
-  Array indicating if data exists (value 1) or not (value 0); uint32; Size: `[nx,ny,nz,nw]`
+## Outputs:
+- **`storage_dims`** *(optional)* — Size of the storage space `[nx, ny, nz, nw]`; `[4]`;  uint32
+- **`has_data`** *(optional)* — Slot occupancy mask; `true` where data exists, `false` otherwise; 
+  `[nx, ny, nz, nw]`; logical
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Inputs:
-    //  0 - fn              Filename of the QDANT file
+    if (nrhs != 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+    if (nlhs > 2)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Output:
-    //  0 - storage_dims    Dimensions of the storage layout in the file, 4-element vector
-    //  1 - has_data        Array indicating if data was stored in that location
+    // Read input
+    const std::string fn = qd_mex_get_string(prhs[0]);
 
-    // Read filename
-    if (nrhs < 1)
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:no_input", "Filename is missing.");
-
-    if (!mxIsClass(prhs[0], "char"))
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:wrong_type", "Input 'fn' must be a string");
-
-    auto mx_fn = mxArrayToString(prhs[0]);
-    std::string fn = std::string(mx_fn);
-    mxFree(mx_fn);
-
-    // Read the storage space from the file - returns [0,0,0,0] if file does not exist
+    // Read storage layout (and channelIDs when requested)
     arma::Col<unsigned> storage_space;
     arma::Col<unsigned> channelID;
-    try
-    {
-        storage_space = quadriga_lib::hdf5_read_layout(fn, &channelID);
-    }
-    catch (const std::invalid_argument &ex)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:unknown_error", ex.what());
-    }
-    catch (...)
-    {
-        mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:unknown_error", "Unknown failure occurred. Possible memory corruption!");
-    }
+    arma::Col<unsigned> *p_channelID = (nlhs > 1) ? &channelID : nullptr;
 
-    // Return storage space
+    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn, p_channelID));
+
+    // Return storage space as 1x4 row vector
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&storage_space, true);
 
-    // Determine if there is data
+    // Build binary occupancy mask as 4D uint32 array (no Col/Mat/Cube helper for 4D)
     if (nlhs > 1)
     {
         unsigned nx = storage_space.at(0),
@@ -104,15 +62,15 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                  nw = storage_space.at(3);
 
         unsigned n_data = nx * ny * nz * nw;
-        if (channelID.n_elem != (unsigned long long)n_data)
-            mexErrMsgIdAndTxt("quadriga_lib:hdf5_read_layout:unknown_error", "Corrupted storage index.");
+        if (channelID.n_elem != (arma::uword)n_data)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Corrupted storage index.");
 
         mwSize dims[4] = {(mwSize)nx, (mwSize)ny, (mwSize)nz, (mwSize)nw};
-        plhs[1] = mxCreateNumericArray(4, dims, mxUINT32_CLASS, mxREAL);
-        unsigned *ptrO = (unsigned *)mxGetData(plhs[1]);
-        unsigned *ptrI = channelID.memptr();
+        plhs[1] = mxCreateLogicalArray(4, dims);
+        mxLogical *ptrO = mxGetLogicals(plhs[1]);
+        const unsigned *ptrI = channelID.memptr();
 
-        for (unsigned n = 0; n < n_data; n++)
+        for (unsigned n = 0; n < n_data; ++n)
             if (ptrI[n] != 0)
                 ptrO[n] = 1;
     }
