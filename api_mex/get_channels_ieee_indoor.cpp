@@ -147,25 +147,5 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                           wall_loss));
 
     if (nlhs > 0)
-    {
-        std::vector<std::string> fields = {"name", "tx_position", "rx_position", "tx_orientation",
-                                           "rx_orientation", "coeff_re", "coeff_im",
-                                           "delay", "path_gain", "center_frequency"};
-
-        plhs[0] = qd_mex_make_struct(fields, n_users);
-
-        for (arma::uword i_user = 0; i_user < n_users; ++i_user)
-        {
-            qd_mex_set_field(plhs[0], fields[0], mxCreateString(chan[i_user].name.c_str()), i_user);
-            qd_mex_set_field(plhs[0], fields[1], qd_mex_copy2matlab(&chan[i_user].tx_pos), i_user);
-            qd_mex_set_field(plhs[0], fields[2], qd_mex_copy2matlab(&chan[i_user].rx_pos), i_user);
-            qd_mex_set_field(plhs[0], fields[3], qd_mex_copy2matlab(&chan[i_user].tx_orientation), i_user);
-            qd_mex_set_field(plhs[0], fields[4], qd_mex_copy2matlab(&chan[i_user].rx_orientation), i_user);
-            qd_mex_set_field(plhs[0], fields[5], qd_mex_vector2matlab(&chan[i_user].coeff_re), i_user);
-            qd_mex_set_field(plhs[0], fields[6], qd_mex_vector2matlab(&chan[i_user].coeff_im), i_user);
-            qd_mex_set_field(plhs[0], fields[7], qd_mex_vector2matlab(&chan[i_user].delay), i_user);
-            qd_mex_set_field(plhs[0], fields[8], qd_mex_vector2matlab(&chan[i_user].path_gain), i_user);
-            qd_mex_set_field(plhs[0], fields[9], qd_mex_copy2matlab(&CarrierFreq_Hz), i_user);
-        }
-    }
+        plhs[0] = qd_mex_channel2struct(chan);
 }
