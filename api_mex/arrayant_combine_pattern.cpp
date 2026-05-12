@@ -19,17 +19,17 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ## Usage:
 ```
 % Input as struct (struct mode)
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in);
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid_new, elevation_grid_new);
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq, azimuth_grid_new, elevation_grid_new );
 
 % Separate outputs, struct input
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid_new, elevation_grid_new, element_pos, ...
-    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern(arrayant_in);
+    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
 % Separate inputs (single-freq only)
-arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid_new, elevation_grid_new, ...
+arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new, elevation_grid_new, ...
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name);
+    coupling_re, coupling_im, center_freq, name );
 ```
 
 ## Input Arguments:
