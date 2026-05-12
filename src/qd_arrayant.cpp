@@ -171,6 +171,10 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
             std::memcpy(output.coupling_im.colptr(n), this->coupling_im.colptr(n), n_elements_1 * sizeof(dtype));
         }
 
+    // Inherit scalar/string metadata from *this
+    output.center_frequency = this->center_frequency;
+    output.name = this->name;
+
     // Copy data from second antenna
     std::memcpy(output.e_theta_re.slice_memptr(n_elements_1), new_arrayant->e_theta_re.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));
     std::memcpy(output.e_theta_im.slice_memptr(n_elements_1), new_arrayant->e_theta_im.slice_memptr(0), n_azimuth * n_elevation * n_elements_2 * sizeof(dtype));

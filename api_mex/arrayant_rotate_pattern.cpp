@@ -40,7 +40,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 - **`x_deg`** *(optional)* — Rotation around x-axis (bank) in degrees; default: 0
 - **`y_deg`** *(optional)* — Rotation around y-axis (tilt) in degrees; default: 0
 - **`z_deg`** *(optional)* — Rotation around z-axis (heading) in degrees; default: 0
-- **`usage`** *(optional)* — Rotation mode; default: 0
+- **`usage`** *(optional)* — Rotation mode; default: 0<br><br>
    | Mode | Pattern | Polarization | Grid adj. |
    | ---- | ------- | ------------ | --------- |
    | 0    | Yes     | Yes          | Yes       |

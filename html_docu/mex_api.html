@@ -64,6 +64,7 @@
 <tr><td><a href="#arrayant_calc_beamwidth">arrayant_calc_beamwidth</a></td><td>Calculates the beam width of array antenna elements in degree</td></tr>
 <tr><td><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a></td><td>Calculates the directivity in dBi of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
+<tr><td><a href="#arrayant_concat">arrayant_concat</a></td><td>Concatenate two arrayant structs into a single one</td></tr>
 <tr><td><a href="#arrayant_copy_element">arrayant_copy_element</a></td><td>Create copies of array antenna elements</td></tr>
 <tr><td><a href="#arrayant_export_obj_file">arrayant_export_obj_file</a></td><td>Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization</td></tr>
 <tr><td><a href="#arrayant_generate">arrayant_generate</a></td><td>Generates predefined array antenna models</td></tr>
@@ -323,17 +324,17 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 <i>Usage:</i><br>
 <pre>
 % Input as struct (struct mode)
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in);
-arrayant_out = quadriga_lib.arrayant_combine_pattern(arrayant_in, freq, azimuth_grid_new, elevation_grid_new);
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq, azimuth_grid_new, elevation_grid_new );
 
 % Separate outputs, struct input
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid_new, elevation_grid_new, element_pos, ...
-    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern(arrayant_in);
+    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
 % Separate inputs (single-freq only)
-arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid_new, elevation_grid_new, ...
+arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new, elevation_grid_new, ...
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name);
+    coupling_re, coupling_im, center_freq, name );
 </pre>
 
 <i>Input Arguments:</i><br>
@@ -359,6 +360,49 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern([], freq, azimuth_grid_new,
 </li>
 <li><b><code>e_theta_re</code>, ..., <code>name</code></b> — Separate-field outputs; <i></i>only available for single-frequency
    results<i></i> (single-struct input with scalar/omitted <code>freq</code>, or separate-input mode).
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="arrayant_concat"></a>
+<b>arrayant_concat</b> - Concatenate two arrayant structs into a single one
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Concatenates all elements from <code>arrayant_in2</code> onto <code>arrayant_in1</code> along the element dimension;
+   <code>element_pos</code> matrices are joined horizontally
+</li>
+<li>Both inputs must share identical azimuth and elevation sampling grids
+</li>
+<li>Coupling is assembled block-diagonally: elements from <code>arrayant_in1</code> connect only to ports from
+   <code>arrayant_in1</code>, elements from <code>arrayant_in2</code> only to ports from <code>arrayant_in2</code>
+</li>
+<li><code>center_freq</code> and <code>name</code> are inherited from <code>arrayant_in1</code>
+</li>
+<li>Supports multi-frequency arrayant models: when both inputs are struct arrays, they must have the
+   same number of entries and matching <code>center_freq</code> at each index; concatenation is performed per
+   entry and a struct array of equal size is returned
+</li>
+<li>Output struct shape matches the input shape (scalar struct -> scalar struct, struct array -> struct array)
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>arrayant_in1</code></b> — Struct containing the first arrayant data; field layout as documented in
+   <a href="#arrayant_generate">arrayant_generate</a>; a struct array may contain a frequency-dependent  model
+</li>
+<li><b><code>arrayant_in2</code></b> — Struct containing the second arrayant data; must match the sampling grids of
+   <code>arrayant_in1</code>, and for multi-frequency the entry count and <code>center_freq</code> per entry
+</li></ul>
+
+<i>Output Arguments:</i><br>
+<ul>
+<li><b><code>arrayant_out</code></b> — Struct containing the combined arrayant data; same field layout as the inputs;
+   a struct array of equal size is returned for multi-frequency input
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -984,11 +1028,17 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 <i>Usage:</i><br>
 <pre>
 % Struct in / struct out
-arrayant_out = quadriga_lib.arrayant_rotate_pattern( arrayant_in, x_deg, y_deg, z_deg, usage, i_element );
+arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
 
 % Separate-field outputs (single-frequency results only)
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, ...
-    center_freq, name] = quadriga_lib.arrayant_rotate_pattern( arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_rotate_pattern( ...
+    arrayant_in, x_deg, y_deg, z_deg, usage, element);
+
+% Separate inputs (single-frequency only)
+arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usage, element, ...
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
+    coupling_re, coupling_im, center_freq, name);
 </pre>
 
 <i>Inputs:</i><br>
@@ -1002,7 +1052,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern( arrayant_in, x_deg, y_deg, 
 </li>
 <li><b><code>z_deg</code></b> <i>(optional)</i> — Rotation around z-axis (heading) in degrees; default: 0
 </li>
-<li><b><code>usage</code></b> <i>(optional)</i> — Rotation mode; default: 0
+<li><b><code>usage</code></b> <i>(optional)</i> — Rotation mode; default: 0<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
