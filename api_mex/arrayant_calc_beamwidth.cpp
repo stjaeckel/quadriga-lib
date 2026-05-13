@@ -51,7 +51,7 @@ Calculates the beam width of array antenna elements in degree
   is calculated for all elements; uint64; `[n_out]` or empty
 - **`threshold_dB`** *(optional)* — Threshold in dB; default: 3 (equivalent to FWHM)
 
-## Output Arguments:
+## Outputs:
 - **`beamwidth_az`** — Azimuth beamwidth in degree; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
 - **`beamwidth_el`** *(optional)* — Elevation beamwidth in degree; `[n_out, n_freq]`
 - **`az_point_ang`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`

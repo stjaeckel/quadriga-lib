@@ -32,7 +32,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new
     coupling_re, coupling_im, center_freq, name );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
 - **`freq`** *(optional)* —  Alternative frequency (grid) in Hz; defaults to per-entry `center_frequency`
@@ -41,7 +41,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new
 - **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted;
   defaults to input grid
 
-## Output Arguments:
+## Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
   result); field layout as documented in [[arrayant_generate]]. Single struct when both input and
   `freq` describe a single frequency; struct array of size `numel(freq)` (or `numel(arrayant_in)`

@@ -65,14 +65,6 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
 - **`azimuth_grid`** — Azimuth sample grid in rad, sorted, in [-π, π]; `[n_azimuth]`
 - **`elevation_grid`** — Elevation sample grid in rad, sorted, in [-π/2, π/2]; `[n_elevation]`
 
-## Derived sizes:
-  `n_azimuth`      | Number of azimuth samples in the pattern
-  `n_elevation`    | Number of elevation samples in the pattern
-  `n_elements`     | Number of antenna elements in the pattern
-  `n_ang`          | Number of interpolation angles
-  `n_out`          | Number of output elements (`n_elements` if `element` is empty, else `numel(element)`)
-  `n_freq`         | Number of target frequencies (multi-frequency mode only)
-
 ## Outputs:
 - **`V_re`** — Real part of the interpolated e-theta (vertical) field component;
   `[n_out, n_ang]` in single-freq mode, `[n_out, n_ang, n_freq]` in multi-freq mode

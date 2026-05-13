@@ -12,7 +12,6 @@ SECTION!*/
 # GENERATE_SPEAKER
 Generate a parametric frequency-dependent loudspeaker directivity model
 
-## Description:
 - Returns one arrayant per frequency sample; each has a single element with the real-valued
   directivity pattern in `e_theta_re` and `center_frequency` set to the corresponding frequency.
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining

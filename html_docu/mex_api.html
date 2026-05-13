@@ -94,7 +94,7 @@
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
-<tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
+<tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Map path delays to a fixed tap grid using two-tap power-weighted interpolation</td></tr>
 </tbody>
 </table>
 </ul>
@@ -2028,20 +2028,26 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="quantize_delays"></a>
-<b>quantize_delays</b> - Fixes the path delays to a grid of delay bins
-<br><br>
-<i>Description:</i><br>
+<b>quantize_delays</b> - Map path delays to a fixed tap grid using two-tap power-weighted interpolation
+<div style="margin-bottom: 1.5em;">
 <ul>
-<li>For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-   of delay bins (taps). This function approximates each path delay using two adjacent taps with
-   power-weighted coefficients, producing smooth transitions in the frequency domain.
+<li>Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α
+   and δ^α, where δ is the fractional offset within the bin and α is <code>power_exponent</code>
 </li>
-<li>For a path at fractional offset &delta; between tap indices, two taps are created with complex
-   coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-   exponent.
+<li>Two-tap interpolation avoids discontinuities when delays cross tap boundaries
 </li>
-<li>Input delays may be per-antenna <code>[n_rx, n_tx, n_path, n_snap]</code> or shared <code>[1, 1, n_path, n_snap]</code>.
+<li>Use <code>power_exponent = 1.0</code> for narrowband (linear interpolation) or <code>0.5</code> for wideband
+   (incoherent power preservation)
+</li>
+<li>If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but
+   tap-selection logic still applies
+</li>
+<li>Input <code>delay</code> may be per-antenna <code>[n_rx, n_tx, n_path, n_snap]</code> or shared
+   <code>[1, 1, n_path, n_snap]</code>; shared delays are expanded internally when <code>fix_taps</code> is 0 or 3
+</li>
+<li>Output arrays are zero-padded along the tap dimension so that all snapshots share the same <code>n_taps</code>
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
@@ -2049,44 +2055,58 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
     tap_spacing, max_no_taps, power_exponent, fix_taps );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
-<li><b><code>coeff_re</code></b> (required)<br>
-   Channel coefficients, real part. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> (double).
+<li><b><code>coeff_re</code></b> — Channel coefficients, real part; <code>[n_rx, n_tx, n_path, n_snap]</code>
 </li>
-<li><b><code>coeff_im</code></b> (required)<br>
-   Channel coefficients, imaginary part. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> (double).
+<li><b><code>coeff_im</code></b> — Channel coefficients, imaginary part; <code>[n_rx, n_tx, n_path, n_snap]</code>
 </li>
-<li><b><code>delay</code></b> (required)<br>
-   Path delays in seconds. 4D array of size <code>[n_rx, n_tx, n_path, n_snap]</code> or
-   <code>[1, 1, n_path, n_snap]</code> (double).
+<li><b><code>delay</code></b> — Path delays in seconds; <code>[n_rx, n_tx, n_path, n_snap]</code> or <code>[1, 1, n_path, n_snap]</code>
 </li>
-<li><b><code>tap_spacing</code></b> (optional)<br>
-   Spacing of the delay bins in seconds. Scalar double. Default: 5e-9
+<li><b><code>tap_spacing</code></b> <i>(optional)</i> — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz
+   sampling rate; default: 5e-9
 </li>
-<li><b><code>max_no_taps</code></b> (optional)<br>
-   Maximum number of output taps. Scalar integer. 0 = unlimited. Default: 48
+<li><b><code>max_no_taps</code></b> <i>(optional)</i> — Maximum number of output taps; 0 = unlimited; default: 48
 </li>
-<li><b><code>power_exponent</code></b> (optional)<br>
-   Interpolation exponent. Scalar double. Default: 1.0
+<li><b><code>power_exponent</code></b> <i>(optional)</i> — Interpolation exponent α; default: 1.0
 </li>
-<li><b><code>fix_taps</code></b> (optional)<br>
-   Delay sharing mode. Scalar integer (0-3). Default: 0<br>
-   0 = per tx-rx pair and snapshot, 1 = single grid for all,
-   2 = per snapshot, 3 = per tx-rx pair.
+<li><b><code>fix_taps</code></b> <i>(optional)</i> — Delay grid sharing mode; default: 0<br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;"></th>
+  <th style="text-align: left;">Value</th>
+  <th style="text-align: left;">Meaning</th>
+</tr>
+<tr>
+  <td></td>
+  <td>0</td>
+  <td>Per tx-rx pair and snapshot; output delays <code>[n_rx, n_tx, n_taps, n_snap]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td>1</td>
+  <td>Single shared grid across all snapshots and tx-rx pairs; output delays <code>[1, 1, n_taps, n_snap]</code></td>
+</tr>
+<tr>
+  <td></td>
+  <td>2</td>
+  <td>Per snapshot; output delays <code>[1, 1, n_taps, n_snap]</code>, each snapshot independent</td>
+</tr>
+<tr>
+  <td></td>
+  <td>3</td>
+  <td>Per tx-rx pair across all snapshots; output delays <code>[n_rx, n_tx, n_taps, n_snap]</code></td>
+</tr>
+</table><br>
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
-<li><b><code>coeff_re_q</code></b><br>
-   Output coefficients, real part. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> (double).
+<li><b><code>coeff_re_q</code></b> — Output coefficients, real part; <code>[n_rx, n_tx, n_taps, n_snap]</code>
 </li>
-<li><b><code>coeff_im_q</code></b><br>
-   Output coefficients, imaginary part. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> (double).
+<li><b><code>coeff_im_q</code></b> — Output coefficients, imaginary part; <code>[n_rx, n_tx, n_taps, n_snap]</code>
 </li>
-<li><b><code>delay_q</code></b><br>
-   Output delays in seconds. 4D array of size <code>[n_rx, n_tx, n_taps, n_snap]</code> or
-   <code>[1, 1, n_taps, n_snap]</code> (double).
+<li><b><code>delay_q</code></b> — Output delays in seconds; <code>[n_rx, n_tx, n_taps, n_snap]</code> or <code>[1, 1, n_taps, n_snap]</code> depending on <code>fix_taps</code>
 </li></ul>
 
 <div class="pagebreak"></div>
@@ -4064,8 +4084,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="ray_mesh_interact"></a>
 <b>ray_mesh_interact</b> - Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul>
 <li>Computes interaction of plane waves with planar interfaces between homogeneous isotropic media
 </li>
@@ -4084,6 +4103,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 <li>Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for
    acoustic simulation with impedance-mapped material parameters (ε derived from Z)
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
