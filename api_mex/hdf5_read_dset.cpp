@@ -32,6 +32,10 @@ dset = quadriga_lib.hdf5_read_dset( fn, location, name, prefix );
 
 ## Outputs:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing
+
+## See also:
+- [[hdf5_read_dset_names]] (for reading names of already written datasets)
+- [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

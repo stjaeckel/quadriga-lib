@@ -33,6 +33,10 @@ storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
 
 ## Output:
 - **`storage_space`** *(optional)* — Actual storage dimensions used; `[4]`; uint32
+
+## See also:
+- [[hdf5_write_channel]] (for writing channel data)
+- [[hdf5_write_dset]] (for writing arbitrary unstructured data)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

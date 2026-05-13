@@ -40,7 +40,10 @@ try
     quadriga_lib.hdf5_create_file(fn);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'File already exists.')));
+    expectedErrorMessage = 'File already exists.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Custom storage layout
@@ -59,7 +62,10 @@ try
     quadriga_lib.hdf5_create_file(fn, [0, 1]);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'cannot contain zeros')));
+    expectedErrorMessage = 'cannot contain zeros';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Reshape layout (preserve total slot count)
@@ -78,7 +84,10 @@ try
     quadriga_lib.hdf5_reshape_layout(fn, 145);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'Mismatch in number of elements')));
+    expectedErrorMessage = 'Mismatch in number of elements';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 delete(fn);
@@ -90,7 +99,10 @@ try
     quadriga_lib.hdf5_reshape_layout(fn, 144);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'File does not exist.')));
+    expectedErrorMessage = 'File does not exist.';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 %% ===== HDF5 version =====
@@ -136,31 +148,37 @@ par.int32_Cube  = -randi(10, [4, 5, 6], 'int32');
 par.uint64_Cube = uint64(randi(10, [5, 6, 7], 'uint32')) + uint64(21e6 * 100e6);
 par.int64_Cube  = int64(randi(10, [6, 7, 8], 'int32'))  - int64(21e6 * 100e6);
 
-% Write par-only via hdf5_write_channel: creates file with default-derived layout
+% Create file with layout large enough for all subsequent writes
 tst = tst + 1; if tst > run_tests; return; end
-if verbose; disp("Test: Write par-only"); end
-storage_space = quadriga_lib.hdf5_write_channel(fn, [1, 1, 1, 1], par, []);
+if verbose; disp("Test: Create file for par+chan tests"); end
+quadriga_lib.hdf5_create_file(fn, [128, 8, 8, 8]);
+storage_space = quadriga_lib.hdf5_read_layout(fn);
+assertEqual(storage_space, uint32([128, 8, 8, 8]));
+
+% Write par via hdf5_write_channel (requires a chan; use a minimal dummy)
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Write par with dummy chan"); end
+dummy_chan = struct('name', 'par_holder');
+storage_space = quadriga_lib.hdf5_write_channel(fn, dummy_chan, par, 1, 1, 1, 1);
 assertEqual(storage_space, uint32([128, 8, 8, 8]));
 
 % Too many outputs
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Too many outputs errors"); end
 try
-    [~, ~] = quadriga_lib.hdf5_write_channel(fn, [2, 1, 1, 1], par, []);
+    [~, ~] = quadriga_lib.hdf5_write_channel(fn, dummy_chan, par, 2);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'Wrong number of output arguments')));
+    expectedErrorMessage = 'Wrong number of output arguments';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
-
-% Writing entirely empty (no par, no chan) should be accepted
-tst = tst + 1; if tst > run_tests; return; end
-if verbose; disp("Test: Write empty par and chan"); end
-quadriga_lib.hdf5_write_channel(fn, [2, 1, 1, 1], [], []);
 
 % Round-trip par via hdf5_read_channel
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Read par round-trip"); end
-[parR, chanR] = quadriga_lib.hdf5_read_channel(fn);
+[chanR, parR] = quadriga_lib.hdf5_read_channel(fn);
 assertTrue(~isfield(chanR, 'coeff_re'));    % no structured data at slot [1,1,1,1]
 assertTrue(~isfield(chanR, 'rx_position'));
 
@@ -202,7 +220,10 @@ try
     quadriga_lib.hdf5_write_dset(fn, [1, 2], 'string', 'Oh no, I bought Ethereum.');
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'already exists')));
+    expectedErrorMessage = 'already exists';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Names of an empty location
@@ -233,12 +254,15 @@ assertEqual(val, pi);
 % Complex data is rejected
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Complex data rejected"); end
-parC.complex = 1 + 21i;
+parC = struct('complex', 1 + 21i);
 try
-    quadriga_lib.hdf5_write_channel(fn, [2, 1, 1, 1], parC, []);
+    quadriga_lib.hdf5_write_channel(fn, dummy_chan, parC, 8);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~strcmp(ME.identifier, 'moxunit:exceptionNotRaised'));
+    expectedErrorMessage = 'Complex datatypes are not supported';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 %% ===== Structured (chan) round-trip =====
@@ -260,12 +284,12 @@ chan.tx_position = tx_pos;
 chan.coeff_re    = coeff_re;
 chan.coeff_im    = coeff_im;
 chan.delay       = delay_4d;
-quadriga_lib.hdf5_write_channel(fn, [3, 1, 1, 1], [], chan);
+quadriga_lib.hdf5_write_channel(fn, chan, [], 3);
 
 % Restore and compare
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Restore minimal chan"); end
-[~, chanR] = quadriga_lib.hdf5_read_channel(fn, 3);
+chanR = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1);
 assertEqual(chanR.rx_position, double(single(rx_pos)));
 assertEqual(chanR.tx_position, double(single(tx_pos)));
 assertEqual(chanR.coeff_re,    double(single(coeff_re)));
@@ -275,7 +299,7 @@ assertEqual(chanR.delay,       double(single(delay_4d)));
 % Reverse snapshot order via snap argument
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Reverse snapshot order"); end
-[~, chanR] = quadriga_lib.hdf5_read_channel(fn, 3, [3, 2, 1]);
+chanR = quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, [3, 2, 1]);
 assertEqual(chanR.coeff_re, double(single(coeff_re(:, :, :, [3, 2, 1]))));
 assertEqual(chanR.coeff_im, double(single(coeff_im(:, :, :, [3, 2, 1]))));
 assertEqual(chanR.delay,    double(single(delay_4d(:, :, :, [3, 2, 1]))));
@@ -284,26 +308,35 @@ assertEqual(chanR.delay,    double(single(delay_4d(:, :, :, [3, 2, 1]))));
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Snapshot out of bounds"); end
 try
-    quadriga_lib.hdf5_read_channel(fn, 3, 0);
+    quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 0);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'out of bounds')));
+    expectedErrorMessage = 'out of bounds';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 try
-    quadriga_lib.hdf5_read_channel(fn, 3, 4);
+    quadriga_lib.hdf5_read_channel(fn, 3, 1, 1, 1, 4);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'out of bounds')));
+    expectedErrorMessage = 'out of bounds';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Snap on slot with no structured data now errors (was silent in old API)
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Snap on par-only slot errors"); end
 try
-    quadriga_lib.hdf5_read_channel(fn, 1, 2);
+    quadriga_lib.hdf5_read_channel(fn, 1, 1, 1, 1, 2);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'out of bounds')));
+    expectedErrorMessage = 'out of bounds';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % 2D-delay shorthand was removed; explicit reshape works
@@ -316,8 +349,8 @@ chan.tx_position = tx_pos;
 chan.coeff_re    = coeff_re;
 chan.coeff_im    = coeff_im;
 chan.delay       = reshape(delay_2d, [1, 1, size(delay_2d, 1), size(delay_2d, 2)]);
-quadriga_lib.hdf5_write_channel(fn, [4, 1, 1, 1], [], chan);
-[~, chanR] = quadriga_lib.hdf5_read_channel(fn, 4);
+quadriga_lib.hdf5_write_channel(fn, chan, [], 4);
+[chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 4, 1, 1, 1);
 assertEqual(squeeze(chanR.delay), double(single(delay_2d)));
 
 % Full chan: every structured field populated
@@ -355,12 +388,12 @@ chan.no_interact       = no_interact;
 chan.interact_coord    = interact_coord;
 chan.rx_orientation    = rx_orientation;
 chan.tx_orientation    = tx_orientation;
-quadriga_lib.hdf5_write_channel(fn, [5, 1, 1, 1], [], chan);
+quadriga_lib.hdf5_write_channel(fn, chan, [], 5);
 
 % Read back full chan and verify every field
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Full chan round-trip"); end
-[parR, chanR] = quadriga_lib.hdf5_read_channel(fn, 5);
+[chanR, parR] = quadriga_lib.hdf5_read_channel(fn, 5, 1, 1, 1);
 assertTrue(isempty(fieldnames(parR)));
 assertEqual(chanR.name, name);
 assertEqual(chanR.rx_position,       double(single(rx_pos)));
@@ -383,7 +416,7 @@ assertEqual(chanR.tx_orientation,    double(single(tx_orientation)));
 % Single-snapshot subset
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Single-snapshot subset"); end
-[~, chanR] = quadriga_lib.hdf5_read_channel(fn, 5, 3);
+[chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 5, 1, 1, 1, 3);
 assertEqual(size(chanR.coeff_re, 4), 1);
 assertEqual(chanR.coeff_re,  double(single(coeff_re(:, :, :, 3))));
 assertEqual(chanR.path_gain, double(single(path_gain(:, 3))));
@@ -393,8 +426,8 @@ tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: initial_position round-trip"); end
 chan_ip = chan;
 chan_ip.initial_position = int32(7);
-quadriga_lib.hdf5_write_channel(fn, [6, 1, 1, 1], [], chan_ip);
-[~, chanR] = quadriga_lib.hdf5_read_channel(fn, [6, 1, 1, 1]);
+quadriga_lib.hdf5_write_channel(fn, chan_ip, [], 6);
+[chanR, ~] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 1);
 assertEqual(chanR.initial_position, int32(7));
 
 % Combined par + chan write with sparse field set
@@ -414,9 +447,9 @@ chan.delay             = delay_4d;
 chan.center_frequency  = center_frequency;
 chan.rx_orientation    = rx_orientation(:, 1);
 chan.tx_orientation    = tx_orientation(:, 2);
-quadriga_lib.hdf5_write_channel(fn, [6, 1, 1, 2], par, chan);
+quadriga_lib.hdf5_write_channel(fn, chan, par, 6, 1, 1, 2);
 
-[parR, chanR] = quadriga_lib.hdf5_read_channel(fn, [6, 1, 1, 2]);
+[chanR, parR] = quadriga_lib.hdf5_read_channel(fn, 6, 1, 1, 2);
 assertTrue(~isempty(fieldnames(parR)));
 assertEqual(chanR.rx_position,       double(single(rx_pos)));
 assertEqual(chanR.tx_position,       double(single(tx_pos)));
@@ -476,51 +509,67 @@ try
     quadriga_lib.hdf5_read_layout(non_hdf5);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'Not an HDF5 file')));
+    expectedErrorMessage = 'Not an HDF5 file';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 delete(non_hdf5);
 
 %% ===== Wrapper-level input validation =====
 
-% chan as 2x1 struct array is rejected
+% par size must match chan size
 tst = tst + 1; if tst > run_tests; return; end
-if verbose; disp("Test: chan struct array rejected"); end
+if verbose; disp("Test: par/chan size mismatch rejected"); end
 chan2 = repmat(chan, 2, 1);
+par2  = repmat(struct('x', 1), 3, 1);
 try
-    quadriga_lib.hdf5_write_channel(fn, [7, 1, 1, 1], [], chan2);
+    quadriga_lib.hdf5_write_channel(fn, chan2, par2, [7, 1]);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, '1x1 struct')));
+    expectedErrorMessage = 'same number of elements';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Non-struct par is rejected
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Non-struct par rejected"); end
 try
-    quadriga_lib.hdf5_write_channel(fn, [7, 1, 1, 1], [1, 2, 3], chan);
+    quadriga_lib.hdf5_write_channel(fn, chan, [1, 2, 3], 7);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'must be a struct')));
+    expectedErrorMessage = 'must be a struct';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Non-struct chan is rejected
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Non-struct chan rejected"); end
 try
-    quadriga_lib.hdf5_write_channel(fn, [7, 1, 1, 1], [], [1, 2, 3]);
+    quadriga_lib.hdf5_write_channel(fn, [1, 2, 3], [], 7);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'must be a struct')));
+    expectedErrorMessage = 'Input ''chan'' must be a non-empty struct';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % Zero in location is rejected
 tst = tst + 1; if tst > run_tests; return; end
 if verbose; disp("Test: Zero location rejected"); end
 try
-    quadriga_lib.hdf5_write_channel(fn, [0, 1, 1, 1], [], chan);
+    quadriga_lib.hdf5_write_channel(fn, chan, [], 0);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'cannot contain zeros')));
+    expectedErrorMessage = 'cannot contain zeros';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
 
 % hdf5_write_dset on non-existent file errors
@@ -530,8 +579,159 @@ try
     quadriga_lib.hdf5_write_dset('does_not_exist.hdf5', 1, 'foo', pi);
     error('moxunit:exceptionNotRaised','Expected an error!');
 catch ME
-    assertTrue(~isempty(strfind(ME.message, 'File does not exist')));
+    expectedErrorMessage = 'File does not exist';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
 end
+
+%% ===== Multi-channel writes (struct array) =====
+
+% Build a 3-element chan struct array
+N = 3;
+chans(N) = struct();   % preallocate
+for k = 1:N
+    chans(k).name             = sprintf('multi_%d', k);
+    chans(k).rx_position      = rand(3, 1);
+    chans(k).tx_position      = rand(3, 1);
+    chans(k).coeff_re         = rand(2, 2, 4, 2);
+    chans(k).coeff_im         = rand(2, 2, 4, 2);
+    chans(k).delay            = rand(2, 2, 4, 2);
+end
+
+% Default layout when file is created from chan array
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: New file sized from numel(chan)"); end
+fn2 = 'hdf_mex_multi.hdf5';
+if exist(fn2, 'file'); delete(fn2); end
+storage_space = quadriga_lib.hdf5_write_channel(fn2, chans);
+assertEqual(storage_space, uint32([N, 1, 1, 1]));
+
+% Read all back with no indices — vector return
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Read all channels"); end
+chansR = quadriga_lib.hdf5_read_channel(fn2);
+assertEqual(numel(chansR), N);
+for k = 1:N
+    assertEqual(chansR(k).name, chans(k).name);
+    assertEqual(chansR(k).coeff_re, double(single(chans(k).coeff_re)));
+end
+
+% Scalar broadcasting on iy
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Scalar broadcasting on iy"); end
+delete(fn2);
+quadriga_lib.hdf5_create_file(fn2, [5, 5]);
+quadriga_lib.hdf5_write_channel(fn2, chans, [], [1, 2, 3], 4);  % (1,4),(2,4),(3,4)
+chansR = quadriga_lib.hdf5_read_channel(fn2, [1, 2, 3], 4);
+assertEqual(numel(chansR), 3);
+for k = 1:N
+    assertEqual(chansR(k).name, chans(k).name);
+end
+
+% par struct array with sparse field set per element
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: par struct array, sparse fields"); end
+delete(fn2);
+par_arr      = struct();
+par_arr(1).a = 11;
+par_arr(2).b = 'hello';
+par_arr(3).a = 33;
+par_arr(3).c = uint32(7);
+quadriga_lib.hdf5_write_channel(fn2, chans, par_arr);
+[chansR, parR] = quadriga_lib.hdf5_read_channel(fn2);
+assertEqual(numel(chansR), N);
+assertEqual(numel(parR), N);
+% Field union: a, b, c
+fn_par = sort(fieldnames(parR));
+assertEqual(fn_par, sort({'a';'b';'c'}));
+% Per-element population
+assertEqual(parR(1).a, 11);
+assertTrue(isempty(parR(1).b));
+assertTrue(isempty(parR(1).c));
+assertTrue(isempty(parR(2).a));
+assertEqual(parR(2).b, 'hello');
+assertEqual(parR(3).a, 33);
+assertEqual(parR(3).c, uint32(7));
+
+% par size must match chan size
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: par/chan size mismatch"); end
+par_short = struct('a', {1, 2});  % length 2 vs chans length 3
+try
+    quadriga_lib.hdf5_write_channel(fn2, chans, par_short);
+    error('moxunit:exceptionNotRaised','Expected an error!');
+catch ME
+    expectedErrorMessage = 'same number of elements';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Index vector length must match chan length (when not scalar)
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: index vector length mismatch"); end
+try
+    quadriga_lib.hdf5_write_channel(fn2, chans, [], [1, 2]);  % 2 indices, 3 chans
+    error('moxunit:exceptionNotRaised','Expected an error!');
+catch ME
+    expectedErrorMessage = 'scalar or a vector of length';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Empty slots are skipped on read
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Empty slots skipped"); end
+delete(fn2);
+quadriga_lib.hdf5_create_file(fn2, [10, 1]);
+quadriga_lib.hdf5_write_channel(fn2, chans(1:2), [], [3, 7]);  % only slots 3 and 7 populated
+chansR = quadriga_lib.hdf5_read_channel(fn2);   % default scans 1:10
+assertEqual(numel(chansR), 2);
+assertEqual(chansR(1).name, chans(1).name);     % column-major order: slot 3 first
+assertEqual(chansR(2).name, chans(2).name);
+
+% snap rejected when more than one slot is requested
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: snap rejected for multi-slot read"); end
+try
+    quadriga_lib.hdf5_read_channel(fn2, [], [], [], [], 1);
+    error('moxunit:exceptionNotRaised','Expected an error!');
+catch ME
+    expectedErrorMessage = 'single slot';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Reading a non-existent file errors
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Read non-existent file errors"); end
+try
+    quadriga_lib.hdf5_read_channel('does_not_exist.hdf5');
+    error('moxunit:exceptionNotRaised','Expected an error!');
+catch ME
+    expectedErrorMessage = 'does not exist';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+% Index out of bounds on read
+tst = tst + 1; if tst > run_tests; return; end
+if verbose; disp("Test: Read index out of bounds"); end
+try
+    quadriga_lib.hdf5_read_channel(fn2, 999);   % nx = 10
+    error('moxunit:exceptionNotRaised','Expected an error!');
+catch ME
+    expectedErrorMessage = 'out of bounds';
+    if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
+        error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
+    end
+end
+
+if exist(fn2, 'file'); delete(fn2); end
 
 %% ===== Final cleanup =====
 

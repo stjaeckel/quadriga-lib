@@ -160,7 +160,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
     return ant;
 }
 
-inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<double>> &chan)
+inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<double>> &chan, bool validate = false)
 {
     mxArray *output = nullptr;
 
@@ -234,6 +234,14 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     for (size_t n = 0; n < n_chan; ++n)
     {
         const auto &c = chan[n];
+
+        if (validate)
+        {
+            auto error_msg = c.is_valid();
+            if (!error_msg.empty())
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+        }
+
         qd_mex_set_field(output, "name", mxCreateString(c.name.c_str()), n);
         if (h_txp)
             qd_mex_set_field(output, "tx_position", qd_mex_copy2matlab(&c.tx_pos), n);
@@ -273,7 +281,7 @@ inline mxArray *qd_mex_channel2struct(const std::vector<quadriga_lib::channel<do
     return output;
 }
 
-inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool copy = false)
+inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mxArray *input, bool validate = false, bool copy = false)
 {
     if (!mxIsStruct(input))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input must be a struct.");
@@ -332,6 +340,25 @@ inline std::vector<quadriga_lib::channel<double>> qd_mex_struct2channel(const mx
 
         if (mxArray *fp = mxGetField(input, (mwIndex)i, "initial_position"))
             c.initial_position = qd_mex_get_scalar<int>(fp, "initial_position", 0);
+
+        // Prune zero-padded trailing columns in interact_coord (round-trip artifacts)
+        const size_t n_snap = (size_t)c.n_snap();
+        if (c.no_interact.size() == n_snap && c.interact_coord.size() == n_snap)
+            for (size_t s = 0; s < n_snap; ++s)
+            {
+                unsigned cnt = 0;
+                for (auto v : c.no_interact[s])
+                    cnt += v;
+                if (c.interact_coord[s].n_cols > (arma::uword)cnt)
+                    c.interact_coord[s].resize(c.interact_coord[s].n_rows, (arma::uword)cnt);
+            }
+
+        if (validate)
+        {
+            auto error_msg = c.is_valid();
+            if (!error_msg.empty())
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+        }
 
         chan.push_back(std::move(c));
     }
