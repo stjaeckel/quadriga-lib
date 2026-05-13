@@ -105,6 +105,7 @@
 <tbody>
 <tr><td><a href="#get_channels_ieee_indoor">get_channels_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
 <tr><td><a href="#get_channels_irs">get_channels_irs</a></td><td>Calculate MIMO channel coefficients for IRS-assisted communication</td></tr>
+<tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Compute channel coefficients for spherical waves across multiple frequencies</td></tr>
 <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate MIMO channel coefficients for planar wave paths</td></tr>
 <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate MIMO channel coefficients and delays for spherical wave propagation</td></tr>
 </tbody>
@@ -2378,6 +2379,95 @@ See also:
 <li><a href="#arrayant_generate">arrayant_generate</a> (antenna array generator)
 </li>
 <li><a href="#combine_irs_coord">combine_irs_coord</a> (coordinate setup for IRS geometry)
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="get_channels_multifreq"></a>
+<b>get_channels_multifreq</b> - Compute channel coefficients for spherical waves across multiple frequencies
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Multi-frequency extension of <a href="#get_channels_spherical">get_channels_spherical</a> with frequency-dependent antenna patterns,
+   path gains, and Jones matrices
+</li>
+<li>Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
+</li>
+<li>Aligns four frequency grids: TX array (from each <code>tx_array.center_freq</code>), RX array, input
+   samples (<code>freq_in</code>), and output (<code>freq_out</code>)
+</li>
+<li>TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
+</li>
+<li><code>path_gain</code> is interpolated linearly; <code>M</code> is interpolated via SLERP per complex entry pair to preserve phase
+</li>
+<li>Extrapolation clamps to the nearest frequency entry on all four grids
+</li>
+<li><code>propagation_speed</code> supports EM (speed of light, default) and acoustic (~343 m/s) simulations
+</li>
+<li><code>M</code> accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows
+   (scalar pressure: ReVV, ImVV only)
+</li>
+<li>Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to
+   antenna pattern handling
+</li>
+<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code>
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+[ coeff_re, coeff_im, delay ] = quadriga_lib.get_channels_multifreq( tx_array, rx_array, ...
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
+    freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed );
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>tx_array</code></b> — Multi-frequency TX arrayant struct array; one entry per input frequency, see <a href="#arrayant_generate">arrayant_generate</a>
+</li>
+<li><b><code>rx_array</code></b> — Multi-frequency RX arrayant struct array; one entry per input frequency, see <a href="#arrayant_generate">arrayant_generate</a>
+</li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>[3, n_path]</code>
+</li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>[3, n_path]</code>
+</li>
+<li><b><code>path_gain</code></b> — Linear-scale path gains per input frequency; <code>[n_path, n_freq_in]</code>
+</li>
+<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>[n_path, 1]</code>
+</li>
+<li><b><code>M</code></b> — Polarization transfer matrix; <code>[8, n_path, n_freq_in]</code> (full pol, interleaved Re/Im for VV, VH, HV, HH) or <code>[2, n_path, n_freq_in]</code> (scalar pressure: ReVV, ImVV only)
+</li>
+<li><b><code>tx_pos</code></b> — Transmitter position; <code>[3, 1]</code>
+</li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code>
+</li>
+<li><b><code>rx_pos</code></b> — Receiver position; <code>[3, 1]</code>
+</li>
+<li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>[3, 1]</code>
+</li>
+<li><b><code>freq_in</code></b> — Input sample frequencies for <code>path_gain</code> and <code>M</code>; <code>[n_freq_in, 1]</code>
+</li>
+<li><b><code>freq_out</code></b> — Target output frequencies; <code>[n_freq_out, 1]</code>
+</li>
+<li><b><code>use_absolute_delays</code></b> <i>(optional)</i> — If <code>true</code>, delays include the LOS component; default: <code>false</code>
+</li>
+<li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — If <code>true</code>, prepends a zero-power LOS path when none is present; default: <code>false</code>
+</li>
+<li><b><code>propagation_speed</code></b> <i>(optional)</i> — Wave speed in m/s; use ~343.0 for acoustics; default: <code>299792458.0</code>
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>coeff_re</code></b> — Real part of channel coefficients; <code>[n_rx, n_tx, n_path_out, n_freq_out]</code>
+</li>
+<li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients; <code>[n_rx, n_tx, n_path_out, n_freq_out]</code>
+</li>
+<li><b><code>delay</code></b> — Propagation delays in seconds; <code>[n_rx, n_tx, n_path_out, n_freq_out]</code>
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#get_channels_spherical">get_channels_spherical</a> (single-frequency equivalent)
+</li>
+<li><a href="#generate_speaker">generate_speaker</a> (acoustic source construction)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
