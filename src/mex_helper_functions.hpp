@@ -214,6 +214,28 @@ inline arma::Cube<dtype> qd_mex_reinterpret_Cube(const mxArray *input, bool crea
     return arma::Cube<dtype>((dtype *)mxGetData(input), d1, d2, d3 * d4, create_copy, !create_copy);
 }
 
+template <typename dtype>
+inline std::vector<arma::Cube<dtype>> qd_mex_reinterpret_CubeVec(const mxArray *input, bool create_copy = false)
+{
+    size_t n_dim = (size_t)mxGetNumberOfDimensions(input);
+    const mwSize *dims = mxGetDimensions(input);
+    size_t d1 = (size_t)dims[0];
+    size_t d2 = (size_t)dims[1];
+    size_t d3 = n_dim < 3 ? 1 : (size_t)dims[2];
+    size_t d4 = n_dim < 4 ? 1 : (size_t)dims[3];
+    if (d1 * d2 * d3 * d4 == 0)
+        return {};
+
+    dtype *data = (dtype *)mxGetData(input);
+    const size_t stride = d1 * d2 * d3;
+    std::vector<arma::Cube<dtype>> output;
+    output.reserve(d4); // prevent later reallocation of aliasing cubes
+    for (size_t i = 0; i < d4; ++i)
+        output.emplace_back(data + i * stride, d1, d2, d3, create_copy, !create_copy);
+
+    return output;
+}
+
 // Converts input to <std::any>
 // - Contained types: scalar native c++, arma::Col, arma::Row, arma::Mat, arma::Cube
 // - 4D Types get converted to arma::Cube with 3rd and 4th dimensions merged
@@ -398,6 +420,51 @@ inline arma::Cube<dtype> qd_mex_typecast_Cube(const mxArray *input, std::string 
     return output;
 }
 
+template <typename dtype>
+inline std::vector<arma::Cube<dtype>> qd_mex_typecast_CubeVec(const mxArray *input, std::string var_name = "")
+{
+    auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(input);
+    if (n_data == 0)
+        return {};
+
+    std::vector<arma::Cube<dtype>> output;
+    output.reserve(d4);
+    for (size_t i = 0; i < d4; ++i)
+        output.emplace_back(d1, d2, d3, arma::fill::none);
+
+    const size_t stride = d1 * d2 * d3;
+    auto copy = [&](auto *src)
+    {
+        for (size_t i = 0; i < d4; ++i)
+        {
+            dtype *dst = output[i].memptr();
+            const auto *s = src + i * stride;
+            for (size_t m = 0; m < stride; ++m)
+                dst[m] = (dtype)s[m];
+        }
+    };
+
+    if (qd_mex_type_matches<double>(input))
+        copy((const double *)mxGetData(input));
+    else if (qd_mex_type_matches<float>(input))
+        copy((const float *)mxGetData(input));
+    else if (qd_mex_type_matches<unsigned>(input))
+        copy((const unsigned *)mxGetData(input));
+    else if (qd_mex_type_matches<int>(input))
+        copy((const int *)mxGetData(input));
+    else if (qd_mex_type_matches<unsigned long long>(input))
+        copy((const unsigned long long *)mxGetData(input));
+    else if (qd_mex_type_matches<long long>(input))
+        copy((const long long *)mxGetData(input));
+    else
+    {
+        std::string msg = var_name.empty() ? "Unsupported data type." : "Input '" + var_name + "' has an unsupported data type.";
+        mexErrMsgIdAndTxt("MATLAB:unexpectedCPPexception", msg.c_str());
+    }
+
+    return output;
+}
+
 // Quick input converters
 template <typename dtype>
 inline arma::Col<dtype> qd_mex_get_Col(const mxArray *input, bool copy = false)
@@ -421,6 +488,14 @@ inline arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false
     return (qd_mex_type_matches<dtype>(input) && !copy)
                ? qd_mex_reinterpret_Cube<dtype>(input)
                : qd_mex_typecast_Cube<dtype>(input);
+}
+
+template <typename dtype>
+inline std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, bool copy = false)
+{
+    return (qd_mex_type_matches<dtype>(input) && !copy)
+               ? qd_mex_reinterpret_CubeVec<dtype>(input)
+               : qd_mex_typecast_CubeVec<dtype>(input);
 }
 
 // Creates an mxArray based on the armadillo input type, copies content
@@ -1452,6 +1527,23 @@ inline mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size
     mxArray *output = mxCreateNumericArray(3, dims, qd_mex_class_id<dtype>(), mxREAL);
     input->~Cube();
     ::new (input) arma::Cube<dtype>((dtype *)mxGetData(output), n_rows, n_cols, n_slices, false, true);
+    return output;
+}
+
+template <typename dtype>
+inline mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input,
+                                   size_t n_rows, size_t n_cols, size_t n_slices, size_t n_cubes) // 4D
+{
+    mwSize dims[4] = {(mwSize)n_rows, (mwSize)n_cols, (mwSize)n_slices, (mwSize)n_cubes};
+    mxArray *output = mxCreateNumericArray(4, dims, qd_mex_class_id<dtype>(), mxREAL);
+    dtype *data = (dtype *)mxGetData(output);
+    const size_t stride = n_rows * n_cols * n_slices;
+
+    input->clear();
+    input->reserve(n_cubes); // critical: avoid any later reallocation
+    for (size_t i = 0; i < n_cubes; ++i)
+        input->emplace_back(data + i * stride, n_rows, n_cols, n_slices, false, true);
+
     return output;
 }
 

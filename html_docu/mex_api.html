@@ -231,7 +231,7 @@
 <li><b><code>threshold_dB</code></b> <i>(optional)</i> — Threshold in dB; default: 3 (equivalent to FWHM)
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>beamwidth_az</code></b> — Azimuth beamwidth in degree; <code>[n_out, n_freq]</code>; with <code>n_out = n_elements</code> when <code>i_element</code> is omitted/empty
 </li>
@@ -299,7 +299,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
    calculated for all elements; uint64; <code>[n_out]</code> or empty
 </li></ul>
 
-<i>Output Argument:</i><br>
+<i>Output:</i><br>
 <ul>
 <li><b><code>directivity</code></b> - Directivity of the antenna pattern in dBi; <code>[n_out, n_freq]</code>;
    with <code>n_out = n_elements</code> when <code>i_element</code> is omitted/empty.
@@ -338,7 +338,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new
     coupling_re, coupling_im, center_freq, name );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
 <li><b><code>arrayant</code></b> — Struct containing the arrayant data; field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>;
    a struct array may contain a frequency-dependent model
@@ -352,7 +352,7 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new
    defaults to input grid
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>arrayant_out</code></b> — Arrayant struct (single-frequency result) or struct array (multi-frequency
    result); field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>. Single struct when both input and
@@ -400,7 +400,7 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
    <code>arrayant_in1</code>, and for multi-frequency the entry count and <code>center_freq</code> per entry
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>arrayant_out</code></b> — Struct containing the combined arrayant data; same field layout as the inputs;
    a struct array of equal size is returned for multi-frequency input
@@ -441,7 +441,7 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, 
    if <code>source_element</code> is a vector, must have the same length
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>arrayant_out</code></b> — Struct containing the modified arrayant data; same field layout as
    <code>arrayant_in</code>; a struct array of equal size is returned for multi-frequency input
@@ -803,34 +803,6 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
 <li><b><code>elevation_grid</code></b> — Elevation sample grid in rad, sorted, in [-π/2, π/2]; <code>[n_elevation]</code>
 </li></ul>
 
-<i>Derived sizes:</i><br>
-<table style="border-collapse: separate; border-spacing: 20px 0;">
-<tr>
-  <td><code>n_azimuth</code></td>
-  <td>Number of azimuth samples in the pattern</td>
-</tr>
-<tr>
-  <td><code>n_elevation</code></td>
-  <td>Number of elevation samples in the pattern</td>
-</tr>
-<tr>
-  <td><code>n_elements</code></td>
-  <td>Number of antenna elements in the pattern</td>
-</tr>
-<tr>
-  <td><code>n_ang</code></td>
-  <td>Number of interpolation angles</td>
-</tr>
-<tr>
-  <td><code>n_out</code></td>
-  <td>Number of output elements (<code>n_elements</code> if <code>element</code> is empty, else <code>numel(element)</code>)</td>
-</tr>
-<tr>
-  <td><code>n_freq</code></td>
-  <td>Number of target frequencies (multi-frequency mode only)</td>
-</tr>
-</table><br>
-
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>V_re</code></b> — Real part of the interpolated e-theta (vertical) field component;
@@ -1117,8 +1089,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="generate_speaker"></a>
 <b>generate_speaker</b> - Generate a parametric frequency-dependent loudspeaker directivity model
-<br><br>
-<i>Description:</i><br>
+<div style="margin-bottom: 1.5em;">
 <ul>
 <li>Returns one arrayant per frequency sample; each has a single element with the real-valued
    directivity pattern in <code>e_theta_re</code> and <code>center_frequency</code> set to the corresponding frequency.
@@ -1163,6 +1134,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 </li>
 <li>For <code>"horn"</code>, if <code>horn_control_freq = 0</code>, it is auto-derived as <code>f_ctrl = c/(2pi·radius)</code>.
 </li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
@@ -1883,12 +1855,12 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Input:</i><br>
 <ul>
 <li><b><code>fn</code></b> — Path to the QRT file; string
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>no_cir</code></b> — Number of channel snapshots per origin point; uint64 scalar
 </li>
@@ -1937,7 +1909,7 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
 <li><b><code>fn</code></b> — Path to the QRT file; string
 </li>
@@ -1976,7 +1948,7 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
 </li></ul>
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>center_freq</code></b> — Center frequency in Hz; <code>[n_freq]</code>
 </li>
@@ -2437,7 +2409,7 @@ See also:
     center_freq, use_absolute_delays, add_fake_los_path );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
 <li><b><code>tx_array</code></b> — Transmit antenna array; <code>n_tx</code> = number of ports after element coupling, see <a href="#arrayant_generate">arrayant_generate</a>
 </li>
@@ -2472,7 +2444,7 @@ See also:
 <li><b><code>add_fake_los_path</code></b> <i>(optional)</i> — If <code>true</code>, prepends a zero-power LOS path when none is present; Default: <code>false</code>
 </li></ul>
 
-<i>Output Arguments:</i><br>
+<i>Outputs:</i><br>
 <ul>
 <li><b><code>coeff_re</code></b> — Real part of channel coefficients; <code>[n_rx, n_tx, n_path(+1)]</code>
 </li>
