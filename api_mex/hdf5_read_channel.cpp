@@ -10,31 +10,31 @@ SECTION!*/
 
 /*!MD
 # HDF5_READ_CHANNEL
-Read a channel object from an HDF5 file
+Read one or more channel objects from an HDF5 file
 
-- Reads structured channel data and any unstructured datasets from a single 4D slot
+- Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
+- Each of ix, iy, iz, iw may be a scalar, vector, or omitted (omitted/empty = read full extent along that dimension)
+- Slots are visited in column-major order empty slots are skipped
 - Structured fields are stored in single precision in the file and returned in double
 - Unstructured datasets keep their stored type and shape
-- The optional `snap` argument extracts a subset of snapshots from structured fields;
-  unstructured datasets are returned in full and are not subsetted
-- Empty/missing slot returns an empty struct (`0x0`) for both outputs
+- If no data is found, both outputs are empty `0x0` structs
 
 ## Usage:
 ```
-[ par, chan ] = quadriga_lib.hdf5_read_channel( fn, location, snap );
+[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 ```
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`location`** *(optional)* — Slot location inside the file; 1-based; vector with 1-4 elements,
-  i.e. `[ix]`, `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; default: `[1, 1, 1, 1]`
-- **`snap`** *(optional)* — Snapshot indices to read; 1-based; default: all snapshots
+- **`ix`** *(optional)* — 1-based slot indices along dimension X; scalar or vector; default: `1:nx`
+- **`iy`** *(optional)* — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
+- **`iz`** *(optional)* — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
+- **`iw`** *(optional)* — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
+- **`snap`** *(optional)* — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+  when the total selection is a single slot.
 
 ## Outputs:
-- **`par`** — Unstructured datasets as a MATLAB struct; field names follow the dataset names in the file
-  (without prefix); empty `0x0` struct if no unstructured data is
-  present
-- **`chan`** — Struct containing the channel data with the following fields:<br><br>
+- **`chan`** — Struct array of length `N` (number of non-empty slots in the selection) with the channel data. Fields per element:<br><br>
   | Field              | Description                                                              | Type / Size                         |
   | ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
   | `name`             | Channel name                                                             | String                              |
@@ -55,43 +55,111 @@ Read a channel object from an HDF5 file
   | `interact_coord`   | Interaction coordinates                                                  | `[3, max(sum(no_interact)), n_snap]`|
   | `center_frequency` | Center Frequency in Hz                                                   | Scalar or `[n_snap]`                |
   | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
+- **`par`** — Unstructured datasets as a `1xN` struct array matching `chan`. The field set is the
+  **union** of dataset names across all loaded channels (without the `par_` prefix). For channels that
+  do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
+  `par` is an empty `0x0` struct.
+
+## See also:
+- [[hdf5_read_layout]] (for reading the layout in the file)
+- [[hdf5_write_channel]] (for writing channel data)
+- [[hdf5_read_dset]] (for reading individual unstructured datasets)
+- [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 1 || nrhs > 3)
+    if (nrhs < 1 || nrhs > 6)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
-    // Read inputs
+    // Read filename
     const std::string fn = qd_mex_get_string(prhs[0]);
-    const arma::u32_vec location = (nrhs < 2) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[1]);
-    arma::Col<arma::uword> snap = (nrhs < 3) ? arma::Col<arma::uword>() : qd_mex_get_Col<arma::uword>(prhs[2]);
 
-    unsigned ix = location.is_empty() ? 1 : location.at(0);
-    unsigned iy = location.n_elem > 1 ? location.at(1) : 1;
-    unsigned iz = location.n_elem > 2 ? location.at(2) : 1;
-    unsigned iw = location.n_elem > 3 ? location.at(3) : 1;
+    // Read storage layout (returns [0,0,0,0] if file does not exist)
+    arma::Col<unsigned> storage_space;
+    arma::Col<unsigned> channel_id;
+    CALL_QD(storage_space = quadriga_lib::hdf5_read_layout(fn, &channel_id));
 
-    if (ix == 0 || iy == 0 || iz == 0 || iw == 0)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'location' cannot contain zeros (1-based indexing).");
-    --ix, --iy, --iz, --iw;
+    const unsigned nx = storage_space.at(0);
+    const unsigned ny = storage_space.at(1);
+    const unsigned nz = storage_space.at(2);
+    const unsigned nw = storage_space.at(3);
 
-    // Read channel from file (request double precision)
-    quadriga_lib::channel<double> channel;
-    CALL_QD(channel = quadriga_lib::hdf5_read_channel<double>(fn, ix, iy, iz, iw));
+    if (nx == 0)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "HDF5 file does not exist or has no layout.");
 
-    if (!channel.empty())
+    // Parse index inputs: omitted/empty -> 1:n_dim; vector -> validated as-is
+    auto parse_idx = [&](int arg_idx, unsigned n_dim, const char *name) -> arma::Col<unsigned>
     {
-        std::string error_msg = channel.is_valid();
-        if (!error_msg.empty())
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
-    }
+        if (arg_idx >= nrhs || mxGetNumberOfElements(prhs[arg_idx]) == 0)
+        {
+            arma::Col<unsigned> v(n_dim);
+            for (unsigned i = 0; i < n_dim; ++i)
+                v.at(i) = i + 1;
+            return v;
+        }
+        arma::Col<unsigned> v = qd_mex_get_Col<unsigned>(prhs[arg_idx]);
+        for (auto val : v)
+            if (val == 0 || val > n_dim)
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Index '%s' out of bounds.", name);
+        return v;
+    };
 
-    // Validate snap indices (1-based) and convert to 0-based
-    const arma::uword n_snap_full = channel.n_snap();
-    if (!snap.is_empty())
+    arma::Col<unsigned> ix_vec = parse_idx(1, nx, "ix");
+    arma::Col<unsigned> iy_vec = parse_idx(2, ny, "iy");
+    arma::Col<unsigned> iz_vec = parse_idx(3, nz, "iz");
+    arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
+
+    // Parse snap (optional)
+    arma::u64_vec snap = (nrhs < 6) ? arma::u64_vec() : qd_mex_get_Col<arma::uword>(prhs[5]);
+
+    const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;
+    if (!snap.is_empty() && n_sel > 1)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'snap' is only allowed when a single slot is requested.");
+
+    // Iterate Cartesian product in column-major order, skipping empty slots.
+    std::vector<quadriga_lib::channel<double>> channels;
+    channels.reserve((size_t)n_sel);
+
+    for (arma::uword w = 0; w < iw_vec.n_elem; ++w)
+        for (arma::uword z = 0; z < iz_vec.n_elem; ++z)
+            for (arma::uword y = 0; y < iy_vec.n_elem; ++y)
+                for (arma::uword x = 0; x < ix_vec.n_elem; ++x)
+                {
+                    const unsigned ix0 = ix_vec.at(x) - 1;
+                    const unsigned iy0 = iy_vec.at(y) - 1;
+                    const unsigned iz0 = iz_vec.at(z) - 1;
+                    const unsigned iw0 = iw_vec.at(w) - 1;
+
+                    // Fast empty-slot check via channel_id (avoids per-slot HDF5 read)
+                    const unsigned lin_idx = ix0 + iy0 * nx + iz0 * nx * ny + iw0 * nx * ny * nz;
+                    if (channel_id.at((size_t)lin_idx) == 0)
+                        continue;
+
+                    quadriga_lib::channel<double> c;
+                    CALL_QD(c = quadriga_lib::hdf5_read_channel<double>(fn, ix0, iy0, iz0, iw0));
+
+                    // Keep par-only channels (c.empty() ignores par_data)
+                    if (c.empty() && c.par_names.empty())
+                        continue;
+
+                    if (!c.empty())
+                    {
+                        std::string error_msg = c.is_valid();
+                        if (!error_msg.empty())
+                            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", error_msg.c_str());
+                    }
+
+                    channels.push_back(std::move(c));
+                }
+
+    // Snap subsetting (only valid for a single loaded channel)
+    if (!snap.is_empty() && !channels.empty())
+    {
+        quadriga_lib::channel<double> &channel = channels[0];
+        const arma::uword n_snap_full = channel.n_snap();
         for (auto &s : snap)
         {
             if (s == 0 || s > n_snap_full)
@@ -99,9 +167,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
             --s;
         }
 
-    // Apply snap subsetting on structured fields (par_data is not per-snapshot)
-    if (!snap.is_empty())
-    {
         quadriga_lib::channel<double> sub;
         sub.name = channel.name;
         sub.initial_position = channel.initial_position;
@@ -139,39 +204,39 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         sub_vec(channel.no_interact, sub.no_interact);
         sub_vec(channel.interact_coord, sub.interact_coord);
 
-        // Move par_data over (not snapshot-dependent)
         sub.par_names = std::move(channel.par_names);
         sub.par_data = std::move(channel.par_data);
         channel = std::move(sub);
     }
 
-    // Output 1: par struct (unstructured datasets)
+    // Output 1: chan struct array (qd_mex_channel2struct handles empty vector)
     if (nlhs > 0)
+        plhs[0] = qd_mex_channel2struct(channels, false);
+
+    // Output 2: par struct array with the union of par_names across all channels
+    if (nlhs > 1)
     {
-        if (channel.par_names.empty())
+        // Collect union of field names, preserving first-seen order
+        std::vector<std::string> par_field_names;
+        for (const auto &c : channels)
+            for (const auto &n : c.par_names)
+                if (std::find(par_field_names.begin(), par_field_names.end(), n) == par_field_names.end())
+                    par_field_names.push_back(n);
+
+        if (par_field_names.empty() || channels.empty())
         {
             std::vector<std::string> none;
-            plhs[0] = qd_mex_make_struct(none, 0);
+            plhs[1] = qd_mex_make_struct(none, 0);
         }
         else
         {
-            plhs[0] = qd_mex_make_struct(channel.par_names);
-
-            for (size_t n = 0; n < channel.par_names.size(); ++n)
+            plhs[1] = qd_mex_make_struct(par_field_names, channels.size());
+            for (size_t k = 0; k < channels.size(); ++k)
             {
-                const std::string &fname = channel.par_names[n];
-                const std::any &dset = channel.par_data[n];
-                qd_mex_set_field(plhs[0], fname, qd_mex_any2matlab(dset));
+                const auto &c = channels[k];
+                for (size_t n = 0; n < c.par_names.size(); ++n)
+                    qd_mex_set_field(plhs[1], c.par_names[n], qd_mex_any2matlab(c.par_data[n]), k);
             }
         }
-    }
-
-    // Output 2: chan struct (structured data)
-    if (nlhs > 1)
-    {
-        std::vector<quadriga_lib::channel<double>> vec;
-        if (!channel.empty())
-            vec.push_back(std::move(channel));
-        plhs[1] = qd_mex_channel2struct(vec);
     }
 }

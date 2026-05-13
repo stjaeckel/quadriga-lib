@@ -31,6 +31,10 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 
 ## Outputs:
 - **`storage_space`** *(optional)* — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
+
+## See also:
+- [[hdf5_create_file]] (for creating a file with a custom storage layout)
+- [[hdf5_read_layout]] (for reading the exisiting layout)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

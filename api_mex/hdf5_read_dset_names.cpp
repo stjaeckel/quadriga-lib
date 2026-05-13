@@ -31,6 +31,10 @@ names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 
 ## Outputs:
 - **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
+
+## See also:
+- [[hdf5_read_dset]] (for reading individual unstructured datasets)
+- [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

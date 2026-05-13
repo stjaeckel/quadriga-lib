@@ -37,6 +37,10 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
 
 ## Outputs:
 - **`storage_dims`** *(optional)* — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
+
+## See also:
+- [[hdf5_read_dset_names]] (for reading names of already written datasets)
+- [[hdf5_read_dset]] (for reading individual unstructured datasets)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

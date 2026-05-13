@@ -84,13 +84,13 @@
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Transforms the channel into frequency domain and returns the frequency response</td></tr>
 <tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
-<tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read a channel object from an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read one or more channel objects from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read names of unstructured datasets stored at a 4D slot in an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshape the storage layout inside an existing HDF5 file</td></tr>
 <tr><td><a href="#hdf5_version">hdf5_version</a></td><td>Return the HDF5 library version string</td></tr>
-<tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Write a channel object to an HDF5 file</td></tr>
+<tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Write one or more channel objects to an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
 <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
 <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
@@ -1384,46 +1384,56 @@ storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
 <li><b><code>storage_space</code></b> <i>(optional)</i> — Actual storage dimensions used; <code>[4]</code>; uint32
 </li></ul>
 
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_write_channel">hdf5_write_channel</a> (for writing channel data)
+</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing arbitrary unstructured data)
+</li></ul>
+
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_channel"></a>
-<b>hdf5_read_channel</b> - Read a channel object from an HDF5 file
+<b>hdf5_read_channel</b> - Read one or more channel objects from an HDF5 file
 <div style="margin-bottom: 1.5em;">
 <ul>
-<li>Reads structured channel data and any unstructured datasets from a single 4D slot
+<li>Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
+</li>
+<li>Each of ix, iy, iz, iw may be a scalar, vector, or omitted (omitted/empty = read full extent along that dimension)
+</li>
+<li>Slots are visited in column-major order empty slots are skipped
 </li>
 <li>Structured fields are stored in single precision in the file and returned in double
 </li>
 <li>Unstructured datasets keep their stored type and shape
 </li>
-<li>The optional <code>snap</code> argument extracts a subset of snapshots from structured fields;
-   unstructured datasets are returned in full and are not subsetted
-</li>
-<li>Empty/missing slot returns an empty struct (<code>0x0</code>) for both outputs
+<li>If no data is found, both outputs are empty <code>0x0</code> structs
 </li></ul>
 </div>
 
 <i>Usage:</i><br>
 <pre>
-[ par, chan ] = quadriga_lib.hdf5_read_channel( fn, location, snap );
+[ chan, par ] = quadriga_lib.hdf5_read_channel( fn, ix, iy, iz, iw, snap );
 </pre>
 
 <i>Inputs:</i><br>
 <ul>
 <li><b><code>fn</code></b> — Filename of the HDF5 file; string
 </li>
-<li><b><code>location</code></b> <i>(optional)</i> — Slot location inside the file; 1-based; vector with 1-4 elements,
-   i.e. <code>[ix]</code>, <code>[ix, iy]</code>, <code>[ix, iy, iz]</code> or <code>[ix, iy, iz, iw]</code>; default: <code>[1, 1, 1, 1]</code>
+<li><b><code>ix</code></b> <i>(optional)</i> — 1-based slot indices along dimension X; scalar or vector; default: <code>1:nx</code>
 </li>
-<li><b><code>snap</code></b> <i>(optional)</i> — Snapshot indices to read; 1-based; default: all snapshots
+<li><b><code>iy</code></b> <i>(optional)</i> — 1-based slot indices along dimension Y; scalar or vector; default: <code>1:ny</code>
+</li>
+<li><b><code>iz</code></b> <i>(optional)</i> — 1-based slot indices along dimension Z; scalar or vector; default: <code>1:nz</code>
+</li>
+<li><b><code>iw</code></b> <i>(optional)</i> — 1-based slot indices along dimension W; scalar or vector; default: <code>1:nw</code>
+</li>
+<li><b><code>snap</code></b> <i>(optional)</i> — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+   when the total selection is a single slot.
 </li></ul>
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>par</code></b> — Unstructured datasets as a MATLAB struct; field names follow the dataset names in the file
-   (without prefix); empty <code>0x0</code> struct if no unstructured data is
-   present
-</li>
-<li><b><code>chan</code></b> — Struct containing the channel data with the following fields:<br><br>
+<li><b><code>chan</code></b> — Struct array of length <code>N</code> (number of non-empty slots in the selection) with the channel data. Fields per element:<br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tr>
   <th style="text-align: left;"></th>
@@ -1540,6 +1550,22 @@ storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
   <td>int32, scalar</td>
 </tr>
 </table><br>
+</li>
+<li><b><code>par</code></b> — Unstructured datasets as a <code>1xN</code> struct array matching <code>chan</code>. The field set is the
+   <b>union</b> of dataset names across all loaded channels (without the <code>par_</code> prefix). For channels that
+   do not contain a given field, the corresponding element is left empty. If no unstructured data is present anywhere,
+   <code>par</code> is an empty <code>0x0</code> struct.
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_read_layout">hdf5_read_layout</a> (for reading the layout in the file)
+</li>
+<li><a href="#hdf5_write_channel">hdf5_write_channel</a> (for writing channel data)
+</li>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)
+</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -1580,6 +1606,13 @@ dset = quadriga_lib.hdf5_read_dset( fn, location, name, prefix );
 <li><b><code>dset</code></b> — Dataset contents; type and shape are defined by the HDF5 dataspace; empty <code>[]</code> if the dataset is missing
 </li></ul>
 
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a> (for reading names of already written datasets)
+</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)
+</li></ul>
+
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_dset_names"></a>
 <b>hdf5_read_dset_names</b> - Read names of unstructured datasets stored at a 4D slot in an HDF5 file
@@ -1613,6 +1646,13 @@ names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 <li><b><code>names</code></b> — Names of all datasets at the given slot, with the prefix stripped; cell array of strings
 </li></ul>
 
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)
+</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)
+</li></ul>
+
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_read_layout"></a>
 <b>hdf5_read_layout</b> - Read the storage layout of channel data inside an HDF5 file
@@ -1642,6 +1682,13 @@ names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 </li>
 <li><b><code>has_data</code></b> <i>(optional)</i> — Slot occupancy mask; <code>true</code> where data exists, <code>false</code> otherwise;
    <code>[nx, ny, nz, nw]</code>; logical
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_create_file">hdf5_create_file</a> (for creating a file with a custom storage layout)
+</li>
+<li><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> (to change the layout later)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -1677,6 +1724,13 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 <li><b><code>storage_space</code></b> <i>(optional)</i> — New storage dimensions <code>[nx, ny, nz, nw]</code>; <code>[4]</code>; uint32
 </li></ul>
 
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_create_file">hdf5_create_file</a> (for creating a file with a custom storage layout)
+</li>
+<li><a href="#hdf5_read_layout">hdf5_read_layout</a> (for reading the exisiting layout)
+</li></ul>
+
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_version"></a>
 <b>hdf5_version</b> - Return the HDF5 library version string
@@ -1701,36 +1755,48 @@ version = quadriga_lib.hdf5_version;
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_write_channel"></a>
-<b>hdf5_write_channel</b> - Write a channel object to an HDF5 file
+<b>hdf5_write_channel</b> - Write one or more channel objects to an HDF5 file
 <div style="margin-bottom: 1.5em;">
 <ul>
-<li>Writes structured channel data and optional unstructured datasets to a single 4D slot
+<li>Writes a struct array of channels into 4D slots (one slot per array element)
 </li>
-<li>Creates the file with a sensible default storage layout if it does not yet exist; appends to existing files otherwise
+<li>Optional unstructured data can be passed as a matching struct array
 </li>
-<li>A warning is issued if the slot already contains data (it is overwritten or extended)
+<li>Creates the file with a sensible default layout if it does not yet exist; appends to existing files otherwise
+</li>
+<li>A warning is issued if any selected slot already contains data (it is overwritten)
 </li>
 <li>Structured data is stored in single precision regardless of MATLAB input precision
 </li>
 <li>Unstructured datasets retain their MATLAB type and shape (see <a href="#hdf5_write_dset">hdf5_write_dset</a>)
+</li>
+<li>Each scalar location input is broadcast to all <code>numel(chan)</code> channels; each vector input must have exactly <code>numel(chan)</code> elements
+</li>
+<li>If the file does not exist, it is created with layout <code>[max(numel(chan), max(ix)), max(iy), max(iz), max(iw)]</code>
 </li></ul>
 </div>
 
 <i>Usage:</i><br>
 <pre>
-storage_dims = quadriga_lib.hdf5_write_channel( fn, location, par, chan );
+storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 </pre>
 
 <i>Inputs:</i><br>
 <ul>
 <li><b><code>fn</code></b> — Filename of the HDF5 file; string
 </li>
-<li><b><code>location</code></b> — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. <code>[ix]</code>,
-   <code>[ix, iy]</code>, <code>[ix, iy, iz]</code> or <code>[ix, iy, iz, iw]</code>; pass <code>[]</code> for default <code>[1, 1, 1, 1]</code>
+<li><b><code>chan</code></b> — Structured channel data; non-empty struct array; field layout matches <a href="#hdf5_read_channel">hdf5_read_channel</a>
 </li>
-<li><b><code>par</code></b> — Unstructured data; struct whose field names become HDF5 dataset names (each prefixed with <code>par_</code>); pass <code>[]</code> to skip
+<li><b><code>par</code></b> <i>(optional)</i> — Unstructured data; struct array of the same size as <code>chan</code>. Field names become HDF5 dataset
+   names per slot (each prefixed with <code>par_</code>). Empty fields are skipped. Pass <code>[]</code> or omit to disable.
 </li>
-<li><b><code>chan</code></b> — Structured channel data; 1x1 struct whose field layout matches <a href="#hdf5_read_channel">hdf5_read_channel</a>; pass <code>[]</code> to skip
+<li><b><code>ix</code></b> <i>(optional)</i> — 1-based slot index along dimension X; scalar or vector of length <code>numel(chan)</code>; default <code>1:numel(chan)</code>
+</li>
+<li><b><code>iy</code></b> <i>(optional)</i> — 1-based slot index along dimension Y; scalar or vector of length <code>numel(chan)</code>; default <code>1</code>
+</li>
+<li><b><code>iz</code></b> <i>(optional)</i> — 1-based slot index along dimension Z; scalar or vector of length <code>numel(chan)</code>; default <code>1</code>
+</li>
+<li><b><code>iw</code></b> <i>(optional)</i> — 1-based slot index along dimension W; scalar or vector of length <code>numel(chan)</code>; default <code>1</code>
 </li></ul>
 
 <i>Outputs:</i><br>
@@ -1738,23 +1804,11 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, location, par, chan );
 <li><b><code>storage_dims</code></b> <i>(optional)</i> — Storage layout dimensions of the file <code>[nx, ny, nz, nw]</code>; <code>[4]</code>; uint32
 </li></ul>
 
-<i>Caveat:</i><br>
+<i>See also:</i><br>
 <ul>
-<li>If the file does not exist, it is created with a default layout derived from the
-   number of elements in <code>location</code>:
-<ul>
-<li><code>[ix]</code> → <code>[max(ix, 65536), 1, 1, 1]</code>
+<li><a href="#hdf5_create_file">hdf5_create_file</a> (for creating a file with a custom storage layout)
 </li>
-<li><code>[ix, iy]</code> → <code>[max(ix, 1024), max(iy, 64), 1, 1]</code>
-</li>
-<li><code>[ix, iy, iz]</code> → <code>[max(ix, 256), max(iy, 16), max(iz, 16), 1]</code>
-</li>
-<li><code>[ix, iy, iz, iw]</code> → <code>[max(ix, 128), max(iy, 8), max(iz, 8), max(iw, 8)]</code>
-</li></ul>
-</li>
-<li>Use <a href="#hdf5_create_file">hdf5_create_file</a> for a custom storage layout
-</li>
-<li>Use <a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> to change the layout later
+<li><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a> (to change the layout later)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
@@ -1799,6 +1853,13 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>storage_dims</code></b> <i>(optional)</i> — Storage layout dimensions of the file <code>[nx, ny, nz, nw]</code>; <code>[4]</code>; uint32
+</li></ul>
+
+<i>See also:</i><br>
+<ul>
+<li><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a> (for reading names of already written datasets)
+</li>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)
 </li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
