@@ -53,9 +53,10 @@ You are implementing a lightweight API wrapper for MATLAB mex to call my C++ rad
 dtype qd_mex_get_scalar(const mxArray *input, std::string var_name = "", dtype default_value = dtype(NAN));
 std::string qd_mex_get_string(const mxArray *input, std::string default_value = "");
 
-arma::Col<dtype> qd_mex_get_Col(const mxArray *input, bool copy = false);
-arma::Mat<dtype> qd_mex_get_Mat(const mxArray *input, bool copy = false);
-arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false);
+arma::Col<dtype> qd_mex_get_Col(const mxArray *input, bool copy = false); // 1D
+arma::Mat<dtype> qd_mex_get_Mat(const mxArray *input, bool copy = false); // 2D
+arma::Cube<dtype> qd_mex_get_Cube(const mxArray *input, bool copy = false); // 3D
+std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, bool copy = false); // 4D
 
 std::vector<bool> qd_mex_matlab2vector_Bool(const mxArray *input);
 
@@ -92,10 +93,11 @@ mxArray *qd_mex_vector2matlab(const std::vector<arma::Mat<dtype>> *input,
 mxArray *qd_mex_vector2matlab(const std::vector<arma::Cube<dtype>> *input, 
         size_t ns = 0, const size_t *is = nullptr,d dtype padding = (dtype)0)
 
-mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem);
-mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool transpose = false); 
-mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols);
-mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size_t n_cols, size_t n_slices); 
+mxArray *qd_mex_init_output(arma::Row<dtype> *input, size_t n_elem); // 1D row
+mxArray *qd_mex_init_output(arma::Col<dtype> *input, size_t n_elem, bool transpose = false); // 1D col 
+mxArray *qd_mex_init_output(arma::Mat<dtype> *input, size_t n_rows, size_t n_cols); // 2D
+mxArray *qd_mex_init_output(arma::Cube<dtype> *input, size_t n_rows, size_t n_cols, size_t n_slices);  // 3D
+mxArray *qd_mex_init_output(std::vector<arma::Cube<dtype>> *input, size_t n_rows, size_t n_cols, size_t n_slices, size_t n_cubes); // 4D
 ```
 
 ## CALL_QD Macro
@@ -181,6 +183,19 @@ const auto data = qd_mex_get_Cube<dtype>(prhs[0]);
 - Adjust the name to match the c++ variable name, and the dtype to match the expected type in the C++ function (e.g. double)
 - dtype can be one of: float, double, int, unsigned, long long, unsigned long long
 
+### 4D numeric arrays as std::vector<arma::Cube>
+- Strict 4D inputs `[d1, d2, d3, d4]` map to `std::vector<arma::Cube<dtype>>` of length `d4`,
+  each cube of shape `(d1, d2, d3)`. Use:
+```
+const auto data = qd_mex_get_CubeVec<dtype>(prhs[0]);
+```
+- Supports zero-copy aliasing when the MATLAB type matches `dtype` and `copy = false` (default);
+  otherwise type-casts into freshly allocated cubes.
+- dtype can be one of: float, double, int, unsigned, long long, unsigned long long.
+- Use this — NOT `qd_mex_matlab2vector_Cube` — when the C++ documentation specifies a regular
+  4D shape like `[d1, d2, d3, d4]`. `qd_mex_matlab2vector_Cube` is for ragged/padded vectors
+  with a runtime `vec_dim` and always copies.
+
 ### std::vector of Armadillo types
 - The C++ function may expect a std::vector of Armadillo types (used for variable-length lists of arrays), e.g. `std::vector<arma::Mat<dtype>>`
 - There are specific helper functions for these types, e.g.:
@@ -238,9 +253,16 @@ if (nlhs > 0)
     plhs[0] = qd_mex_init_output(&az, n_rows, n_cols);
 ```
 - it detects the array and data type from the Armadillo object, calls mxCreateNumericMatrix to allocate MATLAB-owned memory, and sets the pointer of the Armadillo object to the allocated memory. This way, when the C++ function writes to the Armadillo object, it directly writes to the MATLAB output array.
-- qd_mex_init_output has overloads for: Col, Row, Mat, Cube 
+- qd_mex_init_output has overloads for: Col, Row, Mat, Cube, std::vector<Cube> (4D output)
 - Allowed data types: float, double, int, unsigned, long long, unsigned long long
 - For qd_mex_init_output, the wrapper must know the output size before the C++ call - these should be clear from the C++ documentation block, e.g. if the output is described as [n_bins, n_sets], the wrapper can determine n_bins and n_sets from the input data dimensions and allocate accordingly.
+- For 4D outputs `[n_rows, n_cols, n_slices, n_cubes]` use the std::vector<Cube> overload:
+```
+std::vector<arma::cube> paths;
+if (nlhs > 0)
+    plhs[0] = qd_mex_init_output(&paths, n_rows, n_cols, n_slices, n_cubes);
+```
+- Each cube in the vector aliases its slab of the MATLAB-owned 4D buffer (zero-copy). Do not resize the vector or any of its cubes after this call.
 
 ### Unknown output size
 - Do not pre-allocate the output variable, but store data locally, usually it is sufficient to pass the empty Armadillo object to the C++ function, which will resize and populate it as needed
@@ -265,6 +287,7 @@ if (nlhs > 0)
 - Supported are: std::vector of arma::Col, arma::Mat, arma::Cube
 - Optional inputs ns, is should be ignored
 - Data is zero-padded to the maximum size in the vector, so that the output is a regular ND array e.g. 3D for std::vector<arma::Mat> 
+- Use this for unknown/ragged sizes determined by the C++ call. For a regular 4D output with known dimensions, prefer the `qd_mex_init_output(std::vector<arma::Cube>*, ...)` overload — it's zero-copy.
 
 ## Pointer wrapper
 - The c++ function might accept `nullptr` for optional inputs and outputs
