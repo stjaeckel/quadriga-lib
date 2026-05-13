@@ -34,7 +34,7 @@ arrayant_out = quadriga_lib.arrayant_concat( arrayant_in1, arrayant_in2 );
 - **`arrayant_in2`** — Struct containing the second arrayant data; must match the sampling grids of
   `arrayant_in1`, and for multi-frequency the entry count and `center_freq` per entry
 
-## Output Arguments:
+## Outputs:
 - **`arrayant_out`** — Struct containing the combined arrayant data; same field layout as the inputs; 
   a struct array of equal size is returned for multi-frequency input
 MD!*/

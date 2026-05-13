@@ -28,7 +28,7 @@ Calculate MIMO channel coefficients for planar wave paths
     center_freq, use_absolute_delays, add_fake_los_path );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`tx_array`** — Transmit antenna array; `n_tx` = number of ports after element coupling, see [[arrayant_generate]]
 - **`rx_array`** — Receive antenna array; `n_rx` = number of ports after element coupling, see [[arrayant_generate]]
 - **`aod`** — Departure azimuth angles; rad; `[n_path, 1]`
@@ -47,7 +47,7 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
 
 
-## Output Arguments:
+## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
 - **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
 - **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`

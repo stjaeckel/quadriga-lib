@@ -25,7 +25,7 @@ Read ray-tracing CIR data from a QRT file
     quadriga_lib.qrt_file_read( fn, i_cir, i_orig, downlink, normalize_M );
 ```
 
-## Input Arguments:
+## Inputs:
 - **`fn`** — Path to the QRT file; string
 - **`i_cir`** *(optional)* — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: read all
 - **`i_orig`** *(optional)* — Origin index; 1-based; uint64; scalar; default: 1
@@ -39,7 +39,7 @@ Read ray-tracing CIR data from a QRT file
   | 0             | As stored in QRT file | -PL                              |
   | 1             | Max column power = 1  | -PL minus material losses        |
 
-## Output Arguments:
+## Outputs:
 - **`center_freq`** — Center frequency in Hz; `[n_freq]`
 - **`tx_pos`** — Transmitter position in Cartesian coordinates; `[3, n_out]`
 - **`tx_orientation`** — Transmitter orientation (bank, tilt, heading); `[3, n_out]`

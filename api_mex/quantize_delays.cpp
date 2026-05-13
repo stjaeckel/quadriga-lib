@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2025 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_lib.hpp"
@@ -24,17 +11,19 @@ Channel functions
 SECTION!*/
 
 /*!MD
-# quantize_delays
-Fixes the path delays to a grid of delay bins
+# QUANTIZE_DELAYS
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
-## Description:
-- For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-  of delay bins (taps). This function approximates each path delay using two adjacent taps with
-  power-weighted coefficients, producing smooth transitions in the frequency domain.
-- For a path at fractional offset &delta; between tap indices, two taps are created with complex
-  coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-  exponent.
-- Input delays may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`.
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α
+  and δ^α, where δ is the fractional offset within the bin and α is `power_exponent`
+- Two-tap interpolation avoids discontinuities when delays cross tap boundaries
+- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband
+  (incoherent power preservation)
+- If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but
+  tap-selection logic still applies
+- Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared
+  `[1, 1, n_path, n_snap]`; shared delays are expanded internally when `fix_taps` is 0 or 3
+- Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
 
 ## Usage:
 ```
@@ -42,55 +31,41 @@ Fixes the path delays to a grid of delay bins
     tap_spacing, max_no_taps, power_exponent, fix_taps );
 ```
 
-## Input Arguments:
-- **`coeff_re`** (required)<br>
-  Channel coefficients, real part. 4D array of size `[n_rx, n_tx, n_path, n_snap]` (double).
+## Inputs:
+- **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
+- **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
+- **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`
+- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz
+  sampling rate; default: 5e-9
+- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 = unlimited; default: 48
+- **`power_exponent`** *(optional)* — Interpolation exponent α; default: 1.0
+- **`fix_taps`** *(optional)* — Delay grid sharing mode; default: 0<br><br>
+  | Value | Meaning                                                                                         |
+  | ----- | ----------------------------------------------------------------------------------------------- |
+  | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps, n_snap]`                       |
+  | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps, n_snap]` |
+  | 2     | Per snapshot; output delays `[1, 1, n_taps, n_snap]`, each snapshot independent                 |
+  | 3     | Per tx-rx pair across all snapshots; output delays `[n_rx, n_tx, n_taps, n_snap]`               |
 
-- **`coeff_im`** (required)<br>
-  Channel coefficients, imaginary part. 4D array of size `[n_rx, n_tx, n_path, n_snap]` (double).
-
-- **`delay`** (required)<br>
-  Path delays in seconds. 4D array of size `[n_rx, n_tx, n_path, n_snap]` or
-  `[1, 1, n_path, n_snap]` (double).
-
-- **`tap_spacing`** (optional)<br>
-  Spacing of the delay bins in seconds. Scalar double. Default: 5e-9
-
-- **`max_no_taps`** (optional)<br>
-  Maximum number of output taps. Scalar integer. 0 = unlimited. Default: 48
-
-- **`power_exponent`** (optional)<br>
-  Interpolation exponent. Scalar double. Default: 1.0
-
-- **`fix_taps`** (optional)<br>
-  Delay sharing mode. Scalar integer (0-3). Default: 0<br>
-  0 = per tx-rx pair and snapshot, 1 = single grid for all,
-  2 = per snapshot, 3 = per tx-rx pair.
-
-## Output Arguments:
-- **`coeff_re_q`**<br>
-  Output coefficients, real part. 4D array of size `[n_rx, n_tx, n_taps, n_snap]` (double).
-
-- **`coeff_im_q`**<br>
-  Output coefficients, imaginary part. 4D array of size `[n_rx, n_tx, n_taps, n_snap]` (double).
-
-- **`delay_q`**<br>
-  Output delays in seconds. 4D array of size `[n_rx, n_tx, n_taps, n_snap]` or
-  `[1, 1, n_taps, n_snap]` (double).
+## Outputs:
+- **`coeff_re_q`** — Output coefficients, real part; `[n_rx, n_tx, n_taps, n_snap]`
+- **`coeff_im_q`** — Output coefficients, imaginary part; `[n_rx, n_tx, n_taps, n_snap]`
+- **`delay_q`** — Output delays in seconds; `[n_rx, n_tx, n_taps, n_snap]` or `[1, 1, n_taps, n_snap]` depending on `fix_taps`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
-    if (nrhs < 3)
+
+    if (nrhs < 3 || nrhs > 7)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs: 4D arrays are split along the 4th dimension into std::vector<arma::Cube>
-    std::vector<arma::Cube<double>> coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[0], 3);
-    std::vector<arma::Cube<double>> coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[1], 3);
-    std::vector<arma::Cube<double>> delay = qd_mex_matlab2vector_Cube<double>(prhs[2], 3);
+    const auto coeff_re = qd_mex_matlab2vector_Cube<double>(prhs[0], 3);
+    const auto coeff_im = qd_mex_matlab2vector_Cube<double>(prhs[1], 3);
+    const auto delay = qd_mex_matlab2vector_Cube<double>(prhs[2], 3);
 
     // Optional scalar parameters
     double tap_spacing = (nrhs < 4) ? 5.0e-9 : qd_mex_get_scalar<double>(prhs[3], "tap_spacing", 5.0e-9);

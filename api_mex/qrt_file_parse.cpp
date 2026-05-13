@@ -26,10 +26,10 @@ Read metadata from a QRT file
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
-## Input Arguments:
+## Input:
 - **`fn`** — Path to the QRT file; string
 
-## Output Arguments:
+## Outputs:
 - **`no_cir`** — Number of channel snapshots per origin point; uint64 scalar
 - **`no_orig`** — Number of origin points (TX); uint64 scalar
 - **`no_dest`** — Number of destination points (RX); uint64 scalar

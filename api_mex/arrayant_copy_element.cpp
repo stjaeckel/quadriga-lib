@@ -32,7 +32,7 @@ arrayant_out = quadriga_lib.arrayant_copy_element( arrayant_in, source_element, 
 - **`dest_element`** — Index of the destination element(s); 1-based; uint64; scalar or `[n_copy]`;
   if `source_element` is a vector, must have the same length
 
-## Output Arguments:
+## Outputs:
 - **`arrayant_out`** — Struct containing the modified arrayant data; same field layout as
   `arrayant_in`; a struct array of equal size is returned for multi-frequency input
 MD!*/

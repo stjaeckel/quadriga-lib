@@ -14,7 +14,6 @@ SECTION!*/
 # RAY_MESH_INTERACT
 Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
-## Description:
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`)
 - Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);

@@ -45,7 +45,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 - **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the directivity is
   calculated for all elements; uint64; `[n_out]` or empty
 
-## Output Argument:
+## Output:
 - **`directivity`** - Directivity of the antenna pattern in dBi; `[n_out, n_freq]`;
   with `n_out = n_elements` when `i_element` is omitted/empty.
 
