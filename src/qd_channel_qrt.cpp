@@ -174,7 +174,7 @@ void quadriga_lib::qrt_file_parse(const std::string &fn,
     // --- Origin (TX) metadata -----------------------------------------------
     arma::fmat l_orig_pos_all;
     arma::fmat l_orig_orientation;
-    arma::u64_vec l_orig_index;
+    arma::uvec l_orig_index;
 
     if (l_no_orig != 0)
     {
