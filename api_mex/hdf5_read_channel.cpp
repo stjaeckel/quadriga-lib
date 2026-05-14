@@ -113,7 +113,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
 
     // Parse snap (optional)
-    arma::u64_vec snap = (nrhs < 6) ? arma::u64_vec() : qd_mex_get_Col<arma::uword>(prhs[5]);
+    arma::uvec snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5]);
 
     const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;
     if (!snap.is_empty() && n_sel > 1)
