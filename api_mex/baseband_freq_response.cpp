@@ -23,8 +23,7 @@ Compute the baseband frequency response of a MIMO channel
 - Carrier positions are specified one of two ways: as a normalized `pilot_grid` paired with `bandwidth`
   (where `0.0` corresponds to `center_freq(1)` and `1.0` to `center_freq(1) + bandwidth`), or as absolute
   frequencies via `carrier_freq`; supplying both pairs is an error
-- Multi-frequency inputs always require `center_freq`; if `carrier_freq` is omitted it is derived as
- `center_freq(1) + pilot_grid · bandwidth`
+- Multi-frequency inputs always require `center_freq`; if `carrier_freq` is omitted it is derived as `center_freq(1) + pilot_grid · bandwidth`
 - Single-frequency inputs ignore `center_freq` when `pilot_grid` + `bandwidth` are given
 - `delay` supports broadcasting: shape `[1, 1, n_path, ...]` applies the same delays to all RX/TX pairs
 - Internal arithmetic is single-precision; uses AVX2 where supported; double inputs are narrowed to
