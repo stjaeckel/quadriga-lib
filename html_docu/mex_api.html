@@ -131,6 +131,8 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#calc_rotation_matrix">calc_rotation_matrix</a></td><td>Calculate rotation matrices from Euler angles</td></tr>
+<tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length</td></tr>
+<tr><td><a href="#geo2cart">geo2cart</a></td><td>Convert elementwise azimuth/elevation angles to Cartesian coordinates</td></tr>
 </tbody>
 </table>
 </ul>
@@ -139,9 +141,7 @@
 <ul>
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
-<tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length</td></tr>
 <tr><td><a href="#fast_sincos">fast_sincos</a></td><td>Fast, approximate sine/cosine for MATLAB numeric arrays</td></tr>
-<tr><td><a href="#geo2cart">geo2cart</a></td><td>Convert elementwise azimuth/elevation angles to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp">interp</a></td><td>2D and 1D linear interpolation.</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
 </tbody>
@@ -1231,10 +1231,8 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
    (where <code>0.0</code> corresponds to <code>center_freq(1)</code> and <code>1.0</code> to <code>center_freq(1) + bandwidth</code>), or as absolute
    frequencies via <code>carrier_freq</code>; supplying both pairs is an error
 </li>
-<li>Multi-frequency inputs always require <code>center_freq</code>; if <code>carrier_freq</code> is omitted it is derived as
-</li></ul>
- <code>center_freq(1) + pilot_grid · bandwidth</code> 
-<ul>
+<li>Multi-frequency inputs always require <code>center_freq</code>; if <code>carrier_freq</code> is omitted it is derived as <code>center_freq(1) + pilot_grid · bandwidth</code>
+</li>
 <li>Single-frequency inputs ignore <code>center_freq</code> when <code>pilot_grid</code> + <code>bandwidth</code> are given
 </li>
 <li><code>delay</code> supports broadcasting: shape <code>[1, 1, n_path, ...]</code> applies the same delays to all RX/TX pairs
@@ -3022,15 +3020,6 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transp
 <li><b><code>rotation</code></b> — Rotation matrices in column-major order; <code>[9, n_row, n_col]</code> or <code>[9, n_mat]</code> or <code>[9]</code>
 </li></ul>
 
-<div class="pagebreak"></div>
-<hr class="greyline">
-<hr class="greyline">
-<br>
-<br>
-<a name="b11e2d16"></a>
-<font size=+1><b>Miscellaneous / Tools</b></font>
-<br>
-<br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="cart2geo"></a>
 <b>cart2geo</b> - Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
@@ -3073,6 +3062,76 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transp
 <li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length <code>sqrt(x² + y² + z²)</code>; <code>[n, m]</code>
 </li></ul>
 
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="geo2cart"></a>
+<b>geo2cart</b> - Convert elementwise azimuth/elevation angles to Cartesian coordinates
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Conversion: <code>x = cos(el) cos(az) len</code>, <code>y = cos(el) sin(az) len</code>, <code>z = sin(el) len</code>
+</li>
+<li>Optional outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; omit from the
+   output list to skip their computation
+</li>
+<li>Defaults to the GENERIC kernel (<code>use_kernel=1</code>) to preserve full double precision, matching
+   MATLAB's default numeric type
+</li>
+<li>Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel
+   computes in single precision internally (inputs narrowed to float, results widened back)
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+split = true;
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+
+split = false;
+cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code>
+</li>
+<li><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code>
+</li>
+<li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length sqrt(x^2 + y^2 + z^2); <code>[n, m]</code>; default: 1
+</li>
+<li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
+   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
+</li>
+<li><b><code>split</code></b> <i>(optional)</i> — If true, return x/y/z and optional sin/cos as separate <code>[n, m]</code>
+   matrices. If false, return a single combined <code>[3, n, m]</code> cube; sin/cos outputs unavailable
+   in this mode; default: false
+</li></ul>
+
+<i>Outputs:</i><br>
+<ul>
+<li><b><code>x_or_cart</code></b> — If <code>split=true</code>: X-coordinates <code>[n, m]</code>. If <code>split=false</code>: combined cube
+   with components along the first dim, <code>[3, n, m]</code>
+</li>
+<li><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty
+</li>
+<li><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty
+</li>
+<li><b><code>sAZ</code></b> <i>(optional)</i> — sin(az); <code>[n, m]</code> or empty
+</li>
+<li><b><code>cAZ</code></b> <i>(optional)</i> — cos(az); <code>[n, m]</code> or empty
+</li>
+<li><b><code>sEL</code></b> <i>(optional)</i> — sin(el); <code>[n, m]</code> or empty
+</li>
+<li><b><code>cEL</code></b> <i>(optional)</i> — cos(el); <code>[n, m]</code> or empty
+</li></ul>
+
+<div class="pagebreak"></div>
+<hr class="greyline">
+<hr class="greyline">
+<br>
+<br>
+<a name="b11e2d16"></a>
+<font size=+1><b>Miscellaneous / Tools</b></font>
+<br>
+<br>
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="fast_sincos"></a>
 <b>fast_sincos</b> - Fast, approximate sine/cosine for MATLAB numeric arrays
@@ -3142,67 +3201,6 @@ xd = linspace(0, 2*pi, 8);
 s_only = arrayant_lib.fast_sincos(xd);        % class(s_only) == 'single'
 c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
 </pre>
-
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="geo2cart"></a>
-<b>geo2cart</b> - Convert elementwise azimuth/elevation angles to Cartesian coordinates
-<div style="margin-bottom: 1.5em;">
-<ul>
-<li>Conversion: <code>x = cos(el) cos(az) len</code>, <code>y = cos(el) sin(az) len</code>, <code>z = sin(el) len</code>
-</li>
-<li>Optional outputs <code>sAZ</code>, <code>cAZ</code>, <code>sEL</code>, <code>cEL</code> return intermediate sin/cos values; omit from the
-   output list to skip their computation
-</li>
-<li>Defaults to the GENERIC kernel (<code>use_kernel=1</code>) to preserve full double precision, matching
-   MATLAB's default numeric type
-</li>
-<li>Set <code>use_kernel=0</code> for auto-selection or <code>use_kernel=2</code> to force AVX2; the AVX2 kernel
-   computes in single precision internally (inputs narrowed to float, results widened back)
-</li></ul>
-</div>
-
-<i>Usage:</i><br>
-<pre>
-split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
-
-split = false;
-cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
-</pre>
-
-<i>Inputs:</i><br>
-<ul>
-<li><b><code>az</code></b> — Azimuth angles in radians; <code>[n, m]</code>
-</li>
-<li><b><code>el</code></b> — Elevation angles in radians; <code>[n, m]</code>
-</li>
-<li><b><code>len</code></b> <i>(optional)</i> — Euclidean vector length sqrt(x^2 + y^2 + z^2); <code>[n, m]</code>; default: 1
-</li>
-<li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
-</li>
-<li><b><code>split</code></b> <i>(optional)</i> — If true, return x/y/z and optional sin/cos as separate <code>[n, m]</code>
-   matrices. If false, return a single combined <code>[3, n, m]</code> cube; sin/cos outputs unavailable
-   in this mode; default: false
-</li></ul>
-
-<i>Outputs:</i><br>
-<ul>
-<li><b><code>x_or_cart</code></b> — If <code>split=true</code>: X-coordinates <code>[n, m]</code>. If <code>split=false</code>: combined cube
-   with components along the first dim, <code>[3, n, m]</code>
-</li>
-<li><b><code>y</code></b> — Y-coordinates; <code>[n, m]</code> or empty
-</li>
-<li><b><code>z</code></b> — Z-coordinates; <code>[n, m]</code> or empty
-</li>
-<li><b><code>sAZ</code></b> <i>(optional)</i> — sin(az); <code>[n, m]</code> or empty
-</li>
-<li><b><code>cAZ</code></b> <i>(optional)</i> — cos(az); <code>[n, m]</code> or empty
-</li>
-<li><b><code>sEL</code></b> <i>(optional)</i> — sin(el); <code>[n, m]</code> or empty
-</li>
-<li><b><code>cEL</code></b> <i>(optional)</i> — cos(el); <code>[n, m]</code> or empty
-</li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="interp"></a>
