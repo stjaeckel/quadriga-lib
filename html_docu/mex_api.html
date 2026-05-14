@@ -82,7 +82,7 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;">
 <tbody>
 <tr><td><a href="#baseband_freq_response">baseband_freq_response</a></td><td>Compute the baseband frequency response of a MIMO channel</td></tr>
-<tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export path data to a Wavefront OBJ file for visualization in Blender</td></tr>
+<tr><td><a href="#channel_export_obj_file">channel_export_obj_file</a></td><td>Export propagation paths to a Wavefront OBJ file for 3D visualization</td></tr>
 <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
 <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Read one or more channel objects from an HDF5 file</td></tr>
 <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
@@ -1279,75 +1279,66 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="channel_export_obj_file"></a>
-<b>channel_export_obj_file</b> - Export path data to a Wavefront OBJ file for visualization in Blender
-<br><br>
-<i>Description:</i><br>
-This function exports path data to a Wavefront OBJ file, which can be used for visualization in 3D 
-software such as Blender. It supports various colormaps for color-coding the paths based on their 
-gain values. In addition, the function allows you to control the maximum number of paths displayed, 
-set gain thresholds for color-coding and selection.
+<b>channel_export_obj_file</b> - Export propagation paths to a Wavefront OBJ file for 3D visualization
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Writes ray-traced paths as tube geometry to a <code>.obj</code> file (e.g., for use in Blender)
+</li>
+<li>Tubes are color-coded by path gain using a selected colormap; tube radius also scales with gain
+</li>
+<li>Paths below <code>gain_min</code> are excluded; <code>max_no_paths</code> limits the total number of exported paths
+</li>
+<li>The function takes raw channel data fields directly; no MATLAB channel struct is needed
+</li></ul>
+</div>
 
 <i>Usage:</i><br>
 <pre>
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,
-    radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq,
-    coeff_re, coeff_im, i_snap )
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
+    radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq, ...
+    coeff_re, coeff_im, i_snap );
 </pre>
 
-<i>Input Arguments:</i><br>
+<i>Inputs:</i><br>
 <ul>
-<li><b><code>fn</code></b><br>
-   Filename of the OBJ file, string, required
+<li><b><code>fn</code></b> — Output <code>.obj</code> file path
 </li>
-<li><b><code>max_no_paths</code></b> (optional)<br>
-   Maximum number of paths to be shown, optional, default: 0 = export all above <code>gain_min</code>
+<li><b><code>max_no_paths</code></b> <i>(optional)</i> — Max paths to export; 0 includes all paths above <code>gain_min</code>; default: 0
 </li>
-<li><b><code>gain_max</code></b> (optional)<br>
-   Maximum path gain in dB (only for color-coding), optional, default = -60.0
+<li><b><code>gain_max</code></b> <i>(optional)</i> — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
 </li>
-<li><b><code>gain_min</code></b> (optional)<br>
-   Minimum path gain in dB (for color-coding and path selection), optional, default = -140.0
+<li><b><code>gain_min</code></b> <i>(optional)</i> — Lower gain threshold in dB; paths below this are excluded; default: -140.0
 </li>
-<li><b><code>colormap</code></b> (optional)<br>
-   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',
-   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet'
+<li><b><code>colormap</code></b> <i>(optional)</i> — Colormap name; supported: jet, parula, winter, hot, turbo, copper,
+   spring, cool, gray, autumn, summer; default: jet
 </li>
-<li><b><code>radius_max</code></b> (optional)<br>
-   Maximum tube radius in meters, optional, default = 0.05
+<li><b><code>radius_max</code></b> <i>(optional)</i> — Tube radius at maximum gain; default: 0.05
 </li>
-<li><b><code>radius_min</code></b> (optional)<br>
-   Minimum tube radius in meters, optional, default = 0.01
+<li><b><code>radius_min</code></b> <i>(optional)</i> — Tube radius at minimum gain; default: 0.01
 </li>
-<li><b><code>n_edges</code></b> (optional)<br>
-   Number of vertices in the circle building the tube, must be >= 3, optional, default = 5
+<li><b><code>n_edges</code></b> <i>(optional)</i> — Vertices per tube cross-section; must be >= 3; default: 5
 </li>
-<li><b><code>rx_position</code></b><br>
-   Receiver positions, required, size <code>[3, n_snap]</code> or <code>[3, 1]</code>
+<li><b><code>rx_position</code></b> — Receiver positions; <code>[3, n_snap]</code> or <code>[3, 1]</code>
 </li>
-<li><b><code>tx_position</code></b><br>
-   Transmitter positions, required, size <code>[3, n_snap]</code> or <code>[3, 1]</code>
+<li><b><code>tx_position</code></b> — Transmitter positions; <code>[3, n_snap]</code> or <code>[3, 1]</code>
 </li>
-<li><b><code>no_interact</code></b><br>
-   Number interaction points of paths with the environment, required, uint32, Size <code>[n_path, n_snap]</code>
+<li><b><code>no_interact</code></b> — Number of interaction points of paths with the environment; uint32; <code>[n_path, n_snap]</code>
 </li>
-<li><b><code>interact_coord</code></b><br>
-   Interaction coordinates, required, Size <code>[3, max(sum(no_interact)), n_snap]</code>
+<li><b><code>interact_coord</code></b> — Interaction coordinates; <code>[3, max(sum(no_interact)), n_snap]</code>
 </li>
-<li><b><code>center_freq</code></b><br>
-   Center frequency in [Hz], required, Size <code>[n_snap, 1]</code> or scalar
+<li><b><code>center_freq</code></b> — Center frequency; unit: Hz; <code>[n_snap]</code> or scalar
 </li>
-<li><b><code>coeff_re</code></b><br>
-   Channel coefficients, real part, Size: <code>[ n_rx, n_tx, n_path, n_snap ]</code>
+<li><b><code>coeff_re</code></b> — Channel coefficients, real part; <code>[n_rx, n_tx, n_path, n_snap]</code>
 </li>
-<li><b><code>coeff_im</code></b><br>
-   Channel coefficients, imaginary part, Size: <code>[ n_rx, n_tx, n_path, n_snap ]</code>
+<li><b><code>coeff_im</code></b> — Channel coefficients, imaginary part; <code>[n_rx, n_tx, n_path, n_snap]</code>
 </li>
-<li><b><code>i_snap</code></b><br> (optional)
-   Snapshot indices, optional, 1-based, range [1 ... n_snap]
+<li><b><code>i_snap</code></b> <i>(optional)</i> — 1-based snapshot indices to include; range [1 ... n_snap]; empty exports all
 </li></ul>
 
-<i>Output Argument:</i><br>
-This function does not return a value. It writes the OBJ file directly to disk.
+<i>Outputs:</i><br>
+<ul>
+<li>This function writes the OBJ file directly to disk and does not return any data
+</li></ul>
 
 <div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
 <a name="hdf5_create_file"></a>
