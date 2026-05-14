@@ -107,9 +107,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                       i_snap, radius_max, radius_min, n_edges));
 
     // Dummy output for backward compatibility
+    double out = 1.0;
     if (nlhs == 1)
-    {
-        double tmp = 1.0;
-        plhs[0] = qd_mex_copy2matlab(&tmp);
-    }
+        plhs[0] = qd_mex_copy2matlab(&out);
 }

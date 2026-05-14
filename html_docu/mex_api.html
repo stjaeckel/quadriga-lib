@@ -135,7 +135,6 @@
 <tr><td><a href="#geo2cart">geo2cart</a></td><td>Convert elementwise azimuth/elevation angles to Cartesian coordinates</td></tr>
 <tr><td><a href="#interp">interp</a></td><td>2D and 1D linear interpolation.</td></tr>
 <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
-<tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -157,6 +156,7 @@
 <tr><td><a href="#subdivide_triangles">subdivide_triangles</a></td><td>Subdivide triangles into smaller triangles</td></tr>
 <tr><td><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a></td><td>Calculate the axis-aligned bounding box (AABB) of a triangle mesh and its sub-meshes</td></tr>
 <tr><td><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a></td><td>Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing</td></tr>
+<tr><td><a href="#write_png">write_png</a></td><td>Write a data matrix to a color-coded PNG file</td></tr>
 </tbody>
 </table>
 </ul>
@@ -3263,49 +3263,6 @@ version = quadriga_lib.version;
    a suffix <code>_CUDA</code> is added after the version number
 </li></ul>
 
-<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
-<a name="write_png"></a>
-<b>write_png</b> - Write data to a PNG file
-<br><br>
-<i>Description:</i><br>
-<ul>
-<li>Converts input data into a color-coded PNG file for visualization
-</li>
-<li>Support optional selection of a colormap, as well a minimum and maximum value limits
-</li>
-<li>Uses the <a href="https://github.com/lvandeve/lodepng">LodePNG</a> library for PNG writing
-</li></ul>
-
-<i>Declaration:</i><br>
-<pre>
-quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform )
-</pre>
-
-<i>Arguments:</i><br>
-<ul>
-<li><b><code>fn</code></b><br>
-   Filename of the PNG file, string, required
-</li>
-<li><b><code>data</code></b><br>
-   Data matrix, required, size <code>[N, M]</code>
-</li>
-<li><b><code>colormap</code></b> (optional)<br>
-   Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',
-   'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', optional, default = 'jet'
-</li>
-<li><b><code>min_val</code></b> (optional)<br>
-   Minimum value. Values below this value will have be encoded with the color of the smallest value.
-   If <code>NAN</code> is provided (default), the lowest values is determined from the data.
-</li>
-<li><b><code>max_val</code></b> (optional)<br>
-   Maximum value. Values above this value will have be encoded with the color of the largest value.
-   If <code>NAN</code> is provided (default), the largest values is determined from the data.
-</li>
-<li><code><b>log_transform</b></code> (optional)<br>
-   If enabled, the <code>data</code> values are transformed to the log-domain (<code>10*log10(data)</code>) before processing.
-   Default: false (disabled)
-</li></ul>
-
 <div class="pagebreak"></div>
 <hr class="greyline">
 <hr class="greyline">
@@ -4583,6 +4540,39 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
    (0 = padding); uint32; <code>[n_meshR]</code>
 </li>
 <li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>[n_meshR, 9]</code>
+</li></ul>
+
+<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>
+<a name="write_png"></a>
+<b>write_png</b> - Write a data matrix to a color-coded PNG file
+<div style="margin-bottom: 1.5em;">
+<ul>
+<li>Values are clipped to <code>[min_val, max_val]</code> before colormap mapping; auto-detected from data if <code>NaN</code>
+</li>
+<li>Uses [LodePNG](https://github.com/lvandeve/lodepng) for PNG encoding
+</li></ul>
+</div>
+
+<i>Usage:</i><br>
+<pre>
+quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform );
+</pre>
+
+<i>Inputs:</i><br>
+<ul>
+<li><b><code>fn</code></b> — Output <code>.png</code> file path; string
+</li>
+<li><b><code>data</code></b> — Input data matrix; <code>[n_rows, n_cols]</code>
+</li>
+<li><b><code>colormap</code></b> <i>(optional)</i> — Colormap name; supported: jet, parula, winter, hot, turbo, copper,
+   spring, cool, gray, autumn, summer; default: jet
+</li>
+<li><b><code>min_val</code></b> <i>(optional)</i> — Lower clipping bound; auto-detected if <code>NaN</code>; default: <code>NaN</code>
+</li>
+<li><b><code>max_val</code></b> <i>(optional)</i> — Upper clipping bound; auto-detected if <code>NaN</code>; default: <code>NaN</code>
+</li>
+<li><b><code>log_transform</code></b> <i>(optional)</i> — Apply 10·log10(data) before mapping; non-positive values
+   map to the minimum color; logical; default: false
 </li></ul>
 
     <!-- CONTENT END -->
