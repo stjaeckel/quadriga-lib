@@ -16,6 +16,8 @@ delay = rand( 1,1,n_path,n_snap )*100 + 1;
 pilots = 0 : 1/(n_carrier-1) : 1;
 
 tic
-[ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, pilots, fc );
+for n = 1:n_snap
+    [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re(:,:,:,n_snap), coeff_im(:,:,:,n_snap), delay(:,:,:,n_snap), pilots, fc );
+end
 toc
 

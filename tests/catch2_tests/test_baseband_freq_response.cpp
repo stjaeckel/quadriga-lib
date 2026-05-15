@@ -140,7 +140,7 @@ TEST_CASE("Baseband Frequency Response - Multi")
     CHECK(arma::approx_equal(hmat_im[0] * 3.0, hmat_im[2], "absdiff", 2e-6));
 
     // Change the snapshot order
-    arma::u32_vec i_snap = {1, 2, 1, 0};
+    arma::uvec i_snap = {1, 2, 1, 0};
 
     quadriga_lib::baseband_freq_response_vec(&coeff_re_vec, &coeff_im_vec, &delay_vec, &pilots, fc, &hmat_re, &hmat_im, &i_snap);
 
