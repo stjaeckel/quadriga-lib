@@ -1,34 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
-// Copyright (C) 2022-2023 Stephan Jaeckel (https://sjc-wireless.com)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_math.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Math functions
 SECTION!*/
 
 /*!MD
 # INTERP
-2D and 1D linear interpolation.
+Perform linear interpolation (1D or 2D) on single or multiple data sets
 
-## Description:
-This function implements 2D and 1D linear interpolation.
+- Interpolates given input data at specified output points.
+- Supports single and multiple data sets.
+- Returns interpolated results either directly or through reference argument.
+- Data types: `single` or `double`
 
 ## Usage:
 
@@ -38,39 +27,25 @@ dataI = quadriga_lib.interp( x, y, data, xI, yI );      % 2D case
 dataI = quadriga_lib.interp( x, [], data, xI );         % 1D case
 ```
 
-## Input Arguments:
-- **`x`**<br>
-  Vector of sample points in x direction for which data is provided; single or double; Length: `[nx]`
+## Inputs:
+- **`x`** — Data x-axis sampling points; Length: `[nx]`
+- **`y`** — Data y-axis sampling points; Length: `[ny]`
+- **`data`** — Input data array/matrix; `[ny, nx, ne]` or `[1, nx, ne]` for 1D case; 3rd dimension
+  enables interpolation for mutiple datasets simultaneously.
+- **`xI`** — Output x-axis sampling points; Length: `[nxI]`
+- **`yI`** — Output y-axis sampling points; Length: `[nyI]`
 
-- **`y`**<br>
-  Vector of sample points in y direction for which data is provided; single or double; Length: `[ny]`<br>
-  Must be an empty array `[]` in case of 1D interpolation.
-
-- **`data`**<br>
-  The input data tensor; single or double; Size: `[ny, nx, ne]` or `[1, nx, ne]` for 1D case <br>
-  The 3rd dimension enables interpolation for mutiple datasets simultaneously.
-
-- **`xI`**<br>
-  Vector of sample points in x direction for which data should be interpolated; single or double;
-  Length: `[nxI]`
-
-- **`yI`**<br>
-  Vector of sample points in y direction for which data should be interpolated; single or double;
-  Length: `[nyI]`
-
-## Output Arguments:
-- **`dataI`**<br>
-  The interpolated dat; single or double (same as `data`);
-  Size: `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case <br>
+## Output:
+- **`dataI`**  —  Interpolated data `[nyI, nxI, ne]` or `[1, nxI, ne]` for 1D case
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 4)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Need at least 4 input arguments.");
+    if (nrhs < 4 || nrhs > 5)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 1)
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     bool twoD = mxGetNumberOfElements(prhs[1]) != 0;
 
@@ -80,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         const arma::fvec yi = twoD ? qd_mex_get_Col<float>(prhs[1]) : arma::fvec(1);
         const arma::fcube data = qd_mex_get_Cube<float>(prhs[2]);
         const arma::fvec xo = qd_mex_get_Col<float>(prhs[3]);
-        const arma::fvec yo = (nrhs > 4 && twoD)  ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
+        const arma::fvec yo = (nrhs > 4 && twoD) ? qd_mex_get_Col<float>(prhs[4]) : arma::fvec(1);
 
         arma::fcube output;
         plhs[0] = qd_mex_init_output(&output, yo.n_elem, xo.n_elem, data.n_slices);

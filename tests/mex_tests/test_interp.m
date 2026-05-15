@@ -35,7 +35,7 @@ try
     [~,~] = quadriga_lib.interp( x,y,I,x,y );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Too many output arguments.';
+    expectedErrorMessage = 'Wrong number of output arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
@@ -45,7 +45,7 @@ try
     O = quadriga_lib.interp( x,y,I );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Need at least 4 input arguments.';
+    expectedErrorMessage = 'Wrong number of input arguments.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

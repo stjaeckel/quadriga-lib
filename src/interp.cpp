@@ -10,7 +10,7 @@ SECTION!*/
 
 /*!MD
 # interp_1D / interp_2D
-Perform linear interpolation (1D or 2D) on single or multiple data sets.
+Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
 - Supports single and multiple data sets.
