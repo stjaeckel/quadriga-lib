@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "quadriga_tools.hpp"
+#include "quadriga_lib.hpp"
 #include "quadriga_lib_helper_functions.hpp"
 
 namespace arma
@@ -522,6 +522,9 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
     arma::uvec rand_obj_indices = arma::regspace<arma::uvec>(0, n_obj - 1);
     rand_obj_indices = arma::shuffle(rand_obj_indices);
 
+    bool omp_failed = false;
+    std::string omp_error;
+
     // Pairwise tests
 #pragma omp parallel for
     for (int i_obj_1_int = 0; i_obj_1_int < (int)n_obj; ++i_obj_1_int)
@@ -602,7 +605,10 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
             arma::Mat<dtype> edge_orig_t = edges->rows(0, 2).t(); // [3, n_edges].t() → [n_edges, 3]
             arma::Mat<dtype> edge_dest_t = edges->rows(3, 5).t(); // [3, n_edges].t() → [n_edges, 3]
             arma::Mat<dtype> faces_t = faces->rows(0, 8).t();     // [9, n_faces].t() → [n_faces, 9]
-            quadriga_lib::ray_triangle_intersect<dtype>(&edge_orig_t, &edge_dest_t, &faces_t, nullptr, nullptr, nullptr, &hit);
+
+            OMP_SAFE_CALL(omp_failed, omp_error,
+                          quadriga_lib::ray_triangle_intersect<dtype>(&edge_orig_t, &edge_dest_t, &faces_t,
+                                                                      nullptr, nullptr, nullptr, &hit));
 
             // False positives:
             // - Edge lies in the face plane (and hits at a random place due to numeric instabilities)
@@ -832,7 +838,10 @@ arma::uvec quadriga_lib::obj_overlap_test(const arma::Mat<dtype> *mesh, const ar
                 continue;
             }
         }
-    }
+    } // end parallel for
+
+    if (omp_failed)
+        throw std::runtime_error(omp_error);
 
     // Get the number of intersecting objects
     arma::uword n_intersecting = 0;
