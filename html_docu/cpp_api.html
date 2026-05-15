@@ -2621,9 +2621,9 @@ void quadriga_lib::baseband_freq_response_vec(
     const std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *delay,
     const arma::Col&lt;dtype&gt; *pilot_grid,
     const double bandwidth,
-    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_re,
-    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_im,
-    const arma::u32_vec *i_snap = nullptr);
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_re = nullptr,
+    std::vector&lt;arma::Cube&lt;dtype&gt;&gt; *hmat_im = nullptr,
+    const arma::uvec *i_snap = nullptr);
 </pre>
 
 <i>Inputs:</i><br>
@@ -2643,9 +2643,9 @@ void quadriga_lib::baseband_freq_response_vec(
 
 <i>Outputs:</i><br>
 <ul>
-<li><b><code>hmat_re</code></b> — Real part of frequency-domain channel matrices, vector of <code>n_out</code> cubes <code>[n_rx, n_tx, n_carriers]</code>
+<li><b><code>hmat_re</code></b> <i>(optional)</i> — Real part of frequency-domain channel matrices, vector of <code>n_out</code> cubes <code>[n_rx, n_tx, n_carriers]</code>
 </li>
-<li><b><code>hmat_im</code></b> — Imaginary part of frequency-domain channel matrices, same structure as <code>hmat_re</code>
+<li><b><code>hmat_im</code></b> <i>(optional)</i> — Imaginary part of frequency-domain channel matrices, same structure as <code>hmat_re</code>
 </li></ul>
 
 <i>See also:</i><br>

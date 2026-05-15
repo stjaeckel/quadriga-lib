@@ -1218,20 +1218,27 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 <b>baseband_freq_response</b> - Compute the baseband frequency response of a MIMO channel
 <div style="margin-bottom: 1.5em;">
 <ul>
-<li>Dispatches to the single-frequency backend for 3D <code>coeff_re</code> and to the multi-frequency backend for 4D <code>coeff_re</code>
+<li>Three dispatch modes depending on the dimensionality of coeff_re / coeff_im / delay  and the
+   presence of <code>i_snap</code> — see the table below
 </li>
-<li>Single-frequency mode: computes the frequency-domain channel matrix at the carrier  positions via
+<li>Single-frequency mode: computes the frequency-domain channel matrix at the carrier positions via
    DFT over time-domain path coefficients and delays
 </li>
 <li>Multi-frequency mode: interpolates complex channel coefficients from the input frequency grid
    <code>center_freq</code> to the output grid using SLERP, then applies delay-induced phase rotation per output
    carrier; only the first frequency slab of <code>delay</code> is used
 </li>
+<li>Multi-snapshot mode: applies the single-frequency backend in parallel across snapshots via OpenMP;
+   <code>i_snap</code> (1-based MATLAB indices) optionally selects a subset
+</li>
 <li>Carrier positions are specified one of two ways: as a normalized <code>pilot_grid</code> paired with <code>bandwidth</code>
    (where <code>0.0</code> corresponds to <code>center_freq(1)</code> and <code>1.0</code> to <code>center_freq(1) + bandwidth</code>), or as absolute
    frequencies via <code>carrier_freq</code>; supplying both pairs is an error
 </li>
-<li>Multi-frequency inputs always require <code>center_freq</code>; if <code>carrier_freq</code> is omitted it is derived as <code>center_freq(1) + pilot_grid · bandwidth</code>
+<li>Multi-frequency inputs always require <code>center_freq</code>; if <code>carrier_freq</code> is omitted it is derived as
+   <code>center_freq(1) + pilot_grid · bandwidth</code>
+</li>
+<li>Multi-snapshot inputs require <code>center_freq</code> to be omitted or scalar (no combined multi-freq + multi-snap)
 </li>
 <li>Single-frequency inputs ignore <code>center_freq</code> when <code>pilot_grid</code> + <code>bandwidth</code> are given
 </li>
@@ -1245,18 +1252,50 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 <i>Usage:</i><br>
 <pre>
 [ hmat_re, hmat_im ] = quadriga_lib.baseband_freq_response( coeff_re, coeff_im, delay, ...
-    pilot_grid, bandwidth, center_freq, carrier_freq );
+    pilot_grid, bandwidth, center_freq, carrier_freq, i_snap );
 </pre>
+
+<i>Dispatch modes:</i><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;">
+<tr>
+  <th style="text-align: left;">Mode</th>
+  <th style="text-align: left;">Triggered by</th>
+  <th style="text-align: left;"><code>coeff_re</code> shape</th>
+  <th style="text-align: left;">Output shape</th>
+  <th style="text-align: left;"></th>
+</tr>
+<tr>
+  <td>Single-frequency</td>
+  <td>3D <code>coeff_re</code> and <code>i_snap</code> omitted</td>
+  <td><code>[n_rx, n_tx, n_path]</code></td>
+  <td><code>[n_rx, n_tx, n_carrier]</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>Multi-frequency</td>
+  <td>4D <code>coeff_re</code> and <code>i_snap</code> omitted</td>
+  <td><code>[n_rx, n_tx, n_path, n_freq]</code></td>
+  <td><code>[n_rx, n_tx, n_carrier]</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>Multi-snapshot</td>
+  <td><code>i_snap</code> supplied (may be 0 for all)</td>
+  <td><code>[n_rx, n_tx, n_path, n_snap]</code></td>
+  <td><code>[n_rx, n_tx, n_carrier, n_out]</code></td>
+  <td></td>
+</tr>
+</table><br>
 
 <i>Inputs:</i><br>
 <ul>
 <li><b><code>coeff_re</code></b> — Real part of channel coefficients; <code>[n_rx, n_tx, n_path]</code> (single-freq) or
-   <code>[n_rx, n_tx, n_path, n_freq]</code> (multi-freq)
+   <code>[n_rx, n_tx, n_path, n_freq]</code> (multi-freq) or <code>[n_rx, n_tx, n_path, n_snap]</code> (multi-snap)
 </li>
 <li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients; same shape as <code>coeff_re</code>
 </li>
-<li><b><code>delay</code></b> — Path delays in seconds; <code>[n_rx, n_tx, n_path]</code> or <code>[1, 1, n_path]</code> for
-   single-freq; <code>[n_rx, n_tx, n_path, n_freq]</code> or <code>[1, 1, n_path, n_freq]</code> for multi-freq
+<li><b><code>delay</code></b> — Path delays in seconds; same shape as <code>coeff_re</code>, optionally broadcast over RX/TX with
+   shape <code>[1, 1, n_path]</code> or <code>[1, 1, n_path, ...]</code>
 </li>
 <li><b><code>pilot_grid</code></b> <i>(optional)</i> — Normalized sub-carrier positions; <code>0.0</code> = center,
    <code>1.0</code> = center + bandwidth; must be paired with <code>bandwidth</code>; <code>[n_carrier, 1]</code>
@@ -1264,17 +1303,22 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 <li><b><code>bandwidth</code></b> <i>(optional)</i> — Total baseband bandwidth in Hz; must be paired with <code>pilot_grid</code>
 </li>
 <li><b><code>center_freq</code></b> <i>(optional)</i> — Input sample frequencies; required for multi-frequency inputs;
-   length must equal the 4th dimension of <code>coeff_re</code>; <code>[n_freq, 1]</code>
+   length must equal the 4th dimension of <code>coeff_re</code>; for multi-snap must be omitted or scalar; <code>[n_freq, 1]</code>
 </li>
 <li><b><code>carrier_freq</code></b> <i>(optional)</i> — Absolute output carrier frequencies in Hz; cannot be combined
    with <code>pilot_grid</code> + <code>bandwidth</code>; <code>[n_carrier, 1]</code>
+</li>
+<li><b><code>i_snap</code></b> <i>(optional)</i> — Triggers multi-snap mode. Scalar <code>0</code> processes all snapshots;
+   a positive vector of 1-based indices processes the selected subset. Omitting this argument
+   or passing <code>[]</code> keeps the function in single/multi-frequency mode.
 </li></ul>
 
 <i>Outputs:</i><br>
 <ul>
 <li><b><code>hmat_re</code></b> <i>(optional)</i> — Real part of the frequency-domain channel matrix; <code>[n_rx, n_tx, n_carrier]</code>
+   (single/multi-freq) or <code>[n_rx, n_tx, n_carrier, n_out]</code> (multi-snap)
 </li>
-<li><b><code>hmat_im</code></b> <i>(optional)</i> — Imaginary part of the frequency-domain channel matrix; <code>[n_rx, n_tx, n_carrier]</code>
+<li><b><code>hmat_im</code></b> <i>(optional)</i> — Imaginary part of the frequency-domain channel matrix; same shape as <code>hmat_re</code>
 </li></ul>
 
 <i>See also:</i><br>

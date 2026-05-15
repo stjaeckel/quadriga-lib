@@ -10,7 +10,6 @@
 #include <armadillo>
 #include <string>
 #include <vector>
-#include <exception>
 
 // If arma::uword and size_t are not the same width (e.g. 64 bit), the compiler will throw an error here
 // This allows the use of "arma::uword", "size_t" and "unsigned long long" interchangeably
@@ -18,21 +17,29 @@
 static_assert(sizeof(arma::uword) == sizeof(size_t), "arma::uword and size_t have different sizes");
 static_assert(sizeof(unsigned long long) == sizeof(size_t), "unsigned long and size_t have different sizes");
 
-// Wrap a call inside an OpenMP parallel region so exceptions don't escape.
-// Declare an std::exception_ptr (initialized to nullptr) before the region,
-// pass it in, and rethrow it after the region.
-#define OMP_SAFE_CALL(exc_ptr, ...)                   \
-    try                                               \
-    {                                                 \
-        __VA_ARGS__;                                  \
-    }                                                 \
-    catch (...)                                       \
-    {                                                 \
-        _Pragma("omp critical")                       \
-        {                                             \
-            if (!(exc_ptr))                           \
-                (exc_ptr) = std::current_exception(); \
-        }                                             \
+// OpenMP-safe exception handling
+// Declare `bool` + `std::string` before the parallel region, pass them in,
+// and rethrow a runtime_error after the region if the flag was set.
+#define OMP_SAFE_CALL(error_flag, error_msg, ...)                 \
+    try                                                           \
+    {                                                             \
+        __VA_ARGS__;                                              \
+    }                                                             \
+    catch (const std::exception &e)                               \
+    {                                                             \
+        _Pragma("omp critical") if (!(error_flag))                \
+        {                                                         \
+            (error_msg) = e.what();                               \
+            (error_flag) = true;                                  \
+        }                                                         \
+    }                                                             \
+    catch (...)                                                   \
+    {                                                             \
+        _Pragma("omp critical") if (!(error_flag))                \
+        {                                                         \
+            (error_msg) = "Unknown exception in parallel region"; \
+            (error_flag) = true;                                  \
+        }                                                         \
     }
 
 #include "quadriga_math.hpp"
