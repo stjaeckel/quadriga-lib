@@ -17,7 +17,7 @@ cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
            1     1     1   ,    1    -1     1   ,    1    -1    -1;   % 11 East Upper
           -1     1     1   ,    1     1     1   ,    1     1    -1 ]; % 12 North Upper
 
-mtl_prop = repmat([1.5, 0.0, 0.0, 0.0, 0.0],12,1); % Air
+mtl_prop = repmat([1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],12,1); % Air
 
 orig(1,:) = [ -10.0,  0.0,   0.5 ]; dest(1,:) = [  10.0,  0.0,   0.5];
 [ fbs, sbs, ~, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube );
@@ -41,7 +41,7 @@ toc
 % 35 seconds, single core @ 100 million rays
 % 3.7 seconds, 16 cores (32 threads) @ 100 million rays
 
-clear all
+
 
 
 

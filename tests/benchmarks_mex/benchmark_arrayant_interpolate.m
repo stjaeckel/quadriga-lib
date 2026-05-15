@@ -4,12 +4,10 @@ close all
 center_freq = 3.7e9;
 
 % TX array
-[e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, ...
-    coupling_re_tx, coupling_im_tx] = quadriga_lib.arrayant_generate('3GPP', 16, 16, center_freq, 2 );
+ant_tx = quadriga_lib.arrayant_generate('3GPP', 16, 16, center_freq, 2 );
 
 % RX array
-[e_theta_re_rx, e_theta_im_rx, e_phi_re_rx, e_phi_im_rx, azimuth_grid_rx, elevation_grid_rx, element_pos_rx, ...
-    coupling_re_rx, coupling_im_rx] = quadriga_lib.arrayant_generate('xpol');
+ant_rx = quadriga_lib.arrayant_generate('xpol');
 
 % Random FBS
 n_path = 1000;
@@ -33,9 +31,7 @@ rx_pos = [10;0;1.5];
 
 tic
 
-[ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( ...
-    e_theta_re_tx, e_theta_im_tx, e_phi_re_tx, e_phi_im_tx, azimuth_grid_tx, elevation_grid_tx, element_pos_tx, coupling_re_tx, coupling_im_tx, ...
-    e_theta_re_rx, e_theta_im_rx, e_phi_re_rx, e_phi_im_rx, azimuth_grid_rx, elevation_grid_rx, element_pos_rx, coupling_re_rx, coupling_im_rx, ...
+[ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( ant_tx, ant_rx, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, center_freq, use_absolute_delays, add_fake_los_path );
 
 % for yy = 0.1 : 0.1 : 1

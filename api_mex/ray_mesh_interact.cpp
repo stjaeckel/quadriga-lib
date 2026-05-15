@@ -40,7 +40,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
 - **`mtl_prop`** — Material properties; see `obj_file_read`; `[n_mesh, 9]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; 
+- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin;
    order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
   `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
@@ -106,15 +106,46 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto tridir = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
     const auto orig_length = (nrhs < 13) ? arma::vec() : qd_mex_get_Col<double>(prhs[12]);
 
+    // Get number of output rays (fbs_ind != 0)
+    arma::uword n_rayN = 0;
+    const unsigned *p_fbs = fbs_ind.memptr();
+    for (arma::uword i_ray = 0; i_ray < fbs_ind.n_elem; ++i_ray)
+        n_rayN += p_fbs[i_ray] ? 1 : 0;
+
     // Wrap optional input pointers
     const arma::mat *p_trivec = trivec.empty() ? nullptr : &trivec;
     const arma::mat *p_tridir = tridir.empty() ? nullptr : &tridir;
     const arma::vec *p_orig_length = orig_length.empty() ? nullptr : &orig_length;
 
-    // Output containers (sizes unknown — C++ resizes them)
+    // Output containers
     arma::mat origN, destN, xprmatN, trivecN, tridirN, normal_vecN;
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN;
     arma::s32_vec out_typeN;
+
+    if (nlhs > 0)
+        plhs[0] = qd_mex_init_output(&origN, n_rayN, 3);
+    if (nlhs > 1)
+        plhs[1] = qd_mex_init_output(&destN, n_rayN, 3);
+    if (nlhs > 2)
+        plhs[2] = qd_mex_init_output(&gainN, n_rayN);
+    if (nlhs > 3)
+        plhs[3] = qd_mex_init_output(&xprmatN, n_rayN, 8);
+    if (nlhs > 4)
+        plhs[4] = p_trivec ? qd_mex_init_output(&trivecN, n_rayN, 9) : mxCreateDoubleMatrix(0, 0, mxREAL);
+    if (nlhs > 5)
+        plhs[5] = p_tridir ? qd_mex_init_output(&tridirN, n_rayN, tridir.n_cols) : mxCreateDoubleMatrix(0, 0, mxREAL);
+    if (nlhs > 6)
+        plhs[6] = qd_mex_init_output(&orig_lengthN, n_rayN);
+    if (nlhs > 7)
+        plhs[7] = qd_mex_init_output(&fbs_angleN, n_rayN);
+    if (nlhs > 8)
+        plhs[8] = qd_mex_init_output(&thicknessN, n_rayN);
+    if (nlhs > 9)
+        plhs[9] = qd_mex_init_output(&edge_lengthN, n_rayN);
+    if (nlhs > 10)
+        plhs[10] = qd_mex_init_output(&normal_vecN, n_rayN, 6);
+    if (nlhs > 11)
+        plhs[11] = qd_mex_init_output(&out_typeN, n_rayN);
 
     // Wrap optional output pointers based on requested outputs
     arma::mat *p_origN = (nlhs > 0) ? &origN : nullptr;
@@ -138,30 +169,4 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         p_origN, p_destN, p_gainN, p_xprmatN,
         p_trivecN, p_tridirN, p_orig_lengthN,
         p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN));
-
-    // Copy results to MATLAB
-    if (nlhs > 0)
-        plhs[0] = qd_mex_copy2matlab(&origN);
-    if (nlhs > 1)
-        plhs[1] = qd_mex_copy2matlab(&destN);
-    if (nlhs > 2)
-        plhs[2] = qd_mex_copy2matlab(&gainN);
-    if (nlhs > 3)
-        plhs[3] = qd_mex_copy2matlab(&xprmatN);
-    if (nlhs > 4)
-        plhs[4] = qd_mex_copy2matlab(&trivecN);
-    if (nlhs > 5)
-        plhs[5] = qd_mex_copy2matlab(&tridirN);
-    if (nlhs > 6)
-        plhs[6] = qd_mex_copy2matlab(&orig_lengthN);
-    if (nlhs > 7)
-        plhs[7] = qd_mex_copy2matlab(&fbs_angleN);
-    if (nlhs > 8)
-        plhs[8] = qd_mex_copy2matlab(&thicknessN);
-    if (nlhs > 9)
-        plhs[9] = qd_mex_copy2matlab(&edge_lengthN);
-    if (nlhs > 10)
-        plhs[10] = qd_mex_copy2matlab(&normal_vecN);
-    if (nlhs > 11)
-        plhs[11] = qd_mex_copy2matlab(&out_typeN);
 }
