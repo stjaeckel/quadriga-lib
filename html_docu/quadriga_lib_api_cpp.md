@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.5"
 author: "Stephan Jaeckel"
-date: "14.05.2026"
+date: "15.05.2026"
 lang: en-US
 ---
 
@@ -2783,7 +2783,7 @@ void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
 
 ---
 ## interp_1D / interp_2D
-Perform linear interpolation (1D or 2D) on single or multiple data sets.
+Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
 - Supports single and multiple data sets.
