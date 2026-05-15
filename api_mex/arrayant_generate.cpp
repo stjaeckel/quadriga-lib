@@ -39,7 +39,7 @@ ant = quadriga_lib.arrayant_generate('ula', res, freq, [], [], [], [], N, [], []
                                      [], [], [], [], pattern);
 
 % 3GPP-NR array (default 3GPP element pattern)
-ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [], 
+ant = quadriga_lib.arrayant_generate('3GPP', res, freq, [], [], [],
                                      M, N, pol, tilt, spacing, Mg, Ng, dgv, dgh);
 
 % 3GPP-NR array with custom element beamwidth
@@ -118,7 +118,7 @@ ant = quadriga_lib.arrayant_generate('multibeam_sep', res, freq, az_3dB, el_3dB,
    | `coupling_im`    | Coupling matrix, imaginary part                 | `[n_elements, n_ports]`                |
    | `center_freq`    | Center frequency in Hz                          | scalar                                 |
    | `name`           | Name of the array antenna object                | string                                 |
-   If `ant` is used as an input to other fuctions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, 
+   If `ant` is used as an input to other fuctions, fields `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`,
    `elevation_grid` are mandatory; remaining fields are optional (defaults: unit coupling, zero positions, 299792458 Hz)."
 MD!*/
 
@@ -130,8 +130,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs == 0)
-        return;
+    if (nlhs > 11)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     std::string array_type = qd_mex_get_string(prhs[0]);
     double res = (nrhs < 2) ? 1.0 : qd_mex_get_scalar<double>(prhs[1], "res", 1.0);
@@ -246,20 +246,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     if (nlhs == 1) // Output as struct
         plhs[0] = qd_mex_arrayant2struct(arrayant);
-    else if (nlhs == 11) // Separate outputs
+    else if (nlhs > 1) // Separate outputs
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant.e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&arrayant.e_theta_im);
-        plhs[2] = qd_mex_copy2matlab(&arrayant.e_phi_re);
-        plhs[3] = qd_mex_copy2matlab(&arrayant.e_phi_im);
-        plhs[4] = qd_mex_copy2matlab(&arrayant.azimuth_grid, true);
-        plhs[5] = qd_mex_copy2matlab(&arrayant.elevation_grid, true);
-        plhs[6] = qd_mex_copy2matlab(&arrayant.element_pos);
-        plhs[7] = qd_mex_copy2matlab(&arrayant.coupling_re);
-        plhs[8] = qd_mex_copy2matlab(&arrayant.coupling_im);
-        plhs[9] = qd_mex_copy2matlab(&arrayant.center_frequency);
-        plhs[10] = mxCreateString(arrayant.name.c_str());
+        if (nlhs > 2)
+            plhs[2] = qd_mex_copy2matlab(&arrayant.e_phi_re);
+        if (nlhs > 3)
+            plhs[3] = qd_mex_copy2matlab(&arrayant.e_phi_im);
+        if (nlhs > 4)
+            plhs[4] = qd_mex_copy2matlab(&arrayant.azimuth_grid, true);
+        if (nlhs > 5)
+            plhs[5] = qd_mex_copy2matlab(&arrayant.elevation_grid, true);
+        if (nlhs > 6)
+            plhs[6] = qd_mex_copy2matlab(&arrayant.element_pos);
+        if (nlhs > 7)
+            plhs[7] = qd_mex_copy2matlab(&arrayant.coupling_re);
+        if (nlhs > 8)
+            plhs[8] = qd_mex_copy2matlab(&arrayant.coupling_im);
+        if (nlhs > 9)
+            plhs[9] = qd_mex_copy2matlab(&arrayant.center_frequency);
+        if (nlhs > 10)
+            plhs[10] = mxCreateString(arrayant.name.c_str());
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 }
