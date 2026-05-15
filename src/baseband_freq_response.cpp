@@ -337,21 +337,22 @@ void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<dtype
     }
 
     long long n_iter = (long long)n_snap_o;
-    std::exception_ptr thread_exception = nullptr;
+    bool omp_failed = false;
+    std::string omp_error;
 
 #pragma omp parallel for
     for (long long i = 0; i < n_iter; ++i)
     {
         arma::uword js = (p_snap == nullptr) ? (arma::uword)i : p_snap[i];
-        OMP_SAFE_CALL(thread_exception,
+        OMP_SAFE_CALL(omp_failed, omp_error,
                       quadriga_lib::baseband_freq_response<dtype>(
                           &coeff_re->at(js), &coeff_im->at(js), &delay->at(js),
                           pilot_grid, bandwidth,
                           hmat_re != nullptr ? &(*hmat_re)[i] : nullptr,
                           hmat_im != nullptr ? &(*hmat_im)[i] : nullptr));
     }
-    if (thread_exception)
-        std::rethrow_exception(thread_exception);
+    if (omp_failed)
+        throw std::runtime_error(omp_error);
 }
 
 template void quadriga_lib::baseband_freq_response_vec(const std::vector<arma::Cube<float>> *coeff_re, const std::vector<arma::Cube<float>> *coeff_im,

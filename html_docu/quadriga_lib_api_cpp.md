@@ -1330,11 +1330,11 @@ int quadriga_lib::any_type_id(
 ## baseband_freq_response
 Compute the baseband frequency response of a MIMO channel
 
-- Computes the frequency-domain channel matrix `H` at given sub-carrier positions via DFT over time-domain 
+- Computes the frequency-domain channel matrix `H` at given sub-carrier positions via DFT over time-domain
   path coefficients and delays
 - `delay` supports broadcasting: shape `[1, 1, n_path]` applies the same delays to all RX/TX pairs
 - `pilot_grid` values are normalized to bandwidth: `0.0` = center frequency, `1.0` = center + bandwidth
-- Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation; double inputs are 
+- Internal arithmetic is single-precision; uses AVX2 for 8-carrier parallel computation; double inputs are
   narrowed to float internally, results widened back
 - Safe to call in a loop over snapshots and parallelize with OpenMP
 
@@ -1373,11 +1373,11 @@ void quadriga_lib::baseband_freq_response(
 ## baseband_freq_response_multi
 Compute the wideband frequency response of a MIMO channel with frequency-dependent coefficients
 
-- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense 
+- Interpolates complex channel coefficients from a coarse input frequency grid (`freq_in`) to a dense
   output grid (`freq_out`) using SLERP: magnitude and unwrapped phase are each interpolated linearly along the shortest arc
-- Applies delay-induced phase rotation `exp(-j·2·pi·freq_out·delay)` per output carrier in double 
+- Applies delay-induced phase rotation `exp(-j·2·pi·freq_out·delay)` per output carrier in double
   precision to preserve accuracy at high carrier frequencies
-- Only `delay[0]` is used; all entries in the `delay` vector should be identical 
+- Only `delay[0]` is used; all entries in the `delay` vector should be identical
   (path geometry is frequency-independent)
 - `delay` cube supports `[1, 1, n_path]` (planar wave) or `[n_rx, n_tx, n_path]` (spherical wave)
 - Output frequencies outside the range of `freq_in` use constant extrapolation from the nearest endpoint
@@ -1403,8 +1403,8 @@ void quadriga_lib::baseband_freq_response_multi(
 - **`delay`** — Path delays in seconds, vector of `n_freq_in` cubes; only `delay[0]` is used; shape `[n_rx, n_tx, n_path]` or `[1, 1, n_path]`
 - **`freq_in`** — Input sample frequencies, sorted ascending; `[n_freq_in]`
 - **`freq_out`** — Output carrier frequencies (absolute); `[n_carrier]`
-- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and 
-  re-applies analytically at output frequencies; must be `true` for output from 
+- **`remove_delay_phase`** *(optional)* — Removes baked-in `exp(-j·2π·freq_in[f]·delay)` before SLERP and
+  re-applies analytically at output frequencies; must be `true` for output from
   [get_channels_multifreq](#get_channels_multifreq) or [get_channels_spherical](#get_channels_spherical), `false` for pure envelope coefficients
 
 ### Outputs:
@@ -1434,9 +1434,9 @@ void quadriga_lib::baseband_freq_response_vec(
     const std::vector<arma::Cube<dtype>> *delay,
     const arma::Col<dtype> *pilot_grid,
     const double bandwidth,
-    std::vector<arma::Cube<dtype>> *hmat_re,
-    std::vector<arma::Cube<dtype>> *hmat_im,
-    const arma::u32_vec *i_snap = nullptr);
+    std::vector<arma::Cube<dtype>> *hmat_re = nullptr,
+    std::vector<arma::Cube<dtype>> *hmat_im = nullptr,
+    const arma::uvec *i_snap = nullptr);
 ```
 
 ### Inputs:
@@ -1448,8 +1448,8 @@ void quadriga_lib::baseband_freq_response_vec(
 - **`i_snap`** *(optional)* — Snapshot indices to process; if omitted, all `n_snap` snapshots are processed; `[n_out]`
 
 ### Outputs:
-- **`hmat_re`** — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
-- **`hmat_im`** — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
+- **`hmat_re`** *(optional)* — Real part of frequency-domain channel matrices, vector of `n_out` cubes `[n_rx, n_tx, n_carriers]`
+- **`hmat_im`** *(optional)* — Imaginary part of frequency-domain channel matrices, same structure as `hmat_re`
 
 ### See also:
 - [baseband_freq_response](#baseband_freq_response) (single-snapshot variant)
