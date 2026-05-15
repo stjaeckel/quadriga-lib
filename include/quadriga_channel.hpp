@@ -151,7 +151,7 @@ namespace quadriga_lib
     arma::u32_vec hdf5_read_layout(std::string fn, arma::u32_vec *channelID = nullptr);
 
     // Reshapes the storage layout inside an existing HDF5 file
-    // - Total number of elements in the HDF5 file is fixed when calling `hdf5_create`
+    // - Total number of elements in the HDF5 file is fixed when calling hdf5_create
     // - Reshaping is possible only when the total number does not change
     void hdf5_reshape_layout(std::string fn,   // Filename of the HDF5 file
                              unsigned nx,      // Number of x-entries in the storage layout (first dimension, e.g. for BSs)
@@ -247,18 +247,19 @@ namespace quadriga_lib
                                       bool remove_delay_phase = true);                 // Remove baked-in delay phase before SLERP interpolation
 
     // Compute the baseband frequency response of multiple MIMO channels
-    // - Wrapper function for "quadriga_lib::baseband_freq_response" to process multiple snapshot at once
-    // - Optional input i_snap can be used to select a subset of the given coeff_re, coeff_im, delay
-    // - Uses OpenMP to process snapshots in parallel
+    // - Batch wrapper around [[baseband_freq_response]], applying it across snapshots in parallel via OpenMP
+    // - Each element of the input vectors is a cube of shape [n_rx, n_tx, n_path]; delay supports broadcasting to [1, 1, n_path]
+    // - Output vectors have length n_out: either n_snap (all snapshots) or length(i_snap) (subset)
+    // - Internal arithmetic is single-precision
     template <typename dtype>
-    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re, // Channel coefficients, real part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
-                                    const std::vector<arma::Cube<dtype>> *coeff_im, // Channel coefficients, imaginary part, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path]
-                                    const std::vector<arma::Cube<dtype>> *delay,    // Path delays in seconds, vector (n_snap) of Cubes of size [n_rx, n_tx, n_path] or [1, 1, n_path]
-                                    const arma::Col<dtype> *pilot_grid,             // Sub-carrier positions, relative to the bandwidth, 0.0 = fc, 1.0 = fc+bandwidth, Size: [ n_carriers ]
-                                    const double bandwidth,                         // The baseband bandwidth in [Hz]
-                                    std::vector<arma::Cube<dtype>> *hmat_re,        // Output: Channel matrices (H), real part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
-                                    std::vector<arma::Cube<dtype>> *hmat_im,        // Output: Channel matrices (H), imaginary part, vector (n_out) of Cubes of size [n_rx, n_tx, n_carriers]
-                                    const arma::u32_vec *i_snap = nullptr);         // Snapshot indices, 0-based, optional input, vector of length "n_out"
+    void baseband_freq_response_vec(const std::vector<arma::Cube<dtype>> *coeff_re,    // Real part of time-domain channel coefficients, vector of n_snap cubes [n_rx, n_tx, n_path]
+                                    const std::vector<arma::Cube<dtype>> *coeff_im,    // Imaginary part of time-domain channel coefficients, same structure as coeff_re
+                                    const std::vector<arma::Cube<dtype>> *delay,       // Path delays in seconds, same structure as coeff_re; each cube broadcastable to [1, 1, n_path]
+                                    const arma::Col<dtype> *pilot_grid,                // Normalized sub-carrier positions in range [0.0, 1.0]; [n_carriers]
+                                    const double bandwidth,                            // Total baseband bandwidth
+                                    std::vector<arma::Cube<dtype>> *hmat_re = nullptr, // Real part of frequency-domain channel matrices, vector of n_out cubes [n_rx, n_tx, n_carriers]
+                                    std::vector<arma::Cube<dtype>> *hmat_im = nullptr, // Imaginary part of frequency-domain channel matrices, same structure as hmat_re
+                                    const arma::uvec *i_snap = nullptr);               // Snapshot indices to process; if omitted, all n_snap snapshots are processed; [n_out]
 
     // Fixes the path delays to a grid of delay bins
     template <typename dtype>
