@@ -1,9 +1,7 @@
 clear all
 
 no_ray  = 1e6;
-no_pos  = 1e6;
-
-use_index = 1;
+no_pos  = 1e7;
 
 % Generatea rays
 no_div = round(sqrt(no_ray / 20));
@@ -20,17 +18,17 @@ y = rx_pos(2) + ( 0 : res : rx_xy(2) );
 [X,Y] = meshgrid(x,y);
 points = [ X(:), Y(:),  ones(numel(X),1)*rx_pos(3) ];
 
+
+target_size = 1024; 
+
 tic
-
-if use_index
-    [ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, 1 );
-else
-    [ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, points, 1, uint32(0) );
-end
-
+[pointsR, sub_cloud_index, forward_index, reverse_index ] = quadriga_lib.point_cloud_segmentation( points, target_size, 8 );
 toc
 
-h = reshape( ray_ind, numel(y), numel(x) );
+tic
+[ hit_count, ray_ind ] = quadriga_lib.ray_point_intersect( orig, trivec, tridir, pointsR, sub_cloud_index );
+toc
+
+h = reshape( ray_ind(1,reverse_index), numel(y), numel(x) );
 imagesc(y,x,h);
 
-ray_ind;

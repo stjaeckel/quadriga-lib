@@ -1,8 +1,8 @@
 clear all
 close all
 
-no_mesh = 1e6;
-no_pos  = 1e5;
+no_mesh = 1e7;
+no_pos  = 1e7;
 
 use_sub_mesh = 1; % 1 or 0
 
@@ -45,14 +45,8 @@ y = y_min : pixel_size : y_max;
 orig = [X(:), Y(:), ones(numel(X),1)*20];
 dest = [X(:), Y(:), -ones(numel(X),1)*20];
 
-%orig(:,[1,2]) = 0;
-
-origS = single(orig);
-destS = single(dest);
-meshS = single(mesh);
-
 tic
-[ fbs, sbs, no_hit, ifbs, isbs ] = quadriga_lib.ray_triangle_intersect( origS, destS, meshS, sub_mesh_index );
+[ fbs, sbs, no_hit, ifbs, isbs ] = quadriga_lib.ray_triangle_intersect( orig, dest, mesh, sub_mesh_index );
 toc
 
 

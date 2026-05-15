@@ -14,11 +14,11 @@ SECTION!*/
 # CALC_DIFFRACTION_GAIN
 Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
-- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided 
+- Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided
   into `n_path` elliptic-arc paths (controlled by `lod`), each approximated by `n_seg` line segments
-- Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, 
+- Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients,
   generalized to arbitrary 3D shapes
-- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping 
+- Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
   triangles whose bounding box does not intersect the TX-RX path
 
 ## Usage:
@@ -66,16 +66,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     double center_freq = qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
     int lod = (nrhs < 6) ? 2 : qd_mex_get_scalar<int>(prhs[5], "lod", 2);
     int verbose = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "verbose", 0);
+    arma::u32_vec sub_mesh_index = (nrhs < 8) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[7], true);
 
-    // Optional: sub_mesh_index
-    arma::u32_vec sub_mesh_index;
-    if (nrhs > 7 && !mxIsEmpty(prhs[7]))
-    {
-        if (mxIsUint32(prhs[7]))
-            sub_mesh_index = qd_mex_reinterpret_Col<unsigned>(prhs[7]);
-        else
-            sub_mesh_index = qd_mex_typecast_Col<unsigned>(prhs[7]);
-    }
+    if (!sub_mesh_index.empty() && arma::any(sub_mesh_index == 0))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_index' cannot be 0 (1-based index).");
+    else // Convert to 0-based
+        sub_mesh_index -= 1;
 
     int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
     int gpu_id = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "gpu_id", 0);

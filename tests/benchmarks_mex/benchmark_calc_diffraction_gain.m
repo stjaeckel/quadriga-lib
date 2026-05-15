@@ -25,9 +25,9 @@ cube3(:,[1,4,7]) = cube3(:,[1,4,7]) + xo2;
 cube3(:,[2,5,8]) = cube3(:,[2,5,8]) + yo2;
 msh = [ cube; cube2; cube3 ];
 
-mtl_prop = repmat([1.0, 0.0, 0.0003, 0.0, 1.0],12,1);
-mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 0.0],12,1) ];
-mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 1.0],12,1) ];
+mtl_prop = repmat([1.0, 0.0, 0.0003, 0.0, 1.0, 0.0,0.0,0.0,0.0],12,1);
+mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 0.0, 0.0,0.0,0.0,0.0],12,1) ];
+mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 1.0, 0.0,0.0,0.0,0.0],12,1) ];
 
 x = -scl : res : scl;
 y = -scl : res : scl;
@@ -41,7 +41,7 @@ tic
 gain = quadriga_lib.calc_diffraction_gain( orig, dest, msh, mtl_prop, 1e9, lod, 1 );
 toc
 
-gainX = quadriga_lib.calc_diffraction_gain( orig(1,:), [4.3, -3.4, 0], msh, mtl_prop, 1e9, lod,2 );
+%gainX = quadriga_lib.calc_diffraction_gain( orig(1,:), [4.3, -3.4, 0], msh, mtl_prop, 1e9, lod,2 );
 
 
 

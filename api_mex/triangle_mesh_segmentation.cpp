@@ -74,7 +74,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                              target_size, vec_size, p_mtl_prop, p_mtl_propR, p_mesh_index));
 
     // Convert sub_mesh_index from 0-based (C++) to 1-based (MATLAB)
-    sub_mesh_index += 1U;
+    sub_mesh_index += 1;
 
     // Copy outputs to MATLAB (sizes only known after the C++ call)
     if (nlhs > 0)
