@@ -90,7 +90,7 @@ assertElementsAlmostEqual( data.element_pos, [0,0 ; 0,0 ; -0.25,0.25], 'absolute
 
 % Errors
 try 
-    [~,~] = quadriga_lib.arrayant_generate('omni');
+    [~,~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_generate('omni');
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';
