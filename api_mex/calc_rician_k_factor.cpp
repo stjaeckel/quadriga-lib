@@ -30,12 +30,11 @@ Calculate the Rician K-Factor from channel impulse response data
 - **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, n_cir]`
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
-- **`window_size`** *(optional)* — LOS window; paths with length ≤ `dTR + window_size` are
-  treated as LOS; default: 0.01
+- **`window_size`** — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS; default: 0.01
 
 ## Outputs:
-- **`kf`** *(optional)* — Rician K-Factor on linear scale; `[n_cir]`
-- **`pg`** *(optional)* — Total path gain (sum of all path powers) in [W]; `[n_cir]`
+- **`kf`** — Rician K-Factor on linear scale; `[n_cir]`
+- **`pg`** — Total path gain (sum of all path powers) in [W]; `[n_cir]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -145,7 +145,7 @@ catch ME
 end
 
 try
-    [~, ~] = quadriga_lib.arrayant_rotate_pattern( ant );
+    [~,~,~,~,~,~,~,~,~,~,~,~] = quadriga_lib.arrayant_rotate_pattern( ant );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Wrong number of output arguments.';

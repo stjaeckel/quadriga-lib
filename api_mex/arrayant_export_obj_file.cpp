@@ -26,14 +26,13 @@ quadriga_lib.arrayant_export_obj_file( fn, arrayant, directivity_range, colormap
 - **`fn`** — Output OBJ filename; must not be empty; filename must end in `.obj`
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in
   [[arrayant_generate]]; a struct array may contain a frequency-dependent model
-- **`directivity_range`** *(optional)* — Dynamic range of the visualized directivity pattern in dB; default: 30
-- **`colormap`** *(optional)* — Colormap name; default: jet; Available: jet, parula, winter, 
-  hot, turbo, copper, spring, cool, gray, autumn, summer
-- **`object_radius`** *(optional)* — Radius of the exported object; default: 1
-- **`icosphere_n_div`** *(optional)* — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
-- **`i_element`** *(optional)* — Element indices to export; 1-based; uint64; empty = export all elements
-- **`i_freq`** *(optional)* — Frequency index to export from a multi-frequency arrayant struct
-  array; 1-based; uint64; default: 1; must satisfy `1 <= freq <= n_freq`
+- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30 dB
+- **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
+- **`object_radius`** — Radius of the exported object; default: 1 m
+- **`icosphere_n_div`** — Icosphere subdivision count; higher = finer mesh; see [[icosphere]]; default: 4
+- **`i_element`** — Element indices to export; 1-based; uint64; empty = export all elements
+- **`i_freq`** — Frequency index to export from a multi-frequency arrayant struct array; 1-based; 
+  uint64; default: 1; must satisfy `1 <= freq <= n_freq`
 
 ## See also:
 - [[icosphere]] (icosphere primitive used internally)

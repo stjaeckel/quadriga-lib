@@ -40,7 +40,7 @@ Compute the baseband frequency response of a MIMO channel
     pilot_grid, bandwidth, center_freq, carrier_freq, i_snap );
 ```
 
-## Dispatch modes:
+## Dispatch modes:<br>
 | Mode             | Triggered by                             | `coeff_re` shape                  | Output shape                       |
 |------------------|------------------------------------------|-----------------------------------|------------------------------------|
 | Single-frequency | 3D `coeff_re` and `i_snap` omitted       | `[n_rx, n_tx, n_path]`            | `[n_rx, n_tx, n_carrier]`          |
@@ -53,21 +53,20 @@ Compute the baseband frequency response of a MIMO channel
 - **`coeff_im`** — Imaginary part of channel coefficients; same shape as `coeff_re`
 - **`delay`** — Path delays in seconds; same shape as `coeff_re`, optionally broadcast over RX/TX with
   shape `[1, 1, n_path]` or `[1, 1, n_path, ...]`
-- **`pilot_grid`** *(optional)* — Normalized sub-carrier positions; `0.0` = center,
-  `1.0` = center + bandwidth; must be paired with `bandwidth`; `[n_carrier, 1]`
-- **`bandwidth`** *(optional)* — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
-- **`center_freq`** *(optional)* — Input sample frequencies; required for multi-frequency inputs;
-  length must equal the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; `[n_freq, 1]`
-- **`carrier_freq`** *(optional)* — Absolute output carrier frequencies in Hz; cannot be combined
-  with `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
-- **`i_snap`** *(optional)* — Triggers multi-snap mode. Scalar `0` processes all snapshots;
-  a positive vector of 1-based indices processes the selected subset. Omitting this argument
-  or passing `[]` keeps the function in single/multi-frequency mode.
+- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth; 
+  must be paired with `bandwidth`; `[n_carrier, 1]`
+- **`bandwidth`** — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
+- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal 
+  the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; `[n_freq, 1]`
+- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with 
+  `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
+- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based 
+  indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
 
 ## Outputs:
-- **`hmat_re`** *(optional)* — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
+- **`hmat_re`** — Real part of the frequency-domain channel matrix; `[n_rx, n_tx, n_carrier]`
   (single/multi-freq) or `[n_rx, n_tx, n_carrier, n_out]` (multi-snap)
-- **`hmat_im`** *(optional)* — Imaginary part of the frequency-domain channel matrix; same shape as `hmat_re`
+- **`hmat_im`** — Imaginary part of the frequency-domain channel matrix; same shape as `hmat_re`
 
 ## See also:
 - [[get_channels_spherical]] (single-frequency channel generator)

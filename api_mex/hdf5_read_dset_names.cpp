@@ -25,9 +25,9 @@ names = quadriga_lib.hdf5_read_dset_names( fn, location, prefix );
 
 ## Inputs:
 - **`fn`** — Path to the HDF5 file; string
-- **`location`** *(optional)* — Slot location inside the file; 1-based; vector with 1-4
-  elements, i.e. `[ix]`, `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; default:  `[1, 1, 1, 1]`
-- **`prefix`** *(optional)* — Prefix used to identify unstructured datasets; string; default: `'par_'`
+- **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`, `[ix, iy]`,
+  `[ix, iy, iz]` or `[ix, iy, iz, iw]`; default:  `[1, 1, 1, 1]`
+- **`prefix`** — Prefix used to identify unstructured datasets; string; default: `'par_'`
 
 ## Outputs:
 - **`names`** — Names of all datasets at the given slot, with the prefix stripped; cell array of strings

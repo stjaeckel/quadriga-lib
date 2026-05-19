@@ -1,86 +1,42 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "mex.h"
 #include "quadriga_math.hpp"
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Math functions
 SECTION!*/
 
 /*!MD
 # FAST_SINCOS
-Fast, approximate sine/cosine for MATLAB numeric arrays
+Compute elementwise approximate sine and/or cosine of a vector
 
-## Description:
-Computes elementwise sine and/or cosine for input angles in radians.
+- AVX2-optimized (8 floats/lane); scalar fallback without AVX2
+- For x in [-pi, pi]: max absolute error = 2^(-22.1); for x in [-500, 500]: 2^(-16.0)
+- Either `s` or `c` may be `nullptr` to skip that computation
 - Works on vectors, matrices, and 3-D arrays
 - Accepts any numeric input class; best performance with single precision
 - Outputs are always single precision
-- Results are approximate and may differ from MATLAB `sin` / `cos`
-- For x in [-pi, pi], the maximum absolute error is 2^(-22.1), and larger otherwise
-- For x in [-500, 500], the maximum absolute error is 2^(-16.0)
 - Request one or two outputs to control which results are returned
-- With one output, set the optional `cosineOnly` flag to `true` to return cosine instead of sine
+- With one output, set the optional `cos_only` flag to `true` to return cosine instead of sine
 
 ## Usage:
-
 ```
-[s, c] = arrayant_lib.fast_sincos(x);
-s = arrayant_lib.fast_sincos(x);
-c = arrayant_lib.fast_sincos(x, true);
+[s, c] = quadriga_lib.fast_sincos(x);
+s = quadriga_lib.fast_sincos(x);
+c = quadriga_lib.fast_sincos(x, true);
 ```
 
-## Input Arguments:
-- `**x**` (input)<br>
-  Numeric array of angles in radians. Any size/shape.
+## Inputs:
+- **`x`** (input) — Input angles; radians; `[n_elem]`
+- **`cos_only`** — Forsingle output: `true` returns `cos(x)`; false returns `sin(x)`; default: false
 
-- `**cosineOnly** = false` (optional input)<br>
-  Logical scalar. When requesting a single output, set to `true` to return `cos(x)`; otherwise returns
-  `sin(x)`.
-
-## Output Arguments:
-- `**s**`<br>
-  Single-precision `sin(x)`. Same size as `x`.
-
-- `**c**`<br>
-  Single-precision `cos(x)`. Same size as `x`.
-
-## Examples:
-
-```
-% Input as single for best performance
-x = single(linspace(0, 2*pi, 1000));
-
-% Compute sine and cosine
-[s, c] = arrayant_lib.fast_sincos(x);
-
-% Compute only sine (single output)
-s = arrayant_lib.fast_sincos(x);
-
-% Compute only cosine (single output with flag)
-c = arrayant_lib.fast_sincos(x, true);
-
-% Double input is accepted; outputs remain single
-xd = linspace(0, 2*pi, 8);
-s_only = arrayant_lib.fast_sincos(xd);        % class(s_only) == 'single'
-c_only = arrayant_lib.fast_sincos(xd, true);  % class(c_only) == 'single'
-```
+## Outputs:
+- **`s`** — sin(x); `[n_elem]`
+- **`c`** — cos(x); `[n_elem]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

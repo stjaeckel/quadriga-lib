@@ -20,26 +20,27 @@ Combine element patterns, positions, and coupling weights into effective radiati
 ```
 % Input as struct (struct mode)
 arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in );
-arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, freq, azimuth_grid_new, elevation_grid_new );
+arrayant_out = quadriga_lib.arrayant_combine_pattern( arrayant_in, center_freq_new, azimuth_grid_new, elevation_grid_new );
 
-% Separate outputs, struct input
-[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid_new, elevation_grid_new, element_pos, ...
-    coupling_re, coupling_im, freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
+% Separate outputs, struct input (single-freq only)
+[e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, ...
+    coupling_im, center_freq, name] = quadriga_lib.arrayant_combine_pattern( arrayant_in );
 
-% Separate inputs (single-freq only)
-arrayant_out = quadriga_lib.arrayant_combine_pattern( [], freq, azimuth_grid_new, elevation_grid_new, ...
-    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
-    coupling_re, coupling_im, center_freq, name );
+% Separate inputs (split-mode, single-freq only)
+arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimuth_grid_new, elevation_grid_new, ...
+    e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, coupling_re, coupling_im, center_freq, name );
 ```
 
 ## Inputs:
-- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
+- **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`freq`** *(optional)* —  Alternative frequency (grid) in Hz; defaults to per-entry `center_frequency`
-- **`azimuth_grid_new`** *(optional)* — Alternative azimuth grid in rad, in [-pi, pi], sorted;
-  defaults to input grid
-- **`elevation_grid_new`** *(optional)* — Alternative elevation grid in rad, in [-pi/2, pi/2], sorted;
-  defaults to input grid
+- **`center_freq_new`** — Alternative frequency (grid) in Hz; if provided, the combined pattern is 
+  recomputed (interpolated) at each requested frequency. If omitted or empty, the function uses each input 
+   entry's `center_freq` unchanged.
+- **`azimuth_grid_new`** — Alternative azimuth grid in rad; in [-pi, pi]; sorted; defaults to input grid
+- **`elevation_grid_new`** — Alternative elevation grid in rad; in [-pi/2, pi/2]; sorted; defaults to input grid
+- **`e_theta_re`** ... **`elevation_grid`** — Required inputs for slit-mode
+- **`element_pos`** ... **`name`** — Optional inputs for slit-mode
 
 ## Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
@@ -52,13 +53,11 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts: struct mode = 1..4, separate-input mode = 10..15
     if (nrhs < 1 || (nrhs > 4 && nrhs < 10) || nrhs > 15)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
     if (nlhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
-    if (nlhs == 0)
-        return;
 
     // Common optional inputs
     const arma::vec freq = (nrhs < 2) ? arma::vec() : qd_mex_get_Col<double>(prhs[1]);
@@ -135,20 +134,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Return to MATLAB
     if (nlhs == 1)
         plhs[0] = qd_mex_arrayant2struct(arrayant_out);
-    else if (nlhs == 11)
+    else if (nlhs > 1)
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant_out.e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&arrayant_out.e_theta_im);
-        plhs[2] = qd_mex_copy2matlab(&arrayant_out.e_phi_re);
-        plhs[3] = qd_mex_copy2matlab(&arrayant_out.e_phi_im);
-        plhs[4] = qd_mex_copy2matlab(&arrayant_out.azimuth_grid, true);
-        plhs[5] = qd_mex_copy2matlab(&arrayant_out.elevation_grid, true);
-        plhs[6] = qd_mex_copy2matlab(&arrayant_out.element_pos);
-        plhs[7] = qd_mex_copy2matlab(&arrayant_out.coupling_re);
-        plhs[8] = qd_mex_copy2matlab(&arrayant_out.coupling_im);
-        plhs[9] = qd_mex_copy2matlab(&arrayant_out.center_frequency);
-        plhs[10] = mxCreateString(arrayant_out.name.c_str());
+        if (nlhs > 2)
+            plhs[2] = qd_mex_copy2matlab(&arrayant_out.e_phi_re);
+        if (nlhs > 3)
+            plhs[3] = qd_mex_copy2matlab(&arrayant_out.e_phi_im);
+        if (nlhs > 4)
+            plhs[4] = qd_mex_copy2matlab(&arrayant_out.azimuth_grid, true);
+        if (nlhs > 5)
+            plhs[5] = qd_mex_copy2matlab(&arrayant_out.elevation_grid, true);
+        if (nlhs > 6)
+            plhs[6] = qd_mex_copy2matlab(&arrayant_out.element_pos);
+        if (nlhs > 7)
+            plhs[7] = qd_mex_copy2matlab(&arrayant_out.coupling_re);
+        if (nlhs > 8)
+            plhs[8] = qd_mex_copy2matlab(&arrayant_out.coupling_im);
+        if (nlhs > 9)
+            plhs[9] = qd_mex_copy2matlab(&arrayant_out.center_frequency);
+        if (nlhs > 10)
+            plhs[10] = mxCreateString(arrayant_out.name.c_str());
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 }

@@ -17,7 +17,7 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 - Paths with power below `p_max / 10^(0.1 * threshold)` are excluded; the default threshold
   of 100 dB effectively includes all paths
 - When `granularity > 0`, paths falling into the same delay bin of width `granularity` have
-  their powers summed before computing the spread; function recurses on the binned profile
+  their powers summed before computing the spread; binning is applied before the spread calculation
 
 ## Usage:
 ```
@@ -27,14 +27,12 @@ Calculates RMS delay spread from per-CIR delays and linear-scale powers
 ## Inputs:
 - **`delays`** — Delays in [s] per CIR; `[n_path, n_cir]`
 - **`powers`** — Path powers on linear scale in [W]; `[n_path, n_cir]`
-- **`threshold`** *(optional)* — Power threshold in [dB] relative to strongest path; paths
-  below threshold are excluded; default: 100
-- **`granularity`** *(optional)* — Bin width in [s] for grouping paths in the delay domain;
-  default: 0 (no grouping)
+- **`threshold`** — Power threshold in [dB] relative to strongest path; paths below threshold are excluded; default: 100
+- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0 (no grouping)
 
 ## Outputs:
 - **`ds`** — RMS delay spread in [s] per CIR; `[n_cir]`
-- **`mean_delay`** *(optional)* — Mean delay in [s] per CIR; `[n_cir]`
+- **`mean_delay`** — Mean delay in [s] per CIR; `[n_cir]`
 
 ## See also:
 - [[quantize_delays]] (for mapping delays to a fixed tap grid)

@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.5"
 author: "Stephan Jaeckel"
-date: "15.05.2026"
+date: "19.05.2026"
 lang: en-US
 ---
 
@@ -16,7 +16,7 @@ lang: en-US
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
 - Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
 - Index conventions: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
-- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
+- Units: angles in radians (degrees only where stated, e.g. `*_deg`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
 - Polarization transfer matrix `M`: 8 rows per path, interleaved real/imaginary, order `[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]`. A 2-row form `[ReVV, ImVV]` is used for scalar (acoustic) fields.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
@@ -98,31 +98,31 @@ lang: en-US
 | [fast_geo2cart](#fast_geo2cart) | Math functions | 2684 |
 | [fast_sincos](#fast_sincos) | Math functions | 2729 |
 | [fast_slerp](#fast_slerp) | Math functions | 2750 |
-| [interp_1D / interp_2D](#interp_1d-interp_2d) | Math functions | 2785 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2856 |
-| [colormap](#colormap) | Site-specific simulation tools | 2906 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2925 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2968 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3006 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3050 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3084 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3119 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3160 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3278 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3309 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3337 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3366 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3405 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3441 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3477 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3562 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3605 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3653 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3697 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3727 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3755 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3796 |
-| [write_png](#write_png) | Site-specific simulation tools | 3831 |
+| [interp_2D](#interp_2d) | Math functions | 2785 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2849 |
+| [colormap](#colormap) | Site-specific simulation tools | 2899 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2918 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2961 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 2999 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3043 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3077 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3112 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3153 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3271 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3302 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3330 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3359 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3398 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3434 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3470 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3555 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3598 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3646 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3690 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3720 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3748 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3789 |
+| [write_png](#write_png) | Site-specific simulation tools | 3824 |
 
 ---
 
@@ -296,7 +296,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec 
 - **`source`** — Index of the element to copy, 0-based
 - **`destination`** — Target index or indices, 0-based; array resizes to fit the maximum index
 
-# See also:
+### See also:
 - [arrayant_copy_element_multi](#arrayant_copy_element_multi) (multi-freq counterpart)
 
 ---
@@ -2782,7 +2782,7 @@ void quadriga_lib::fast_slerp(const arma::vec &Ar, const arma::vec &Ai,
 - **`Xi`** — Imaginary part of interpolated result; `[n_elem]`
 
 ---
-## interp_1D / interp_2D
+## interp_2D
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
@@ -2815,17 +2815,10 @@ arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype>
 - `output`: Interpolated data cube (modified in-place for one variant)
 
 ### Input / Output size details:
-- 2D interpolation of multiple datasets (`arma::Cube`):
-  Input size: `[ny, nx, ne]`, Output size: `[my, mx, ne]`
-
-- 2D interpolation of single dataset (`arma::Mat`):
-  Input size: `[ny, nx]`, Output size: `[my, mx]`
-
-- 1D interpolation of multiple datasets (`arma::Mat`):
-  Input size: `[nx, ne]`, Output size: `[mx, ne]`
-
-- 1D interpolation of single dataset (`arma::Col`):
-  Input length: `[nx]`, Output length: `[mx]`
+- 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
+- 2D interpolation of single dataset (`arma::Mat`): input: `[ny, nx]`; output: `[my, mx]`
+- 1D interpolation of multiple datasets (`arma::Mat`): input: `[nx, ne]`; output: `[mx, ne]`
+- 1D interpolation of single dataset (`arma::Col`): input: `[nx]`, output: `[mx]`
 
 ### Examples:
 - 2D interpolation example:
@@ -3199,7 +3192,7 @@ arma::uword quadriga_lib::obj_file_read(
 - **`mesh`** *(optional)* — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:
   | Index | Symbol | Property                                      |
-  | ----- | ------ | --------------------------------------------- |
+  | :---: | :----: | --------------------------------------------- |
   | 0     | a      | ε_r at fRef                                   |
   | 1     | b      | Frequency exponent for ε_r                    |
   | 2     | c      | σ at fRef [S/m]                               |
@@ -3217,7 +3210,7 @@ arma::uword quadriga_lib::obj_file_read(
 - **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
 - **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:
    | Index | Property                  | Range | Default |
-   | ----- | ------------------------- | ----- | ------- |
+   | :---: | ------------------------- | :---: | ------: |
    | 0     | Base Color Red            | 0–1   | 0.8     |
    | 1     | Base Color Green          | 0–1   | 0.8     |
    | 2     | Base Color Blue           | 0–1   | 0.8     |
@@ -3242,7 +3235,7 @@ arma::uword quadriga_lib::obj_file_read(
 ### Default material table:
 - For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:
   | Name                  | a     | b      | c       | d      | att  | max fGHz |
-  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
+  | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
   | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
   | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |

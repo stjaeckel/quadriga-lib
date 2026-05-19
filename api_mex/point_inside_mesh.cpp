@@ -31,10 +31,9 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 ## Inputs:
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
-- **`distance`** *(optional)* — Surface proximity threshold; points within this distance
-  of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
-  range: 0–20 m; Default: 0
+- **`obj_ind`** — Object index per mesh element; enables per-object output; `[n_mesh]`
+- **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are 
+  classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
 
 ## Output:
 - `**result**`— Indicator: `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object

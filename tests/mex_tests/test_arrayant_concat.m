@@ -1,8 +1,8 @@
 function test_arrayant_concat
 
 % --- Single frequency: basic append (xpol + xpol = 4 elements) ---
-ant1 = quadriga_lib.arrayant_generate('xpol');  % 2 elements
-ant2 = quadriga_lib.arrayant_generate('xpol');  % 2 elements
+ant1 = quadriga_lib.arrayant_generate('xpol', 1);  % 2 elements
+ant2 = quadriga_lib.arrayant_generate('xpol', 1);  % 2 elements
 ant_out = quadriga_lib.arrayant_concat(ant1, ant2);
 
 assert( size(ant_out.e_theta_re, 3) == 4 );

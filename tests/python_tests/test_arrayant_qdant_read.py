@@ -45,7 +45,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(data["elevation_grid"], np.array([-np.pi / 2, -np.pi / 4, 0, np.pi / 4, np.pi / 2]), decimal=13)
         npt.assert_almost_equal(data["element_pos"][:,0], np.array([0, 0, 0]), decimal=13)
         npt.assert_almost_equal(data["coupling_re"], np.array([[1]]), decimal=13)
-        npt.assert_almost_equal(data["center_freq"], 299792448, decimal=13)
+        npt.assert_almost_equal(data["center_freq"], 299792458, decimal=13)
         assert data["name"] == 'bla'
         assert data["layout"] == np.uint32(1)
         

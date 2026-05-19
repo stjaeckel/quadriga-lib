@@ -33,10 +33,10 @@ storage_dims = quadriga_lib.hdf5_write_dset( fn, location, name, data, prefix );
   `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; pass `[]` for default `[1, 1, 1, 1]`
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; string
 - **`data`** — Data to be written; type must be supported (see above); cannot be empty
-- **`prefix`** *(optional)* — Prefix prepended to `name` in the HDF5 file; string; default: `'par_'`
+- **`prefix`** — Prefix prepended to `name` in the HDF5 file; string; default: `'par_'`
 
 ## Outputs:
-- **`storage_dims`** *(optional)* — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
+- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
 
 ## See also:
 - [[hdf5_read_dset_names]] (for reading names of already written datasets)

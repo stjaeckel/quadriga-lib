@@ -16,13 +16,12 @@ Read metadata from a QRT file
 
 - Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count,
   CIR offsets, names, positions, orientations, and file version
-- All output arguments are optional; MATLAB only computes outputs that are requested
 - When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
   `cir_offset` reflect this
 
 ## Usage:
 ```
-[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, freq, ...
+[ no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, ...
      cir_pos, cir_orientation, orig_pos, orig_orientation ] = quadriga_lib.qrt_file_parse( fn );
 ```
 
@@ -38,7 +37,7 @@ Read metadata from a QRT file
 - **`orig_names`** — Names of origin points; cell array of strings; `[no_orig]`
 - **`dest_names`** — Names of destination points; cell array of strings; `[no_dest]`
 - **`version`** — QRT file version number; int32 scalar
-- **`freq`** — Frequencies as stored in the file; usually in GHz; single; `[no_freq]`
+- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); single; `[no_freq]`
 - **`cir_pos`** — CIR positions in Cartesian coordinates; single; `[no_cir, 3]`
 - **`cir_orientation`** — CIR orientations as Euler angles; single; `[no_cir, 3]`
 - **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; single; `[no_orig, 3]`
@@ -61,7 +60,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
-    arma::fvec fGHz;
+    arma::fvec center_freq;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
     // Wrap optional output pointers based on nlhs
@@ -73,7 +72,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> *p_orig_names = (nlhs > 5) ? &orig_names : nullptr;
     std::vector<std::string> *p_dest_names = (nlhs > 6) ? &dest_names : nullptr;
     int *p_version = (nlhs > 7) ? &version : nullptr;
-    arma::fvec *p_fGHz = (nlhs > 8) ? &fGHz : nullptr;
+    arma::fvec *p_center_freq = (nlhs > 8) ? &center_freq : nullptr;
     arma::fmat *p_cir_pos = (nlhs > 9) ? &cir_pos : nullptr;
     arma::fmat *p_cir_orientation = (nlhs > 10) ? &cir_orientation : nullptr;
     arma::fmat *p_orig_pos = (nlhs > 11) ? &orig_pos : nullptr;
@@ -82,7 +81,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Call library function
     CALL_QD(quadriga_lib::qrt_file_parse(fn, p_no_cir, p_no_orig, p_no_dest, p_no_freq,
                                          p_cir_offset, p_orig_names, p_dest_names, p_version,
-                                         p_fGHz, p_cir_pos, p_cir_orientation, p_orig_pos,
+                                         p_center_freq, p_cir_pos, p_cir_orientation, p_orig_pos,
                                          p_orig_orientation));
 
     // Copy to MATLAB
@@ -103,7 +102,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nlhs > 7)
         plhs[7] = qd_mex_copy2matlab(&version);
     if (nlhs > 8)
-        plhs[8] = qd_mex_copy2matlab(&fGHz);
+        plhs[8] = qd_mex_copy2matlab(&center_freq);
     if (nlhs > 9)
         plhs[9] = qd_mex_copy2matlab(&cir_pos);
     if (nlhs > 10)

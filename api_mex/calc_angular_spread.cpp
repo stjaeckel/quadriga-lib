@@ -39,11 +39,9 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 - **`az`** — Azimuth angles; range -pi to pi; `[n_path, n_cir]`
 - **`el`** — Elevation angles; range -pi/2 to pi/2; `[n_path, n_cir]`
 - **`powers`** — Path powers in [W]; `[n_path, n_cir]`
-- **`wrapping`** *(optional)* — If true, enables spherical rotation; default: false
-- **`calc_bank_angle`** *(optional)* — If true, computes optimal bank angle analytically;
-  only used when `wrapping = true`; default: false
-- **`quantize`** *(optional)* — Angular quantization step in [deg]; paths within this
-  distance are grouped; default: 0 (no quantization)
+- **`wrapping`** — If true, enables spherical rotation; default: false
+- **`calc_bank_angle`** — If true, computes optimal bank angle analytically; only used when `wrapping = true`; default: false
+- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0 (no quantization)
 
 ## Outputs:
 - **`as`** — RMS azimuth angular spread; `[n_cir]`
@@ -87,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         az, el, powers, p_as, p_es, p_orient, p_phi, p_theta,
         !wrapping, calc_bank_angle, quantize));
 
-    // --- Write outputs to MATLAB ---
+    // Write outputs to MATLAB
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&azimuth_spread);
     if (nlhs > 1)

@@ -12,14 +12,12 @@ SECTION!*/
 # ARRAYANT_INTERPOLATE
 Interpolate polarimetric array antenna field patterns (single- and multi-frequency)
 
-- Interpolates complex e-theta (V) and e-phi (H) field components at the requested
-  azimuth / elevation angles.
-- Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs);
-  returns up to 8 outputs including the optional `dist`, `azimuth_loc`, `elevation_loc`,
-  and `gamma` as matrices of size `[n_out, n_ang]`
-- Multi-frequency mode is selected automatically when `arrayant` is a struct array with
-  more than one element or when `freq` is non-empty; for each target frequency, the two
-  bracketing `center_freq` entries are located and blended via SLERP.
+- Interpolates complex e-theta (V) and e-phi (H) field components at the requested azimuth / elevation angles.
+- Single-frequency mode: pass a 1-element struct (or arrayant data via separate inputs); returns up to 8 outputs 
+  including the optional `dist`, `azimuth_loc`, `elevation_loc`, and `gamma` as matrices of size `[n_out, n_ang]`
+- Multi-frequency mode is selected automatically when `arrayant` is a struct array with more than one 
+  element or when `freq` is non-empty; for each target frequency, the two bracketing `center_freq` 
+  entries are located and blended via SLERP.
 - Separate arrayant inputs are accepted in single-frequency mode only
 
 ## Usage:
@@ -34,28 +32,25 @@ Interpolate polarimetric array antenna field patterns (single- and multi-frequen
     e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
 
 % Multi-frequency, struct array input
-[V_re, V_im, H_re, H_im] = ...
-    quadriga_lib.arrayant_interpolate( arrayant_multi, azimuth, elevation, element, orientation, element_pos, freq );
+[V_re, V_im, H_re, H_im] = quadriga_lib.arrayant_interpolate( arrayant_multi, azimuth, elevation, ...
+    element, orientation, element_pos, freq );
 ```
 
 ## Inputs:
-- **`arrayant`** *(optional)* — Struct (single-frequency) or struct array (multi-frequency)
-  containing the arrayant data; field layout as in [[arrayant_generate]]. Pass `[]` to provide
-  the data via separate inputs (single-frequency only)
-- **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision;
-  `[1, n_ang]` for planar-wave mode (same angles for all elements) or `[n_out, n_ang]` for
-  per-element angles (spherical-wave mode)
-- **`elevation`** — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must
-  match `azimuth`
-- **`element`** *(optional)* — 1-based element indices to interpolate; duplicates allowed;
-  defaults to `[1:n_elements]` when empty; `[1, n_out]`, `[n_out, 1]`, or `[]`; uint32 or double
-- **`orientation`** *(optional)* — Antenna orientation (bank, tilt, heading) in rad; East is
-  the default broadside; `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]`, `[3, n_out, n_ang]`, or `[]`
-- **`element_pos`** *(optional)* — Override element positions in m; `[3, n_out]` or `[]`;
-  falls back to `arrayant.element_pos` (or zeros) when empty
-- **`freq`** *(optional, struct input only)* — Target frequencies in Hz; `[n_freq]`. When passing a
-  struct array, `freq` may be omitted or `[]`, in which case the `center_freq` values of the struct
-  array entries are used as target frequencies (no interpolation between bands, one output slice per entry).
+- **`arrayant`** — Struct (single-frequency) or struct array (multi-frequency) containing the arrayant data; 
+  field layout as in [[arrayant_generate]]. Pass `[]` to provide the data via separate inputs (single-frequency only)
+- **`azimuth`** — Azimuth angles in rad, in [-π, π]; single or double precision; `[1, n_ang]` for planar-wave mode 
+  (same angles for all elements) or `[n_out, n_ang]` for per-element angles (spherical-wave mode)
+- **`elevation`** — Elevation angles in rad, in [-π/2, π/2]; single or double; shape must match `azimuth`
+- **`element`** — Element indices to interpolate; duplicates allowed; defaults to `[1:n_elements]` 
+  when empty; `[1, n_out]`, `[n_out, 1]`, or `[]`; uint32 or double
+- **`orientation`** — Antenna orientation (bank, tilt, heading) in rad; East is the default broadside; 
+  `[3, 1]`, `[3, n_out]`, `[3, 1, n_ang]`, `[3, n_out, n_ang]`, or `[]`
+- **`element_pos`** — Override element positions in m; `[3, n_out]` or `[]`; falls back to `arrayant.element_pos` 
+  (or zeros) when empty
+- **`freq`** — Target frequencies in Hz; `[n_freq]`. When passing a struct array, `freq` may be omitted or `[]`, 
+  in which case the `center_freq` values of the struct array entries are used  as target frequencies (no 
+  interpolation between bands, one output slice per entry).
 
 ## Inputs (separate arrayant data, required when arrayant is [], single-frequency only):
 - **`e_theta_re`** — e-theta real part; `[n_elevation, n_azimuth, n_elements]`

@@ -26,7 +26,7 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern(arrayant_in, x_deg, y_deg, z
 % Separate-field outputs (single-frequency results only)
 [e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, element_pos, ...
     coupling_re, coupling_im, center_freq, name] = quadriga_lib.arrayant_rotate_pattern( ...
-    arrayant_in, x_deg, y_deg, z_deg, usage, element);
+    arrayant_in, x_deg, y_deg, z_deg, usage, i_element);
 
 % Separate inputs (single-frequency only)
 arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usage, element, ...
@@ -37,20 +37,21 @@ arrayant_out = quadriga_lib.arrayant_rotate_pattern([], x_deg, y_deg, z_deg, usa
 ## Inputs:
 - **`arrayant_in`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array represents a frequency-dependent model
-- **`x_deg`** *(optional)* — Rotation around x-axis (bank) in degrees; default: 0
-- **`y_deg`** *(optional)* — Rotation around y-axis (tilt) in degrees; default: 0
-- **`z_deg`** *(optional)* — Rotation around z-axis (heading) in degrees; default: 0
-- **`usage`** *(optional)* — Rotation mode; default: 0<br><br>
+- **`x_deg`** — Rotation around x-axis (bank) in degrees; default: 0
+- **`y_deg`** — Rotation around y-axis (tilt) in degrees; default: 0
+- **`z_deg`** — Rotation around z-axis (heading) in degrees; default: 0
+- **`usage`** — Rotation mode; default: 0<br><br>
    | Mode | Pattern | Polarization | Grid adj. |
-   | ---- | ------- | ------------ | --------- |
+   | :--: | :-----: | :----------: | :-------: |
    | 0    | Yes     | Yes          | Yes       |
    | 1    | Yes     | No           | Yes       |
    | 2    | No      | Yes          | No        |
    | 3    | Yes     | Yes          | No        |
    | 4    | Yes     | No           | No        |
+
   Multi-frequency input accepts `usage` in {0, 1, 2} and never adjusts the grid (internally maps
   0 → 3 and 1 → 4 for uniform-grid consistency across frequencies).
-- **`i_element`** *(optional)* — 1-based element indices to rotate; defaults to all elements; `[n]`
+- **`i_element`** — 1-based element indices to rotate; defaults to all elements; `[n]`
 
 ## Outputs:
 - **`arrayant_out`** — Arrayant struct (single-frequency result) or struct array (multi-frequency
@@ -138,19 +139,28 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Return to MATLAB
     if (nlhs == 1)
         plhs[0] = qd_mex_arrayant2struct(ant);
-    else if (nlhs == 11)
+    else if (nlhs > 1)
     {
         plhs[0] = qd_mex_copy2matlab(&ant.e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&ant.e_theta_im);
-        plhs[2] = qd_mex_copy2matlab(&ant.e_phi_re);
-        plhs[3] = qd_mex_copy2matlab(&ant.e_phi_im);
-        plhs[4] = qd_mex_copy2matlab(&ant.azimuth_grid, true);
-        plhs[5] = qd_mex_copy2matlab(&ant.elevation_grid, true);
-        plhs[6] = qd_mex_copy2matlab(&ant.element_pos);
-        plhs[7] = qd_mex_copy2matlab(&ant.coupling_re);
-        plhs[8] = qd_mex_copy2matlab(&ant.coupling_im);
-        plhs[9] = qd_mex_copy2matlab(&ant.center_frequency);
-        plhs[10] = mxCreateString(ant.name.c_str());
+        if (nlhs > 2)
+            plhs[2] = qd_mex_copy2matlab(&ant.e_phi_re);
+        if (nlhs > 3)
+            plhs[3] = qd_mex_copy2matlab(&ant.e_phi_im);
+        if (nlhs > 4)
+            plhs[4] = qd_mex_copy2matlab(&ant.azimuth_grid, true);
+        if (nlhs > 5)
+            plhs[5] = qd_mex_copy2matlab(&ant.elevation_grid, true);
+        if (nlhs > 6)
+            plhs[6] = qd_mex_copy2matlab(&ant.element_pos);
+        if (nlhs > 7)
+            plhs[7] = qd_mex_copy2matlab(&ant.coupling_re);
+        if (nlhs > 8)
+            plhs[8] = qd_mex_copy2matlab(&ant.coupling_im);
+        if (nlhs > 9)
+            plhs[9] = qd_mex_copy2matlab(&ant.center_frequency);
+        if (nlhs > 10)
+            plhs[10] = mxCreateString(ant.name.c_str());
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");

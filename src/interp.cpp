@@ -9,7 +9,7 @@ Math functions
 SECTION!*/
 
 /*!MD
-# interp_1D / interp_2D
+# interp_2D
 Perform linear interpolation (1D or 2D) on single or multiple data sets
 
 - Interpolates given input data at specified output points.
@@ -42,17 +42,10 @@ arma::Col<dtype> interp_1D(const arma::Col<dtype> &input, const arma::Col<dtype>
 - `output`: Interpolated data cube (modified in-place for one variant)
 
 ## Input / Output size details:
-- 2D interpolation of multiple datasets (`arma::Cube`):<br>
-  Input size: `[ny, nx, ne]`, Output size: `[my, mx, ne]`
-
-- 2D interpolation of single dataset (`arma::Mat`):<br>
-  Input size: `[ny, nx]`, Output size: `[my, mx]`
-
-- 1D interpolation of multiple datasets (`arma::Mat`):<br>
-  Input size: `[nx, ne]`, Output size: `[mx, ne]`
-
-- 1D interpolation of single dataset (`arma::Col`):<br>
-  Input length: `[nx]`, Output length: `[mx]`
+- 2D interpolation of multiple datasets (`arma::Cube`): input: `[ny, nx, ne]`; output: `[my, mx, ne]`
+- 2D interpolation of single dataset (`arma::Mat`): input: `[ny, nx]`; output: `[my, mx]`
+- 1D interpolation of multiple datasets (`arma::Mat`): input: `[nx, ne]`; output: `[mx, ne]`
+- 1D interpolation of single dataset (`arma::Col`): input: `[nx]`, output: `[mx]`
 
 ## Examples:
 - 2D interpolation example:

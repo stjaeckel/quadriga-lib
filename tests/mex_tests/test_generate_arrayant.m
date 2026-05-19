@@ -172,13 +172,13 @@ data = quadriga_lib.arrayant_generate('multibeam_sep', 10, [], [], [], [], 1, 4,
 % With separate_beams=true, expect n_ports > 1 in coupling matrix
 assert( size(data.coupling_re, 2) == 2 );
 
-% --- multibeam: beam_angles with only 1 row should error ---
+% --- multibeam: dir with only 1 row should error ---
 try
     bad = [0];  % only azimuth, no elevation
     data = quadriga_lib.arrayant_generate('multibeam', 10, [], [], [], [], 1, 4, 1, bad);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''beam_angles'' must have at least 2 rows';
+    expectedErrorMessage = 'Input ''dir'' must have at least 2 rows';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

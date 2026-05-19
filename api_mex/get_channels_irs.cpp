@@ -23,7 +23,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delays, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
+[ coeff_re, coeff_im, delay, active_path_out, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_irs( ...
     ant_tx, ant_rx, ant_irs, ...
     fbs_pos_1, lbs_pos_1, path_gain_1, path_length_1, M_1, ...
     fbs_pos_2, lbs_pos_2, path_gain_2, path_length_2, M_2, ...
@@ -39,8 +39,7 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`lbs_pos_1`** — Last-bounce scatterer positions for TX → IRS paths; `[3, n_path_1]`
 - **`path_gain_1`** — Path gains in linear scale for TX → IRS paths; `[n_path_1, 1]`
 - **`path_length_1`** — Total path lengths from TX to IRS phase center for TX → IRS paths; `[n_path_1, 1]`
-- **`M_1`** — Polarization transfer matrix for TX → IRS paths, interleaved
-  (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path_1]`
+- **`M_1`** — Polarization transfer matrix for TX → IRS paths, interleaved (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH); `[8, n_path_1]`
 - **`fbs_pos_2`** — First-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`lbs_pos_2`** — Last-bounce scatterer positions for IRS → RX paths; `[3, n_path_2]`
 - **`path_gain_2`** — Path gains in linear scale for IRS → RX paths; `[n_path_2, 1]`
@@ -52,24 +51,22 @@ Calculate MIMO channel coefficients for IRS-assisted communication
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`irs_pos`** — IRS position; `[3, 1]`
 - **`irs_orientation`** — IRS orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`i_irs`** *(optional)* — IRS codebook port index; default: `0`
-- **`threshold_dB`** *(optional)* — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: `0`
-- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component; default: `false`
-- **`active_path_in`** *(optional)* — Bitmask selecting active path pairs; overrides `threshold_dB`
-  when non-empty; logical; `[n_path_1 · n_path_2, 1]`
-- **`ant_irs_2`** *(optional)* — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
+- **`i_irs`** — IRS codebook port index; default: `0`
+- **`threshold_dB`** — Gain threshold in dB; path combinations below this are discarded; dB; default: `-140`
+- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: `0`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
+- **`active_path_in`** — Bitmask selecting active path pairs; overrides `threshold_dB` when non-empty; logical; `[n_path_1 · n_path_2, 1]`
+- **`ant_irs_2`** — Second IRS antenna array for the RX-facing side; enables asymmetric IRS patterns
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
 - **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path_irs]`
-- **`delays`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_irs]`
-- **`active_path_out`** *(optional)* — Bitmask indicating which path combinations were included in
-  the output; logical; `[n_path_1 · n_path_2, 1]`
-- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path_irs]`
-- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
-- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
-- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
+- **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path_irs]`
+- **`active_path_out`** — Bitmask indicating which path combinations were included in the output; logical; `[n_path_1 · n_path_2, 1]`
+- **`aod`** — Azimuth of departure; `[n_rx, n_tx, n_path_irs]`
+- **`eod`** — Elevation of departure; `[n_rx, n_tx, n_path_irs]`
+- **`aoa`** — Azimuth of arrival; `[n_rx, n_tx, n_path_irs]`
+- **`eoa`** — Elevation of arrival; `[n_rx, n_tx, n_path_irs]`
 
 ## See also:
 - [[get_channels_spherical]] (single-segment spherical-wave channel)

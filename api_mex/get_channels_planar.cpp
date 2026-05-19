@@ -17,13 +17,13 @@ Calculate MIMO channel coefficients for planar wave paths
 - LOS path detection is distance-based (angles ignored).
 - Polarization transfer matrix `M` must be normalized; rows are interleaved real/imag components.
 - If `add_fake_los_path` is true, a zero-power LOS path is appended, making output size `n_path+1`.
-- Setting `center_frequency = 0` disables phase calculation (delays still computed).
+- Setting `center_freq = 0` disables phase calculation (delays still computed).
 - `use_absolute_delays = false` subtracts the straight-line TX↔RX distance from all path lengths before
   converting to delay.
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delays, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
+[ coeff_re, coeff_im, delay, rx_Doppler ] = quadriga_lib.get_channels_planar( tx_array, rx_array, ...
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
     center_freq, use_absolute_delays, add_fake_los_path );
 ```
@@ -42,9 +42,9 @@ Calculate MIMO channel coefficients for planar wave paths
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` or skip/leave empty to skip phase computation
-- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component; Default: `false`
-- **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
+- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
 
 
 ## Outputs:
@@ -56,7 +56,7 @@ Calculate MIMO channel coefficients for planar wave paths
 ## See also:
 - [[get_channels_spherical]] (spherical wave variant accounting for per-element angle differences)
 - [[get_channels_ieee_indoor]] (for generating IEEE compliant channels using `get_channels_planar` internally)
-- [[arrayant_generate]] (antenna array geneartor)
+- [[arrayant_generate]] (antenna array generator)
 - [[baseband_freq_response]] (for calculating the frequency response)
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/

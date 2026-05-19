@@ -32,18 +32,11 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ## Inputs (struct mode):
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the directivity is
-  calculated for all elements; uint64; `[n_out]` or empty
+- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
 
 ## Inputs (split mode):
-- **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_theta_im`** — e-theta field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_re`** — e-phi field component, real part; `[n_elevation, n_azimuth, n_elements]`
-- **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
-- **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
-- **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
-- **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the directivity is
-  calculated for all elements; uint64; `[n_out]` or empty
+- split mode accepts `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`
+  in place of arrayant; see [[arrayant_calc_beamwidth]]
 
 ## Output:
 - **`directivity`** - Directivity of the antenna pattern in dBi; `[n_out, n_freq]`;
@@ -51,6 +44,7 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 
 ## See also:
 - [[arrayant_combine_pattern]] (to apply element coupling before calculating directivity)
+- [[arrayant_calc_beamwidth]] (calculates the beam width of array antennas)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

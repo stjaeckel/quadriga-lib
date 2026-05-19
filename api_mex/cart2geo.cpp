@@ -26,23 +26,23 @@ Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector
 ```
 
 ## Inputs:
-- **`x`** — X-coordinates or combined input; `[n, m]` or `[3, n, m]`
-- **`y`** — Y-coordinates; `[n, m]` or empty
-- **`z`** — Z-coordinates; `[n, m]` or empty
-- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
-  1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
+- **`x`** — X-coordinates or combined input; `[n, m]` or `[3, n, m]`; 
+- **`y`** — Y-coordinates; `[n, m]` or empty; ignored for combined input
+- **`z`** — Z-coordinates; `[n, m]` or empty; ignored for combined input
+- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 
+  (throws if AVX2 unavailable); default: 1
 
 ## Outputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** *(optional)* — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
+- **`len`** — Euclidean vector length `sqrt(x² + y² + z²)`; `[n, m]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 4)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
     if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 

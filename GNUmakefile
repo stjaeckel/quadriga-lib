@@ -8,7 +8,7 @@ static_lib = ON
 shared_lib = OFF
 octave = ON
 matlab = ON
-python = OFF
+python = ON
 avx2 = ON
 cuda = OFF
 
@@ -108,6 +108,7 @@ documentation:
 	python3 tools/extract_html.py -o html_docu/download.html -p tools/html_parts/download.html.part -d tools/download_md/ -c
 
 	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
+	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master

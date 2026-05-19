@@ -32,7 +32,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 - **`center_frequency`** — Center frequency in Hz
 - **`lod`** — Level of detail; controls `n_path` and `n_seg`:<br><br>
    | `lod` | `n_path` | `n_seg` | Note  |
-   | ----- | -------- | ------- | ----- |
+   | :---: | -------: | ------: | ----: |
    | 1     | 7        | 3       | -     |
    | 2     | 19       | 3       | -     |
    | 3     | 37       | 4       | -     |
@@ -43,7 +43,7 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 ## Outputs:
 - **`rays`** — Coordinates of path waypoints (x, y, z stacked along the 4th dimension, endpoints
   excluded); `[n_pos, n_path, n_seg-1, 3]`
-- **`weights`** *(optional)* — Per-segment weights; `[n_pos, n_path, n_seg]`
+- **`weights`** — Per-segment weights; `[n_pos, n_path, n_seg]`
 
 ## See also:
 - [[calc_diffraction_gain]] (consumes the output of this function)

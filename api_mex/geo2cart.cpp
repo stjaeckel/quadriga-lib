@@ -25,31 +25,30 @@ Convert elementwise azimuth/elevation angles to Cartesian coordinates
 ## Usage:
 ```
 split = true;
-[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+[ x, y, z, sAZ, cAZ, sEL, cEL ] = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
 
 split = false;
-cart = quadriga_lib.fast_geo2cart( az, el, len, use_kernel, split );
+cart = quadriga_lib.geo2cart( az, el, len, use_kernel, split );
 ```
 
 ## Inputs:
 - **`az`** — Azimuth angles in radians; `[n, m]`
 - **`el`** — Elevation angles in radians; `[n, m]`
-- **`len`** *(optional)* — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
-- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
+- **`len`** — Euclidean vector length sqrt(x^2 + y^2 + z^2); `[n, m]`; default: 1
+- **`use_kernel`** — Kernel selection: 0 = auto (AVX2 if available, else GENERIC),
   1 = GENERIC, 2 = AVX2 (throws if AVX2 unavailable); default: 1
-- **`split`** *(optional)* — If true, return x/y/z and optional sin/cos as separate `[n, m]`
-  matrices. If false, return a single combined `[3, n, m]` cube; sin/cos outputs unavailable
-  in this mode; default: false
+- **`split`** — If true, return x/y/z and optional sin/cos as separate `[n, m]` matrices. If false, 
+  return a single combined `[3, n, m]` cube; sin/cos outputs unavailable in this mode; default: false
 
 ## Outputs:
-- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube
-  with components along the first dim, `[3, n, m]`
+- **`x_or_cart`** — If `split=true`: X-coordinates `[n, m]`. If `split=false`: combined cube with components 
+  along the first dim, `[3, n, m]`
 - **`y`** — Y-coordinates; `[n, m]` or empty
 - **`z`** — Z-coordinates; `[n, m]` or empty
-- **`sAZ`** *(optional)* — sin(az); `[n, m]` or empty
-- **`cAZ`** *(optional)* — cos(az); `[n, m]` or empty
-- **`sEL`** *(optional)* — sin(el); `[n, m]` or empty
-- **`cEL`** *(optional)* — cos(el); `[n, m]` or empty
+- **`sAZ`** — sin(az); `[n, m]` or empty
+- **`cAZ`** — cos(az); `[n, m]` or empty
+- **`sEL`** — sin(el); `[n, m]` or empty
+- **`cEL`** — cos(el); `[n, m]` or empty
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

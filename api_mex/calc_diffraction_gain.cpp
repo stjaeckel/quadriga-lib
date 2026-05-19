@@ -24,7 +24,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ## Usage:
 ```
 [ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_prop, ...
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
 ```
 
 ## Inputs:
@@ -32,16 +32,17 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `[n_mesh, 9]`
 - **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
-- **`center_frequency`** — Center frequency
-- **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
-- **`verbose`** *(optional)* — Verbosity level
-- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]]; `[n_mesh, 1]`
-- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
+- **`center_freq`** — Center frequency
+- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]; default: 2
+- **`verbose`** — Verbosity level; default: 0 (no output)
+- **`sub_mesh_index`** — 1-based sub-mesh index for acceleration; see [[triangle_mesh_segmentation]];  `[n_mesh, 1]`;
+  default: `[]` (not using sub-meshes)
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
+- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
 
 ## Outputs:
-- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `[n_pos, 1]`
-- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
+- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos, 1]`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:
 - [[generate_diffraction_paths]] (controls path/segment count via `lod`)

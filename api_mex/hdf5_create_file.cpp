@@ -28,11 +28,11 @@ storage_space = quadriga_lib.hdf5_create_file( fn, storage_dims );
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file to create; string
-- **`storage_dims`** *(optional)* — Size of the storage layout; vector with 1-4 elements,
-  i.e. `[nx]`, `[nx, ny]`, `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
+- **`storage_dims`** — Size of the storage layout; vector with 1-4 elements, i.e. `[nx]`, `[nx, ny]`, 
+  `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
 
 ## Output:
-- **`storage_space`** *(optional)* — Actual storage dimensions used; `[4]`; uint32
+- **`storage_space`** — Actual storage dimensions used; `[4]`; uint32
 
 ## See also:
 - [[hdf5_write_channel]] (for writing channel data)
