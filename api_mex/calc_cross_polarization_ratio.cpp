@@ -14,25 +14,20 @@ SECTION!*/
 # CALC_CROSS_POLARIZATION_RATIO
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
-- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio
-  method: co-pol and cross-pol powers are summed across all qualifying paths per CIR, and
-  XPR is their ratio
-- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the
-  Jones matrix transform `M_circ = T * M_lin * T^-1`
-- LOS paths are identified by comparing path length against the direct TX-RX distance
-  `dTR`; paths with `path_length < dTR + window_size` are excluded by default
-- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary
-  parts, 8 rows per path:
+- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method: co-pol 
+  and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix transform `M_circ = T * M_lin * T^-1`
+- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths with 
+  `path_length < dTR + window_size` are excluded by default
+- Polarization transfer matrix `M` is stored column-major with interleaved real/imaginary parts, 8 rows per path:
   `[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]`
 - Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
-- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are
-  zero, XPR is set to 0
+- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR is set to 0
 - TX/RX positions may be fixed `[3, 1]` or mobile `[3, n_cir]`
 
 ## Usage:
 ```
-[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, ...
-    tx_pos, rx_pos, include_los, window_size );
+[ xpr, pg ] = quadriga_lib.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size );
 ```
 
 ## Inputs:
@@ -41,22 +36,20 @@ Calculate the cross-polarization ratio (XPR) for linear and circular polarizatio
 - **`path_length`** — Absolute TX-to-RX path lengths; `[n_path, n_cir]`
 - **`tx_pos`** — Transmitter position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
 - **`rx_pos`** — Receiver position [x; y; z]; `[3, 1]` (fixed) or `[3, n_cir]` (mobile)
-- **`include_los`** *(optional)* — If true, includes LOS and near-LOS paths in the XPR
-  calculation; default: false
-- **`window_size`** *(optional)* — LOS exclusion window; paths within `dTR + window_size`
-  are excluded when `include_los = false`; default: 0.01
+- **`include_los`** — If true, includes LOS and near-LOS paths in the XPR calculation; default: false
+- **`window_size`** — LOS exclusion window; paths within `dTR + window_size` are excluded when `include_los = false`; default: 0.01
 
 ## Outputs:
-- **`xpr`** *(optional)* — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
+- **`xpr`** — XPR on linear scale; `[n_cir, 6]`; columns:<br><br>
    | Col | Description                                                     |
-   | --- | --------------------------------------------------------------- |
+   | :-: | --------------------------------------------------------------- |
    | 1   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
    | 2   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
    | 3   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
    | 4   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
    | 5   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
    | 6   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
-- **`pg`** *(optional)* — Total path gain summed over all paths (including LOS) as
+- **`pg`** — Total path gain summed over all paths (including LOS) as 
   `0.5 * sum(powers * (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `[n_cir]`
 MD!*/
 

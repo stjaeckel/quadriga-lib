@@ -18,7 +18,7 @@ Writes array antenna data to QDANT files
   the returned `id_in_file` identifies its location in the file
 - An optional `layout` can be provided to organize the data inside the file
 - Passing a struct array (multiple elements) writes a frequency-dependent model with sequential
-  1-based IDs; in this mode any existing file is overwritten and `id`/`layout` must be omitted
+  1-based IDs; in this mode appending to an exisiting file is not allowed and will cause an error
 
 ## Usage:
 ```
@@ -32,13 +32,12 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 
 ## Inputs:
 - **`fn`** — Output QDANT filename; string; must not be empty
-- **`arrayant`** *(optional)* — Struct containing the arrayant data; field layout as documented
-  in [[arrayant_generate]]; pass `[]` to provide the data via separate inputs instead; a struct
-  array writes a frequency-dependent model and requires `id` and `layout` to be omitted
-- **`id`** *(optional)* — Target ID of the antenna inside the file; default: max-ID in existing
-  file + 1 (or 1 if the file does not exist)
-- **`layout`** *(optional)* — Matrix organizing multiple antenna IDs within the file; must only
-  reference IDs present in the file; datatype: uint32
+- **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]]; 
+  pass `[]` to provide the data via separate inputs instead; a struct array writes a frequency-dependent 
+  model and requires `id` and `layout` to be omitted
+- **`id`** — Target ID of the antenna inside the file; default: max-ID in existing file + 1 (or 1 if the file does not exist);
+  ignored for multi-frequency model
+- **`layout`** — Matrix organizing multiple antenna IDs within the file; must only reference IDs present in the file; uint32
 
 ## Inputs (separate arrayant data, required when `arrayant` is `[]`):
 - **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
@@ -47,15 +46,14 @@ id_in_file = quadriga_lib.arrayant_qdant_write( fn, [], id, layout, e_theta_re, 
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
 - **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
-- **`element_pos`** *(optional)* — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
-- **`coupling_re`** *(optional)* — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
-- **`coupling_im`** *(optional)* — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
-- **`center_freq`** *(optional)* — Center frequency in Hz; default: 299792458
-- **`name`** *(optional)* — Name of the array antenna object; string
+- **`element_pos`** — Element (x,y,z) positions; `[3, n_elements]`; default: zeros
+- **`coupling_re`** — Coupling matrix, real part; `[n_elements, n_ports]`; default: identity
+- **`coupling_im`** — Coupling matrix, imaginary part; `[n_elements, n_ports]`; default: zeros
+- **`center_freq`** — Center frequency in Hz; default: 299792458
+- **`name`** — Name of the array antenna object; string
 
 ## Outputs:
-- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in
-  multi-frequency (struct array) mode
+- **`id_in_file`** — ID assigned to the antenna in the file after writing; set to 0 in multi-frequency (struct array) mode
 
 ## See also:
 - [[arrayant_qdant_read]] (for reading QDANT data)
@@ -124,6 +122,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     else
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
+    // Check if files exisits in multi-freq mode and trow error if yes
+    if (is_multi && std::filesystem::exists(fn))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "File exisits. Appending a multi-frequency arrays to an aeisting file is not allowed.");
 
     // Write to file
     if (is_multi)

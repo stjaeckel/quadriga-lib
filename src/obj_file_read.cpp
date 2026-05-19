@@ -238,7 +238,7 @@ arma::uword quadriga_lib::obj_file_read(
 - **`mesh`** *(optional)* — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
 - **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
-  | ----- | ------ | --------------------------------------------- |
+  | :---: | :----: | --------------------------------------------- |
   | 0     | a      | ε_r at fRef                                   |
   | 1     | b      | Frequency exponent for ε_r                    |
   | 2     | c      | σ at fRef [S/m]                               |
@@ -256,7 +256,7 @@ arma::uword quadriga_lib::obj_file_read(
 - **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
 - **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
    | Index | Property                  | Range | Default |
-   | ----- | ------------------------- | ----- | ------- |
+   | :---: | ------------------------- | :---: | ------: |
    | 0     | Base Color Red            | 0–1   | 0.8     |
    | 1     | Base Color Green          | 0–1   | 0.8     |
    | 2     | Base Color Blue           | 0–1   | 0.8     |
@@ -281,7 +281,7 @@ arma::uword quadriga_lib::obj_file_read(
 ## Default material table:
 - For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:<br><br>
   | Name                  | a     | b      | c       | d      | att  | max fGHz |
-  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
+  | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
   | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
   | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |

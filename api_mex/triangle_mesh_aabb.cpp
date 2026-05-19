@@ -27,10 +27,9 @@ aabb = quadriga_lib.triangle_mesh_aabb( mesh, sub_mesh_index, vec_size );
 
 ## Inputs:
 - **`mesh`** — Triangle mesh vertices in global Cartesian coordinates; `[n_triangles, 9]`
-- **`sub_mesh_index`** *(optional)* — 1-based start indices of sub-meshes; if omitted, the AABB
-  of the entire mesh is returned; uint32; `[n_sub]`
-- **`vec_size`** *(optional)* — Alignment size for SIMD/CUDA padding (e.g., `8` for AVX2, `32`
-  for CUDA); default: 1
+- **`sub_mesh_index`** — Start indices of sub-meshes in `mesh`; use [[triangle_mesh_segmentation]] to generate; 
+  `[n_sub]` or empty; default: `[]` (returns AABB of the entire mesh)
+- **`vec_size`** — Alignment size for SIMD/CUDA padding (e.g., 8 for AVX2); default: 1
 
 ## Output:
 - **`aabb`** — Axis-aligned bounding boxes, one row per sub-mesh; `[n_sub_aligned, 6]`

@@ -26,11 +26,11 @@ Subdivide triangles into smaller triangles
 ## Inputs:
 - **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
 - **`n_div`** — Number of subdivisions per edge
-- **`mtl_prop`** *(optional)* — Material properties; see `obj_file_read`; `[n_triangles_in, 9]`
+- **`mtl_prop_in`** — Material properties; see `obj_file_read`; `[n_triangles_in, 9]`; default: `[]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 9]`
+- **`mtl_prop_out`** — Material properties for subdivided triangles; `[n_triangles_out, 9]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

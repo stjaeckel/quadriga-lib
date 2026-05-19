@@ -21,29 +21,27 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, ...
-    radius_min, n_edges, rx_position, tx_position, no_interact, interact_coord, center_freq, ...
-    coeff_re, coeff_im, i_snap );
+quadriga_lib.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max,  radius_min, ...
+    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff_re, coeff_im, i_snap );
 ```
 
 ## Inputs:
 - **`fn`** — Output `.obj` file path
-- **`max_no_paths`** *(optional)* — Max paths to export; 0 includes all paths above `gain_min`; default: 0
-- **`gain_max`** *(optional)* — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
-- **`gain_min`** *(optional)* — Lower gain threshold in dB; paths below this are excluded; default: -140.0
-- **`colormap`** *(optional)* — Colormap name; supported: jet, parula, winter, hot, turbo, copper, 
-  spring, cool, gray, autumn, summer; default: jet
-- **`radius_max`** *(optional)* — Tube radius at maximum gain; default: 0.05
-- **`radius_min`** *(optional)* — Tube radius at minimum gain; default: 0.01
-- **`n_edges`** *(optional)* — Vertices per tube cross-section; must be >= 3; default: 5
-- **`rx_position`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
-- **`tx_position`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
+- **`max_no_paths`** — Max paths to export; 0 includes all paths above `gain_min`; default: 0
+- **`gain_max`** — Upper gain threshold in dB for color/radius mapping; higher values are clipped; default: -60.0
+- **`gain_min`** — Lower gain threshold in dB; paths below this are excluded; default: -140.0
+- **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
+- **`radius_max`** — Tube radius at maximum gain; default: 0.05
+- **`radius_min`** — Tube radius at minimum gain; default: 0.01
+- **`n_edges`** — Vertices per tube cross-section; must be >= 3; default: 5
+- **`rx_pos`** — Receiver positions; `[3, n_snap]` or `[3, 1]`
+- **`tx_pos`** — Transmitter positions; `[3, n_snap]` or `[3, 1]`
 - **`no_interact`** — Number of interaction points of paths with the environment; uint32; `[n_path, n_snap]`
 - **`interact_coord`** — Interaction coordinates; `[3, max(sum(no_interact)), n_snap]`
-- **`center_freq`** — Center frequency; unit: Hz; `[n_snap]` or scalar
+- **`center_freq`** — Center frequency in Hz; `[n_snap]` or scalar
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
 - **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
-- **`i_snap`** *(optional)* — 1-based snapshot indices to include; range [1 ... n_snap]; empty exports all
+- **`i_snap`** — Snapshot indices to include; range [1 ... n_snap]; empty exports all
 
 ## Outputs:
 - This function writes the OBJ file directly to disk and does not return any data

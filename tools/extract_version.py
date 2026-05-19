@@ -46,7 +46,7 @@ def update_html_first_line(html_path, heading):
         sys.exit(1)
 
     # Format the new first line
-    new_first_line = f"<big><b>{heading}</b></big>\n"
+    new_first_line = f'<span class="qd-heading"><b>{heading}</b></span>\n'
 
     if not lines:
         # If file is empty, just write the new heading as the only line

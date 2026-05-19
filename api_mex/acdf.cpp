@@ -11,12 +11,12 @@ Channel statistics
 SECTION!*/
 
 /*!MD
-# acdf
+# ACDF
 Calculate the empirical averaged cumulative distribution function (CDF)
 
 - Computes per-column empirical CDFs by histogramming into bins and taking the normalized cumulative sum
-- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each column CDF are averaged,
-  then mapped back to the bin grid
+- Averaged CDF is obtained by quantile-space averaging: for a fine probability grid, x-values from each 
+  column CDF are averaged, then mapped back to the bin grid
 - Quantile statistics (mean and std) are reported at the 0.1, 0.2, ..., 0.9 probability levels
 - `Inf` and `NaN` values are excluded from computation
 - If `bins` is empty, equally spaced bins spanning the data range are generated
@@ -27,25 +27,26 @@ Calculate the empirical averaged cumulative distribution function (CDF)
 ```
 
 ## Inputs:
-- **`data`** — Input data matrix; each column is one independent data set, `[n_samples, n_sets]`
-- **`bins_in`** *(optional)* — Bin centers; used as-is if non-empty, `[n_bins_in]`
-- **`n_bins`** *(optional)* — Number of bins when auto-generating; must be >= 2; ignored when
-  non-empty `bins_in` are provided
+- **`data`** — Input data matrix; each column is one independent data set; `[n_samples, n_sets]`
+- **`bins_in`** — Bin centers; used as-is if non-empty; if empty, equally spaced bins spanning the 
+  data range are generated; `[n_bins_in]` or empty; default: `[]`
+- **`n_bins`** — Number of bins when auto-generating; must be >= 2; ignored when non-empty `bins_in` 
+  are provided; default: 201
 
 ## Outputs:
-- **`cdf_per_set`** *(optional)* — Individual CDFs, one per column of data, `[n_bins_out, n_sets]`
-- **`bins_out`** *(optional)* — Auto-generated bins; copy of `bins_in` when
-  non-empty `bins_in` are provided, `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
-- **`cdf_avg`** *(optional)* — Averaged CDF via quantile-space averaging across data sets, `[n_bins]`
-- **`mu`** *(optional)* — Mean of the 0.1–0.9 quantiles across data sets, `[9]`
-- **`sig`** *(optional)* — Standard deviation of the 0.1–0.9 quantiles across data sets, `[9]`
+- **`cdf_per_set`** — Individual CDFs; one per column of data; `[n_bins_out, n_sets]`
+- **`bins_out`** — Auto-generated bins; copy of `bins_in` when non-empty `bins_in` are provided;
+  `[n_bins_out = n_bins]` or `[n_bins_out = n_bins_in]`
+- **`cdf_avg`** — Averaged CDF via quantile-space averaging across data sets; `[n_bins]`
+- **`mu`** — Mean of the 0.1–0.9 quantiles across data sets; `[9]`
+- **`sig`** — Standard deviation of the 0.1–0.9 quantiles across data sets; `[9]`
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs < 1 || nrhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
     if (nlhs > 5)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 

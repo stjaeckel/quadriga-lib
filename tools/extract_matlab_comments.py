@@ -5,19 +5,26 @@ def markdown_converter(content_md):
     lines = content_md.split('\n')
     content_mat = []
 
-    for line in lines:
+    for ind, line in enumerate(lines):
         # Check if line starts with a heading syntax (e.g., #, ##, ###, etc.)
-        if line.startswith('```'):
+        if ind < 2:
+            content_mat.append('% ' + line)
+        elif line.startswith('```'):
             line = line.replace('`', '')
         elif line.startswith('#'):
             line = line.replace('#', '')
+            line = line.replace('<br>', '')
             content_mat.append('%' + line)
+        elif line.lstrip().startswith('|'):
+            line = line.replace('*', ' ')
+            line = line.replace('`', ' ')
+            content_mat.append('%   ' + line)
         else:
             line = line.replace('<br>', '')
             line = line.replace('*', '')
             line = line.replace('`', '')
             line = re.sub(r'<a href=[^>]*>([^<]*)<\/a>', r'\1', line)
-            content_mat.append('%    ' + line)
+            content_mat.append('%   ' + line)
    
     return '\n'.join(content_mat)
 

@@ -29,19 +29,20 @@ storage_dims = quadriga_lib.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw );
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; string
 - **`chan`** — Structured channel data; non-empty struct array; field layout matches [[hdf5_read_channel]]
-- **`par`** *(optional)* — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
+- **`par`** — Unstructured data; struct array of the same size as `chan`. Field names become HDF5 dataset
   names per slot (each prefixed with `par_`). Empty fields are skipped. Pass `[]` or omit to disable.
-- **`ix`** *(optional)* — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default `1:numel(chan)`
-- **`iy`** *(optional)* — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default `1`
-- **`iz`** *(optional)* — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default `1`
-- **`iw`** *(optional)* — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default `1`
+- **`ix`** — 1-based slot index along dimension X; scalar or vector of length `numel(chan)`; default `1:numel(chan)`
+- **`iy`** — 1-based slot index along dimension Y; scalar or vector of length `numel(chan)`; default `1`
+- **`iz`** — 1-based slot index along dimension Z; scalar or vector of length `numel(chan)`; default `1`
+- **`iw`** — 1-based slot index along dimension W; scalar or vector of length `numel(chan)`; default `1`
 
 ## Outputs:
-- **`storage_dims`** *(optional)* — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
+- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `[4]`; uint32
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)
 - [[hdf5_reshape_layout]] (to change the layout later)
+- [[hdf5_read_channel]] (for reading channel data)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

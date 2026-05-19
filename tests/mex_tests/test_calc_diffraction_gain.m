@@ -49,10 +49,10 @@ assertElementsAlmostEqual( gain_only, gain_single, 'absolute', 1e-5 );
 
 % Empty sub-mesh index
 [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, [] );
-[~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32(0) );
+[~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, 1 );
 
 % sub_mesh_index with non-uint32 numeric (typecast path in new wrapper)
-gain_smi = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, int32(0) );
+gain_smi = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, 1 );
 assertElementsAlmostEqual( gain, gain_smi, 'absolute', 1e-14 );
 
 % use_kernel = 1 (GENERIC), should match default
@@ -179,7 +179,7 @@ end
 
 % Error: sub_mesh_index first element not 0
 try
-    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32(1));
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, 2);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'First sub-mesh must start at index 0.';
@@ -190,7 +190,7 @@ end
 
 % Error: sub_mesh_index exceeds mesh count
 try
-    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, uint32([0,32]));
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop, 1e9, 0, 0, [1,33]);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
     expectedErrorMessage = 'Sub-mesh indices cannot exceed number of faces.';

@@ -12,19 +12,15 @@ SECTION!*/
 # GET_CHANNELS_MULTIFREQ
 Compute channel coefficients for spherical waves across multiple frequencies
 
-- Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, 
-  path gains, and Jones matrices
+- Multi-frequency extension of [[get_channels_spherical]] with frequency-dependent antenna patterns, path gains, and Jones matrices
 - Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies
-- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input
-  samples (`freq_in`), and output (`freq_out`)
+- Aligns four frequency grids: TX array (from each `tx_array.center_freq`), RX array, input samples (`freq_in`), and output (`freq_out`)
 - TX/RX patterns are interpolated per output frequency via SLERP with linear fallback
 - `path_gain` is interpolated linearly; `M` is interpolated via SLERP per complex entry pair to preserve phase
 - Extrapolation clamps to the nearest frequency entry on all four grids
-- `propagation_speed` supports EM (speed of light, default) and acoustic (~343 m/s) simulations
-- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows
-  (scalar pressure: ReVV, ImVV only)
-- Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to
-  antenna pattern handling
+- `propagation_speed` supports EM (speed of light, default) and acoustic (343 m/s) simulations
+- `M` accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)
+- Coupling matrices are interpolated across frequencies (SLERP for complex pairs), identical to antenna pattern handling
 - `n_path_out = n_path + 1` if `add_fake_los_path` else `n_path`
 
 ## Usage:
@@ -48,9 +44,9 @@ Compute channel coefficients for spherical waves across multiple frequencies
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`freq_in`** — Input sample frequencies for `path_gain` and `M`; `[n_freq_in, 1]`
 - **`freq_out`** — Target output frequencies; `[n_freq_out, 1]`
-- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component; default: `false`
-- **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present; default: `false`
-- **`propagation_speed`** *(optional)* — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; default: `false`
+- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; default: `false`
+- **`propagation_speed`** — Wave speed in m/s; use ~343.0 for acoustics; default: `299792458.0`
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path_out, n_freq_out]`

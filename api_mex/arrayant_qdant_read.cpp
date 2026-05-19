@@ -12,14 +12,12 @@ SECTION!*/
 # ARRAYANT_QDANT_READ
 Reads array antenna data from QDANT files
 
-- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna
-  pattern data
-- Without `id`, all entries are read: returns a struct array when the file has multiple entries
-  (frequency-dependent model) or a single struct when it has exactly one entry
-- With `id`, a single entry is read; useful for picking one frequency from a multi-frequency
-  file
-- Separate-fields output (11 or 12 outputs) is only available when the result is a single
-  entry (i.e. `id` was provided, or the file contains exactly one entry)
+- The QuaDRiGa array antenna exchange format (QDANT) is an XML format for storing antenna pattern data
+- Without `id`, all entries are read: returns a struct array when the file has multiple entries (frequency-dependent model) 
+  or a single struct when it has exactly one entry
+- With `id`, a single entry is read; useful for picking one frequency from a multi-frequency file
+- Separate-fields output (11 or 12 outputs) is only available when the result is a single entry 
+  (i.e. `id` was provided, or the file contains exactly one entry)
 
 ## Usage:
 ```
@@ -36,18 +34,14 @@ Reads array antenna data from QDANT files
 
 ## Inputs:
 - **`fn`** — Path to the QDANT file; string; must not be empty
-- **`id`** *(optional)* — 1-based ID of the antenna entry to read; pass `[]` or omit to read
-  every entry in the file
+- **`id`** — 1-based ID of the antenna entry to read; pass `[]` or omit to read every entry in the file
 
 ## Outputs:
-- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout
-  as documented in [[arrayant_generate]]
-- **`layout`** *(optional)* — Matrix of element IDs describing how entries are arranged in the
-  file; datatype: uint32
-- **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`,
-  `element_pos`, `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field
-  outputs with contents and sizes as in [[arrayant_generate]]; only available when the result
-  is a single entry
+- **`ant`** — Arrayant struct (single entry) or struct array (multiple entries); field layout as documented in [[arrayant_generate]]
+- **`layout`** — Matrix of element IDs describing how entries are arranged in the file; datatype: uint32
+- **`e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid`, `element_pos`, 
+  `coupling_re`, `coupling_im`, `center_freq`, `name`** — Separate-field outputs with contents and sizes as 
+  in [[arrayant_generate]]; only available when the result is a single entry
 
 ## See also:
 - [[arrayant_qdant_write]] (for writing QDANT data)
@@ -61,8 +55,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     if (nrhs < 1 || nrhs > 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs == 0)
-        return;
+    if (nlhs > 12)
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read inputs
     std::string fn = qd_mex_get_string(prhs[0]);
@@ -102,23 +96,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         if (nlhs == 2)
             plhs[1] = qd_mex_copy2matlab(&layout);
     }
-    else if (nlhs == 11 || nlhs == 12) // Separate outputs
+    else if (nlhs > 3) // Separate outputs
     {
         plhs[0] = qd_mex_copy2matlab(&arrayant[0].e_theta_re);
         plhs[1] = qd_mex_copy2matlab(&arrayant[0].e_theta_im);
         plhs[2] = qd_mex_copy2matlab(&arrayant[0].e_phi_re);
         plhs[3] = qd_mex_copy2matlab(&arrayant[0].e_phi_im);
-        plhs[4] = qd_mex_copy2matlab(&arrayant[0].azimuth_grid, true);
-        plhs[5] = qd_mex_copy2matlab(&arrayant[0].elevation_grid, true);
-        plhs[6] = qd_mex_copy2matlab(&arrayant[0].element_pos);
-        plhs[7] = qd_mex_copy2matlab(&arrayant[0].coupling_re);
-        plhs[8] = qd_mex_copy2matlab(&arrayant[0].coupling_im);
-        plhs[9] = qd_mex_copy2matlab(&arrayant[0].center_frequency);
-        plhs[10] = mxCreateString(arrayant[0].name.c_str());
-
-        if (nlhs == 12)
+        if (nlhs > 4)
+            plhs[4] = qd_mex_copy2matlab(&arrayant[0].azimuth_grid, true);
+        if (nlhs > 5)
+            plhs[5] = qd_mex_copy2matlab(&arrayant[0].elevation_grid, true);
+        if (nlhs > 6)
+            plhs[6] = qd_mex_copy2matlab(&arrayant[0].element_pos);
+        if (nlhs > 7)
+            plhs[7] = qd_mex_copy2matlab(&arrayant[0].coupling_re);
+        if (nlhs > 8)
+            plhs[8] = qd_mex_copy2matlab(&arrayant[0].coupling_im);
+        if (nlhs > 9)
+            plhs[9] = qd_mex_copy2matlab(&arrayant[0].center_frequency);
+        if (nlhs > 10)
+            plhs[10] = mxCreateString(arrayant[0].name.c_str());
+        if (nlhs > 11)
             plhs[11] = qd_mex_copy2matlab(&layout);
     }
-    else
-        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 }

@@ -26,11 +26,11 @@ storage_space = quadriga_lib.hdf5_reshape_layout( fn, storage_dims );
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`storage_dims`** *(optional)* — New storage layout; vector with 1-4 elements,
+- **`storage_dims`** — New storage layout; vector with 1-4 elements,
   i.e. `[nx]`, `[nx, ny]`, `[nx, ny, nz]` or `[nx, ny, nz, nw]`; default: `[65536, 1, 1, 1]`
 
 ## Outputs:
-- **`storage_space`** *(optional)* — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
+- **`storage_space`** — New storage dimensions `[nx, ny, nz, nw]`; `[4]`; uint32
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)

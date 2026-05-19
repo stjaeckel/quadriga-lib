@@ -40,24 +40,19 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
 - **`mtl_prop`** — Material properties; see `obj_file_read`; `[n_mesh, 9]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin;
-   order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`
-- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
-  `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
-- **`orig_length`** *(optional)* — Accumulated path length at origin; default: 0; `[n_ray]`
+- **`trivec`** — Beam wavefront triangle vertices relative to origin; order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
+- **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
+- **`orig_length`** — Accumulated path length at origin; default: 0; `[n_ray]`; default: `[]`
 
 ## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear, includes in-medium attenuation, excludes FSPL);
   averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex
-  `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; for types 3–4 (scalar):
-  `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient; includes
-  interaction gain, TE/TM coefficients, incidence plane orientation, in-medium
-  attenuation (excludes FSPL); `[n_rayN, 8]`
-- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input);
-  empty if `trivec`/`tridir` not provided
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; 
+  for types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient; includes interaction gain, 
+  TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`
+- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if `trivec`/`tridir` not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
@@ -65,7 +60,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
 - **`out_typeN`** — Interaction type code (int32); `[n_rayN]`<br><br>
    | Code  | Description                                         |
-   | ----- | --------------------------------------------------- |
+   | :---: | --------------------------------------------------- |
    |   1   | Single hit, outside→inside                          |
    |   2   | Single hit, inside→outside                          |
    |   3   | Single hit, inside→outside, total reflection        |

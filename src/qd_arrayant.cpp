@@ -659,7 +659,7 @@ void quadriga_lib::arrayant<dtype>::copy_element(arma::uword source, arma::uvec 
 - **`source`** — Index of the element to copy, 0-based
 - **`destination`** — Target index or indices, 0-based; array resizes to fit the maximum index
 
-# See also:
+## See also:
 - [[arrayant_copy_element_multi]] (multi-freq counterpart)
 MD!*/
 

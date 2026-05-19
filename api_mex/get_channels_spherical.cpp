@@ -17,13 +17,13 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
   (bank/tilt/heading Euler angles).
 - Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
-- If `center_frequency == 0`, phase calculation is disabled and only delays are computed.
+- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
 - If `use_absolute_delays == false`, the minimum delay (LOS delay) is subtracted from all paths.
 - If `add_fake_los_path == true`, a zero-power LOS path is prepended when no LOS path is detected.
 
 ## Usage:
 ```
-[ coeff_re, coeff_im, delays, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, rx_array, ...
+[ coeff_re, coeff_im, delay, aod, eod, aoa, eoa ] = quadriga_lib.get_channels_spherical( tx_array, rx_array, ...
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, ...
     center_freq, use_absolute_delays, add_fake_los_path, use_avx2 );
 ```
@@ -40,25 +40,25 @@ Calculate MIMO channel coefficients and delays for spherical wave propagation
 - **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `[3, 1]`
 - **`rx_pos`** — Receiver position; `[3, 1]`
 - **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `[3, 1]`
-- **`center_freq`** *(optional)* — Center frequency; set to `0` or skip/leave empty to skip phase computation
-- **`use_absolute_delays`** *(optional)* — If `true`, delays include the LOS component; Default: `false`
-- **`add_fake_los_path`** *(optional)* — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
-- **`use_avx2`** *(optional)* — If `true`, use AVX2 for antenna interpolation; faster, but less accurate;
-  ignored when not supported; Default: `false`
+- **`center_freq`** — Center frequency; set to `0` or skip/leave empty to skip phase computation; default: 0
+- **`use_absolute_delays`** — If `true`, delays include the LOS component; Default: `false`
+- **`add_fake_los_path`** — If `true`, prepends a zero-power LOS path when none is present; Default: `false`
+- **`use_avx2`** — If `true`, use AVX2 for antenna interpolation; reduces accuracy to single-precision interpolation, 
+  equivalent precision loss to the AVX2 kernel in arrayant_interpolate; default: `false`
 
 ## Outputs:
 - **`coeff_re`** — Real part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
 - **`coeff_im`** — Imaginary part of channel coefficients; `[n_rx, n_tx, n_path(+1)]`
 - **`delay`** — Propagation delays in seconds; `[n_rx, n_tx, n_path(+1)]`
-- **`aod`** *(optional)* — Azimuth of departure; `[n_rx, n_tx, n_path(+1)]`
-- **`eod`** *(optional)* — Elevation of departure; `[n_rx, n_tx, n_path(+1)]`
-- **`aoa`** *(optional)* — Azimuth of arrival; `[n_rx, n_tx, n_path(+1)]`
-- **`eoa`** *(optional)* — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
+- **`aod`** — Azimuth of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`eod`** — Elevation of departure; `[n_rx, n_tx, n_path(+1)]`
+- **`aoa`** — Azimuth of arrival; `[n_rx, n_tx, n_path(+1)]`
+- **`eoa`** — Elevation of arrival; `[n_rx, n_tx, n_path(+1)]`
 
 ## See also:
 - [[get_channels_planar]] (planar wave variant)
 - [[get_channels_irs]] (for IRS-assisted communication)
-- [[arrayant_generate]] (antenna array geneartor)
+- [[arrayant_generate]] (antenna array generator)
 - [[baseband_freq_response]] (for calculating the frequency response)
 - [[quantize_delays]] (for mapping delays to a fixed grid)
 MD!*/

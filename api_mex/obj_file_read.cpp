@@ -39,16 +39,15 @@ Read a Wavefront .obj file and extract geometry and material information
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file
-- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
-  Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
-  Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
-  If empty, ITU-R P.2040-3 defaults are used.
+- **`materials_csv`** — Path to CSV file with custom material properties. Required columns: `name`, `a`. 
+  Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`. Column order is flexible; 
+  missing optional columns default to `0` (`fRef` → `1`). If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
-- **`mesh`** *(optional)* — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
+- **`mesh`** — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
-  | ----- | ------ | --------------------------------------------- |
+  | :---: | :----: | --------------------------------------------- |
   | 1     | a      | ε_r at fRef                                   |
   | 2     | b      | Frequency exponent for ε_r                    |
   | 3     | c      | σ at fRef [S/m]                               |
@@ -58,15 +57,15 @@ Read a Wavefront .obj file and extract geometry and material information
   | 7     | alpha  | Distance absorption at fRef [dB/m]            |
   | 8     | alphaB | Frequency exponent for alpha                  |
   | 9     | fRef   | Reference frequency [GHz]                     |
-- **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** *(optional)* — 1-based indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
-- **`obj_ind`** *(optional)* — 1-based object index per triangle; uint64; `[n_mesh]`
-- **`mtl_ind`** *(optional)* — 1-based material index per triangle; uint64; `[n_mesh]`
-- **`obj_names`** *(optional)* — Object names; cell array of strings; length = `max(obj_ind)`
-- **`mtl_names`** *(optional)* — Material names; cell array of strings; length = `max(mtl_ind)`
-- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
+- **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
+- **`face_ind`** — 1-based indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
+- **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; uint64; `[n_mesh]`
+- **`obj_names`** — Object names; cell array of strings; length = `max(obj_ind)`
+- **`mtl_names`** — Material names; cell array of strings; length = `max(mtl_ind)`
+- **`bsdf`** — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
    | Index | Property                  | Range | Default |
-   | ----- | ------------------------- | ----- | ------- |
+   | :---: | ------------------------- | :---: | ------: |
    | 1     | Base Color Red            | 0–1   | 0.8     |
    | 2     | Base Color Green          | 0–1   | 0.8     |
    | 3     | Base Color Blue           | 0–1   | 0.8     |
@@ -88,7 +87,7 @@ Read a Wavefront .obj file and extract geometry and material information
 ## Default material table:
 - For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:<br><br>
   | Name                  | a     | b      | c       | d      | att  | max fGHz |
-  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
+  | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
   | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
   | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
@@ -113,6 +112,11 @@ Read a Wavefront .obj file and extract geometry and material information
   | itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
   | itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
   | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
+
+## See also:
+- [[triangle_mesh_segmentation]] (for calculating sub-meshes)
+- [[triangle_mesh_aabb]] (for calculating bounding boxes)
+- [[subdivide_triangles]] (for mesh subdivision)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

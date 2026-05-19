@@ -14,10 +14,10 @@ Read one or more channel objects from an HDF5 file
 
 - Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file
 - Each of ix, iy, iz, iw may be a scalar, vector, or omitted (omitted/empty = read full extent along that dimension)
-- Slots are visited in column-major order empty slots are skipped
-- Structured fields are stored in single precision in the file and returned in double
-- Unstructured datasets keep their stored type and shape
-- If no data is found, both outputs are empty `0x0` structs
+- Slots are visited in column-major order and empty slots are skipped.
+- Structured fields are stored in single precision in the file and returned in double.
+- Unstructured datasets keep their stored type and shape.
+- If no data is found, both outputs are empty `0x0` structs.
 
 ## Usage:
 ```
@@ -26,11 +26,11 @@ Read one or more channel objects from an HDF5 file
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; string
-- **`ix`** *(optional)* — 1-based slot indices along dimension X; scalar or vector; default: `1:nx`
-- **`iy`** *(optional)* — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
-- **`iz`** *(optional)* — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
-- **`iw`** *(optional)* — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
-- **`snap`** *(optional)* — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
+- **`ix`** — 1-based slot indices along dimension X; scalar or vector; default: `1:nx`
+- **`iy`** — 1-based slot indices along dimension Y; scalar or vector; default: `1:ny`
+- **`iz`** — 1-based slot indices along dimension Z; scalar or vector; default: `1:nz`
+- **`iw`** — 1-based slot indices along dimension W; scalar or vector; default: `1:nw`
+- **`snap`** — Snapshot indices to read; 1-based; default: all snapshots. Only allowed
   when the total selection is a single slot.
 
 ## Outputs:
@@ -112,7 +112,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::Col<unsigned> iz_vec = parse_idx(3, nz, "iz");
     arma::Col<unsigned> iw_vec = parse_idx(4, nw, "iw");
 
-    // Parse snap (optional)
+    // Parse snap
     arma::uvec snap = (nrhs < 6) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[5]);
 
     const arma::uword n_sel = ix_vec.n_elem * iy_vec.n_elem * iz_vec.n_elem * iw_vec.n_elem;

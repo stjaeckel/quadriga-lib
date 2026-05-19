@@ -7,7 +7,7 @@
 #include "mex_helper_functions.hpp"
 
 /*!SECTION
-Site-specific simulation tools
+Miscellaneous / Tools
 SECTION!*/
 
 /*!MD
@@ -25,12 +25,10 @@ quadriga_lib.write_png( fn, data, colormap, min_val, max_val, log_transform );
 ## Inputs:
 - **`fn`** — Output `.png` file path; string
 - **`data`** — Input data matrix; `[n_rows, n_cols]`
-- **`colormap`** *(optional)* — Colormap name; supported: jet, parula, winter, hot, turbo, copper,
-  spring, cool, gray, autumn, summer; default: jet
-- **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NaN`; default: `NaN`
-- **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NaN`; default: `NaN`
-- **`log_transform`** *(optional)* — Apply 10·log10(data) before mapping; non-positive values
-  map to the minimum color; logical; default: false
+- **`colormap`** — Colormap name; supported: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer; default: jet
+- **`min_val`** — Lower clipping bound; auto-detected if `NaN`; default: `NaN`
+- **`max_val`** — Upper clipping bound; auto-detected if `NaN`; default: `NaN`
+- **`log_transform`** — Apply 10·log10(data) before mapping; non-positive values map to the minimum color; logical; default: false
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

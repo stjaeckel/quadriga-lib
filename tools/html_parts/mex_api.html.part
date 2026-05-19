@@ -1,2 +1,27 @@
-<big><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.5</b></big>
+<span class="qd-heading"><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.5</b></span>
 <br><br><br>
+
+<b>Markdown version of this page:</b>
+<ul><li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_api_mex.md">quadriga_lib_api_mex.md</a></li></ul>
+<br>
+
+<b># General usage notes</b>
+<ul>
+<li>Each function has a 1-line short description, optional detailed notes, a Usage block, and Inputs/Outputs sections.</li>
+<li>Array sizes follow in backticks, e.g. <code>[n_rx, n_tx, n_path]</code>.</li>
+<li>All functions live in the <code>+quadriga_lib</code> package and are called as <code>quadriga_lib.function_name(...)</code>.</li>
+<li>Numeric inputs accept any numeric type and are cast internally; default is <code>double</code> unless stated otherwise (e.g. <code>uint64</code> for some index arguments).</li>
+<li>MATLAB arrays are column-major. Shape notation <code>[a, b, c]</code> means <code>[rows, cols, slices]</code> for 3-D arrays; <code>[rows, cols]</code> for 2-D matrices; <code>[n]</code> for vectors.</li>
+<li>Parameters marked *(optional)* have defaults; all others are required. Output arguments are optional via <code>nargout</code>; outputs after the first are computed only when requested.</li>
+<li>Functions operating on arrayant data accept either a single struct (*struct mode*) or the individual fields as separate positional arguments (*split mode*). Split-mode signatures are single-frequency only; multi-frequency input requires struct mode.</li>
+<li>Invalid inputs (shape/domain) and I/O failures raise a MATLAB error; the error identifier indicates the category (<code>quadriga_lib:invalid_argument</code>, <code>quadriga_lib:runtime_error</code>).</li>
+<li>Index conventions: 1-based unless the field is explicitly called 0-based.</li>
+<li>Units: angles in radians (degrees only where stated, e.g. <code>*_deg</code>); distances in meters; frequencies in Hz; time in seconds; powers linear unless <code>_dB</code>.</li>
+<li>Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.</li>
+<li>Polarization transfer matrix <code>M</code>: 8 rows per path, interleaved real/imaginary, order <code>[ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH]</code>. A 2-row form <code>[ReVV, ImVV]</code> is used for scalar (acoustic) fields.</li>
+<li>The canonical arrayant struct is defined in [arrayant_generate](#arrayant_generate). Mandatory fields: <code>e_theta_re/im</code>, <code>e_phi_re/im</code>, <code>azimuth_grid</code>, <code>elevation_grid</code>. Optional field defaults: <code>element_pos = zeros(3, n_elements)</code>, identity coupling, <code>center_freq = 299792458</code>, empty <code>name</code>. A struct array represents a frequency-dependent (multi-frequency) model with one entry per frequency.</li>
+<li>Speed of light/sound defaults: <code>299792458.0</code> m/s (EM), <code>343.0</code> m/s (acoustic).</li>
+<li>Kernel-selection parameters (<code>use_kernel</code>): <code>0</code> = auto (CUDA if available and problem large enough, else AVX2 if available, else GENERIC), <code>1</code> = GENERIC, <code>2</code> = AVX2, <code>3</code> = CUDA. Throws if the requested kernel is unavailable.</li>
+<li><code>gpu_id</code> is only read when <code>use_kernel</code> resolves to CUDA.</li>
+</ul>
+<br>

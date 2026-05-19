@@ -41,14 +41,15 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    // Validate argument counts
     if (nrhs != 2)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
+
     if (nlhs > 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     if (!mxIsStruct(prhs[0]))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in1' must be a struct.");
+        
     if (!mxIsStruct(prhs[1]))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Input 'arrayant_in2' must be a struct.");
 

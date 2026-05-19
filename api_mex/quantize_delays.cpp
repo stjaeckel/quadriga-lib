@@ -14,15 +14,14 @@ SECTION!*/
 # QUANTIZE_DELAYS
 Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
-- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α
-  and δ^α, where δ is the fractional offset within the bin and α is `power_exponent`
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α, 
+  where δ is the fractional offset within the bin and α is `power_exponent`
 - Two-tap interpolation avoids discontinuities when delays cross tap boundaries
-- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband
-  (incoherent power preservation)
-- If all fractional offsets are below 0.01 or above 0.99, weight computation is skipped but
-  tap-selection logic still applies
-- Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared
-  `[1, 1, n_path, n_snap]`; shared delays are expanded internally when `fix_taps` is 0 or 3
+- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband (incoherent power preservation)
+- If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped 
+  (nearest neighor selection) but tap-selection logic still applies
+- Input `delay` may be per-antenna `[n_rx, n_tx, n_path, n_snap]` or shared `[1, 1, n_path, n_snap]`; 
+  shared delays are expanded internally when `fix_taps` is 0 or 3
 - Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
 
 ## Usage:
@@ -35,13 +34,12 @@ Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 - **`coeff_re`** — Channel coefficients, real part; `[n_rx, n_tx, n_path, n_snap]`
 - **`coeff_im`** — Channel coefficients, imaginary part; `[n_rx, n_tx, n_path, n_snap]`
 - **`delay`** — Path delays in seconds; `[n_rx, n_tx, n_path, n_snap]` or `[1, 1, n_path, n_snap]`
-- **`tap_spacing`** *(optional)* — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz
-  sampling rate; default: 5e-9
-- **`max_no_taps`** *(optional)* — Maximum number of output taps; 0 = unlimited; default: 48
-- **`power_exponent`** *(optional)* — Interpolation exponent α; default: 1.0
-- **`fix_taps`** *(optional)* — Delay grid sharing mode; default: 0<br><br>
+- **`tap_spacing`** — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9
+- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`power_exponent`** — Interpolation exponent α; default: 1.0
+- **`fix_taps`** — Delay grid sharing mode; default: 0<br><br>
   | Value | Meaning                                                                                         |
-  | ----- | ----------------------------------------------------------------------------------------------- |
+  | :---: | ----------------------------------------------------------------------------------------------- |
   | 0     | Per tx-rx pair and snapshot; output delays `[n_rx, n_tx, n_taps, n_snap]`                       |
   | 1     | Single shared grid across all snapshots and tx-rx pairs; output delays `[1, 1, n_taps, n_snap]` |
   | 2     | Per snapshot; output delays `[1, 1, n_taps, n_snap]`, each snapshot independent                 |

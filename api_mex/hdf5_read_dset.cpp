@@ -28,7 +28,7 @@ dset = quadriga_lib.hdf5_read_dset( fn, location, name, prefix );
 - **`location`** — Slot location inside the file; 1-based; vector with 1-4 elements, i.e. `[ix]`,
   `[ix, iy]`, `[ix, iy, iz]` or `[ix, iy, iz, iw]`; pass `[]` for default `[1, 1, 1, 1]`
 - **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; string
-- **`prefix`** *(optional)* — Prefix prepended to `name` when looking up the dataset; string; default: `'par_'`
+- **`prefix`** — Prefix prepended to `name` when looking up the dataset; string; default: `'par_'`
 
 ## Outputs:
 - **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; empty `[]` if the dataset is missing

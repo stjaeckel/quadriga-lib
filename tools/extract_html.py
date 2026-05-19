@@ -57,6 +57,9 @@ def escape_code(match):
 
 
 def format_text(text):
+    # Smaller
+    text = re.sub(r' < ', r' &lt; ', text)
+
      # Replace `code` with <code>code</code>
     text = re.sub(r'`(.*?)`', escape_code, text)
 
@@ -79,41 +82,60 @@ def format_text(text):
 def format_nested_lists(text):
     lines = text.split('\n')
     out = []
-    stack = []  # indent levels of currently-open <ul>s
+    stack = []        # indent levels of currently-open <ul>s
+    li_stack = []     # parallel to stack: out-index of each currently-open <li>
+
+    def close_li():
+        # Fold </li> if nothing structural was appended since <li> opened,
+        # otherwise emit </li> on its own line.
+        if not li_stack:
+            return
+        li_idx = li_stack.pop()
+        if li_idx == len(out) - 1:
+            out[-1] += "</li>"
+        else:
+            out.append("</li>")
 
     for line in lines:
         rline = line.rstrip()
         stripped = rline.lstrip(' ')
         indent = len(rline) - len(stripped)
-
         if stripped.startswith("- "):
             item = stripped[2:]
             while stack and stack[-1] > indent:
-                out.append("</li></ul>")
+                close_li()
+                out.append("</ul>")
                 stack.pop()
             if not stack or stack[-1] < indent:
                 out.append("<ul>")
                 stack.append(indent)
                 out.append("<li>" + item)
+                li_stack.append(len(out) - 1)
             else:  # sibling at same indent
-                out.append("</li>")
+                close_li()
                 out.append("<li>" + item)
+                li_stack.append(len(out) - 1)
         elif stack and indent >= 2 and stripped != "":
             # Continuation of the current list item
-            out.append(" " + rline)
+            if stripped.startswith("|") or (li_stack and li_stack[-1] != len(out) - 1):
+                # Table row, or item already has structural content — own line
+                out.append(stripped)
+            else:
+                # Plain text — fold into the current <li>
+                out[-1] += " " + stripped
         elif stack and stripped == "":
             # Blank line inside a list — skip, keep list open
             continue
         else:
             while stack:
-                out.append("</li></ul>")
+                close_li()
+                out.append("</ul>")
                 stack.pop()
             out.append(line)
-
     while stack:
-        out.append("</li></ul>")
+        close_li()
+        out.append("</ul>")
         stack.pop()
-
     return "\n".join(out) + "\n"
 
 
@@ -126,23 +148,34 @@ def format_tables(text):
     def process_table(table_lines):
         if not table_lines:
             return ""
-        html_content = '<table style="border-collapse: separate; border-spacing: 20px 0;">\n'
+        html_content = '<table class="md">\n'
+
         # Identify alignment line if present
-        alignment_line = None
+        alignments = []
         if len(table_lines) > 1 and all(c in "|-: " for c in table_lines[1]):
-            alignment_line = table_lines.pop(1)
+            spec_line = table_lines.pop(1)
+            for spec in spec_line.strip().strip('|').split('|'):
+                spec = spec.strip()
+                left, right = spec.startswith(':'), spec.endswith(':')
+                if left and right:
+                    alignments.append('center')
+                elif right:
+                    alignments.append('right')
+                else:
+                    alignments.append('left')  # ':---' and '---' both default to left
+        has_header = bool(alignments)
+
         # Process table content
         for i, line in enumerate(table_lines):
-            cols = line.strip('|').split('|')
+            cols = line.strip().strip('|').split('|')
             html_content += "<tr>\n"
-            for col in cols:
-                if i == 0 and alignment_line is not None:
-                    # If this is the first line, and an alignment line was found, use <th>
-                    html_content += f'  <th style="text-align: left;">{col.strip()}</th>\n'
-                else:
-                    html_content += f"  <td>{col.strip()}</td>\n"
+            for j, col in enumerate(cols):
+                align = alignments[j] if j < len(alignments) else 'left'
+                tag = 'th' if (i == 0 and has_header) else 'td'
+                cls = '' if align == 'left' else f' class="{align[0]}"'
+                html_content += f'  <{tag}{cls}>{col.strip()}</{tag}>\n'
             html_content += "</tr>\n"
-        html_content += "</table><br>\n"
+        html_content += "</table>\n"
 
         return html_content
 
@@ -265,7 +298,7 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
         # Print functions per section
         if not compact:
             for idx, section in enumerate(sections):
-                html_content += f'<b>{section}</b>\n<ul>\n<table style="border-collapse: separate; border-spacing: 20px 0;">\n<tbody>\n'
+                html_content += f'<b>{section}</b><br><br>\n<table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>\n'
 
                 for function_name, md_section, add_space in section_dict[section]:
                     lines = md_section.split('\n')
@@ -273,18 +306,17 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
                     padding = ""
                     if add_space:
                         padding = ' style="padding-bottom: 10px;"'
-                    html_content += f'<tr><td{padding}><a href="#{function_name}">{function_name}</a></td><td{padding}>{description}</td></tr>\n'
+                    html_content += f'  <tr><td{padding}><a href="#{function_name}">{function_name}</a></td><td{padding}>{description}</td></tr>\n'
 
-                html_content += '</tbody>\n</table>\n</ul>\n<br>\n'
+                html_content += '</tbody></table><br>\n\n'
 
         for idx, section in enumerate(sections):
             h = hashlib.shake_256(section.encode("utf-8"))
             if compact:
-                html_content += f'<hr class="greyline">\n<br>\n'
+                html_content += f'<hr class="greyline"><br>\n'
             else:
-                html_content += f'<div class="pagebreak"></div>\n<hr class="greyline">\n<hr class="greyline">\n<br>\n<br>\n'
-            html_content += f'<a name="{h.hexdigest(4)}"></a>\n'
-            html_content += f'<font size=+1><b>{section}</b></font>\n<br>\n'
+                html_content += f'<hr class="greyline"><br><br>\n'
+            html_content += f'<span id="{h.hexdigest(4)}" class="qd-section"><b>{section}</b></span><br>\n'
             if not compact:
                 html_content += f'<br>\n'
 
@@ -325,10 +357,12 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
                 if len(lines) > 1:
                     short_description = lines[1]
                
+                html_content += '<hr class="greyline"><br>\n'
+                html_content += f'<span id="{function_name}" class="qd-func"><b>{function_name}</b></span><br>\n'
+                html_content += '<hr class="thin">\n'
+
                 if len(short_description) > 0:
-                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b> - {short_description}\n'
-                else:
-                    html_content += f'<div class="pagebreak"></div><div class="noprint"><hr class="greyline"><br></div>\n<a name="{function_name}"></a>\n<b>{function_name}</b>\n'
+                    html_content += f'{short_description}\n'
 
                 i = 2  # Start after the function name and short description
 
@@ -344,7 +378,7 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
                 intro_lines_formatted = format_nested_lists(intro_lines_formatted)
                 intro_lines_formatted = format_tables(intro_lines_formatted)
                 if intro_lines_formatted.strip():
-                    html_content += f'<div style="margin-bottom: 1.5em;">\n{intro_lines_formatted.strip()}\n</div>\n'
+                    html_content += f'{intro_lines_formatted.strip()}\n'
 
                 no_intro = not bool(intro_lines_formatted.strip())
                 first_section = True
@@ -380,7 +414,7 @@ def generate_html(folder_name, html_output_file, html_preamble, compact, lower_c
 
                         prefix = '<br><br>\n' if (no_intro and first_section) else '\n'
                         first_section = False 
-                        html_content += f'{prefix}<i>{section_name}</i><br>\n{section_content.strip()}\n'
+                        html_content += f'{prefix}<b>{section_name}</b><br>\n{section_content.strip()}\n'
                     else:
                         i += 1
 

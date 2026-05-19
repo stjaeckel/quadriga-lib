@@ -26,16 +26,14 @@ Construct a geodesic polyhedron from recursive icosahedron subdivision
 ## Inputs:
 - **`n_div`** — Number of subdivisions; generates 20 · n_div² faces; default: 1
 - **`radius`** — Radius of icosphere in meters; default: 1
-- **`direction_xyz`** *(optional)* — Output directions in Cartesian (true) or spherical
-  azimuth/elevation (false); default: false
+- **`direction_xyz`** — Output directions in Cartesian (true) or spherical azimuth/elevation (false); default: false
 
 ## Outputs:
 - **`center`** — Face center coordinates in Cartesian space; each vector points radially outward
   from origin with magnitude equal to the inradius of the face; `[n_faces, 3]`
-- **`length`** *(optional)* — Distance from origin to face plane; equals the magnitude of each
-  `center` vector; `[n_faces]`
-- **`vert`** *(optional)* — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
-- **`direction`** *(optional)* — Edge directions; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
+- **`length`** — Distance from origin to face plane; equals the magnitude of each `center` vector; `[n_faces]`
+- **`vert`** — Vertex offsets from face center `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_faces, 9]`
+- **`direction`** — Edge directions; spherical `{az1,el1,az2,el2,az3,el3}` or Cartesian
   `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per `direction_xyz` flag; `[n_faces, 6]` or `[n_faces, 9]`
 MD!*/
 

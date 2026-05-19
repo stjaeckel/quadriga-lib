@@ -27,9 +27,8 @@ Read the storage layout of channel data inside an HDF5 file
 - **`fn`** — Filename of the HDF5 file; string
 
 ## Outputs:
-- **`storage_dims`** *(optional)* — Size of the storage space `[nx, ny, nz, nw]`; `[4]`;  uint32
-- **`has_data`** *(optional)* — Slot occupancy mask; `true` where data exists, `false` otherwise; 
-  `[nx, ny, nz, nw]`; logical
+- **`storage_dims`** — Size of the storage space `[nx, ny, nz, nw]`; `[4]`;  uint32
+- **`has_data`** — Slot occupancy mask; `true` where data exists, `false` otherwise; `[nx, ny, nz, nw]`; logical
 
 ## See also:
 - [[hdf5_create_file]] (for creating a file with a custom storage layout)

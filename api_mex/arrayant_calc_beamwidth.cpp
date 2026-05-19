@@ -14,7 +14,7 @@ Calculates the beam width of array antenna elements in degree
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
-- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in 
+- Sub-grid resolution is achieved by bilinear interpolation of the field pattern (≈100x finer grid in
   each direction than the antenna sampling grid)
 - Calculated per element, not per port; ignores element coupling
 
@@ -30,15 +30,15 @@ Calculates the beam width of array antenna elements in degree
     quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid );
 
 [ beamwidth_az, beamwidth_el, az_point_ang, el_point_ang ] = ...
-    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, i_element, threshold_dB );
+    quadriga_lib.arrayant_calc_beamwidth( e_theta_re, e_theta_im, e_phi_re, e_phi_im, azimuth_grid, elevation_grid, ...
+    i_element, threshold_dB );
 ```
 
 ## Inputs (struct mode):
 - **`arrayant`** — Struct containing the arrayant data; field layout as documented in [[arrayant_generate]];
   a struct array may contain a frequency-dependent model
-- **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the beamwidth is
-  calculated for all elements; uint64; `[n_out]` or empty
-- **`threshold_dB`** *(optional)* — Threshold in dB; default: 3 (equivalent to FWHM)
+- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
+- **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
 
 ## Inputs (split mode):
 - **`e_theta_re`** — e-theta field component, real part; `[n_elevation, n_azimuth, n_elements]`
@@ -47,17 +47,17 @@ Calculates the beam width of array antenna elements in degree
 - **`e_phi_im`** — e-phi field component, imaginary part; `[n_elevation, n_azimuth, n_elements]`
 - **`azimuth_grid`** — Azimuth angles in rad, -π to π, sorted; `[n_azimuth]`
 - **`elevation_grid`** — Elevation angles in rad, -π/2 to π/2, sorted; `[n_elevation]`
-- **`i_element`** *(optional)* — Element index; 1-based; if not provided or empty, the beamwidth
-  is calculated for all elements; uint64; `[n_out]` or empty
-- **`threshold_dB`** *(optional)* — Threshold in dB; default: 3 (equivalent to FWHM)
+- **`i_element`** — Element index; 1-based; if not provided or empty, all elements are used; uint64; `[n_out]` or empty
+- **`threshold_dB`** — Threshold in dB; default: 3 (equivalent to FWHM)
 
 ## Outputs:
 - **`beamwidth_az`** — Azimuth beamwidth in degree; `[n_out, n_freq]`; with `n_out = n_elements` when `i_element` is omitted/empty
-- **`beamwidth_el`** *(optional)* — Elevation beamwidth in degree; `[n_out, n_freq]`
-- **`az_point_ang`** *(optional)* — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
-- **`el_point_ang`** *(optional)* — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`beamwidth_el`** — Elevation beamwidth in degree; `[n_out, n_freq]`
+- **`az_point_ang`** — Azimuth pointing angle of the main beam in degree; `[n_out, n_freq]`
+- **`el_point_ang`** — Elevation pointing angle of the main beam in degree; `[n_out, n_freq]`
 
 ## See also:
+- [[arrayant_combine_pattern]] (to apply element coupling before calculating directivity)
 - [[arrayant_calc_directivity]] (directivity in dBi of array antenna elements)
 MD!*/
 

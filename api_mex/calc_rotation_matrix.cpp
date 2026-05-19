@@ -14,7 +14,7 @@ SECTION!*/
 # CALC_ROTATION_MATRIX
 Calculate rotation matrices from Euler angles
 
-- Computes 3×3 rotation matrices from Euler angles (bank, tilt, head) in column-major order (9 elements
+- Computes 3×3 rotation matrices from Euler angles (bank, tilt, heading) in column-major order (9 elements
   per orientation)
 - Single-precision input is cast to double; output is always double
 
@@ -24,10 +24,10 @@ rotation = quadriga_lib.calc_rotation_matrix( orientation, invert_y_axis, transp
 ```
 
 ## Inputs:
-- **`orientation`** — Euler angles (bank, tilt, head); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
-- **`invert_y_axis`** *(optional)* — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of
+- **`orientation`** — Euler angles (bank, tilt, heading); `[3, n_row, n_col]` or `[3, n_mat]` or `[3]`
+- **`invert_y_axis`** — Flips the sign of the tilt angle, i.e. applies `-tilt` instead of
   `tilt`; use when the input convention defines positive tilt as downward; logical; default: false
-- **`transpose`** *(optional)* — Returns the transpose of the rotation matrix; logical; default: false
+- **`transpose`** — Returns the transpose of the rotation matrix; logical; default: false
 
 ## Outputs:
 - **`rotation`** — Rotation matrices in column-major order; `[9, n_row, n_col]` or `[9, n_mat]` or `[9]`

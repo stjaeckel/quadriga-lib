@@ -27,17 +27,16 @@ Read ray-tracing CIR data from a QRT file
 
 ## Inputs:
 - **`fn`** — Path to the QRT file; string
-- **`i_cir`** *(optional)* — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: read all
-- **`i_orig`** *(optional)* — Origin index; 1-based; uint64; scalar; default: 1
-- **`downlink`** *(optional)* — If `true`, origin=TX, destination=RX; if `false`, roles are
-  swapped; logical scalar; default: `true`
-- **`normalize_M`** *(optional)* — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
+- **`i_cir`** — Snapshot indices; 1-based; uint64; `[n_out]` or empty; default: `[]` (read all)
+- **`i_orig`** — Origin index; 1-based; uint64; scalar; default: 1
+- **`downlink`** — If `true`, origin=TX, destination=RX; if `false`, roles are swapped; logical scalar; default: `true`
+- **`normalize_M`** — Controls `M` and `path_gain` scaling where PL is the propagation-only path loss
   - v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]
   - v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
-  | `normalize_M` | `M`                   | `path_gain`                      |
-  | ------------- | --------------------- | -------------------------------- |
-  | 0             | As stored in QRT file | -PL                              |
-  | 1             | Max column power = 1  | -PL minus material losses        |
+    | `normalize_M` | `M`                   | `path_gain`                      |
+    | :-----------: | :-------------------: | :------------------------------: |
+    | 0             | As stored in QRT file | -PL                              |
+    | 1             | Max column power = 1  | -PL minus material losses        |
 
 ## Outputs:
 - **`center_freq`** — Center frequency in Hz; `[n_freq]`
@@ -66,6 +65,7 @@ Read ray-tracing CIR data from a QRT file
 - [[arrayant_generate]] (for generating antenna arrays)
 - [[get_channels_planar]] (for embedding antennas using departure and arrival angles)
 - [[get_channels_spherical]] (for embedding antennas using FBS/LBS positions)
+- [[get_channels_multifreq]] (for multi-frequency antenna embedding)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

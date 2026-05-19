@@ -17,14 +17,12 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 - Multi-driver systems (e.g. two-way) are built by calling this function per driver and combining
   results via `append` and `element_pos`; crossover behavior emerges from overlapping bandpass
   responses.
-- Frequency response is a Butterworth-style bandpass:
-  `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
+- Frequency response is a Butterworth-style bandpass: `H(f) = 1/sqrt(1+(f_low/f)^(2n)) · 1/sqrt(1+(f/f_high)^(2n))`,
   where `n = slope_dB_per_octave / 6`; -3 dB at the cutoff frequencies.
-- Sensitivity scales amplitude linearly relative to 85 dB SPL:
-  `sens_lin = 10^((sensitivity - 85) / 20)`.
+- Sensitivity scales amplitude linearly relative to 85 dB SPL: `sens_lin = 10^((sensitivity - 85) / 20)`.
 - If `frequencies` is empty, third-octave band center frequencies are auto-generated from one band
   below `lower_cutoff` to one band above `upper_cutoff`, clipped to 20-20000 Hz.
-- Speed of sound assumed to be 344 m/s.
+- Speed of sound assumed to be 343 m/s.
 - Driver models (`driver_type`):
   - `piston` - circular piston in baffle, `D(theta) = 2·J1(ka·sin theta)/(ka·sin theta)`,
     rotationally symmetric, narrows with increasing `ka`
@@ -36,7 +34,7 @@ Generate a parametric frequency-dependent loudspeaker directivity model
   - `hemisphere` - sealed box with baffle-step transition, `f_baffle = c/(pi·sqrt(W·H))`
   - `dipole` - figure-8, `R = abs(cos(theta_off))` with sign inversion in rear hemisphere
   - `cardioid` - `R = 0.5·(1+cos(theta_off))`
-- For `"horn"`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`.
+- For `horn`, if `horn_control_freq = 0`, it is auto-derived as `f_ctrl = c/(2pi·radius)`.
 
 ## Usage:
 ```
@@ -47,31 +45,21 @@ arrayant = quadriga_lib.generate_speaker( driver_type, radius, lower_cutoff, upp
 ```
 
 ## Inputs:
-- **`driver_type`** *(optional)* - Driver directivity model: `"piston"`, `"horn"`, or `"omni"`;
-  default: `"piston"`
-- **`radius`** *(optional)* - Effective radiating radius; cone/dome radius for piston, mouth radius
-  for horn; default: 0.05
-- **`lower_cutoff`** *(optional)* - Lower -3 dB bandpass frequency; default: 80
-- **`upper_cutoff`** *(optional)* - Upper -3 dB bandpass frequency; default: 12000
-- **`lower_rolloff_slope`** *(optional)* - Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order
-  Butterworth); default: 12
-- **`upper_rolloff_slope`** *(optional)* - High-frequency rolloff in dB/octave; default: 12
-- **`sensitivity`** *(optional)* - On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity
-  amplitude; default: 85
-- **`radiation_type`** *(optional)* - Enclosure radiation model: `"monopole"`, `"hemisphere"`,
-  `"dipole"`, or `"cardioid"`; default: `"hemisphere"`
-- **`hor_coverage`** *(optional)* - Horn horizontal coverage angle in degrees; `0` defaults to 90;
-  default: 0
-- **`ver_coverage`** *(optional)* - Horn vertical coverage angle in degrees; `0` defaults to 60;
-  default: 0
-- **`horn_control_freq`** *(optional)* - Horn pattern control frequency; `0` auto-derives from
-  `radius`; default: 0
-- **`baffle_width`** *(optional)* - Baffle width; used by `"hemisphere"` model; default: 0.15
-- **`baffle_height`** *(optional)* - Baffle height; used by `"hemisphere"` model; default: 0.25
-- **`frequencies`** *(optional)* - Frequency sample points; auto-generated third-octave bands if
-  empty; `[n_freq]`
-- **`angular_resolution`** *(optional)* - Azimuth and elevation sampling grid resolution in
-  degrees; default: 5
+- **`driver_type`** - Driver directivity model: `piston`, `horn`, or `omni`; default: `piston`
+- **`radius`** - Effective radiating radius in m; cone/dome radius for piston, mouth radius for horn; default: 0.05
+- **`lower_cutoff`** - Lower -3 dB bandpass frequency in Hz; default: 80
+- **`upper_cutoff`** - Upper -3 dB bandpass frequency in Hz; default: 12000
+- **`lower_rolloff_slope`** - Low-frequency rolloff in dB/octave (12 dB/oct = 2nd-order Butterworth); default: 12
+- **`upper_rolloff_slope`** - High-frequency rolloff in dB/octave; default: 12
+- **`sensitivity`** - On-axis sensitivity in dB SPL at 1W/1m; 85 dB gives unity amplitude; default: 85
+- **`radiation_type`** - Enclosure radiation model: `monopole`, `hemisphere`, `dipole`, or `cardioid`; default: `hemisphere`
+- **`hor_coverage`** - Horn horizontal coverage angle in degrees; `0` defaults to 90;  default: 90
+- **`ver_coverage`** - Horn vertical coverage angle in degrees; `0` defaults to 60;  default: 60
+- **`horn_control_freq`** - Horn pattern control frequency; `0` auto-derives from `radius`; default: 0
+- **`baffle_width`** - Baffle width; used by `hemisphere` model; default: 0.15
+- **`baffle_height`** - Baffle height; used by `hemisphere` model; default: 0.25
+- **`frequencies`** - Frequency sample points; auto-generated third-octave bands if empty; `[n_freq]`
+- **`angular_resolution`** - Azimuth and elevation sampling grid resolution in degrees; default: 5
 
 ## Outputs:
 - **`arrayant`** - Struct array with one arrayant per frequency sample; directivity is stored in
