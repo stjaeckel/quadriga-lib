@@ -18,7 +18,7 @@
 #include "python_quadriga_adapter.hpp"
 
 /*!SECTION
-Array antenna functions
+Channel generation functions
 SECTION!*/
 
 /*!MD

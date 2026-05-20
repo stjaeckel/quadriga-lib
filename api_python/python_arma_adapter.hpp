@@ -728,6 +728,9 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::array_t<dtype> &inp
 template <typename dtype>
 static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool view = false, bool strict = false)
 {
+    if (obj.is_none())
+        return arma::Col<dtype>();
+
     py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
         pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
@@ -744,6 +747,9 @@ static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool vie
 template <typename dtype>
 static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool view = false, bool strict = false)
 {
+    if (obj.is_none())
+        return arma::Mat<dtype>();
+
     py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
         pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);
@@ -760,6 +766,9 @@ static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool vie
 template <typename dtype>
 static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool view = false, bool strict = false)
 {
+    if (obj.is_none())
+        return arma::Cube<dtype>();
+
     py::array_t<dtype> pyarray;
     if (py::isinstance<py::array_t<dtype>>(obj))
         pyarray = py::reinterpret_borrow<py::array_t<dtype>>(obj);

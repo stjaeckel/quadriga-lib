@@ -1,5 +1,5 @@
 ---
-title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.5"
+title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.6"
 author: "Stephan Jaeckel"
 date: "19.05.2026"
 lang: en-US
@@ -90,7 +90,7 @@ lang: en-US
 
 ---
 ## arrayant_calc_beamwidth
-Calculates the beam width of array antenna elements in degree
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam

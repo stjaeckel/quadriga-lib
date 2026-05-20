@@ -46,7 +46,7 @@
 
       <!-- CONTENT BEGIN -->
 
-<span class="qd-heading"><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.5</b></span>
+<span class="qd-heading"><b>MALAB / Octave API Documentation for Quadriga-Lib v0.11.6</b></span>
 <br><br><br>
 
 <b>Markdown version of this page:</b>
@@ -87,7 +87,7 @@
 <br>
 <b>Array antenna functions</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
-  <tr><td><a href="#arrayant_calc_beamwidth">arrayant_calc_beamwidth</a></td><td>Calculates the beam width of array antenna elements in degree</td></tr>
+  <tr><td><a href="#arrayant_calc_beamwidth">arrayant_calc_beamwidth</a></td><td>Calculate the beamwidth and pointing angles of array antenna elements in degrees</td></tr>
   <tr><td><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a></td><td>Calculates the directivity in dBi of array antenna elements</td></tr>
   <tr><td><a href="#arrayant_combine_pattern">arrayant_combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
   <tr><td><a href="#arrayant_concat">arrayant_concat</a></td><td>Concatenate two arrayant structs into a single one</td></tr>
@@ -175,7 +175,7 @@
 <hr class="greyline"><br>
 <span id="arrayant_calc_beamwidth" class="qd-func"><b>arrayant_calc_beamwidth</b></span><br>
 <hr class="thin">
-Calculates the beam width of array antenna elements in degree
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
 <ul>
 <li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)</li>
 <li>Also returns the azimuth and elevation pointing angles of the main beam</li>

@@ -10,7 +10,7 @@ SECTION!*/
 
 /*!MD
 # ARRAYANT_CALC_BEAMWIDTH
-Calculates the beam width of array antenna elements in degree
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam
