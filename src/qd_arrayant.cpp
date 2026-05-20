@@ -194,7 +194,7 @@ quadriga_lib::arrayant<dtype> quadriga_lib::arrayant<dtype>::append(const quadri
 
 /*!MD
 # .calc_beamwidth_deg
-Calculate the beam width of an antenna element in degree
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
 
 - Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)
 - Also returns the azimuth and elevation pointing angles of the main beam

@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
 
@@ -23,54 +10,78 @@ SECTION!*/
 
 /*!MD
 # calc_directivity
-Calculates the directivity (in dBi) of array antenna elements
+Calculates the directivity in dBi of array antenna elements
 
-## Description:
-Directivity is a parameter of an antenna or which measures the degree to which the radiation emitted
-is concentrated in a single direction. It is the ratio of the radiation intensity in a given direction
-from the antenna to the radiation intensity averaged over all directions. Therefore, the directivity
-of a hypothetical isotropic radiator is 1, or 0 dBi.
+- Directivity = 10·log10(peak radiation intensity / mean over 4π); isotropic radiator = 0 dBi
+- Calculated per element, not per port; ignores element coupling
+- Accepts both single-frequency (3D pattern fields) and multi-frequency (4D pattern fields)
+  arrayant dicts; output dimensionality follows the input
 
 ## Usage:
-
 ```
-from quadriga_lib import arrayant
-directivity = arrayant.calc_directivity(arrayant, element)
+directivity = quadriga_lib.arrayant.calc_directivity( arrayant )
+directivity = quadriga_lib.arrayant.calc_directivity( arrayant, element )
 ```
 
-## Input Arguments:
-- **`arrayant_in`**<br>
-  Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
+## Inputs:
+- **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
+  only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
+  see [[generate]] for the field layout
+- **`element`** — Element indices (0-based); if None or empty, all elements are used; `(n_out,)` or None;
+  default: None
 
-- **`element`** (optional)<br>
-  Element index, 0-based. If not provided or empty, the directivity is calculated for all elements in the
-  array antenna. Shape: `(n_out)` or empty
+## Outputs:
+- **`directivity`** — Directivity in dBi; `(n_out,)` for a single-frequency input,
+  `(n_out, n_freq)` for a multi-frequency input; `n_out = n_elements` when `element` is None
 
-## Output Argument:
-- **`directivity`**<br>
-  Directivity of the antenna pattern in dBi, Shape: `[n_out)` or `[n_elements)`
+## See also:
+- [[combine_pattern]] (apply element coupling before calculating directivity)
+- [[calc_beamwidth]] (calculates the beam width of array antennas)
 MD!*/
 
-py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,                // Input data
-                                              const py::array_t<arma::uword> &element) // Antenna element indices, 0-based
+py::array_t<double> arrayant_calc_directivity(const py::dict &arrayant,
+                                              py::handle element)
 {
-    const auto ant = qd_python_dict2arrayant(arrayant, true);
+    // Parse arrayant (handles 3D single-freq and 4D multi-freq pattern arrays uniformly)
+    const auto ant_multi = qd_python_dict2arrayant_multi(arrayant, true, false, true);
+    const size_t n_freq = ant_multi.size();
+    const arma::uword n_elements = ant_multi[0].e_theta_re.n_slices;
 
-    arma::uvec element_ind = (element.size() == 0) ? arma::regspace<arma::uvec>(0, ant.e_theta_re.n_slices - 1)
-                                                   : qd_python_numpy2arma_Col(element);
+    if (n_elements == 0)
+        throw std::invalid_argument("Array antenna has no elements.");
 
-    arma::vec directivity;
-    auto output = qd_python_init_output<double>(element_ind.n_elem, &directivity);
+    // Element indices (0-based); empty input → all elements
+    const auto element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
+    const arma::uvec element_ind = element_a.empty() ? arma::regspace<arma::uvec>(0, n_elements - 1) : element_a;
 
-    auto *p_directivity = directivity.memptr();
-    for (auto el : element_ind)
-        *p_directivity++ = ant.calc_directivity_dBi(el);
+    if (n_freq == 1)
+    {
+        // Single frequency: 1D output (n_out,)
+        arma::vec directivity;
+        auto out_py = qd_python_init_output(element_ind.n_elem, &directivity);
 
-    return output;
+        auto *p_directivity = directivity.memptr();
+        for (auto el : element_ind)
+            *p_directivity++ = ant_multi[0].calc_directivity_dBi(el);
+
+        return out_py;
+    }
+
+    // Multi-frequency: 2D output (n_out, n_freq)
+    arma::mat directivity;
+    auto out_py = qd_python_init_output(element_ind.n_elem, (arma::uword)n_freq, &directivity);
+
+    for (size_t i_freq = 0; i_freq < n_freq; ++i_freq)
+    {
+        auto *p_directivity = directivity.colptr(i_freq);
+        for (auto el : element_ind)
+            *p_directivity++ = ant_multi[i_freq].calc_directivity_dBi(el);
+    }
+
+    return out_py;
 }
+
+// pybind11 declaration:
+// m.def("calc_directivity", &arrayant_calc_directivity,
+//       py::arg("arrayant"),
+//       py::arg("element") = py::none());

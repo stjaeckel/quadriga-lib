@@ -46,7 +46,7 @@
 
       <!-- CONTENT BEGIN -->
 
-<span class="qd-heading"><b>C++ API Documentation for Quadriga-Lib v0.11.5</b></span>
+<span class="qd-heading"><b>C++ API Documentation for Quadriga-Lib v0.11.6</b></span>
 <br><br><br>
 
 <b>Markdown version of this page:</b>
@@ -93,7 +93,7 @@
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
   <tr><td style="padding-bottom: 10px;"><a href="#arrayant">arrayant</a></td><td style="padding-bottom: 10px;">Class for storing and manipulating array antenna models</td></tr>
   <tr><td><a href="#.append">.append</a></td><td>Append elements of another arrayant to the current one</td></tr>
-  <tr><td><a href="#.calc_beamwidth_deg">.calc_beamwidth_deg</a></td><td>Calculate the beam width of an antenna element in degree</td></tr>
+  <tr><td><a href="#.calc_beamwidth_deg">.calc_beamwidth_deg</a></td><td>Calculate the beamwidth and pointing angles of array antenna elements in degrees</td></tr>
   <tr><td><a href="#.calc_directivity_dBi">.calc_directivity_dBi</a></td><td>Calculate the directivity in dBi of a single array element</td></tr>
   <tr><td><a href="#.combine_pattern">.combine_pattern</a></td><td>Combine element patterns, positions, and coupling weights into effective radiation patterns</td></tr>
   <tr><td><a href="#.copy_element">.copy_element</a></td><td>Copy a single antenna element to one or more destination slots</td></tr>
@@ -420,7 +420,7 @@ quadriga_lib::arrayant&lt;dtype&gt; quadriga_lib::arrayant&lt;dtype&gt;::append(
 <hr class="greyline"><br>
 <span id=".calc_beamwidth_deg" class="qd-func"><b>.calc_beamwidth_deg</b></span><br>
 <hr class="thin">
-Calculate the beam width of an antenna element in degree
+Calculate the beamwidth and pointing angles of array antenna elements in degrees
 <ul>
 <li>Computes azimuth and elevation beamwidth at a given dB threshold (default 3 dB = FWHM)</li>
 <li>Also returns the azimuth and elevation pointing angles of the main beam</li>

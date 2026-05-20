@@ -8,6 +8,7 @@
 namespace py = pybind11;
 
 // Include parts
+#include "qpy_arrayant_calc_beamwidth.cpp"
 #include "qpy_arrayant_calc_directivity.cpp"
 #include "qpy_arrayant_combine_pattern.cpp"
 #include "qpy_arrayant_copy_element.cpp"
@@ -17,16 +18,21 @@ namespace py = pybind11;
 #include "qpy_arrayant_qdant_read.cpp"
 #include "qpy_arrayant_qdant_write.cpp"
 #include "qpy_arrayant_rotate_pattern.cpp"
-#include "qpy_arrayant_speaker.cpp"
+#include "qpy_generate_speaker.cpp"
 #include "qpy_get_channels_planar.cpp"
 #include "qpy_get_channels_spherical.cpp"
 #include "qpy_get_channels_multifreq.cpp"
 
 void quadriga_lib_arrayant(py::module_ &m)
 {
+    m.def("calc_beamwidth", &arrayant_calc_beamwidth,
+          py::arg("arrayant"),
+          py::arg("element") = py::none(),
+          py::arg("threshold_dB") = 3.0);
+
     m.def("calc_directivity", &arrayant_calc_directivity,
-          py::arg("arrayant") = py::dict(),
-          py::arg("element") = py::array_t<arma::uword>());
+          py::arg("arrayant"),
+          py::arg("element") = py::none());
 
     m.def("combine_pattern", &arrayant_combine_pattern,
           py::arg("arrayant") = py::dict(),
@@ -50,7 +56,7 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("generate", &arrayant_generate,
           py::arg("type"),
-          py::arg("res") = 1.0,
+          py::arg("res") = 0.0,
           py::arg("freq") = 299792458.0,
           py::arg("az_3dB") = 0.0,
           py::arg("el_3dB") = 0.0,
@@ -64,9 +70,9 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("Ng") = 1,
           py::arg("dgv") = 0.5,
           py::arg("dgh") = 0.5,
-          py::arg("beam_az") = py::array_t<double>(),
-          py::arg("beam_el") = py::array_t<double>(),
-          py::arg("beam_weight") = py::array_t<double>(),
+          py::arg("beam_az") = py::none(),
+          py::arg("beam_el") = py::none(),
+          py::arg("beam_weight") = py::none(),
           py::arg("separate_beams") = false,
           py::arg("apply_weights") = false,
           py::arg("pattern") = py::dict());
@@ -85,7 +91,7 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("horn_control_freq") = 0.0,
           py::arg("baffle_width") = 0.15,
           py::arg("baffle_height") = 0.25,
-          py::arg("frequencies") = py::array_t<double>(),
+          py::arg("frequencies") = py::none(),
           py::arg("angular_resolution") = 5.0);
 
     m.def("interpolate", &arrayant_interpolate,
