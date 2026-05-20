@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.6"
 author: "Stephan Jaeckel"
-date: "19.05.2026"
+date: "20.05.2026"
 lang: en-US
 ---
 
@@ -30,59 +30,59 @@ lang: en-US
 | [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) | Array antenna functions | 92 |
 | [arrayant_calc_directivity](#arrayant_calc_directivity) | Array antenna functions | 144 |
 | [arrayant_combine_pattern](#arrayant_combine_pattern) | Array antenna functions | 182 |
-| [arrayant_concat](#arrayant_concat) | Array antenna functions | 224 |
-| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | 254 |
-| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | 282 |
-| [arrayant_generate](#arrayant_generate) | Array antenna functions | 311 |
-| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | 432 |
-| [arrayant_qdant_read](#arrayant_qdant_read) | Array antenna functions | 503 |
-| [arrayant_qdant_write](#arrayant_qdant_write) | Array antenna functions | 543 |
-| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | 595 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 647 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 709 |
-| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 771 |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | 807 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 835 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 893 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 922 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 948 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 972 |
-| [hdf5_version](#hdf5_version) | Channel functions | 998 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1014 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1050 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1082 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1115 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1172 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1216 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1286 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1352 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1401 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1452 |
-| [acdf](#acdf) | Channel statistics | 1510 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1541 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1581 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1623 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1651 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1681 |
-| [cart2geo](#cart2geo) | Math functions | 1703 |
-| [fast_sincos](#fast_sincos) | Math functions | 1730 |
-| [geo2cart](#geo2cart) | Math functions | 1758 |
-| [interp](#interp) | Math functions | 1798 |
-| [version](#version) | Miscellaneous / Tools | 1829 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1846 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1870 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1909 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1947 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1973 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2081 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2108 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2135 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2164 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2231 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2271 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2311 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2333 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2360 |
+| [arrayant_concat](#arrayant_concat) | Array antenna functions | 232 |
+| [arrayant_copy_element](#arrayant_copy_element) | Array antenna functions | 262 |
+| [arrayant_export_obj_file](#arrayant_export_obj_file) | Array antenna functions | 290 |
+| [arrayant_generate](#arrayant_generate) | Array antenna functions | 319 |
+| [arrayant_interpolate](#arrayant_interpolate) | Array antenna functions | 440 |
+| [arrayant_qdant_read](#arrayant_qdant_read) | Array antenna functions | 511 |
+| [arrayant_qdant_write](#arrayant_qdant_write) | Array antenna functions | 551 |
+| [arrayant_rotate_pattern](#arrayant_rotate_pattern) | Array antenna functions | 603 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 655 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 717 |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 779 |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | 815 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 843 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 901 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 930 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 956 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 980 |
+| [hdf5_version](#hdf5_version) | Channel functions | 1006 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 1022 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1058 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1090 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1123 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1180 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1224 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1294 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1360 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1409 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1460 |
+| [acdf](#acdf) | Channel statistics | 1518 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1549 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1589 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1631 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1659 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1689 |
+| [cart2geo](#cart2geo) | Math functions | 1711 |
+| [fast_sincos](#fast_sincos) | Math functions | 1738 |
+| [geo2cart](#geo2cart) | Math functions | 1766 |
+| [interp](#interp) | Math functions | 1806 |
+| [version](#version) | Miscellaneous / Tools | 1837 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1854 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1878 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1917 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1955 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1981 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2089 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2116 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2143 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2172 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2239 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2279 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2319 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2341 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2368 |
 
 ---
 
@@ -182,9 +182,11 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 ## arrayant_combine_pattern
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output
-  element per port (column) of the coupling matrix
-- Useful for beamforming and MIMO channel computation speedup
+- Integrates the element field patterns, element positions, and coupling weights into one effective
+  pattern per port (column of the coupling matrix)
+- The result behaves as a virtual array with one element per port, zeroed element positions, and an
+  identity coupling matrix
+- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
 
 ### Usage:
 ```
@@ -219,6 +221,12 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
   when `freq` is omitted) otherwise.
 - **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
   results** (single-struct input with scalar/omitted `freq`, or separate-input mode).
+
+### See also:
+- [arrayant_generate](#arrayant_generate) (for field layout in the arrayant struct)
+- [arrayant_rotate_pattern](#arrayant_rotate_pattern) (for changing the orientation of elements before combining)
+- [arrayant_calc_beamwidth](#arrayant_calc_beamwidth) (calculates the beam width of array antennas)
+- [arrayant_calc_directivity](#arrayant_calc_directivity) (directivity in dBi of array antenna elements)
 
 ---
 ## arrayant_concat

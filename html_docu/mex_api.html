@@ -282,8 +282,9 @@ directivity = quadriga_lib.arrayant_calc_directivity(e_theta_re, e_theta_im, e_p
 <hr class="thin">
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 <ul>
-<li>Integrates <code>e_theta_re/im</code>, <code>e_phi_re/im</code>, <code>element_pos</code>, and <code>coupling_re/im</code> to produce one output element per port (column) of the coupling matrix</li>
-<li>Useful for beamforming and MIMO channel computation speedup</li>
+<li>Integrates the element field patterns, element positions, and coupling weights into one effective pattern per port (column of the coupling matrix)</li>
+<li>The result behaves as a virtual array with one element per port, zeroed element positions, and an identity coupling matrix</li>
+<li>Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning</li>
 </ul>
 
 <b>Usage:</b><br>
@@ -315,6 +316,14 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
 <ul>
 <li><b><code>arrayant_out</code></b> — Arrayant struct (single-frequency result) or struct array (multi-frequency result); field layout as documented in <a href="#arrayant_generate">arrayant_generate</a>. Single struct when both input and <code>freq</code> describe a single frequency; struct array of size <code>numel(freq)</code> (or <code>numel(arrayant_in)</code> when <code>freq</code> is omitted) otherwise.</li>
 <li><b><code>e_theta_re</code>, ..., <code>name</code></b> — Separate-field outputs; <i></i>only available for single-frequency results<i></i> (single-struct input with scalar/omitted <code>freq</code>, or separate-input mode).</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#arrayant_generate">arrayant_generate</a> (for field layout in the arrayant struct)</li>
+<li><a href="#arrayant_rotate_pattern">arrayant_rotate_pattern</a> (for changing the orientation of elements before combining)</li>
+<li><a href="#arrayant_calc_beamwidth">arrayant_calc_beamwidth</a> (calculates the beam width of array antennas)</li>
+<li><a href="#arrayant_calc_directivity">arrayant_calc_directivity</a> (directivity in dBi of array antenna elements)</li>
 </ul>
 
 <hr class="greyline"><br>

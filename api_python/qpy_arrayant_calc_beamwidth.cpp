@@ -30,8 +30,7 @@ bw_az, bw_el, az_pt, el_pt = quadriga_lib.arrayant.calc_beamwidth( arrayant, ele
 - **`arrayant`** — Arrayant dict; single-frequency or multi-frequency (4th pattern dim is frequency);
   only `e_theta_re`, `e_theta_im`, `e_phi_re`, `e_phi_im`, `azimuth_grid`, `elevation_grid` are used;
   see [[generate]] for the field layout
-- **`element`** — Element indices (0-based); if None or empty, all elements are used; `(n_out,)` or None;
-  default: None
+- **`element`** — Element indices; if None or empty, all elements are used; `(n_out,)` or None; default: None
 - **`threshold_dB`** — Threshold in dB (3 = FWHM); default: 3.0
 
 ## Outputs:
@@ -58,7 +57,7 @@ py::tuple arrayant_calc_beamwidth(const py::dict &arrayant,
     if (n_elements == 0)
         throw std::invalid_argument("Array antenna has no elements.");
 
-    // Element indices (0-based); empty input → all elements
+    // Element indices; empty input → all elements
     const auto element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
     const arma::uvec element_ind = element_a.empty() ? arma::regspace<arma::uvec>(0, n_elements - 1) : element_a;
 

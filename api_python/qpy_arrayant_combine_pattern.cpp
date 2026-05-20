@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
 
@@ -23,89 +10,81 @@ SECTION!*/
 
 /*!MD
 # combine_pattern
-Calculate effective radiation patterns for array antennas
+Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-## Description:
-An array antenna consists of multiple individual elements. Each element occupies a specific position
-relative to the array's phase-center, its local origin. Elements can also be inter-coupled,
-represented by a coupling matrix. By integrating the element radiation patterns, their positions,
-and the coupling weights, one can determine an effective radiation pattern observable by a receiver
-in the antenna's far field. Leveraging these effective patterns is especially beneficial in antenna
-design, beamforming applications such as in 5G systems, and in planning wireless communication
-networks in complex environments like urban areas. This streamlined approach offers a significant
-boost in computation speed when calculating MIMO channel coefficients, as it reduces the number of
-necessary operations. The function `arrayant_combine_pattern` is designed to compute these effective
-radiation patterns.
+- Integrates the element field patterns, element positions, and coupling weights into one effective
+  pattern per port (column of the coupling matrix)
+- The result behaves as a virtual array with one element per port, zeroed element positions, and an
+  identity coupling matrix
+- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
+- Accepts a frequency-dependent antenna (4D pattern fields); the pattern is then combined per frequency
+- `freq` may recompute (interpolate) the combined pattern at one or more requested frequencies
 
 ## Usage:
 ```
-from quadriga_lib import arrayant
+# Single frequency
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant )
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
 
-# Minimal example
-arrayant_out = arrayant.combine_pattern(arrayant)
-
-# Optional inputs: freq, azimuth_grid, elevation_grid
-arrayant_out = arrayant.combine_pattern(arrayant, freq, azimuth_grid, elevation_grid)
+# Multiple frequencies (freq as a 1D array, or a frequency-dependent input antenna)
+arrayant_out = quadriga_lib.arrayant.combine_pattern( arrayant, freq, azimuth_grid, elevation_grid )
 ```
 
-## Input Arguments:
-- **`arrayant`**<br>
-  Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation, n_azimuth, n_elements)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
-  `element_pos`    | Antenna element (x,y,z) positions                     | Shape: `(3, n_elements)`
-  `coupling_re`    | Coupling matrix, real part                            | Shape: `(n_elements, n_ports)`
-  `coupling_im`    | Coupling matrix, imaginary part                       | Shape: `(n_elements, n_ports)`
-  `center_freq`    | Center frequency in [Hz], optional                    | Scalar
-  `name`           | Name of the array antenna object, optional            | String
+## Inputs:
+- **`arrayant`** — Dict with the array antenna data; keys as documented in [[generate]]
+- **`freq`** — Alternative center frequency in Hz; scalar or 1D array; if given, the pattern is
+  recomputed at each value; if `None`, each input entry's `center_freq` is used; a scalar `<= 0`
+  is treated as not given; default: `None`
+- **`azimuth_grid`** — Alternative output azimuth grid in rad; -pi to pi; sorted; `(n_azimuth_out,)`;
+  if `None`, the input grid is used; default: `None`
+- **`elevation_grid`** — Alternative output elevation grid in rad; -pi/2 to pi/2; sorted;
+  `(n_elevation_out,)`; if `None`, the input grid is used; default: `None`
 
-- **`freq`** (optional)<br>
-  An alternative value for the center frequency. Overwrites the value given in `arrayant_in`. If
-  neither `freq` not `arrayant_in["center_freq")` are given, an error is thrown.
+## Outputs:
+- **`arrayant_out`** — Dict with the combined array antenna data; keys as in [[generate]]
 
-- **`azimuth_grid`** (optional)<br>
-  Alternative azimuth angles for the output in [rad], -pi to pi, sorted, Shape: `(n_azimuth_out)`,
-  If not given, `arrayant_in["azimuth_grid")` is used instead.
-
-- **`elevation_grid`** (optional)<br>
-  Alternative elevation angles for the output in [rad], -pi/2 to pi/2, sorted, Shape: `(n_elevation_out)`,
-  If not given, `arrayant_in["elevation_grid")` is used instead.
-
-## Output Arguments:
-- **`arrayant_out`**<br>
-  Dictionary containing the arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_out, n_azimuth_out, n_ports)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_azimuth_out, n_azimuth_out, n_ports)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_out)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_azimuth_out)`
-  `element_pos`    | Antenna element (x,y,z) positions, set to 0           | Shape: `(3, n_ports)`
-  `coupling_re`    | Coupling matrix, real part, identity matrix           | Shape: `(n_ports, n_ports)`
-  `coupling_im`    | Coupling matrix, imaginary part, zero matrix          | Shape: `(n_ports, n_ports)`
-  `center_freq`    | Center frequency in [Hz]                              | Scalar
-  `name`           | Name of the array antenna object, same as input       | String
+## See also:
+- [[generate]] (for field layout in the arrayant struct)
+- [[rotate_pattern]] (for changing the orientation of elements before combining)
+- [[calc_beamwidth]] (calculates the beam width of array antennas)
+- [[calc_directivity]] (directivity in dBi of array antenna elements)
 MD!*/
 
-py::dict arrayant_combine_pattern(const py::dict &arrayant,                  // Input data
-                                  double freq,                               // The center frequency in [Hz]
-                                  const py::array_t<double> &azimuth_grid,   // Optional alternative azimuth_grid
-                                  const py::array_t<double> &elevation_grid) // Optional alternative elevation_grid)
+py::dict arrayant_combine_pattern(const py::dict &arrayant,
+                                  py::handle freq,
+                                  py::handle azimuth_grid,
+                                  py::handle elevation_grid)
 {
-    auto ant = qd_python_dict2arrayant(arrayant, true);
+    // Optional output grids (empty Col = keep the input grid)
+    const auto azimuth_grid_a = qd_python_numpy2arma_Col<double>(azimuth_grid, true);
+    const auto elevation_grid_a = qd_python_numpy2arma_Col<double>(elevation_grid, true);
 
-    if (freq > 0.0)
-        ant.center_frequency = freq;
+    // Optional frequency override: accepts a scalar or a 1D array.
+    arma::vec freq_a = qd_python_numpy2arma_Col<double>(freq, true);
+    if (freq_a.n_elem == 1 && freq_a[0] <= 0.0)
+        freq_a.reset();
 
-    const auto az = qd_python_numpy2arma_Col(azimuth_grid, true);
-    const auto el = qd_python_numpy2arma_Col(elevation_grid, true);
+    // Parse the (possibly frequency-dependent) input antenna; length 1 for a single-freq dict.
+    auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true);
 
-    auto arrayant_out = ant.combine_pattern(&az, &el);
-    arrayant_out.center_frequency = freq;
+    // Multi-frequency branch: frequency-dependent input, or a freq vector with > 1 entry
+    if (ant.size() > 1 || freq_a.n_elem > 1)
+    {
+        auto out = quadriga_lib::arrayant_combine_pattern_multi(ant, &azimuth_grid_a, &elevation_grid_a, &freq_a);
+        return qd_python_arrayant2dict_multi(out);
+    }
 
+    // Single-frequency branch
+    if (freq_a.n_elem == 1)
+        ant[0].center_frequency = freq_a[0];
+
+    auto arrayant_out = ant[0].combine_pattern(&azimuth_grid_a, &elevation_grid_a);
     return qd_python_arrayant2dict(arrayant_out);
 }
+
+// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
+// m.def("combine_pattern", &arrayant_combine_pattern,
+//       py::arg("arrayant"),
+//       py::arg("freq") = py::none(),
+//       py::arg("azimuth_grid") = py::none(),
+//       py::arg("elevation_grid") = py::none());

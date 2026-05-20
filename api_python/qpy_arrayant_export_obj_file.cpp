@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
 
@@ -23,58 +10,58 @@ SECTION!*/
 
 /*!MD
 # export_obj_file
-Creates a Wavefront OBJ file for visualizing the shape of the antenna pattern
+Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
+
+- The pattern is mapped onto an icosphere; a higher `icosphere_n_div` gives a finer mesh
+- The OBJ file is written to `fn`; the function returns nothing
+- Accepts a frequency-dependent antenna (4D pattern fields); `freq_ind` selects which frequency
+  entry is exported
 
 ## Usage:
-
 ```
-from quadriga_lib import arrayant
-arrayant.export_obj_file( fn, arrayant, directivity_range, colormap,
-                object_radius, icosphere_n_div, i_element )
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius,
+    icosphere_n_div, element, freq_ind )
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the OBJ file, string
-
-- **`arrayant`**<br>
-  Dictionary containing array antenna data with at least the following keys:
-  `e_theta_re`     | Real part of e-theta field component             | Shape: `(n_elevation, n_azimuth, n_elements_c)`
-  `e_theta_im`     | Imaginary part of e-theta field component        | Shape: `(n_elevation, n_azimuth, n_elements_c)`
-  `e_phi_re`       | Real part of e-phi field component               | Shape: `(n_elevation, n_azimuth, n_elements_c)`
-  `e_phi_im`       | Imaginary part of e-phi field component          | Shape: `(n_elevation, n_azimuth, n_elements_c)`
-  `azimuth_grid`   | Azimuth angles in [rad] -pi to pi, sorted        | Shape: `(n_azimuth)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted | Shape: `(n_elevation)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional      | Shape: `(3, n_elements)`
-  `name`           | Name of the array antenna object                 | String
-
-- **`directivity_range`**<br>
-  Directivity range of the antenna pattern visualization in dB
-
-- **`colormap`**<br>
-  Colormap for the visualization, string, supported are 'jet', 'parula', 'winter', 'hot', 'turbo',
-  'copper', 'spring', 'cool', 'gray', 'autumn', 'summer', Optional, default = 'jet'
-
-- **`object_radius`**<br>
-  Radius in meters of the exported object
-
-- **`icosphere_n_div`**<br>
-  Map pattern to an Icosphere with given number of subdivisions
-
-- **`element`**<br>
-  Antenna element indices, 0-based, empty = export all
+## Inputs:
+- **`fn`** — Output OBJ filename; str; must not be empty and must end in `.obj`
+- **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
+- **`directivity_range`** — Dynamic range of the visualized directivity pattern in dB; default: 30.0
+- **`colormap`** — Colormap name; default: jet; Available: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
+- **`object_radius`** — Radius of the exported object in meters; default: 1.0
+- **`icosphere_n_div`** — Icosphere subdivision count; higher gives a finer mesh; see [[icosphere]]; default: 4
+- **`element`** — Element indices to export; 1D list or array of int; `None` or empty exports all elements; default: `None`
+- **`freq_ind`** — Frequency index to export from a frequency-dependent antenna; must satisfy `0 <= freq_ind < n_freq`; default: 0
 MD!*/
 
-void arrayant_export_obj_file(const std::string fn,
-                              const py::dict arrayant,
+void arrayant_export_obj_file(const std::string &fn,
+                              const py::dict &arrayant,
                               double directivity_range,
-                              const std::string colormap,
+                              const std::string &colormap,
                               double object_radius,
-                              unsigned icosphere_n_div,
-                              const py::array_t<arma::uword> element)
+                              arma::uword icosphere_n_div,
+                              py::handle element,
+                              arma::uword freq_ind)
 {
-    const auto ant = qd_python_dict2arrayant(arrayant, true);
-    const arma::uvec i_element_a = qd_python_numpy2arma_Col(element);
+    // Element indices (0-based); empty uvec = export all elements
+    const arma::uvec element_a = qd_python_numpy2arma_Col<arma::uword>(element, true);
 
-    ant.export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, i_element_a);
+    // Parse the (possibly frequency-dependent) input antenna
+    const auto ant = qd_python_dict2arrayant_multi(arrayant, true, false, true);
+
+    if (freq_ind >= ant.size())
+        throw std::invalid_argument("'freq_ind' is out of bound.");
+
+    ant[freq_ind].export_obj_file(fn, directivity_range, colormap, object_radius, icosphere_n_div, element_a);
 }
+
+// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
+// m.def("export_obj_file", &arrayant_export_obj_file,
+//       py::arg("fn"),
+//       py::arg("arrayant"),
+//       py::arg("directivity_range") = 30.0,
+//       py::arg("colormap") = "jet",
+//       py::arg("object_radius") = 1.0,
+//       py::arg("icosphere_n_div") = 4,
+//       py::arg("element") = py::none(),
+//       py::arg("freq_ind") = 0);
