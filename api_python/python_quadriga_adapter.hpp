@@ -173,6 +173,16 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     // Determine number of frequencies from e_theta_re shape
     py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
     int nd = (int)e_theta_re_arr.request().ndim;
+
+    // 1D/2D pattern fields describe a single-frequency antenna with implicit trailing dimensions. 
+    // Delegate to the single-frequency parser (qd_python_numpy2arma_Cube promotes them to 3D cubes) and return a length-1 vector.
+    if (nd < 3)
+    {
+        std::vector<quadriga_lib::arrayant<double>> ant(1);
+        ant[0] = qd_python_dict2arrayant(arrayant, view, strict, validate);
+        return ant;
+    }
+
     size_t n_freq = 1;
     if (nd == 4)
         n_freq = (size_t)e_theta_re_arr.request().shape[3];

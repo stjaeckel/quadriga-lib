@@ -741,6 +741,11 @@ static arma::Col<dtype> qd_python_numpy2arma_Col(const py::handle &obj, bool vie
         pyarray = py::cast<py::array_t<dtype>>(obj);
         view = false;
     }
+    if (pyarray.ndim() == 0)
+    {
+        pyarray = py::array_t<dtype>(1, pyarray.data());
+        view = false;
+    }
     return qd_python_numpy2arma_Col(pyarray, view, strict);
 }
 
@@ -760,6 +765,11 @@ static arma::Mat<dtype> qd_python_numpy2arma_Mat(const py::handle &obj, bool vie
         pyarray = py::cast<py::array_t<dtype>>(obj);
         view = false;
     }
+    if (pyarray.ndim() == 0)
+    {
+        pyarray = py::array_t<dtype>(1, pyarray.data());
+        view = false;
+    }
     return qd_python_numpy2arma_Mat(pyarray, view, strict);
 }
 
@@ -777,6 +787,11 @@ static arma::Cube<dtype> qd_python_numpy2arma_Cube(const py::handle &obj, bool v
         if (view && strict)
             throw std::invalid_argument("Expected a numpy.ndarray, but got something else.");
         pyarray = py::cast<py::array_t<dtype>>(obj);
+        view = false;
+    }
+    if (pyarray.ndim() == 0)
+    {
+        pyarray = py::array_t<dtype>(1, pyarray.data());
         view = false;
     }
     return qd_python_numpy2arma_Cube(pyarray, view, strict);

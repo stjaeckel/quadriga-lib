@@ -12,9 +12,11 @@ SECTION!*/
 # ARRAYANT_COMBINE_PATTERN
 Combine element patterns, positions, and coupling weights into effective radiation patterns
 
-- Integrates `e_theta_re/im`, `e_phi_re/im`, `element_pos`, and `coupling_re/im` to produce one output
-  element per port (column) of the coupling matrix
-- Useful for beamforming and MIMO channel computation speedup
+- Integrates the element field patterns, element positions, and coupling weights into one effective
+  pattern per port (column of the coupling matrix)
+- The result behaves as a virtual array with one element per port, zeroed element positions, and an
+  identity coupling matrix
+- Speeds up MIMO channel computation; useful for beamforming in 5G systems and network planning
 
 ## Usage:
 ```
@@ -49,6 +51,12 @@ arrayant_out = quadriga_lib.arrayant_combine_pattern( [], center_freq_new, azimu
   when `freq` is omitted) otherwise.
 - **`e_theta_re`, ..., `name`** — Separate-field outputs; **only available for single-frequency
   results** (single-struct input with scalar/omitted `freq`, or separate-input mode).
+
+## See also:
+- [[arrayant_generate]] (for field layout in the arrayant struct)
+- [[arrayant_rotate_pattern]] (for changing the orientation of elements before combining)
+- [[arrayant_calc_beamwidth]] (calculates the beam width of array antennas)
+- [[arrayant_calc_directivity]] (directivity in dBi of array antenna elements)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])

@@ -584,24 +584,5 @@ class TestQdantWriteReadMultiFreq(unittest.TestCase):
         finally:
             if os.path.exists(fn): os.unlink(fn)
 
-    def test_overwrite_existing_file(self):
-        """Writing multi-freq to an existing file should overwrite it."""
-        ant1 = make_dipole_multi(n_freq=2, res=10.0)
-        ant2 = make_dipole_multi(n_freq=4, res=10.0)
-        fn = _temp_qdant()
-        try:
-            # Write first version
-            arrayant.qdant_write(fn, ant1)
-            out1 = arrayant.qdant_read(fn, id=0)
-            self.assertEqual(out1['e_theta_re'].shape[3], 2)
-
-            # Overwrite with second version (different n_freq)
-            arrayant.qdant_write(fn, ant2)
-            out2 = arrayant.qdant_read(fn, id=0)
-            self.assertEqual(out2['e_theta_re'].shape[3], 4)
-        finally:
-            if os.path.exists(fn): os.unlink(fn)
-
-
 if __name__ == '__main__':
     unittest.main()

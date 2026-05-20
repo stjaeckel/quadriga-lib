@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_quadriga_adapter.hpp"
 
@@ -23,80 +10,49 @@ SECTION!*/
 
 /*!MD
 # rotate_pattern
-Rotates antenna patterns
+Rotate antenna radiation patterns around the principal axes using Euler rotations
 
-## Description:
-- This function transforms the radiation patterns of array antenna elements, allowing for
-  precise rotations around the three principal axes (x, y, z) of the local Cartesian coordinate system.
-  The 3 rotations are applied in the order: 1. rotation around the x-axis (bank angle);
-  2. rotation around the y-axis (tilt angle), 3. rotation around the z-axis (heading angle).
-- Supports both single-frequency arrayants (3D pattern fields) and multi-frequency arrayants
-  (4D pattern fields). For multi-frequency inputs, the rotation is applied consistently across all
-  frequency entries. The function auto-detects the format by inspecting the dimensionality of
-  `e_theta_re` (3D = single, 4D = multi).
-- **Note on usage modes for multi-frequency:** Grid adjustment (usage 0 and 1) is not supported for
-  multi-frequency arrayants because all frequency entries must share the same angular grid. The multi-
-  frequency path automatically maps usage 0 → 3 (pattern + polarization, no grid adjust) and
-  usage 1 → 4 (pattern only, no grid adjust). Usage 2 (polarization only) works identically in both
-  paths.
+- Rotates the pattern and/or polarization of array antenna elements around the x (bank), y (tilt), and z (heading) axes
+- Rotations are applied in the order x, y, z, composed as Rz·Ry·Rx (intrinsic Tait-Bryan)
+- Single-frequency input (3D pattern fields): `usage` 0 and 1 adjust the sampling grid for non-uniformly sampled antennas
+- Frequency-dependent input (4D pattern fields): the rotation is applied to every entry and the grid is never adjusted,
+  since all entries must share one grid
+- For scalar acoustic fields (pressure stored in `e_theta_re` only) use `usage = 1` to avoid spurious polarization effects
 
 ## Usage:
-
 ```
-from quadriga_lib import arrayant
+# Rotate all elements by 45 deg bank
+arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, x_deg=45.0 )
 
-# Single-frequency: rotate all elements by 45 deg bank
-arrayant_out = arrayant.rotate_pattern(ant, x_deg=45.0)
+# Rotate only elements 0 and 1 by 90 deg heading
+arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, z_deg=90.0, element=[0, 1] )
 
-# Single-frequency: rotate only elements 0 and 1 (0-based)
-arrayant_out = arrayant.rotate_pattern(ant, z_deg=90.0, element=[0, 1])
-
-# Multi-frequency (4D patterns): same interface
-speaker_out = arrayant.rotate_pattern(speaker, y_deg=10.0)
+# Frequency-dependent input (4D patterns) — same interface
+arrayant_out = quadriga_lib.arrayant.rotate_pattern( arrayant, y_deg=10.0 )
 ```
 
-## Input Arguments:
-- **`arrayant`**<br>
-  Dictionary containing the arrayant data. Pattern fields may be 3D (single-frequency) or
-  4D (multi-frequency, 4th dimension = frequency). The following keys are expected:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_el, n_az, n_elem)` or `(n_el, n_az, n_elem, n_freq)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_el, n_az, n_elem)` or `(n_el, n_az, n_elem, n_freq)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_el, n_az, n_elem)` or `(n_el, n_az, n_elem, n_freq)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_el, n_az, n_elem)` or `(n_el, n_az, n_elem, n_freq)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements)`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elem, n_ports)` or `(n_elem, n_ports, n_freq)`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elem, n_ports)` or `(n_elem, n_ports, n_freq)`
-  `center_freq`    | Center frequency in [Hz], optional                    | Scalar or 1D array `(n_freq)`
-  `name`           | Name of the array antenna object, optional            | String
+## Inputs:
+- **`arrayant`** — Dict with the array antenna data; keys as in [[generate]]; pattern fields may
+  be 3D `(n_elevation, n_azimuth, n_elements)` or 4D `(n_elevation, n_azimuth, n_elements, n_freq)`
+- **`x_deg`** — Rotation around the x-axis (bank) in degrees; default: 0.0
+- **`y_deg`** — Rotation around the y-axis (tilt) in degrees; default: 0.0
+- **`z_deg`** — Rotation around the z-axis (heading) in degrees; default: 0.0
+- **`usage`** — Rotation mode; default: 0<br><br>
+   | Mode | Pattern | Polarization | Grid adj. |
+   | :--: | :-----: | :----------: | :-------: |
+   | 0    | Yes     | Yes          | Yes       |
+   | 1    | Yes     | No           | Yes       |
+   | 2    | No      | Yes          | No        |
+   | 3    | Yes     | Yes          | No        |
+   | 4    | Yes     | No           | No        |
 
-- **`x_deg`** (optional)<br>
-  The rotation angle around x-axis (bank angle) in [degrees]. Default: `0.0`
+   for 4D input the grid is never adjusted, so `0`/`3` and `1`/`4` are equivalent
+- **`element`** — Element indices to rotate; 1D list or array of int; `None` or empty rotates all
+  elements; default: `None`
 
-- **`y_deg`** (optional)<br>
-  The rotation angle around y-axis (tilt angle) in [degrees]. Default: `0.0`
-
-- **`z_deg`** (optional)<br>
-  The rotation angle around z-axis (heading angle) in [degrees]. Default: `0.0`
-
-- **`usage`** (optional)<br>
-  The optional parameter 'usage' can limit the rotation procedure either to the pattern or polarization.
-  `usage = 0` | Rotate both, pattern and polarization, adjusts sampling grid (default; multi-freq: no grid adjust)
-  `usage = 1` | Rotate only pattern, adjusts sampling grid (multi-freq: no grid adjust)
-  `usage = 2` | Rotate only polarization
-  `usage = 3` | Rotate both, but do not adjust the sampling grid
-  `usage = 4` | Rotate only pattern, do not adjust the sampling grid
-
-- **`element`** (optional)<br>
-  The element indices for which the pattern should be transformed. Optional parameter. Values must
-  be between 0 and n_elements-1 (0-based). If this parameter is not provided (or an empty array is
-  passed), all elements will be rotated by the same angles. Shape: `(n_elements)` or empty `()`
-
-## Output Arguments:
-- **`arrayant_out`**<br>
-  Dictionary containing the arrayant data with the rotated patterns. Output format matches the
-  input format (3D for single-frequency, 4D for multi-frequency).
+## Outputs:
+- **`arrayant_out`** — Dict with the rotated array antenna data; same keys and layout as
+  `arrayant`; single-frequency dict for 3D input, frequency-dependent dict for 4D input
 MD!*/
 
 py::dict arrayant_rotate_pattern(const py::dict &arrayant,
@@ -104,49 +60,37 @@ py::dict arrayant_rotate_pattern(const py::dict &arrayant,
                                  double y_deg,
                                  double z_deg,
                                  unsigned usage,
-                                 const py::array_t<unsigned> &element)
+                                 py::handle element)
 {
-    const auto element_ind = qd_python_numpy2arma_Col(element, true);
+    // Element indices (0-based); empty = rotate all elements
+    const arma::uvec element_ind = qd_python_numpy2arma_Col<arma::uword>(element, true);
 
-    // Detect single vs multi-frequency from e_theta_re dimensionality
-    py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
-    int nd = (int)e_theta_re_arr.request().ndim;
+    // Parse the (possibly frequency-dependent) antenna
+    auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false, false, true);
 
-    if (nd == 4) // Multi-frequency path
+    if (ant_vec.size() > 1) // Frequency-dependent: rotate every entry
     {
-        auto ant_vec = qd_python_dict2arrayant_multi(arrayant, false);
-
-        // Validate multi-frequency consistency
-        std::string err = quadriga_lib::arrayant_is_valid_multi(ant_vec, true);
-        if (!err.empty())
-            throw std::invalid_argument(err);
-
-        // Element indices are 0-based in Python; arrayant_rotate_pattern_multi also uses 0-based
-        arma::uvec i_element;
-        if (element_ind.n_elem > 0)
-        {
-            i_element.set_size(element_ind.n_elem);
-            for (arma::uword i = 0; i < element_ind.n_elem; ++i)
-                i_element[i] = (arma::uword)(element_ind[i]);
-        }
-
-        usage = (usage == 3) ? 0 : usage;
-        usage = (usage == 4) ? 1 : usage;
-
-        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, x_deg, y_deg, z_deg, usage, i_element);
-
-        return qd_python_arrayant2dict_multi(ant_vec);
+        unsigned usage_multi = (usage == 3) ? 0 : ((usage == 4) ? 1 : usage);
+        quadriga_lib::arrayant_rotate_pattern_multi(ant_vec, x_deg, y_deg, z_deg, usage_multi, element_ind);
     }
-    else // Single-frequency path
+    else // Single-frequency: usage 0/1 adjust the sampling grid.
     {
-        auto ant = qd_python_dict2arrayant(arrayant, false); // Copy
-
+        auto &ant = ant_vec[0];
         if (element_ind.n_elem == 0)
             ant.rotate_pattern(x_deg, y_deg, z_deg, usage);
         else
-            for (auto el : element_ind)
-                ant.rotate_pattern(x_deg, y_deg, z_deg, usage, el);
-
-        return qd_python_arrayant2dict(ant);
+            for (arma::uword el : element_ind)
+                ant.rotate_pattern(x_deg, y_deg, z_deg, usage, (unsigned)el);
     }
+
+    return qd_python_arrayant2dict_multi(ant_vec);
 }
+
+// pybind11 declaration (register under the `arrayant` submodule in python_main.cpp):
+// m.def("rotate_pattern", &arrayant_rotate_pattern,
+//       py::arg("arrayant"),
+//       py::arg("x_deg") = 0.0,
+//       py::arg("y_deg") = 0.0,
+//       py::arg("z_deg") = 0.0,
+//       py::arg("usage") = 0,
+//       py::arg("element") = py::none());

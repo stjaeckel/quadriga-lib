@@ -11,6 +11,7 @@ namespace py = pybind11;
 #include "qpy_arrayant_calc_beamwidth.cpp"
 #include "qpy_arrayant_calc_directivity.cpp"
 #include "qpy_arrayant_combine_pattern.cpp"
+#include "qpy_arrayant_concat.cpp"
 #include "qpy_arrayant_copy_element.cpp"
 #include "qpy_arrayant_export_obj_file.cpp"
 #include "qpy_arrayant_generate.cpp"
@@ -35,24 +36,29 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("element") = py::none());
 
     m.def("combine_pattern", &arrayant_combine_pattern,
-          py::arg("arrayant") = py::dict(),
-          py::arg("freq") = 0.0,
-          py::arg("azimuth_grid") = py::array_t<double>(),
-          py::arg("elevation_grid") = py::array_t<double>());
+          py::arg("arrayant"),
+          py::arg("freq") = py::none(),
+          py::arg("azimuth_grid") = py::none(),
+          py::arg("elevation_grid") = py::none());
+
+    m.def("concat", &arrayant_concat,
+          py::arg("arrayant1"),
+          py::arg("arrayant2"));
 
     m.def("copy_element", &arrayant_copy_element,
-          py::arg("arrayant") = py::dict(),
-          py::arg("source_element") = py::array_t<arma::uword>(),
-          py::arg("dest_element") = py::array_t<arma::uword>());
+          py::arg("arrayant"),
+          py::arg("source_element"),
+          py::arg("dest_element"));
 
     m.def("export_obj_file", &arrayant_export_obj_file,
           py::arg("fn"),
-          py::arg("arrayant") = py::dict(),
+          py::arg("arrayant"),
           py::arg("directivity_range") = 30.0,
           py::arg("colormap") = "jet",
           py::arg("object_radius") = 1.0,
           py::arg("icosphere_n_div") = 4,
-          py::arg("element") = py::array_t<arma::uword>());
+          py::arg("element") = py::none(),
+          py::arg("freq_ind") = 0);
 
     m.def("generate", &arrayant_generate,
           py::arg("type"),
@@ -95,13 +101,13 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("angular_resolution") = 5.0);
 
     m.def("interpolate", &arrayant_interpolate,
-          py::arg("arrayant") = py::dict(),
-          py::arg("azimuth") = py::array_t<double>(),
-          py::arg("elevation") = py::array_t<double>(),
-          py::arg("element") = py::array_t<arma::uword>(),
-          py::arg("orientation") = py::array_t<double>(),
-          py::arg("element_pos") = py::array_t<double>(),
-          py::arg("frequency") = py::array_t<double>(),
+          py::arg("arrayant"),
+          py::arg("azimuth") = py::none(),
+          py::arg("elevation") = py::none(),
+          py::arg("element") = py::none(),
+          py::arg("orientation") = py::none(),
+          py::arg("element_pos") = py::none(),
+          py::arg("frequency") = py::none(),
           py::arg("complex") = false,
           py::arg("dist") = false,
           py::arg("local_angles") = false,
@@ -111,17 +117,17 @@ void quadriga_lib_arrayant(py::module_ &m)
 
     m.def("qdant_write", &arrayant_qdant_write,
           py::arg("fn"),
-          py::arg("arrayant") = py::dict(),
-          py::arg("id") = 1,
-          py::arg("layout") = py::array_t<unsigned>());
+          py::arg("arrayant"),
+          py::arg("id") = 0,
+          py::arg("layout") = py::none());
 
     m.def("rotate_pattern", &arrayant_rotate_pattern,
-          py::arg("arrayant") = py::dict(),
+          py::arg("arrayant"),
           py::arg("x_deg") = 0.0,
           py::arg("y_deg") = 0.0,
           py::arg("z_deg") = 0.0,
           py::arg("usage") = 0,
-          py::arg("element") = py::array_t<unsigned>());
+          py::arg("element") = py::none());
 
     m.def("get_channels_planar", &get_channels_planar,
           py::arg("ant_tx") = py::dict(),

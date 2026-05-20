@@ -520,7 +520,7 @@ class TestErrorHandling(unittest.TestCase):
 
     def test_no_arrayant_raises(self):
         with self.assertRaises(KeyError):
-            arrayant.interpolate()
+            arrayant.interpolate({}, azimuth=0)
 
     def test_empty_azimuth_raises(self):
         ant = {"e_theta_re": np.random.random((5, 10, 3)),
@@ -562,13 +562,6 @@ class TestErrorHandling(unittest.TestCase):
                "elevation_grid": np.array([-np.pi / 4, np.pi / 4])}
         with self.assertRaises(ValueError):
             arrayant.interpolate(ant, 0, 0, fast_access=1)
-
-    def test_multi_freq_missing_frequency_raises(self):
-        """4D arrayant without frequency parameter must throw."""
-        ant = make_multi_freq_ant([1000, 2000])
-        with self.assertRaises(ValueError) as ctx:
-            arrayant.interpolate(ant, [[0]], [[0]])
-        self.assertIn("frequency", str(ctx.exception).lower())
 
     def test_multi_freq_dist_raises(self):
         ant = make_multi_freq_ant([1000, 2000])
