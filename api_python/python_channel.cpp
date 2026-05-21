@@ -47,12 +47,14 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("radius_max") = 0.05,
           py::arg("radius_min") = 0.01,
           py::arg("n_edges") = 5,
-          py::arg("rx_pos") = py::array_t<double>(),
-          py::arg("tx_pos") = py::array_t<double>(),
+          py::arg("rx_pos") = py::none(),
+          py::arg("tx_pos") = py::none(),
           py::arg("no_interact") = py::list(),
           py::arg("interact_coord") = py::list(),
-          py::arg("center_freq") = py::array_t<double>(),
-          py::arg("coeff") = py::list(),
+          py::arg("center_freq") = py::none(),
+          py::arg("coeff") = py::none(),
+          py::arg("coeff_re") = py::none(),
+          py::arg("coeff_im") = py::none(),
           py::arg("i_snap") = py::array_t<arma::uword>());
 
     m.def("hdf5_create_file", &hdf5_create_file, py::arg("fn"),
