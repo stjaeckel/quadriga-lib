@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
@@ -24,125 +11,98 @@ SECTION!*/
 
 /*!MD
 # baseband_freq_response
-Compute the frequency-domain channel response from time-domain coefficients
+Compute the baseband frequency response of a MIMO channel
 
-## Description:
-- Transforms channel impulse response data into the frequency domain and returns the channel transfer
-  function H(f) at specified sub-carrier or output frequencies.
-- Supports two operating modes determined by the dimensionality of the input coefficient arrays:
-  1. **Single-frequency (3D inputs)**: Each list item is a 3D array of shape `(n_rx, n_tx, n_path)`.
-  Calls `baseband_freq_response` per snapshot using a DFT with AVX2 acceleration.
-  2. **Multi-frequency (4D inputs)**: Each list item is a 4D array of shape
-  `(n_rx, n_tx, n_path, n_freq_in)`. Calls `baseband_freq_response_multi` per snapshot using
-  SLERP interpolation of the coefficient envelope across frequency.
-- Coefficients can be provided as a single complex array (`coeff`) or as separate real and imaginary
-  parts (`coeff_re`, `coeff_im`). Providing both is an error.
-- The output frequency grid can be defined in two ways:
-  1. `bandwidth` + `pilot_grid` (or `carriers`): baseband offsets, for single-frequency mode.
-  2. `freq_in` + `freq_out`: absolute frequencies in Hz, works for both single-frequency and
-  multi-frequency mode. For single-frequency inputs, `bandwidth` and `pilot_grid` are derived
-    internally from `freq_out`.
-- When using multi-frequency mode, the `remove_delay_phase` flag (default `True`) undoes the
-  delay-induced phase baked into coefficients by `get_channels_multifreq` before SLERP interpolation,
-  then re-applies it analytically at each output frequency. Set to `False` only if the input
-  coefficients are pure slowly-varying envelopes without baked-in delay phase.
-- Snapshots are processed in parallel using OpenMP. The number of paths `n_path` may vary across
-  snapshots, but `n_rx`, `n_tx`, and (for 4D) `n_freq_in` must be consistent.
+- Transforms time-domain channel coefficients into the frequency-domain transfer function H(f)
+- Snapshots are passed as Python lists; each list item is one snapshot, processed in parallel via OpenMP
+- Two per-snapshot modes, selected by the ndim of the coefficient arrays:
+  - single-freq: 3D items `(n_rx, n_tx, n_path)`; DFT over path delays at the requested carriers (AVX2)
+  - multi-freq: 4D items `(n_rx, n_tx, n_path, n_freq_in)`; SLERP interpolation across `freq_in`,
+    then delay-induced phase applied per output carrier
+- All list items must share ndim, `n_rx`, `n_tx` (and `n_freq_in` for 4D); `n_path` may vary per snapshot
+- Coefficients are given either as one complex array `coeff`, or as split `coeff_re` + `coeff_im`;
+  supplying both forms is an error
+- Output carriers are defined one of two mutually exclusive ways:
+  - `bandwidth` paired with `pilot_grid` (or `carriers` for an evenly spaced grid) — single-freq only
+  - `freq_in` + `freq_out` as absolute frequencies — required for multi-freq, optional for single-freq
+- For single-freq with `freq_in` + `freq_out`, the baseband grid is derived internally; the phase is
+  referenced to `freq_in[0]` when given, else to `min(freq_out)`
+- `delay` may be broadcast: a `(1, 1, n_path)` item applies the same delays to every RX/TX pair;
+  for multi-freq a 3D delay item is reused for all input frequencies
+- `snap` selects a 0-based subset of snapshots; omitted processes all snapshots
+- Internal arithmetic is single-precision; double inputs are narrowed to float, results widened back
 
 ## Usage:
-
 ```
-import quadriga_lib
+# Single-freq, bandwidth + evenly spaced carriers
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6, carriers=128 )
 
-# Single-frequency with bandwidth + carriers
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, bandwidth=100e6 )
+# Single-freq, absolute frequencies
+hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay, freq_in=freq_in, freq_out=freq_out )
 
-# Single-frequency with freq_in + freq_out
-hmat = quadriga_lib.channel.baseband_freq_response( coeff=coeff, delay=delay,
-    freq_in=np.array([2.0e9]), freq_out=np.linspace(1.95e9, 2.05e9, 128) )
-
-# Multi-frequency with separate re/im
-hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay,
-    freq_in=freq_in, freq_out=freq_out )
+# Multi-freq, split real / imaginary parts
+hmat = quadriga_lib.channel.baseband_freq_response( coeff_re=cre, coeff_im=cim, delay=delay, freq_in=freq_in, freq_out=freq_out )
 ```
 
-## Input Arguments:
-- **`coeff`** (optional)<br>
-  Channel coefficients, complex-valued. List of length `n_snap`. Each item is a numpy array of
-  shape `(n_rx, n_tx, n_path)` (single-freq) or `(n_rx, n_tx, n_path, n_freq_in)` (multi-freq).
-  Mutually exclusive with `coeff_re` / `coeff_im`.
+## Inputs:
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`
+  (single-freq) or `(n_rx, n_tx, n_path, n_freq_in)` (multi-freq); mutually exclusive with
+  `coeff_re` / `coeff_im`; default: `None`
+- **`delay`** — Path delays in seconds; list of length `n_snap`; each item shaped like the matching
+  `coeff` item or broadcast as `(1, 1, n_path)` (with an optional 4th dimension `n_freq_in`)
+- **`bandwidth`** — Baseband bandwidth in Hz; paired with `pilot_grid` or `carriers`; single-freq only;
+  cannot be combined with `freq_out`; default: `0.0`
+- **`carriers`** — Number of evenly spaced carriers on `[0, 1]`; used only when both `pilot_grid` and
+  `freq_out` are omitted; default: 128
+- **`pilot_grid`** — Normalized sub-carrier positions, `0.0` = center, `1.0` = center + `bandwidth`;
+  1D array of length `n_carrier`; default: `None`
+- **`snap`** — 0-based snapshot indices to process; 1D array of length `n_out`; omitted processes
+  all snapshots; default: `None`
+- **`coeff_re`** — Real part of channel coefficients; same list/shape layout as `coeff`; must be
+  paired with `coeff_im`; mutually exclusive with `coeff`; default: `None`
+- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`freq_in`** — Input sample frequencies in Hz; 1D array; required for multi-freq input; for
+  single-freq input used together with `freq_out` as the phase reference; default: `None`
+- **`freq_out`** — Absolute output carrier frequencies in Hz; 1D array of length `n_carrier`;
+  required for multi-freq input; may replace `bandwidth` + `pilot_grid` for single-freq; default: `None`
+- **`remove_delay_phase`** — If `True`, undo the delay-induced phase baked in by the channel
+  generator before SLERP, then re-apply it analytically per output carrier; multi-freq only;
+  default: `True`
 
-- **`delay`**<br>
-  Propagation delays in seconds, real-valued. List of length `n_snap`. Each item is a numpy array
-  of shape `(n_rx, n_tx, n_path)` or `(1, 1, n_path)` (single-freq), or the same shapes with an
-  additional 4th dimension `n_freq_in` (multi-freq). For multi-freq, a 3D delay is broadcast to
-  all input frequencies (since delays are frequency-independent).
+## Outputs:
+- **`hmat`** — Complex frequency-domain channel matrix; shape `(n_rx, n_tx, n_carrier, n_out)`,
+  where `n_out` is the number of processed snapshots
 
-- **`bandwidth`** (optional)<br>
-  Baseband bandwidth in Hz. Used with `pilot_grid` or `carriers` to define sub-carrier positions.
-  Cannot be combined with `freq_out`. Default: `0.0`
-
-- **`carriers`** (optional)<br>
-  Number of equally spaced carriers across the bandwidth. Only used if `pilot_grid` is not given
-  and `freq_out` is not given. Default: `128`
-
-- **`pilot_grid`** (optional)<br>
-  Sub-carrier positions relative to bandwidth (0 = center freq, 1 = center + bandwidth).
-  1D numpy array of length `n_carriers`.
-
-- **`snap`** (optional)<br>
-  0-based snapshot indices to process. If not given, all snapshots are processed.
-  1D numpy array of length `n_out`.
-
-- **`coeff_re`** (optional)<br>
-  Real part of channel coefficients. Same list/shape structure as `coeff`.
-  Must be provided together with `coeff_im`. Mutually exclusive with `coeff`.
-
-- **`coeff_im`** (optional)<br>
-  Imaginary part of channel coefficients. Must match `coeff_re` in structure and shape.
-
-- **`freq_in`** (optional)<br>
-  Input sample frequencies in Hz, 1D numpy array. Required for multi-freq (4D) inputs.
-  For single-freq (3D) inputs, used together with `freq_out` to derive baseband parameters.
-
-- **`freq_out`** (optional)<br>
-  Output carrier frequencies in Hz, 1D numpy array. Required for multi-freq (4D) inputs.
-  For single-freq (3D) inputs, can replace `bandwidth` + `pilot_grid`.
-
-- **`remove_delay_phase`** (optional)<br>
-  If `True` (default), removes the delay-induced phase baked into coefficients by channel
-  generation functions (e.g. `get_channels_multifreq`) before SLERP interpolation in multi-freq
-  mode. Has no effect in single-freq mode.
-
-## Output Argument:
-- **`hmat`**<br>
-  Complex-valued frequency-domain channel matrix, numpy array of shape
-  `(n_rx, n_tx, n_carriers, n_out)`.
+## See also:
+- [[get_channels_spherical]] (single-frequency channel generator)
+- [[get_channels_multifreq]] (multi-frequency channel generator)
 MD!*/
 
 py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff,
                                                          const py::object &delay,
                                                          double bandwidth,
                                                          size_t carriers,
-                                                         const py::array_t<double> &pilot_grid,
-                                                         const py::array_t<arma::uword> &snap,
+                                                         py::handle pilot_grid,
+                                                         py::handle snap,
                                                          const py::object &coeff_re,
                                                          const py::object &coeff_im,
-                                                         const py::array_t<double> &freq_in,
-                                                         const py::array_t<double> &freq_out,
+                                                         py::handle freq_in,
+                                                         py::handle freq_out,
                                                          bool remove_delay_phase)
 {
-    // =====================================================================================
-    // Step 1: Input mode detection and basic validation
-    // =====================================================================================
-
+    // Input mode detection and basic validation
     bool have_coeff = !coeff.is_none();
     bool have_cre = !coeff_re.is_none();
     bool have_cim = !coeff_im.is_none();
     bool have_delay = !delay.is_none();
-    bool have_freq_in = (freq_in.size() > 0);
-    bool have_freq_out = (freq_out.size() > 0);
-    bool have_pilot = (pilot_grid.size() > 0);
+
+    // Convert optional frequency / pilot inputs up front (handle overloads accept None)
+    arma::vec freq_in_arma = qd_python_numpy2arma_Col<double>(freq_in, true);
+    arma::vec freq_out_arma = qd_python_numpy2arma_Col<double>(freq_out, true);
+    arma::vec pilot_grid_arma_in = qd_python_numpy2arma_Col<double>(pilot_grid, true);
+    bool have_freq_in = !freq_in_arma.is_empty();
+    bool have_freq_out = !freq_out_arma.is_empty();
+    bool have_pilot = !pilot_grid_arma_in.is_empty();
     bool have_bw = (bandwidth > 0.0);
 
     // Mutual exclusivity checks
@@ -179,10 +139,12 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
         cim_list = py::cast<py::list>(coeff_im);
     }
 
-    // Get list lengths
     size_t n_snap_total = use_complex ? coeff_list.size() : cre_list.size();
-    if (n_snap_total == 0)
-        return py::array_t<std::complex<double>>();
+    if (n_snap_total == 0) // Preserve the 4D output contract for an empty snapshot list
+    {
+        std::vector<arma::Cube<std::complex<double>>> hmat_empty;
+        return qd_python_init_output<std::complex<double>>(0, 0, 0, 0, &hmat_empty);
+    }
 
     if (delay_list.size() != n_snap_total)
         throw std::invalid_argument("Length of 'delay' list does not match coefficient list length.");
@@ -213,15 +175,12 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
             arr = py::cast<py::array>(cre_list[i]);
 
         if ((int)arr.ndim() != input_ndim)
-            throw std::invalid_argument("All coefficient arrays must have the same dimensionality. "
-                                        "Item 0 is " + std::to_string(input_ndim) + "D, but item " +
-                                        std::to_string(i) + " is " + std::to_string((int)arr.ndim()) + "D.");
+            throw std::invalid_argument("All coefficient arrays must have the same dimensionality. Item 0 is " +
+                                        std::to_string(input_ndim) + "D, but item " + std::to_string(i) +
+                                        " is " + std::to_string((int)arr.ndim()) + "D.");
     }
 
-    // =====================================================================================
-    // Step 2: Frequency grid validation
-    // =====================================================================================
-
+    // Frequency grid validation
     if (is_multifreq)
     {
         if (!have_freq_in)
@@ -237,13 +196,11 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
     {
         if (have_freq_out && have_bw)
             throw std::invalid_argument("Cannot provide both 'bandwidth' and 'freq_out'; use one or the other.");
+        if (have_pilot && !have_bw)
+            throw std::invalid_argument("'bandwidth' must be > 0 when 'pilot_grid' is given.");
         if (!have_bw && !have_freq_out)
-            throw std::invalid_argument("Must provide 'bandwidth' or 'freq_out' to define the frequency grid.");
+            throw std::invalid_argument("Must provide 'bandwidth' (with 'pilot_grid' or 'carriers') or 'freq_out' to define the frequency grid.");
     }
-
-    // Convert frequency vectors
-    arma::vec freq_in_arma = have_freq_in ? qd_python_numpy2arma_Col<double>(freq_in, true) : arma::vec();
-    arma::vec freq_out_arma = have_freq_out ? qd_python_numpy2arma_Col<double>(freq_out, true) : arma::vec();
 
     // Build pilot grid for single-freq mode
     arma::vec pilot_grid_arma;
@@ -270,7 +227,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
         }
         else if (have_pilot)
         {
-            pilot_grid_arma = qd_python_numpy2arma_Col<double>(pilot_grid, true);
+            pilot_grid_arma = pilot_grid_arma_in;
         }
         else
         {
@@ -283,14 +240,9 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
     arma::uword n_carrier = is_multifreq ? (arma::uword)freq_out_arma.n_elem : (arma::uword)pilot_grid_arma.n_elem;
     arma::uword n_freq_in_expected = is_multifreq ? (arma::uword)freq_in_arma.n_elem : 0;
 
-    // =====================================================================================
-    // Step 3: Pre-parse list items (extract arrays, pointers, shapes; validate dimensions)
-    //         Must happen before OMP to avoid GIL issues.
-    // =====================================================================================
-
+    // Pre-parse list items (extract arrays, pointers, shapes; validate dimensions)
+    // Must happen before OMP to avoid GIL issues.
     arma::uword n_rx = 0, n_tx = 0;
-
-    // --- 3D pre-parse using qd_python_get_list_shape ---
 
     // For 3D complex path
     std::vector<std::complex<double> *> coeff_ptrs_cx;
@@ -370,7 +322,8 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
     }
     else // ---- 4D multi-freq pre-parse ----
     {
-        auto alloc_4d = [&](size_t n) {
+        auto alloc_4d = [&](size_t n)
+        {
             if (use_complex)
             {
                 coeff_arrays_4d_cx.resize(n);
@@ -381,11 +334,16 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
             }
             else
             {
-                cre_arrays_4d.resize(n);  cim_arrays_4d.resize(n);
-                cre_ptrs_4d.resize(n);    cim_ptrs_4d.resize(n);
-                cre_shapes_4d.resize(n);  cim_shapes_4d.resize(n);
-                cre_nframes_4d.resize(n); cim_nframes_4d.resize(n);
-                cre_fstride_4d.resize(n); cim_fstride_4d.resize(n);
+                cre_arrays_4d.resize(n);
+                cim_arrays_4d.resize(n);
+                cre_ptrs_4d.resize(n);
+                cim_ptrs_4d.resize(n);
+                cre_shapes_4d.resize(n);
+                cim_shapes_4d.resize(n);
+                cre_nframes_4d.resize(n);
+                cim_nframes_4d.resize(n);
+                cre_fstride_4d.resize(n);
+                cim_fstride_4d.resize(n);
             }
             delay_arrays_4d.resize(n);
             delay_ptrs_4d.resize(n);
@@ -407,7 +365,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     coeff_arrays_4d_cx[i] = arr.cast<py::array_t<std::complex<double>>>();
 
                 coeff_shapes_4d_cx[i] = qd_python_get_shape(coeff_arrays_4d_cx[i], false,
-                                                             &coeff_nframes_4d_cx[i], &coeff_fstride_4d_cx[i]);
+                                                            &coeff_nframes_4d_cx[i], &coeff_fstride_4d_cx[i]);
                 coeff_ptrs_4d_cx[i] = coeff_arrays_4d_cx[i].data();
 
                 if (i == 0)
@@ -437,7 +395,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     cre_arrays_4d[i] = arr_re.cast<py::array_t<double>>();
 
                 cre_shapes_4d[i] = qd_python_get_shape(cre_arrays_4d[i], false,
-                                                        &cre_nframes_4d[i], &cre_fstride_4d[i]);
+                                                       &cre_nframes_4d[i], &cre_fstride_4d[i]);
                 cre_ptrs_4d[i] = cre_arrays_4d[i].data();
 
                 // coeff_im
@@ -448,7 +406,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                     cim_arrays_4d[i] = arr_im.cast<py::array_t<double>>();
 
                 cim_shapes_4d[i] = qd_python_get_shape(cim_arrays_4d[i], false,
-                                                        &cim_nframes_4d[i], &cim_fstride_4d[i]);
+                                                       &cim_nframes_4d[i], &cim_fstride_4d[i]);
                 cim_ptrs_4d[i] = cim_arrays_4d[i].data();
 
                 if (i == 0)
@@ -487,7 +445,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
                 delay_shapes_4d[i] = qd_python_get_shape(delay_arrays_4d[i], false);
             else if (dl_ndim == 4)
                 delay_shapes_4d[i] = qd_python_get_shape(delay_arrays_4d[i], false,
-                                                          &delay_nframes_4d[i], &delay_fstride_4d[i]);
+                                                         &delay_nframes_4d[i], &delay_fstride_4d[i]);
             else
                 throw std::invalid_argument("Snapshot " + std::to_string(i) +
                                             ": 'delay' must be 3D or 4D, got " + std::to_string(dl_ndim) + "D.");
@@ -509,16 +467,12 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
         }
     }
 
-    // =====================================================================================
-    // Step 4: Process snapshot indices and allocate output
-    // =====================================================================================
-
-    arma::uvec snap_arma;
-    if (snap.size() == 0)
+    // Process snapshot indices and allocate output
+    arma::uvec snap_arma = qd_python_numpy2arma_Col<arma::uword>(snap, true);
+    if (snap_arma.is_empty())
         snap_arma = arma::regspace<arma::uvec>(0, (arma::uword)n_snap_total - 1);
     else
     {
-        snap_arma = qd_python_numpy2arma_Col<arma::uword>(snap, true);
         for (arma::uword i = 0; i < snap_arma.n_elem; ++i)
             if (snap_arma(i) >= (arma::uword)n_snap_total)
                 throw std::invalid_argument("Snapshot index " + std::to_string(snap_arma(i)) +
@@ -531,10 +485,7 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
     std::vector<arma::Cube<std::complex<double>>> hmat_vec;
     auto output = qd_python_init_output<std::complex<double>>(n_rx, n_tx, n_carrier, n_snap_out, &hmat_vec);
 
-    // =====================================================================================
-    // Step 5: OMP parallel loop over snapshots
-    // =====================================================================================
-
+    //  OMP parallel loop over snapshots
     int n_snap_omp = (int)n_snap_out;
 
     if (!is_multifreq) // ---- Single-freq (3D) path ----
@@ -669,3 +620,17 @@ py::array_t<std::complex<double>> baseband_freq_response(const py::object &coeff
 
     return output;
 }
+
+// pybind11 declaration (channel submodule):
+// m.def("baseband_freq_response", &baseband_freq_response,
+//       py::arg("coeff") = py::none(),
+//       py::arg("delay") = py::none(),
+//       py::arg("bandwidth") = 0.0,
+//       py::arg("carriers") = 128,
+//       py::arg("pilot_grid") = py::none(),
+//       py::arg("snap") = py::none(),
+//       py::arg("coeff_re") = py::none(),
+//       py::arg("coeff_im") = py::none(),
+//       py::arg("freq_in") = py::none(),
+//       py::arg("freq_out") = py::none(),
+//       py::arg("remove_delay_phase") = true);
