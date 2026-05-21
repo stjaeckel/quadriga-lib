@@ -850,6 +850,32 @@ static std::vector<arma::Cube<dtype>> qd_python_numpy2arma_vecCube(const py::han
     return qd_python_numpy2arma_vecCube(pyarray, view, strict);
 }
 
+template <typename dtype>
+static void qd_python_numpy2arma_vecCube_Cplx(const py::array_t<std::complex<dtype>> &input,
+                                              std::vector<arma::Cube<dtype>> &real,
+                                              std::vector<arma::Cube<dtype>> &imag)
+{
+    size_t n_frames, stride_frames;
+    auto shape = qd_python_get_shape(input, false, &n_frames, &stride_frames);
+
+    real.clear(); real.resize(n_frames);
+    imag.clear(); imag.resize(n_frames);
+
+    const std::complex<dtype> *src = input.data();
+    for (size_t i = 0; i < n_frames; ++i)
+        qd_python_copy2arma(src + i * stride_frames, shape, real[i], imag[i]);
+}
+
+// py::handle overload
+template <typename dtype>
+static void qd_python_numpy2arma_vecCube_Cplx(const py::handle &obj,
+                                              std::vector<arma::Cube<dtype>> &real,
+                                              std::vector<arma::Cube<dtype>> &imag)
+{
+    auto pyarray = py::cast<py::array_t<std::complex<dtype>>>(obj);
+    qd_python_numpy2arma_vecCube_Cplx(pyarray, real, imag);
+}
+
 // -------------------------------- qd_python_list2vector --------------------------------
 
 template <typename dtype>
