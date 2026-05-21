@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.6"
 author: "Stephan Jaeckel"
-date: "20.05.2026"
+date: "21.05.2026"
 lang: en-US
 ---
 
@@ -756,14 +756,14 @@ Compute the baseband frequency response of a MIMO channel
 - **`coeff_im`** — Imaginary part of channel coefficients; same shape as `coeff_re`
 - **`delay`** — Path delays in seconds; same shape as `coeff_re`, optionally broadcast over RX/TX with
   shape `[1, 1, n_path]` or `[1, 1, n_path, ...]`
-- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth; 
+- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth;
   must be paired with `bandwidth`; `[n_carrier, 1]`
 - **`bandwidth`** — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
-- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal 
+- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal
   the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; `[n_freq, 1]`
-- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with 
+- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
-- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based 
+- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
   indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
 
 ### Outputs:

@@ -53,14 +53,14 @@ Compute the baseband frequency response of a MIMO channel
 - **`coeff_im`** — Imaginary part of channel coefficients; same shape as `coeff_re`
 - **`delay`** — Path delays in seconds; same shape as `coeff_re`, optionally broadcast over RX/TX with
   shape `[1, 1, n_path]` or `[1, 1, n_path, ...]`
-- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth; 
+- **`pilot_grid`** — Normalized sub-carrier positions; `0.0` = center, `1.0` = center + bandwidth;
   must be paired with `bandwidth`; `[n_carrier, 1]`
 - **`bandwidth`** — Total baseband bandwidth in Hz; must be paired with `pilot_grid`
-- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal 
+- **`center_freq`** — Input sample frequencies; required for multi-frequency inputs; length must equal
   the 4th dimension of `coeff_re`; for multi-snap must be omitted or scalar; `[n_freq, 1]`
-- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with 
+- **`carrier_freq`** — Absolute output carrier frequencies in Hz; cannot be combined with
   `pilot_grid` + `bandwidth`; `[n_carrier, 1]`
-- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based 
+- **`i_snap`** — Triggers multi-snap mode. Scalar `0` processes all snapshots; a positive vector of 1-based
   indices processes the selected subset. Omitting this argument or passing `[]` keeps the function in single/multi-frequency mode.
 
 ## Outputs:
@@ -89,22 +89,22 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto center_freq = (nrhs < 6) ? arma::vec() : qd_mex_get_Col<double>(prhs[5]);
     const auto carrier_freq_in = (nrhs < 7) ? arma::vec() : qd_mex_get_Col<double>(prhs[6]);
 
-// i_snap signals multi-snap mode. Scalar 0 = all snapshots; non-empty
-// positive vector = subset (1-based). Omitted or [] -> single/multi-freq mode.
-arma::uvec i_snap;
-bool has_isnap = false;
-if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
-{
-    has_isnap = true;
-    arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7]);
-    if (!(idx.n_elem == 1 && idx[0] == 0))
+    // i_snap signals multi-snap mode. Scalar 0 = all snapshots; non-empty
+    // positive vector = subset (1-based). Omitted or [] -> single/multi-freq mode.
+    arma::uvec i_snap;
+    bool has_isnap = false;
+    if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
     {
-        if (idx.min() < 1)
-            mexErrMsgIdAndTxt("quadriga_lib:CPPerror",
-                "Snapshot indices must be 1-based (>=1) or scalar 0 for all snapshots.");
-        i_snap = idx - 1; // 1-based MATLAB -> 0-based C++
+        has_isnap = true;
+        arma::uvec idx = qd_mex_get_Col<arma::uword>(prhs[7]);
+        if (!(idx.n_elem == 1 && idx[0] == 0))
+        {
+            if (idx.min() < 1)
+                mexErrMsgIdAndTxt("quadriga_lib:CPPerror",
+                                  "Snapshot indices must be 1-based (>=1) or scalar 0 for all snapshots.");
+            i_snap = idx - 1; // 1-based MATLAB -> 0-based C++
+        }
     }
- }
 
     // Identify which carrier source(s) the user supplied
     bool has_cf = !center_freq.is_empty();
@@ -197,10 +197,11 @@ if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
                 if (carrier_freq_in[0] < center_freq[0])
                     pilot_grid[0] = -1.0;
             }
-            else
+            else // Anchor pilot_grid = 0 to the carrier (center_freq); otherwise fall back to the first output carrier.
             {
                 bw = carrier_freq_in[n_c - 1] - carrier_freq_in[0];
-                pilot_grid = (carrier_freq_in - carrier_freq_in[0]) / bw;
+                double f_ref = has_cf ? center_freq[0] : carrier_freq_in[0];
+                pilot_grid = (carrier_freq_in - f_ref) / bw;
             }
         }
 
@@ -208,7 +209,7 @@ if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
                                                                  &pilot_grid, bw, p_hmat_re_v, p_hmat_im_v,
                                                                  i_snap.is_empty() ? nullptr : &i_snap));
     }
-    else if (n_slab == 1) // Single-frequency backend; center_freq is ignored
+    else if (n_slab == 1) // Single-frequency backend (center_freq is the carrier ref for freq_pair)
     {
         arma::vec pilot_grid;
         double bw;
@@ -227,10 +228,10 @@ if (nrhs >= 8 && !mxIsEmpty(prhs[7]))
                 if (carrier_freq_in[0] < center_freq[0])
                     pilot_grid[0] = -1.0;
             }
-            else
+            else // Anchor pilot_grid = 0 to the carrier (center_freq)
             {
                 bw = carrier_freq_in[n_carrier - 1] - carrier_freq_in[0];
-                pilot_grid = (carrier_freq_in - carrier_freq_in[0]) / bw;
+                pilot_grid = (carrier_freq_in - center_freq[0]) / bw;
             }
         }
 

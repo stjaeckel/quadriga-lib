@@ -30,12 +30,12 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("delay") = py::none(),
           py::arg("bandwidth") = 0.0,
           py::arg("carriers") = 128,
-          py::arg("pilot_grid") = py::array_t<double>(),
-          py::arg("snap") = py::array_t<arma::uword>(),
+          py::arg("pilot_grid") = py::none(),
+          py::arg("snap") = py::none(),
           py::arg("coeff_re") = py::none(),
           py::arg("coeff_im") = py::none(),
-          py::arg("freq_in") = py::array_t<double>(),
-          py::arg("freq_out") = py::array_t<double>(),
+          py::arg("freq_in") = py::none(),
+          py::arg("freq_out") = py::none(),
           py::arg("remove_delay_phase") = true);
 
     m.def("channel_export_obj_file", &channel_export_obj_file,
