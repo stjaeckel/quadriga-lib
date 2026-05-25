@@ -13,34 +13,22 @@ SECTION!*/
 # hdf5_reshape_layout
 Reshapes the storage layout inside an existing HDF5 file
 
-## Description:
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A
-notable feature of this library is its capacity to manage multiple channels within a single HDF5
-file. In this framework, channels can be arranged in a multi-dimensional array format.
-Once an HDF5 file has been created, the number of channels in the storage layout is fixed.
-However, it is possible to reshape the layout using `quadriga_lib.channel.hdf5_reshape_layout`.
+- Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
+- The total number of slots (`nx · ny · nz · nw`) must match the original layout
+- Only the dimension metadata is updated; stored channel data is not moved
+- Errors if the file does not exist or is not a valid HDF5 file
 
 ## Usage:
 ```
-from quadriga_lib import channel
-channel.hdf5_reshape_layout( fn, storage_dims );
+quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
-
-- **`nx`** (optional)<br>
-  Number of elements on the x-dimension, Default = 65536
-
-- **`ny`** (optional)<br>
-  Number of elements on the x-dimension, Default = 1
-
-- **`nz`** (optional)<br>
-  Number of elements on the x-dimension, Default = 1
-
-- **`nw`** (optional)<br>
-  Number of elements on the x-dimension, Default = 1
+## Inputs:
+- **`fn`** — Filename of the HDF5 file to create; str
+- **`nx`** — Number of elements on the x-dimension; default: 65536
+- **`ny`** — Number of elements on the y-dimension; default: 1
+- **`nz`** — Number of elements on the z-dimension; default: 1
+- **`nw`** — Number of elements on the w-dimension; default: 1
 MD!*/
 
 void hdf5_reshape_layout(std::string fn, unsigned nx, unsigned ny, unsigned nz, unsigned nw)

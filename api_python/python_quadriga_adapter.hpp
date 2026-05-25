@@ -174,7 +174,7 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     py::array e_theta_re_arr = py::cast<py::array>(arrayant["e_theta_re"]);
     int nd = (int)e_theta_re_arr.request().ndim;
 
-    // 1D/2D pattern fields describe a single-frequency antenna with implicit trailing dimensions. 
+    // 1D/2D pattern fields describe a single-frequency antenna with implicit trailing dimensions.
     // Delegate to the single-frequency parser (qd_python_numpy2arma_Cube promotes them to 3D cubes) and return a length-1 vector.
     if (nd < 3)
     {
@@ -304,6 +304,169 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     }
 
     return ant;
+}
+
+// Convert a single channel object to the Python channel dict
+static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &channel,
+                                       const arma::uvec &snap = arma::uvec(),
+                                       bool validate = false)
+{
+    if (validate)
+    {
+        auto error_msg = channel.is_valid();
+        if (!error_msg.empty())
+            throw std::invalid_argument(error_msg.c_str());
+    }
+
+    const bool snap_given = !snap.is_empty();
+    const arma::uword n_snap_channel = channel.n_snap();
+
+    // Resolve snapshot index: empty -> all; otherwise validate bounds
+    arma::uvec i_snap;
+    if (n_snap_channel == 0)
+        i_snap.reset();
+    else if (!snap_given)
+    {
+        i_snap.set_size(n_snap_channel);
+        for (arma::uword s = 0; s < n_snap_channel; ++s)
+            i_snap.at(s) = s;
+    }
+    else
+    {
+        for (arma::uword s : snap)
+            if (s >= n_snap_channel)
+                throw std::invalid_argument("Snapshot index out of bound.");
+        i_snap = snap;
+    }
+
+    py::dict output;
+
+    // Positions / orientations: (3, 1) shared or (3, n_snap) per-snapshot
+    auto emit_per_snap_mat = [&](const char *key, const arma::Mat<double> &matrix)
+    {
+        if (matrix.n_cols == 1 || (matrix.n_cols > 1 && !snap_given))
+            output[key] = qd_python_copy2numpy(matrix);
+        else if (snap_given && matrix.n_cols > 1)
+            output[key] = qd_python_copy2numpy(matrix, i_snap);
+    };
+
+    output["name"] = channel.name;
+
+    emit_per_snap_mat("rx_position", channel.rx_pos);
+    emit_per_snap_mat("tx_position", channel.tx_pos);
+    emit_per_snap_mat("rx_orientation", channel.rx_orientation);
+    emit_per_snap_mat("tx_orientation", channel.tx_orientation);
+
+    // Coefficients (complex) and delays -> list of ragged 3D arrays
+    if (!channel.coeff_re.empty())
+        output["coeff"] = qd_python_copy2numpy(channel.coeff_re, channel.coeff_im, i_snap);
+    if (!channel.delay.empty())
+        output["delay"] = qd_python_copy2numpy(channel.delay, i_snap);
+
+    if (!channel.path_gain.empty())
+        output["path_gain"] = qd_python_copy2numpy(channel.path_gain, i_snap);
+    if (!channel.path_length.empty())
+        output["path_length"] = qd_python_copy2numpy(channel.path_length, i_snap);
+    if (!channel.path_polarization.empty())
+        output["path_polarization"] = qd_python_copy2numpy(qd_python_Interleaved2Complex(channel.path_polarization), i_snap);
+    if (!channel.path_angles.empty())
+        output["path_angles"] = qd_python_copy2numpy(channel.path_angles, i_snap);
+
+    if (!channel.path_fbs_pos.empty())
+        output["fbs_pos"] = qd_python_copy2numpy(channel.path_fbs_pos, i_snap);
+    if (!channel.path_lbs_pos.empty())
+        output["lbs_pos"] = qd_python_copy2numpy(channel.path_lbs_pos, i_snap);
+
+    if (!channel.no_interact.empty())
+        output["no_interact"] = qd_python_copy2numpy(channel.no_interact, i_snap);
+    if (!channel.interact_coord.empty())
+        output["interact_coord"] = qd_python_copy2numpy(channel.interact_coord, i_snap);
+
+    // Center frequency: scalar shared or per-snapshot
+    if (channel.center_frequency.n_elem == 1 || (channel.center_frequency.n_elem > 1 && !snap_given))
+        output["center_frequency"] = qd_python_copy2numpy(channel.center_frequency);
+    else if (snap_given && channel.center_frequency.n_elem > 1)
+        output["center_frequency"] = qd_python_copy2numpy(channel.center_frequency, i_snap);
+
+    if (n_snap_channel > 0)
+    {
+        output["initial_position"] = channel.initial_position;
+    }
+
+    return output;
+}
+
+// Convert an unstructured dataset (std::any) to a numpy array / scalar / str.
+// Missing dataset -> None. Stored type and shape are preserved.
+static py::object qd_python_any2numpy(const std::any &dset)
+{
+    if (!dset.has_value())
+        return py::none();
+
+    unsigned long long dims[3];
+    void *dataptr = nullptr;
+    int type_id = quadriga_lib::any_type_id(&dset, dims, &dataptr);
+
+#define QD_PY_ANY_ARR(id, T) \
+    case id:                 \
+        return qd_python_copy2numpy(std::any_cast<T>(dset));
+
+    switch (type_id)
+    {
+    case 9: // std::string
+        return py::cast(std::any_cast<std::string>(dset));
+
+    // Scalars -> Python numbers
+    case 10:
+        return py::cast(*(float *)dataptr);
+    case 11:
+        return py::cast(*(double *)dataptr);
+    case 12:
+        return py::cast(*(unsigned long long *)dataptr);
+    case 13:
+        return py::cast(*(long long *)dataptr);
+    case 14:
+        return py::cast(*(unsigned *)dataptr);
+    case 15:
+        return py::cast(*(int *)dataptr);
+
+        // Matrices
+        QD_PY_ANY_ARR(20, arma::Mat<float>)
+        QD_PY_ANY_ARR(21, arma::Mat<double>)
+        QD_PY_ANY_ARR(22, arma::Mat<unsigned long long>)
+        QD_PY_ANY_ARR(23, arma::Mat<long long>)
+        QD_PY_ANY_ARR(24, arma::Mat<unsigned>)
+        QD_PY_ANY_ARR(25, arma::Mat<int>)
+
+        // Cubes
+        QD_PY_ANY_ARR(30, arma::Cube<float>)
+        QD_PY_ANY_ARR(31, arma::Cube<double>)
+        QD_PY_ANY_ARR(32, arma::Cube<unsigned long long>)
+        QD_PY_ANY_ARR(33, arma::Cube<long long>)
+        QD_PY_ANY_ARR(34, arma::Cube<unsigned>)
+        QD_PY_ANY_ARR(35, arma::Cube<int>)
+
+        // Column vectors
+        QD_PY_ANY_ARR(40, arma::Col<float>)
+        QD_PY_ANY_ARR(41, arma::Col<double>)
+        QD_PY_ANY_ARR(42, arma::Col<unsigned long long>)
+        QD_PY_ANY_ARR(43, arma::Col<long long>)
+        QD_PY_ANY_ARR(44, arma::Col<unsigned>)
+        QD_PY_ANY_ARR(45, arma::Col<int>)
+
+        // Row vectors
+        QD_PY_ANY_ARR(50, arma::Row<float>)
+        QD_PY_ANY_ARR(51, arma::Row<double>)
+        QD_PY_ANY_ARR(52, arma::Row<unsigned long long>)
+        QD_PY_ANY_ARR(53, arma::Row<long long>)
+        QD_PY_ANY_ARR(54, arma::Row<unsigned>)
+        QD_PY_ANY_ARR(55, arma::Row<int>)
+
+    default:
+        throw std::invalid_argument("Unsupported dataset type.");
+    }
+
+#undef QD_PY_ANY_ARR
 }
 
 #endif

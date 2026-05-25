@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -13,248 +12,87 @@ SECTION!*/
 # hdf5_read_channel
 Reads channel data from HDF5 files
 
-## Description:
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data
-comprises various well-defined sets, including channel coefficients, positions of transmitters and
-receivers, as well as path data that reflects the interaction of radio waves with the environment.
-Typically, these datasets are multi-dimensional, encompassing data for `n_rx` receive antennas,
-`n_tx` transmit antennas, `n_path` propagation paths, and `n_snap` snapshots. Snapshots are
-particularly useful for recording data across different locations (such as along a trajectory) or
-various frequencies. It is important to note that not all datasets include all these dimensions.<br><br>
-
-The library also supports the addition of extra datasets of any type or shape, which can be useful
-for incorporating descriptive data or analysis results. To facilitate data access, the function
-`quadriga_lib.channel.hdf5_read_channel` is designed to read both structured and unstructured data from the
-file.
+- Reads structured channel data and any unstructured datasets from one slot of an indexed HDF5 file
+- A slot is addressed by the 0-based storage indices `(ix, iy, iz, iw)`
+- Datasets span `n_rx` RX antennas, `n_tx` TX antennas, `n_path` paths and `n_snap` snapshots;
+  snapshots typically index positions along a trajectory or frequencies
+- Not every dataset spans all dimensions; only datasets present in the file are returned
+- Per-snapshot data is returned as a `list` of arrays, one per snapshot, since `n_path` may differ between snapshots
+- Stored in single precision, returned as double precision
+- `snap` selects a subset of snapshots; if `None`, all snapshots are read
 
 ## Usage:
 ```
-from quadriga_lib import channel
-data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Filename of the HDF5 file; str
+- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
+- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
+- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
+- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
+- **`snap`** — Snapshot indices to read; 0-based; `(n_sel,)` or `None`; `None` reads all
+  snapshots; default: `None`
 
-- **`ix`**<br>
-  Storage index for x-dimension, Default = 0
+## Outputs:
+- **`chan`** — Dict with the channel data; only keys present in the file are included:<br><br>
+  | Key                | Description                                                              | Type / Shape                         |
+  | ------------------ | ------------------------------------------------------------------------ | ----------------------------------- |
+  | `name`             | Channel name                                                             | String                              |
+  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, n_snap)` or `(3, 1)`           |
+  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | `(3, n_snap)` or `(3, 1)`           |
+  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, n_snap)` or `(3, 1)`           |
+  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, n_snap)` or `(3, 1)`           |
+  | `coeff`            | Channel coefficients, complex-valued                                     | list of `(n_rx, n_tx, n_path_s)`    |
+  | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)`    |
+  | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`               |
+  | `path_length`      | Path length in m                                                         | list of `(n_path_s,)`               |
+  | `path_polarization`| Polarization transfer function, complex                                  | list of `(4, n_path_s)`             |
+  | `path_angles`      | Departure and arrival angles [AOD, EOD, AOA, EOA] in rad                 | list of `(n_path_s, 4)`             |
+  | `fbs_pos`          | First-bounce scatterer positions                                         | list of `(3, n_path_s)`             |
+  | `lbs_pos`          | Last-bounce scatterer positions                                          | list of `(3, n_path_s)`             |
+  | `no_interact`      | Number of interaction points per path; uint32                            | list of `(n_path_s,)`               |
+  | `interact_coord`   | Interaction coordinates                                                  | list of `(3, sum(no_interact_s))`   |
+  | `center_frequency` | Center Frequency in Hz                                                   | `(n_snap,)` or scalar               |
+  | `initial_position` | Index of reference position; 1-based                                     | int32, scalar                       |
 
-- **`iy`**<br>
-  Storage index for y-dimension, Default = 0
+- **`par`** —Dictionary of unstructured data
 
-- **`iz`**<br>
-  Storage index for z-dimension, Default = 0
-
-- **`iw`**<br>
-  Storage index for w-dimension, Default = 0
-
-- **`snap`** (optional)<br>
-  Snapshot range, 0-based notation; optional; vector, default: empty = read all
-
-## Output Arguments:
-- **`data`**<br>
-  Dictionary containing the data in the HDF file with the following keys:
-  `par`            | Dictionary of unstructured data                          | Variable
-  `rx_position`    | Receiver positions                                       | `[3, n_snap]` or `[3, 1]`
-  `tx_position`    | Transmitter positions                                    | `[3, n_snap]` or `[3, 1]`
-  `coeff`          | Channel coefficients, complex valued                     | list of `[n_rx, n_tx, n_path_s]`
-  `delay`          | Propagation delays in seconds                            | list of `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
-  `center_freq`    | Center frequency in [Hz]                                 | `[n_snap]` or scalar
-  `name`           | Name of the channel                                      | String
-  `initial_pos`    | Index of reference position, 1-based                     | uint32, scalar
-  `path_gain`      | Path gain before antenna, linear scale                   | list of `[n_path_s]`
-  `path_length`    | Path length from TX to RX phase center in m              | list of `[n_path_s]`
-  `polarization`   | Polarization transfer function, complex valued           | list of `[4, n_path_s]`
-  `path_angles`    | Departure and arrival angles {AOD, EOD, AOA, EOA} in rad | list of `[n_path, 4_s]`
-  `path_fbs_pos`   | First-bounce scatterer positions                         | list of `[3, n_path_s]`
-  `path_lbs_pos`   | Last-bounce scatterer positions                          | list of `[3, n_path_s]`
-  `no_interact`    | Number interaction points of paths with the environment  | uint32, list of `[n_path_s]`
-  `interact_coord` | Interaction coordinates                                  | list of `[3, max(sum(no_interact))]`
-  `rx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3]`
-  `tx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3]`
-## Caveat:
-- Only datasets that are present in the HDF file are returned in the dictionary.
-- Although the data is stored in single precision, it is converted to double precision by default.
+## See also:
+- [[hdf5_read_layout]] (for reading the layout in the file)
+- [[hdf5_write_channel]] (for writing channel data)
+- [[hdf5_read_dset]] (for reading individual unstructured datasets)
+- [[hdf5_write_dset]] (for writing individual unstructured datasets)
 MD!*/
 
-py::dict hdf5_read_channel(const std::string fn,
-                           unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                           const py::array_t<arma::uword> snap)
+py::tuple hdf5_read_channel(const std::string &fn,
+                            unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                            py::handle snap)
 {
-    // Read data from file
+    // Read the channel object from the requested storage slot
     const auto channel = quadriga_lib::hdf5_read_channel<double>(fn, ix, iy, iz, iw);
 
-    // Read snapshot range
-    arma::uvec snap_arma = qd_python_numpy2arma_Col(snap, true);
+    // Snapshot selection (None / empty reads all snapshots)
+    const arma::uvec snap_a = qd_python_numpy2arma_Col<arma::uword>(snap, true);
 
-    // Update snapshot index
-    auto n_snap_channel = channel.n_snap();
-    if (snap_arma.empty() && n_snap_channel != 0)
-    {
-        snap_arma.set_size(n_snap_channel);
-        arma::uword *p = snap_arma.memptr();
-        for (arma::uword s = 0; s < n_snap_channel; ++s)
-            p[s] = s;
-    }
-    else if (n_snap_channel != 0) // Check bounds
-    {
-        for (auto &p : snap_arma)
-            if (p >= n_snap_channel)
-                throw std::invalid_argument("Snapshot index out of bound.");
-    }
-    else // n_snap_channel == 0ULL
-        snap_arma.reset();
+    auto chan = qd_python_channel2dict(channel, snap_a);
 
-    arma::uword n_snap = snap_arma.n_elem;
-    arma::uword *i_snap = snap_arma.memptr(); // Snapshot index
-
-    // Get number of paths
-    arma::uword n_path = 0;
-    if (n_snap != 0 && n_snap_channel != 0)
-    {
-        arma::uvec n_path_vec = channel.n_path();
-        arma::uword *p = n_path_vec.memptr();
-        for (arma::uword i = 0; i < n_snap; ++i)
-            n_path = (p[i_snap[i]] > n_path) ? p[i_snap[i]] : n_path;
-    }
-
-    // Initialize output
-    py::dict output;
-
-    // Parse unstructured data
+    // Unstructured data
+    py::dict par;
     if (!channel.par_names.empty())
-    {
-        py::dict par;
         for (size_t n = 0; n < channel.par_names.size(); ++n)
-        {
-            unsigned long long dims[3];
-            void *dataptr;
-            int type_id = quadriga_lib::any_type_id(&channel.par_data.at(n), dims, &dataptr);
-            auto par_name = channel.par_names.at(n).c_str();
+            par[channel.par_names[n].c_str()] = qd_python_any2numpy(channel.par_data[n]);
 
-            if (type_id == 9) // Strings
-                par[par_name] = std::any_cast<std::string>(channel.par_data.at(n));
-
-            // Scalars
-            else if (type_id == 10)
-                par[par_name] = *(float *)dataptr;
-            else if (type_id == 11)
-                par[par_name] = *(double *)dataptr;
-            else if (type_id == 12)
-                par[par_name] = *(unsigned long long int *)dataptr;
-            else if (type_id == 13)
-                par[par_name] = *(long long int *)dataptr;
-            else if (type_id == 14)
-                par[par_name] = *(unsigned int *)dataptr;
-            else if (type_id == 15)
-                par[par_name] = *(int *)dataptr;
-
-            // Matrices
-            else if (type_id == 20)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<float>>(channel.par_data.at(n)));
-            else if (type_id == 21)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<double>>(channel.par_data.at(n)));
-            else if (type_id == 22)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<unsigned long long>>(channel.par_data.at(n)));
-            else if (type_id == 23)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<long long>>(channel.par_data.at(n)));
-            else if (type_id == 24)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<unsigned>>(channel.par_data.at(n)));
-            else if (type_id == 25)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Mat<int>>(channel.par_data.at(n)));
-
-            // Cubes
-            else if (type_id == 30)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<float>>(channel.par_data.at(n)));
-            else if (type_id == 31)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<double>>(channel.par_data.at(n)));
-            else if (type_id == 32)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<unsigned long long>>(channel.par_data.at(n)));
-            else if (type_id == 33)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<long long>>(channel.par_data.at(n)));
-            else if (type_id == 34)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<unsigned>>(channel.par_data.at(n)));
-            else if (type_id == 35)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Cube<int>>(channel.par_data.at(n)));
-
-            // Vectors (Columns only)
-            else if (type_id == 40)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<float>>(channel.par_data.at(n)));
-            else if (type_id == 41)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<double>>(channel.par_data.at(n)));
-            else if (type_id == 42)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<unsigned long long>>(channel.par_data.at(n)));
-            else if (type_id == 43)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<long long>>(channel.par_data.at(n)));
-            else if (type_id == 44)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<unsigned>>(channel.par_data.at(n)));
-            else if (type_id == 45)
-                par[par_name] = qd_python_copy2numpy(std::any_cast<arma::Col<int>>(channel.par_data.at(n)));
-        }
-        output["par"] = par;
-    }
-
-    if (channel.rx_pos.n_cols == 1 || (channel.rx_pos.n_cols > 1 && snap.size() == 0)) // Return all
-        output["rx_position"] = qd_python_copy2numpy(channel.rx_pos);
-    else if (snap.size() != 0) // Subset
-        output["rx_position"] = qd_python_copy2numpy(channel.rx_pos, snap_arma);
-
-    if (channel.tx_pos.n_cols == 1 || (channel.tx_pos.n_cols > 1 && snap.size() == 0)) // Return all
-        output["tx_position"] = qd_python_copy2numpy(channel.tx_pos);
-    else if (snap.size() != 0) // Subset
-        output["tx_position"] = qd_python_copy2numpy(channel.tx_pos, snap_arma);
-
-    if (!channel.coeff_re.empty())
-        output["coeff"] = qd_python_copy2numpy(channel.coeff_re, channel.coeff_im, snap_arma);
-
-    if (!channel.delay.empty())
-        output["delay"] = qd_python_copy2numpy(channel.delay, snap_arma);
-
-    if (channel.center_frequency.n_elem == 1 || (channel.center_frequency.n_elem > 1 && snap.size() == 0)) // Return all
-        output["center_freq"] = qd_python_copy2numpy(channel.center_frequency);
-    else if (snap.size() != 0) // Subset
-        output["center_freq"] = qd_python_copy2numpy(channel.center_frequency, snap_arma);
-
-    if (n_snap_channel > 0)
-    {
-        output["name"] = channel.name;
-        output["initial_pos"] = channel.initial_position;
-    }
-
-    if (!channel.path_gain.empty())
-        output["path_gain"] = qd_python_copy2numpy(channel.path_gain, snap_arma);
-
-    if (!channel.path_length.empty())
-        output["path_length"] = qd_python_copy2numpy(channel.path_length, snap_arma);
-
-    if (!channel.path_polarization.empty())
-        output["polarization"] = qd_python_copy2numpy(qd_python_Interleaved2Complex(channel.path_polarization), snap_arma);
-
-    if (!channel.path_angles.empty())
-        output["path_angles"] = qd_python_copy2numpy(channel.path_angles, snap_arma);
-
-    if (!channel.path_fbs_pos.empty())
-        output["path_fbs_pos"] = qd_python_copy2numpy(channel.path_fbs_pos, snap_arma);
-
-    if (!channel.path_lbs_pos.empty())
-        output["path_lbs_pos"] = qd_python_copy2numpy(channel.path_lbs_pos, snap_arma);
-
-    if (!channel.no_interact.empty())
-        output["no_interact"] = qd_python_copy2numpy(channel.no_interact, snap_arma);
-
-    if (!channel.interact_coord.empty())
-        output["interact_coord"] = qd_python_copy2numpy(channel.interact_coord, snap_arma);
-
-    if (channel.rx_orientation.n_cols == 1 || (channel.rx_orientation.n_cols > 1 && snap.size() == 0)) // Return all
-        output["rx_orientation"] = qd_python_copy2numpy(channel.rx_orientation);
-    else if (snap.size() != 0) // Subset
-        output["rx_orientation"] = qd_python_copy2numpy(channel.rx_orientation, snap_arma);
-
-    if (channel.tx_orientation.n_cols == 1 || (channel.tx_orientation.n_cols > 1 && snap.size() == 0)) // Return all
-        output["tx_orientation"] = qd_python_copy2numpy(channel.tx_orientation);
-    else if (snap.size() != 0) // Subset
-        output["tx_orientation"] = qd_python_copy2numpy(channel.tx_orientation, snap_arma);
-
-    return output;
+    // Assemble the output
+    return py::make_tuple(chan, par);
 }
+
+// pybind11 declaration:
+// m.def("hdf5_read_channel", &hdf5_read_channel,
+//       py::arg("fn"),
+//       py::arg("ix") = 0,
+//       py::arg("iy") = 0,
+//       py::arg("iz") = 0,
+//       py::arg("iw") = 0,
+//       py::arg("snap") = py::none());
