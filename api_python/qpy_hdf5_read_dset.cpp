@@ -13,112 +13,50 @@ SECTION!*/
 # hdf5_read_dset
 Read a single unstructured dataset from an HDF5 file
 
-## Description:
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition
-to structured datasets, the library facilitates the inclusion of extra datasets of various types
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis
-results. The function `quadriga_lib.channel.hdf5_read_dset` retrieves a single unstructured dataset.
-The output type of the function is defined by the datatype in the file. An empty matrix is returned
-if the dataset does not exist in the file.
+- Reads one user-defined dataset from the slot addressed by the 0-based indices `(ix, iy, iz, iw)`
+- The dataset is looked up under `'par_' + name` — the `par_` prefix is prepended internally
+- The returned type and shape are defined by the dataset's HDF5 dataspace
+- Returns `None` if the dataset does not exist at the requested slot
+- Supported types: str, scalar, vector, 2D array, and 3D array
 
 ## Usage:
 ```
-from quadriga_lib import channel
-dset = channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Filename of the HDF5 file; str
+- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
+- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
+- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
+- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
+- **`name`** — Dataset name without the `par_` prefix, e.g. `'carrier_frequency'`; str
 
-- **`ix`**<br>
-  Storage index for x-dimension, Default = 0
+## Outputs:
+- **`dset`** — Dataset contents; type and shape are defined by the HDF5 dataspace; `None` if the dataset is missing
 
-- **`iy`**<br>
-  Storage index for y-dimension, Default = 0
-
-- **`iz`**<br>
-  Storage index for z-dimension, Default = 0
-
-- **`iw`**<br>
-  Storage index for w-dimension, Default = 0
-
-- **`name`**<br>
-  Name of the dataset; String
-
-## Output Argument:
-- **`dset`**<br>
-  Output data. Type and size is defined by the dataspace in the file
-
-## Caveat:
-- Only datasets that are present in the HDF file are returned in the dictionary.
+## See also:
+- [[hdf5_read_dset_names]] (for reading names of already written datasets)
+- [[hdf5_write_dset]] (for writing individual unstructured datasets)
+- [[hdf5_read_channel]] (for reading structured channel data)
 MD!*/
 
-py::array hdf5_read_dset(const std::string &fn,
-                         unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                         const std::string &name)
+py::object hdf5_read_dset(const std::string &fn,
+                          unsigned ix, unsigned iy, unsigned iz, unsigned iw,
+                          const std::string &name)
 {
-    // Read dataset
+    // Read the dataset; the C++ side prepends the default 'par_' prefix to 'name'
     std::any dset = quadriga_lib::hdf5_read_dset(fn, name, ix, iy, iz, iw);
-    int type_id = quadriga_lib::any_type_id(&dset);
 
-    // Convert data to python type
-    switch (type_id)
-    {
-    case 10:
-        return py::float_(std::any_cast<float>(dset));
-    case 11:
-        return py::float_(std::any_cast<double>(dset));
-    case 12:
-        return py::int_(std::any_cast<unsigned long long int>(dset));
-    case 13:
-        return py::int_(std::any_cast<long long int>(dset));
-    case 14:
-        return py::int_(std::any_cast<unsigned int>(dset));
-    case 15:
-        return py::int_(std::any_cast<int>(dset));
-    case 20:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<float>>(dset));
-    case 21:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<double>>(dset));
-    case 22:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<unsigned long long>>(dset));
-    case 23:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<long long>>(dset));
-    case 24:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<unsigned>>(dset));
-    case 25:
-        return qd_python_copy2numpy(std::any_cast<arma::Mat<int>>(dset));
-    case 30:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<float>>(dset));
-    case 31:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<double>>(dset));
-    case 32:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<unsigned long long>>(dset));
-    case 33:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<long long>>(dset));
-    case 34:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<unsigned>>(dset));
-    case 35:
-        return qd_python_copy2numpy(std::any_cast<arma::Cube<int>>(dset));
-    case 40:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<float>>(dset));
-    case 41:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<double>>(dset));
-    case 42:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<unsigned long long>>(dset));
-    case 43:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<long long>>(dset));
-    case 44:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<unsigned>>(dset));
-    case 45:
-        return qd_python_copy2numpy(std::any_cast<arma::Col<int>>(dset));
-    case -2:
-        throw std::runtime_error("Dataset '" + name + "' does not exist in file.");
-    default:
-        throw std::runtime_error("Dataset '" + name + "' has an unsupported type.");
-    }
-
-    // Default return type, should never be called
-    return py::int_(0);
+    // Convert to numpy array / scalar / str; None if the dataset is missing
+    return qd_python_any2numpy(dset);
 }
+
+// pybind11 declaration:
+// m.def("hdf5_read_dset", &hdf5_read_dset,
+//       py::arg("fn"),
+//       py::arg("ix") = 0,
+//       py::arg("iy") = 0,
+//       py::arg("iz") = 0,
+//       py::arg("iw") = 0,
+//       py::arg("name"));

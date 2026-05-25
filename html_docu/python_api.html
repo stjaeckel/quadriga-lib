@@ -111,11 +111,11 @@ import quadriga_lib
   <tr><td><a href="#hdf5_create_file">hdf5_create_file</a></td><td>Create a new HDF5 channel file with a custom storage layout</td></tr>
   <tr><td><a href="#hdf5_read_channel">hdf5_read_channel</a></td><td>Reads channel data from HDF5 files</td></tr>
   <tr><td><a href="#hdf5_read_dset">hdf5_read_dset</a></td><td>Read a single unstructured dataset from an HDF5 file</td></tr>
-  <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured data fields from an HDF5 file</td></tr>
+  <tr><td><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a></td><td>Read the names of unstructured datasets from an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_read_layout">hdf5_read_layout</a></td><td>Read the storage layout of channel data inside an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_reshape_layout">hdf5_reshape_layout</a></td><td>Reshapes the storage layout inside an existing HDF5 file</td></tr>
   <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Writes channel data to HDF5 files</td></tr>
-  <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Writes unstructured data to a HDF5 file</td></tr>
+  <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
   <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
   <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
@@ -955,8 +955,8 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 <b>Usage:</b><br>
 <pre>
-quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min,
-    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, i_snap )
+quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min, 
+    n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, coeff_re, coeff_im, i_snap )
 </pre>
 
 <b>Inputs:</b><br>
@@ -974,7 +974,9 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_m
 <li><b><code>no_interact</code></b> — Number of interaction points of each path with the environment; uint32; either a <code>list</code> of <code>n_snap</code> arrays of shape <code>(n_path,)</code>, or an ndarray <code>(n_path, n_snap)</code></li>
 <li><b><code>interact_coord</code></b> — Interaction coordinates; either a <code>list</code> of <code>n_snap</code> arrays of shape <code>(3, sum(no_interact))</code>, or an ndarray <code>(3, max(sum(no_interact)), n_snap)</code></li>
 <li><b><code>center_freq</code></b> — Center frequency in Hz; ndarray <code>(n_snap,)</code> or scalar</li>
-<li><b><code>coeff</code></b> — Channel coefficients, complex valued; either a <code>list</code> of <code>n_snap</code> arrays of shape <code>(n_rx, n_tx, n_path)</code>, or an ndarray <code>(n_rx, n_tx, n_path, n_snap)</code></li>
+<li><b><code>coeff</code></b> — Channel coefficients, complex valued; either a <code>list</code> of <code>n_snap</code> arrays of shape <code>(n_rx, n_tx, n_path)</code>, or an ndarray <code>(n_rx, n_tx, n_path, n_snap)</code>; provide this or <code>coeff_re</code>/<code>coeff_im</code>, not both; default: None</li>
+<li><b><code>coeff_re</code></b> — Real part of the channel coefficients; same format as <code>coeff</code> but real-valued; must be paired with <code>coeff_im</code>; default: None</li>
+<li><b><code>coeff_im</code></b> — Imaginary part of the channel coefficients; same format as <code>coeff_re</code>; must be paired with <code>coeff_re</code>; default: None</li>
 <li><b><code>i_snap</code></b> — Snapshot indices to include; 0-based; <code>None</code> or empty exports all; default: None</li>
 </ul>
 
@@ -987,247 +989,305 @@ quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_m
 <span id="hdf5_create_file" class="qd-func"><b>hdf5_create_file</b></span><br>
 <hr class="thin">
 Create a new HDF5 channel file with a custom storage layout
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib offers an HDF5-based method for storing and managing channel data. A key feature of this 
-library is its ability to organize multiple channels within a single HDF5 file while enabling access 
-to individual data sets without the need to read the entire file. In this system, channels can be 
-structured in a multi-dimensional array. For instance, the first dimension might represent the Base 
-Station (BS), the second the User Equipment (UE), and the third the frequency. However, it is important 
-to note that the dimensions of the storage layout must be defined when the file is initially created 
-and cannot be altered thereafter. The function <code>quadriga_lib.channel.hdf5_create_file</code> is used to create an 
-empty file with a predetermined custom storage layout.
+<ul>
+<li>Initializes a new HDF5 file for storing channel data</li>
+<li>Defines a 4D storage layout <code>(nx, ny, nz, nw)</code>; each index combination maps to one channel slot</li>
+<li>Typical dimension mapping: nx = BS, ny = UE, nz = frequency, nw = scenario/repetition</li>
+<li>Storage layout is fixed at creation and cannot be changed afterwards</li>
+<li>Raises an error if the target file already exists; delete it first to recreate it</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-channel.hdf5_create_file( fn, nx, ny, nz, nw )
+storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>nx</code></b> (optional)<br> Number of elements on the x-dimension, Default = 65536</li>
-<li><b><code>ny</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
-<li><b><code>nz</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
-<li><b><code>nw</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file to create; str</li>
+<li><b><code>nx</code></b> — Number of elements on the x-dimension; default: 65536</li>
+<li><b><code>ny</code></b> — Number of elements on the y-dimension; default: 1</li>
+<li><b><code>nz</code></b> — Number of elements on the z-dimension; default: 1</li>
+<li><b><code>nw</code></b> — Number of elements on the w-dimension; default: 1</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>storage_space</code></b> — Storage dimensions used by the new file, <code>[nx, ny, nz, nw]</code>; <code>(4,)</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#hdf5_write_channel">hdf5_write_channel</a> (for writing channel data)</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing arbitrary unstructured data)</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="hdf5_read_channel" class="qd-func"><b>hdf5_read_channel</b></span><br>
 <hr class="thin">
 Reads channel data from HDF5 files
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This data 
-comprises various well-defined sets, including channel coefficients, positions of transmitters and 
-receivers, as well as path data that reflects the interaction of radio waves with the environment. 
-Typically, these datasets are multi-dimensional, encompassing data for <code>n_rx</code> receive antennas, 
-<code>n_tx</code> transmit antennas, <code>n_path</code> propagation paths, and <code>n_snap</code> snapshots. Snapshots are 
-particularly useful for recording data across different locations (such as along a trajectory) or 
-various frequencies. It is important to note that not all datasets include all these dimensions.<br><br> 
- 
-The library also supports the addition of extra datasets of any type or shape, which can be useful 
-for incorporating descriptive data or analysis results. To facilitate data access, the function 
-<code>quadriga_lib.channel.hdf5_read_channel</code> is designed to read both structured and unstructured data from the 
-file.
+<ul>
+<li>Reads structured channel data and any unstructured datasets from one slot of an indexed HDF5 file</li>
+<li>A slot is addressed by the 0-based storage indices <code>(ix, iy, iz, iw)</code></li>
+<li>Datasets span <code>n_rx</code> RX antennas, <code>n_tx</code> TX antennas, <code>n_path</code> paths and <code>n_snap</code> snapshots; snapshots typically index positions along a trajectory or frequencies</li>
+<li>Not every dataset spans all dimensions; only datasets present in the file are returned</li>
+<li>Per-snapshot data is returned as a <code>list</code> of arrays, one per snapshot, since <code>n_path</code> may differ between snapshots</li>
+<li>Stored in single precision, returned as double precision</li>
+<li><code>snap</code> selects a subset of snapshots; if <code>None</code>, all snapshots are read</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-data = channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>ix</code></b><br> Storage index for x-dimension, Default = 0</li>
-<li><b><code>iy</code></b><br> Storage index for y-dimension, Default = 0</li>
-<li><b><code>iz</code></b><br> Storage index for z-dimension, Default = 0</li>
-<li><b><code>iw</code></b><br> Storage index for w-dimension, Default = 0</li>
-<li><b><code>snap</code></b> (optional)<br> Snapshot range, 0-based notation; optional; vector, default: empty = read all</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
+<li><b><code>ix</code></b> — Storage index for the x-dimension; 0-based; default: 0</li>
+<li><b><code>iy</code></b> — Storage index for the y-dimension; 0-based; default: 0</li>
+<li><b><code>iz</code></b> — Storage index for the z-dimension; 0-based; default: 0</li>
+<li><b><code>iw</code></b> — Storage index for the w-dimension; 0-based; default: 0</li>
+<li><b><code>snap</code></b> — Snapshot indices to read; 0-based; <code>(n_sel,)</code> or <code>None</code>; <code>None</code> reads all snapshots; default: <code>None</code></li>
 </ul>
 
-<b>Output Arguments:</b><br>
+<b>Outputs:</b><br>
 <ul>
+<li><b><code>chan</code></b> — Dict with the channel data; only keys present in the file are included:<br><br>
 <table class="md">
 <tr>
-  <td><li><b><code>data</code></b><br> Dictionary containing the data in the HDF file with the following keys: <code>par</code></td>
-  <td>Dictionary of unstructured data</td>
-  <td>Variable <code>rx_position</code></td>
-  <td>Receiver positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code> <code>tx_position</code></td>
-  <td>Transmitter positions</td>
-  <td><code>[3, n_snap]</code> or <code>[3, 1]</code> <code>coeff</code></td>
-  <td>Channel coefficients, complex valued</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code> <code>delay</code></td>
+  <th>Key</th>
+  <th>Description</th>
+  <th>Type / Shape</th>
+</tr>
+<tr>
+  <td><code>name</code></td>
+  <td>Channel name</td>
+  <td>String</td>
+</tr>
+<tr>
+  <td><code>tx_position</code></td>
+  <td>Transmitter positions (AP for downlink, STA for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+</tr>
+<tr>
+  <td><code>rx_position</code></td>
+  <td>Receiver positions (STA for downlink, AP for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+</tr>
+<tr>
+  <td><code>tx_orientation</code></td>
+  <td>Transmitter orientation, Euler angles (AP for downlink, STA for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+</tr>
+<tr>
+  <td><code>rx_orientation</code></td>
+  <td>Receiver orientation, Euler angles (STA for downlink, AP for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+</tr>
+<tr>
+  <td><code>coeff</code></td>
+  <td>Channel coefficients, complex-valued</td>
+  <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+</tr>
+<tr>
+  <td><code>delay</code></td>
   <td>Propagation delays in seconds</td>
-  <td>list of <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code> <code>center_freq</code></td>
-  <td>Center frequency in [Hz]</td>
-  <td><code>[n_snap]</code> or scalar <code>name</code></td>
-  <td>Name of the channel</td>
-  <td>String <code>initial_pos</code></td>
-  <td>Index of reference position, 1-based</td>
-  <td>uint32, scalar <code>path_gain</code></td>
+  <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+</tr>
+<tr>
+  <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
-  <td>list of <code>[n_path_s]</code> <code>path_length</code></td>
-  <td>Path length from TX to RX phase center in m</td>
-  <td>list of <code>[n_path_s]</code> <code>polarization</code></td>
-  <td>Polarization transfer function, complex valued</td>
-  <td>list of <code>[4, n_path_s]</code> <code>path_angles</code></td>
-  <td>Departure and arrival angles {AOD, EOD, AOA, EOA} in rad</td>
-  <td>list of <code>[n_path, 4_s]</code> <code>path_fbs_pos</code></td>
+  <td>list of <code>(n_path_s,)</code></td>
+</tr>
+<tr>
+  <td><code>path_length</code></td>
+  <td>Path length in m</td>
+  <td>list of <code>(n_path_s,)</code></td>
+</tr>
+<tr>
+  <td><code>path_polarization</code></td>
+  <td>Polarization transfer function, complex</td>
+  <td>list of <code>(4, n_path_s)</code></td>
+</tr>
+<tr>
+  <td><code>path_angles</code></td>
+  <td>Departure and arrival angles [AOD, EOD, AOA, EOA] in rad</td>
+  <td>list of <code>(n_path_s, 4)</code></td>
+</tr>
+<tr>
+  <td><code>fbs_pos</code></td>
   <td>First-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code> <code>path_lbs_pos</code></td>
+  <td>list of <code>(3, n_path_s)</code></td>
+</tr>
+<tr>
+  <td><code>lbs_pos</code></td>
   <td>Last-bounce scatterer positions</td>
-  <td>list of <code>[3, n_path_s]</code> <code>no_interact</code></td>
-  <td>Number interaction points of paths with the environment</td>
-  <td>uint32, list of <code>[n_path_s]</code> <code>interact_coord</code></td>
+  <td>list of <code>(3, n_path_s)</code></td>
+</tr>
+<tr>
+  <td><code>no_interact</code></td>
+  <td>Number of interaction points per path; uint32</td>
+  <td>list of <code>(n_path_s,)</code></td>
+</tr>
+<tr>
+  <td><code>interact_coord</code></td>
   <td>Interaction coordinates</td>
-  <td>list of <code>[3, max(sum(no_interact))]</code> <code>rx_orientation</code></td>
-  <td>Receiver orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code> <code>tx_orientation</code></td>
-  <td>Transmitter orientation</td>
-  <td><code>[3, n_snap]</code> or <code>[3]</code></li></td>
+  <td>list of <code>(3, sum(no_interact_s))</code></td>
+</tr>
+<tr>
+  <td><code>center_frequency</code></td>
+  <td>Center Frequency in Hz</td>
+  <td><code>(n_snap,)</code> or scalar</td>
+</tr>
+<tr>
+  <td><code>initial_position</code></td>
+  <td>Index of reference position; 1-based</td>
+  <td>int32, scalar</td>
 </tr>
 </table>
+</li>
+<li><b><code>par</code></b> —Dictionary of unstructured data</li>
 </ul>
 
-<b>Caveat:</b><br>
+<b>See also:</b><br>
 <ul>
-<li>Only datasets that are present in the HDF file are returned in the dictionary.</li>
-<li>Although the data is stored in single precision, it is converted to double precision by default.</li>
+<li><a href="#hdf5_read_layout">hdf5_read_layout</a> (for reading the layout in the file)</li>
+<li><a href="#hdf5_write_channel">hdf5_write_channel</a> (for writing channel data)</li>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="hdf5_read_dset" class="qd-func"><b>hdf5_read_dset</b></span><br>
 <hr class="thin">
 Read a single unstructured dataset from an HDF5 file
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function <code>quadriga_lib.channel.hdf5_read_dset</code> retrieves a single unstructured dataset. 
-The output type of the function is defined by the datatype in the file. An empty matrix is returned 
-if the dataset does not exist in the file.
+<ul>
+<li>Reads one user-defined dataset from the slot addressed by the 0-based indices <code>(ix, iy, iz, iw)</code></li>
+<li>The dataset is looked up under <code>'par_' + name</code> — the <code>par_</code> prefix is prepended internally</li>
+<li>The returned type and shape are defined by the dataset's HDF5 dataspace</li>
+<li>Returns <code>None</code> if the dataset does not exist at the requested slot</li>
+<li>Supported types: str, scalar, vector, 2D array, and 3D array</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-dset = channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
+dset = quadriga_lib.channel.hdf5_read_dset( fn, ix, iy, iz, iw, name )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>ix</code></b><br> Storage index for x-dimension, Default = 0</li>
-<li><b><code>iy</code></b><br> Storage index for y-dimension, Default = 0</li>
-<li><b><code>iz</code></b><br> Storage index for z-dimension, Default = 0</li>
-<li><b><code>iw</code></b><br> Storage index for w-dimension, Default = 0</li>
-<li><b><code>name</code></b><br> Name of the dataset; String</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
+<li><b><code>ix</code></b> — Storage index for the x-dimension; 0-based; default: 0</li>
+<li><b><code>iy</code></b> — Storage index for the y-dimension; 0-based; default: 0</li>
+<li><b><code>iz</code></b> — Storage index for the z-dimension; 0-based; default: 0</li>
+<li><b><code>iw</code></b> — Storage index for the w-dimension; 0-based; default: 0</li>
+<li><b><code>name</code></b> — Dataset name without the <code>par_</code> prefix, e.g. <code>'carrier_frequency'</code>; str</li>
 </ul>
 
-<b>Output Argument:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><b><code>dset</code></b><br> Output data. Type and size is defined by the dataspace in the file</li>
+<li><b><code>dset</code></b> — Dataset contents; type and shape are defined by the HDF5 dataspace; <code>None</code> if the dataset is missing</li>
 </ul>
 
-<b>Caveat:</b><br>
+<b>See also:</b><br>
 <ul>
-<li>Only datasets that are present in the HDF file are returned in the dictionary.</li>
+<li><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a> (for reading names of already written datasets)</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)</li>
+<li><a href="#hdf5_read_channel">hdf5_read_channel</a> (for reading structured channel data)</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="hdf5_read_dset_names" class="qd-func"><b>hdf5_read_dset_names</b></span><br>
 <hr class="thin">
-Read the names of unstructured data fields from an HDF5 file
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. Users can add any number of such unstructured datasets, each identified by a unique 
-dataset name. The function <code>quadriga_lib.channel.hdf5_read_dset_names</code> retrieves the names of all  
-these datasets, returning them as a list of strings.
+Read the names of unstructured datasets from an HDF5 file
+<ul>
+<li>Lists all unstructured datasets stored at the slot addressed by the 0-based indices <code>(ix, iy, iz, iw)</code></li>
+<li>Datasets are identified by the <code>par_</code> prefix; the returned names have that prefix stripped</li>
+<li>Returns an empty list if no unstructured datasets are present at the slot</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-names = channel.hdf5_read_dset_names( fn, ix, iy, iz, iw );
+names = quadriga_lib.channel.hdf5_read_dset_names( fn, ix, iy, iz, iw )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>ix</code></b><br> Storage index for x-dimension, Default = 0</li>
-<li><b><code>iy</code></b><br> Storage index for y-dimension, Default = 0</li>
-<li><b><code>iz</code></b><br> Storage index for z-dimension, Default = 0</li>
-<li><b><code>iw</code></b><br> Storage index for w-dimension, Default = 0</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
+<li><b><code>ix</code></b> — Storage index for the x-dimension; 0-based; default: 0</li>
+<li><b><code>iy</code></b> — Storage index for the y-dimension; 0-based; default: 0</li>
+<li><b><code>iz</code></b> — Storage index for the z-dimension; 0-based; default: 0</li>
+<li><b><code>iw</code></b> — Storage index for the w-dimension; 0-based; default: 0</li>
 </ul>
 
-<b>Output Argument:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><b><code>names</code></b><br> List of names of all these at the given location in the files; Cell array of strings</li>
+<li><b><code>names</code></b> — Names of all unstructured datasets at the slot, with the <code>par_</code> prefix stripped; list of str</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)</li>
+<li><a href="#hdf5_write_dset">hdf5_write_dset</a> (for writing individual unstructured datasets)</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="hdf5_read_layout" class="qd-func"><b>hdf5_read_layout</b></span><br>
 <hr class="thin">
 Read the storage layout of channel data inside an HDF5 file
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
-file. In this framework, channels can be arranged in a multi-dimensional array format. 
- 
-The function <code>quadriga_lib.channel.hdf5_read_layout</code> is designed to read the storage layout from an 
-existing file. Furthermore, it also generates an array that marks the locations within the layout 
-where data already exists. This functionality aids in efficiently managing and accessing channel 
-data within the HDF5 file structure.
+<ul>
+<li>Returns the dimensions of the 4D channel-slot grid stored inside an HDF5 file</li>
+<li>Also reports which slots already hold data, so free slots can be found without scanning the file</li>
+<li>Returns <code>(0, 0, 0, 0)</code> dimensions if the file does not exist</li>
+<li>Raises an error if the file exists but is not a valid HDF5 file</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-storage_dims, has_data = channel.hdf5_read_layout( fn )
+storage_dims, has_data = quadriga_lib.channel.hdf5_read_layout( fn )
 </pre>
 
-<b>Input Argument:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
 </ul>
 
-<b>Output Arguments:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><b><code>storage_dims</code></b><br> Size of the dimensions of the storage space, vector with 4 elements, i.e. <code>[nx,ny,nz,nw]</code>.</li>
-<li><b><code>has_data</code></b><br> Array indicating if data exists (value 1) or not (value 0); uint32; Size: <code>[nx,ny,nz,nw]</code></li>
+<li><b><code>storage_dims</code></b> — Size of the storage space <code>[nx, ny, nz, nw]</code>; <code>(4,)</code></li>
+<li><b><code>has_data</code></b> — Slot occupancy mask; 1 where a slot holds data, 0 otherwise; <code>(nx, ny, nz, nw)</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#hdf5_create_file">hdf5_create_file</a> (for creating a file with a custom storage layout)</li>
+<li><a href="#hdf5_read_channel">hdf5_read_channel</a> (for reading channel data)</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="hdf5_reshape_layout" class="qd-func"><b>hdf5_reshape_layout</b></span><br>
 <hr class="thin">
 Reshapes the storage layout inside an existing HDF5 file
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib provides an HDF5-based solution for the storage and organization of channel data. A 
-notable feature of this library is its capacity to manage multiple channels within a single HDF5 
-file. In this framework, channels can be arranged in a multi-dimensional array format. 
-Once an HDF5 file has been created, the number of channels in the storage layout is fixed. 
-However, it is possible to reshape the layout using <code>quadriga_lib.channel.hdf5_reshape_layout</code>.
+<ul>
+<li>Changes the 4D slot grid <code>(nx, ny, nz, nw)</code> of an existing HDF5 channel file</li>
+<li>The total number of slots (<code>nx · ny · nz · nw</code>) must match the original layout</li>
+<li>Only the dimension metadata is updated; stored channel data is not moved</li>
+<li>Errors if the file does not exist or is not a valid HDF5 file</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-channel.hdf5_reshape_layout( fn, storage_dims );
+quadriga_lib.channel.hdf5_reshape_layout( fn, nx, ny, nz, nw )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>nx</code></b> (optional)<br> Number of elements on the x-dimension, Default = 65536</li>
-<li><b><code>ny</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
-<li><b><code>nz</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
-<li><b><code>nw</code></b> (optional)<br> Number of elements on the x-dimension, Default = 1</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file to create; str</li>
+<li><b><code>nx</code></b> — Number of elements on the x-dimension; default: 65536</li>
+<li><b><code>ny</code></b> — Number of elements on the y-dimension; default: 1</li>
+<li><b><code>nz</code></b> — Number of elements on the z-dimension; default: 1</li>
+<li><b><code>nw</code></b> — Number of elements on the w-dimension; default: 1</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -1324,38 +1384,36 @@ storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, par, rx_pos, tx_p
 <hr class="greyline"><br>
 <span id="hdf5_write_dset" class="qd-func"><b>hdf5_write_dset</b></span><br>
 <hr class="thin">
-Writes unstructured data to a HDF5 file
-<br><br>
-<b>Description:</b><br>
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition 
-to structured datasets, the library facilitates the inclusion of extra datasets of various types 
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis 
-results. The function <code>quadriga_lib.channel.hdf5_write_dset</code> writes a single unstructured dataset.
+Write a single unstructured dataset to an HDF5 file
+<ul>
+<li>Dataset is stored under <code>prefix + name</code> at slot <code>(ix, iy, iz, iw)</code></li>
+<li><code>name</code> must contain only alphanumeric characters and underscores</li>
+<li>The file must already exist (use <a href="#hdf5_create_file">hdf5_create_file</a> first)</li>
+<li>A dataset of the same name at the same slot is not overwritten; an error is thrown instead</li>
+<li>Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element types: single, double, int32, uint32, int64, uint64</li>
+<li>Row vectors are stored as column vectors</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import channel
-channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 </pre>
 
 <b>Input Arguments:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the HDF5 file, string</li>
-<li><b><code>ix</code></b><br> Storage index for x-dimension, Default = 0</li>
-<li><b><code>iy</code></b><br> Storage index for y-dimension, Default = 0</li>
-<li><b><code>iz</code></b><br> Storage index for z-dimension, Default = 0</li>
-<li><b><code>iw</code></b><br> Storage index for w-dimension, Default = 0</li>
-<li><b><code>name</code></b><br> Name of the dataset; String</li>
-<li><b><code>data</code></b><br> Data to be written</li>
+<li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
+<li><b><code>ix</code></b> — Storage index for the x-dimension; 0-based; default: 0</li>
+<li><b><code>iy</code></b> — Storage index for the y-dimension; 0-based; default: 0</li>
+<li><b><code>iz</code></b> — Storage index for the z-dimension; 0-based; default: 0</li>
+<li><b><code>iw</code></b> — Storage index for the w-dimension; 0-based; default: 0</li>
+<li><b><code>name</code></b> — Dataset name without prefix, e.g. <code>'carrier_frequency'</code>; alphanumeric and underscores only; str</li>
+<li><b><code>data</code></b> — Data to be written; type must be supported (see above); cannot be empty</li>
 </ul>
 
-<b>Caveat:</b><br>
+<b>See also:</b><br>
 <ul>
-<li>Throws an error if dataset already exists at this location</li>
-<li>Throws an error if file does not exist (use hdf5_create_file)</li>
-<li>Supported types: string, double, float, (u)int32, (u)int64</li>
-<li>Supported size: up to 3 dimensions</li>
-<li>Storage order is maintained</li>
+<li><a href="#hdf5_read_dset_names">hdf5_read_dset_names</a> (for reading names of already written datasets)</li>
+<li><a href="#hdf5_read_dset">hdf5_read_dset</a> (for reading individual unstructured datasets)</li>
 </ul>
 
 <hr class="greyline"><br>

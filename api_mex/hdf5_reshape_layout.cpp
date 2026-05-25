@@ -15,7 +15,7 @@ SECTION!*/
 Reshape the storage layout inside an existing HDF5 file
 
 - Changes the 4D slot grid `(nx, ny, nz, nw)` of an existing HDF5 channel file
-- The total number of slots (`nx · ny · nz · nw`) must match the original layout; otherwise an error is thrown
+- The total number of slots (`nx · ny · nz · nw`) must match the original layout
 - Only the dimension metadata is updated; stored channel data is not moved
 - Errors if the file does not exist or is not a valid HDF5 file
 

@@ -11,49 +11,33 @@ SECTION!*/
 
 /*!MD
 # hdf5_write_dset
-Writes unstructured data to a HDF5 file
+Write a single unstructured dataset to an HDF5 file
 
-## Description:
-Quadriga-Lib offers a solution based on HDF5 for storing and organizing channel data. In addition
-to structured datasets, the library facilitates the inclusion of extra datasets of various types
-and shapes. This feature is particularly beneficial for integrating descriptive data or analysis
-results. The function `quadriga_lib.channel.hdf5_write_dset` writes a single unstructured dataset.
+- Dataset is stored under `prefix + name` at slot `(ix, iy, iz, iw)`
+- `name` must contain only alphanumeric characters and underscores
+- The file must already exist (use [[hdf5_create_file]] first)
+- A dataset of the same name at the same slot is not overwritten; an error is thrown instead
+- Supported types: string, scalar, vector (row or column), 2D matrix, and 3D array; numeric element
+  types: single, double, int32, uint32, int64, uint64
+- Row vectors are stored as column vectors
 
 ## Usage:
-
 ```
-from quadriga_lib import channel
-channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
 ```
 
 ## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+- **`fn`** — Filename of the HDF5 file; str
+- **`ix`** — Storage index for the x-dimension; 0-based; default: 0
+- **`iy`** — Storage index for the y-dimension; 0-based; default: 0
+- **`iz`** — Storage index for the z-dimension; 0-based; default: 0
+- **`iw`** — Storage index for the w-dimension; 0-based; default: 0
+- **`name`** — Dataset name without prefix, e.g. `'carrier_frequency'`; alphanumeric and underscores only; str
+- **`data`** — Data to be written; type must be supported (see above); cannot be empty
 
-- **`ix`**<br>
-  Storage index for x-dimension, Default = 0
-
-- **`iy`**<br>
-  Storage index for y-dimension, Default = 0
-
-- **`iz`**<br>
-  Storage index for z-dimension, Default = 0
-
-- **`iw`**<br>
-  Storage index for w-dimension, Default = 0
-
-- **`name`**<br>
-  Name of the dataset; String
-
-- **`data`**<br>
-  Data to be written
-
-## Caveat:
-- Throws an error if dataset already exists at this location
-- Throws an error if file does not exist (use hdf5_create_file)
-- Supported types: string, double, float, (u)int32, (u)int64
-- Supported size: up to 3 dimensions
-- Storage order is maintained
+## See also:
+- [[hdf5_read_dset_names]] (for reading names of already written datasets)
+- [[hdf5_read_dset]] (for reading individual unstructured datasets)
 MD!*/
 
 void hdf5_write_dset(const std::string fn,

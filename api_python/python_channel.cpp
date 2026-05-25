@@ -60,15 +60,23 @@ void quadriga_lib_channel(py::module_ &m)
     m.def("hdf5_create_file", &hdf5_create_file, py::arg("fn"),
           py::arg("nx") = 65536, py::arg("ny") = 1, py::arg("nz") = 1, py::arg("nw") = 1);
 
-    m.def("hdf5_read_channel", &hdf5_read_channel, py::arg("fn"),
-          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
-          py::arg("snap") = py::array_t<arma::uword>());
+    m.def("hdf5_read_channel", &hdf5_read_channel,
+          py::arg("fn"),
+          py::arg("ix") = 0,
+          py::arg("iy") = 0,
+          py::arg("iz") = 0,
+          py::arg("iw") = 0,
+          py::arg("snap") = py::none());
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0);
 
-    m.def("hdf5_read_dset", &hdf5_read_dset, py::arg("fn"),
-          py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0,
+    m.def("hdf5_read_dset", &hdf5_read_dset,
+          py::arg("fn"),
+          py::arg("ix") = 0,
+          py::arg("iy") = 0,
+          py::arg("iz") = 0,
+          py::arg("iw") = 0,
           py::arg("name"));
 
     m.def("hdf5_read_layout", &hdf5_read_layout, py::arg("fn"));
