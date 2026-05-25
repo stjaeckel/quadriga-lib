@@ -94,14 +94,14 @@ py::tuple qrt_file_parse(const std::string &fn)
     quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version,
                                  &fGHz, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
-    auto cir_offset_p = qd_python_copy2numpy(cir_offset);
-    auto orig_names_p = qd_python_copy2python(orig_names);
-    auto dest_names_p = qd_python_copy2python(dest_names);
-    auto fGHz_p = qd_python_copy2numpy(fGHz);
-    auto cir_pos_p = qd_python_copy2numpy(cir_pos);
-    auto cir_orientation_p = qd_python_copy2numpy(cir_orientation);
-    auto orig_pos_p = qd_python_copy2numpy(orig_pos);
-    auto orig_orientation_p = qd_python_copy2numpy(orig_orientation);
+    auto cir_offset_p = qd_python_copy2numpy(&cir_offset);
+    auto orig_names_p = qd_python_copy2list(orig_names);
+    auto dest_names_p = qd_python_copy2list(dest_names);
+    auto fGHz_p = qd_python_copy2numpy(&fGHz);
+    auto cir_pos_p = qd_python_copy2numpy(&cir_pos);
+    auto cir_orientation_p = qd_python_copy2numpy(&cir_orientation);
+    auto orig_pos_p = qd_python_copy2numpy(&orig_pos);
+    auto orig_orientation_p = qd_python_copy2numpy(&orig_orientation);
 
     return py::make_tuple(no_cir, no_orig, no_dest, no_freq, cir_offset_p, orig_names_p, dest_names_p, version,
                           fGHz_p, cir_pos_p, cir_orientation_p, orig_pos_p, orig_orientation_p);

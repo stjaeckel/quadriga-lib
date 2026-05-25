@@ -131,15 +131,15 @@ py::tuple obj_file_read(const std::string &fn, const std::string &materials_csv)
 
     quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv);
 
-    auto mesh_p = qd_python_copy2numpy(mesh);
-    auto mtl_prop_p = qd_python_copy2numpy(mtl_prop);
-    auto vert_list_p = qd_python_copy2numpy(vert_list);
-    auto face_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(face_ind);
-    auto obj_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(obj_ind);
-    auto mtl_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(mtl_ind);
-    auto obj_names_p = qd_python_copy2python(obj_names);
-    auto mtl_names_p = qd_python_copy2python(mtl_names);
-    auto bsdf_p = qd_python_copy2numpy(bsdf);
+    auto mesh_p = qd_python_copy2numpy(&mesh);
+    auto mtl_prop_p = qd_python_copy2numpy(&mtl_prop);
+    auto vert_list_p = qd_python_copy2numpy(&vert_list);
+    auto face_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(&face_ind);
+    auto obj_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(&obj_ind);
+    auto mtl_ind_p = qd_python_copy2numpy<arma::uword, py::ssize_t>(&mtl_ind);
+    auto obj_names_p = qd_python_copy2list(obj_names);
+    auto mtl_names_p = qd_python_copy2list(mtl_names);
+    auto bsdf_p = qd_python_copy2numpy(&bsdf);
 
     return py::make_tuple(mesh_p, mtl_prop_p, vert_list_p, face_ind_p, obj_ind_p, mtl_ind_p, obj_names_p, mtl_names_p, bsdf_p);
 }

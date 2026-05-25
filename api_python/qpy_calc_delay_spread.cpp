@@ -86,8 +86,8 @@ py::tuple calc_delay_spread(py::list delays_py, py::list powers_py,
     arma::vec ds = quadriga_lib::calc_delay_spread<double>(delays, powers, threshold, granularity, &mean_delay);
 
     // Convert to Python types
-    auto ds_p = qd_python_copy2numpy(ds);
-    auto mean_delay_p = qd_python_copy2numpy(mean_delay);
+    auto ds_p = qd_python_copy2numpy(&ds);
+    auto mean_delay_p = qd_python_copy2numpy(&mean_delay);
 
     return py::make_tuple(ds_p, mean_delay_p);
 }

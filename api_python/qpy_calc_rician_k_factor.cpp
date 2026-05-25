@@ -91,8 +91,8 @@ py::tuple calc_rician_k_factor(py::list powers_list, py::list path_length_list,
     quadriga_lib::calc_rician_k_factor<double>(powers, path_length, tx_pos, rx_pos, &kf, &pg, window_size);
 
     // Convert to Python
-    auto kf_p = qd_python_copy2numpy(kf);
-    auto pg_p = qd_python_copy2numpy(pg);
+    auto kf_p = qd_python_copy2numpy(&kf);
+    auto pg_p = qd_python_copy2numpy(&pg);
 
     return py::make_tuple(kf_p, pg_p);
 }

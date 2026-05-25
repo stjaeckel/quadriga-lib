@@ -83,21 +83,21 @@ py::dict qrt_file_read(const std::string &fn, arma::uword cir, arma::uword orig,
                                         &path_length, &M, &aod, &eod, &aoa, &eoa, &path_coord, normalize_M);
 
     py::dict output;
-    output["center_freq"] = qd_python_copy2numpy(center_frequency);
-    output["tx_pos"] = qd_python_copy2numpy(tx_pos);
-    output["tx_orientation"] = qd_python_copy2numpy(tx_orientation);
-    output["rx_pos"] = qd_python_copy2numpy(rx_pos);
-    output["rx_orientation"] = qd_python_copy2numpy(rx_orientation);
-    output["fbs_pos"] = qd_python_copy2numpy(fbs_pos);
-    output["lbs_pos"] = qd_python_copy2numpy(lbs_pos);
-    output["path_gain"] = qd_python_copy2numpy(path_gain);
-    output["path_length"] = qd_python_copy2numpy(path_length);
-    output["M"] = qd_python_copy2numpy(M);
-    output["aod"] = qd_python_copy2numpy(aod);
-    output["eod"] = qd_python_copy2numpy(eod);
-    output["aoa"] = qd_python_copy2numpy(aoa);
-    output["eoa"] = qd_python_copy2numpy(eoa);
-    output["path_coord"] = qd_python_copy2numpy(path_coord);
+    output["center_freq"] = qd_python_copy2numpy(&center_frequency);
+    output["tx_pos"] = qd_python_copy2numpy(&tx_pos);
+    output["tx_orientation"] = qd_python_copy2numpy(&tx_orientation);
+    output["rx_pos"] = qd_python_copy2numpy(&rx_pos);
+    output["rx_orientation"] = qd_python_copy2numpy(&rx_orientation);
+    output["fbs_pos"] = qd_python_copy2numpy(&fbs_pos);
+    output["lbs_pos"] = qd_python_copy2numpy(&lbs_pos);
+    output["path_gain"] = qd_python_copy2numpy(&path_gain);
+    output["path_length"] = qd_python_copy2numpy(&path_length);
+    output["M"] = qd_python_copy2numpy(&M);
+    output["aod"] = qd_python_copy2numpy(&aod);
+    output["eod"] = qd_python_copy2numpy(&eod);
+    output["aoa"] = qd_python_copy2numpy(&aoa);
+    output["eoa"] = qd_python_copy2numpy(&eoa);
+    output["path_coord"] = qd_python_copy2list(&path_coord);
 
     return output;
 }

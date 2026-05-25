@@ -42,5 +42,5 @@ py::list hdf5_read_dset_names(const std::string &fn,
 {
     std::vector<std::string> par_names;
     quadriga_lib::hdf5_read_dset_names(fn, &par_names, ix, iy, iz, iw);
-    return qd_python_copy2python(par_names);
+    return qd_python_copy2list(par_names);
 }

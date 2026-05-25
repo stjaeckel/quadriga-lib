@@ -1027,127 +1027,148 @@ storage_space = quadriga_lib.channel.hdf5_create_file( fn, nx, ny, nz, nw )
 <hr class="thin">
 Reads channel data from HDF5 files
 <ul>
-<li>Reads structured channel data and any unstructured datasets from one slot of an indexed HDF5 file</li>
-<li>A slot is addressed by the 0-based storage indices <code>(ix, iy, iz, iw)</code></li>
+<li>Reads structured channel data and any unstructured datasets from a 4D indexed HDF5 file</li>
+<li>Each of ix, iy, iz, iw may be a scalar, vector, or omitted (= None)</li>
 <li>Datasets span <code>n_rx</code> RX antennas, <code>n_tx</code> TX antennas, <code>n_path</code> paths and <code>n_snap</code> snapshots; snapshots typically index positions along a trajectory or frequencies</li>
+<li>Slots are visited in column-major order and empty slots are skipped.</li>
 <li>Not every dataset spans all dimensions; only datasets present in the file are returned</li>
 <li>Per-snapshot data is returned as a <code>list</code> of arrays, one per snapshot, since <code>n_path</code> may differ between snapshots</li>
-<li>Stored in single precision, returned as double precision</li>
+<li>Structured fields are stored in single precision in the file and returned in double.</li>
+<li>Unstructured datasets keep their stored type and shape.</li>
 <li><code>snap</code> selects a subset of snapshots; if <code>None</code>, all snapshots are read</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap )
+chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, stack )
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>fn</code></b> — Filename of the HDF5 file; str</li>
-<li><b><code>ix</code></b> — Storage index for the x-dimension; 0-based; default: 0</li>
-<li><b><code>iy</code></b> — Storage index for the y-dimension; 0-based; default: 0</li>
-<li><b><code>iz</code></b> — Storage index for the z-dimension; 0-based; default: 0</li>
-<li><b><code>iw</code></b> — Storage index for the w-dimension; 0-based; default: 0</li>
-<li><b><code>snap</code></b> — Snapshot indices to read; 0-based; <code>(n_sel,)</code> or <code>None</code>; <code>None</code> reads all snapshots; default: <code>None</code></li>
+<li><b><code>ix</code></b> — 0-based slot indices along dimension X; scalar or vector; default: 0 ... nx-1</li>
+<li><b><code>iy</code></b> — 0-based slot indices along dimension Y; scalar or vector; default: 0 ... ny-1</li>
+<li><b><code>iz</code></b> — 0-based slot indices along dimension Z; scalar or vector; default: 0 ... nz-1</li>
+<li><b><code>iw</code></b> — 0-based slot indices along dimension W; scalar or vector; default: 0 ... nw-1</li>
+<li><b><code>snap</code></b> — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.</li>
+<li><b><code>stack</code></b> — If <code>True</code>, stack snapshots. Default: <code>False</code> (return as list)</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>chan</code></b> — Dict with the channel data; only keys present in the file are included:<br><br>
+<li><b><code>chan</code></b> — List of dicts with the following keys:<br><br>
 <table class="md">
 <tr>
   <th>Key</th>
   <th>Description</th>
-  <th>Type / Shape</th>
+  <th>Shape <code>stack = False</code></th>
+  <th>Shape <code>stack = True</code></th>
 </tr>
 <tr>
   <td><code>name</code></td>
   <td>Channel name</td>
-  <td>String</td>
+  <td>str</td>
+  <td>str</td>
 </tr>
 <tr>
   <td><code>tx_position</code></td>
   <td>Transmitter positions (AP for downlink, STA for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
   <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
 </tr>
 <tr>
   <td><code>rx_position</code></td>
   <td>Receiver positions (STA for downlink, AP for uplink)</td>
   <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
 </tr>
 <tr>
   <td><code>tx_orientation</code></td>
   <td>Transmitter orientation, Euler angles (AP for downlink, STA for uplink)</td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
   <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
 </tr>
 <tr>
   <td><code>rx_orientation</code></td>
   <td>Receiver orientation, Euler angles (STA for downlink, AP for uplink)</td>
   <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
+  <td><code>(3, n_snap)</code> or <code>(3, 1)</code></td>
 </tr>
 <tr>
   <td><code>coeff</code></td>
   <td>Channel coefficients, complex-valued</td>
   <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+  <td><code>(n_rx, n_tx, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>delay</code></td>
   <td>Propagation delays in seconds</td>
   <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+  <td><code>(n_rx, n_tx, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
   <td>list of <code>(n_path_s,)</code></td>
+  <td><code>(n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>path_length</code></td>
   <td>Path length in m</td>
   <td>list of <code>(n_path_s,)</code></td>
+  <td><code>(n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>path_polarization</code></td>
   <td>Polarization transfer function, complex</td>
   <td>list of <code>(4, n_path_s)</code></td>
+  <td><code>(4, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>path_angles</code></td>
-  <td>Departure and arrival angles [AOD, EOD, AOA, EOA] in rad</td>
+  <td>Departure and arrival angles (AOD, EOD, AOA, EOA) in rad</td>
   <td>list of <code>(n_path_s, 4)</code></td>
+  <td><code>(n_path, 4, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>fbs_pos</code></td>
   <td>First-bounce scatterer positions</td>
   <td>list of <code>(3, n_path_s)</code></td>
+  <td><code>(3, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>lbs_pos</code></td>
   <td>Last-bounce scatterer positions</td>
   <td>list of <code>(3, n_path_s)</code></td>
+  <td><code>(3, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>no_interact</code></td>
   <td>Number of interaction points per path; uint32</td>
   <td>list of <code>(n_path_s,)</code></td>
+  <td><code>(n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>interact_coord</code></td>
   <td>Interaction coordinates</td>
   <td>list of <code>(3, sum(no_interact_s))</code></td>
+  <td><code>(3, max(sum(no_interact)), n_snap)</code></td>
 </tr>
 <tr>
   <td><code>center_frequency</code></td>
   <td>Center Frequency in Hz</td>
+  <td><code>(n_snap,)</code> or scalar</td>
   <td><code>(n_snap,)</code> or scalar</td>
 </tr>
 <tr>
   <td><code>initial_position</code></td>
   <td>Index of reference position; 1-based</td>
   <td>int32, scalar</td>
+  <td>int32, scalar</td>
 </tr>
 </table>
 </li>
-<li><b><code>par</code></b> —Dictionary of unstructured data</li>
+<li><b><code>par</code></b> — Dict (single slot) or list of dicts (multiple slots) containing the unstructured data in the file.</li>
 </ul>
 
 <b>See also:</b><br>
@@ -2085,7 +2106,7 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
 
 <b>Output:</b><br>
 <ul>
-<li><b><code>chan</code></b><br> List of length <code>n_users</code> containing dictionaries of channel data with the following keys.<br><br>
+<li><b><code>chan</code></b><br> List of length <code>n_users</code> containing dictionaries of channel data with the following keys:<br><br>
 <table class="md">
 <tr>
   <th>Key</th>

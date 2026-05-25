@@ -13,15 +13,15 @@ namespace py = pybind11;
 static py::dict qd_python_arrayant2dict(const quadriga_lib::arrayant<double> &ant)
 {
     py::dict output;
-    output["e_theta_re"] = qd_python_copy2numpy(ant.e_theta_re);
-    output["e_theta_im"] = qd_python_copy2numpy(ant.e_theta_im);
-    output["e_phi_re"] = qd_python_copy2numpy(ant.e_phi_re);
-    output["e_phi_im"] = qd_python_copy2numpy(ant.e_phi_im);
-    output["azimuth_grid"] = qd_python_copy2numpy(ant.azimuth_grid);
-    output["elevation_grid"] = qd_python_copy2numpy(ant.elevation_grid);
-    output["element_pos"] = qd_python_copy2numpy(ant.element_pos);
-    output["coupling_re"] = qd_python_copy2numpy(ant.coupling_re);
-    output["coupling_im"] = qd_python_copy2numpy(ant.coupling_im);
+    output["e_theta_re"] = qd_python_copy2numpy(&ant.e_theta_re);
+    output["e_theta_im"] = qd_python_copy2numpy(&ant.e_theta_im);
+    output["e_phi_re"] = qd_python_copy2numpy(&ant.e_phi_re);
+    output["e_phi_im"] = qd_python_copy2numpy(&ant.e_phi_im);
+    output["azimuth_grid"] = qd_python_copy2numpy(&ant.azimuth_grid);
+    output["elevation_grid"] = qd_python_copy2numpy(&ant.elevation_grid);
+    output["element_pos"] = qd_python_copy2numpy(&ant.element_pos);
+    output["coupling_re"] = qd_python_copy2numpy(&ant.coupling_re);
+    output["coupling_im"] = qd_python_copy2numpy(&ant.coupling_im);
     output["center_freq"] = ant.center_frequency;
     output["name"] = ant.name;
     return output;
@@ -49,22 +49,22 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
         vec_epr[f] = ant[f].e_phi_re;
         vec_epi[f] = ant[f].e_phi_im;
     }
-    output["e_theta_re"] = qd_python_copy2numpy_4d(vec_etr);
-    output["e_theta_im"] = qd_python_copy2numpy_4d(vec_eti);
-    output["e_phi_re"] = qd_python_copy2numpy_4d(vec_epr);
-    output["e_phi_im"] = qd_python_copy2numpy_4d(vec_epi);
+    output["e_theta_re"] = qd_python_stack2numpy(&vec_etr);
+    output["e_theta_im"] = qd_python_stack2numpy(&vec_eti);
+    output["e_phi_re"] = qd_python_stack2numpy(&vec_epr);
+    output["e_phi_im"] = qd_python_stack2numpy(&vec_epi);
 
     // Shared fields from first entry
-    output["azimuth_grid"] = qd_python_copy2numpy(a0.azimuth_grid);
-    output["elevation_grid"] = qd_python_copy2numpy(a0.elevation_grid);
-    output["element_pos"] = qd_python_copy2numpy(a0.element_pos);
+    output["azimuth_grid"] = qd_python_copy2numpy(&a0.azimuth_grid);
+    output["elevation_grid"] = qd_python_copy2numpy(&a0.elevation_grid);
+    output["element_pos"] = qd_python_copy2numpy(&a0.element_pos);
     output["name"] = a0.name;
 
     // Center frequency as 1D array
     arma::Col<double> center_freqs(n_freq);
     for (size_t f = 0; f < n_freq; ++f)
         center_freqs[f] = ant[f].center_frequency;
-    output["center_freq"] = qd_python_copy2numpy(center_freqs);
+    output["center_freq"] = qd_python_copy2numpy(&center_freqs);
 
     // Coupling: check if all entries are identical
     bool coupling_varies = false;
@@ -91,10 +91,10 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
             arma::Cube<double> cpl_re(nr, nc, n_freq, arma::fill::none);
             for (size_t f = 0; f < n_freq; ++f)
                 cpl_re.slice(f) = ant[f].coupling_re;
-            output["coupling_re"] = qd_python_copy2numpy(cpl_re);
+            output["coupling_re"] = qd_python_copy2numpy(&cpl_re);
         }
         else
-            output["coupling_re"] = qd_python_copy2numpy(a0.coupling_re);
+            output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
 
         if (a0.coupling_im.n_elem > 0)
         {
@@ -102,16 +102,16 @@ static py::dict qd_python_arrayant2dict_multi(const std::vector<quadriga_lib::ar
             arma::Cube<double> cpl_im(nr, nc, n_freq, arma::fill::none);
             for (size_t f = 0; f < n_freq; ++f)
                 cpl_im.slice(f) = ant[f].coupling_im;
-            output["coupling_im"] = qd_python_copy2numpy(cpl_im);
+            output["coupling_im"] = qd_python_copy2numpy(&cpl_im);
         }
         else
-            output["coupling_im"] = qd_python_copy2numpy(a0.coupling_im);
+            output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
     }
     else
     {
         // Shared: store as 2D
-        output["coupling_re"] = qd_python_copy2numpy(a0.coupling_re);
-        output["coupling_im"] = qd_python_copy2numpy(a0.coupling_im);
+        output["coupling_re"] = qd_python_copy2numpy(&a0.coupling_re);
+        output["coupling_im"] = qd_python_copy2numpy(&a0.coupling_im);
     }
 
     return output;
@@ -345,9 +345,9 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     auto emit_per_snap_mat = [&](const char *key, const arma::Mat<double> &matrix)
     {
         if (matrix.n_cols == 1 || (matrix.n_cols > 1 && !snap_given))
-            output[key] = qd_python_copy2numpy(matrix);
+            output[key] = qd_python_copy2numpy(&matrix);
         else if (snap_given && matrix.n_cols > 1)
-            output[key] = qd_python_copy2numpy(matrix, i_snap);
+            output[key] = qd_python_copy2numpy<double, double>(&matrix, nullptr, i_snap);
     };
 
     output["name"] = channel.name;
@@ -359,34 +359,34 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
 
     // Coefficients (complex) and delays -> list of ragged 3D arrays
     if (!channel.coeff_re.empty())
-        output["coeff"] = qd_python_copy2numpy(channel.coeff_re, channel.coeff_im, i_snap);
+        output["coeff"] = qd_python_copy2list<arma::cube, std::complex<double>>(&channel.coeff_re, &channel.coeff_im, i_snap);
     if (!channel.delay.empty())
-        output["delay"] = qd_python_copy2numpy(channel.delay, i_snap);
+        output["delay"] = qd_python_copy2list<arma::cube, double>(&channel.delay, nullptr, i_snap);
 
     if (!channel.path_gain.empty())
-        output["path_gain"] = qd_python_copy2numpy(channel.path_gain, i_snap);
+        output["path_gain"] = qd_python_copy2list<arma::vec, double>(&channel.path_gain, nullptr, i_snap);
     if (!channel.path_length.empty())
-        output["path_length"] = qd_python_copy2numpy(channel.path_length, i_snap);
+        output["path_length"] = qd_python_copy2list<arma::vec, double>(&channel.path_length, nullptr, i_snap);
     if (!channel.path_polarization.empty())
-        output["path_polarization"] = qd_python_copy2numpy(qd_python_Interleaved2Complex(channel.path_polarization), i_snap);
+        output["path_polarization"] = qd_python_copy2list<arma::mat, std::complex<double>>(&channel.path_polarization, nullptr, i_snap); 
     if (!channel.path_angles.empty())
-        output["path_angles"] = qd_python_copy2numpy(channel.path_angles, i_snap);
+        output["path_angles"] = qd_python_copy2list<arma::mat, double>(&channel.path_angles, nullptr, i_snap);
 
     if (!channel.path_fbs_pos.empty())
-        output["fbs_pos"] = qd_python_copy2numpy(channel.path_fbs_pos, i_snap);
+        output["fbs_pos"] = qd_python_copy2list<arma::mat, double>(&channel.path_fbs_pos, nullptr, i_snap);
     if (!channel.path_lbs_pos.empty())
-        output["lbs_pos"] = qd_python_copy2numpy(channel.path_lbs_pos, i_snap);
+        output["lbs_pos"] = qd_python_copy2list<arma::mat, double>(&channel.path_lbs_pos, nullptr, i_snap);
 
     if (!channel.no_interact.empty())
-        output["no_interact"] = qd_python_copy2numpy(channel.no_interact, i_snap);
+        output["no_interact"] = qd_python_copy2list<arma::u32_vec, py::ssize_t>(&channel.no_interact, nullptr, i_snap);
     if (!channel.interact_coord.empty())
-        output["interact_coord"] = qd_python_copy2numpy(channel.interact_coord, i_snap);
+        output["interact_coord"] = qd_python_copy2list<arma::mat, double>(&channel.interact_coord, nullptr, i_snap);
 
     // Center frequency: scalar shared or per-snapshot
     if (channel.center_frequency.n_elem == 1 || (channel.center_frequency.n_elem > 1 && !snap_given))
-        output["center_frequency"] = qd_python_copy2numpy(channel.center_frequency);
+        output["center_frequency"] = qd_python_copy2numpy(&channel.center_frequency);
     else if (snap_given && channel.center_frequency.n_elem > 1)
-        output["center_frequency"] = qd_python_copy2numpy(channel.center_frequency, i_snap);
+        output["center_frequency"] = qd_python_copy2numpy<double, double>(&channel.center_frequency, nullptr, i_snap);
 
     if (n_snap_channel > 0)
     {
@@ -394,6 +394,15 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     }
 
     return output;
+}
+
+static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<double>> &chan,
+                                       bool validate = false)
+{
+    py::list list;
+    for (const auto &channel : chan)
+        list.append(qd_python_channel2dict(channel, {}, validate));
+    return list;
 }
 
 // Convert an unstructured dataset (std::any) to a numpy array / scalar / str.
@@ -409,7 +418,7 @@ static py::object qd_python_any2numpy(const std::any &dset)
 
 #define QD_PY_ANY_ARR(id, T) \
     case id:                 \
-        return qd_python_copy2numpy(std::any_cast<T>(dset));
+        return qd_python_copy2numpy(std::any_cast<T>(&dset));
 
     switch (type_id)
     {

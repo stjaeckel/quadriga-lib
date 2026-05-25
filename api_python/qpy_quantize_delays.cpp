@@ -104,9 +104,9 @@ py::tuple quantize_delays(py::list coeff_re_list,
         tap_spacing, (arma::uword)max_no_taps, power_exponent, fix_taps);
 
     // Convert outputs to 4D numpy arrays (all output cubes have uniform size)
-    auto coeff_re_q_p = qd_python_copy2numpy(coeff_re_q);
-    auto coeff_im_q_p = qd_python_copy2numpy(coeff_im_q);
-    auto delay_q_p = qd_python_copy2numpy(delay_q);
+    auto coeff_re_q_p = qd_python_copy2list(&coeff_re_q);
+    auto coeff_im_q_p = qd_python_copy2list(&coeff_im_q);
+    auto delay_q_p = qd_python_copy2list(&delay_q);
 
     return py::make_tuple(coeff_re_q_p, coeff_im_q_p, delay_q_p);
 }
