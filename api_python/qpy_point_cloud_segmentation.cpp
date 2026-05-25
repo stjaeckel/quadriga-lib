@@ -52,10 +52,10 @@ py::tuple point_cloud_segmentation(const py::array_t<double> &points,
     quadriga_lib::point_cloud_segmentation<double>(&points_arma, &points_out, &sub_cloud_ind,
                                                    target_size, vec_size, &forward_ind, &reverse_ind);
 
-    auto points_out_p = qd_python_copy2numpy(points_out);
-    auto sub_cloud_ind_p = qd_python_copy2numpy(sub_cloud_ind);
-    auto forward_ind_p = qd_python_copy2numpy(forward_ind);
-    auto reverse_ind_p = qd_python_copy2numpy(reverse_ind);
+    auto points_out_p = qd_python_copy2numpy(&points_out);
+    auto sub_cloud_ind_p = qd_python_copy2numpy(&sub_cloud_ind);
+    auto forward_ind_p = qd_python_copy2numpy(&forward_ind);
+    auto reverse_ind_p = qd_python_copy2numpy(&reverse_ind);
 
     return py::make_tuple(points_out_p, sub_cloud_ind_p, forward_ind_p, reverse_ind_p);
 }

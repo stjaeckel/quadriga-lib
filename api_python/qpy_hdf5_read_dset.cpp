@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions

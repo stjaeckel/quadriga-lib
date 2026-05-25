@@ -286,9 +286,9 @@ py::tuple get_channels_multifreq(const py::dict &ant_tx,
                                                  use_absolute_delays, add_fake_los_path, propagation_speed);
 
     // Convert outputs to 4D numpy arrays (4th dim = frequency)
-    auto coeff_re_p = qd_python_copy2numpy_4d(coeff_re);
-    auto coeff_im_p = qd_python_copy2numpy_4d(coeff_im);
-    auto delay_p = qd_python_copy2numpy_4d(delay);
+    auto coeff_re_p = qd_python_stack2numpy(&coeff_re);
+    auto coeff_im_p = qd_python_stack2numpy(&coeff_im);
+    auto delay_p = qd_python_stack2numpy(&delay);
 
     return py::make_tuple(coeff_re_p, coeff_im_p, delay_p);
 }

@@ -117,11 +117,11 @@ static py::tuple calc_angular_spread(py::list az_py,
         !wrapping, calc_bank_angle, quantize);
 
     // Convert to Python
-    auto as_py = qd_python_copy2numpy(azimuth_spread);
-    auto es_py = qd_python_copy2numpy(elevation_spread);
-    auto orient_py = qd_python_copy2numpy(orientation);
-    auto phi_py = qd_python_copy2numpy(phi);
-    auto theta_py = qd_python_copy2numpy(theta);
+    auto as_py = qd_python_copy2numpy(&azimuth_spread);
+    auto es_py = qd_python_copy2numpy(&elevation_spread);
+    auto orient_py = qd_python_copy2numpy(&orientation);
+    auto phi_py = qd_python_copy2list(&phi);
+    auto theta_py = qd_python_copy2list(&theta);
 
     return py::make_tuple(as_py, es_py, orient_py, phi_py, theta_py);
 }

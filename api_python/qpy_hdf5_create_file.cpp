@@ -51,7 +51,7 @@ py::array_t<unsigned> hdf5_create_file(const std::string &fn, unsigned nx, unsig
 
     // Return the storage layout that was used
     arma::u32_vec storage_space = {nx, ny, nz, nw};
-    return qd_python_copy2numpy(storage_space);
+    return qd_python_copy2numpy<unsigned, py::ssize_t>(&storage_space);
 }
 
 // pybind11 declaration:

@@ -1,6 +1,6 @@
-You are implementing a lightweight Python API wrapper for pybind11 (v3) to call my C++ radio channel modelling library (quadriga-lib). You will receive a documentation block for the C++ API. Your task is to implement the wrapper function (a regular C++ function exposed via pybind11) that correctly calls the C++ function, handles input and output arguments, and ensures proper memory management. The wrapper should be designed to be user-friendly for Python users while maintaining the performance benefits of the underlying C++ library.
+You are implementing a lightweight Python API wrapper for pybind11 (v3) to call my C++ radio channel modelling library (quadriga-lib). You will receive either a documentation block for the C++ API and/or a MATLAB MEX wrapper that implements the same function for MATLAB. Your task is to implement the wrapper function (a regular C++ function exposed via pybind11) that correctly calls the C++ function, handles input and output arguments, and ensures proper memory management. The wrapper should be designed to be user-friendly for Python users while maintaining the performance benefits of the underlying C++ library.
 
-# CPP API DOCUMENTATION BLOCK FORMAT
+# CPP/MEX API DOCUMENTATION BLOCK FORMAT
 - Each function has a 1-line short description, optional detailed notes, a Declaration block, and Inputs/Outputs/Returns sections.
 - Array sizes follow in backticks, e.g. `[n_rx, n_tx, n_path]`.
 - All functions and classes live in the `quadriga_lib` namespace.
@@ -9,16 +9,16 @@ You are implementing a lightweight Python API wrapper for pybind11 (v3) to call 
 - Armadillo types are column-major. Shape notation `[a, b, c]` means `[rows, cols, slices]` for `arma::Cube`; `[rows, cols]` for `arma::Mat`; `[n]` for `arma::Col`/`arma::Row`.
 - Pointer arguments: `nullptr` skips optional outputs; required inputs throw on `nullptr`.
 - Output containers are resized automatically unless they already have the correct shape; this invalidates any prior pointers into their memory.
-- Invalid inputs (shape/domain) cause a `std::invalid_argument`; I/O failures a `std::runtime_error`.
-- Index conventions: 0-based unless the field is explicitly called "1-based" (which applies to `obj_ind`, `mtl_ind`, `fbs_ind`, `sbs_ind`, and QDANT `id`).
-- Units: angles in radians (degrees only where stated, e.g. `*_deg`, `*_3dB`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
+- Invalid inputs (shape/domain) cause a `std::invalid_argument`
+- Index conventions: 0-based unless the field is explicitly called "1-based"
+- Units: angles in radians (degrees only where stated, e.g. `*_deg`); distances in meters; frequencies in Hz; time in seconds; powers linear unless `_dB`.
 - Coordinate system: GCS = right-handed Cartesian, meters. Euler angles are intrinsic Tait-Bryan in the order (bank=x, tilt=y, heading=z), applied as Rz·Ry·Rx.
 - Speed of light/sound defaults: `299792458.0` m/s (EM), `343.0` m/s (acoustic).
 
 # IMPLEMENTATION GUIDELINES
 
 ## File and function naming
-- All Python wrapper source files use the `qpy_` prefix and match the C++ function name, so `quadriga_lib::function_name` is wrapped in `qpy_function_name.cpp`.
+- All Python wrapper source files use the `qpy_` prefix and match the C++/MEX function name, so `quadriga_lib::function_name` is wrapped in `qpy_function_name.cpp`.
 - The wrapper function itself is named after the C++ function it wraps (e.g. `acdf`), and is exposed to Python via pybind11. The function name is kept as-is — no case conversion (lowercase stays lowercase).
 - The dispatcher in `python_main.cpp` registers each wrapper with one of the submodules (`arrayant`, `channel`, `tools`, `RTtools`). From Python, the user calls e.g. `quadriga_lib.tools.acdf(...)`.
 
@@ -45,47 +45,58 @@ You are implementing a lightweight Python API wrapper for pybind11 (v3) to call 
 - `python_arma_adapter.hpp` pulls in pybind11, numpy, and Armadillo. `py` is aliased to `pybind11`.
 
 ## Helper function signatures
-Quadriga-Lib uses Armadillo for data structures. Conversion between numpy arrays / Python objects and Armadillo types is done via the helpers in `python_arma_adapter.hpp`:
+Quadriga-Lib uses Armadillo for data structures. Conversion between numpy arrays / Python objects and Armadillo types is done via the helpers in `python_arma_adapter.hpp`.
 
-```
-// Copy from Armadillo to Numpy (auto = py::array_t<dtype>)
-auto pyarray = qd_python_copy2numpy(Col, transpose, i_elem);        // Column vector
-auto pyarray = qd_python_copy2numpy(Mat, i_col);                    // Matrix
-auto pyarray = qd_python_copy2numpy(Cube, i_slice);                 // Cube
-auto pyarray = qd_python_copy2numpy(MatRe, MatIm, i_col);           // Re/Im → complex
-auto pyarray = qd_python_copy2numpy(CubeRe, CubeIm, i_slice);       // Re/Im → complex
-auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(Col);    // Cast on copy
-auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(Mat);    // Cast on copy
-auto pyarray = qd_python_copy2numpy_4d(vecCubes);                   // 4D from vector<Cube>
+The `copy2numpy`, `stack2numpy` and `copy2list` converters take their Armadillo inputs **by pointer** (pass `&obj`, and `nullptr` for an absent optional input) and are templated as `<dtype, dtype_numpy = dtype>`: `dtype` is the Armadillo scalar (deduced from the argument) and `dtype_numpy` is the numpy element type. `dtype_numpy` may be the same as `dtype`, a different real type (cast on copy), or a `std::complex<...>` (complex output). When a *real* `dtype_numpy` is combined with an imaginary input, the real and imaginary parts are **interleaved along the rows** and the row count doubles; pass a `std::complex<...>` `dtype_numpy` to get a genuine complex array instead.
 
-// Copy std::vector of Armadillo types to py::list of numpy arrays
-auto pylist = qd_python_copy2numpy(vecCol/Mat/Cube, i_vec);
-auto pylist = qd_python_copy2numpy(vecMatRe, vecMatIm, i_vec);      // Re/Im list → complex list
-auto pylist = qd_python_copy2numpy(vecCubeRe, vecCubeIm, i_vec);
-auto pylist = qd_python_copy2python(vecStrings, i_vec);             // Vector of strings
+```cpp
+// --- Copy a single Armadillo object to a Numpy array (auto = py::array_t<dtype_numpy>) ---
+auto pyarray = qd_python_copy2numpy(&Col, &ColIm, i_elem, transpose);  // Col; im/i_elem/transpose optional
+auto pyarray = qd_python_copy2numpy(&Mat, &MatIm, i_col);              // Mat; im/i_col optional
+auto pyarray = qd_python_copy2numpy(&Cube, &CubeIm, i_slice);          // Cube; im/i_slice optional
+auto pyarray = qd_python_copy2numpy(&Col);                             // simplest form: plain real copy
+auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(&Mat);      // cast on copy
+auto pyarray = qd_python_copy2numpy<float, std::complex<double>>(&MatRe, &MatIm, i_col);  // Re/Im -> complex
+auto pyarray = qd_python_copy2numpy<float, std::complex<double>>(&CubeRe);                // Re only -> complex (imag = 0)
 
-// Reserve memory in Python and map to Armadillo (zero-copy writes)
+// --- Stack a std::vector of Armadillo objects into one higher-dim Numpy array ---
+// (ragged inputs are zero-padded to the per-axis maximum; frame = last axis; i_vec selects frames)
+auto pyarray = qd_python_stack2numpy(&vecCol, &vecColIm, i_vec);       // vector<Col>  -> 2D
+auto pyarray = qd_python_stack2numpy(&vecMat, &vecMatIm, i_vec);       // vector<Mat>  -> 3D
+auto pyarray = qd_python_stack2numpy(&vecCube, &vecCubeIm, i_vec);     // vector<Cube> -> 4D
+auto pyarray = qd_python_stack2numpy<float, std::complex<double>>(&vecCubeRe, &vecCubeIm);  // -> complex 4D
+
+// --- Copy a std::vector of Armadillo objects to a py::list of Numpy arrays ---
+auto pylist = qd_python_copy2list(&vec, &vecImag, i_vec);              // vec = vector<Col|Mat|Cube>; im/i_vec optional
+auto pylist = qd_python_copy2list<arma::Mat<float>, std::complex<double>>(&vecMatRe, &vecMatIm);  // -> list of complex
+auto pylist = qd_python_copy2python(vecStrings, i_vec);                // vector of strings
+
+// --- Reserve memory in Python and map to Armadillo (zero-copy writes) ---
 auto pyarray = qd_python_init_output(n_elem, &Col);                            // 1D
 auto pyarray = qd_python_init_output(n_rows, n_cols, &Mat);                    // 2D
 auto pyarray = qd_python_init_output(n_rows, n_cols, n_slices, &Cube);         // 3D
 auto pyarray = qd_python_init_output(n_rows, n_cols, n_slices, n_frames, &vecCubes); // 4D
 
-// Convert numpy → Armadillo (view=true means zero-copy view if strides match, else copy)
+// --- Convert numpy -> Armadillo (view=true means zero-copy view if strides match, else copy) ---
 auto Col     = qd_python_numpy2arma_Col(pyarray_or_handle, view, strict);
 auto Mat     = qd_python_numpy2arma_Mat(pyarray_or_handle, view, strict);
 auto Cube    = qd_python_numpy2arma_Cube(pyarray_or_handle, view, strict);
-auto vecCube = qd_python_numpy2arma_vecCube(pyarray_or_handle, view, strict);  // 4D → vector<Cube>
+auto vecCube = qd_python_numpy2arma_vecCube(pyarray_or_handle, view, strict);  // 4D -> vector<Cube>
 
-// Copy py::list of numpy arrays to std::vector of Armadillo types
-auto vecCol = qd_python_list2vector_Col<dtype>(pylist);
-auto vecMat = qd_python_list2vector_Mat<dtype>(pylist);
-auto vecCube = qd_python_list2vector_Cube<dtype>(pylist);
+// --- Copy py::list of numpy arrays to std::vector of Armadillo types ---
+auto vecCol     = qd_python_list2vector_Col<dtype>(pylist);
+auto vecMat     = qd_python_list2vector_Mat<dtype>(pylist);
+auto vecCube    = qd_python_list2vector_Cube<dtype>(pylist);
 auto vecStrings = qd_python_list2vector_Strings(pylist);
-qd_python_list2vector_Cube_Cplx<dtype>(pylistComplex, vecCubeRe, vecCubeIm);   // Complex → Re/Im
+qd_python_list2vector_Cube_Cplx<dtype>(pylistComplex, vecCubeRe, vecCubeIm);   // Complex -> Re/Im
 ```
-
-- dtype for numeric helpers: `float`, `double`, `int`, `unsigned`, `long long`, `unsigned long long`.
+- `dtype` (deduced, Armadillo scalar): `float`, `double`, `int`, `unsigned`, `long long`, `unsigned long long`. `dtype_numpy` (numpy element type, defaults to `dtype`): any of those, or `std::complex<float>` / `std::complex<double>`.
+- `dtype_numpy` cannot be deduced; to set it you must also spell `dtype`, since it is the second template parameter (e.g. `<float, std::complex<double>>`).
+- Armadillo inputs `re`/`im` are passed by pointer; `im` defaults to `nullptr`. Selectors `i_elem`/`i_col`/`i_slice`/`i_vec` are `arma::uvec` passed by value and default to empty (= use all); `transpose` defaults to `false` (a `Col` with `transpose = true` is emitted as a `(1, n)` row).
+- `i_vec` selects which `std::vector` elements (frames) are used; `i_elem`/`i_col`/`i_slice` select elements/columns/slices within a single object. Out-of-range indices throw `std::out_of_range`.
+- `copy2numpy` and `copy2list` throw `std::invalid_argument` on a null `re`; `stack2numpy` returns an empty array when `re` is null or empty.
 - The handle overloads of `qd_python_numpy2arma_*` accept `py::none()` and return an empty Armadillo object — used for optional inputs.
+
 
 ## Exception handling
 - No `CALL_QD` macro is needed. pybind11 automatically translates `std::exception` (including `std::invalid_argument` and `std::runtime_error`) into Python exceptions, so the wrapper simply calls the C++ function directly.
@@ -104,13 +115,14 @@ SECTION!*/
 - Block starts with `/*!MD` and ends with `MD!*/`.
 - First line after `/*!MD` is the function name (kept as-is, lowercase), followed by a 1-line summary on the next line.
 - The bullet-point description follows directly after the 1-line summary — there is no `## Description:` heading.
-- The 1-line summary should be identical to the C++ documentation block.
+- The 1-line summary should be identical to the C++/MEX documentation block.
 - Each bullet contains one concise fact.
 - Never use `*` or `|` in formulas or any other text — they are reserved for markdown formatting. Use `·` for multiplication (e.g. `Rz·Ry·Rx`) and `abs()` for absolute values.
 - Lines longer than 120 characters need to be split, indenting continuation lines by 2 spaces.
-- Omit any dtype specifications — they are not relevant for the Python user (the wrapper always uses double).
+- Omit any dtype specifications — they are not relevant for the Python user (the wrapper always uses double and integer types are converted automatically).
 - Use Python types and syntax in descriptions: tuples `(n, m)` for shapes, `list`, `dict`, `str`, `None`, etc.
 - Use a `## Usage:` section with the function signature as it should be called from Python:
+- Never specify any import statements, e.g. "from quadriga_lib import channel" (these are the same for all API files); only place the function call with the "quadriga_lib" included:
 ```
 ## Usage:
 ```

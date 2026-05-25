@@ -95,8 +95,8 @@ py::tuple calc_cross_polarization_ratio(py::list powers_py, py::list M_py, py::l
                                                         &xpr, &pg, include_los, window_size);
 
     // Convert outputs
-    auto xpr_py = qd_python_copy2numpy(xpr);
-    auto pg_py = qd_python_copy2numpy(pg);
+    auto xpr_py = qd_python_copy2numpy(&xpr);
+    auto pg_py = qd_python_copy2numpy(&pg);
 
     return py::make_tuple(xpr_py, pg_py);
 }

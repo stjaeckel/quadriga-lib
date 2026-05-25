@@ -54,5 +54,5 @@ py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
 
     auto res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, &obj_ind_arma, distance);
 
-    return qd_python_copy2numpy(res);
+    return qd_python_copy2numpy(&res);
 }

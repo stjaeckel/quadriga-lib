@@ -68,7 +68,7 @@ py::dict arrayant_qdant_read(const std::string &fn,
         output = qd_python_arrayant2dict(ant);
     }
 
-    output["layout"] = qd_python_copy2numpy(layout);
+    output["layout"] = qd_python_copy2numpy<unsigned, py::ssize_t>(&layout);
     return output;
 }
 

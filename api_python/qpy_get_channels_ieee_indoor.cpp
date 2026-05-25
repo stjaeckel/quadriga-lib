@@ -61,7 +61,7 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
 
 ## Output:
 - **`chan`**<br>
-  List of length `n_users` containing dictionaries of channel data with the following keys.<br><br>
+  List of length `n_users` containing dictionaries of channel data with the following keys:<br><br>
   | Key                | Description                                                              | Type                             |
   | ------------------ | ------------------------------------------------------------------------ | ---------------------------------|
   | `name`             | Channel name                                                             | String                           |
@@ -142,20 +142,5 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                                   wall_loss);
 
     // Copy results to Python
-    py::list list;
-    for (const auto &channel : chan)
-    {
-        py::dict item;
-        item["name"] = channel.name;
-        item["tx_position"] = qd_python_copy2numpy(channel.tx_pos);
-        item["rx_position"] = qd_python_copy2numpy(channel.rx_pos);
-        item["tx_orientation"] = qd_python_copy2numpy(channel.tx_orientation);
-        item["rx_orientation"] = qd_python_copy2numpy(channel.rx_orientation);
-        item["coeff"] = qd_python_copy2numpy(channel.coeff_re, channel.coeff_im);
-        item["delay"] = qd_python_copy2numpy(channel.delay);
-        item["path_gain"] = qd_python_copy2numpy(channel.path_gain);
-        item["center_frequency"] = CarrierFreq_Hz;
-        list.append(item);
-    }
-    return list;
+    return qd_python_channel2list(chan);
 }

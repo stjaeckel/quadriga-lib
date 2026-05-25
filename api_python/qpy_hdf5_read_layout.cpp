@@ -48,7 +48,7 @@ py::tuple hdf5_read_layout(const std::string &fn)
         throw std::runtime_error("Corrupted storage index.");
 
     // storage_dims: 4-element vector [nx, ny, nz, nw]
-    auto storage_dims = qd_python_copy2numpy(storage_space);
+    auto storage_dims = qd_python_copy2numpy(&storage_space);
 
     // has_data: 4D occupancy mask (1 where a slot holds data, 0 otherwise)
     std::vector<arma::Cube<unsigned>> has_data_cubes;

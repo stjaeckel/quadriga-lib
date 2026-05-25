@@ -69,7 +69,7 @@ py::tuple acdf(const py::array_t<double> &data,
     quadriga_lib::acdf<double>(data_a, &bins_out, &cdf_per_set, &cdf_avg, &mu, &sig, n_bins);
 
     // Copy to python
-    auto bins_out_py = qd_python_copy2numpy(bins_out);
+    auto bins_out_py = qd_python_copy2numpy(&bins_out);
 
     // Return tuple
     return py::make_tuple(cdf_per_set_py, bins_out_py, cdf_avg_py, mu_py, sig_py);

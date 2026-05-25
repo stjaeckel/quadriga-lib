@@ -68,7 +68,7 @@ py::tuple ray_point_intersect(const py::array_t<double> &orig,
     auto ray_ind = quadriga_lib::ray_point_intersect<double>(&points_arma, &orig_arma, &trivec_arma, &tridir_arma,
                                                              &sub_cloud_ind_arma, &hit_count, use_kernel, gpu_id);
 
-    auto index_p = qd_python_copy2numpy(ray_ind);
+    auto index_p = qd_python_copy2list<arma::u32_vec, py::ssize_t>(&ray_ind);
 
     return py::make_tuple(hit_count_p, index_p);
 }

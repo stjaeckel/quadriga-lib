@@ -159,7 +159,9 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
                                                          element_ind, &ori, &elpos, false);
 
         if (complex)
-            return py::make_tuple(qd_python_copy2numpy(V_re, V_im), qd_python_copy2numpy(H_re, H_im));
+            return py::make_tuple(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im),
+                                  qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
+
         return py::make_tuple(V_re_py, V_im_py, H_re_py, H_im_py);
     }
 
@@ -197,8 +199,8 @@ py::tuple arrayant_interpolate(const py::dict &arrayant,
     py::list out;
     if (complex)
     {
-        out.append(qd_python_copy2numpy(V_re, V_im));
-        out.append(qd_python_copy2numpy(H_re, H_im));
+        out.append(qd_python_copy2numpy<double, std::complex<double>>(&V_re, &V_im));
+        out.append(qd_python_copy2numpy<double, std::complex<double>>(&H_re, &H_im));
     }
     else
     {
