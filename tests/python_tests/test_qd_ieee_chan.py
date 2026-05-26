@@ -81,8 +81,9 @@ def _ieee_call(ant_ap, ant_sta, model, *,
                SF_std_dB_NLOS=np.nan,
                dBP_m=np.nan,
                n_walls=None,
-               wall_loss=5.0):
-    """Wrapper around channel.get_ieee_indoor that supplies the 24 positional
+               wall_loss=5.0,
+               stack=False):
+    """Wrapper around channel.get_ieee_indoor that supplies the 25 positional
     arguments by name with the documented defaults."""
     if Dist_m is None:
         Dist_m = np.array([4.99])
@@ -102,7 +103,7 @@ def _ieee_call(ant_ap, ant_sta, model, *,
         offset_angles, n_subpath, Doppler_effect, seed,
         KF_linear, XPR_NLOS_linear,
         SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m,
-        n_walls, wall_loss)
+        n_walls, wall_loss, stack)
 
 
 # ============================================================================
@@ -515,6 +516,113 @@ class test_case(unittest.TestCase):
 
         self.assertLess(max_err, 1e-10)
 
+    # ------------------------------------------------------------------
+    # 10) stack option: list mode vs stacked mode are equivalent
+    # ------------------------------------------------------------------
+    def test_ieee_chan_stack_equivalence(self):
+        """stack=True must return the same data as stack=False, reshaped into
+        a single array with the snapshot as the trailing axis. Tested on a
+        time-evolving channel so n_snap > 1."""
+        ant = arrayant.generate("xpol", 30.0)  # 2x2
+        common = dict(CarrierFreq_Hz=2.4e9, tap_spacing_s=10e-9,
+                      observation_time=0.1, update_rate=1e-3,
+                      speed_station_kmh=30.0, seed=2024)
+
+        chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
+        chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
+
+        self.assertEqual(len(chan_list), 1)
+        self.assertEqual(len(chan_stk), 1)
+        ch_l, ch_s = chan_list[0], chan_stk[0]
+
+        # List mode: per-snapshot lists
+        coeff_l = _snap_list(ch_l, "coeff")
+        delay_l = _snap_list(ch_l, "delay")
+        n_snap = len(coeff_l)
+        self.assertGreater(n_snap, 1)
+
+        # n_path is constant across snapshots for this model -> non-ragged stack
+        n_path_set = {_coeff_at(ch_l, s).shape[2] for s in range(n_snap)}
+        self.assertEqual(len(n_path_set), 1,
+                         "n_path varies across snapshots; stack comparison "
+                         "assumes it is constant")
+        n_rx, n_tx, n_path = _coeff_at(ch_l, 0).shape
+
+        # Stack mode: single ndarrays with a trailing snapshot axis
+        coeff_s = ch_s["coeff"]
+        delay_s = ch_s["delay"]
+        pg_s = ch_s["path_gain"]
+
+        self.assertIsInstance(coeff_s, np.ndarray)
+        self.assertIsInstance(delay_s, np.ndarray)
+        self.assertIsInstance(pg_s, np.ndarray)
+
+        self.assertEqual(coeff_s.shape, (n_rx, n_tx, n_path, n_snap))
+        self.assertEqual(delay_s.shape, (n_rx, n_tx, n_path, n_snap))
+        self.assertEqual(pg_s.shape, (n_path, n_snap))
+
+        self.assertTrue(np.iscomplexobj(coeff_s))
+        self.assertFalse(np.iscomplexobj(delay_s))
+        self.assertFalse(np.iscomplexobj(pg_s))
+
+        # Stacked array == per-snapshot list stacked along the trailing axis.
+        # Same seed -> identical underlying data, so the match must be exact.
+        coeff_ref = np.stack([_coeff_at(ch_l, s) for s in range(n_snap)], axis=-1)
+        delay_ref = np.stack([_delay_at(ch_l, s) for s in range(n_snap)], axis=-1)
+        pg_ref = np.stack([_path_gain_at(ch_l, s) for s in range(n_snap)], axis=-1)
+
+        npt.assert_array_equal(coeff_s, coeff_ref)
+        npt.assert_array_equal(delay_s, delay_ref)
+        npt.assert_array_equal(pg_s, pg_ref)
+
+        # Per-snapshot metadata is unaffected by the stack flag
+        for key in ("tx_position", "rx_position",
+                    "tx_orientation", "rx_orientation"):
+            npt.assert_array_equal(np.asarray(ch_l[key]), np.asarray(ch_s[key]))
+        self.assertEqual(ch_l["name"], ch_s["name"])
+        npt.assert_array_equal(np.asarray(ch_l["center_frequency"]),
+                               np.asarray(ch_s["center_frequency"]))
+
+    # ------------------------------------------------------------------
+    # 11) stack option: per-user list is preserved for MU-MIMO
+    # ------------------------------------------------------------------
+    def test_ieee_chan_stack_multiuser(self):
+        """stack mode keeps chan as a list of length n_users; each user's data
+        is stacked independently. Static channel here, so n_snap = 1 and the
+        trailing axis has length 1."""
+        ant = arrayant.generate("omni", 30.0)
+        common = dict(CarrierFreq_Hz=2.4e9, tap_spacing_s=10e-9,
+                      n_users=3,
+                      Dist_m=np.array([3.0, 5.0, 7.0]),
+                      n_floors=np.array([0, 0, 0], dtype=np.uint64),
+                      seed=321)
+
+        chan_list = _ieee_call(ant, ant, "B", stack=False, **common)
+        chan_stk = _ieee_call(ant, ant, "B", stack=True, **common)
+
+        self.assertEqual(len(chan_list), 3)
+        self.assertEqual(len(chan_stk), 3)
+
+        for u in range(3):
+            ch_l, ch_s = chan_list[u], chan_stk[u]
+            n_snap = _n_snap(ch_l)  # static -> 1
+            n_rx, n_tx, n_path = _coeff_at(ch_l, 0).shape
+
+            self.assertIsInstance(ch_s["coeff"], np.ndarray)
+            self.assertEqual(ch_s["coeff"].shape, (n_rx, n_tx, n_path, n_snap))
+            self.assertEqual(ch_s["delay"].shape, (n_rx, n_tx, n_path, n_snap))
+            self.assertEqual(ch_s["path_gain"].shape, (n_path, n_snap))
+
+            npt.assert_array_equal(
+                ch_s["coeff"],
+                np.stack([_coeff_at(ch_l, s) for s in range(n_snap)], axis=-1))
+            npt.assert_array_equal(
+                ch_s["delay"],
+                np.stack([_delay_at(ch_l, s) for s in range(n_snap)], axis=-1))
+            npt.assert_array_equal(
+                ch_s["path_gain"],
+                np.stack([_path_gain_at(ch_l, s) for s in range(n_snap)], axis=-1))
+            
 
 if __name__ == '__main__':
     unittest.main()
