@@ -306,10 +306,26 @@ static std::vector<quadriga_lib::arrayant<double>> qd_python_dict2arrayant_multi
     return ant;
 }
 
+// Emit a vector of per-snapshot arma objects either as a Python list of arrays
+// (stack = false) or stacked into one higher-dimensional Numpy array along an
+// appended snapshot axis (stack = true). i_vec selects / orders the snapshots.
+template <typename dtype_numpy, typename dtype_arma>
+static py::object qd_python_emit_paths(const std::vector<dtype_arma> *re,
+                                       bool stack,
+                                       const arma::uvec &i_vec = arma::uvec(),
+                                       const std::vector<dtype_arma> *im = nullptr)
+{
+    using dtype = typename dtype_arma::elem_type;
+    if (stack)
+        return qd_python_stack2numpy<dtype, dtype_numpy>(re, im, i_vec);
+    return qd_python_copy2list<dtype_arma, dtype_numpy>(re, im, i_vec);
+}
+
 // Convert a single channel object to the Python channel dict
 static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &channel,
                                        const arma::uvec &snap = arma::uvec(),
-                                       bool validate = false)
+                                       bool validate = false,
+                                       bool stack = false)
 {
     if (validate)
     {
@@ -357,30 +373,30 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
     emit_per_snap_mat("rx_orientation", channel.rx_orientation);
     emit_per_snap_mat("tx_orientation", channel.tx_orientation);
 
-    // Coefficients (complex) and delays -> list of ragged 3D arrays
+    // Coefficients (complex) and delays
     if (!channel.coeff_re.empty())
-        output["coeff"] = qd_python_copy2list<arma::cube, std::complex<double>>(&channel.coeff_re, &channel.coeff_im, i_snap);
+        output["coeff"] = qd_python_emit_paths<std::complex<double>>(&channel.coeff_re, stack, i_snap, &channel.coeff_im);
     if (!channel.delay.empty())
-        output["delay"] = qd_python_copy2list<arma::cube, double>(&channel.delay, nullptr, i_snap);
+        output["delay"] = qd_python_emit_paths<double>(&channel.delay, stack, i_snap);
 
     if (!channel.path_gain.empty())
-        output["path_gain"] = qd_python_copy2list<arma::vec, double>(&channel.path_gain, nullptr, i_snap);
+        output["path_gain"] = qd_python_emit_paths<double>(&channel.path_gain, stack, i_snap);
     if (!channel.path_length.empty())
-        output["path_length"] = qd_python_copy2list<arma::vec, double>(&channel.path_length, nullptr, i_snap);
+        output["path_length"] = qd_python_emit_paths<double>(&channel.path_length, stack, i_snap);
     if (!channel.path_polarization.empty())
-        output["path_polarization"] = qd_python_copy2list<arma::mat, std::complex<double>>(&channel.path_polarization, nullptr, i_snap); 
+        output["path_polarization"] = qd_python_emit_paths<std::complex<double>>(&channel.path_polarization, stack, i_snap);
     if (!channel.path_angles.empty())
-        output["path_angles"] = qd_python_copy2list<arma::mat, double>(&channel.path_angles, nullptr, i_snap);
+        output["path_angles"] = qd_python_emit_paths<double>(&channel.path_angles, stack, i_snap);
 
     if (!channel.path_fbs_pos.empty())
-        output["fbs_pos"] = qd_python_copy2list<arma::mat, double>(&channel.path_fbs_pos, nullptr, i_snap);
+        output["fbs_pos"] = qd_python_emit_paths<double>(&channel.path_fbs_pos, stack, i_snap);
     if (!channel.path_lbs_pos.empty())
-        output["lbs_pos"] = qd_python_copy2list<arma::mat, double>(&channel.path_lbs_pos, nullptr, i_snap);
+        output["lbs_pos"] = qd_python_emit_paths<double>(&channel.path_lbs_pos, stack, i_snap);
 
     if (!channel.no_interact.empty())
-        output["no_interact"] = qd_python_copy2list<arma::u32_vec, py::ssize_t>(&channel.no_interact, nullptr, i_snap);
+        output["no_interact"] = qd_python_emit_paths<py::ssize_t>(&channel.no_interact, stack, i_snap);
     if (!channel.interact_coord.empty())
-        output["interact_coord"] = qd_python_copy2list<arma::mat, double>(&channel.interact_coord, nullptr, i_snap);
+        output["interact_coord"] = qd_python_emit_paths<double>(&channel.interact_coord, stack, i_snap);
 
     // Center frequency: scalar shared or per-snapshot
     if (channel.center_frequency.n_elem == 1 || (channel.center_frequency.n_elem > 1 && !snap_given))
@@ -397,11 +413,12 @@ static py::dict qd_python_channel2dict(const quadriga_lib::channel<double> &chan
 }
 
 static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<double>> &chan,
-                                       bool validate = false)
+                                       bool validate = false,
+                                       bool stack = false)
 {
     py::list list;
     for (const auto &channel : chan)
-        list.append(qd_python_channel2dict(channel, {}, validate));
+        list.append(qd_python_channel2dict(channel, {}, validate, stack));
     return list;
 }
 

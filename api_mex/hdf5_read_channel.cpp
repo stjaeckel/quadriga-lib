@@ -87,6 +87,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const unsigned nz = storage_space.at(2);
     const unsigned nw = storage_space.at(3);
 
+    if (channel_id.n_elem != arma::uword(nx * ny * nz * nw))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Corrupted storage index.");
+
     if (nx == 0)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "HDF5 file does not exist or has no layout.");
 
