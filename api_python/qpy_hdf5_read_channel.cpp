@@ -30,10 +30,10 @@ chan, par = quadriga_lib.channel.hdf5_read_channel( fn, ix, iy, iz, iw, snap, st
 
 ## Inputs:
 - **`fn`** — Filename of the HDF5 file; str
-- **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: 0 ... nx-1
-- **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: 0 ... ny-1
-- **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: 0 ... nz-1
-- **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: 0 ... nw-1
+- **`ix`** — 0-based slot indices along dimension X; scalar or vector; default: `0 ... nx-1`
+- **`iy`** — 0-based slot indices along dimension Y; scalar or vector; default: `0 ... ny-1`
+- **`iz`** — 0-based slot indices along dimension Z; scalar or vector; default: `0 ... nz-1`
+- **`iw`** — 0-based slot indices along dimension W; scalar or vector; default: `0 ... nw-1`
 - **`snap`** — Snapshot indices to read; 0-based; default: all snapshots. Only allowed when the total selection is a single slot.
 - **`stack`** — If `True`, stack snapshots. Default: `False` (return as list)
 

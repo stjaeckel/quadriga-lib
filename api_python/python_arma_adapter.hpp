@@ -1243,6 +1243,37 @@ static void qd_python_numpy2arma_vecCube_Cplx(const py::handle &obj,
     qd_python_numpy2arma_vecCube_Cplx(pyarray, real, imag);
 }
 
+// Convert a 1D or 2D Numpy array to std::vector<arma::Col<dtype>>
+// 1D input → vector with 1 entry; 2D input → vector with n_cols entries (one Col per column).
+// Always copies (column extraction cannot alias). None → empty vector.
+template <typename dtype>
+static std::vector<arma::Col<dtype>> qd_python_numpy2arma_vecCol(const py::handle &obj)
+{
+    if (obj.is_none())
+        return {};
+    const auto mat = qd_python_numpy2arma_Mat<dtype>(obj, true);
+    std::vector<arma::Col<dtype>> output(mat.n_cols);
+    for (arma::uword c = 0; c < mat.n_cols; ++c)
+        output[c] = mat.col(c);
+    return output;
+}
+
+// Convert a 2D or 3D Numpy array to std::vector<arma::Mat<dtype>>
+// 2D input → vector with 1 entry; 3D input → vector with n_slices entries (one Mat per slice).
+// Always copies (slice extraction cannot alias). None → empty vector.
+// Works for real dtypes and for std::complex<...>.
+template <typename dtype>
+static std::vector<arma::Mat<dtype>> qd_python_numpy2arma_vecMat(const py::handle &obj)
+{
+    if (obj.is_none())
+        return {};
+    const auto cube = qd_python_numpy2arma_Cube<dtype>(obj, true);
+    std::vector<arma::Mat<dtype>> output(cube.n_slices);
+    for (arma::uword s = 0; s < cube.n_slices; ++s)
+        output[s] = cube.slice(s);
+    return output;
+}
+
 // -------------------------------- qd_python_list2vector --------------------------------
 
 template <typename dtype>

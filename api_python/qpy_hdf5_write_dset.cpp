@@ -23,7 +23,7 @@ Write a single unstructured dataset to an HDF5 file
 
 ## Usage:
 ```
-quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data );
+quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
 ```
 
 ## Input Arguments:
