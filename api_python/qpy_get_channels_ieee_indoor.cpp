@@ -22,13 +22,15 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 - Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m
 - Floor floor penetration loss according to TGah for CarrierFreq < 1 GHz and TGax for above 1 GHz
 - NAN or negative value for any override parameter restores the model default
+- Per-snapshot data (`coeff`, `delay`, `path_gain`) is returned as a list of per-snapshot arrays, 
+  or stacked into one array along an appended snapshot axis when `stack = True`
 
 ## Usage:
 ```
 chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz,
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh,
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss )
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
 ```
 
 ## Inputs:
@@ -57,28 +59,33 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
 - **`dBP_m`** *(optional)* — Overrides breakpoint distance; NAN or negative restores model default; default: NAN
 - **`n_walls`** *(optional)* — Number of walls per user TGax models; `(n_users,)` or `(1,)`; default: 0
 - **`wall_loss`** *(optional)* — Penetration loss for a single wall; TGax defines 5 or 7; default: 5
+- **`stack`** *(optional)* — If `True`, per-snapshot data is stacked into a single array along an appended 
+  snapshot axis instead of being returned as a list of per-snapshot arrays; default: False
 
 
 ## Output:
-- **`chan`**<br>
-  List of length `n_users` containing dictionaries of channel data with the following keys:<br><br>
-  | Key                | Description                                                              | Type                             |
-  | ------------------ | ------------------------------------------------------------------------ | ---------------------------------|
-  | `name`             | Channel name                                                             | String                           |
-  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | Shape: `(3, 1)` or `(3, n_snap)` |
-  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | Shape: `(3, 1)` or `(3, n_snap)` |
-  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | Shape: `(3, 1)` or `(3, n_snap)` |
-  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | Shape: `(3, 1)` or `(3, n_snap)` |
-  | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` |
-  | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)` |
-  | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s)`             |
-  | `center_frequency` | Center Frequency in Hz                                                   | Scalar                           |
+- **`chan`** — List of length `n_users` containing dictionaries of channel data. Only the keys
+  listed below are populated; all other channel keys are omitted by this generator.<br><br>
+  | Key                | Description                                                              | Shape `stack = False`            | Shape `stack = True`           |
+  | ------------------ | ------------------------------------------------------------------------ | -------------------------------- | ------------------------------ |
+  | `name`             | Channel name                                                             | str                              | str                            |
+  | `tx_position`      | Transmitter positions (AP for downlink, STA for uplink)                  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `rx_position`      | Receiver positions (STA for downlink, AP for uplink)                     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `tx_orientation`   | Transmitter orientation, Euler angles (AP for downlink, STA for uplink)  | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `rx_orientation`   | Receiver orientation, Euler angles (STA for downlink, AP for uplink)     | `(3, 1)` or `(3, n_snap)`        | `(3, 1)` or `(3, n_snap)`      |
+  | `coeff`            | Channel coefficients, complex valued                                     | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
+  | `delay`            | Propagation delays in seconds                                            | list of `(n_rx, n_tx, n_path_s)` | `(n_rx, n_tx, n_path, n_snap)` |
+  | `path_gain`        | Path gain before antenna, linear scale                                   | list of `(n_path_s,)`            | `(n_path, n_snap)`             |
+  | `center_frequency` | Center Frequency in Hz                                                   | scalar                           | scalar                         |
 
 See also:
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/03/11-03-0940-04-000n-tgn-channel-models.doc">IEEE 802.11-03/940r4 - TGn Channel Models</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
+- <a target="_blank" rel="noopener noreferrer" href="publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf">S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025</a>
+- [[hdf5_write_channel]] (for writing channel data to a HDF5 file)
+- [[hdf5_read_channel]] (for reading channel data to a HDF5 file)
 MD!*/
 
 py::list get_channels_ieee_indoor(const py::dict &ap_array,
@@ -104,7 +111,8 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                   const double SF_std_dB_NLOS,
                                   const double dBP_m,
                                   const py::array_t<arma::uword> &n_walls,
-                                  const double wall_loss)
+                                  const double wall_loss,
+                                  const bool stack)
 {
     // Parse input arguments
     const auto ant_tx_a = qd_python_dict2arrayant(ap_array, true);
@@ -142,5 +150,5 @@ py::list get_channels_ieee_indoor(const py::dict &ap_array,
                                                   wall_loss);
 
     // Copy results to Python
-    return qd_python_channel2list(chan);
+    return qd_python_channel2list(chan, false, stack);
 }

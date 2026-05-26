@@ -2066,6 +2066,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 <li>Default breakpoint distance: A/B/C → 5 m, D → 10 m, E → 20 m, F → 30 m</li>
 <li>Floor floor penetration loss according to TGah for CarrierFreq &lt; 1 GHz and TGax for above 1 GHz</li>
 <li>NAN or negative value for any override parameter restores the model default</li>
+<li>Per-snapshot data (<code>coeff</code>, <code>delay</code>, <code>path_gain</code>) is returned as a list of per-snapshot arrays, or stacked into one array along an appended snapshot axis when <code>stack = True</code></li>
 </ul>
 
 <b>Usage:</b><br>
@@ -2073,7 +2074,7 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz,
    tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh,
    Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
-   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss )
+   KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
 </pre>
 
 <b>Inputs:</b><br>
@@ -2102,61 +2103,72 @@ chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, C
 <li><b><code>dBP_m</code></b> <i>(optional)</i> — Overrides breakpoint distance; NAN or negative restores model default; default: NAN</li>
 <li><b><code>n_walls</code></b> <i>(optional)</i> — Number of walls per user TGax models; <code>(n_users,)</code> or <code>(1,)</code>; default: 0</li>
 <li><b><code>wall_loss</code></b> <i>(optional)</i> — Penetration loss for a single wall; TGax defines 5 or 7; default: 5</li>
+<li><b><code>stack</code></b> <i>(optional)</i> — If <code>True</code>, per-snapshot data is stacked into a single array along an appended snapshot axis instead of being returned as a list of per-snapshot arrays; default: False</li>
 </ul>
 
 <b>Output:</b><br>
 <ul>
-<li><b><code>chan</code></b><br> List of length <code>n_users</code> containing dictionaries of channel data with the following keys:<br><br>
+<li><b><code>chan</code></b> — List of length <code>n_users</code> containing dictionaries of channel data. Only the keys listed below are populated; all other channel keys are omitted by this generator.<br><br>
 <table class="md">
 <tr>
   <th>Key</th>
   <th>Description</th>
-  <th>Type</th>
+  <th>Shape <code>stack = False</code></th>
+  <th>Shape <code>stack = True</code></th>
 </tr>
 <tr>
   <td><code>name</code></td>
   <td>Channel name</td>
-  <td>String</td>
+  <td>str</td>
+  <td>str</td>
 </tr>
 <tr>
   <td><code>tx_position</code></td>
   <td>Transmitter positions (AP for downlink, STA for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>rx_position</code></td>
   <td>Receiver positions (STA for downlink, AP for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>tx_orientation</code></td>
   <td>Transmitter orientation, Euler angles (AP for downlink, STA for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>rx_orientation</code></td>
   <td>Receiver orientation, Euler angles (STA for downlink, AP for uplink)</td>
-  <td>Shape: <code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
+  <td><code>(3, 1)</code> or <code>(3, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>coeff</code></td>
   <td>Channel coefficients, complex valued</td>
   <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+  <td><code>(n_rx, n_tx, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>delay</code></td>
   <td>Propagation delays in seconds</td>
   <td>list of <code>(n_rx, n_tx, n_path_s)</code></td>
+  <td><code>(n_rx, n_tx, n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>path_gain</code></td>
   <td>Path gain before antenna, linear scale</td>
-  <td>list of <code>(n_path_s)</code></td>
+  <td>list of <code>(n_path_s,)</code></td>
+  <td><code>(n_path, n_snap)</code></td>
 </tr>
 <tr>
   <td><code>center_frequency</code></td>
   <td>Center Frequency in Hz</td>
-  <td>Scalar</td>
+  <td>scalar</td>
+  <td>scalar</td>
 </tr>
 </table>
 </li>
@@ -2167,6 +2179,9 @@ See also:
 <li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a></li>
 <li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a></li>
 <li><a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a></li>
+<li><a target="_blank" rel="noopener noreferrer" href="publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf">S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025</a></li>
+<li><a href="#hdf5_write_channel">hdf5_write_channel</a> (for writing channel data to a HDF5 file)</li>
+<li><a href="#hdf5_read_channel">hdf5_read_channel</a> (for reading channel data to a HDF5 file)</li>
 </ul>
 
 <hr class="greyline"><br><br>

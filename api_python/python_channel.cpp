@@ -135,7 +135,8 @@ void quadriga_lib_channel(py::module_ &m)
           py::arg("SF_std_dB_NLOS") = NAN,
           py::arg("dBP_m") = NAN,
           py::arg("n_walls") = py::array_t<arma::uword>(),
-          py::arg("wall_loss") = 5.0);
+          py::arg("wall_loss") = 5.0,
+          py::arg("stack") = false);
 
     m.def("quantize_delays", &quantize_delays,
           py::arg("coeff_re"),

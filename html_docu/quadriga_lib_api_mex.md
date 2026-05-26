@@ -1,7 +1,7 @@
 ---
 title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.6"
 author: "Stephan Jaeckel"
-date: "25.05.2026"
+date: "26.05.2026"
 lang: en-US
 ---
 
@@ -54,35 +54,35 @@ lang: en-US
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1123 |
 | [quantize_delays](#quantize_delays) | Channel functions | 1180 |
 | [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1224 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1294 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1360 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1409 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1460 |
-| [acdf](#acdf) | Channel statistics | 1518 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1549 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1589 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1631 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1659 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1689 |
-| [cart2geo](#cart2geo) | Math functions | 1711 |
-| [fast_sincos](#fast_sincos) | Math functions | 1738 |
-| [geo2cart](#geo2cart) | Math functions | 1766 |
-| [interp](#interp) | Math functions | 1806 |
-| [version](#version) | Miscellaneous / Tools | 1837 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1854 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1878 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1917 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1955 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1981 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2089 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2116 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2143 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2172 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2239 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2279 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2319 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2341 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2368 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 1297 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1363 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1412 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1463 |
+| [acdf](#acdf) | Channel statistics | 1521 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1552 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1592 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1634 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1662 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 1692 |
+| [cart2geo](#cart2geo) | Math functions | 1714 |
+| [fast_sincos](#fast_sincos) | Math functions | 1741 |
+| [geo2cart](#geo2cart) | Math functions | 1769 |
+| [interp](#interp) | Math functions | 1809 |
+| [version](#version) | Miscellaneous / Tools | 1840 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1857 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1881 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 1920 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1958 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1984 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2092 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2119 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2146 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 2175 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2242 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2282 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 2322 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2344 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2371 |
 
 ---
 
@@ -1289,6 +1289,9 @@ chan = quadriga_lib.get_channels_ieee_indoor( ap_array, sta_array, channel_type,
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/09/11-09-0308-12-00ac-tgac-channel-model-addendum-document.doc">IEEE 802.11-09/0308r12 - TGac Channel Model Addendum</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/11/11-11-0968-04-00ah-channel-model-text.docx">IEEE 802.11-11/0968r4 - TGah Channel Model</a>
 - <a target="_blank" rel="noopener noreferrer" href="https://mentor.ieee.org/802.11/dcn/14/11-14-0882-04-00ax-tgax-channel-model-document.docx">IEEE 802.11-14/0882r4 - IEEE 802.11ax Channel Model</a>
+- <a target="_blank" rel="noopener noreferrer" href="publications/11-25-2318-00-0ucm-a-modern-cpp-framework-for-the-ieee-indoor-channel-models.pdf">S. Jaeckel; "A modern C++ framework for the IEEE indoor channel models"; IEEE 802.11-25/2318r0; Tech. Rep., 2025</a>
+- [hdf5_write_channel](#hdf5_write_channel) (for writing channel data to a HDF5 file)
+- [hdf5_read_channel](#hdf5_read_channel) (for reading channel data to a HDF5 file)
 
 ---
 ## get_channels_irs
