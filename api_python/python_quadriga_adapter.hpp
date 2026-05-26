@@ -422,6 +422,204 @@ static py::list qd_python_channel2list(const std::vector<quadriga_lib::channel<d
     return list;
 }
 
+// Build a single channel object from a Python channel dict (inverse of qd_python_channel2dict).
+//
+// Per-snapshot fields are accepted in either layout, auto-detected per field:
+//   * "list" model  — a Python list of per-snapshot arrays (n_path may vary per snapshot)
+//   * "stack" model — a single Numpy array with the snapshot index as the last axis
+// Positions, orientations and center_frequency are plain arrays in both models.
+// Dict keys match qd_python_channel2dict / hdf5_read_channel (NOT the legacy write keys).
+// Unstructured "par" data is NOT handled here — it is kept separate (see hdf5_write_channel).
+static quadriga_lib::channel<double> qd_python_dict2channel(const py::dict &dict,
+                                                            bool validate = false)
+{
+    quadriga_lib::channel<double> c;
+
+    auto has = [&](const char *key) -> bool
+    {
+        return dict.contains(key) && !dict[key].is_none();
+    };
+
+    // Load a real vector<Cube<double>> field: list of 3D arrays, or a single 4D array.
+    auto load_vecCube_real = [&](const char *key) -> std::vector<arma::Cube<double>>
+    {
+        py::object v = dict[key];
+        if (py::isinstance<py::list>(v))
+            return qd_python_list2vector_Cube<double>(py::reinterpret_borrow<py::list>(v));
+        return qd_python_numpy2arma_vecCube<double>(v, true);
+    };
+
+    // Scalars / strings
+    if (has("name"))
+        c.name = dict["name"].cast<std::string>();
+    if (has("initial_position"))
+        c.initial_position = dict["initial_position"].cast<decltype(c.initial_position)>();
+
+    // Positions / orientations: (3, n_snap) or (3, 1)
+    if (has("tx_position"))
+        c.tx_pos = qd_python_numpy2arma_Mat<double>(dict["tx_position"], true);
+    if (has("rx_position"))
+        c.rx_pos = qd_python_numpy2arma_Mat<double>(dict["rx_position"], true);
+    if (has("tx_orientation"))
+        c.tx_orientation = qd_python_numpy2arma_Mat<double>(dict["tx_orientation"], true);
+    if (has("rx_orientation"))
+        c.rx_orientation = qd_python_numpy2arma_Mat<double>(dict["rx_orientation"], true);
+
+    // Center frequency: (n_snap,) or scalar
+    if (has("center_frequency"))
+        c.center_frequency = qd_python_numpy2arma_Col<double>(dict["center_frequency"], true);
+
+    // Coefficients (complex)
+    // Accepted in one of two mutually exclusive forms:
+    //   * "coeff"                  — a single complex key (list of 3D or 4D complex array)
+    //   * "coeff_re" / "coeff_im"  — two real keys (each: list of 3D or 4D real array)
+    const bool has_coeff = has("coeff");
+    const bool has_coeff_re = has("coeff_re");
+    const bool has_coeff_im = has("coeff_im");
+
+    if (has_coeff && (has_coeff_re || has_coeff_im))
+        throw std::invalid_argument("Channel dict: provide either 'coeff' (complex) or 'coeff_re'/'coeff_im' (real), not both.");
+
+    if (has_coeff)
+    {
+        py::object v = dict["coeff"];
+        if (py::isinstance<py::list>(v))
+            qd_python_list2vector_Cube_Cplx<double>(py::reinterpret_borrow<py::list>(v), c.coeff_re, c.coeff_im);
+        else
+            qd_python_numpy2arma_vecCube_Cplx<double>(v, c.coeff_re, c.coeff_im);
+    }
+    else // split real / imaginary form
+    {
+        if (has_coeff_re)
+            c.coeff_re = load_vecCube_real("coeff_re");
+        if (has_coeff_im)
+            c.coeff_im = load_vecCube_real("coeff_im");
+    }
+
+    // Delays (real): list of (n_rx, n_tx, n_path_s) or 4D
+    if (has("delay"))
+        c.delay = load_vecCube_real("delay");
+
+    // Per-path vector<Col> fields: list of (n_path_s,) or 2D (n_path, n_snap)
+    if (has("path_gain"))
+    {
+        py::object v = dict["path_gain"];
+        if (py::isinstance<py::list>(v))
+            c.path_gain = qd_python_list2vector_Col<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.path_gain = qd_python_numpy2arma_vecCol<double>(v);
+    }
+    if (has("path_length"))
+    {
+        py::object v = dict["path_length"];
+        if (py::isinstance<py::list>(v))
+            c.path_length = qd_python_list2vector_Col<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.path_length = qd_python_numpy2arma_vecCol<double>(v);
+    }
+    if (has("no_interact"))
+    {
+        py::object v = dict["no_interact"];
+        if (py::isinstance<py::list>(v))
+            c.no_interact = qd_python_list2vector_Col<unsigned>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.no_interact = qd_python_numpy2arma_vecCol<unsigned>(v);
+    }
+
+    // Per-path vector<Mat> real fields: list of 2D or 3D (rows, cols, n_snap)
+    if (has("path_angles"))
+    {
+        py::object v = dict["path_angles"];
+        if (py::isinstance<py::list>(v))
+            c.path_angles = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.path_angles = qd_python_numpy2arma_vecMat<double>(v);
+    }
+    if (has("fbs_pos"))
+    {
+        py::object v = dict["fbs_pos"];
+        if (py::isinstance<py::list>(v))
+            c.path_fbs_pos = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.path_fbs_pos = qd_python_numpy2arma_vecMat<double>(v);
+    }
+    if (has("lbs_pos"))
+    {
+        py::object v = dict["lbs_pos"];
+        if (py::isinstance<py::list>(v))
+            c.path_lbs_pos = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.path_lbs_pos = qd_python_numpy2arma_vecMat<double>(v);
+    }
+    if (has("interact_coord"))
+    {
+        py::object v = dict["interact_coord"];
+        if (py::isinstance<py::list>(v))
+            c.interact_coord = qd_python_list2vector_Mat<double>(py::reinterpret_borrow<py::list>(v));
+        else
+            c.interact_coord = qd_python_numpy2arma_vecMat<double>(v);
+    }
+
+    // Polarization (complex): list of (4, n_path_s) or 3D (4, n_path, n_snap)
+    //     Channel stores it interleaved (real Mat, 2*4 rows) -> convert from complex.
+    if (has("path_polarization"))
+    {
+        py::object v = dict["path_polarization"];
+        std::vector<arma::Mat<std::complex<double>>> pol;
+        if (py::isinstance<py::list>(v))
+            pol = qd_python_list2vector_Mat<std::complex<double>>(py::reinterpret_borrow<py::list>(v));
+        else
+            pol = qd_python_numpy2arma_vecMat<std::complex<double>>(v);
+        c.path_polarization = qd_python_Complex2Interleaved(pol);
+    }
+
+    if (validate && !c.empty())
+    {
+        const std::string err = c.is_valid();
+        if (!err.empty())
+            throw std::invalid_argument(err);
+    }
+
+    return c;
+}
+
+// Build a vector of channel objects from Python input (inverse of qd_python_channel2list).
+//
+// Accepts either:
+//   * a list of channel dicts  -> one channel per list entry
+//   * a single channel dict    -> a length-1 vector (convenience, mirrors MEX scalar-struct)
+// Each dict is converted via qd_python_dict2channel; per-snapshot fields independently use
+// the list or stack model (see there).
+static std::vector<quadriga_lib::channel<double>> qd_python_list2channel(const py::handle &obj,
+                                                                         bool validate = false)
+{
+    std::vector<quadriga_lib::channel<double>> channels;
+
+    if (obj.is_none())
+        return channels;
+
+    // Single dict -> length-1 vector
+    if (py::isinstance<py::dict>(obj))
+    {
+        channels.push_back(qd_python_dict2channel(py::reinterpret_borrow<py::dict>(obj), validate));
+        return channels;
+    }
+
+    if (!py::isinstance<py::list>(obj))
+        throw std::invalid_argument("Channel input must be a dict or a list of dicts.");
+
+    py::list list = py::reinterpret_borrow<py::list>(obj);
+    channels.reserve(list.size());
+    for (py::handle item : list)
+    {
+        if (!py::isinstance<py::dict>(item))
+            throw std::invalid_argument("Each channel list entry must be a dict.");
+        channels.push_back(qd_python_dict2channel(py::reinterpret_borrow<py::dict>(item), validate));
+    }
+
+    return channels;
+}
+
 // Convert an unstructured dataset (std::any) to a numpy array / scalar / str.
 // Missing dataset -> None. Stored type and shape are preserved.
 static py::object qd_python_any2numpy(const std::any &dset)

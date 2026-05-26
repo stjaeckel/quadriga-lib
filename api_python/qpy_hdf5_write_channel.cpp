@@ -2,8 +2,7 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include "python_arma_adapter.hpp"
-#include "quadriga_lib.hpp"
+#include "python_quadriga_adapter.hpp"
 
 /*!SECTION
 Channel functions
@@ -11,183 +10,120 @@ SECTION!*/
 
 /*!MD
 # hdf5_write_channel
-Writes channel data to HDF5 files
+Write one or more channel objects to an HDF5 file
 
-## Description:
-Quadriga-Lib provides an HDF5-based solution for storing and organizing channel data. This function
-can be used to write structured and unstructured data to an HDF5 file.
+- Writes a list of channel dicts into 4D storage slots (one slot per list entry)
+- `chan` may also be a single dict, in which case one channel is written
+- Optional unstructured data (`par`) can be passed as a matching list of dicts (or a single dict)
+- Creates the file with a default layout if it does not exist; appends to existing files otherwise
+- A warning is issued if any selected slot already contains data (it is overwritten)
+- Structured data is stored in single precision regardless of the input precision
+- Unstructured datasets retain their numpy dtype and shape
+- Each scalar index input is broadcast to all channels; each vector index must have one entry per channel
+- If the file does not exist, the layout is `[max(len(chan), max(ix)+1), max(iy)+1, max(iz)+1, max(iw)+1]`
+- Channel dict field layout matches [[hdf5_read_channel]]
+- Per-snapshot fields accept the list model (list of arrays) or the stack model
+  (single array with the snapshot index as the last axis), detected per field
+- Coefficients may be passed as a complex `coeff`, or as separate real `coeff_re` and `coeff_im` (the two forms are mutually exclusive)
+- Slot indices are 0-based
 
 ## Usage:
-
 ```
-from quadriga_lib import channel
-
-storage_dims = channel.hdf5_write_channel( fn, ix, iy, iz, iw, par, rx_pos, tx_pos, ...
-   coeff, delay, center_freq, name, initial_pos, path_gain, path_length, ...
-   polarization, path_angles, path_fbs_pos, path_lbs_pos, no_interact, interact_coord, ...
-   rx_orientation, tx_orientation )
+storage_dims = quadriga_lib.channel.hdf5_write_channel( fn, chan, par, ix, iy, iz, iw )
 ```
 
-## Input Arguments:
-- **`fn`**<br>
-  Filename of the HDF5 file, string
+## Inputs:
+- **`fn`** — Filename of the HDF5 file; str
+- **`chan`** — Structured channel data; a channel dict or a list of channel dicts; field layout matches [[hdf5_read_channel]]
+- **`par`** — Unstructured data; a dict or a list of dicts with the same number of entries as `chan`. Dict keys become HDF5 dataset
+  names per slot; `None` values are skipped. Pass `None` to disable; default: `None`
+- **`ix`** — 0-based slot indices along dimension X; scalar or vector of length `len(chan)`; default: `0 ... len(chan)-1`
+- **`iy`** — 0-based slot indices along dimension Y; scalar or vector of length `len(chan)`; default: 0
+- **`iz`** — 0-based slot indices along dimension Z; scalar or vector of length `len(chan)`; default: 0
+- **`iw`** — 0-based slot indices along dimension W; scalar or vector of length `len(chan)`; default: 0
 
-- **`ix`**<br>
-  Storage index for x-dimension, Default = 0
+## Outputs:
+- **`storage_dims`** — Storage layout dimensions of the file `[nx, ny, nz, nw]`; `(4,)`; uint32
 
-- **`iy`**<br>
-  Storage index for y-dimension, Default = 0
-
-- **`iz`**<br>
-  Storage index for z-dimension, Default = 0
-
-- **`iw`**<br>
-  Storage index for w-dimension, Default = 0
-
-- **`par`**<br>
-  Dictionary of unstructured data, can be empty if no unstructured data should be written
-
-- **Structured data:** (double precision)<br>
-  Each snapshot may have a different number of paths `n_path_s`. Variable-length data is provided as lists.
-  `rx_pos`         | Receiver positions                                       | `[3, n_snap]` or `[3, 1]`
-  `tx_pos`         | Transmitter positions                                    | `[3, n_snap]` or `[3, 1]`
-  `coeff`          | Channel coefficients, complex valued                     | list of `[n_rx, n_tx, n_path_s]`
-  `delay`          | Propagation delays in seconds                            | list of `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`
-  `center_freq`    | Center frequency in [Hz]                                 | `[n_snap]` or scalar
-  `name`           | Name of the channel                                      | String
-  `initial_pos`    | Index of reference position, 1-based                     | uint32, scalar
-  `path_gain`      | Path gain before antenna, linear scale                   | list of `[n_path_s]`
-  `path_length`    | Path length from TX to RX phase center in m              | list of `[n_path_s]`
-  `polarization`   | Polarization transfer function, complex valued           | list of `[4, n_path_s]`
-  `path_angles`    | Departure and arrival angles {AOD, EOD, AOA, EOA} in rad | list of `[n_path, 4_s]`
-  `path_fbs_pos`   | First-bounce scatterer positions                         | list of `[3, n_path_s]`
-  `path_lbs_pos`   | Last-bounce scatterer positions                          | list of `[3, n_path_s]`
-  `no_interact`    | Number interaction points of paths with the environment  | uint32, list of `[n_path_s]`
-  `interact_coord` | Interaction coordinates                                  | list of `[3, max(sum(no_interact))]`
-  `rx_orientation` | Transmitter orientation                                  | `[3, n_snap]` or `[3]`
-  `tx_orientation` | Receiver orientation                                     | `[3, n_snap]` or `[3]`
-
-## Output Arguments:
-- **`storage_dims`**<br>
-  Size of the dimensions of the storage space, vector with 4 elements, i.e. `[nx,ny,nz,nw]`.
-
-## Caveat:
-- If the file exists already, the new data is added to the exisiting file
-- If a new file is created, a storage layout is created to store the location of datasets in the file
-- For `location = [ix]` storage layout is `[65536,1,1,1]` or `[ix,1,1,1]` if (`ix > 65536`)
-- For `location = [ix,iy]` storage layout is `[1024,64,1,1]`
-- For `location = [ix,iy,iz]` storage layout is `[256,16,16,1]`
-- For `location = [ix,iy,iz,iw]` storage layout is `[128,8,8,8]`
-- You can create a custom storage layout by creating the file first using "`hdf5_create_file`"
-- You can reshape the storage layout by using "`hdf5_reshape_storage`", but the total number of elements must not change
-- Inputs can be empty or missing.
-- All structured data is written in single precision (but can can be provided as single or double)
-- Unstructured datatypes are maintained in the HDF file
-- Supported unstructured types: string, double, float, (u)int32, (u)int64
-- Supported unstructured size: up to 3 dimensions
-- Storage order of the unstructured data is maintained
+## See also:
+- [[hdf5_create_file]] (for creating a file with a custom storage layout)
+- [[hdf5_reshape_layout]] (to change the layout later)
+- [[hdf5_read_channel]] (for reading channel data)
 MD!*/
 
-py::array_t<unsigned> hdf5_write_channel(const std::string fn,
-                                         unsigned ix, unsigned iy, unsigned iz, unsigned iw,
-                                         const py::dict par,
-                                         const py::array_t<double> rx_pos,
-                                         const py::array_t<double> tx_pos,
-                                         const py::list coeff,
-                                         const py::list delay,
-                                         const py::array_t<double> center_freq,
-                                         const std::string name,
-                                         const int initial_position,
-                                         const py::list path_gain,
-                                         const py::list path_length,
-                                         const py::list path_polarization,
-                                         const py::list path_angles,
-                                         const py::list path_fbs_pos,
-                                         const py::list path_lbs_pos,
-                                         const py::list no_interact,
-                                         const py::list interact_coord,
-                                         const py::array_t<double> rx_orientation,
-                                         const py::array_t<double> tx_orientation)
+py::array_t<unsigned> hdf5_write_channel(const std::string &fn,
+                                         py::handle chan,
+                                         py::handle par,
+                                         py::handle ix,
+                                         py::handle iy,
+                                         py::handle iz,
+                                         py::handle iw)
 {
-    // Construct channel object from input data
-    auto c = quadriga_lib::channel<double>();
-    c.initial_position = initial_position;
-    c.name = name;
+    // Convert the channel input (single dict or list of dicts) to channel objects
+    std::vector<quadriga_lib::channel<double>> channels = qd_python_list2channel(chan, true);
+    const arma::uword n_chan = (arma::uword)channels.size();
+    if (n_chan == 0)
+        throw std::invalid_argument("Input 'chan' must contain at least one channel.");
 
-    // Process the unstructured data
-    for (auto item : par)
+    // Parse the unstructured 'par' data: dict, list of dicts, or None
+    std::vector<py::dict> par_vec;
+    if (!par.is_none())
     {
-        std::string fieldName = py::str(item.first);
-        std::string fieldString = "par." + fieldName;
-        c.par_names.push_back(std::string(fieldName));
-        c.par_data.push_back(qd_python_anycast(item.second, fieldName));
+        if (py::isinstance<py::dict>(par))
+            par_vec.emplace_back(py::reinterpret_borrow<py::dict>(par));
+        else if (py::isinstance<py::list>(par))
+        {
+            for (py::handle item : py::reinterpret_borrow<py::list>(par))
+            {
+                if (!py::isinstance<py::dict>(item))
+                    throw std::invalid_argument("Each 'par' list entry must be a dict.");
+                par_vec.emplace_back(py::reinterpret_borrow<py::dict>(item));
+            }
+        }
+        else
+            throw std::invalid_argument("'par' must be a dict, a list of dicts, or None.");
+
+        if ((arma::uword)par_vec.size() != n_chan)
+            throw std::invalid_argument("'par' must have the same number of entries as 'chan'.");
     }
 
-    if (rx_pos.size() != 0)
-        c.rx_pos = qd_python_numpy2arma_Mat(rx_pos, true);
-
-    if (tx_pos.size() != 0)
-        c.tx_pos = qd_python_numpy2arma_Mat(tx_pos, true);
-
-    if (coeff.size() != 0)
-        qd_python_list2vector_Cube_Cplx(coeff, c.coeff_re, c.coeff_im);
-
-    if (delay.size() != 0)
-        c.delay = qd_python_list2vector_Cube<double>(delay);
-
-    if (center_freq.size() != 0)
-        c.center_frequency = qd_python_numpy2arma_Col(center_freq, true, true);
-
-    if (path_gain.size() != 0)
-        c.path_gain = qd_python_list2vector_Col<double>(path_gain);
-
-    if (path_length.size() != 0)
-        c.path_length = qd_python_list2vector_Col<double>(path_length);
-
-    if (path_polarization.size() != 0)
-        c.path_polarization = qd_python_Complex2Interleaved(qd_python_list2vector_Mat<std::complex<double>>(path_polarization));
-
-    if (path_angles.size() != 0)
-        c.path_angles = qd_python_list2vector_Mat<double>(path_angles);
-
-    if (path_fbs_pos.size() != 0)
-        c.path_fbs_pos = qd_python_list2vector_Mat<double>(path_fbs_pos);
-
-    if (path_lbs_pos.size() != 0)
-        c.path_lbs_pos = qd_python_list2vector_Mat<double>(path_lbs_pos);
-
-    if (no_interact.size() != 0)
-        c.no_interact = qd_python_list2vector_Col<unsigned>(no_interact);
-
-    if (interact_coord.size() != 0)
-        c.interact_coord = qd_python_list2vector_Mat<double>(interact_coord);
-
-    if (rx_orientation.size() != 0)
-        c.rx_orientation = qd_python_numpy2arma_Mat(rx_orientation, true);
-
-    if (tx_orientation.size() != 0)
-        c.tx_orientation = qd_python_numpy2arma_Mat(tx_orientation, true);
-
-    // Create HDF File if it dies not already exist
-    auto storage_space = quadriga_lib::hdf5_read_layout(fn);
-    if (storage_space.at(0) == 0) // File does not exist
+    // Resolve a slot-index argument (scalar / vector / None) to a 0-based index vector.
+    // 'ix' defaults to 0 ... n_chan-1; the others default to a scalar 0.
+    auto parse_idx = [&](py::handle h, const char *name, bool is_x) -> arma::Col<unsigned>
     {
-        unsigned nx = 1, ny = 1, nz = 1, nw = 1;
-        if (iy == 0 && iz == 0 && iw == 0)
-            nx = ix > 65536U ? ix : 65536U;
-        else if (iz == 0 && iw == 0)
-            nx = ix > 1024U ? ix : 1024U,
-            ny = iy > 64U ? iy : 64U;
-        else if (iw == 0)
-            nx = ix > 256U ? ix : 256U,
-            ny = iy > 16U ? iy : 16U,
-            nz = iz > 16U ? iz : 16U;
-        else
-            nx = ix > 128U ? ix : 128U,
-            ny = iy > 8U ? iy : 8U,
-            nz = iz > 8U ? iz : 8U,
-            nw = iz > 8U ? iw : 8U;
+        arma::Col<unsigned> v = qd_python_numpy2arma_Col<unsigned>(h, false);
+        if (v.is_empty())
+        {
+            if (is_x)
+            {
+                v.set_size(n_chan);
+                for (arma::uword i = 0; i < n_chan; ++i)
+                    v.at(i) = (unsigned)i;
+            }
+            else
+                v = arma::Col<unsigned>(1, arma::fill::zeros);
+        }
+        if (v.n_elem != 1 && v.n_elem != n_chan)
+            throw std::invalid_argument(std::string("Input '") + name +
+                                        "' must be a scalar or a vector of length len(chan).");
+        return v;
+    };
 
+    const arma::Col<unsigned> ix_vec = parse_idx(ix, "ix", true);
+    const arma::Col<unsigned> iy_vec = parse_idx(iy, "iy", false);
+    const arma::Col<unsigned> iz_vec = parse_idx(iz, "iz", false);
+    const arma::Col<unsigned> iw_vec = parse_idx(iw, "iw", false);
+
+    // Read the storage layout (returns [0,0,0,0] if the file does not exist)
+    arma::Col<unsigned> storage_space = quadriga_lib::hdf5_read_layout(fn);
+
+    // Create the file with a default layout if it does not exist
+    if (storage_space.at(0) == 0)
+    {
+        unsigned nx = std::max((unsigned)n_chan, ix_vec.max() + 1u);
+        unsigned ny = iy_vec.max() + 1u;
+        unsigned nz = iz_vec.max() + 1u;
+        unsigned nw = iw_vec.max() + 1u;
         quadriga_lib::hdf5_create(fn, nx, ny, nz, nw);
         storage_space.at(0) = nx;
         storage_space.at(1) = ny;
@@ -195,12 +131,50 @@ py::array_t<unsigned> hdf5_write_channel(const std::string fn,
         storage_space.at(3) = nw;
     }
 
-    // Throw error if location exceeds storage space
-    if (ix > storage_space.at(0) || iy > storage_space.at(1) || iz > storage_space.at(2) || iw > storage_space.at(3))
-        throw std::invalid_argument("Location exceeds storage space in HDF file");
+    // Write each channel to its slot
+    bool any_overwrite = false;
+    for (arma::uword k = 0; k < n_chan; ++k)
+    {
+        quadriga_lib::channel<double> &c = channels[k];
 
-    // Write data to file
-    quadriga_lib::hdf5_write(&c, fn, ix, iy, iz, iw);
+        // Attach the unstructured 'par' data for this channel
+        if (!par_vec.empty())
+            for (auto item : par_vec[k])
+            {
+                if (item.second.is_none()) // empty / missing field -> skip
+                    continue;
+                std::string field_name = py::cast<std::string>(item.first);
+                c.par_names.push_back(field_name);
+                c.par_data.push_back(qd_python_anycast(item.second, field_name));
+            }
 
-    return py::array_t<unsigned>(4ULL, storage_space.memptr());
+        // Resolve the slot location with scalar broadcasting
+        unsigned cx = ix_vec.n_elem == 1 ? ix_vec.at(0) : ix_vec.at(k);
+        unsigned cy = iy_vec.n_elem == 1 ? iy_vec.at(0) : iy_vec.at(k);
+        unsigned cz = iz_vec.n_elem == 1 ? iz_vec.at(0) : iz_vec.at(k);
+        unsigned cw = iw_vec.n_elem == 1 ? iw_vec.at(0) : iw_vec.at(k);
+
+        // Write (indices are 0-based, passed through unchanged)
+        int return_code = quadriga_lib::hdf5_write(&c, fn, cx, cy, cz, cw);
+        if (return_code == 1)
+            any_overwrite = true;
+    }
+
+    // Warn if existing data was overwritten
+    if (any_overwrite)
+        py::module_::import("warnings")
+            .attr("warn")("Modifying or overwriting existing dataset in file.");
+
+    // Return the storage layout
+    return qd_python_copy2numpy(&storage_space);
 }
+
+// pybind11 declaration:
+// m.def("hdf5_write_channel", &hdf5_write_channel,
+//       py::arg("fn"),
+//       py::arg("chan"),
+//       py::arg("par") = py::none(),
+//       py::arg("ix") = py::none(),
+//       py::arg("iy") = py::none(),
+//       py::arg("iz") = py::none(),
+//       py::arg("iw") = py::none());
