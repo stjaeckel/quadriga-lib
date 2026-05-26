@@ -62,11 +62,12 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("hdf5_read_channel", &hdf5_read_channel,
           py::arg("fn"),
-          py::arg("ix") = 0,
-          py::arg("iy") = 0,
-          py::arg("iz") = 0,
-          py::arg("iw") = 0,
-          py::arg("snap") = py::none());
+          py::arg("ix") = py::none(),
+          py::arg("iy") = py::none(),
+          py::arg("iz") = py::none(),
+          py::arg("iw") = py::none(),
+          py::arg("snap") = py::none(),
+          py::arg("stack") = false);
 
     m.def("hdf5_read_dset_names", &hdf5_read_dset_names, py::arg("fn"),
           py::arg("ix") = 0, py::arg("iy") = 0, py::arg("iz") = 0, py::arg("iw") = 0);

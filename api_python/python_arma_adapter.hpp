@@ -380,7 +380,7 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Co
     dtype_numpy *p_out = output.mutable_data();
 
     if (ragged)
-        std::memset(p_out, 0, n_total * n_bytes);
+        std::fill_n(p_out, n_total, dtype_numpy{});
 
     for (size_t f = 0; f < n_frames; ++f)
     {
@@ -502,7 +502,7 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Ma
     dtype_numpy *p_out = output.mutable_data();
 
     if (ragged)
-        std::memset(p_out, 0, n_total * n_bytes);
+        std::fill_n(p_out, n_total, dtype_numpy{});
 
     for (size_t f = 0; f < n_frames; ++f)
     {
@@ -656,7 +656,7 @@ static py::array_t<dtype_numpy> qd_python_stack2numpy(const std::vector<arma::Cu
     dtype_numpy *p_out = output.mutable_data();
 
     if (ragged)
-        std::memset(p_out, 0, n_total * n_bytes);
+        std::fill_n(p_out, n_total, dtype_numpy{});
 
     for (size_t f = 0; f < n_frames; ++f)
     {
