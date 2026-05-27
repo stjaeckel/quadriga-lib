@@ -137,9 +137,10 @@ void quadriga_lib_channel(py::module_ &m)
 
     m.def("qrt_file_parse", &qrt_file_parse, py::arg("fn"));
 
-    m.def("qrt_file_read", &qrt_file_read, py::arg("fn"),
-          py::arg("cir") = 0,
-          py::arg("orig") = 0,
+    m.def("qrt_file_read", &qrt_file_read,
+          py::arg("fn"),
+          py::arg("i_cir") = py::none(),
+          py::arg("i_orig") = 0,
           py::arg("downlink") = true,
           py::arg("normalize_M") = 1);
 }

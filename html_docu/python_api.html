@@ -117,7 +117,7 @@ import quadriga_lib
   <tr><td><a href="#hdf5_write_channel">hdf5_write_channel</a></td><td>Write one or more channel objects to an HDF5 file</td></tr>
   <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
-  <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing data from QRT file</td></tr>
+  <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
   <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
 </tbody></table><br>
 
@@ -1398,103 +1398,115 @@ quadriga_lib.channel.hdf5_write_dset( fn, ix, iy, iz, iw, name, data )
 <span id="qrt_file_parse" class="qd-func"><b>qrt_file_parse</b></span><br>
 <hr class="thin">
 Read metadata from a QRT file
-<br><br>
-<b>Usage:</b><br>
-<pre>
-from quadriga_lib import channel
-
-# Separate outputs
-no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation = channel.qrt_file_parse( fn )
-
-# Output as tuple
-data = channel.qrt_file_parse( fn )
-</pre>
-
-<b>Input Argument:</b><br>
 <ul>
-<li><b><code>fn</code></b><br> Filename of the QRT file, string</li>
+<li>Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR offsets, names, positions, orientations, and file version</li>
+<li>When <code>no_dest == 0</code> in the file, one implicit RX named <code>"RX"</code> is assumed; <code>dest_names</code> and <code>cir_offset</code> reflect this</li>
 </ul>
 
-<b>Output Arguments:</b><br>
+<b>Usage:</b><br>
+<pre>
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq,
+    cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
+</pre>
+
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>no_cir</code></b><br> Number of channel snapshots per origin point</li>
-<li><b><code>no_orig</code></b><br> Number of origin points (e.g., TXs)</li>
-<li><b><code>no_dest</code></b><br> Number of destinations (RX)</li>
-<li><b><code>no_freq</code></b><br> Number of frequencies</li>
-<li><b><code>cir_offset</code></b><br> CIR offset for each destination</li>
-<li><b><code>orig_names</code></b><br> Names of the origin points (TXs), list of strings</li>
-<li><b><code>dest_names</code></b><br> Names of the destination points (RXs), list of strings</li>
-<li><b><code>version</code></b><br> QRT file version</li>
-<li><b><code>fGHz</code></b><br> Center frequency in GHz as stored in the QRT file, numpy array of floats</li>
-<li><b><code>cir_pos</code></b><br> CIR positions in Cartesian coordinates, numpy array of shape [no_cir, 3]</li>
-<li><b><code>cir_orientation</code></b><br> CIR orientation in Euler angles in rad, numpy array of shape [no_cir, 3]</li>
-<li><b><code>orig_pos</code></b><br> Origin (TX) positions in Cartesian coordinates, numpy array of shape [no_orig, 3]</li>
-<li><b><code>orig_orientation</code></b><br> Origin (TX) orientations in Euler angles in rad, numpy array of shape [no_orig, 3]</li>
+<li><b><code>fn</code></b> — Path to the QRT file</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>no_cir</code></b> — Number of channel snapshots per origin point</li>
+<li><b><code>no_orig</code></b> — Number of origin points (TX)</li>
+<li><b><code>no_dest</code></b> — Number of destination points (RX)</li>
+<li><b><code>no_freq</code></b> — Number of frequency bands</li>
+<li><b><code>cir_offset</code></b> — CIR offset per destination; <code>(no_dest,)</code></li>
+<li><b><code>orig_names</code></b> — Names of the origin points (TX); list of strings; length <code>no_orig</code></li>
+<li><b><code>dest_names</code></b> — Names of the destination points (RX); list of strings; length <code>no_dest</code></li>
+<li><b><code>version</code></b> — QRT file version number</li>
+<li><b><code>center_freq</code></b> — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); <code>(no_freq,)</code></li>
+<li><b><code>cir_pos</code></b> — CIR positions in Cartesian coordinates; <code>(no_cir, 3)</code></li>
+<li><b><code>cir_orientation</code></b> — CIR orientations as Euler angles; <code>(no_cir, 3)</code></li>
+<li><b><code>orig_pos</code></b> — Origin (TX) positions in Cartesian coordinates; <code>(no_orig, 3)</code></li>
+<li><b><code>orig_orientation</code></b> — Origin (TX) orientations as Euler angles; <code>(no_orig, 3)</code></li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="qrt_file_read" class="qd-func"><b>qrt_file_read</b></span><br>
 <hr class="thin">
-Read ray-tracing data from QRT file
-<br><br>
-<b>Usage:</b><br>
-<pre>
-from quadriga_lib import channel
-data = channel.qrt_file_read( fn, i_cir, i_orig, downlink )
-</pre>
-
-<b>Input Arguments:</b><br>
+Read ray-tracing CIR data from a QRT file
 <ul>
-<li><b><code>fn</code></b><br> Filename of the QRT file, string</li>
-<li><b><code>cir</code></b><br> Snapshot index in the file, Default = 0</li>
-<li><b><code>orig</code></b><br> Origin index (for downlink Origin = TX), Default = 0</li>
-<li><b><code>downlink</code></b><br> Switch for uplink / downlink direction, Default = true (downlink)</li>
-<table class="md">
-<tr>
-  <td><li><b><code>normalize_M</code></b><br> Switch for different normalization options: 0</td>
-  <td>M as in QRT file, path_gain as FSPL (no normalization) 1</td>
-  <td>M has sum-column power is 2, path_gain is FSPL + material losses (default)</li></td>
-</tr>
-</table>
+<li>Reads channel impulse response data from QRT files</li>
+<li>A file read cache is initialized once and reused across all requested snapshots, which significantly speeds up multi-snapshot reads</li>
+<li>If <code>downlink = True</code>, origin is TX and destination is RX; if <code>False</code>, the roles are swapped</li>
+<li>Per-snapshot outputs are returned as lists with one entry per requested snapshot</li>
 </ul>
 
-<b>Output Arguments:</b><br>
+<b>Usage:</b><br>
+<pre>
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod,
+    aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
+</pre>
+
+<b>Inputs:</b><br>
 <ul>
+<li><b><code>fn</code></b> — Path to the QRT file</li>
+<li><b><code>cir</code></b> — Snapshot indices to read; <code>(n_out,)</code> or <code>None</code>; if <code>None</code> or empty, all snapshots are read; default: <code>None</code></li>
+<li><b><code>orig</code></b> — Origin index (origin = TX for downlink); scalar; default: 0</li>
+<li><b><code>downlink</code></b> — If <code>True</code>, origin=TX and destination=RX; if <code>False</code>, the roles are swapped; default: <code>True</code></li>
+<li><b><code>normalize_M</code></b> — Controls <code>M</code> and <code>path_gain</code> scaling; 0 = values as stored in the QRT file with <code>path_gain</code> = -PL; 1 = <code>M</code> columns scaled to max power 1 and <code>path_gain</code> = -PL minus material losses; default: 1
+<ul>
+<li>v4/v5 (EM):    FSPL = 32.45 + 20·log10(f_GHz) + 20·log10(d_m)  [dB]</li>
+<li>v6 (scalar):   20·log10(d_m) + α(f)·d_m  [dB], with α from ISO 9613-1 at T=20°C, RH=50%, p=1 atm<br><br>
 <table class="md">
 <tr>
-  <td><li><b><code>data</code></b><br> Dictionary containing the data in the HDF file with the following keys: <code>center_freq</code></td>
-  <td>Center frequency in [Hz]</td>
-  <td>Length <code>[n_freq]</code> <code>tx_pos</code></td>
-  <td>Transmitter position</td>
-  <td>Length <code>[3]</code> <code>tx_orientation</code></td>
-  <td>Transmitter orientation, Euler angles, rad</td>
-  <td>Length <code>[3]</code> <code>rx_pos</code></td>
-  <td>Receiver position</td>
-  <td>Length <code>[3]</code> <code>rx_orientation</code></td>
-  <td>Receiver orientation, Euler angles, rad</td>
-  <td>Length <code>[3]</code> <code>fbs_pos</code></td>
-  <td>First-bounce scatterer positions</td>
-  <td>Size <code>[3, n_path]</code> <code>lbs_pos</code></td>
-  <td>Last-bounce scatterer positions</td>
-  <td>Size <code>[3, n_path]</code> <code>path_gain</code></td>
-  <td>Path gain before antenna, linear scale</td>
-  <td>Size <code>[n_path, n_freq]</code> <code>path_length</code></td>
-  <td>Path length from TX to RX phase center in m</td>
-  <td>Length <code>[n_path]</code> <code>M</code></td>
-  <td>Polarization transfer function, interleaved complex</td>
-  <td>Size <code>[8, n_path, n_freq]</code> or <code>[2, n_path, n_freq]</code> <code>aod</code></td>
-  <td>Departure azimuth angles in [rad]</td>
-  <td>Length <code>[n_path]</code> <code>eod</code></td>
-  <td>Departure elevation angles in [rad]</td>
-  <td>Length <code>[n_path]</code> <code>aoa</code></td>
-  <td>Arrival azimuth angles in [rad]</td>
-  <td>Length <code>[n_path]</code> <code>eoa</code></td>
-  <td>Arrival elevation angles in [rad]</td>
-  <td>Length <code>[n_path]</code> <code>path_coord</code></td>
-  <td>Interaction coordinates</td>
-  <td>List of <code>[3, n_int_s]</code></li></td>
+  <th class="c"><code>normalize_M</code></th>
+  <th class="c"><code>M</code></th>
+  <th class="c"><code>path_gain</code></th>
+</tr>
+<tr>
+  <td class="c">0</td>
+  <td class="c">As stored in QRT file</td>
+  <td class="c">-PL</td>
+</tr>
+<tr>
+  <td class="c">1</td>
+  <td class="c">Max column power = 1</td>
+  <td class="c">-PL minus material losses</td>
 </tr>
 </table>
+</li>
+</ul>
+</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>center_freq</code></b> — Center frequencies in Hz; <code>(n_freq,)</code></li>
+<li><b><code>tx_pos</code></b> — Transmitter positions in Cartesian coordinates; <code>(3, n_out)</code></li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientations as Euler angles (bank, tilt, heading); <code>(3, n_out)</code></li>
+<li><b><code>rx_pos</code></b> — Receiver positions in Cartesian coordinates; <code>(3, n_out)</code></li>
+<li><b><code>rx_orientation</code></b> — Receiver orientations as Euler angles (bank, tilt, heading); <code>(3, n_out)</code></li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; list of length <code>n_out</code>; entries <code>(3, n_path)</code></li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; list of length <code>n_out</code>; entries <code>(3, n_path)</code></li>
+<li><b><code>path_gain</code></b> — Path gain on linear scale; list of length <code>n_out</code>; entries <code>(n_path, n_freq)</code></li>
+<li><b><code>path_length</code></b> — Absolute path length from TX to RX phase center; list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length <code>n_out</code>; entries <code>(8, n_path, n_freq)</code>, or <code>(2, n_path, n_freq)</code> for v6 files</li>
+<li><b><code>aod</code></b> — Departure azimuth angles; list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>eod</code></b> — Departure elevation angles; list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>aoa</code></b> — Arrival azimuth angles; list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>eoa</code></b> — Arrival elevation angles; list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>path_coord</code></b> — Interaction coordinates per path; list of length <code>n_out</code>; each entry is a list of length <code>n_path</code> with arrays <code>(3, n_interact + 2)</code></li>
+<li><b><code>no_int</code></b> — Number of mesh interactions per path (0 indicates LOS); list of length <code>n_out</code>; entries <code>(n_path,)</code></li>
+<li><b><code>coord</code></b> — Interaction coordinates concatenated across paths; list of length <code>n_out</code>; entries <code>(3, sum(no_int))</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#generate">generate</a> (for generating antenna arrays)</li>
+<li><a href="#get_channels_planar">get_channels_planar</a> (for embedding antennas using departure and arrival angles)</li>
+<li><a href="#get_channels_spherical">get_channels_spherical</a> (for embedding antennas using FBS/LBS positions)</li>
+<li><a href="#get_channels_multifreq">get_channels_multifreq</a> (for multi-frequency antenna embedding)</li>
 </ul>
 
 <hr class="greyline"><br>

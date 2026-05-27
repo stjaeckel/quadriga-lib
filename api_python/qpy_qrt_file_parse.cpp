@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
@@ -26,83 +13,67 @@ SECTION!*/
 # qrt_file_parse
 Read metadata from a QRT file
 
+- Parses a QRT file and extracts snapshot counts, origin/destination counts, frequency count, CIR
+  offsets, names, positions, orientations, and file version
+- When `no_dest == 0` in the file, one implicit RX named `"RX"` is assumed; `dest_names` and
+  `cir_offset` reflect this
+
 ## Usage:
 ```
-from quadriga_lib import channel
-
-# Separate outputs
-no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, fGHz, cir_pos, cir_orientation, orig_pos, orig_orientation = channel.qrt_file_parse( fn )
-
-# Output as tuple
-data = channel.qrt_file_parse( fn )
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq,
+    cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
 ```
 
-## Input Argument:
-- **`fn`**<br>
-  Filename of the QRT file, string
+## Inputs:
+- **`fn`** — Path to the QRT file
 
-## Output Arguments:
-- **`no_cir`**<br>
-  Number of channel snapshots per origin point
-
-- **`no_orig`**<br>
-  Number of origin points (e.g., TXs)
-
-- **`no_dest`**<br>
-  Number of destinations (RX)
-
-- **`no_freq`**<br>
-  Number of frequencies
-
-- **`cir_offset`**<br>
-  CIR offset for each destination
-
-- **`orig_names`**<br>
-  Names of the origin points (TXs), list of strings
-
-- **`dest_names`**<br>
-  Names of the destination points (RXs), list of strings
-
-- **`version`**<br>
-  QRT file version
-
-- **`fGHz`**<br>
-  Center frequency in GHz as stored in the QRT file, numpy array of floats
-
-- **`cir_pos`**<br>
-  CIR positions in Cartesian coordinates, numpy array of shape [no_cir, 3]
-
-- **`cir_orientation`**<br>
-  CIR orientation in Euler angles in rad, numpy array of shape [no_cir, 3]
-
-- **`orig_pos`**<br>
-  Origin (TX) positions in Cartesian coordinates, numpy array of shape [no_orig, 3]
-
-- **`orig_orientation`**<br>
-  Origin (TX) orientations in Euler angles in rad, numpy array of shape [no_orig, 3]
+## Outputs:
+- **`no_cir`** — Number of channel snapshots per origin point
+- **`no_orig`** — Number of origin points (TX)
+- **`no_dest`** — Number of destination points (RX)
+- **`no_freq`** — Number of frequency bands
+- **`cir_offset`** — CIR offset per destination; `(no_dest,)`
+- **`orig_names`** — Names of the origin points (TX); list of strings; length `no_orig`
+- **`dest_names`** — Names of the destination points (RX); list of strings; length `no_dest`
+- **`version`** — QRT file version number
+- **`center_freq`** — Frequencies as stored in the file; GHz for EM mode (v4/v5), Hz for scalar mode (v6); `(no_freq,)`
+- **`cir_pos`** — CIR positions in Cartesian coordinates; `(no_cir, 3)`
+- **`cir_orientation`** — CIR orientations as Euler angles; `(no_cir, 3)`
+- **`orig_pos`** — Origin (TX) positions in Cartesian coordinates; `(no_orig, 3)`
+- **`orig_orientation`** — Origin (TX) orientations as Euler angles; `(no_orig, 3)`
 MD!*/
 
 py::tuple qrt_file_parse(const std::string &fn)
 {
+    // Declare outputs
     arma::uword no_cir, no_orig, no_dest, no_freq;
     arma::uvec cir_offset;
     std::vector<std::string> orig_names, dest_names;
     int version;
-    arma::fvec fGHz;
+    arma::fvec center_freq;
     arma::fmat cir_pos, cir_orientation, orig_pos, orig_orientation;
 
-    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset, &orig_names, &dest_names, &version,
-                                 &fGHz, &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
+    // Call library function
+    quadriga_lib::qrt_file_parse(fn, &no_cir, &no_orig, &no_dest, &no_freq, &cir_offset,
+                                 &orig_names, &dest_names, &version, &center_freq,
+                                 &cir_pos, &cir_orientation, &orig_pos, &orig_orientation);
 
-    auto cir_offset_p = qd_python_copy2numpy(&cir_offset);
-    auto orig_names_p = qd_python_copy2list(orig_names);
-    auto dest_names_p = qd_python_copy2list(dest_names);
-    auto fGHz_p = qd_python_copy2numpy(&fGHz);
-    auto cir_pos_p = qd_python_copy2numpy(&cir_pos);
-    auto cir_orientation_p = qd_python_copy2numpy(&cir_orientation);
-    auto orig_pos_p = qd_python_copy2numpy(&orig_pos);
-    auto orig_orientation_p = qd_python_copy2numpy(&orig_orientation);
+    // Copy to python
+    auto cir_offset_py = qd_python_copy2numpy(&cir_offset);
+    auto orig_names_py = qd_python_copy2list(orig_names);
+    auto dest_names_py = qd_python_copy2list(dest_names);
+    auto center_freq_py = qd_python_copy2numpy(&center_freq);
+    auto cir_pos_py = qd_python_copy2numpy(&cir_pos);
+    auto cir_orientation_py = qd_python_copy2numpy(&cir_orientation);
+    auto orig_pos_py = qd_python_copy2numpy(&orig_pos);
+    auto orig_orientation_py = qd_python_copy2numpy(&orig_orientation);
 
-    return py::make_tuple(no_cir, no_orig, no_dest, no_freq, cir_offset_p, orig_names_p, dest_names_p, version,
-                          fGHz_p, cir_pos_p, cir_orientation_p, orig_pos_p, orig_orientation_p);
+    // Return tuple
+    return py::make_tuple(no_cir, no_orig, no_dest, no_freq, cir_offset_py, orig_names_py,
+                          dest_names_py, version, center_freq_py, cir_pos_py, cir_orientation_py,
+                          orig_pos_py, orig_orientation_py);
 }
+
+// pybind11 declaration:
+// m.def("qrt_file_parse", &qrt_file_parse,
+//       py::arg("fn"));

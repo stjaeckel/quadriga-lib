@@ -109,6 +109,7 @@ documentation:
 
 	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_cpp.md -a cpp
 	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_mex.md -a mex
+	python3 tools/extract_md.py -o html_docu/quadriga_lib_api_python.md -a python
 
 moxunit-lib:
 	- rm -rf external/MOxUnit-master
