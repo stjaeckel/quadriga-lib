@@ -69,7 +69,7 @@ auto pyarray = qd_python_stack2numpy<float, std::complex<double>>(&vecCubeRe, &v
 // --- Copy a std::vector of Armadillo objects to a py::list of Numpy arrays ---
 auto pylist = qd_python_copy2list(&vec, &vecImag, i_vec);              // vec = vector<Col|Mat|Cube>; im/i_vec optional
 auto pylist = qd_python_copy2list<arma::Mat<float>, std::complex<double>>(&vecMatRe, &vecMatIm);  // -> list of complex
-auto pylist = qd_python_copy2python(vecStrings, i_vec);                // vector of strings
+auto pylist = qd_python_copy2list(vecStrings, i_vec);                // vector of strings
 
 // --- Reserve memory in Python and map to Armadillo (zero-copy writes) ---
 auto pyarray = qd_python_init_output(n_elem, &Col);                            // 1D
