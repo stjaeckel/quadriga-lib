@@ -158,6 +158,7 @@
   <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
+  <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a Wavefront .obj file</td></tr>
   <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
@@ -3237,9 +3238,55 @@ Read a Wavefront .obj file and extract geometry and material information
 
 <b>See also:</b><br>
 <ul>
+<li><a href="#obj_file_write">obj_file_write</a> (for writing OBJ files)</li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (for calculating sub-meshes)</li>
 <li><a href="#triangle_mesh_aabb">triangle_mesh_aabb</a> (for calculating bounding boxes)</li>
 <li><a href="#subdivide_triangles">subdivide_triangles</a> (for mesh subdivision)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="obj_file_write" class="qd-func"><b>obj_file_write</b></span><br>
+<hr class="thin">
+Write a Wavefront .obj file
+<ul>
+<li>Supply geometry as either <code>mesh</code>, or as <code>vert_list</code> and <code>face_ind</code>; giving both, or neither, is  an error</li>
+<li>With <code>mesh</code>, <code>vert_list_out</code> and <code>face_ind_out</code> are derived from it, merging vertices of the same object that are closer than <code>threshold</code> (no merging across objects)</li>
+<li>With <code>vert_list</code> and <code>face_ind</code>, the geometry is written unchanged</li>
+<li>Faces are written grouped by object; the faces of each object must form a contiguous block in <code>obj_ind</code></li>
+<li>Without <code>obj_ind</code> and <code>obj_names</code>, a single object named <code>object</code> is written</li>
+<li>Without <code>mtl_ind</code> (or if all entries are 0), no <code>usemtl</code> tags and no <code>.mtl</code> file are written</li>
+<li>The <code>.mtl</code> file is named after the <code>.obj</code> and lists each used material; values default to a gray material when <code>bsdf</code> is omitted</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+[ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, ...
+    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold );
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>fn</code></b> — Path to the output <code>.obj</code> file; must end in <code>.obj</code>; if empty, no file is written (outputs are still computed)</li>
+<li><b><code>mesh</code></b> — Triangle coordinates <code>{X1,Y1,Z1,...,X3,Y3,Z3}</code> per row; <code>[n_mesh, 9]</code>; mutually exclusive with <code>vert_list</code> and <code>face_ind</code></li>
+<li><b><code>obj_ind</code></b> — 1-based object index per face; <code>[n_mesh]</code>; each object must form a contiguous block</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = unassigned); <code>[n_mesh]</code></li>
+<li><b><code>obj_names</code></b> — Object names; cell array of strings; length >= max(obj_ind); required if <code>obj_ind</code> is given</li>
+<li><b><code>mtl_names</code></b> — Material names; cell array of strings; length >= max(mtl_ind); required if <code>mtl_ind</code> has nonzero entries</li>
+<li><b><code>vert_list</code></b> — Vertex positions; <code>[n_vert, 3]</code>; only valid with <code>face_ind</code>; written unchanged</li>
+<li><b><code>face_ind</code></b> — 1-based vertex indices per face; <code>[n_mesh, 3]</code>; required with <code>vert_list</code></li>
+<li><b><code>bsdf</code></b> — Principled BSDF values for the <code>.mtl</code> file; <code>[n_mtl, 17]</code>; see <a href="#obj_file_read">obj_file_read</a> for the column layout</li>
+<li><b><code>threshold</code></b> — Vertex co-location distance for merging within an object; default: 0.001 (1 mm)</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>vert_list_out</code></b> — Vertices derived from <code>mesh</code>, or a copy of <code>vert_list</code>; <code>[n_vert, 3]</code></li>
+<li><b><code>face_ind_out</code></b> — 1-based face indices derived from <code>mesh</code>, or a copy of <code>face_ind</code>; <code>[n_mesh, 3]</code></li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#obj_file_read">obj_file_read</a> (for reading OBJ files and the BSDF column layout)</li>
 </ul>
 
 <hr class="greyline"><br>

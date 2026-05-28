@@ -1,0 +1,355 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
+# Part of quadriga-lib — see LICENSE for terms.
+
+import sys
+import os
+import unittest
+import numpy as np
+import numpy.testing as npt
+
+# Append the directory containing your package to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+package_path = os.path.join(current_dir, "../../lib")
+if package_path not in sys.path:
+    sys.path.append(package_path)
+
+import quadriga_lib
+
+
+def _rm(fn):
+    if os.path.isfile(fn):
+        os.remove(fn)
+
+
+def cube_vertices():
+    """8 vertices of a unit cube."""
+    return np.array(
+        [
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, -1.0],
+            [1.0, -1.0, 1.0],
+            [1.0, -1.0, -1.0],
+            [-1.0, 1.0, 1.0],
+            [-1.0, 1.0, -1.0],
+            [-1.0, -1.0, 1.0],
+            [-1.0, -1.0, -1.0],
+        ]
+    )
+
+
+def cube_faces():
+    """12 triangular faces, 0-based indices into cube_vertices()."""
+    return (
+        np.array(
+            [
+                [5, 3, 1],
+                [3, 8, 4],
+                [7, 6, 8],
+                [2, 8, 6],
+                [1, 4, 2],
+                [5, 2, 6],
+                [5, 7, 3],
+                [3, 7, 8],
+                [7, 5, 6],
+                [2, 4, 8],
+                [1, 3, 4],
+                [5, 1, 2],
+            ],
+            dtype=np.uint64,
+        )
+        - 1
+    )
+
+
+def make_mesh(V, F):
+    """Assemble a (n_face, 9) mesh from a vertex list and 0-based face indices."""
+    return np.hstack([V[F[:, 0], :], V[F[:, 1], :], V[F[:, 2], :]])
+
+
+class test_case(unittest.TestCase):
+
+    def test_mesh_roundtrip(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        _rm(fn)
+        _rm(mtl_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+
+        # Write from mesh; no objects, no materials
+        vlo, fio = quadriga_lib.RTtools.obj_file_write(fn, mesh)
+
+        assert vlo.shape == (8, 3)
+        assert fio.shape == (12, 3)
+        npt.assert_(vlo.dtype == np.float64)
+        npt.assert_(fio.dtype == np.int64)
+        npt.assert_almost_equal(make_mesh(vlo, fio), mesh, decimal=12)
+        npt.assert_(not os.path.isfile(mtl_fn))  # no materials -> no .mtl
+
+        (
+            mesh_rd,
+            _,
+            vert_list_rd,
+            face_ind_rd,
+            obj_ind_rd,
+            mtl_ind_rd,
+            obj_names_rd,
+            mtl_names_rd,
+            _,
+        ) = quadriga_lib.RTtools.obj_file_read(fn)
+
+        assert vert_list_rd.shape == (8, 3)
+        npt.assert_almost_equal(mesh_rd, mesh, decimal=12)
+        npt.assert_almost_equal(make_mesh(vert_list_rd, face_ind_rd), mesh, decimal=12)
+        assert len(obj_names_rd) == 1
+        npt.assert_equal(obj_names_rd[0], "object")
+        assert len(mtl_names_rd) == 0
+        npt.assert_(np.all(obj_ind_rd == 1))
+        npt.assert_(np.all(mtl_ind_rd == 0))
+
+        _rm(fn)
+
+    def test_vertlist_faceind_roundtrip(self):
+        fn = "cube.obj"
+        _rm(fn)
+
+        V = cube_vertices()
+        F = cube_faces()  # 0-based
+        mesh = make_mesh(V, F)
+
+        # Write directly from vertex list + face indices (no mesh)
+        vlo, fio = quadriga_lib.RTtools.obj_file_write(fn, vert_list=V, face_ind=F)
+
+        # In this mode the outputs are exact copies of the inputs (0-based)
+        npt.assert_almost_equal(vlo, V, decimal=14)
+        npt.assert_array_equal(fio, F)
+
+        _, _, vert_list_rd, face_ind_rd, _, _, _, _, _ = (
+            quadriga_lib.RTtools.obj_file_read(fn)
+        )
+        npt.assert_almost_equal(
+            make_mesh(vert_list_rd, face_ind_rd), mesh, decimal=12
+        )
+        _rm(fn)
+
+    def test_materials_roundtrip(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        _rm(fn)
+        _rm(mtl_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+        obj_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind[4:] = 2  # faces 0-3 concrete, 4-11 wood
+        obj_names = ["Cube"]
+        mtl_names = ["itu_concrete", "itu_wood"]
+
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names
+        )
+        npt.assert_(os.path.isfile(mtl_fn))
+
+        _, mtl_prop, _, _, _, mtl_ind_rd, _, mtl_names_rd, _ = (
+            quadriga_lib.RTtools.obj_file_read(fn)
+        )
+
+        assert len(mtl_names_rd) == 2
+        npt.assert_equal(mtl_names_rd[0], "itu_concrete")
+        npt.assert_equal(mtl_names_rd[1], "itu_wood")
+        npt.assert_almost_equal(
+            mtl_prop[0, :], [5.24, 0.0, 0.0462, 0.7822, 0, 0, 0, 0, 1], decimal=12
+        )
+        npt.assert_almost_equal(
+            mtl_prop[4, :], [1.99, 0.0, 0.0047, 1.0718, 0, 0, 0, 0, 1], decimal=12
+        )
+        npt.assert_array_equal(mtl_ind_rd, [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
+
+        _rm(fn)
+        _rm(mtl_fn)
+
+    def test_custom_inline_material(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        _rm(fn)
+        _rm(mtl_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+        obj_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, ["Cube"], ["glass::6.0:0:0.1:1.2"]
+        )
+
+        _, mtl_prop, _, _, _, mtl_ind_rd, _, mtl_names_rd, _ = (
+            quadriga_lib.RTtools.obj_file_read(fn)
+        )
+        npt.assert_equal(mtl_names_rd[0], "glass::6.0:0:0.1:1.2")
+        npt.assert_almost_equal(
+            mtl_prop[0, :], [6.0, 0.0, 0.1, 1.2, 0, 0, 0, 0, 1], decimal=12
+        )
+        npt.assert_(np.all(mtl_ind_rd == 1))
+
+        _rm(fn)
+        _rm(mtl_fn)
+
+    def test_bsdf_roundtrip(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        _rm(fn)
+        _rm(mtl_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+        obj_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+
+        # Distinct non-default values; clamped fields inside [0, 1], ior in a sane range
+        bsdf = np.array(
+            [
+                [
+                    0.1, 0.2, 0.3,        # base color RGB
+                    0.7,                  # transparency
+                    0.4,                  # roughness
+                    0.6,                  # metallic
+                    1.7,                  # ior
+                    0.8,                  # specular
+                    0.05, 0.15, 0.25,     # emission RGB
+                    0.3,                  # sheen
+                    0.35,                 # clearcoat
+                    0.45,                 # clearcoat roughness
+                    0.55,                 # anisotropic
+                    0.65,                 # anisotropic rotation
+                    0.9,                  # transmission
+                ]
+            ]
+        )
+
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, ["Cube"], ["painted"], bsdf=bsdf
+        )
+        npt.assert_(os.path.isfile(mtl_fn))
+
+        _, _, _, _, _, _, _, mtl_names_rd, bsdf_rd = (
+            quadriga_lib.RTtools.obj_file_read(fn)
+        )
+        npt.assert_equal(mtl_names_rd[0], "painted")
+        assert bsdf_rd.shape == (1, 17)
+        npt.assert_almost_equal(bsdf_rd, bsdf, decimal=9)
+
+        _rm(fn)
+        _rm(mtl_fn)
+
+    def test_multiple_objects(self):
+        fn = "cube.obj"
+        _rm(fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        meshA = make_mesh(V, F)
+        meshB = meshA.copy()
+        meshB[:, [0, 3, 6]] += 10.0  # shift x of all corners -> disjoint cube
+        mesh = np.vstack([meshA, meshB])  # (24, 9)
+        obj_ind = np.concatenate(
+            [np.ones(12, dtype=np.uint64), 2 * np.ones(12, dtype=np.uint64)]
+        )
+        obj_names = ["CubeA", "CubeB"]
+
+        vlo, _ = quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, obj_names=obj_names
+        )
+        assert vlo.shape == (16, 3)  # no cross-object merging -> 8 + 8
+
+        _, _, vert_list_rd, face_ind_rd, obj_ind_rd, _, obj_names_rd, _, _ = (
+            quadriga_lib.RTtools.obj_file_read(fn)
+        )
+
+        assert vert_list_rd.shape == (16, 3)
+        assert len(obj_names_rd) == 2
+        npt.assert_equal(obj_names_rd[0], "CubeA")
+        npt.assert_equal(obj_names_rd[1], "CubeB")
+        npt.assert_array_equal(
+            obj_ind_rd,
+            np.concatenate(
+                [np.ones(12, dtype=np.int64), 2 * np.ones(12, dtype=np.int64)]
+            ),
+        )
+        npt.assert_almost_equal(
+            make_mesh(vert_list_rd, face_ind_rd), mesh, decimal=12
+        )
+        _rm(fn)
+
+    def test_outputs_only(self):
+        # Empty filename: derive vert_list / face_ind from mesh, write no file
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+
+        vlo, fio = quadriga_lib.RTtools.obj_file_write("", mesh)
+        assert vlo.shape == (8, 3)
+        assert fio.shape == (12, 3)
+        npt.assert_almost_equal(make_mesh(vlo, fio), mesh, decimal=12)
+
+    def test_errors(self):
+        fn = "cube.obj"
+        _rm(fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+
+        # Both mesh and vert_list / face_ind given
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write(fn, mesh, vert_list=V, face_ind=F)
+
+        # Neither geometry source given
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write(fn)
+
+        # File name does not end in .obj
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write("cube.txt", mesh)
+
+        # Non-contiguous obj_ind: {1,1,2,2,1,...}
+        with self.assertRaises(ValueError):
+            obj_bad = np.ones(12, dtype=np.uint64)
+            obj_bad[2] = 2
+            obj_bad[3] = 2
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, obj_bad, obj_names=["A", "B"]
+            )
+
+        # obj_names too short for obj_ind
+        with self.assertRaises(ValueError):
+            obj_ind = np.concatenate(
+                [np.ones(6, dtype=np.uint64), 2 * np.ones(6, dtype=np.uint64)]
+            )
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, obj_ind, obj_names=["OnlyOne"]
+            )
+
+        # mtl_names too short for mtl_ind
+        with self.assertRaises(ValueError):
+            mtl_ind = np.concatenate(
+                [np.ones(6, dtype=np.uint64), 2 * np.ones(6, dtype=np.uint64)]
+            )
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, mtl_ind=mtl_ind, mtl_names=["OnlyOne"]
+            )
+
+        # bsdf given without materials
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write(fn, mesh, bsdf=np.zeros((1, 17)))
+
+        # None of the error cases should have produced a file
+        npt.assert_(not os.path.isfile(fn))
+        npt.assert_(not os.path.isfile("cube.txt"))

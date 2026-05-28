@@ -229,14 +229,14 @@ arma::uword quadriga_lib::obj_file_read(
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file
-- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
+- **`materials_csv`** — Path to CSV file with custom material properties.
   Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
   Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
   If empty, ITU-R P.2040-3 defaults are used.
 
 ## Outputs:
-- **`mesh`** *(optional)* — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; `[n_mesh, 9]`; Columns:<br><br>
+- **`mesh`** — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; `[n_mesh, 9]`; Columns:<br><br>
   | Index | Symbol | Property                                      |
   | :---: | :----: | --------------------------------------------- |
   | 0     | a      | ε_r at fRef                                   |
@@ -248,13 +248,13 @@ arma::uword quadriga_lib::obj_file_read(
   | 6     | alpha  | Distance absorption at fRef [dB/m]            |
   | 7     | alphaB | Frequency exponent for alpha                  |
   | 8     | fRef   | Reference frequency [GHz]                     |
-- **`vert_list`** *(optional)* — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** *(optional)* — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
-- **`obj_ind`** *(optional)* — 1-based object index per triangle; `[n_mesh]`
-- **`mtl_ind`** *(optional)* — 1-based material index per triangle; `[n_mesh]`
-- **`obj_names`** *(optional)* — Object names; length = `max(obj_ind)`
-- **`mtl_names`** *(optional)* — Material names; length = `max(mtl_ind)`
-- **`bsdf`** *(optional)* — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
+- **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
+- **`face_ind`** — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
+- **`obj_ind`** — 1-based object index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle; `[n_mesh]`
+- **`obj_names`** — Object names; length = `max(obj_ind)`
+- **`mtl_names`** — Material names; length = `max(mtl_ind)`
+- **`bsdf`** — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
    | Index | Property                  | Range | Default |
    | :---: | ------------------------- | :---: | ------: |
    | 0     | Base Color Red            | 0–1   | 0.8     |
@@ -308,6 +308,7 @@ arma::uword quadriga_lib::obj_file_read(
   | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ## See also:
+- [[obj_file_write]] (for writing OBJ files)
 - [[obj_overlap_test]] (for testing mesh geometry)
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
 - [[ray_mesh_interact]] (calculating interactions between rays and the triangular mesh)

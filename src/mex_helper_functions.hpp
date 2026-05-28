@@ -498,6 +498,30 @@ inline std::vector<arma::Cube<dtype>> qd_mex_get_CubeVec(const mxArray *input, b
                : qd_mex_typecast_CubeVec<dtype>(input);
 }
 
+// Read a MATLAB cell array of strings (or a single char string) into a std::vector<std::string>
+inline std::vector<std::string> qd_mex_get_strings(const mxArray *input)
+{
+    std::vector<std::string> out;
+    if (input == nullptr || mxIsEmpty(input))
+        return out;
+
+    if (mxIsChar(input)) // single string -> one entry
+    {
+        out.push_back(qd_mex_get_string(input));
+        return out;
+    }
+
+    if (!mxIsCell(input))
+        mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Object/material names must be a cell array of strings.");
+
+    size_t n = mxGetNumberOfElements(input);
+    out.reserve(n);
+    for (size_t i = 0; i < n; ++i)
+        out.push_back(qd_mex_get_string(mxGetCell(input, i)));
+
+    return out;
+}
+
 // Creates an mxArray based on the armadillo input type, copies content
 template <typename dtype>
 inline mxArray *qd_mex_copy2matlab(const dtype *input) // Scalar

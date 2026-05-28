@@ -1350,13 +1350,31 @@ static void qd_python_list2vector_Cube_Cplx(const py::list &input,
         qd_python_copy2arma(pointers[i], shape[i], real[i], imag[i]);
 }
 
-static std::vector<std::string> qd_python_list2vector_Strings(const py::list &input)
+static std::vector<std::string> qd_python_list2vector_Strings(const py::handle &input)
 {
     std::vector<std::string> output;
-    output.reserve(py::len(input));
 
-    for (py::handle obj : input)
+    // None (or a null handle) -> empty vector
+    if (!input || input.is_none())
+        return output;
+
+    // A bare string -> single-element vector
+    if (py::isinstance<py::str>(input))
     {
+        output.emplace_back(py::cast<std::string>(input));
+        return output;
+    }
+
+    // Otherwise expect a list or tuple of strings; reject anything else
+    if (!py::isinstance<py::list>(input) && !py::isinstance<py::tuple>(input))
+        throw std::invalid_argument("Expected a string, a list of strings, or None.");
+
+    auto seq = py::reinterpret_borrow<py::sequence>(input);
+    output.reserve(py::len(seq));
+    for (py::handle obj : seq)
+    {
+        if (!py::isinstance<py::str>(obj))
+            throw std::invalid_argument("Expected a string, a list of strings, or None.");
         output.emplace_back(py::cast<std::string>(obj));
     }
 

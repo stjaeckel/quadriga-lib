@@ -114,6 +114,7 @@ Read a Wavefront .obj file and extract geometry and material information
   | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ## See also:
+- [[obj_file_write]] (for writing OBJ files)
 - [[triangle_mesh_segmentation]] (for calculating sub-meshes)
 - [[triangle_mesh_aabb]] (for calculating bounding boxes)
 - [[subdivide_triangles]] (for mesh subdivision)

@@ -242,10 +242,25 @@ namespace quadriga_lib
                               arma::umat *face_ind = nullptr,                // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
                               arma::uvec *obj_ind = nullptr,                 // Object index, 1-based, Size: [ n_mesh ]
                               arma::uvec *mtl_ind = nullptr,                 // Material index, 1-based, Size: [ n_mesh ]
-                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) - 1 ]
-                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) - 1 ]
+                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) ]
+                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) ]
                               arma::Mat<dtype> *bsdf = nullptr,              // BSDF data from .MTL File, size [mtl_names.size, 15]
                               const std::string &materials_csv = "");        // Location of the material parameter file
+
+    // Write Wavefront .obj file
+    template <typename dtype>                                                // Supported types: float or double
+    void obj_file_write(const std::string &fn = "",                          // File name
+                        const arma::Mat<dtype> *mesh = nullptr,              // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
+                        const arma::uvec *obj_ind = nullptr,                 // Object index, 1-based, Size: [ n_mesh ]
+                        const arma::uvec *mtl_ind = nullptr,                 // Material index, 1-based, Size: [ n_mesh ]
+                        const std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) ]
+                        const std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) ]
+                        arma::Mat<dtype> *vert_list_out = nullptr,           // Out: List of vertices generated from mesh, Size: [ n_vert, 3 ]
+                        arma::umat *face_ind_out = nullptr,                  // Out: faces indices generated from mesh, 0-based, Size: [ n_mesh, 3 ]
+                        const arma::Mat<dtype> *vert_list = nullptr,         // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
+                        const arma::umat *face_ind = nullptr,                // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
+                        const arma::Mat<dtype> *bsdf = nullptr,              // BSDF data for the .MTL File, size [mtl_names.size, 17]
+                        const dtype threshold = 0.001);                      // Co-location threshold for vertices, Default: 1 mm
 
     // Tests if 3D objects overlap (have a shared volume or boolean intersection)
     // - Returns: Subset of list of object indices (obj_ind) that are overlapping, length [ n_overlap ]
