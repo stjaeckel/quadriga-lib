@@ -11,6 +11,7 @@ namespace py = pybind11;
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
+#include "qpy_obj_file_write.cpp"
 #include "qpy_point_cloud_aabb.cpp"
 #include "qpy_point_cloud_segmentation.cpp"
 #include "qpy_point_inside_mesh.cpp"
@@ -52,6 +53,18 @@ void quadriga_lib_RTtools(py::module_ &m)
     m.def("obj_file_read", &obj_file_read,
           py::arg("fn"),
           py::arg("materials_csv") = "");
+
+    m.def("obj_file_write", &obj_file_write,
+          py::arg("fn") = "",
+          py::arg("mesh") = py::none(),
+          py::arg("obj_ind") = py::none(),
+          py::arg("mtl_ind") = py::none(),
+          py::arg("obj_names") = py::none(),
+          py::arg("mtl_names") = py::none(),
+          py::arg("vert_list") = py::none(),
+          py::arg("face_ind") = py::none(),
+          py::arg("bsdf") = py::none(),
+          py::arg("threshold") = 0.001);
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),

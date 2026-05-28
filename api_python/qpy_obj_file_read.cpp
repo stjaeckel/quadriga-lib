@@ -116,6 +116,7 @@ data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
   | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ## See also:
+- [[obj_file_write]] (for writing OBJ files)
 - [[obj_overlap_test]] (for testing mesh geometry)
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
 - [[ray_mesh_interact]] (calculating interactions between rays and the triangular mesh)
