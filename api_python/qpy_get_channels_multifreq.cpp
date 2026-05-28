@@ -58,8 +58,8 @@ Calculate channel coefficients for spherical waves across multiple frequencies
 from quadriga_lib import arrayant
 import numpy as np
 
-coeff_re, coeff_im, delays = arrayant.get_channels_multifreq( ant_tx, ant_rx,
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation,
+coeff_re, coeff_im, delays = arrayant.get_channels_multifreq( ant_tx, ant_rx, \
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
 ```
 

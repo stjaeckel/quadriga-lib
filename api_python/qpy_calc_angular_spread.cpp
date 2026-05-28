@@ -42,8 +42,8 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 ```
 import quadriga_lib
 as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers)
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread(
-    az, el, powers, wrapping=True, calc_bank_angle=True, quantize=0.0)
+as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers, \
+   wrapping=True, calc_bank_angle=True, quantize=0.0)
 ```
 
 ## Arguments:

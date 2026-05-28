@@ -1155,7 +1155,7 @@ Read ray-tracing CIR data from a QRT file
 - **`rx_orientation`** — Receiver orientation (bank, tilt, heading); `[3, n_out]`
 - **`fbs_pos`** — First-bounce scatterer positions; Cell of length `n_out`; elements `[3, n_path]`
 - **`lbs_pos`** — Last-bounce scatterer positions;  Cell of length `n_out`; elements `[3, n_path]`
-- **`path_gain`** — Path gain on linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
+- **`path_gain`** — Path gain in linear scale; Cell of length `n_out`; elements `[n_path, n_freq]`
 - **`path_length`** — Absolute path length TX to RX phase center; Cell of length `n_out`; elements `[n_path]`
 - **`M`** — Polarization transfer matrix; Cell of length `n_out`;
   elements `[8, n_path, n_freq]` or `[2, n_path, n_freq]` for v6 files

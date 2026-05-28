@@ -27,9 +27,9 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ## Usage:
 ```
-chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz,
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh,
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
+chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
 ```
 

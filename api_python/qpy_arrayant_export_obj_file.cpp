@@ -19,7 +19,7 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 ## Usage:
 ```
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius,
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
     icosphere_n_div, element, freq_ind )
 ```
 

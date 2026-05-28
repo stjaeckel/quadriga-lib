@@ -42,7 +42,7 @@ ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacin
 ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, pattern=my_pattern)
 
 # Multi-beam M×N array
-ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1,
+ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
     beam_az=[-30.0, 30.0], beam_el=[0.0, 0.0], separate_beams=False)
 ```
 

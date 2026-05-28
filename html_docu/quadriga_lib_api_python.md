@@ -249,7 +249,7 @@ Export antenna pattern geometry to a Wavefront OBJ file for 3D visualization
 
 ### Usage:
 ```
-quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius,
+quadriga_lib.arrayant.export_obj_file( fn, arrayant, directivity_range, colormap, object_radius, \
     icosphere_n_div, element, freq_ind )
 ```
 
@@ -297,7 +297,7 @@ ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, spacin
 ant = quadriga_lib.arrayant.generate('3gpp', M=2, N=2, freq=3.7e9, pol=1, pattern=my_pattern)
 
 # Multi-beam M×N array
-ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1,
+ant = quadriga_lib.arrayant.generate('multibeam', M=6, N=6, freq=3.7e9, pol=1, \
     beam_az=[-30.0, 30.0], beam_el=[0.0, 0.0], separate_beams=False)
 ```
 
@@ -390,17 +390,17 @@ Generate a parametric frequency-dependent loudspeaker directivity model
 speaker = quadriga_lib.arrayant.generate_speaker()
 
 # Horn tweeter with custom coverage
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025,
+speaker = quadriga_lib.arrayant.generate_speaker(driver_type='horn', radius=0.025, \
     lower_cutoff=1500.0, upper_cutoff=20000.0, hor_coverage=90.0, ver_coverage=60.0)
 
 # Omnidirectional subwoofer with steep rolloff
-speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165,
-    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope=24.0, upper_rolloff_slope=24.0,
+speaker = quadriga_lib.arrayant.generate_speaker(driver_type='omni', radius=0.165, \
+    lower_cutoff=30.0, upper_cutoff=300.0, lower_rolloff_slope=24.0, upper_rolloff_slope=24.0, \
     sensitivity=90.0, radiation_type='monopole')
 
 # Piston driver at specific frequencies
-speaker = quadriga_lib.arrayant.generate_speaker(
-    frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]), angular_resolution=5.0)
+speaker = quadriga_lib.arrayant.generate_speaker( frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]), \
+    angular_resolution=5.0)
 ```
 
 ### Inputs:
@@ -467,7 +467,7 @@ v, h = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, complex=
 
 # Projected distance / local angles (single-frequency only)
 vr, vi, hr, hi, dist = quadriga_lib.arrayant.interpolate( arrayant, azimuth, elevation, dist=True )
-vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth,
+vr, vi, hr, hi, azimuth_loc, elevation_loc, gamma = quadriga_lib.arrayant.interpolate( arrayant, azimuth, \
     elevation, orientation=ori, local_angles=True )
 
 # Element selection, orientation, element positions
@@ -729,7 +729,7 @@ Export propagation paths to a Wavefront OBJ file for 3D visualization
 
 ### Usage:
 ```
-quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min, 
+quadriga_lib.channel.channel_export_obj_file( fn, max_no_paths, gain_max, gain_min, colormap, radius_max, radius_min, \
     n_edges, rx_pos, tx_pos, no_interact, interact_coord, center_freq, coeff, coeff_re, coeff_im, i_snap )
 ```
 
@@ -1036,7 +1036,7 @@ Read metadata from a QRT file
 
 ### Usage:
 ```
-no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq,
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, \
     cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
 ```
 
@@ -1070,7 +1070,7 @@ Read ray-tracing CIR data from a QRT file
 
 ### Usage:
 ```
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod,
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, \
     aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
 ```
 
@@ -1096,7 +1096,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`rx_orientation`** — Receiver orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
 - **`fbs_pos`** — First-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`path_gain`** — Path gain on linear scale; list of length `n_out`; entries `(n_path, n_freq)`
+- **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
 - **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
 - **`M`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
 - **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
@@ -1131,7 +1131,7 @@ Fixes the path delays to a grid of delay bins
 ### Usage:
 ```
 import quadriga_lib
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays(
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( \
     coeff_re, coeff_im, delay, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
 ```
 
@@ -1211,8 +1211,8 @@ Calculate channel coefficients for spherical waves across multiple frequencies
 from quadriga_lib import arrayant
 import numpy as np
 
-coeff_re, coeff_im, delays = arrayant.get_channels_multifreq( ant_tx, ant_rx,
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation,
+coeff_re, coeff_im, delays = arrayant.get_channels_multifreq( ant_tx, ant_rx, \
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
 ```
 
@@ -1387,9 +1387,9 @@ execution of this process, several pieces of input data are required:
 ```
 from quadriga_lib import arrayant
 
-coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, ant_rx, 
-    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
-    center_freq, use_absolute_delays, add_fake_los_path );
+coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, ant_rx, \
+    aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
+    center_freq, use_absolute_delays, add_fake_los_path )
 ```
 
 ### Input Arguments:
@@ -1520,14 +1520,14 @@ execution of this process, several pieces of input data are required:
 from quadriga_lib import arrayant
 
 # Return only coefficients and delays
-coeff_re, coeff_im, delays = arrayant.get_channels_spherical( ant_tx, ant_rx, 
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
-    center_freq, use_absolute_delays, add_fake_los_path );
+coeff_re, coeff_im, delays = arrayant.get_channels_spherical( ant_tx, ant_rx, \
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
+    center_freq, use_absolute_delays, add_fake_los_path )
 
 # Return additional departure and arrival angles
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant_tx, ant_rx, 
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, 
-    center_freq, use_absolute_delays, add_fake_los_path, angles=1 );
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant_tx, ant_rx, \
+    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
+    center_freq, use_absolute_delays, add_fake_los_path, angles=1 )
 ```
 
 ### Input Arguments:
@@ -1666,9 +1666,9 @@ Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models
 
 ### Usage:
 ```
-chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz,
-   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh,
-   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed,
+chan = quadriga_lib.channel.get_ieee_indoor( ap_array, sta_array, ChannelType, CarrierFreq_Hz, \
+   tap_spacing_s, n_users, observation_time, update_rate, speed_station_kmh, speed_env_kmh, \
+   Dist_m, n_floors, uplink, offset_angles, n_subpath, Doppler_effect, seed, \
    KF_linear, XPR_NLOS_linear, SF_std_dB_LOS, SF_std_dB_NLOS, dBP_m, n_walls, wall_loss, stack )
 ```
 
@@ -1784,8 +1784,8 @@ Calculate azimuth and elevation angular spreads with spherical wrapping
 ```
 import quadriga_lib
 as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers)
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread(
-    az, el, powers, wrapping=True, calc_bank_angle=True, quantize=0.0)
+as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers, \
+   wrapping=True, calc_bank_angle=True, quantize=0.0)
 ```
 
 ### Arguments:
@@ -2092,11 +2092,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 ### Usage:
 ```
 # Output as tuple
-data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency,
+data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
     lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 
 # Unpacked outputs
-gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency,
+gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
     lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 ```
 
@@ -2206,14 +2206,14 @@ Read a Wavefront .obj file and extract geometry and material information
 ### Usage:
 ```
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = 
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = \
     quadriga_lib.RTtools.obj_file_read( fn )
 
 # Return as tuple with 9 elements
-data = RTtools.obj_file_read( fn )
+data = quadriga_lib.RTtools.obj_file_read( fn )
 
 # Use a custom material definition file
-data = RTtools.obj_file_read( fn, materials_csv )
+data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
 ```
 
 ### Inputs:
@@ -2340,7 +2340,7 @@ Reorganize a point cloud into spatial sub-clouds for efficient processing
 data = quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
 
 # Unpacked outputs
-points_out, sub_cloud_ind, forward_ind, reverse_ind =
+points_out, sub_cloud_ind, forward_ind, reverse_ind = \
     quadriga_lib.RTtools.point_cloud_segmentation( points, target_size, vec_size )
 ```
 
@@ -2510,7 +2510,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_propR = 
+triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
     quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 ```
 

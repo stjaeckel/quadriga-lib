@@ -20,7 +20,7 @@ Read metadata from a QRT file
 
 ## Usage:
 ```
-no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq,
+no_cir, no_orig, no_dest, no_freq, cir_offset, orig_names, dest_names, version, center_freq, \
     cir_pos, cir_orientation, orig_pos, orig_orientation = quadriga_lib.channel.qrt_file_parse( fn )
 ```
 

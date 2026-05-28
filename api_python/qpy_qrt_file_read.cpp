@@ -21,7 +21,7 @@ Read ray-tracing CIR data from a QRT file
 
 ## Usage:
 ```
-center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod,
+center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, path_gain, path_length, M, aod, eod, \
     aoa, eoa, path_coord, no_int, coord = quadriga_lib.channel.qrt_file_read( fn, cir, orig, downlink, normalize_M )
 ```
 
@@ -47,7 +47,7 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 - **`rx_orientation`** — Receiver orientations as Euler angles (bank, tilt, heading); `(3, n_out)`
 - **`fbs_pos`** — First-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
 - **`lbs_pos`** — Last-bounce scatterer positions; list of length `n_out`; entries `(3, n_path)`
-- **`path_gain`** — Path gain on linear scale; list of length `n_out`; entries `(n_path, n_freq)`
+- **`path_gain`** — Path gain in linear scale; list of length `n_out`; entries `(n_path, n_freq)`
 - **`path_length`** — Absolute path length from TX to RX phase center; list of length `n_out`; entries `(n_path,)`
 - **`M`** — Polarization transfer matrix, stored as interleaved real/imaginary pairs; list of length `n_out`; entries `(8, n_path, n_freq)`, or `(2, n_path, n_freq)` for v6 files
 - **`aod`** — Departure azimuth angles; list of length `n_out`; entries `(n_path,)`
