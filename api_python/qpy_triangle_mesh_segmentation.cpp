@@ -24,7 +24,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_propR = 
+triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
     quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
 ```
 

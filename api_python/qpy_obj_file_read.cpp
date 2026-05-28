@@ -28,14 +28,14 @@ Read a Wavefront .obj file and extract geometry and material information
 ## Usage:
 ```
 # Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = 
+mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = \
     quadriga_lib.RTtools.obj_file_read( fn )
 
 # Return as tuple with 9 elements
-data = RTtools.obj_file_read( fn )
+data = quadriga_lib.RTtools.obj_file_read( fn )
 
 # Use a custom material definition file
-data = RTtools.obj_file_read( fn, materials_csv )
+data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
 ```
 
 ## Inputs:
