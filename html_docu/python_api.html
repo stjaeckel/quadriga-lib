@@ -2476,7 +2476,7 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 <li><b><code>orig</code></b> — TX positions; <code>(n_pos, 3)</code></li>
 <li><b><code>dest</code></b> — RX positions; <code>(n_pos, 3)</code></li>
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code>; <code>(n_mesh, 9)</code></li>
-<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, 9)</code></li>
+<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, n_param)</code></li>
 <li><b><code>center_frequency</code></b> — Center frequency</li>
 <li><b><code>lod</code></b> <i>(optional)</i> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a></li>
 <li><b><code>verbose</code></b> <i>(optional)</i> — Verbosity level</li>
@@ -3321,7 +3321,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
 <li><b><code>triangles</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>(n_mesh, 9)</code></li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024</li>
 <li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count is rounded up to a multiple of this value; default: 1</li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, 9)</code></li>
+<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, n_param)</code></li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -3329,7 +3329,7 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
 <li><b><code>triangles_out</code></b> — Reordered and padded triangle vertices; <code>(n_triangles_out, 9)</code></li>
 <li><b><code>sub_mesh_index</code></b> — 0-based start indices of sub-meshes in <code>triangles_out</code>; uint32; <code>(n_sub,)</code></li>
 <li><b><code>mesh_index</code></b> — 1-based mapping from original to reorganized mesh (0 = padding); uint32; <code>(n_triangles_out, )</code></li>
-<li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>(n_triangles_out, 9)</code></li>
+<li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>(n_triangles_out, n_param)</code></li>
 </ul>
 
     <!-- CONTENT END -->

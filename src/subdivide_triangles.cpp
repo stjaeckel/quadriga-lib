@@ -29,11 +29,11 @@ arma::uword quadriga_lib::subdivide_triangles(
 ## Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_triangles_in, 9]`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_triangles_in, n_param]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, 9]`
+- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, n_param]`
 
 ## Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -63,17 +63,18 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
         triangles_out->set_size(n_triangles_out, 9);
 
     bool process_mtl_prop = (mtl_prop != nullptr) && (mtl_prop_out != nullptr) && (mtl_prop->n_elem != 0);
+    arma::uword n_mtl_cols = process_mtl_prop ? mtl_prop->n_cols : 0;
 
     if (process_mtl_prop)
     {
-        if (mtl_prop->n_cols != 9)
-            throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
+        if (mtl_prop->n_cols < 1)
+            throw std::invalid_argument("Input 'mtl_prop' must have at least 1 column.");
 
         if (mtl_prop->n_rows != n_triangles_in)
             throw std::invalid_argument("Number of rows in 'triangles_in' and 'mtl_prop' dont match.");
 
-        if (mtl_prop_out->n_cols != 9 || mtl_prop_out->n_rows != n_triangles_out)
-            mtl_prop_out->set_size(n_triangles_out, 9);
+        if (mtl_prop_out->n_cols != n_mtl_cols || mtl_prop_out->n_rows != n_triangles_out)
+            mtl_prop_out->set_size(n_triangles_out, n_mtl_cols);
     }
 
     // Process each triangle
@@ -83,6 +84,12 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
     dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
     const dtype *p_mtl_prop = process_mtl_prop ? mtl_prop->memptr() : nullptr;
     dtype *p_mtl_prop_out = process_mtl_prop ? mtl_prop_out->memptr() : nullptr;
+
+    auto copy_mtl = [&](arma::uword src, arma::uword dst)
+    {
+        for (arma::uword k = 0; k < n_mtl_cols; ++k)
+            p_mtl_prop_out[dst + k * n_triangles_out] = p_mtl_prop[src + k * n_triangles_in];
+    };
 
     for (arma::uword n = 0; n < n_triangles_in; ++n)
     {
@@ -96,21 +103,6 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
         dtype e13x = p_triangles_in[n + 6 * n_triangles_in] - v1x;
         dtype e13y = p_triangles_in[n + 7 * n_triangles_in] - v1y;
         dtype e13z = p_triangles_in[n + 8 * n_triangles_in] - v1z;
-
-        // Read current material
-        dtype mtl[9];
-        if (process_mtl_prop)
-        {
-            mtl[0] = p_mtl_prop[n];
-            mtl[1] = p_mtl_prop[n + n_triangles_in];
-            mtl[2] = p_mtl_prop[n + 2 * n_triangles_in];
-            mtl[3] = p_mtl_prop[n + 3 * n_triangles_in];
-            mtl[4] = p_mtl_prop[n + 4 * n_triangles_in];
-            mtl[5] = p_mtl_prop[n + 5 * n_triangles_in];
-            mtl[6] = p_mtl_prop[n + 6 * n_triangles_in];
-            mtl[7] = p_mtl_prop[n + 7 * n_triangles_in];
-            mtl[8] = p_mtl_prop[n + 8 * n_triangles_in];
-        }
 
         for (arma::uword u = 0; u < n_div; ++u)
         {
@@ -139,17 +131,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
 
                 // Material
                 if (process_mtl_prop)
-                {
-                    p_mtl_prop_out[cnt] = mtl[0];
-                    p_mtl_prop_out[cnt + n_triangles_out] = mtl[1];
-                    p_mtl_prop_out[cnt + 2 * n_triangles_out] = mtl[2];
-                    p_mtl_prop_out[cnt + 3 * n_triangles_out] = mtl[3];
-                    p_mtl_prop_out[cnt + 4 * n_triangles_out] = mtl[4];
-                    p_mtl_prop_out[cnt + 5 * n_triangles_out] = mtl[5];
-                    p_mtl_prop_out[cnt + 6 * n_triangles_out] = mtl[6];
-                    p_mtl_prop_out[cnt + 7 * n_triangles_out] = mtl[7];
-                    p_mtl_prop_out[cnt + 8 * n_triangles_out] = mtl[8];
-                }
+                    copy_mtl(n, cnt);
 
                 ++cnt;
 
@@ -172,17 +154,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
 
                     // Material
                     if (process_mtl_prop)
-                    {
-                        p_mtl_prop_out[cnt] = mtl[0];
-                        p_mtl_prop_out[cnt + n_triangles_out] = mtl[1];
-                        p_mtl_prop_out[cnt + 2 * n_triangles_out] = mtl[2];
-                        p_mtl_prop_out[cnt + 3 * n_triangles_out] = mtl[3];
-                        p_mtl_prop_out[cnt + 4 * n_triangles_out] = mtl[4];
-                        p_mtl_prop_out[cnt + 5 * n_triangles_out] = mtl[5];
-                        p_mtl_prop_out[cnt + 6 * n_triangles_out] = mtl[6];
-                        p_mtl_prop_out[cnt + 7 * n_triangles_out] = mtl[7];
-                        p_mtl_prop_out[cnt + 8 * n_triangles_out] = mtl[8];
-                    }
+                        copy_mtl(n, cnt);
 
                     ++cnt;
                 }

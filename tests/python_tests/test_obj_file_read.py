@@ -46,6 +46,13 @@ def create_cube_with_materials(obj_file, mtl1, mtl2=None):
         f.write("f 5 1 2\n")
 
 
+def row_matches(mtl_prop, row, expected, decimal=14):
+    """Compare a (possibly trimmed) mtl_prop row against an expected vector.
+    The expected is truncated to the actual width of mtl_prop."""
+    w = mtl_prop.shape[1]
+    npt.assert_almost_equal(mtl_prop[row, :], np.asarray(expected, dtype=float)[:w], decimal=decimal)
+
+
 def cleanup(fn, csv_fn):
     if os.path.isfile(fn):
         os.remove(fn)
@@ -145,7 +152,7 @@ class test_case(unittest.TestCase):
         ) = quadriga_lib.RTtools.obj_file_read(fn)
 
         assert mesh.shape == (12, 9)
-        assert mtl_prop.shape == (12, 9)
+        assert mtl_prop.shape == (12, 1)  # vacuum scene → only col 0 (a) survives the trim
         assert vert_list.shape == (8, 3)
         assert face_ind.shape == (12, 3)
         assert obj_ind.shape == (12,)
@@ -161,9 +168,7 @@ class test_case(unittest.TestCase):
         npt.assert_(obj_ind.dtype == np.int64)
         npt.assert_(mtl_ind.dtype == np.int64)
 
-        npt.assert_(np.all(mtl_prop[:, 0] == 1.0))
-        npt.assert_(np.all(mtl_prop[:, 1:8] == 0.0))
-        npt.assert_(np.all(mtl_prop[:, 8] == 1.0))  # fRef defaults to 1 GHz
+        npt.assert_(np.all(mtl_prop[:, 0] == 1.0))  # a = 1 for vacuum (other cols cropped at defaults)
 
         npt.assert_almost_equal(vert_list, vert_list_correct, decimal=14)
         npt.assert_array_equal(face_ind, face_ind_correct)

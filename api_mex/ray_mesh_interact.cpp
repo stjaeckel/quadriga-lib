@@ -38,7 +38,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see `obj_file_read`; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; see `obj_file_read`; `[n_mesh, n_param]`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
 - **`trivec`** — Beam wavefront triangle vertices relative to origin; order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
 - **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`

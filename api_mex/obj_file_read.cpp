@@ -15,48 +15,79 @@ SECTION!*/
 Read a Wavefront .obj file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown or missing materials default to
-  `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (all
+  parameters at their defaults: ε_r = 1, σ = 0, all loss and resonance terms disabled)
 - Material name matching is case-sensitive
 - Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
 - Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef`<br>
-  - ε_r(f)  = a · (f/fRef)^b           (relative permittivity)<br>
-  - σ(f)    = c · (f/fRef)^d   [S/m]   (conductivity)<br>
-  - Att(f)  = att · (f/fRef)^attB [dB] (fixed penetration loss)<br>
-  - α(f)    = alpha · (f/fRef)^alphaB  [dB/m] (distance-dependent absorption)<br>
-  - Trailing fields are optional; defaults are `b = c = d = att = attB = alpha = alphaB = 0`, `fRef = 1` GHz
+- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef:m:resF:resQ:resS:coiF:coiQ:coiA`
+  - Trailing fields are optional; any omitted field falls back to its default (see the parameter table below)
+  - Example (only ε and conductivity): `usemtl Glass::6.31:0:0.0036:1.3394`
+- A material row has between 1 and 16 columns. Only column 0 (`a`) is required; every other column may be
+  omitted and is then substituted with its default. The columns split into three roles:
+  - **Interface reflection** (`a`, `b`, `c`, `d`, `resF`, `resQ`, `resS`) — set the complex permittivity ε, which
+    fixes the Fresnel reflection coefficient and therefore the room-side absorption `1 − abs(R)²`.
+    Applied once per surface hit, independent of path length.
+  - **Interface transmission** (`att`, `attB`, `coiF`, `coiQ`, `coiA`) — a lumped through-surface loss in dB,
+    applied once per transmission, independent of path length.
+  - **In-medium attenuation** (`c`, `d` via ε, `alpha`, `alphaB`, `m`) — loss accumulated along the path
+    traversed inside a body; depends on the in-medium distance.
+- Frequency laws (`f` in GHz; `f/fRef` is the relative frequency, but `resF` and `coiF` are absolute GHz):<br><br>
+  | Parameter  | Formula                                                      | Unit   | Meaning                                |
+  | ---------- | ------------------------------------------------------------ | ------ | -------------------------------------- |
+  | ε(f)       | `a·(f/fRef)^b + resS·resF² / (resF² − f² − i·(resF/resQ)·f)` | —      | relative permittivity (complex)        |
+  | σ(f)       | `c·(f/fRef)^d`                                               | [S/m]  | conductivity                           |
+  | att(f)     | `att·(f/fRef)^attB + coiA / (1 + (coiQ·(f − coiF)/coiF)²)`   | [dB]   | per-interface transmission loss        |
+  | α(f)       | `alpha·(f/fRef)^alphaB`                                      | [dB/m] | in-medium loss × in-medium path length |
+  | mass(f, L) | `max(0, m·log10((f/fRef)·L))`                                | [dB]   | in-medium, L = path length in metres   |
+- **Permittivity resonance** (`resF`, `resQ`, `resS`): a Lorentz pole that adds a peak to absorption (acoustic α) 
+  and a feature to reflection near `resF`; `resQ` sets sharpness (higher = narrower). Active only when `resF > 0` and
+  `resS ≠ 0`. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).
+- **Coincidence term** (`coiF`, `coiQ`, `coiA`): a Lorentzian added to the transmission loss at `coiF`. 
+  Negative `coiA` produces a transmission dip (acoustic coincidence / pass-band); positive `coiA` produces 
+  a stop-band. Total loss is clamped to ≥ 0. Active only when `coiF > 0` and `coiA ≠ 0`.
+- **Mass-law term** (`m`): a transmission loss that is logarithmic in both frequency and in-medium path 
+  length. `m = 20` reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 
+  0 (EM through-loss is the linear `alpha` term). The imaginary sign of the ε resonance follows the library's 
+  loss convention (consistent with σ).
 
 ## Usage:
 ```
 [ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
-    quadriga_lib.obj_file_read( fn );
-
-% Use a custom material definition file
-[ mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf ] = ...
-    quadriga_lib.obj_file_read( fn, materials_csv );
+    quadriga_lib.obj_file_read( fn, materials_csv, trim );
 ```
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file
-- **`materials_csv`** — Path to CSV file with custom material properties. Required columns: `name`, `a`. 
-  Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`. Column order is flexible; 
-  missing optional columns default to `0` (`fRef` → `1`). If empty, ITU-R P.2040-3 defaults are used.
+- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
+  Required columns: `name`, `a`. Optional columns (any order, any subset):
+  `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`, `m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`.
+  Missing optional columns and empty cells fall back to per-column defaults (`a` → 1, `fRef` → 1, all others → 0).
+  If empty, ITU-R P.2040-3 defaults are used.
+- **`trim`** *(optional, default = `true`)* — If `true`, `mtl_prop` is trimmed to the smallest width 
+  that captures all non-default parameter values in the scene; if `false`, all 16 columns are returned.
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; `[n_mesh, 9]`; Columns:<br><br>
-  | Index | Symbol | Property                                      |
-  | :---: | :----: | --------------------------------------------- |
-  | 1     | a      | ε_r at fRef                                   |
-  | 2     | b      | Frequency exponent for ε_r                    |
-  | 3     | c      | σ at fRef [S/m]                               |
-  | 4     | d      | Frequency exponent for σ                      |
-  | 5     | att    | Penetration loss at fRef [dB]                 |
-  | 6     | attB   | Frequency exponent for att                    |
-  | 7     | alpha  | Distance absorption at fRef [dB/m]            |
-  | 8     | alphaB | Frequency exponent for alpha                  |
-  | 9     | fRef   | Reference frequency [GHz]                     |
+- **`mtl_prop`** — Material properties; `[n_mesh, n_cols]` with `1 ≤ n_cols ≤ 16` (depends on `trim`). Columns:<br><br>
+  | Index | Symbol | Property                             | Units    | Default |
+  | :---: | :----: | ------------------------------------ | :------: | :-----: |
+  | 1     | a      | ε_r at fRef                          | —        | 1.0     |
+  | 2     | b      | Frequency exponent for ε_r           | —        | 0       |
+  | 3     | c      | σ at fRef                            | S/m      | 0       |
+  | 4     | d      | Frequency exponent for σ             | —        | 0       |
+  | 5     | att    | Penetration loss at fRef             | dB       | 0       |
+  | 6     | attB   | Frequency exponent for att           | —        | 0       |
+  | 7     | alpha  | In-medium absorption at fRef         | dB/m     | 0       |
+  | 8     | alphaB | Frequency exponent for alpha         | —        | 0       |
+  | 9     | fRef   | Reference frequency                  | GHz      | 1.0     |
+  | 10    | m      | Mass-law transmission slope          | dB/decade| 0       |
+  | 11    | resF   | Permittivity resonance frequency     | GHz      | 0       |
+  | 12    | resQ   | Permittivity resonance quality factor| —        | 0       |
+  | 13    | resS   | Permittivity resonance strength      | —        | 0       |
+  | 14    | coiF   | Coincidence frequency                | GHz      | 0       |
+  | 15    | coiQ   | Coincidence quality factor           | —        | 0       |
+  | 16    | coiA   | Coincidence loss amplitude           | dB       | 0       |
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** — 1-based indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
 - **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
@@ -85,7 +116,7 @@ Read a Wavefront .obj file and extract geometry and material information
    | 17    | Transmission              | 0–1   | 0.0     |
 
 ## Default material table:
-- For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:<br><br>
+- Built-in materials use only columns 1–5 (`a`, `b`, `c`, `d`, `att`); `attB = alpha = alphaB = 0`, `fRef = 1 GHz`, and all extended parameters (`m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`) = 0. A scene using only built-in materials with `trim = true` therefore yields a 5-column `mtl_prop` (4 columns if no material sets `att`; only `irr_glass` does).<br><br>
   | Name                  | a     | b      | c       | d      | att  | max fGHz |
   | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
@@ -122,7 +153,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs > 2 || nrhs < 1)
+    if (nrhs > 3 || nrhs < 1)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 9)
@@ -130,6 +161,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     std::string fn = qd_mex_get_string(prhs[0]);
     std::string materials_csv = (nrhs < 2) ? "" : qd_mex_get_string(prhs[1]);
+    bool trim = (nrhs < 3) ? true : (bool)mxGetScalar(prhs[2]);
 
     arma::mat mesh, mtl_prop, vert_list, bsdf;
     arma::umat face_ind;
@@ -137,7 +169,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::vector<std::string> obj_names, mtl_names;
 
     CALL_QD(quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind,
-                                                &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv));
+                                                &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv, trim));
 
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&mesh);

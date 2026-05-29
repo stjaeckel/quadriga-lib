@@ -8,6 +8,55 @@
 #define quadriga_lib_helper_H
 
 #include <cstring>
+#include <complex>
+
+// Material defaults (16 parameters)
+static constexpr double MTL_DEFAULT[16] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+// Helper thar reads a material either from a mtl_prop or default
+template <typename dtype>
+static inline double mtl_get(const arma::Mat<dtype> &ml_prop, arma::uword iM, arma::uword k)
+{
+    return (k < ml_prop.n_cols) ? (double)ml_prop.at(iM, k) : MTL_DEFAULT[k];
+}
+
+// Assemble complex-valued eta from mtl coefficients
+static inline std::complex<double> eta_from_coeffs(double a, double b, double c, double d, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double f_rel = fGHz / fRef;
+    double eta_r = a * std::pow(f_rel, b);
+    double sigma = c * std::pow(f_rel, d);
+    double eta_i = -17.98 * sigma / fGHz;
+    return std::complex<double>(eta_r, eta_i);
+}
+
+// Calculate in-medium loss
+static inline double medium_loss_dB(std::complex<double> eta, double alpha, double alphaB, double fRef, double fGHz, double dist)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double er = std::real(eta);
+    double tan_delta = std::imag(eta) / er;
+    double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
+    double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+    Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
+    double loss = dist * 8.686 / Delta;
+    loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
+    return loss;
+}
+
+// Calculate length
+template <typename dtype>
+static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
+{
+    dtype a = Dx - Ox;
+    dtype b = a * a;
+    a = Dy - Oy, b += a * a;
+    a = Dz - Oz, b += a * a;
+    return std::sqrt(b);
+}
 
 // Cross product
 template <typename dtype>
@@ -513,5 +562,8 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
         p_coeff_im[R] = (-re * sp + im * cp) * path_amplitude;
     }
 }
+
+
+
 
 #endif

@@ -320,14 +320,6 @@ class TestCalcDiffractionGain(unittest.TestCase):
             )
         self.assertIn("orig", str(ctx.exception).lower())
 
-    #  Error: wrong mtl_prop columns
-    def test_error_wrong_mtl_prop_columns(self):
-        with self.assertRaises(ValueError) as ctx:
-            RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_prop[:, :1], 1e9, lod=0
-            )
-        self.assertIn("9 columns", str(ctx.exception))
-
     #  Error: wrong mtl_prop rows
     def test_error_wrong_mtl_prop_rows(self):
         with self.assertRaises(ValueError) as ctx:

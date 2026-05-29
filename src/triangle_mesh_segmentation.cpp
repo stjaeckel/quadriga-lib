@@ -34,12 +34,12 @@ arma::uword triangle_mesh_segmentation(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
-- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_mesh, n_param]`
 
 ## Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, 9]`
+- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, n_param]`
 - **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
 
 ## Returns:
@@ -76,11 +76,12 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
         throw std::invalid_argument("Input 'vec_size' cannot be 0.");
 
     bool process_mtl_prop = (mtl_prop != nullptr) && (mtl_propR != nullptr) && (mtl_prop->n_elem != 0);
+    arma::uword n_mtl_cols = process_mtl_prop ? mtl_prop->n_cols : 0;
 
     if (process_mtl_prop)
     {
-        if (mtl_prop->n_cols != 9)
-            throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
+        if (mtl_prop->n_cols < 1)
+            throw std::invalid_argument("Input 'mtl_prop' must have at least 1 column.");
 
         if (mtl_prop->n_rows != mesh->n_rows)
             throw std::invalid_argument("Number of rows in 'mesh' and 'mtl_prop' dont match.");
@@ -202,7 +203,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
     dtype *p_mtl_out = nullptr;
     if (process_mtl_prop)
     {
-        mtl_propR->set_size(n_out, 9);
+        mtl_propR->set_size(n_out, n_mtl_cols);
         p_mtl_out = mtl_propR->memptr();
     }
 
@@ -228,7 +229,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
 
         // Copy material data
         if (process_mtl_prop)
-            for (arma::uword i_col = 0; i_col < 9; ++i_col)
+            for (arma::uword i_col = 0; i_col < n_mtl_cols; ++i_col)
             {
                 arma::uword offset_out = i_col * n_out + (arma::uword)p_sub_ind[i_sub];
                 arma::uword offset_in = i_col * n_mesh;
@@ -258,6 +259,7 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
             arma::uword i_start = (arma::uword)p_sub_ind[i_sub] + n_sub_faces;
             arma::uword i_end = (i_sub == n_sub - 1) ? n_out : (arma::uword)p_sub_ind[i_sub + 1];
 
+            // Geometry padding: dummy triangle collapsed to the AABB center
             for (arma::uword i_col = 0; i_col < 9; ++i_col)
                 for (arma::uword i_pad = i_start; i_pad < i_end; ++i_pad)
                 {
@@ -268,11 +270,15 @@ arma::uword quadriga_lib::triangle_mesh_segmentation(const arma::Mat<dtype> *mes
                         p_mesh_out[offset] = y;
                     else
                         p_mesh_out[offset] = z;
+                }
 
-                    if (process_mtl_prop && (i_col == 0 || i_col == 8))
-                        p_mtl_out[offset] = (dtype)1.0;
-                    else if (process_mtl_prop && i_col < 8)
-                        p_mtl_out[offset] = (dtype)0.0;
+            // Material padding: vacuum (a = fRef = 1, all other columns 0)
+            if (process_mtl_prop)
+                for (arma::uword i_col = 0; i_col < n_mtl_cols; ++i_col)
+                {
+                    dtype val = (i_col == 0 || i_col == 8) ? (dtype)1.0 : (dtype)0.0;
+                    for (arma::uword i_pad = i_start; i_pad < i_end; ++i_pad)
+                        p_mtl_out[i_col * n_out + i_pad] = val;
                 }
         }
     }

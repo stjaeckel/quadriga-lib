@@ -2,9 +2,8 @@
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
 // Part of quadriga-lib — see LICENSE for terms.
 
-#include <cstring> // For std::memcpy
-#include <complex>
 #include "quadriga_tools.hpp"
+#include "quadriga_lib_helper_functions.hpp"
 
 // FUNCTION: Number formatter
 static std::string MioNum(size_t number)
@@ -23,17 +22,6 @@ static std::string MioNum(size_t number)
     return str;
 }
 
-// FUNCTION: Calculate length
-template <typename dtype>
-static inline dtype calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
-{
-    dtype a = Dx - Ox;
-    dtype b = a * a;
-    a = Dy - Oy, b += a * a;
-    a = Dz - Oz, b += a * a;
-    return std::sqrt(b);
-}
-
 // FUNCTION: Check if materials are the same
 template <typename dtype>
 static inline bool same_materials(const arma::Mat<dtype> *mtl_prop, unsigned iMa, unsigned iMb)
@@ -48,9 +36,11 @@ static inline bool same_materials(const arma::Mat<dtype> *mtl_prop, unsigned iMa
     unsigned iFBS = iMa - 1, iSBS = iMb - 1;
     const dtype *p_mtl_prop = mtl_prop->memptr();
 
-    for (unsigned k = 0; k < 9; ++k)
+    unsigned n_cols = (unsigned)mtl_prop->n_cols;
+    for (unsigned k = 0; k < n_cols; ++k)
         if (p_mtl_prop[iFBS + k * n_mesh] != p_mtl_prop[iSBS + k * n_mesh])
             return false;
+
     return true;
 }
 
@@ -65,7 +55,6 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop,
         return (dtype)0.0;
 
     unsigned iFBS = iMa - 1, iSBS = iMb - 1;
-    const dtype *p_mtl_prop = mtl_prop->memptr();
 
     // Convert to double
     double dTheta = (double)theta;
@@ -84,22 +73,23 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop,
     {
         if (dTheta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
         {
-            kS1 = (double)p_mtl_prop[iFBS];
-            kS2 = (double)p_mtl_prop[iFBS + n_mesh];
-            kS3 = (double)p_mtl_prop[iFBS + 2 * n_mesh];
-            kS4 = (double)p_mtl_prop[iFBS + 3 * n_mesh];
-            double att = (double)p_mtl_prop[iFBS + 4 * n_mesh];
-            double attB = (double)p_mtl_prop[iFBS + 5 * n_mesh];
-            kS_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh];
+            kS1 = mtl_get(*mtl_prop, iFBS, 0);
+            kS2 = mtl_get(*mtl_prop, iFBS, 1);
+            kS3 = mtl_get(*mtl_prop, iFBS, 2);
+            kS4 = mtl_get(*mtl_prop, iFBS, 3);
+            double att = mtl_get(*mtl_prop, iFBS, 4);
+            double attB = mtl_get(*mtl_prop, iFBS, 5);
+            kS_fRef = mtl_get(*mtl_prop, iFBS, 8);
             transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
         else // Ray hits back side of FBS face, set first material to object material
         {
-            kR1 = (double)p_mtl_prop[iFBS];
-            kR2 = (double)p_mtl_prop[iFBS + n_mesh];
-            kR3 = (double)p_mtl_prop[iFBS + 2 * n_mesh];
-            kR4 = (double)p_mtl_prop[iFBS + 3 * n_mesh];
-            kR_fRef = (double)p_mtl_prop[iFBS + 8 * n_mesh];
+            kR1 = mtl_get(*mtl_prop, iFBS, 0);
+            kR2 = mtl_get(*mtl_prop, iFBS, 1);
+            kR3 = mtl_get(*mtl_prop, iFBS, 2);
+            kR4 = mtl_get(*mtl_prop, iFBS, 3);
+            kR_fRef = mtl_get(*mtl_prop, iFBS, 8);
+            ;
         }
     }
 
@@ -107,31 +97,28 @@ static inline dtype transition_gain_linear(const arma::Mat<dtype> *mtl_prop,
     {
         if (dTheta >= 0.0) // SBS (front side) is hit first
         {
-            kR1 = (double)p_mtl_prop[iSBS];
-            kR2 = (double)p_mtl_prop[iSBS + n_mesh];
-            kR3 = (double)p_mtl_prop[iSBS + 2 * n_mesh];
-            kR4 = (double)p_mtl_prop[iSBS + 3 * n_mesh];
-            kR_fRef = (double)p_mtl_prop[iSBS + 8 * n_mesh];
+            kR1 = mtl_get(*mtl_prop, iSBS, 0);
+            kR2 = mtl_get(*mtl_prop, iSBS, 1);
+            kR3 = mtl_get(*mtl_prop, iSBS, 2);
+            kR4 = mtl_get(*mtl_prop, iSBS, 3);
+            kR_fRef = mtl_get(*mtl_prop, iSBS, 8);
         }
         else // FBS (back side) is hit first
         {
-            kS1 = (double)p_mtl_prop[iSBS];
-            kS2 = (double)p_mtl_prop[iSBS + n_mesh];
-            kS3 = (double)p_mtl_prop[iSBS + 2 * n_mesh];
-            kS4 = (double)p_mtl_prop[iSBS + 3 * n_mesh];
-            double att = (double)p_mtl_prop[iSBS + 4 * n_mesh];
-            double attB = (double)p_mtl_prop[iSBS + 5 * n_mesh];
-            kS_fRef = (double)p_mtl_prop[iSBS + 8 * n_mesh];
+            kS1 = mtl_get(*mtl_prop, iSBS, 0);
+            kS2 = mtl_get(*mtl_prop, iSBS, 1);
+            kS3 = mtl_get(*mtl_prop, iSBS, 2);
+            kS4 = mtl_get(*mtl_prop, iSBS, 3);
+            double att = mtl_get(*mtl_prop, iSBS, 4);
+            double attB = mtl_get(*mtl_prop, iSBS, 5);
+            kS_fRef = mtl_get(*mtl_prop, iSBS, 8);
             transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
     }
 
     // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
-    double f1_rel = fGHz / kR_fRef;
-    double f2_rel = fGHz / kS_fRef;
-    double scl = -17.98 / fGHz;
-    std::complex<double> eta1(kR1 * std::pow(f1_rel, kR2), scl * kR3 * std::pow(f1_rel, kR4));
-    std::complex<double> eta2(kS1 * std::pow(f2_rel, kS2), scl * kS3 * std::pow(f2_rel, kS4));
+    std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, (double)fGHz);
+    std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz);
     bool dense_to_light = std::real(eta1) > std::real(eta2);
 
     double reflection_gain = 0.0;
@@ -192,7 +179,7 @@ void calc_diffraction_gain(
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, 9]`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, n_param]`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** *(optional)* — Verbosity level
@@ -241,8 +228,8 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mtl_prop->n_cols != 9)
-        throw std::invalid_argument("Input 'mtl_prop' must have 9 columns.");
+    if (mtl_prop->n_cols < 1)
+        throw std::invalid_argument("Input 'mtl_prop' must have at least 1 column.");
 
     const arma::uword n_pos = orig->n_rows;  // Number of positions
     const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
@@ -442,7 +429,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
 
                 if (nH == 0 && RS != 0) // Entire ray is inside the object
                 {
-                    dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                    dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                     power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                 }
                 else if (nH == 0) // Entire ray is outside
@@ -454,7 +441,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                 {
                     if (RS == 0) // State (o) + o-i transition
                     {
-                        dtype dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                        dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                         dist = dist > ray_offset ? dist - ray_offset : dist;
                         power *= interaction_gain * quadriga_lib::medium_gain(*mtl_prop, arma::uword(iM1 - 1), dist, center_frequency);
                         p_ray_state[iG] = iM1; // Change state to inside
@@ -462,7 +449,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     else // State (i) + o-i transition, Overlapping mesh
                     {
                         // Ignore o-i transition @ FBS, Entire ray is inside material 1
-                        dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                         power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                         p_next_transition[iG] = iM1;
                     }
@@ -484,16 +471,16 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     {
                         if (same_materials(mtl_prop, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
                         {
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency); // M1 medium defined by RS
                             p_next_transition[iG] = 0;                                                                  // Clear next transition buffer
                         }
                         else
                         {
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                             power *= transition_gain_linear(mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
-                            dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(NT - 1), dist, center_frequency);
                             p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                             p_next_transition[iG] = 0; // Clear next transition buffer
@@ -501,7 +488,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     }
                     else if (nH == 2) // Material is in buffer, Double hit, State (i) + virtual ii-oo transition from M1 to Air
                     {
-                        dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                         power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                         power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
                         p_ray_state[iG] = 0;       // Change state to outside
@@ -526,7 +513,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     }
                     else // Double hit, (i) + o-i-o, overlapping mesh
                     {
-                        dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                         power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency); // M1 medium defined by RS
                         p_next_transition[iG] = iM1;
 
@@ -563,7 +550,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     }
                     else if (RS != 0) // Ray state in buffer, state (i) + virtual i-i + i-o
                     {
-                        dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                         if (same_materials(mtl_prop, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
                         {
                             // Add in-medium loss for medium 1 (from Orig to Dest), M1 medium defined by RS
@@ -603,7 +590,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         {
                             // Medium loss of segment 1 already included in interaction_gain, segment 2 must be added
                             unsigned iM = (typeH == 5) ? iM2 : iM1; // If back wall was hit first, use SBS material
-                            dtype dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= interaction_gain * quadriga_lib::medium_gain(*mtl_prop, arma::uword(iM - 1), dist - ray_offset, center_frequency);
 
                             p_ray_state[iG] = iM; // Update ray state
@@ -612,7 +599,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     else if (NT != 0)
                     {
                         // Continue in medium defined by RS
-                        dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                         power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
 
                         // Swap the material stored in NT
@@ -633,15 +620,15 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         if (same_materials(mtl_prop, iM1, iM2)) // Ignore hit
                         {
                             // Add in-medium loss for medium 1 (from Orig to Dest)
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                         }
                         else // Add i-i transition
                         {
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                             power *= transition_gain_linear(mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
-                            dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(iM1 - 1), dist, center_frequency);
                             p_ray_state[iG] = iM1; // Continue in M1
                         }
@@ -654,7 +641,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         power *= interaction_gain;
 
                         // Account for floating point precision
-                        dtype dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
+                        dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
                         p_ray_state[iG] = (dist > 1.0e-6) ? iM2 : 0; // Continue inside material defined by SBS
                     }
                     else // Indoor state
@@ -662,13 +649,13 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                         if (same_materials(mtl_prop, iM1, iM2)) // Ignore hit
                         {
                             // Add in-medium loss for medium 1 (from Orig to Dest)
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                         }
                         else // Add i-i transition
                         {
                             // Medium loss of segment 1 already included in interaction_gain
-                            dtype dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                            dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(iM2 - 1), dist - ray_offset, center_frequency);
                             p_ray_state[iG] = iM2; // Update ray state
                         }
@@ -702,7 +689,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                     {
                         if (typeH == 1 || typeH == 7 || typeH == 13) // State (i) + o-i transition, Overlapping mesh
                         {
-                            dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist + ray_offset, center_frequency);
                             p_next_transition[iG] = iM1;
                         }
@@ -715,7 +702,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             }
                             else // Material is in buffer, State (i) + virtual i-i transition
                             {
-                                dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 if (same_materials(mtl_prop, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
                                 {
                                     // Add in-medium loss for medium 1 (from Orig to Dest)
@@ -754,7 +741,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             }
                             else // Material in Buffer
                             {
-                                dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist, center_frequency);
                                 power *= transition_gain_linear(mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
                                 p_ray_state[iG] = 0;       // Change state to outside
@@ -770,7 +757,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             }
                             else if (NT == 0)
                             {
-                                dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 if (same_materials(mtl_prop, iM1, iM2)) // Ignore hit
                                 {
                                     // Add in-medium loss for medium 1 (from Orig to Dest)
@@ -786,7 +773,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                             }
                             else if (NT != 0) // Material is in buffer, State (i) + virtual i-i transition
                             {
-                                dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 if (same_materials(mtl_prop, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
                                 {
                                     power *= quadriga_lib::medium_gain(*mtl_prop, arma::uword(RS - 1), dist + ray_offset, center_frequency);
@@ -809,12 +796,12 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig, const arm
                                 power *= interaction_gain;
 
                                 // Account for floating point precision
-                                dtype dist = calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
+                                dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
                                 p_ray_state[iG] = (dist > 1.0e-6) ? iM2 : 0; // Continue inside material defined by SBS
                             }
                             else if (NT == 0)
                             {
-                                dtype dist = calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
+                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 if (same_materials(mtl_prop, iM1, iM2)) // Ignore hit
                                 {
                                     // Add in-medium loss for medium 1 (from Orig to Dest)

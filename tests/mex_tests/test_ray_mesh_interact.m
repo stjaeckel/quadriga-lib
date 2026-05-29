@@ -324,11 +324,11 @@ catch ME
     end
 end
 
-try % wrong mesh
-    quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, mesh, mtl_prop(:,1), fbs_ind, sbs_ind );
+try % wrong mtl_prop
+    quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, mesh, [], fbs_ind, sbs_ind );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''mtl_prop'' must have 9 columns.';
+    expectedErrorMessage = 'Input ''mtl_prop'' must have at least 1 column.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

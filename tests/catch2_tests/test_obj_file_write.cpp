@@ -39,6 +39,15 @@ static inline arma::mat make_mesh(const arma::mat &V, const arma::umat &F)
     return arma::join_rows(V.rows(F.col(0)), V.rows(F.col(1)), V.rows(F.col(2)));
 }
 
+// Compare a cropped mtl_prop row against an expected 9-element row by trimming
+// the expectation to the actual width of mtl_prop.
+static inline bool row_matches(const arma::mat &mtl_prop, arma::uword row,
+                               const arma::mat &expected_9, double tol = 1e-14)
+{
+    arma::uword w = mtl_prop.n_cols;
+    return arma::approx_equal(mtl_prop.row(row), expected_9.cols(0, w - 1), "absdiff", tol);
+}
+
 TEST_CASE("Test OBJ File Write - Mesh round-trip (geometry only)")
 {
     arma::mat V = cube_vertices();
@@ -144,8 +153,9 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
 
         arma::mat concrete = {{5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}};
         arma::mat wood = {{1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), concrete, "absdiff", 1e-12));
-        CHECK(arma::approx_equal(mtl_prop.row(4), wood, "absdiff", 1e-12));
+
+        CHECK(row_matches(mtl_prop, 0, concrete));
+        CHECK(row_matches(mtl_prop, 4, wood));
 
         CHECK(arma::all(mtl_ind_rd.subvec(0, 3) == 1U));
         CHECK(arma::all(mtl_ind_rd.subvec(4, 11) == 2U));
@@ -171,7 +181,7 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
         CHECK(mtl_names_rd[0] == "glass::6.0:0:0.1:1.2");
 
         arma::mat glass = {{6.0, 0.0, 0.1, 1.2, 0.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), glass, "absdiff", 1e-12));
+        CHECK(row_matches(mtl_prop, 0, glass));
         CHECK(arma::all(mtl_ind_rd == 1U));
 
         std::remove("cube.obj");
@@ -191,19 +201,19 @@ TEST_CASE("Test OBJ File Write - BSDF round-trip")
     std::vector<std::string> mtl_names = {"painted"};
 
     // Distinct, non-default values; clamped fields kept inside [0, 1], ior in a sane range
-    arma::mat bsdf = {{0.1, 0.2, 0.3,         // base color RGB
-                       0.7,                   // transparency (d)
-                       0.4,                   // roughness (Pr)
-                       0.6,                   // metallic (Pm)
-                       1.7,                   // ior (Ni)
-                       0.8,                   // specular (Ks)
-                       0.05, 0.15, 0.25,      // emission RGB (Ke)
-                       0.3,                   // sheen (Ps)
-                       0.35,                  // clearcoat (Pc)
-                       0.45,                  // clearcoat roughness (Pcr)
-                       0.55,                  // anisotropic (aniso)
-                       0.65,                  // anisotropic rotation (anisor)
-                       0.9}};                 // transmission (Tf)
+    arma::mat bsdf = {{0.1, 0.2, 0.3,    // base color RGB
+                       0.7,              // transparency (d)
+                       0.4,              // roughness (Pr)
+                       0.6,              // metallic (Pm)
+                       1.7,              // ior (Ni)
+                       0.8,              // specular (Ks)
+                       0.05, 0.15, 0.25, // emission RGB (Ke)
+                       0.3,              // sheen (Ps)
+                       0.35,             // clearcoat (Pc)
+                       0.45,             // clearcoat roughness (Pcr)
+                       0.55,             // anisotropic (aniso)
+                       0.65,             // anisotropic rotation (anisor)
+                       0.9}};            // transmission (Tf)
 
     arma::mat vlo;
     arma::umat fio;

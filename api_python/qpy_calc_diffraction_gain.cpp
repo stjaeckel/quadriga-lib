@@ -35,7 +35,7 @@ gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_
 - **`orig`** — TX positions; `(n_pos, 3)`
 - **`dest`** — RX positions; `(n_pos, 3)`
 - **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `(n_mesh, 9)`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `(n_mesh, 9)`
+- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `(n_mesh, n_param)`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
 - **`verbose`** *(optional)* — Verbosity level
