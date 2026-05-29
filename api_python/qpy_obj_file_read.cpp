@@ -123,14 +123,15 @@ data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
 - [[mitsuba_xml_file_write]] (for exporting to Mitsuba scene file format)
 MD!*/
 
-py::tuple obj_file_read(const std::string &fn, const std::string &materials_csv)
+py::tuple obj_file_read(const std::string &fn, const std::string &materials_csv, bool trim)
 {
     arma::mat mesh, mtl_prop, vert_list, bsdf;
     arma::umat face_ind;
     arma::uvec obj_ind, mtl_ind;
     std::vector<std::string> obj_names, mtl_names;
 
-    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &bsdf, materials_csv);
+    quadriga_lib::obj_file_read<double>(fn, &mesh, &mtl_prop, &vert_list, &face_ind, &obj_ind, &mtl_ind,
+                                        &obj_names, &mtl_names, &bsdf, materials_csv, trim);
 
     auto mesh_p = qd_python_copy2numpy(&mesh);
     auto mtl_prop_p = qd_python_copy2numpy(&mtl_prop);

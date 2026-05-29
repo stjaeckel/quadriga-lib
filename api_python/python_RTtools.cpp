@@ -52,7 +52,8 @@ void quadriga_lib_RTtools(py::module_ &m)
 
     m.def("obj_file_read", &obj_file_read,
           py::arg("fn"),
-          py::arg("materials_csv") = "");
+          py::arg("materials_csv") = "",
+          py::arg("trim") = true);
 
     m.def("obj_file_write", &obj_file_write,
           py::arg("fn") = "",

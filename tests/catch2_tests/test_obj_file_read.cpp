@@ -49,6 +49,15 @@ static inline bool my_fancy_cube(std::string fn, std::string mtl_name = "", std:
     return false;
 }
 
+// Compare a cropped mtl_prop row against an expected 9-element row by trimming
+// the expectation to the actual width of mtl_prop.
+static inline bool row_matches(const arma::mat &mtl_prop, arma::uword row,
+                               const arma::mat &expected_9, double tol = 1e-14)
+{
+    arma::uword w = mtl_prop.n_cols;
+    return arma::approx_equal(mtl_prop.row(row), expected_9.cols(0, w - 1), "absdiff", tol);
+}
+
 TEST_CASE("Test OBJ File Read - Simple test")
 {
     REQUIRE(my_fancy_cube("cube.obj"));
@@ -104,7 +113,7 @@ TEST_CASE("Test OBJ File Read - Simple test")
     CHECK(mesh.n_cols == 9);
 
     CHECK(mtl_prop.n_rows == 12);
-    CHECK(mtl_prop.n_cols == 9);
+    CHECK(mtl_prop.n_cols == 1); // vacuum scene → only column 0 (a) survives the crop
 
     CHECK(vert_list.n_rows == 8);
     CHECK(vert_list.n_cols == 3);
@@ -119,8 +128,7 @@ TEST_CASE("Test OBJ File Read - Simple test")
     CHECK(mtl_names.empty());
 
     CHECK(arma::all(mtl_prop.col(0) == 1.0));
-    CHECK(arma::all(arma::all(mtl_prop.cols(1, 7) == 0.0)));
-    CHECK(arma::all(mtl_prop.col(8) == 1.0));
+    // cols 1..15 cropped away (all at defaults) — consumers default them
 
     CHECK(arma::approx_equal(vert_list, vert_list_correct, "absdiff", 1e-14));
     CHECK(arma::approx_equal(face_ind, face_ind_correct_u32, "absdiff", 1e-14));
@@ -143,7 +151,7 @@ TEST_CASE("Test OBJ File Read - Materials")
     mtl_correct = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     REQUIRE(my_fancy_cube("cube.obj", "air"));
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
-    CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 0, mtl_correct));
     CHECK(mtl_names[0] == "air");
     CHECK(arma::all(mtl_ind == 1U));
 
@@ -152,12 +160,12 @@ TEST_CASE("Test OBJ File Read - Materials")
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
 
     mtl_correct = {{5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 0, mtl_correct));
     CHECK(mtl_names[0] == "itu_concrete");
     CHECK(mtl_ind(0) == 1U);
 
     mtl_correct = {{1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 4, mtl_correct));
     CHECK(mtl_names[1] == "itu_wood");
     CHECK(mtl_ind(4) == 2U);
 
@@ -166,11 +174,11 @@ TEST_CASE("Test OBJ File Read - Materials")
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
 
     mtl_correct = {{3.91, 0.0, 0.0238, 0.16, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 0, mtl_correct));
     CHECK(mtl_names[0] == "itu_brick.001");
 
     mtl_correct = {{1.0, 0.0, 1.0e7, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 4, mtl_correct));
     CHECK(mtl_names[1] == "itu_metal.shiny.001");
 
     // Custom materials
@@ -178,12 +186,12 @@ TEST_CASE("Test OBJ File Read - Materials")
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
 
     mtl_correct = {{1.1, 0.1, 0.2, -3.0, 20.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 0, mtl_correct));
     CHECK(mtl_names[0] == "itu_brick.001::1.1:0.1:0.2:-3:20");
     CHECK(mtl_ind(0) == 1U);
 
     mtl_correct = {{5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 4, mtl_correct));
     CHECK(mtl_names[1] == "something_new::5");
     CHECK(mtl_ind(4) == 2U);
 
@@ -192,7 +200,7 @@ TEST_CASE("Test OBJ File Read - Materials")
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, &mtl_prop, nullptr, nullptr, &obj_ind, &mtl_ind, nullptr, &mtl_names);
 
     mtl_correct = {{5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 4, mtl_correct));
     CHECK(mtl_names[1] == "something_new::5");
 
     REQUIRE(my_fancy_cube("cube.obj",
@@ -202,10 +210,10 @@ TEST_CASE("Test OBJ File Read - Materials")
                                         nullptr, &mtl_ind, nullptr, &mtl_names);
 
     mtl_correct = {{2.2, 0.05, 0.01, 0.7, 4.0, 0.3, 0.8, 0.2, 3.5}};
-    CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 0, mtl_correct));
 
     mtl_correct = {{6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 1.0}}; // fRef defaults to 1
-    CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct, "absdiff", 1e-14));
+    CHECK(row_matches(mtl_prop, 4, mtl_correct));
 
     std::remove("cube.obj");
 }
@@ -233,12 +241,12 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct_1 = {{2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct_1, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct_1));
         CHECK(mtl_names[0] == "custom_material_1");
         CHECK(mtl_ind(0) == 1U);
 
         arma::mat mtl_correct_2 = {{4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct_2, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 4, mtl_correct_2));
         CHECK(mtl_names[1] == "custom_material_2");
         CHECK(mtl_ind(4) == 2U);
 
@@ -263,11 +271,11 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct_1 = {{2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct_1, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct_1));
         CHECK(mtl_names[0] == "custom_material_1");
 
         arma::mat mtl_correct_2 = {{4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(4), mtl_correct_2, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 4, mtl_correct_2));
         CHECK(mtl_names[1] == "custom_material_2");
 
         std::remove("cube.obj");
@@ -310,7 +318,7 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct = {{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -365,7 +373,7 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct = {{4.5, 0.1, 0.02, 0.8, 3.0, 0.2, 0.5, 0.15, 2.4}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -388,7 +396,7 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct = {{3.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -410,7 +418,7 @@ TEST_CASE("Test OBJ File Read - Custom Materials csv")
                                             "custom_materials.csv");
 
         arma::mat mtl_correct = {{2.0, 0.0, 0.005, 0.0, 1.5, 0.0, 0.0, 0.0, 1.0}};
-        CHECK(arma::approx_equal(mtl_prop.row(0), mtl_correct, "absdiff", 1e-14));
+        CHECK(row_matches(mtl_prop, 0, mtl_correct));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");

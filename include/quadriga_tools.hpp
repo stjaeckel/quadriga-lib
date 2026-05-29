@@ -218,34 +218,20 @@ namespace quadriga_lib
                                 const arma::Mat<dtype> &bsdf = {},         // BSDF data, size [mtl_names.size(), 17]
                                 bool map_to_itu_materials = false);        // Optional mapping to ITU default materials used by Sionna
 
-    // Read Wavefront .obj file
-    // - See: https://en.wikipedia.org/wiki/Wavefront_.obj_file
-    // - 3D model must be triangularized
-    // - Material properties are encoded in the material name using the "usemtl [material name]" tag
-    // - Default material properties are taken from ITU-R P.2040-3, Table 3
-    // - Default materials: vacuum, air, itu_concrete, itu_brick, itu_plasterboard, itu_wood, itu_glass, itu_ceiling_board,
-    //                      itu_ceiling_board, itu_chipboard, itu_plywood, itu_marble, itu_metal, itu_very_dry_ground,
-    //                      itu_medium_dry_ground, itu_wet_ground, itu_vegetation, itu_water, itu_ice, irr_glass
-    // - Supported frequency range: 1 - 40 GHz (1 - 10 GHz for ground materials)
-    // - Custom materials can be defined by: "usemtl Name::A:B:C:D:att"
-    //          - Real part of relative permittivity "eta = A * fGHz ^ B"
-    //          - Conductivity "sigma = C * fGHz ^ D"
-    //          - att = Material penetration loss in dB (fixed loss per material interaction)
-    // - Unknown materials are treated as Vacuum
-    // - Returns number of mesh elements "n_mesh"
-    // - Attempts to change the size of the output if it does not have correct size already
+    // Read Wavefront .obj file — see obj_file_read documentation block for details.
     template <typename dtype>                                                // Supported types: float or double
     arma::uword obj_file_read(std::string fn,                                // File name
-                              arma::Mat<dtype> *mesh = nullptr,              // Faces of the triangular mesh, Size: [ n_mesh, 9 ]
-                              arma::Mat<dtype> *mtl_prop = nullptr,          // Material properties, Size: [ n_mesh, 5 ]
-                              arma::Mat<dtype> *vert_list = nullptr,         // List of vertices found in the OBJ file, Size: [ n_vert, 3 ]
-                              arma::umat *face_ind = nullptr,                // Vertex indices matching the corresponding mesh elements, 0-based, Size: [ n_mesh, 3 ]
-                              arma::uvec *obj_ind = nullptr,                 // Object index, 1-based, Size: [ n_mesh ]
-                              arma::uvec *mtl_ind = nullptr,                 // Material index, 1-based, Size: [ n_mesh ]
-                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [ max(obj_ind) ]
-                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [ max(mtl_ind) ]
-                              arma::Mat<dtype> *bsdf = nullptr,              // BSDF data from .MTL File, size [mtl_names.size, 15]
-                              const std::string &materials_csv = "");        // Location of the material parameter file
+                              arma::Mat<dtype> *mesh = nullptr,              // Triangle vertices, Size: [n_mesh, 9]
+                              arma::Mat<dtype> *mtl_prop = nullptr,          // Material properties, Size: [n_mesh, 1..16]
+                              arma::Mat<dtype> *vert_list = nullptr,         // Vertex list, Size: [n_vert, 3]
+                              arma::umat *face_ind = nullptr,                // 0-based vertex indices per face, Size: [n_mesh, 3]
+                              arma::uvec *obj_ind = nullptr,                 // 1-based object index, Size: [n_mesh]
+                              arma::uvec *mtl_ind = nullptr,                 // 1-based material index, Size: [n_mesh]
+                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [max(obj_ind)]
+                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [max(mtl_ind)]
+                              arma::Mat<dtype> *bsdf = nullptr,              // BSDF data from .mtl file, Size: [mtl_names.size, 17]
+                              const std::string &materials_csv = "",         // Optional material CSV file
+                              bool trim = true);                             // Trim mtl_prop to columns containing non-default values
 
     // Write Wavefront .obj file
     template <typename dtype>                                                // Supported types: float or double

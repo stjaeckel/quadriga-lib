@@ -34,13 +34,13 @@ triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
   near sqrt(n_mesh); default: 1024
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
   sub-mesh row count is rounded up to a multiple of this value; default: 1
-- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `(n_mesh, 9)`
+- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `(n_mesh, n_param)`
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
 - **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out, )`
-- **`mtl_prop_out`** — Reordered and padded material properties; `(n_triangles_out, 9)`
+- **`mtl_prop_out`** — Reordered and padded material properties; `(n_triangles_out, n_param)`
 MD!*/
 
 py::tuple triangle_mesh_segmentation(const py::array_t<double> &triangles, // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]

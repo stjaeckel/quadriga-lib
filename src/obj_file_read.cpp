@@ -17,12 +17,19 @@
 struct MaterialProp
 {
     std::string name;
-    double a, b, c, d;    // ε_r and σ models
-    double att, attB;     // Att(f)   = att   * (f/fRef)^attB   [dB]
-    double alpha, alphaB; // α(f)     = alpha * (f/fRef)^alphaB [dB/m]
-    double fRef;          // reference frequency [GHz], default 1.0
+    double a, b, c, d;
+    double att, attB;
+    double alpha, alphaB;
+    double fRef;
     arma::uword index;
+    double m = 0.0;
+    double resF = 0.0, resQ = 0.0, resS = 0.0;
+    double coiF = 0.0, coiQ = 0.0, coiA = 0.0;
 };
+
+// Material defaults (16 parameters)
+#define NO_MTL 16
+static constexpr double MTL_DEFAULT[NO_MTL] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 // Minimal CSV parser for material properties
 // Required columns: name, a
@@ -96,12 +103,20 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
     Col col_alpha = make_opt("alpha", 0.0);
     Col col_alphaB = make_opt("alphaB", 0.0);
     Col col_fRef = make_opt("fRef", 1.0);
+    Col col_m = make_opt("m", 0.0);
+    Col col_resF = make_opt("resF", 0.0);
+    Col col_resQ = make_opt("resQ", 0.0);
+    Col col_resS = make_opt("resS", 0.0);
+    Col col_coiF = make_opt("coiF", 0.0);
+    Col col_coiQ = make_opt("coiQ", 0.0);
+    Col col_coiA = make_opt("coiA", 0.0);
 
     // Minimum required row width (covers all columns that *are* declared in the header)
     size_t max_idx = std::max(idx_name, idx_a);
-    for (const Col *c : {&col_b, &col_c, &col_d, &col_att, &col_attB, &col_alpha, &col_alphaB, &col_fRef})
-        if (c->present)
-            max_idx = std::max(max_idx, c->idx);
+    for (const Col *cc : {&col_b, &col_c, &col_d, &col_att, &col_attB, &col_alpha, &col_alphaB, &col_fRef,
+                          &col_m, &col_resF, &col_resQ, &col_resS, &col_coiF, &col_coiQ, &col_coiA})
+        if (cc->present)
+            max_idx = std::max(max_idx, cc->idx);
 
     // Check for duplicate names while parsing
     std::unordered_set<std::string> seen_names;
@@ -170,6 +185,13 @@ static inline std::vector<MaterialProp> parse_materials_csv(const std::string &f
             mat.alpha = parse_opt(col_alpha);
             mat.alphaB = parse_opt(col_alphaB);
             mat.fRef = parse_opt(col_fRef);
+            mat.m = parse_opt(col_m);
+            mat.resF = parse_opt(col_resF);
+            mat.resQ = parse_opt(col_resQ);
+            mat.resS = parse_opt(col_resS);
+            mat.coiF = parse_opt(col_coiF);
+            mat.coiQ = parse_opt(col_coiQ);
+            mat.coiA = parse_opt(col_coiA);
         }
         catch (const std::exception &)
         {
@@ -200,16 +222,34 @@ SECTION!*/
 Read a Wavefront .obj file and extract geometry and material information
 
 - Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
+- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (all
+  parameters at their defaults: ε_r = 1, σ = 0, all loss and resonance terms disabled)
 - Material name matching is case-sensitive
 - Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
 - Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef`<br>
-  - ε_r(f)   = a · (f/fRef)^b          (relative permittivity)<br>
-  - σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)<br>
-  - Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)<br>
-  - α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)<br>
-  - Trailing fields are optional; defaults are `b=c=d=att=attB=alpha=alphaB=0`, `fRef=1` GHz
+- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef:m:resF:resQ:resS:coiF:coiQ:coiA`
+  - Trailing fields are optional; any omitted field falls back to its default (see the parameter table below)
+  - Example (only ε and conductivity): `usemtl Glass::6.31:0:0.0036:1.3394`
+- A material row has between 1 and 16 columns. Only column 0 (`a`) is required; every other column may be
+  omitted and is then substituted with its default. The columns split into three roles:
+  - **Interface reflection** (`a`, `b`, `c`, `d`, `resF`, `resQ`, `resS`) — set the complex permittivity ε, which
+    fixes the Fresnel reflection coefficient and therefore the room-side absorption `1 − abs(R)²`.
+    Applied once per surface hit, independent of path length.
+  - **Interface transmission** (`att`, `attB`, `coiF`, `coiQ`, `coiA`) — a lumped through-surface loss in dB,
+    applied once per transmission, independent of path length.
+  - **In-medium attenuation** (`c`, `d` via ε, `alpha`, `alphaB`, `m`) — loss accumulated along the path
+    traversed inside a body; depends on the in-medium distance.
+- Frequency laws (`f` in GHz; `f/fRef` is the relative frequency, but `resF` and `coiF` are absolute GHz):<br><br>
+  | Parameter  | Formula                                                      | Unit   | Meaning                                |
+  | ---------- | ------------------------------------------------------------ | ------ | -------------------------------------- |
+  | ε(f)       | `a·(f/fRef)^b + resS·resF² / (resF² − f² − i·(resF/resQ)·f)` | —      | relative permittivity (complex)        |
+  | σ(f)       | `c·(f/fRef)^d`                                               | [S/m]  | conductivity                           |
+  | att(f)     | `att·(f/fRef)^attB + coiA / (1 + (coiQ·(f − coiF)/coiF)²)`   | [dB]   | per-interface transmission loss        |
+  | α(f)       | `alpha·(f/fRef)^alphaB`                                      | [dB/m] | in-medium loss × in-medium path length |
+  | mass(f, L) | `max(0, m·log10((f/fRef)·L))`                                | [dB]   | in-medium, L = path length in metres   |
+- **Permittivity resonance** (`resF`, `resQ`, `resS`): a Lorentz pole that adds a peak to absorption (acoustic α) and a feature to reflection near `resF`; `resQ` sets sharpness (higher = narrower). Active only when `resF > 0` and `resS ≠ 0`. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).
+- **Coincidence term** (`coiF`, `coiQ`, `coiA`): a Lorentzian added to the transmission loss at `coiF`. Negative `coiA` produces a transmission dip (acoustic coincidence / pass-band); positive `coiA` produces a stop-band. Total loss is clamped to ≥ 0. Active only when `coiF > 0` and `coiA ≠ 0`.
+- **Mass-law term** (`m`): a transmission loss that is logarithmic in both frequency and in-medium path length. `m = 20` reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 0 (EM through-loss is the linear `alpha` term). The imaginary sign of the ε resonance follows the library's loss convention (consistent with σ).
 
 ## Declaration:
 ```
@@ -224,62 +264,53 @@ arma::uword quadriga_lib::obj_file_read(
     std::vector<std::string> *obj_names = nullptr,
     std::vector<std::string> *mtl_names = nullptr,
     arma::Mat<dtype> *bsdf = nullptr,
-    const std::string &materials_csv = "");
+    const std::string &materials_csv = "",
+    bool trim = true);
 ```
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file
 - **`materials_csv`** — Path to CSV file with custom material properties.
-  Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
-  Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
+  Required column: `a`, plus `name`. Optional columns (any order, any subset):
+  `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`, `m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`.
+  Missing optional columns and empty cells fall back to the per-column defaults below (`a` → 1, `fRef` → 1, everything else → 0).
   If empty, ITU-R P.2040-3 defaults are used.
+- **`trim`** — If `true`, remove non-default columns from `mtl_prop`
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; `[n_mesh, 9]`; Columns:<br><br>
-  | Index | Symbol | Property                                      |
-  | :---: | :----: | --------------------------------------------- |
-  | 0     | a      | ε_r at fRef                                   |
-  | 1     | b      | Frequency exponent for ε_r                    |
-  | 2     | c      | σ at fRef [S/m]                               |
-  | 3     | d      | Frequency exponent for σ                      |
-  | 4     | att    | Penetration loss at fRef [dB]                 |
-  | 5     | attB   | Frequency exponent for att                    |
-  | 6     | alpha  | Distance absorption at fRef [dB/m]            |
-  | 7     | alphaB | Frequency exponent for alpha                  |
-  | 8     | fRef   | Reference frequency [GHz]                     |
+- **`mtl_prop`** — Material properties; `[n_mesh, n_cols]` with `1 ≤ n_cols ≤ 16`. The width is the minimum that captures all non-default parameters in the scene; consumers substitute defaults for absent columns. Columns:<br><br>
+  | Index | Symbol | Property                             | Units    | Default |
+  | :---: | :----: | ------------------------------------ | :------: | :-----: |
+  | 0     | a      | ε_r at fRef                          | —        | 1.0     |
+  | 1     | b      | Frequency exponent for ε_r           | —        | 0       |
+  | 2     | c      | σ at fRef                            | S/m      | 0       |
+  | 3     | d      | Frequency exponent for σ             | —        | 0       |
+  | 4     | att    | Penetration loss at fRef             | dB       | 0       |
+  | 5     | attB   | Frequency exponent for att           | —        | 0       |
+  | 6     | alpha  | In-medium absorption at fRef         | dB/m     | 0       |
+  | 7     | alphaB | Frequency exponent for alpha         | —        | 0       |
+  | 8     | fRef   | Reference frequency                  | GHz      | 1.0     |
+  | 9     | m      | Mass-law transmission slope          | dB/decade| 0       |
+  | 10    | resF   | Permittivity resonance frequency     | GHz      | 0       |
+  | 11    | resQ   | Permittivity resonance quality factor| —        | 0       |
+  | 12    | resS   | Permittivity resonance strength      | —        | 0       |
+  | 13    | coiF   | Coincidence frequency                | GHz      | 0       |
+  | 14    | coiQ   | Coincidence quality factor           | —        | 0       |
+  | 15    | coiA   | Coincidence loss amplitude           | dB       | 0       |
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
 - **`face_ind`** — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
 - **`obj_ind`** — 1-based object index per triangle; `[n_mesh]`
 - **`mtl_ind`** — 1-based material index per triangle; `[n_mesh]`
 - **`obj_names`** — Object names; length = `max(obj_ind)`
 - **`mtl_names`** — Material names; length = `max(mtl_ind)`
-- **`bsdf`** — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]`; columns:<br><br>
-   | Index | Property                  | Range | Default |
-   | :---: | ------------------------- | :---: | ------: |
-   | 0     | Base Color Red            | 0–1   | 0.8     |
-   | 1     | Base Color Green          | 0–1   | 0.8     |
-   | 2     | Base Color Blue           | 0–1   | 0.8     |
-   | 3     | Transparency (alpha)      | 0–1   | 1.0     |
-   | 4     | Roughness                 | 0–1   | 0.5     |
-   | 5     | Metallic                  | 0–1   | 0.0     |
-   | 6     | Index of refraction (IOR) | 0–4   | 1.45    |
-   | 7     | Specular IOR adjustment   | 0–1   | 0.5     |
-   | 8     | Emission Red              | 0–1   | 0.0     |
-   | 9     | Emission Green            | 0–1   | 0.0     |
-   | 10    | Emission Blue             | 0–1   | 0.0     |
-   | 11    | Sheen                     | 0–1   | 0.0     |
-   | 12    | Clearcoat                 | 0–1   | 0.0     |
-   | 13    | Clearcoat roughness       | 0–1   | 0.0     |
-   | 14    | Anisotropic               | 0–1   | 0.0     |
-   | 15    | Anisotropic rotation      | 0–1   | 0.0     |
-   | 16    | Transmission              | 0–1   | 0.0     |
+- **`bsdf`** — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]` (unchanged; see below)
 
 ## Returns:
 - Number of triangular mesh elements (`n_mesh`)
 
 ## Default material table:
-- For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:<br><br>
+- All built-in materials use only columns 0–4 (`a`, `b`, `c`, `d`, `att`); `attB = alpha = alphaB = 0`, `fRef = 1 GHz`, and all extended parameters (`m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`) = 0. A scene using only built-in materials therefore yields a 5-column `mtl_prop` (4 columns if no material sets `att`; only `irr_glass` does).<br><br>
   | Name                  | a     | b      | c       | d      | att  | max fGHz |
   | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
   | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
@@ -313,13 +344,33 @@ arma::uword quadriga_lib::obj_file_read(
 - [[triangle_mesh_segmentation]] (used to calculate indexed mesh for faster processing)
 - [[ray_mesh_interact]] (calculating interactions between rays and the triangular mesh)
 - [[mitsuba_xml_file_write]] (for exporting to Mitsuba scene file format)
+
+<a target="_blank" rel="noopener noreferrer" href=""></a>
+
+## Background and references:
+Base EM model (columns 0–8, reflection and σ-loss):
+- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.2040">ITU-R P.2040</a> (recommendation
+  defining the (a, b, c, d) permittivity/conductivity model and the Fresnel coefficients)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Fresnel_equations">Fresnel equations</a> (interface reflection/transmission from ε)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Relative_permittivity">Relative permittivity (a, b)</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Electrical_resistivity_and_conductivity">Electrical resistivity and conductivity (c, d)</a>
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Dielectric_loss">Dielectric loss / loss tangent</a> (in-medium σ loss)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Attenuation">Attenuation</a> (alpha, linear in path length)
+
+Acoustic mechanism mapping (the analogy the parameters approximate):
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_impedance">Acoustic impedance</a> (basis for deriving `a` from an impedance ratio)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_transmission">Acoustic transmission</a> (mass-law transmission loss (m) and the coincidence effect)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Soundproofing">Soundproofing</a> (mass law, coincidence, partition behaviour)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Sound_transmission_class">Sound transmission class</a> (single-number TL rating context)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Absorption_(acoustics)">Absorption (acoustics)</a> (porous absorption: alpha, alphaB)
+- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Helmholtz_resonance">Helmholtz resonance</a> (resonant absorbers (resF/resQ/resS, coiF/coiQ/coiA))
 MD!*/
 
 template <typename dtype>
 arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *vert_list,
                                         arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                         std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
-                                        arma::Mat<dtype> *bsdf, const std::string &materials_csv)
+                                        arma::Mat<dtype> *bsdf, const std::string &materials_csv, bool trim)
 {
     // Turn std::string into a std::filesystem::path
     std::filesystem::path obj_file{fn};
@@ -406,9 +457,11 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     // Local data
     arma::uword i_vert = 0, i_face = 0, j_face = 0, i_object = 0, i_mtl = 0; // Counters for vertices, faces, objects, materials
     arma::uword iM = 0;                                                      // Material index
-    double aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, fRefM = 1.0;              // Default material properties
-    double attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0;             // Default attenuation properties
     bool simple_face_format = true;                                          // Selector for face format
+
+    // Current material properties (layout per MTL_DEFAULT)
+    double mtlM[NO_MTL];
+    std::copy(MTL_DEFAULT, MTL_DEFAULT + NO_MTL, mtlM);
 
     // Obtain memory for the vertex list (scratch buffer if caller doesn't request it)
     std::vector<dtype> vert_scratch;
@@ -441,8 +494,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     }
 
     // Set size of "mtl_prop"
-    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != 9))
-        mtl_prop->set_size(n_faces, 9);
+    if (mtl_prop != nullptr && (mtl_prop->n_rows != n_faces || mtl_prop->n_cols != NO_MTL))
+        mtl_prop->set_size(n_faces, NO_MTL);
     dtype *p_mtl_prop = (mtl_prop == nullptr) ? nullptr : mtl_prop->memptr();
 
     // Set size of "mtl_ind"
@@ -503,17 +556,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 
             // Store current material properties
             if (p_mtl_prop != nullptr)
-            {
-                p_mtl_prop[i_face] = (dtype)aM;
-                p_mtl_prop[i_face + n_faces] = (dtype)bM;
-                p_mtl_prop[i_face + 2 * n_faces] = (dtype)cM;
-                p_mtl_prop[i_face + 3 * n_faces] = (dtype)dM;
-                p_mtl_prop[i_face + 4 * n_faces] = (dtype)attM;
-                p_mtl_prop[i_face + 5 * n_faces] = (dtype)attBM;
-                p_mtl_prop[i_face + 6 * n_faces] = (dtype)alphaM;
-                p_mtl_prop[i_face + 7 * n_faces] = (dtype)alphaBM;
-                p_mtl_prop[i_face + 8 * n_faces] = (dtype)fRefM;
-            }
+                for (arma::uword k = 0; k < NO_MTL; ++k)
+                    p_mtl_prop[i_face + k * n_faces] = (dtype)mtlM[k];
 
             if (p_mtl_ind != nullptr)
                 p_mtl_ind[i_face] = iM;
@@ -540,7 +584,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             }
 
             // Reset current material
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0, iM = 0;
+            std::copy(MTL_DEFAULT, MTL_DEFAULT + NO_MTL, mtlM);
+            iM = 0;
             j_face = i_face;
             ++i_object;
         }
@@ -553,7 +598,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             std::string mtl_name_raw = mtl_name;
 
             // Reset current material
-            aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0, iM = 0;
+            std::copy(MTL_DEFAULT, MTL_DEFAULT + NO_MTL, mtlM);
+            iM = 0;
             int found = -1;
 
             // If "mtl_name" does not contain a "::", remove everything after the dot
@@ -568,28 +614,56 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             for (size_t n = 0; n < mtl_lib.size(); ++n)
                 if (mtl_lib[n].name.compare(mtl_name) == 0)
                 {
-                    aM = mtl_lib[n].a;
-                    bM = mtl_lib[n].b;
-                    cM = mtl_lib[n].c;
-                    dM = mtl_lib[n].d;
-                    attM = mtl_lib[n].att;
-                    attBM = mtl_lib[n].attB;
-                    alphaM = mtl_lib[n].alpha;
-                    alphaBM = mtl_lib[n].alphaB;
-                    fRefM = mtl_lib[n].fRef;
-                    iM = mtl_lib[n].index;
+                    const MaterialProp &src = mtl_lib[n];
+                    mtlM[0] = src.a;
+                    mtlM[1] = src.b;
+                    mtlM[2] = src.c;
+                    mtlM[3] = src.d;
+                    mtlM[4] = src.att;
+                    mtlM[5] = src.attB;
+                    mtlM[6] = src.alpha;
+                    mtlM[7] = src.alphaB;
+                    mtlM[8] = src.fRef;
+                    mtlM[9] = src.m;
+                    mtlM[10] = src.resF;
+                    mtlM[11] = src.resQ;
+                    mtlM[12] = src.resS;
+                    mtlM[13] = src.coiF;
+                    mtlM[14] = src.coiQ;
+                    mtlM[15] = src.coiA;
+                    iM = src.index;
                     found = (int)n;
                 }
 
             if (found == -1) // Add new material
             {
-                aM = 1.0, bM = 0.0, cM = 0.0, dM = 0.0, attM = 0.0, attBM = 0.0, alphaM = 0.0, alphaBM = 0.0, fRefM = 1.0;
                 sscanf(mtl_name.c_str(),
-                       "%*[^:]::%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf",
-                       &aM, &bM, &cM, &dM, &attM, &attBM, &alphaM, &alphaBM, &fRefM);
-                if (aM <= 0.0) // ε_r can't be ≤ 0; reset the permittivity pair
-                    aM = 1.0, bM = 0.0;
-                mtl_lib.push_back({mtl_name, aM, bM, cM, dM, attM, attBM, alphaM, alphaBM, fRefM, 0});
+                       "%*[^:]::%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf:%lf",
+                       &mtlM[0], &mtlM[1], &mtlM[2], &mtlM[3], &mtlM[4], &mtlM[5], &mtlM[6], &mtlM[7],
+                       &mtlM[8], &mtlM[9], &mtlM[10], &mtlM[11], &mtlM[12], &mtlM[13], &mtlM[14], &mtlM[15]);
+                if (mtlM[0] <= 0.0)
+                    mtlM[0] = 1.0, mtlM[1] = 0.0;
+
+                MaterialProp mat;
+                mat.name = mtl_name;
+                mat.a = mtlM[0];
+                mat.b = mtlM[1];
+                mat.c = mtlM[2];
+                mat.d = mtlM[3];
+                mat.att = mtlM[4];
+                mat.attB = mtlM[5];
+                mat.alpha = mtlM[6];
+                mat.alphaB = mtlM[7];
+                mat.fRef = mtlM[8];
+                mat.m = mtlM[9];
+                mat.resF = mtlM[10];
+                mat.resQ = mtlM[11];
+                mat.resS = mtlM[12];
+                mat.coiF = mtlM[13];
+                mat.coiQ = mtlM[14];
+                mat.coiA = mtlM[15];
+                mat.index = 0;
+                mtl_lib.push_back(std::move(mat));
                 found = (int)mtl_lib.size() - 1;
             }
 
@@ -613,6 +687,26 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
     // Single unnamed object: ensure obj_names has one entry
     if (obj_names != nullptr && i_object == 1 && obj_names->empty())
         obj_names->push_back("object");
+
+    // Trim mtl_prop to the smallest width that holds a non-default value
+    if (trim && mtl_prop != nullptr && n_faces > 0)
+    {
+        arma::uword w = 1; // column 0 (a) is always kept
+        for (arma::uword k = NO_MTL - 1; k >= 1; --k)
+        {
+            bool nondefault = false;
+            for (arma::uword r = 0; r < n_faces && !nondefault; ++r)
+                if ((double)mtl_prop->at(r, k) != MTL_DEFAULT[k])
+                    nondefault = true;
+            if (nondefault)
+            {
+                w = k + 1;
+                break;
+            }
+        }
+        if (w < 16)
+            mtl_prop->shed_cols(w, NO_MTL - 1);
+    }
 
     // Calculate the triangle mesh from vertices and faces
     if (mesh != nullptr)
@@ -658,11 +752,8 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
         else
             mtl_file.replace_filename(mtllib_fn);
 
-        if (!std::filesystem::exists(mtl_file))
-        {
-            bsdf->reset();
-        }
-        else
+        bsdf->reset(); // start empty; only sized below if at least one material is matched
+        if (std::filesystem::exists(mtl_file))
         {
             std::ifstream fileR{mtl_file, std::ios::in};
             if (!fileR.is_open())
@@ -672,6 +763,7 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
             if (bsdf->n_rows != n_mtl || bsdf->n_cols != 17)
                 bsdf->set_size(n_mtl, 17);
 
+            bool any_found = false;
             size_t i_mtl = 0;
             for (const auto &mtl : *mtl_names)
             {
@@ -695,7 +787,6 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                 double transmission = 0.0;
 
                 std::string line;
-                bool foundMaterial = false;
 
                 // Find the "newmtl <mtl>" line
                 while (std::getline(fileR, line))
@@ -705,16 +796,10 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                         std::string name = line.substr(7);
                         if (name == mtl)
                         {
-                            foundMaterial = true;
+                            any_found = true;
                             break;
                         }
                     }
-                if (!foundMaterial)
-                {
-                    // Custom inline materials (:: syntax) won't appear in .mtl file; skip with defaults
-                    ++i_mtl;
-                    continue;
-                }
 
                 // From here, scan until the next "newmtl " or EOF to look for Kd and Ns
                 while (std::getline(fileR, line))
@@ -853,9 +938,9 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
                 bsdf->at(i_mtl, 16) = (dtype)transmission;
                 ++i_mtl;
             }
+            if (!any_found)
+                bsdf->reset();
         }
-
-        fileR.close();
     }
 
     return n_faces;
@@ -864,9 +949,9 @@ arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<dtype> *mesh, 
 template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<float> *mesh, arma::Mat<float> *mtl_prop, arma::Mat<float> *vert_list,
                                                  arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                                  std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
-                                                 arma::Mat<float> *bsdf, const std::string &materials_csv);
+                                                 arma::Mat<float> *bsdf, const std::string &materials_csv, bool trim);
 
 template arma::uword quadriga_lib::obj_file_read(std::string fn, arma::Mat<double> *mesh, arma::Mat<double> *mtl_prop, arma::Mat<double> *vert_list,
                                                  arma::umat *face_ind, arma::uvec *obj_ind, arma::uvec *mtl_ind,
                                                  std::vector<std::string> *obj_names, std::vector<std::string> *mtl_names,
-                                                 arma::Mat<double> *bsdf, const std::string &materials_csv);
+                                                 arma::Mat<double> *bsdf, const std::string &materials_csv, bool trim);

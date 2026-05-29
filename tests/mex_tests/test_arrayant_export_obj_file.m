@@ -18,7 +18,7 @@ assert( size(face_ind, 2) == 3 );                      % 3 vertex indices per fa
 assert( numel(obj_ind) == size(mesh, 1) );
 assert( numel(mtl_ind) == size(mesh, 1) );
 assert( size(mtl_prop, 1) == size(mesh, 1) );
-assert( size(mtl_prop, 2) == 9 );
+assert( size(mtl_prop, 2) == 1 );
 % Face indices reference valid vertices
 assert( max(face_ind(:)) <= size(vert_list, 1) );
 assert( min(face_ind(:)) >= 1 );

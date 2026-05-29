@@ -61,8 +61,8 @@ assertTrue( exist(mtl_fn,'file') == 2 );
 assertEqual( size(mtl_names_rd), [2,1] );
 assertEqual( mtl_names_rd{1,1}, 'itu_concrete' );
 assertEqual( mtl_names_rd{2,1}, 'itu_wood' );
-assertElementsAlmostEqual( mtl_prop(1,:), [5.24, 0, 0.0462, 0.7822, 0, 0, 0, 0, 1], 'absolute', 1e-12 );
-assertElementsAlmostEqual( mtl_prop(5,:), [1.99, 0, 0.0047, 1.0718, 0, 0, 0, 0, 1], 'absolute', 1e-12 );
+assertElementsAlmostEqual( mtl_prop(1,:), [5.24, 0, 0.0462, 0.7822], 'absolute', 1e-12 );
+assertElementsAlmostEqual( mtl_prop(5,:), [1.99, 0, 0.0047, 1.0718], 'absolute', 1e-12 );
 assertEqual( mtl_ind_rd, uint64([1;1;1;1;2;2;2;2;2;2;2;2]) );
 delete(fn); delete(mtl_fn);
 
@@ -77,7 +77,7 @@ quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names );
 [ ~, mtl_prop, ~, ~, ~, mtl_ind_rd, ~, mtl_names_rd ] = quadriga_lib.obj_file_read( fn );
 
 assertEqual( mtl_names_rd{1,1}, 'glass::6.0:0:0.1:1.2' );
-assertElementsAlmostEqual( mtl_prop(1,:), [6.0, 0, 0.1, 1.2, 0, 0, 0, 0, 1], 'absolute', 1e-12 );
+assertElementsAlmostEqual( mtl_prop(1,:), [6.0, 0, 0.1, 1.2], 'absolute', 1e-12 );
 assertTrue( all( mtl_ind_rd == 1 ) );
 delete(fn); delete(mtl_fn);
 

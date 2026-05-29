@@ -157,10 +157,10 @@ end
 
 % Error: wrong mtl_prop columns (now expects 9)
 try
-    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, mtl_prop(:,1:5), 1e9, 0 );
+    [~, ~] = quadriga_lib.calc_diffraction_gain( orig, dest, cube, [], 1e9, 0 );
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Input ''mtl_prop'' must have 9 columns.';
+    expectedErrorMessage = 'Input ''mtl_prop'' must have at least 1 column.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
