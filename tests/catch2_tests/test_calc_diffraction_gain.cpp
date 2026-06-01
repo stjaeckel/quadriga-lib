@@ -4,7 +4,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "quadriga_tools.hpp"
+
 #include <iostream>
+#include <unordered_map>
+#include <vector>
+#include <string>
 
 // Function to calculate the gain
 #ifndef calc_transition_gain_HELPER
@@ -68,6 +72,46 @@ static double calc_transition_gain(int interaction_type,       // (0) Reflection
 }
 #endif
 
+// Convert a per-face material matrix [n_face, 9] with columns
+// {a,b,c,d,att,attB,alpha,alphaB,fRef} into the new (mtl_ind, mtl_prop-map) pair.
+// Identical rows are deduplicated, so mtl_ind/mtl_prop match what obj_file_read would emit.
+static inline void mtl_matrix_to_map(const arma::mat &M,
+                                     arma::uvec &mtl_ind,
+                                     std::unordered_map<std::string, std::vector<double>> &mtl_prop)
+{
+    static const char *names[9] = {"a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"};
+    const arma::uword n_face = M.n_rows;
+
+    mtl_ind.set_size(n_face);
+    std::vector<arma::uword> uniq; // row index of each distinct material
+    for (arma::uword f = 0; f < n_face; ++f)
+    {
+        arma::uword m = 0;
+        bool found = false;
+        for (; m < uniq.size(); ++m)
+            if (arma::approx_equal(M.row(f), M.row(uniq[m]), "absdiff", 0.0))
+            {
+                found = true;
+                break;
+            }
+        if (!found)
+        {
+            m = (arma::uword)uniq.size();
+            uniq.push_back(f);
+        }
+        mtl_ind(f) = m;
+    }
+
+    mtl_prop.clear();
+    for (int c = 0; c < 9; ++c)
+    {
+        std::vector<double> col(uniq.size());
+        for (size_t m = 0; m < uniq.size(); ++m)
+            col[m] = M.at(uniq[m], c);
+        mtl_prop[names[c]] = std::move(col);
+    }
+}
+
 TEST_CASE("Calc Diffraction Gain")
 {
     double deg2rad = arma::datum::pi / 180.0;
@@ -91,11 +135,14 @@ TEST_CASE("Calc Diffraction Gain")
 
     mtl_prop = {{1.5, 0.0, 0.001, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
 
     // Entire path outside
     orig = {{-10.0, 0.0, 0.5}};
     dest = {{-5.0, 0.0, 0.5}};
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 1.0e9, 1, &gain, &coord, 0);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 1.0e9, 1, &gain, &coord, 0);
 
     tv = {1.0};
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-13));
@@ -104,19 +151,19 @@ TEST_CASE("Calc Diffraction Gain")
     tc.slice(0) = {{-8.75, -6.25}, {0.0, 0.0}, {0.5, 0.5}};
     CHECK(arma::approx_equal(coord, tc, "absdiff", 1e-13));
 
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 1.0e9, 2, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 1.0e9, 2, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-13));
     CHECK(arma::approx_equal(coord, tc, "absdiff", 1e-13));
 
     tc.set_size(3, 3, 1);
     tc.slice(0) = {{-10.0 + 5.0 * 0.1464, -7.5, -10.0 + 5.0 * 0.8536}, {0.0, 0.0, 0.0}, {0.5, 0.5, 0.5}};
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 1.0e9, 3, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 1.0e9, 3, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-13));
     CHECK(arma::approx_equal(coord, tc, "absdiff", 1e-13));
 
     tc.set_size(3, 4, 1);
     tc.slice(0) = {{-10.0 + 5.0 * 0.0955, -10.0 + 5.0 * 0.3455, -10.0 + 5.0 * 0.6545, -10.0 + 5.0 * 0.9045}, {0.0, 0.0, 0.0, 0.0}, {0.5, 0.5, 0.5, 0.5}};
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 1.0e9, 4, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 1.0e9, 4, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-13));
     CHECK(arma::approx_equal(coord, tc, "absdiff", 1e-13));
 
@@ -129,20 +176,20 @@ TEST_CASE("Calc Diffraction Gain")
     tv = {total_gain};
     orig = {{-10.0, 0.0, 0.5}};
     dest = {{0.5, 0.0, 0.5}};
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0, &gain, &coord);
 
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 5, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 5, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 6, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 6, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 
     // 2 segments, (1) outside to inside, (2) inside
     orig = {{-1.5, 0.0, 0.5}};
     dest = {{0.5, 0.0, 0.5}};
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 5, &gain, &coord);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 5, &gain, &coord);
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-7));
 }
 
@@ -164,12 +211,15 @@ TEST_CASE("Calc Diffraction Gain - Alpha in-medium absorption")
     // ε_r = 1 (no Fresnel), σ = 0, α = 4 dB/m, all exponents 0, fRef = 1
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
 
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
 
     arma::vec gain;
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0, &gain);
 
     // 1.5 m × 4 dB/m = 6 dB  →  gain = 10^-0.6
     arma::vec tv = {std::pow(10.0, -0.1 * 4.0 * 1.5)};
@@ -195,12 +245,15 @@ TEST_CASE("Calc Diffraction Gain - Penetration loss frequency scaling")
     // att = 3 dB @ fRef = 2 GHz, attB = 1  →  at 10 GHz:  Att = 3·(10/2)^1 = 15 dB
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 2.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
 
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
 
     arma::vec gain;
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0, &gain);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0, &gain);
 
     arma::vec tv = {std::pow(10.0, -1.5)}; // 10^-1.5
     CHECK(arma::approx_equal(gain, tv, "absdiff", 1e-10));
@@ -226,14 +279,18 @@ TEST_CASE("Calc Diffraction Gain - fRef parameterization equivalence")
     arma::mat mat_B = {{3.0, 1.0, 0.002, 1.0, 4.0, 1.0, 1.0, 1.0, 2.0}}; // fRef = 2
     mat_A = repmat(mat_A, 12, 1);
     mat_B = repmat(mat_B, 12, 1);
+    arma::uvec mtl_ind_A, mtl_ind_B;
+    std::unordered_map<std::string, std::vector<double>> mtl_map_A, mtl_map_B;
+    mtl_matrix_to_map(mat_A, mtl_ind_A, mtl_map_A);
+    mtl_matrix_to_map(mat_B, mtl_ind_B, mtl_map_B);
 
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
 
     arma::vec gain_A, gain_B;
     // Use lod=3 to exercise the full ray-state machine with multi-path + multi-hit logic
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mat_A, 10.0e9, 3, &gain_A);
-    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mat_B, 10.0e9, 3, &gain_B);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind_A, &mtl_map_A, 10.0e9, 3, &gain_A);
+    quadriga_lib::calc_diffraction_gain(&orig, &dest, &cube, &mtl_ind_B, &mtl_map_B, 10.0e9, 3, &gain_B);
 
     CHECK(arma::approx_equal(gain_A, gain_B, "absdiff", 1e-12));
 }
@@ -256,24 +313,27 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
     // ε_r = 2 → non-trivial reflection contrast
     arma::mat mtl_prop = {{2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
 
     arma::vec gain_em, gain_scalar;
 
     // --- Normal incidence: ray along +x axis ---
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
-    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
                                                 &gain_em, nullptr, 0, nullptr, 0, 0, false);
-    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
                                                 &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
     CHECK(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-12));
 
     // --- Oblique incidence: ray hits west wall at ~23° off-normal ---
     orig = {{-3.0, 0.0, 0.5}};
     dest = {{0.5, 1.5, 0.5}};
-    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
                                                 &gain_em, nullptr, 0, nullptr, 0, 0, false);
-    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_prop, 10.0e9, 0,
+    quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
                                                 &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
     // Scalar uses |R_TE|²; EM uses ½(|R_TE|² + |R_TM|²). These differ at oblique hits.
     CHECK_FALSE(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-4));

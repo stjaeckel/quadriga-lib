@@ -1,7 +1,7 @@
 ---
-title: "Python API Documentation for Quadriga-Lib v0.11.6"
+title: "Python API Documentation for Quadriga-Lib v0.11.7"
 author: "Stephan Jaeckel"
-date: "29.05.2026"
+date: "01.06.2026"
 lang: en-US
 ---
 
@@ -51,17 +51,17 @@ lang: en-US
 | [version](#version) | Miscellaneous / Tools | 2027 |
 | [write_png](#write_png) | Miscellaneous / Tools | 2040 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2083 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 2128 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2160 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2192 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2305 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2345 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2372 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2402 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2435 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2472 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2515 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2541 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 2131 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2163 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2196 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2246 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2286 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2313 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2343 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2376 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2413 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2456 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2482 |
 
 ---
 
@@ -2089,40 +2089,43 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   generalized to arbitrary 3D shapes
 - Optional sub-mesh indexing (see [triangle_mesh_segmentation](#triangle_mesh_segmentation)) accelerates computation by skipping
   triangles whose bounding box does not intersect the TX-RX path
+- For a detailed description of the material model see
+  <a href="http://quadriga-lib.org/formats.html">Data Formats</a> section
 
 ### Usage:
 ```
 # Output as tuple
-data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
-    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 
 # Unpacked outputs
-gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
-    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+gain, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 ```
 
 ### Inputs:
 - **`orig`** — TX positions; `(n_pos, 3)`
 - **`dest`** — RX positions; `(n_pos, 3)`
-- **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `(n_mesh, 9)`
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `(n_mesh, n_param)`
+- **`mesh`** — Triangle vertices, each row `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]`; `(n_mesh, 9)`
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`
+- **`mtl_prop`** — Material properties as a `dict`; each key is one column (the `csv_prop` output of [obj_file_read](#obj_file_read)) mapping to a 1D array of length `n_mtl`
 - **`center_frequency`** — Center frequency
-- **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
-- **`verbose`** *(optional)* — Verbosity level
-- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); uint32; `(n_mesh,)`
-- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
-- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
-  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
+- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths); default: 2
+- **`verbose`** — Verbosity level; default: 0
+- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `(n_mesh,)` or `None`; default: `None`
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
+- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
+- **`scalar_mode`** — If `True`, uses scalar transmission (TE-only reflection coefficient,
+  energy-conservation transmission) instead of EM TE/TM averaging; default: `False`
 
 ### Outputs:
-- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `(n_pos,)`
-- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
+- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `(n_pos,)`
+- **`coord`** — Diffracted path coordinates excluding endpoints; `(3, n_seg-1, n_pos)`
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (generates `sub_mesh_index`)
-- [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
+- [obj_file_read](#obj_file_read) (defines the material format)
 
 ---
 ## icosphere
@@ -2168,20 +2171,21 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
   both the XML and the mesh folder must be distributable together
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Usage:
 ```
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
 ```
 
 ### Input Arguments:
 - **`fn`** — Output file path including `.xml` extension
 - **`vert_list`** — Vertex coordinates (x, y, z); `(n_vert, 3)`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; uint64; `(n_mesh, 3)`
-- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; uint64; `(n_mesh,)`
-- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; uint64; `(n_mesh,)`
-- **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind)`
-- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind)`
+- **`obj_ind`** — 0-based object index per triangle; length `obj_names` must equal `max(obj_ind) + 1`; uint64; `(n_mesh,)`
+- **`mtl_ind`** — 0-based material index per triangle; length `mtl_names` must equal `max(mtl_ind) + 1`; uint64; `(n_mesh,)`
+- **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
+- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind) + 1`
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
@@ -2190,130 +2194,67 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mt
 
 ---
 ## obj_file_read
-Read a Wavefront .obj file and extract geometry and material information
+Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-- Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (ε_r = 1, σ = 0, Att = 0, α = 0)
-- Material name matching is case-sensitive
-- Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
-- Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef`
-  - ε_r(f)   = a · (f/fRef)^b          (relative permittivity)
-  - σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)
-  - Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)
-  - α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)
-  - Trailing fields are optional; defaults are `b=c=d=att=attB=alpha=alphaB=0`, `fRef=1` GHz
+- Parses a triangulated `.obj`; quads and n-gons are rejected
+- Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
+  - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
+  - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
+- A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
+  before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`)
+- Unmatched names raise an error when `csv_strict = True`; otherwise they map to row 0 of the table
+  (the transparent fallback)
+- With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`,
+  `csv_prop`) is populated; if `fn_csv` is also empty, the built-in default table is returned
+- For a detailed description of the material model see
+  <a href="http://quadriga-lib.org/formats.html">Data Formats</a> section
 
 ### Usage:
 ```
-# Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = \
-    quadriga_lib.RTtools.obj_file_read( fn )
-
-# Return as tuple with 9 elements
-data = quadriga_lib.RTtools.obj_file_read( fn )
-
-# Use a custom material definition file
-data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
+mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop = \
+    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, csv_strict )
 ```
 
 ### Inputs:
-- **`fn`** — Path to the `.obj` file
-- **`materials_csv`** *(optional)* — Path to CSV file with custom material properties.
-  Required columns: `name`, `a`. Optional columns: `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`.
-  Column order is flexible; missing optional columns default to `0` (`fRef` → `1`).
-  If empty, ITU-R P.2040-3 defaults are used.
+- **`fn`** — Path to the `.obj` file; empty loads only the material table
+- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column, and row 0 is the
+  fallback material (should be transparent, e.g. air); empty uses the built-in default table;
+  default: `""`
+- **`csv_strict`** — If `True`, raise when a `usemtl` material is absent from the table; otherwise
+  map to row 0; default: `False`
 
 ### Outputs:
-- **`mesh`** — Triangle vertex coordinates as `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `(n_mesh, 9)`
-- **`mtl_prop`** — Material properties; `(n_mesh, 9)`; Columns:
-  | Index | Symbol | Property                                      |
-  | ----- | ------ | --------------------------------------------- |
-  | 0     | a      | ε_r at fRef                                   |
-  | 1     | b      | Frequency exponent for ε_r                    |
-  | 2     | c      | σ at fRef [S/m]                               |
-  | 3     | d      | Frequency exponent for σ                      |
-  | 4     | att    | Penetration loss at fRef [dB]                 |
-  | 5     | attB   | Frequency exponent for att                    |
-  | 6     | alpha  | Distance absorption at fRef [dB/m]            |
-  | 7     | alphaB | Frequency exponent for alpha                  |
-  | 8     | fRef   | Reference frequency [GHz]                     |
+- **`mesh`** — Triangle vertex coordinates `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]` per row; `(n_mesh, 9)`
 - **`vert_list`** — All vertex positions in the file; `(n_vert, 3)`
-- **`face_ind`** — 0-based indices into `vert_list` per triangle; uint64; `(n_mesh, 3)`
-- **`obj_ind`** — 1-based object index per triangle; uint64; `(n_mesh, )`
-- **`mtl_ind`** — 1-based material index per triangle; uint64; `(n_mesh, )`
-- **`obj_names`** — Object names; list of strings; length = `max(obj_ind)`
-- **`mtl_names`** — Material names; list os strings; length = `max(mtl_ind)`
-- **`bsdf`** — Principled BSDF values from the `.mtl` file; `(n_mtl, 17)`; columns:
-   | Index | Property                  | Range | Default |
-   | ----- | ------------------------- | ----- | ------- |
-   | 0     | Base Color Red            | 0–1   | 0.8     |
-   | 1     | Base Color Green          | 0–1   | 0.8     |
-   | 2     | Base Color Blue           | 0–1   | 0.8     |
-   | 3     | Transparency (alpha)      | 0–1   | 1.0     |
-   | 4     | Roughness                 | 0–1   | 0.5     |
-   | 5     | Metallic                  | 0–1   | 0.0     |
-   | 6     | Index of refraction (IOR) | 0–4   | 1.45    |
-   | 7     | Specular IOR adjustment   | 0–1   | 0.5     |
-   | 8     | Emission Red              | 0–1   | 0.0     |
-   | 9     | Emission Green            | 0–1   | 0.0     |
-   | 10    | Emission Blue             | 0–1   | 0.0     |
-   | 11    | Sheen                     | 0–1   | 0.0     |
-   | 12    | Clearcoat                 | 0–1   | 0.0     |
-   | 13    | Clearcoat roughness       | 0–1   | 0.0     |
-   | 14    | Anisotropic               | 0–1   | 0.0     |
-   | 15    | Anisotropic rotation      | 0–1   | 0.0     |
-   | 16    | Transmission              | 0–1   | 0.0     |
-
-### Default material table:
-- For all defaults below: `attB = alpha = alphaB = 0` and `fRef = 1 GHz`:
-  | Name                  | a     | b      | c       | d      | att  | max fGHz |
-  | --------------------- | ----- | ------ | ------- | ------ | ---- | -------- |
-  | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
-  | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
-  | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
-  | ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 100      |
-  | sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 100      |
-  | sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 100      |
-  | water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 20       |
-  | water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 20       |
-  | itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 100      |
-  | itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 40       |
-  | itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 100      |
-  | itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 100      |
-  | itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 100      |
-  | itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 100      |
-  | itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 100      |
-  | itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 40       |
-  | itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 60       |
-  | itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 100      |
-  | itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 100      |
-  | itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 10       |
-  | itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 10       |
-  | itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
-  | itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
-  | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
+- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `(n_mesh, 3)`
+- **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
+- **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
+- **`mtl_ind`** — 0-based visual-material index per triangle; `(n_mesh,)`
+- **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `no_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `(no_mtl, 17)`
+- **`csv_ind`** — 0-based EM/acoustic-material index per triangle; `(n_mesh,)`
+- **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
+- **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
+  mapping to a 1D array of length `n_csv`
 
 ### See also:
 - [obj_file_write](#obj_file_write) (for writing OBJ files)
-- [obj_overlap_test](#obj_overlap_test) (for testing mesh geometry)
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (used to calculate indexed mesh for faster processing)
 - [ray_mesh_interact](#ray_mesh_interact) (calculating interactions between rays and the triangular mesh)
-- [mitsuba_xml_file_write](#mitsuba_xml_file_write) (for exporting to Mitsuba scene file format)
 
 ---
 ## obj_file_write
 Write a Wavefront .obj file
 
 - Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
-- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same
-  object that are closer than `threshold` (no merging across objects)
+- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same object 
+  that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
-- Without `obj_ind` and `obj_names`, a single object named `object` is written
+- Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - Without `mtl_ind` (or if all entries are 0), no `usemtl` tags and no `.mtl` file are written
-- The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray
-  material when `bsdf` is omitted
+- The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Usage:
 ```
@@ -2324,10 +2265,10 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 ### Inputs:
 - **`fn`** — Path to the output `.obj` file; must end in `.obj`; if empty, no file is written (outputs are still computed); default: `""`
 - **`mesh`** — Triangle coordinates `{X1,Y1,Z1,...,X3,Y3,Z3}` per row; `(n_mesh, 9)`; mutually exclusive with `vert_list` and `face_ind`; default: None
-- **`obj_ind`** — 1-based object index per face; `(n_mesh,)`; each object must form a contiguous block; default: None
-- **`mtl_ind`** — 1-based material index per face (0 = unassigned); `(n_mesh,)`; default: None
-- **`obj_names`** — Object names; list of str; length >= max(obj_ind); required if `obj_ind` is given; default: None
-- **`mtl_names`** — Material names; list of str; length >= max(mtl_ind); required if `mtl_ind` has nonzero entries; default: None
+- **`obj_ind`** — 0-based object index per face; `(n_mesh,)`; each object must form a contiguous block; default: None
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind`/`mtl_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`; omit (None) for no materials; default: None
+- **`obj_names`** — Object names; list of str; length > max(obj_ind); required if `obj_ind` is given; default: None
+- **`mtl_names`** — Material names; list of str; length > max(mtl_ind); required if `mtl_ind` is given; default: None
 - **`vert_list`** — Vertex positions; `(n_vert, 3)`; only valid with `face_ind`; written unchanged; default: None
 - **`face_ind`** — 0-based vertex indices per face; `(n_mesh, 3)`; required with `vert_list`; default: None
 - **`bsdf`** — Principled BSDF values for the `.mtl` file; `(n_mtl, 17)`; see [obj_file_read](#obj_file_read) for the column layout; default: None
@@ -2541,32 +2482,36 @@ aabb = quadriga_lib.RTtools.triangle_mesh_aabb( triangles, sub_mesh_index, vec_s
 ## triangle_mesh_segmentation
 Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster processing
 
-- Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
-- Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
-- If `mtl_prop` is provided, material rows are reordered and padded in the same way
+- Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more
+  than `target_size` triangles
+- Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
+  zero-sized dummy triangles to align row counts to `vec_size`
+- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark
+  padding entries
+- If `mtl_ind` is provided, material indices are reordered and padded in the same way; padding
+  entries get index 0
 
 ### Usage:
 ```
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
+    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 ```
 
 ### Inputs:
-- **`triangles`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
-- **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set
-  near sqrt(n_mesh); default: 1024
-- **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each
-  sub-mesh row count is rounded up to a multiple of this value; default: 1
-- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `(n_mesh, n_param)`
+- **`triangles`** — Triangle vertices, each row `[x1,y1,z1,x2,y2,z2,x3,y3,z3]`; `(n_mesh, 9)`
+- **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
+- **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count
+  is rounded up to a multiple of this value; default: 1
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read));
+  `(n_mesh,)` or `None`; default: `None`
 
 ### Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out, )`
-- **`mtl_prop_out`** — Reordered and padded material properties; `(n_triangles_out, n_param)`
+- **`mesh_index`** — 0-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
+- **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
 

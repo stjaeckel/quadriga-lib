@@ -21,20 +21,21 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
   both the XML and the mesh folder must be distributable together
 - Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
 ```
 
 ## Input Arguments:
 - **`fn`** — Output file path including `.xml` extension
 - **`vert_list`** — Vertex coordinates (x, y, z); `(n_vert, 3)`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; uint64; `(n_mesh, 3)`
-- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; uint64; `(n_mesh,)`
-- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; uint64; `(n_mesh,)`
-- **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind)`
-- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind)`
+- **`obj_ind`** — 0-based object index per triangle; length `obj_names` must equal `max(obj_ind) + 1`; uint64; `(n_mesh,)`
+- **`mtl_ind`** — 0-based material index per triangle; length `mtl_names` must equal `max(mtl_ind) + 1`; uint64; `(n_mesh,)`
+- **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
+- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind) + 1`
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 

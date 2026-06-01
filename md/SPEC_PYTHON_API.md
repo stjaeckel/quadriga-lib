@@ -27,6 +27,12 @@ You are implementing a lightweight Python API wrapper for pybind11 (v3) to call 
 - C++ functions may offer dtype = float / double specialization. The Python wrapper only uses the double version, so hardcode dtype to `double` in the call to the C++ function.
 - Armadillo types map to their C++ counterparts, e.g. `arma::uword = unsigned long long` (enforced at compile time by static_asserts).
 - When a C++ parameter is both input and output (in-out pointer pattern), split it into two Python names with `_in` / `_out` suffixes (or `bins` / `bins_out` style where the input name is short).
+- Integer outputs returned to Python use signed 64-bit (`py::ssize_t`) as the numpy element type,
+  since Python's native `int` and numpy's default integer are signed 64-bit. Emit index/count arrays
+  with the cast form of the converter, e.g.
+  `qd_python_copy2numpy<unsigned, py::ssize_t>(&u32vec)` or
+  `qd_python_copy2numpy<arma::uword, py::ssize_t>(&uvec)`. This applies to all integer-valued outputs
+  (face/object/material indices, sub-mesh offsets, counts); float outputs are unaffected.
 
 ## License statement
 - At the top of the file, include the following license statement as a comment block:
@@ -55,7 +61,7 @@ auto pyarray = qd_python_copy2numpy(&Col, &ColIm, i_elem, transpose);  // Col; i
 auto pyarray = qd_python_copy2numpy(&Mat, &MatIm, i_col);              // Mat; im/i_col optional
 auto pyarray = qd_python_copy2numpy(&Cube, &CubeIm, i_slice);          // Cube; im/i_slice optional
 auto pyarray = qd_python_copy2numpy(&Col);                             // simplest form: plain real copy
-auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(&Mat);      // cast on copy
+auto pyarray = qd_python_copy2numpy<unsigned, py::ssize_t>(&Mat);      // integer output: cast to signed 64-bit (default for all index/count outputs)
 auto pyarray = qd_python_copy2numpy<float, std::complex<double>>(&MatRe, &MatIm, i_col);  // Re/Im -> complex
 auto pyarray = qd_python_copy2numpy<float, std::complex<double>>(&CubeRe);                // Re only -> complex (imag = 0)
 

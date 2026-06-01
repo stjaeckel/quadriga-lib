@@ -142,9 +142,8 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
     ray_triangle_intersect(&orig, &dest, &meshR, &fbs, &sbs, &no_interact, &fbs_ind, &sbs_ind, &sub_mesh_index);
 
     // Calculate the incidence angles
-    arma::Mat<dtype> mtl_prop(meshR.n_rows, 1, arma::fill::ones);
     arma::Col<dtype> fbs_angle, thickness;
-    quadriga_lib::ray_mesh_interact<dtype>(0, 1.0e9, &orig, &dest, &fbs, &sbs, &meshR, &mtl_prop, &fbs_ind, &sbs_ind,
+    quadriga_lib::ray_mesh_interact<dtype>(0, 1.0e9, &orig, &dest, &fbs, &sbs, &meshR, nullptr, nullptr, &fbs_ind, &sbs_ind,
                                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                            nullptr, nullptr, nullptr, &fbs_angle, &thickness);
 

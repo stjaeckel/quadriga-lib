@@ -16,6 +16,26 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
+# obj_file_read output order:
+#   mesh, vert_list, face_ind, obj_ind, obj_names,
+#   mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop
+
+_EM_DEFAULTS = {"a": 1.0, "b": 0.0, "c": 0.0, "d": 0.0, "att": 0.0,
+                "attB": 0.0, "alpha": 0.0, "alphaB": 0.0, "fRef": 1.0}
+_EM_ORDER = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
+
+
+def prop_at(csv_prop, key, idx):
+    """Value of column 'key' for material index 'idx', with per-column default if absent."""
+    if key in csv_prop:
+        return float(csv_prop[key][idx])
+    return _EM_DEFAULTS.get(key, 0.0)
+
+
+def em_row(csv_prop, idx):
+    """9-element EM row {a,b,c,d,att,attB,alpha,alphaB,fRef} for material index 'idx'."""
+    return np.array([prop_at(csv_prop, k, idx) for k in _EM_ORDER], dtype=float)
+
 
 def _rm(fn):
     if os.path.isfile(fn):
@@ -91,13 +111,15 @@ class test_case(unittest.TestCase):
 
         (
             mesh_rd,
-            _,
             vert_list_rd,
             face_ind_rd,
             obj_ind_rd,
-            mtl_ind_rd,
             obj_names_rd,
+            mtl_ind_rd,
             mtl_names_rd,
+            _,
+            csv_ind_rd,
+            _,
             _,
         ) = quadriga_lib.RTtools.obj_file_read(fn)
 
@@ -106,9 +128,12 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(make_mesh(vert_list_rd, face_ind_rd), mesh, decimal=12)
         assert len(obj_names_rd) == 1
         npt.assert_equal(obj_names_rd[0], "object")
-        assert len(mtl_names_rd) == 0
-        npt.assert_(np.all(obj_ind_rd == 1))
+        # No usemtl written -> faces get the synthetic "default" material
+        assert len(mtl_names_rd) == 1
+        npt.assert_equal(mtl_names_rd[0], "default")
+        npt.assert_(np.all(obj_ind_rd == 0))
         npt.assert_(np.all(mtl_ind_rd == 0))
+        npt.assert_(np.all(csv_ind_rd == 0))  # "default" -> air fallback (row 0)
 
         _rm(fn)
 
@@ -127,7 +152,7 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(vlo, V, decimal=14)
         npt.assert_array_equal(fio, F)
 
-        _, _, vert_list_rd, face_ind_rd, _, _, _, _, _ = (
+        _, vert_list_rd, face_ind_rd, _, _, _, _, _, _, _, _ = (
             quadriga_lib.RTtools.obj_file_read(fn)
         )
         npt.assert_almost_equal(
@@ -144,9 +169,9 @@ class test_case(unittest.TestCase):
         V = cube_vertices()
         F = cube_faces()
         mesh = make_mesh(V, F)
-        obj_ind = np.ones(12, dtype=np.uint64)
-        mtl_ind = np.ones(12, dtype=np.uint64)
-        mtl_ind[4:] = 2  # faces 0-3 concrete, 4-11 wood
+        obj_ind = np.zeros(12, dtype=np.uint64)        # 0-based, single object
+        mtl_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind[4:] = 1  # faces 0-3 concrete (0), 4-11 wood (1)
         obj_names = ["Cube"]
         mtl_names = ["itu_concrete", "itu_wood"]
 
@@ -155,7 +180,8 @@ class test_case(unittest.TestCase):
         )
         npt.assert_(os.path.isfile(mtl_fn))
 
-        _, mtl_prop, _, _, _, mtl_ind_rd, _, mtl_names_rd, _ = (
+        # Resolve EM properties from the built-in default table (names are ITU materials)
+        (_, _, _, _, _, mtl_ind_rd, mtl_names_rd, _, csv_ind_rd, _, csv_prop_rd) = (
             quadriga_lib.RTtools.obj_file_read(fn)
         )
 
@@ -163,43 +189,55 @@ class test_case(unittest.TestCase):
         npt.assert_equal(mtl_names_rd[0], "itu_concrete")
         npt.assert_equal(mtl_names_rd[1], "itu_wood")
         npt.assert_almost_equal(
-            mtl_prop[0, :], [5.24, 0.0, 0.0462, 0.7822, 0, 0, 0, 0, 1], decimal=12
+            em_row(csv_prop_rd, csv_ind_rd[0]),
+            [5.24, 0.0, 0.0462, 0.7822, 0, 0, 0, 0, 1], decimal=3
         )
         npt.assert_almost_equal(
-            mtl_prop[4, :], [1.99, 0.0, 0.0047, 1.0718, 0, 0, 0, 0, 1], decimal=12
+            em_row(csv_prop_rd, csv_ind_rd[4]),
+            [1.99, 0.0, 0.0047, 1.0718, 0, 0, 0, 0, 1], decimal=3
         )
-        npt.assert_array_equal(mtl_ind_rd, [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
+        npt.assert_array_equal(mtl_ind_rd, [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1])
 
         _rm(fn)
         _rm(mtl_fn)
 
-    def test_custom_inline_material(self):
+    def test_custom_material_csv(self):
         fn = "cube.obj"
         mtl_fn = "cube.mtl"
+        csv_fn = "custom_materials.csv"
         _rm(fn)
         _rm(mtl_fn)
+        _rm(csv_fn)
 
         V = cube_vertices()
         F = cube_faces()
         mesh = make_mesh(V, F)
-        obj_ind = np.ones(12, dtype=np.uint64)
-        mtl_ind = np.ones(12, dtype=np.uint64)
+        obj_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.zeros(12, dtype=np.uint64)
 
         quadriga_lib.RTtools.obj_file_write(
-            fn, mesh, obj_ind, mtl_ind, ["Cube"], ["glass::6.0:0:0.1:1.2"]
+            fn, mesh, obj_ind, mtl_ind, ["Cube"], ["glass"]
         )
 
-        _, mtl_prop, _, _, _, mtl_ind_rd, _, mtl_names_rd, _ = (
-            quadriga_lib.RTtools.obj_file_read(fn)
+        # EM properties come from a CSV, not from the OBJ/MTL
+        with open(csv_fn, "w") as f:
+            f.write("name,a,b,c,d,att\n")
+            f.write("air,1.0,0.0,0.0,0.0,0.0\n")
+            f.write("glass,6.0,0.0,0.1,1.2,0.0\n")
+
+        (_, _, _, _, _, mtl_ind_rd, mtl_names_rd, _, csv_ind_rd, _, csv_prop_rd) = (
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
         )
-        npt.assert_equal(mtl_names_rd[0], "glass::6.0:0:0.1:1.2")
+        npt.assert_equal(mtl_names_rd[0], "glass")
         npt.assert_almost_equal(
-            mtl_prop[0, :], [6.0, 0.0, 0.1, 1.2, 0, 0, 0, 0, 1], decimal=12
+            em_row(csv_prop_rd, csv_ind_rd[0]),
+            [6.0, 0.0, 0.1, 1.2, 0, 0, 0, 0, 1], decimal=12
         )
-        npt.assert_(np.all(mtl_ind_rd == 1))
+        npt.assert_(np.all(mtl_ind_rd == 0))
 
         _rm(fn)
         _rm(mtl_fn)
+        _rm(csv_fn)
 
     def test_bsdf_roundtrip(self):
         fn = "cube.obj"
@@ -210,8 +248,8 @@ class test_case(unittest.TestCase):
         V = cube_vertices()
         F = cube_faces()
         mesh = make_mesh(V, F)
-        obj_ind = np.ones(12, dtype=np.uint64)
-        mtl_ind = np.ones(12, dtype=np.uint64)
+        obj_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.zeros(12, dtype=np.uint64)
 
         # Distinct non-default values; clamped fields inside [0, 1], ior in a sane range
         bsdf = np.array(
@@ -239,7 +277,7 @@ class test_case(unittest.TestCase):
         )
         npt.assert_(os.path.isfile(mtl_fn))
 
-        _, _, _, _, _, _, _, mtl_names_rd, bsdf_rd = (
+        (_, _, _, _, _, _, mtl_names_rd, bsdf_rd, _, _, _) = (
             quadriga_lib.RTtools.obj_file_read(fn)
         )
         npt.assert_equal(mtl_names_rd[0], "painted")
@@ -260,8 +298,8 @@ class test_case(unittest.TestCase):
         meshB[:, [0, 3, 6]] += 10.0  # shift x of all corners -> disjoint cube
         mesh = np.vstack([meshA, meshB])  # (24, 9)
         obj_ind = np.concatenate(
-            [np.ones(12, dtype=np.uint64), 2 * np.ones(12, dtype=np.uint64)]
-        )
+            [np.zeros(12, dtype=np.uint64), np.ones(12, dtype=np.uint64)]
+        )  # 0-based
         obj_names = ["CubeA", "CubeB"]
 
         vlo, _ = quadriga_lib.RTtools.obj_file_write(
@@ -269,7 +307,7 @@ class test_case(unittest.TestCase):
         )
         assert vlo.shape == (16, 3)  # no cross-object merging -> 8 + 8
 
-        _, _, vert_list_rd, face_ind_rd, obj_ind_rd, _, obj_names_rd, _, _ = (
+        (_, vert_list_rd, face_ind_rd, obj_ind_rd, obj_names_rd, _, _, _, _, _, _) = (
             quadriga_lib.RTtools.obj_file_read(fn)
         )
 
@@ -280,7 +318,7 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(
             obj_ind_rd,
             np.concatenate(
-                [np.ones(12, dtype=np.int64), 2 * np.ones(12, dtype=np.int64)]
+                [np.zeros(12, dtype=np.int64), np.ones(12, dtype=np.int64)]
             ),
         )
         npt.assert_almost_equal(
@@ -319,28 +357,28 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError):
             quadriga_lib.RTtools.obj_file_write("cube.txt", mesh)
 
-        # Non-contiguous obj_ind: {1,1,2,2,1,...}
+        # Non-contiguous obj_ind: {0,0,1,1,0,...}
         with self.assertRaises(ValueError):
-            obj_bad = np.ones(12, dtype=np.uint64)
-            obj_bad[2] = 2
-            obj_bad[3] = 2
+            obj_bad = np.zeros(12, dtype=np.uint64)
+            obj_bad[2] = 1
+            obj_bad[3] = 1
             quadriga_lib.RTtools.obj_file_write(
                 fn, mesh, obj_bad, obj_names=["A", "B"]
             )
 
-        # obj_names too short for obj_ind
+        # obj_names too short for obj_ind (0-based: max index 1 needs 2 names)
         with self.assertRaises(ValueError):
             obj_ind = np.concatenate(
-                [np.ones(6, dtype=np.uint64), 2 * np.ones(6, dtype=np.uint64)]
+                [np.zeros(6, dtype=np.uint64), np.ones(6, dtype=np.uint64)]
             )
             quadriga_lib.RTtools.obj_file_write(
                 fn, mesh, obj_ind, obj_names=["OnlyOne"]
             )
 
-        # mtl_names too short for mtl_ind
+        # mtl_names too short for mtl_ind (0-based: max index 1 needs 2 names)
         with self.assertRaises(ValueError):
             mtl_ind = np.concatenate(
-                [np.ones(6, dtype=np.uint64), 2 * np.ones(6, dtype=np.uint64)]
+                [np.zeros(6, dtype=np.uint64), np.ones(6, dtype=np.uint64)]
             )
             quadriga_lib.RTtools.obj_file_write(
                 fn, mesh, mtl_ind=mtl_ind, mtl_names=["OnlyOne"]

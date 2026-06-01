@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <charconv>
+#include <limits>
 
 // Helper: Convert mesh to vert_list + face_ind (Blender-style, per-object self-contained)
 // - Co-located vertices within "threshold" belonging to the SAME object are merged into one.
@@ -25,7 +26,7 @@
 // - Greedy O(n^2) weld per object; not performance-critical.
 template <typename dtype>
 static void mesh2vert_list(const arma::Mat<dtype> &mesh, // mesh, Size: [ n_mesh, 9 ]
-                           const arma::uvec &obj_ind,    // Object index, 1-based, Size: [ n_mesh ]
+                           const arma::uvec &obj_ind,    // Object index, 0-based, Size: [ n_mesh ]
                            arma::Mat<dtype> &vert_list,  // Out: List of vertices, Size: [ n_vert_out, 3 ]
                            arma::umat &face_ind,         // Out: face indices, 0-based, Size: [ n_mesh, 3 ]
                            dtype threshold)              // Co-location threshold for vertices, Default: 1 mm
@@ -141,8 +142,8 @@ Write a triangulated Wavefront .obj (and .mtl) file
   are closer than `threshold` (no merging across objects). With `vert_list`/`face_ind`: data is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind`/`obj_names`: a single object named `object` is written
-- Without `mtl_ind` (or if all entries are `0`): no `usemtl` tags and no `.mtl` file are written;
-  `mtl_ind = 0` marks an individual face as unassigned
+- Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, every face is
+  assigned a (0-based) material; pass `mtl_ind = nullptr` to leave geometry unassigned
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
 
 ## Declaration:
@@ -165,10 +166,10 @@ void obj_file_write(
 ## Inputs:
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
-- **`obj_ind`** — 1-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (`0` = none); `[n_mesh]`
-- **`obj_names`** — Object names; length ≥ `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)`; required if `mtl_ind` has nonzero entries
+- **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
+- **`mtl_ind`** — 0-based material index per face; `[n_mesh]`; omit (`nullptr`) for no materials
+- **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
+- **`mtl_names`** — Material names; length > `max(mtl_ind)`; required if `mtl_ind` is given
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [[obj_file_read]] for columns
@@ -232,7 +233,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     if (n_mesh == 0)
         throw std::invalid_argument("No faces to write (empty geometry).");
 
-    // Validate obj_ind: 1-based, each object a contiguous block
+    // Validate obj_ind: 0-based, each object a contiguous block
     if (obj_ind != nullptr)
     {
         if (obj_ind->n_elem != n_mesh)
@@ -240,14 +241,10 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         std::unordered_set<arma::uword> seen;
         arma::uword prev = obj_ind->at(0);
-        if (prev == 0)
-            throw std::invalid_argument("Input 'obj_ind' must be 1-based (found 0).");
         seen.insert(prev);
         for (arma::uword n = 1; n < n_mesh; ++n)
         {
             const arma::uword cur = obj_ind->at(n);
-            if (cur == 0)
-                throw std::invalid_argument("Input 'obj_ind' must be 1-based (found 0).");
             if (cur != prev)
             {
                 if (!seen.insert(cur).second)
@@ -256,24 +253,21 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             }
         }
 
-        if (obj_names == nullptr || obj_names->size() < obj_ind->max())
+        if (obj_names == nullptr || obj_names->size() <= obj_ind->max())
             throw std::invalid_argument("'obj_names' is missing or too short for the given 'obj_ind'.");
     }
 
-    // Validate mtl_ind (0 = no material, allowed)
+    // Validate mtl_ind
     if (mtl_ind != nullptr)
     {
         if (mtl_ind->n_elem != n_mesh)
             throw std::invalid_argument("Input 'mtl_ind' must have one element per face.");
 
-        const arma::uword max_mtl = mtl_ind->max();
-        if (max_mtl > 0)
-        {
-            if (mtl_names == nullptr || mtl_names->size() < max_mtl)
-                throw std::invalid_argument("'mtl_names' is missing or too short for the given 'mtl_ind'.");
-            if (bsdf != nullptr && (bsdf->n_cols != 17 || bsdf->n_rows < max_mtl))
-                throw std::invalid_argument("Input 'bsdf' must have 17 columns and one row per material.");
-        }
+        const arma::uword n_mtl = mtl_ind->max() + 1;
+        if (mtl_names == nullptr || mtl_names->size() < n_mtl)
+            throw std::invalid_argument("'mtl_names' is missing or too short for the given 'mtl_ind'.");
+        if (bsdf != nullptr && (bsdf->n_cols != 17 || bsdf->n_rows < n_mtl))
+            throw std::invalid_argument("Input 'bsdf' must have 17 columns and one row per material.");
     }
     else if (bsdf != nullptr)
         throw std::invalid_argument("'bsdf' requires 'mtl_ind' and 'mtl_names'.");
@@ -290,7 +284,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         const arma::uvec *pObj = obj_ind;
         if (pObj == nullptr)
         {
-            obj_ones = arma::ones<arma::uvec>(n_mesh);
+            obj_ones = arma::zeros<arma::uvec>(n_mesh);
             pObj = &obj_ones;
         }
         mesh2vert_list(*mesh, *pObj, VL_local, FI_local, threshold);
@@ -328,17 +322,17 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     const std::string mtllib_name = mtl_path.filename().string();
 
     // Per-face accessors
+    constexpr arma::uword NO_MTL = std::numeric_limits<arma::uword>::max();
     auto objid = [&](arma::uword f) -> arma::uword
-    { return (obj_ind != nullptr) ? obj_ind->at(f) : (arma::uword)1; };
+    { return (obj_ind != nullptr) ? obj_ind->at(f) : (arma::uword)0; };
     auto mtlid = [&](arma::uword f) -> arma::uword
-    { return (mtl_ind != nullptr) ? mtl_ind->at(f) : (arma::uword)0; };
+    { return (mtl_ind != nullptr) ? mtl_ind->at(f) : NO_MTL; };
 
     // Materials actually used (nonzero, sorted, unique)
     std::set<arma::uword> used_mtl;
     if (mtl_ind != nullptr)
         for (arma::uword f = 0; f < n_mesh; ++f)
-            if (const arma::uword m = mtlid(f); m != 0)
-                used_mtl.insert(m);
+            used_mtl.insert(mtlid(f)); // every entry is a valid 0-based material
     const bool write_materials = !used_mtl.empty();
 
     // Shortest round-trip number formatter (also maps -0 -> 0)
@@ -377,7 +371,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         // Object header
         std::string oname;
         if (obj_ind != nullptr)
-            oname = (*obj_names)[cur_obj - 1];
+            oname = (*obj_names)[cur_obj];
         else if (obj_names != nullptr && !obj_names->empty())
             oname = (*obj_names)[0];
         else
@@ -404,13 +398,13 @@ void quadriga_lib::obj_file_write(const std::string &fn,
             obj << "v " << fmt(VL.at(gv, 0)) << " " << fmt(VL.at(gv, 1)) << " " << fmt(VL.at(gv, 2)) << "\n";
 
         // Faces; emit usemtl on material change (reset per object, like the reader)
-        arma::uword last_mtl = 0;
+        arma::uword last_mtl = NO_MTL;
         for (arma::uword i = f; i < g; ++i)
         {
             if (write_materials)
-                if (const arma::uword m = mtlid(i); m != 0 && m != last_mtl)
+                if (const arma::uword m = mtlid(i); m != last_mtl)
                 {
-                    obj << "usemtl " << (*mtl_names)[m - 1] << "\n";
+                    obj << "usemtl " << (*mtl_names)[m] << "\n";
                     last_mtl = m;
                 }
 
@@ -436,11 +430,11 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
         for (const arma::uword id : used_mtl)
         {
-            mtl << "\nnewmtl " << (*mtl_names)[id - 1] << "\n";
+            mtl << "\nnewmtl " << (*mtl_names)[id] << "\n";
 
             if (bsdf != nullptr)
             {
-                const arma::uword r = id - 1;
+                const arma::uword r = id; // id is already the 0-based material row
                 const dtype R = bsdf->at(r, 0), G = bsdf->at(r, 1), B = bsdf->at(r, 2);
                 const dtype d = bsdf->at(r, 3), Pr = bsdf->at(r, 4), Pm = bsdf->at(r, 5);
                 const dtype Ni = bsdf->at(r, 6), Ks = bsdf->at(r, 7);

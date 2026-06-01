@@ -7,18 +7,16 @@ assertTrue(exist('test_mex.obj', 'file') == 2);
 assertTrue(exist('test_mex.mtl', 'file') == 2);
 
 % --- Read back and validate content ---
-[mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names] = ...
+[mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind] = ...
     quadriga_lib.obj_file_read('test_mex.obj');
 
 assert( size(mesh, 1) > 0 );
-assert( size(mesh, 2) == 9 );                          % {X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3} per triangle
+assert( size(mesh, 2) == 9 );                          % {X1,Y1,Z1,...,X3,Y3,Z3} per triangle
 assert( size(vert_list, 2) == 3 );                     % xyz columns
 assert( size(face_ind, 1) == size(mesh, 1) );          % one face per triangle
 assert( size(face_ind, 2) == 3 );                      % 3 vertex indices per face
 assert( numel(obj_ind) == size(mesh, 1) );
 assert( numel(mtl_ind) == size(mesh, 1) );
-assert( size(mtl_prop, 1) == size(mesh, 1) );
-assert( size(mtl_prop, 2) == 1 );
 % Face indices reference valid vertices
 assert( max(face_ind(:)) <= size(vert_list, 1) );
 assert( min(face_ind(:)) >= 1 );
@@ -45,11 +43,11 @@ assert( size(mesh_low, 1), 20 );
 
 % --- object_radius scales the mesh linearly ---
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 1.0, 2);
-[~, ~, vert_r1] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_r1] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_c, 30, 'jet', 3.0, 2);
-[~, ~, vert_r3] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_r3] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 max_r1 = max(abs(vert_r1(:)));
@@ -60,11 +58,11 @@ assertElementsAlmostEqual( max_r3 / max_r1, 3.0, 'relative', 0.05 );
 ant_xp = quadriga_lib.arrayant_generate('xpol');  % 2 elements
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_xp, 30, 'jet', 1.0, 2, []);
-[~, ~, ~, ~, obj_ind_all] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, ~, ~, obj_ind_all] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_xp, 30, 'jet', 1.0, 2, 1);
-[~, ~, ~, ~, obj_ind_one] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, ~, ~, obj_ind_one] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 assert( max(obj_ind_all) == 2 );
@@ -97,12 +95,12 @@ ant_mf = [ant_a, ant_b];
 
 % freq=1 -> uses ant_a entry
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2, [], 1);
-[~, ~, vert_freq1] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_freq1] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 % freq=2 -> uses ant_b entry
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2, [], 2);
-[~, ~, vert_freq2] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_freq2] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 % Geometries differ because beam patterns differ
@@ -110,11 +108,11 @@ assert( ~isequal(vert_freq1, vert_freq2) );
 
 % Each multi-freq export matches its direct single-freq counterpart
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_a, 30, 'jet', 1.0, 2);
-[~, ~, vert_a] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_a] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_b, 30, 'jet', 1.0, 2);
-[~, ~, vert_b] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_b] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 
 assertElementsAlmostEqual( vert_freq1, vert_a, 'absolute', 1e-10 );
@@ -122,13 +120,13 @@ assertElementsAlmostEqual( vert_freq2, vert_b, 'absolute', 1e-10 );
 
 % Omitted freq defaults to 1 (matches explicit freq=1)
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2);
-[~, ~, vert_default] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_default] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 assertElementsAlmostEqual( vert_default, vert_freq1, 'absolute', 1e-12 );
 
 % Empty freq input also defaults to 1
 quadriga_lib.arrayant_export_obj_file('test_mex.obj', ant_mf, 30, 'jet', 1.0, 2, [], []);
-[~, ~, vert_empty] = quadriga_lib.obj_file_read('test_mex.obj');
+[~, vert_empty] = quadriga_lib.obj_file_read('test_mex.obj');
 delete('test_mex.obj'); delete('test_mex.mtl');
 assertElementsAlmostEqual( vert_empty, vert_freq1, 'absolute', 1e-12 );
 

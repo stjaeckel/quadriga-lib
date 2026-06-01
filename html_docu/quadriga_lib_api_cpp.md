@@ -1,7 +1,7 @@
 ---
-title: "C++ API Documentation for Quadriga-Lib v0.11.6"
+title: "C++ API Documentation for Quadriga-Lib v0.11.7"
 author: "Stephan Jaeckel"
-date: "29.05.2026"
+date: "01.06.2026"
 lang: en-US
 ---
 
@@ -100,30 +100,30 @@ lang: en-US
 | [fast_slerp](#fast_slerp) | Math functions | 2751 |
 | [interp_2D](#interp_2d) | Math functions | 2786 |
 | [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2850 |
-| [colormap](#colormap) | Site-specific simulation tools | 2900 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2919 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2962 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3000 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3044 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3078 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3113 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3154 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3302 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3352 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3383 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3411 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3440 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3479 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3515 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3551 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3636 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3679 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3727 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3771 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3801 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3829 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3870 |
-| [write_png](#write_png) | Site-specific simulation tools | 3905 |
+| [colormap](#colormap) | Site-specific simulation tools | 2902 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2921 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2964 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3002 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3046 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3080 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3115 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3156 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3221 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3271 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3302 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3330 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3359 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3398 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3434 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3470 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3566 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3609 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3657 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3701 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3731 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3759 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3800 |
+| [write_png](#write_png) | Site-specific simulation tools | 3835 |
 
 ---
 
@@ -2860,7 +2860,8 @@ void calc_diffraction_gain(
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
     const arma::Mat<dtype> *mesh,
-    const arma::Mat<dtype> *mtl_prop,
+    const arma::uvec *mtl_ind,
+    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
     dtype center_frequency,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
@@ -2875,7 +2876,8 @@ void calc_diffraction_gain(
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, n_param]`
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
 - **`verbose`** *(optional)* — Verbosity level
@@ -3090,17 +3092,17 @@ Linear gain of a ray traversing a homogeneous lossy medium
 ### Declaration:
 ```
 dtype quadriga_lib::medium_gain(
-        const arma::Mat<dtype> &mtl_prop,
-        arma::uword iM,
-        dtype dist,
-        dtype fGHz);
+    const arma::Mat<dtype> &mtl_prop,
+    arma::uword iM,
+    dtype dist,
+    dtype fGHz);
 ```
 
 ### Inputs:
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read) for the column layout; `[n_mesh, 9]`
-- **`iM`** — Row index selecting the material from `mtl_prop`
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
+- **`iM`** — 0-based material index selecting the material from `mtl_prop`
 - **`dist`** — Path length of the ray inside the medium
-- **`center_frequency`** — Center frequency; Hu
+- **`center_frequency`** — Center frequency in [Hz]
 
 ### Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -3113,13 +3115,13 @@ dtype quadriga_lib::medium_gain(
 ## mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for 
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
   differentiable radio-propagation simulations
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
-- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; 
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
   both the XML and the mesh folder must be distributable together
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) 
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 
 ### Declaration:
@@ -3140,10 +3142,10 @@ void quadriga_lib::mitsuba_xml_file_write(
 - **`fn`** — Output file path including `.xml` extension
 - **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; `[n_mesh]`
-- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; `[n_mesh]`
-- **`obj_names`** — Object names; length must equal `max(obj_ind)`
-- **`mtl_names`** — Material names; length must equal `max(mtl_ind)`
+- **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 0-based material index per triangle; `[n_mesh]`
+- **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
+- **`mtl_names`** — Material names; length must equal `max(mtl_ind)+1`
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `[mtl_names.size(), 17]`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
@@ -3152,124 +3154,61 @@ void quadriga_lib::mitsuba_xml_file_write(
 
 ---
 ## obj_file_read
-Read a Wavefront .obj file and extract geometry and material information
+Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 
-- Parses a triangulated Wavefront `.obj` file; quads and n-gons are not supported
-- Materials applied per triangle via `usemtl` tag; unknown/missing materials default to `"vacuum"` (all
-  parameters at their defaults: ε_r = 1, σ = 0, all loss and resonance terms disabled)
-- Material name matching is case-sensitive
-- Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)
-- Default material tag syntax: `usemtl itu_concrete` (or `itu_brick`, `itu_wood`, etc.)
-- Custom material tag syntax: `usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef:m:resF:resQ:resS:coiF:coiQ:coiA`
-  - Trailing fields are optional; any omitted field falls back to its default (see the parameter table below)
-  - Example (only ε and conductivity): `usemtl Glass::6.31:0:0.0036:1.3394`
-- A material row has between 1 and 16 columns. Only column 0 (`a`) is required; every other column may be
-  omitted and is then substituted with its default. The columns split into three roles:
-  - **Interface reflection** (`a`, `b`, `c`, `d`, `resF`, `resQ`, `resS`) — set the complex permittivity ε, which
-    fixes the Fresnel reflection coefficient and therefore the room-side absorption `1 − abs(R)²`.
-    Applied once per surface hit, independent of path length.
-  - **Interface transmission** (`att`, `attB`, `coiF`, `coiQ`, `coiA`) — a lumped through-surface loss in dB,
-    applied once per transmission, independent of path length.
-  - **In-medium attenuation** (`c`, `d` via ε, `alpha`, `alphaB`, `m`) — loss accumulated along the path
-    traversed inside a body; depends on the in-medium distance.
-- Frequency laws (`f` in GHz; `f/fRef` is the relative frequency, but `resF` and `coiF` are absolute GHz):
-  | Parameter  | Formula                                                      | Unit   | Meaning                                |
-  | ---------- | ------------------------------------------------------------ | ------ | -------------------------------------- |
-  | ε(f)       | `a·(f/fRef)^b + resS·resF² / (resF² − f² − i·(resF/resQ)·f)` | —      | relative permittivity (complex)        |
-  | σ(f)       | `c·(f/fRef)^d`                                               | [S/m]  | conductivity                           |
-  | att(f)     | `att·(f/fRef)^attB + coiA / (1 + (coiQ·(f − coiF)/coiF)²)`   | [dB]   | per-interface transmission loss        |
-  | α(f)       | `alpha·(f/fRef)^alphaB`                                      | [dB/m] | in-medium loss × in-medium path length |
-  | mass(f, L) | `max(0, m·log10((f/fRef)·L))`                                | [dB]   | in-medium, L = path length in metres   |
-- **Permittivity resonance** (`resF`, `resQ`, `resS`): a Lorentz pole that adds a peak to absorption (acoustic α) and a feature to reflection near `resF`; `resQ` sets sharpness (higher = narrower). Active only when `resF > 0` and `resS ≠ 0`. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).
-- **Coincidence term** (`coiF`, `coiQ`, `coiA`): a Lorentzian added to the transmission loss at `coiF`. Negative `coiA` produces a transmission dip (acoustic coincidence / pass-band); positive `coiA` produces a stop-band. Total loss is clamped to ≥ 0. Active only when `coiF > 0` and `coiA ≠ 0`.
-- **Mass-law term** (`m`): a transmission loss that is logarithmic in both frequency and in-medium path length. `m = 20` reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 0 (EM through-loss is the linear `alpha` term). The imaginary sign of the ε resonance follows the library's loss convention (consistent with σ).
+- Parses a triangulated `.obj`; quads and n-gons are rejected. Two independent material systems are returned:
+  - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
+  - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
+- A face's `usemtl` name is matched to the table by exact name, then by name with a trailing Blender
+  `.NNN` suffix removed. Unmatched names throw when `csv_strict = true`; otherwise they map to row 0
+  of the table (the transparent fallback). The two index spaces are decoupled, so several visual
+  materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
+- All returned indices are 0-based.
+- With an empty `fn_obj`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
+  is populated — useful for inspecting a CSV or the default library. If `fn_csv` is also empty, the built-in default table is returned.
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Declaration:
 ```
 arma::uword quadriga_lib::obj_file_read(
-    std::string fn,
+    const std::string &fn_obj = "",
     arma::Mat<dtype> *mesh = nullptr,
-    arma::Mat<dtype> *mtl_prop = nullptr,
     arma::Mat<dtype> *vert_list = nullptr,
     arma::umat *face_ind = nullptr,
     arma::uvec *obj_ind = nullptr,
-    arma::uvec *mtl_ind = nullptr,
     std::vector<std::string> *obj_names = nullptr,
+    arma::uvec *mtl_ind = nullptr,
     std::vector<std::string> *mtl_names = nullptr,
     arma::Mat<dtype> *bsdf = nullptr,
-    const std::string &materials_csv = "",
-    bool trim = true);
+    const std::string &fn_csv = "",
+    arma::uvec *csv_ind = nullptr,
+    std::vector<std::string> *csv_names = nullptr,
+    std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
+    bool csv_strict = false);
 ```
 
 ### Inputs:
-- **`fn`** — Path to the `.obj` file
-- **`materials_csv`** — Path to CSV file with custom material properties.
-  Required column: `a`, plus `name`. Optional columns (any order, any subset):
-  `b`, `c`, `d`, `att`, `attB`, `alpha`, `alphaB`, `fRef`, `m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`.
-  Missing optional columns and empty cells fall back to the per-column defaults below (`a` → 1, `fRef` → 1, everything else → 0).
-  If empty, ITU-R P.2040-3 defaults are used.
-- **`trim`** — If `true`, remove non-default columns from `mtl_prop`
+- **`fn_obj`** — Path to the `.obj` file; empty loads only the material table
+- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column, and row 0 is the
+  fallback material (should be transparent, e.g. air). Empty uses the built-in ITU-R P.2040 default table.
+- **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to row 0
 
 ### Outputs:
-- **`mesh`** — Triangle vertex coordinates as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; `[n_mesh, n_cols]` with `1 ≤ n_cols ≤ 16`. The width is the minimum that captures all non-default parameters in the scene; consumers substitute defaults for absent columns. Columns:
-  | Index | Symbol | Property                             | Units    | Default |
-  | :---: | :----: | ------------------------------------ | :------: | :-----: |
-  | 0     | a      | ε_r at fRef                          | —        | 1.0     |
-  | 1     | b      | Frequency exponent for ε_r           | —        | 0       |
-  | 2     | c      | σ at fRef                            | S/m      | 0       |
-  | 3     | d      | Frequency exponent for σ             | —        | 0       |
-  | 4     | att    | Penetration loss at fRef             | dB       | 0       |
-  | 5     | attB   | Frequency exponent for att           | —        | 0       |
-  | 6     | alpha  | In-medium absorption at fRef         | dB/m     | 0       |
-  | 7     | alphaB | Frequency exponent for alpha         | —        | 0       |
-  | 8     | fRef   | Reference frequency                  | GHz      | 1.0     |
-  | 9     | m      | Mass-law transmission slope          | dB/decade| 0       |
-  | 10    | resF   | Permittivity resonance frequency     | GHz      | 0       |
-  | 11    | resQ   | Permittivity resonance quality factor| —        | 0       |
-  | 12    | resS   | Permittivity resonance strength      | —        | 0       |
-  | 13    | coiF   | Coincidence frequency                | GHz      | 0       |
-  | 14    | coiQ   | Coincidence quality factor           | —        | 0       |
-  | 15    | coiA   | Coincidence loss amplitude           | dB       | 0       |
+- **`mesh`** — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
 - **`vert_list`** — All vertex positions in the file; `[n_vert, 3]`
-- **`face_ind`** — 0-based indices into `vert_list` per triangle; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; `[n_mesh]`
-- **`mtl_ind`** — 1-based material index per triangle; `[n_mesh]`
-- **`obj_names`** — Object names; length = `max(obj_ind)`
-- **`mtl_names`** — Material names; length = `max(mtl_ind)`
-- **`bsdf`** — Principled BSDF values from the `.mtl` file; `[n_mtl, 17]` (unchanged; see below)
+- **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
+- **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
+- **`obj_names`** — Object names; length `max(obj_ind)+1`
+- **`mtl_ind`** — 0-based visual-material index per triangle; `[n_mesh]`
+- **`mtl_names`** — Visual material names (raw `usemtl`); length `no_mtl`
+- **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
+- **`csv_ind`** — 0-based EM/acoustic-material index per triangle; `[n_mesh]`
+- **`csv_names`** — Material names from the table; length `n_csv` (the full table)
+- **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
+  length `n_csv`. Columns absent from the table are defaulted by consumers; empty cells parse as 0.
 
 ### Returns:
 - Number of triangular mesh elements (`n_mesh`)
-
-### Default material table:
-- All built-in materials use only columns 0–4 (`a`, `b`, `c`, `d`, `att`); `attB = alpha = alphaB = 0`, `fRef = 1 GHz`, and all extended parameters (`m`, `resF`, `resQ`, `resS`, `coiF`, `coiQ`, `coiA`) = 0. A scene using only built-in materials therefore yields a 5-column `mtl_prop` (4 columns if no material sets `att`; only `irr_glass` does).
-  | Name                  | a     | b      | c       | d      | att  | max fGHz |
-  | --------------------- | ----: | -----: | ------: | -----: | ---: | -------: |
-  | vacuum / air          | 1.0   | 0.0    | 0.0     | 0.0    | 0.0  | 100      |
-  | textiles              | 1.5   | 0.0    | 5e-5    | 0.62   | 0.0  | 100      |
-  | plastic               | 2.44  | 0.0    | 2.33e-5 | 1.0    | 0.0  | 100      |
-  | ceramic               | 6.5   | 0.0    | 0.0023  | 1.32   | 0.0  | 100      |
-  | sea_water             | 80.0  | -0.25  | 4.0     | 0.58   | 0.0  | 100      |
-  | sea_ice               | 3.2   | -0.022 | 1.1     | 1.5    | 0.0  | 100      |
-  | water                 | 80.0  | -0.18  | 0.6     | 1.52   | 0.0  | 20       |
-  | water_ice             | 3.17  | -0.005 | 5.6e-5  | 1.7    | 0.0  | 20       |
-  | itu_concrete          | 5.24  | 0.0    | 0.0462  | 0.7822 | 0.0  | 100      |
-  | itu_brick             | 3.91  | 0.0    | 0.0238  | 0.16   | 0.0  | 40       |
-  | itu_plasterboard      | 2.73  | 0.0    | 0.0085  | 0.9395 | 0.0  | 100      |
-  | itu_wood              | 1.99  | 0.0    | 0.0047  | 1.0718 | 0.0  | 100      |
-  | itu_glass             | 6.31  | 0.0    | 0.0036  | 1.3394 | 0.0  | 100      |
-  | itu_ceiling_board     | 1.48  | 0.0    | 0.0011  | 1.075  | 0.0  | 100      |
-  | itu_chipboard         | 2.58  | 0.0    | 0.0217  | 0.78   | 0.0  | 100      |
-  | itu_plywood           | 2.71  | 0.0    | 0.33    | 0.0    | 0.0  | 40       |
-  | itu_marble            | 7.074 | 0.0    | 0.0055  | 0.9262 | 0.0  | 60       |
-  | itu_floorboard        | 3.66  | 0.0    | 0.0044  | 1.3515 | 0.0  | 100      |
-  | itu_metal             | 1.0   | 0.0    | 1.0e7   | 0.0    | 0.0  | 100      |
-  | itu_very_dry_ground   | 3.0   | 0.0    | 0.00015 | 2.52   | 0.0  | 10       |
-  | itu_medium_dry_ground | 15.0  | -0.1   | 0.035   | 1.63   | 0.0  | 10       |
-  | itu_wet_ground        | 30.0  | -0.4   | 0.15    | 1.3    | 0.0  | 10       |
-  | itu_vegetation        | 1.0   | 0.0    | 1.0e-4  | 1.1    | 0.0  | 100      |
-  | irr_glass             | 6.27  | 0.0    | 0.0043  | 1.1925 | 23.0 | 100      |
 
 ### See also:
 - [obj_file_write](#obj_file_write) (for writing OBJ files)
@@ -3277,26 +3216,6 @@ arma::uword quadriga_lib::obj_file_read(
 - [triangle_mesh_segmentation](#triangle_mesh_segmentation) (used to calculate indexed mesh for faster processing)
 - [ray_mesh_interact](#ray_mesh_interact) (calculating interactions between rays and the triangular mesh)
 - [mitsuba_xml_file_write](#mitsuba_xml_file_write) (for exporting to Mitsuba scene file format)
-
-<a target="_blank" rel="noopener noreferrer" href=""></a>
-
-### Background and references:
-Base EM model (columns 0–8, reflection and σ-loss):
-- <a target="_blank" rel="noopener noreferrer" href="https://www.itu.int/rec/R-REC-P.2040">ITU-R P.2040</a> (recommendation
-  defining the (a, b, c, d) permittivity/conductivity model and the Fresnel coefficients)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Fresnel_equations">Fresnel equations</a> (interface reflection/transmission from ε)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Relative_permittivity">Relative permittivity (a, b)</a>
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Electrical_resistivity_and_conductivity">Electrical resistivity and conductivity (c, d)</a>
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Dielectric_loss">Dielectric loss / loss tangent</a> (in-medium σ loss)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Attenuation">Attenuation</a> (alpha, linear in path length)
-
-Acoustic mechanism mapping (the analogy the parameters approximate):
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_impedance">Acoustic impedance</a> (basis for deriving `a` from an impedance ratio)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Acoustic_transmission">Acoustic transmission</a> (mass-law transmission loss (m) and the coincidence effect)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Soundproofing">Soundproofing</a> (mass law, coincidence, partition behaviour)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Sound_transmission_class">Sound transmission class</a> (single-number TL rating context)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Absorption_(acoustics)">Absorption (acoustics)</a> (porous absorption: alpha, alphaB)
-- <a target="_blank" rel="noopener noreferrer" href="https://en.wikipedia.org/wiki/Helmholtz_resonance">Helmholtz resonance</a> (resonant absorbers (resF/resQ/resS, coiF/coiQ/coiA))
 
 ---
 ## obj_file_write
@@ -3307,8 +3226,8 @@ Write a triangulated Wavefront .obj (and .mtl) file
   are closer than `threshold` (no merging across objects). With `vert_list`/`face_ind`: data is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind`/`obj_names`: a single object named `object` is written
-- Without `mtl_ind` (or if all entries are `0`): no `usemtl` tags and no `.mtl` file are written;
-  `mtl_ind = 0` marks an individual face as unassigned
+- Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, every face is
+  assigned a (0-based) material; pass `mtl_ind = nullptr` to leave geometry unassigned
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
 
 ### Declaration:
@@ -3331,10 +3250,10 @@ void obj_file_write(
 ### Inputs:
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
-- **`obj_ind`** — 1-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 1-based material index per face (`0` = none); `[n_mesh]`
-- **`obj_names`** — Object names; length ≥ `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)`; required if `mtl_ind` has nonzero entries
+- **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
+- **`mtl_ind`** — 0-based material index per face; `[n_mesh]`; omit (`nullptr`) for no materials
+- **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
+- **`mtl_names`** — Material names; length > `max(mtl_ind)`; required if `mtl_ind` is given
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [obj_file_read](#obj_file_read) for columns
@@ -3561,21 +3480,31 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
 - Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
   simulation with impedance-mapped material parameters (ε derived from Z).
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Declaration:
 ```
 void quadriga_lib::ray_mesh_interact(
-    int interaction_type, dtype center_frequency,
-    const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs, const arma::Mat<dtype> *sbs,
-    const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
-    const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
+    int interaction_type,
+    dtype center_frequency,
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *fbs,
+    const arma::Mat<dtype> *sbs,
+    const arma::Mat<dtype> *mesh,
+    const arma::uvec *mtl_ind,
+    const std::unordered_map<std::string, td::vector<dtype>> *mtl_prop,
+    const arma::u32_vec *fbs_ind,
+    const arma::u32_vec *sbs_ind,
     const arma::Mat<dtype> *trivec = nullptr,
     const arma::Mat<dtype> *tridir = nullptr,
     const arma::Col<dtype> *orig_length = nullptr,
-    arma::Mat<dtype> *origN = nullptr, arma::Mat<dtype> *destN = nullptr,
-    arma::Col<dtype> *gainN = nullptr, arma::Mat<dtype> *xprmatN = nullptr,
-    arma::Mat<dtype> *trivecN = nullptr, arma::Mat<dtype> *tridirN = nullptr,
+    arma::Mat<dtype> *origN = nullptr,
+    arma::Mat<dtype> *destN = nullptr,
+    arma::Col<dtype> *gainN = nullptr,
+    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *trivecN = nullptr,
+    arma::Mat<dtype> *tridirN = nullptr,
     arma::Col<dtype> *orig_lengthN = nullptr,
     arma::Col<dtype> *fbs_angleN = nullptr,
     arma::Col<dtype> *thicknessN = nullptr,
@@ -3589,8 +3518,9 @@ void quadriga_lib::ray_mesh_interact(
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangle mesh faces; ee [obj_file_read](#obj_file_read); `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, n_param]`
+- **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. NULL → all faces treated as air.
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`. NULL → air defaults used.
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
@@ -3773,7 +3703,7 @@ Subdivide triangles into smaller triangles
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
-- Material properties are duplicated from parent triangle to all sub-triangles
+- Material indices are duplicated from the parent triangle to all sub-triangles
 
 ### Declaration:
 ```
@@ -3781,18 +3711,18 @@ arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
     const arma::Mat<dtype> *triangles_in,
     arma::Mat<dtype> *triangles_out,
-    const arma::Mat<dtype> *mtl_prop = nullptr,
-    arma::Mat<dtype> *mtl_prop_out = nullptr);
+    const arma::uvec *mtl_ind = nullptr,
+    arma::uvec *mtl_ind_out = nullptr);
 ```
 
 ### Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_triangles_in, n_param]`
+- **`mtl_ind`** — Material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_triangles_in]`
 
 ### Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, n_param]`
+- **`mtl_ind_out`** — Material indices for subdivided triangles; `[n_triangles_out]`
 
 ### Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -3832,7 +3762,7 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 - Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to `vec_size`
 - Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark padding entries
-- If `mtl_prop` is provided, material rows are reordered and padded in the same way
+- If `mtl_ind` is provided, material indices are reordered and padded the same way (padding uses index 0)
 
 ### Declaration:
 ```
@@ -3842,8 +3772,8 @@ arma::uword triangle_mesh_segmentation(
     arma::u32_vec *sub_mesh_index,
     arma::uword target_size = 1024,
     arma::uword vec_size = 1,
-    const arma::Mat<dtype> *mtl_prop = nullptr,
-    arma::Mat<dtype> *mtl_propR = nullptr,
+    const arma::uvec *mtl_ind = nullptr,
+    arma::uvec *mtl_ind_out = nullptr,
     arma::u32_vec *mesh_index = nullptr);
 ```
 
@@ -3851,12 +3781,12 @@ arma::uword triangle_mesh_segmentation(
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`target_size`** *(optional)* — Target triangle count per sub-mesh; for best performance set near `sqrt(n_mesh)`
 - **`vec_size`** *(optional)* — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value
-- **`mtl_prop`** *(optional)* — Material properties; see [obj_file_read](#obj_file_read); `[n_mesh, n_param]`
+- **`mtl_ind`** *(optional)* — 0-based material indices per triangle (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 
 ### Outputs:
 - **`meshR`** — Reordered and padded triangle vertices; `[n_meshR, 9]`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `meshR`; `[n_sub]`
-- **`mtl_propR`** *(optional)* — Reordered and padded material properties; `[n_meshR, n_param]`
+- **`mtl_ind_out`** *(optional)* — Reordered and padded material indices (padding = 0); `[n_meshR]`
 - **`mesh_index`** *(optional)* — 1-based mapping from original to reorganized mesh (0 = padding); `[n_meshR]`
 
 ### Returns:
@@ -3864,7 +3794,7 @@ arma::uword triangle_mesh_segmentation(
 
 ### See also:
 - [calc_diffraction_gain](#calc_diffraction_gain) (uses `sub_mesh_index` for acceleration)
-- [obj_file_read](#obj_file_read) (defines `mtl_prop` format)
+- [obj_file_read](#obj_file_read) (defines `mtl_ind` / `csv_ind`)
 
 ---
 ## triangle_mesh_split

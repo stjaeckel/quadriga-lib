@@ -17,6 +17,30 @@ if package_path not in sys.path:
 from quadriga_lib import RTtools
 
 
+
+def m2p(M):
+    """Convert a [n_face, 9] material matrix with columns
+    {a,b,c,d,att,attB,alpha,alphaB,fRef} into the (mtl_ind, mtl_prop-dict) pair
+    the new API expects. Identical rows are deduplicated; mtl_ind is 0-based."""
+    names = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
+    M = np.asarray(M, dtype=np.float64)
+    uniq = []
+    mtl_ind = np.empty(M.shape[0], dtype=np.uint64)
+    for f in range(M.shape[0]):
+        hit = -1
+        for m, row in enumerate(uniq):
+            if np.array_equal(M[f], row):
+                hit = m
+                break
+        if hit < 0:
+            hit = len(uniq)
+            uniq.append(M[f])
+        mtl_ind[f] = hit
+    U = np.array(uniq)
+    prop = {names[c]: np.ascontiguousarray(U[:, c]) for c in range(9)}
+    return mtl_ind, prop
+
+
 def build_cube_mesh():
     """
     Build a [-1,1]^3 cube as 12 triangles matching the MEX test geometry.
@@ -47,6 +71,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def setUpClass(cls):
         cls.cube = build_cube_mesh()
         cls.mtl_prop = np.tile([1.0, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        cls.mtl_ind, cls.mtl_dict = m2p(cls.mtl_prop)
 
         cls.orig = np.array(
             [
@@ -66,14 +91,14 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # Basic diffraction gain, lod = 0
     def test_basic_lod0(self):
         gain, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=0
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
         )
         npt.assert_allclose(gain, self.expected_gain, atol=1e-14)
 
     # 2 outputs, lod = 5
     def test_lod5_with_coord(self):
         gain, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=5
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=5
         )
         npt.assert_allclose(gain, self.expected_gain, atol=1e-14)
 
@@ -86,21 +111,22 @@ class TestCalcDiffractionGain(unittest.TestCase):
         orig_los = np.array([[0.0, 0.0, 5.0]])
         dest_los = np.array([[0.0, 0.0, 10.0]])
         gain, _ = RTtools.calc_diffraction_gain(
-            orig_los, dest_los, self.cube, self.mtl_prop, 1e9, lod=2
+            orig_los, dest_los, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
         npt.assert_allclose(gain, [1.0], atol=1e-6)
 
     # Single-precision inputs (adapter should cast to double)
     def test_single_precision_inputs(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
             self.orig.astype(np.float32),
             self.dest.astype(np.float32),
             self.cube.astype(np.float32),
-            self.mtl_prop.astype(np.float32),
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=2,
         )
@@ -111,7 +137,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
         n_pos = self.orig.shape[0]
 
         gain, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
         self.assertEqual(gain.shape, (n_pos,))
         self.assertEqual(coord.shape, (3, 2, n_pos))  # lod 2 -> n_seg=2
@@ -119,45 +145,46 @@ class TestCalcDiffractionGain(unittest.TestCase):
     #  Coord dimensions for each lod value
     def test_coord_shape_lod1(self):
         _, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=1
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=1
         )
         self.assertEqual(coord.shape, (3, 2, 2))  # n_seg=2
 
     def test_coord_shape_lod2(self):
         _, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
         self.assertEqual(coord.shape, (3, 2, 2))  # n_seg=2
 
     def test_coord_shape_lod3(self):
         _, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=3
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=3
         )
         self.assertEqual(coord.shape, (3, 3, 2))  # n_seg=3
 
     def test_coord_shape_lod4(self):
         _, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=4
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=4
         )
         self.assertEqual(coord.shape, (3, 4, 2))  # n_seg=4
 
     def test_coord_shape_lod6(self):
         _, coord = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=6
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=6
         )
         self.assertEqual(coord.shape, (3, 1, 2))  # n_seg=1
 
     # Empty sub_mesh_index
     def test_empty_sub_mesh_index(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=0
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=np.array([], dtype=np.uint32),
@@ -167,7 +194,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     #  Valid sub_mesh_index (single sub-mesh covering all triangles)
     def test_single_submesh(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=0
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
         )
 
         smi = np.zeros(1, dtype=np.uint32)  # one sub-mesh starting at 0
@@ -175,7 +202,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=smi,
@@ -188,7 +216,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=np.zeros(1, dtype=np.uint32),
@@ -198,7 +227,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=np.zeros(1, dtype=np.int32),
@@ -210,7 +240,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=np.zeros(1, dtype=np.uint32),
@@ -220,7 +251,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=0,
             sub_mesh_index=np.zeros(1, dtype=np.int64),
@@ -230,23 +262,23 @@ class TestCalcDiffractionGain(unittest.TestCase):
     #  Kernel selector: GENERIC (1)
     def test_kernel_generic(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2, use_kernel=1
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2, use_kernel=1
         )
         npt.assert_allclose(gain, gain_ref, atol=1e-14)
 
     #  Kernel selector: AVX2 (2) — may not be available
     def test_kernel_avx2(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
 
         try:
             gain, _ = RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2, use_kernel=2
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2, use_kernel=2
             )
         except ValueError:
             return
@@ -257,7 +289,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_kernel_cuda(self):
         try:
             RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2, use_kernel=3
+                self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2, use_kernel=3
             )
         except ValueError:
             pass
@@ -265,14 +297,15 @@ class TestCalcDiffractionGain(unittest.TestCase):
     #  All 10 args with explicit gpu_id
     def test_all_args_explicit(self):
         gain_ref, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
 
         gain, _ = RTtools.calc_diffraction_gain(
             self.orig,
             self.dest,
             self.cube,
-            self.mtl_prop,
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=2,
             verbose=0,
@@ -285,7 +318,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     #  Single TX-RX pair — minimal batch
     def test_single_pair(self):
         gain, coord = RTtools.calc_diffraction_gain(
-            self.orig[:1], self.dest[:1], self.cube, self.mtl_prop, 1e9, lod=2
+            self.orig[:1], self.dest[:1], self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=2
         )
         self.assertEqual(gain.shape, (1,))
         self.assertEqual(coord.shape, (3, 2, 1))
@@ -296,7 +329,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             np.ascontiguousarray(self.orig),
             np.ascontiguousarray(self.dest),
             np.ascontiguousarray(self.cube),
-            np.ascontiguousarray(self.mtl_prop),
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=2,
         )
@@ -305,7 +339,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
             np.asfortranarray(self.orig),
             np.asfortranarray(self.dest),
             np.asfortranarray(self.cube),
-            np.asfortranarray(self.mtl_prop),
+            self.mtl_ind,
+            self.mtl_dict,
             1e9,
             lod=2,
         )
@@ -316,7 +351,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_error_wrong_dest_size(self):
         with self.assertRaises(ValueError) as ctx:
             RTtools.calc_diffraction_gain(
-                self.orig, self.dest[:1], self.cube, self.mtl_prop, 1e9, lod=0
+                self.orig, self.dest[:1], self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
             )
         self.assertIn("orig", str(ctx.exception).lower())
 
@@ -324,7 +359,7 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_error_wrong_mtl_prop_rows(self):
         with self.assertRaises(ValueError) as ctx:
             RTtools.calc_diffraction_gain(
-                self.orig, self.dest, self.cube, self.mtl_prop[:1], 1e9, lod=0
+                self.orig, self.dest, self.cube, self.mtl_ind[:1], self.mtl_dict, 1e9, lod=0
             )
         self.assertIn("mesh", str(ctx.exception).lower())
 
@@ -335,7 +370,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
                 self.orig,
                 self.dest,
                 self.cube,
-                self.mtl_prop,
+                self.mtl_ind,
+                self.mtl_dict,
                 1e9,
                 lod=0,
                 sub_mesh_index=np.array([1], dtype=np.uint32),
@@ -349,7 +385,8 @@ class TestCalcDiffractionGain(unittest.TestCase):
                 self.orig,
                 self.dest,
                 self.cube,
-                self.mtl_prop,
+                self.mtl_ind,
+                self.mtl_dict,
                 1e9,
                 lod=0,
                 sub_mesh_index=np.array([0, 32], dtype=np.uint32),
@@ -360,11 +397,12 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_different_frequency(self):
         # attB = 1 → linear frequency scaling of penetration loss
         mtl_freq = np.tile([1.0, 0.0, 0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_freq_i, mtl_freq_p = m2p(mtl_freq)
         gain_1g, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, mtl_freq, 1e9, lod=2
+            self.orig, self.dest, self.cube, mtl_freq_i, mtl_freq_p, 1e9, lod=2
         )
         gain_10g, _ = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, mtl_freq, 10e9, lod=2
+            self.orig, self.dest, self.cube, mtl_freq_i, mtl_freq_p, 10e9, lod=2
         )
         self.assertFalse(np.allclose(gain_1g, gain_10g))
 
@@ -372,20 +410,22 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_alpha_in_medium_absorption(self):
         # eps_r=1 (no Fresnel), sigma=0, att=0, alpha=4 dB/m, exponents=0, fRef=1
         mtl_alpha = np.tile([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0], (12, 1))
+        mtl_alpha_i, mtl_alpha_p = m2p(mtl_alpha)
         orig_in = np.array([[-10.0, 0.0, 0.5]])
         dest_in = np.array([[0.5, 0.0, 0.5]])  # ends inside cube
         gain, _ = RTtools.calc_diffraction_gain(
-            orig_in, dest_in, self.cube, mtl_alpha, 10e9, lod=0
+            orig_in, dest_in, self.cube, mtl_alpha_i, mtl_alpha_p, 10e9, lod=0
         )
         npt.assert_allclose(gain, [10 ** (-0.6)], atol=1e-10)
 
     # Penetration-loss frequency scaling
     def test_attB_frequency_scaling(self):
         mtl_attB = np.tile([1.0, 0.0, 0.0, 0.0, 3.0, 1.0, 0.0, 0.0, 2.0], (12, 1))
+        mtl_attB_i, mtl_attB_p = m2p(mtl_attB)
         orig_in = np.array([[-10.0, 0.0, 0.5]])
         dest_in = np.array([[0.5, 0.0, 0.5]])
         gain, _ = RTtools.calc_diffraction_gain(
-            orig_in, dest_in, self.cube, mtl_attB, 10e9, lod=0
+            orig_in, dest_in, self.cube, mtl_attB_i, mtl_attB_p, 10e9, lod=0
         )
         npt.assert_allclose(gain, [10 ** (-1.5)], atol=1e-10)
 
@@ -394,17 +434,19 @@ class TestCalcDiffractionGain(unittest.TestCase):
         # At every f: eps_r=1.5*f, sigma=0.001*f, att=2*f dB, alpha=0.5*f dB/m
         mat_A = np.tile(
             [1.5, 1.0, 0.001, 1.0, 2.0, 1.0, 0.5, 1.0, 1.0], (12, 1)
-        )  # fRef=1
+        )
+        mat_A_i, mat_A_p = m2p(mat_A)  # fRef=1
         mat_B = np.tile(
             [3.0, 1.0, 0.002, 1.0, 4.0, 1.0, 1.0, 1.0, 2.0], (12, 1)
-        )  # fRef=2
+        )
+        mat_B_i, mat_B_p = m2p(mat_B)  # fRef=2
         orig_in = np.array([[-10.0, 0.0, 0.5]])
         dest_in = np.array([[0.5, 0.0, 0.5]])
         gain_A, _ = RTtools.calc_diffraction_gain(
-            orig_in, dest_in, self.cube, mat_A, 10e9, lod=3
+            orig_in, dest_in, self.cube, mat_A_i, mat_A_p, 10e9, lod=3
         )
         gain_B, _ = RTtools.calc_diffraction_gain(
-            orig_in, dest_in, self.cube, mat_B, 10e9, lod=3
+            orig_in, dest_in, self.cube, mat_B_i, mat_B_p, 10e9, lod=3
         )
         npt.assert_allclose(gain_A, gain_B, atol=1e-12)
 
@@ -412,26 +454,28 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # The two modes must be bit-identical.
     def test_scalar_normal_incidence_equivalence(self):
         mtl = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-10.0, 0.0, 0.5]])
         dest = np.array([[0.5, 0.0, 0.5]])  # ray along +x → normal hit on west wall
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         npt.assert_allclose(gain_em, gain_sc, atol=1e-12)
 
     # Oblique incidence: scalar ≠ EM, both physical
     def test_scalar_oblique_incidence_diverges(self):
         mtl = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-3.0, 0.0, 0.5]])
         dest = np.array([[0.5, 1.5, 0.5]])  # ~23° off-normal on west wall
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         self.assertFalse(np.allclose(gain_em, gain_sc, atol=1e-4))
         self.assertTrue(0.0 < gain_em[0] < 1.0)
@@ -443,13 +487,14 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_scalar_em_inequality_direction(self):
         # High contrast → clear margin between TE and TM transmission
         mtl = np.tile([4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-3.0, 0.0, 0.5]])
         dest = np.array([[0.5, 1.5, 0.5]])
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         self.assertGreater(gain_em[0], gain_sc[0])
 
@@ -458,13 +503,14 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_scalar_no_fresnel_contrast_invariance(self):
         # eps_r = 1, only penetration loss
         mtl = np.tile([1.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-3.0, 0.0, 0.5], [-3.0, 0.0, 0.0]])
         dest = np.array([[0.5, 1.5, 0.5], [0.5, 0.5, 0.0]])
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         npt.assert_allclose(gain_em, gain_sc, atol=1e-14)
 
@@ -472,13 +518,14 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # Distance absorption is polarization-independent — a path that ends inside the medium isolates the alpha branch.
     def test_scalar_alpha_only_invariance(self):
         mtl = np.tile([1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-10.0, 0.0, 0.5]])
         dest = np.array([[0.5, 0.0, 0.5]])  # ends inside cube
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         npt.assert_allclose(gain_em, gain_sc, atol=1e-14)
 
@@ -488,14 +535,15 @@ class TestCalcDiffractionGain(unittest.TestCase):
     def test_scalar_lossy_normal_incidence(self):
         mtl = np.tile(
             [4.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1)
-        )  # sigma = 0.5
+        )
+        mtl_i, mtl_p = m2p(mtl)  # sigma = 0.5
         orig = np.array([[-10.0, 0.0, 0.5]])
         dest = np.array([[0.5, 0.0, 0.5]])
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True
         )
         npt.assert_allclose(gain_em, gain_sc, atol=1e-12)
 
@@ -503,13 +551,14 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # distinguishable, so this test will fail loudly if the default ever flips.
     def test_scalar_default_value(self):
         mtl = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[-3.0, 0.0, 0.5]])
         dest = np.array([[0.5, 1.5, 0.5]])
         gain_default, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0
         )
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False
         )
         npt.assert_allclose(gain_default, gain_em, atol=1e-14)  # default = EM
 
@@ -518,10 +567,11 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # where the scalar code path takes a different ray-state machine branch.
     def test_scalar_with_lod_multipath(self):
         mtl = np.tile([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         gain_em, coord_em = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, mtl, 10e9, lod=3, scalar_mode=False)
+            self.orig, self.dest, self.cube, mtl_i, mtl_p, 10e9, lod=3, scalar_mode=False)
         gain_sc, coord_sc = RTtools.calc_diffraction_gain(
-            self.orig, self.dest, self.cube, mtl, 10e9, lod=3, scalar_mode=True)
+            self.orig, self.dest, self.cube, mtl_i, mtl_p, 10e9, lod=3, scalar_mode=True)
         npt.assert_allclose(coord_em, coord_sc, atol=1e-6)       # geometry identical
         self.assertTrue(np.all(np.isfinite(gain_em)))
         self.assertTrue(np.all(np.isfinite(gain_sc)))
@@ -532,12 +582,13 @@ class TestCalcDiffractionGain(unittest.TestCase):
     # Pretty much pure regression — guards against the scalar branch accidentally affecting unobstructed paths.
     def test_scalar_los_unaffected(self):
         mtl = np.tile([4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
+        mtl_i, mtl_p = m2p(mtl)
         orig = np.array([[0.0, 0.0,  5.0]])
         dest = np.array([[0.0, 0.0, 10.0]])
         gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=False)
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False)
         gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl, 10e9, lod=0, scalar_mode=True)
+            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True)
         npt.assert_allclose(gain_em, [1.0], atol=1e-12)
         npt.assert_allclose(gain_sc, [1.0], atol=1e-12)
 

@@ -14,14 +14,14 @@ SECTION!*/
 Write a Wavefront .obj file
 
 - Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
-- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same
-  object that are closer than `threshold` (no merging across objects)
+- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same object 
+  that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
-- Without `obj_ind` and `obj_names`, a single object named `object` is written
+- Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - Without `mtl_ind` (or if all entries are 0), no `usemtl` tags and no `.mtl` file are written
-- The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray
-  material when `bsdf` is omitted
+- The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
@@ -32,10 +32,10 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 ## Inputs:
 - **`fn`** — Path to the output `.obj` file; must end in `.obj`; if empty, no file is written (outputs are still computed); default: `""`
 - **`mesh`** — Triangle coordinates `{X1,Y1,Z1,...,X3,Y3,Z3}` per row; `(n_mesh, 9)`; mutually exclusive with `vert_list` and `face_ind`; default: None
-- **`obj_ind`** — 1-based object index per face; `(n_mesh,)`; each object must form a contiguous block; default: None
-- **`mtl_ind`** — 1-based material index per face (0 = unassigned); `(n_mesh,)`; default: None
-- **`obj_names`** — Object names; list of str; length >= max(obj_ind); required if `obj_ind` is given; default: None
-- **`mtl_names`** — Material names; list of str; length >= max(mtl_ind); required if `mtl_ind` has nonzero entries; default: None
+- **`obj_ind`** — 0-based object index per face; `(n_mesh,)`; each object must form a contiguous block; default: None
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind`/`mtl_ind` output of [[obj_file_read]]); `(n_mesh,)`; omit (None) for no materials; default: None
+- **`obj_names`** — Object names; list of str; length > max(obj_ind); required if `obj_ind` is given; default: None
+- **`mtl_names`** — Material names; list of str; length > max(mtl_ind); required if `mtl_ind` is given; default: None
 - **`vert_list`** — Vertex positions; `(n_vert, 3)`; only valid with `face_ind`; written unchanged; default: None
 - **`face_ind`** — 0-based vertex indices per face; `(n_mesh, 3)`; required with `vert_list`; default: None
 - **`bsdf`** — Principled BSDF values for the `.mtl` file; `(n_mtl, 17)`; see [[obj_file_read]] for the column layout; default: None

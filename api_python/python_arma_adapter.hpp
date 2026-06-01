@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <unordered_map>
 
 namespace py = pybind11;
 
@@ -1510,6 +1511,70 @@ static std::any qd_python_anycast(py::handle obj, std::string var_name = "")
     throw std::invalid_argument(error_message);
 
     return std::any();
+}
+
+// -------------------------------- qd_python_map2dict / dict2map --------------------------------
+
+// Convert std::unordered_map<std::string, std::vector<dtype>> to a Python dict.
+// Each key becomes a dict entry; each value vector becomes a 1D numpy array of length n_mtl.
+// 'key_order' (optional) fixes the insertion order of the keys present in the map; keys not in
+// the map are skipped, and any map key not listed is appended afterwards in iteration order.
+template <typename dtype, typename dtype_numpy = dtype>
+static py::dict qd_python_map2dict(const std::unordered_map<std::string, std::vector<dtype>> &map,
+                                   const std::vector<std::string> &key_order = {})
+{
+    py::dict output;
+
+    auto emit = [&](const std::string &key)
+    {
+        const std::vector<dtype> &vec = map.at(key);
+        arma::Col<dtype> col(const_cast<dtype *>(vec.data()), vec.size(), false, true); // no-copy alias
+        output[py::str(key)] = qd_python_copy2numpy<dtype, dtype_numpy>(&col);
+    };
+
+    std::unordered_map<std::string, bool> done;
+    for (const auto &key : key_order)
+        if (map.find(key) != map.end() && !done[key])
+            emit(key), done[key] = true;
+
+    for (const auto &kv : map)
+        if (!done[kv.first])
+            emit(kv.first), done[kv.first] = true;
+
+    return output;
+}
+
+// Convert a Python dict (or None) to std::unordered_map<std::string, std::vector<dtype>>.
+// Each dict entry's value is read as a 1D array and cast to dtype. All values must have the same
+// length (n_mtl); a mismatch throws. None or an empty dict yields an empty map.
+template <typename dtype>
+static std::unordered_map<std::string, std::vector<dtype>> qd_python_dict2map(const py::handle &obj)
+{
+    std::unordered_map<std::string, std::vector<dtype>> map;
+    if (obj.is_none())
+        return map;
+    if (!py::isinstance<py::dict>(obj))
+        throw std::invalid_argument("Expected a dict mapping column names to 1D arrays.");
+
+    py::dict d = py::reinterpret_borrow<py::dict>(obj);
+
+    bool n_set = false;
+    arma::uword n_mtl = 0;
+    for (auto item : d)
+    {
+        const std::string key = py::str(item.first);
+        arma::Col<dtype> col = qd_python_numpy2arma_Col<dtype>(item.second, false, false);
+
+        if (!n_set)
+            n_mtl = col.n_elem, n_set = true;
+        else if (col.n_elem != n_mtl)
+            throw std::invalid_argument("Material property column '" + key + "' has " +
+                                        std::to_string(col.n_elem) + " elements, expected " +
+                                        std::to_string(n_mtl) + " (all columns must have the same length).");
+
+        map[key] = std::vector<dtype>(col.begin(), col.end());
+    }
+    return map;
 }
 
 #endif

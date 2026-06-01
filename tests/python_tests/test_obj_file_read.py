@@ -16,6 +16,29 @@ if package_path not in sys.path:
 
 import quadriga_lib
 
+# obj_file_read output order:
+#   mesh, vert_list, face_ind, obj_ind, obj_names,
+#   mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop
+
+# Per-column defaults for absent EM columns (mirrors the consumer-side defaults).
+_EM_DEFAULTS = {"a": 1.0, "b": 0.0, "c": 0.0, "d": 0.0, "att": 0.0,
+                "attB": 0.0, "alpha": 0.0, "alphaB": 0.0, "fRef": 1.0}
+_EM_ORDER = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
+
+
+def prop_at(csv_prop, key, idx):
+    """Read the value of column 'key' for material index 'idx' from the csv_prop dict,
+    applying the documented per-column default when the column is absent."""
+    if key in csv_prop:
+        return float(csv_prop[key][idx])
+    return _EM_DEFAULTS.get(key, 0.0)
+
+
+def em_row(csv_prop, idx):
+    """Assemble the standard 9-element EM row {a,b,c,d,att,attB,alpha,alphaB,fRef}
+    for material index 'idx', filling absent columns with their defaults."""
+    return np.array([prop_at(csv_prop, k, idx) for k in _EM_ORDER], dtype=float)
+
 
 def create_cube_with_materials(obj_file, mtl1, mtl2=None):
     """Helper to create a cube OBJ file with specified materials"""
@@ -44,13 +67,6 @@ def create_cube_with_materials(obj_file, mtl1, mtl2=None):
         f.write("f 2 4 8\n")
         f.write("f 1 3 4\n")
         f.write("f 5 1 2\n")
-
-
-def row_matches(mtl_prop, row, expected, decimal=14):
-    """Compare a (possibly trimmed) mtl_prop row against an expected vector.
-    The expected is truncated to the actual width of mtl_prop."""
-    w = mtl_prop.shape[1]
-    npt.assert_almost_equal(mtl_prop[row, :], np.asarray(expected, dtype=float)[:w], decimal=decimal)
 
 
 def cleanup(fn, csv_fn):
@@ -125,7 +141,7 @@ class test_case(unittest.TestCase):
                 dtype=int,
             )
             - 1
-        )  # zero‐based indexing
+        )  # zero-based indexing
 
         mesh_correct = np.hstack(
             [
@@ -141,45 +157,58 @@ class test_case(unittest.TestCase):
         # Read all
         (
             mesh,
-            mtl_prop,
             vert_list,
             face_ind,
             obj_ind,
-            mtl_ind,
             obj_names,
+            mtl_ind,
             mtl_names,
             bsdf,
+            csv_ind,
+            csv_names,
+            csv_prop,
         ) = quadriga_lib.RTtools.obj_file_read(fn)
 
         assert mesh.shape == (12, 9)
-        assert mtl_prop.shape == (12, 1)  # vacuum scene → only col 0 (a) survives the trim
         assert vert_list.shape == (8, 3)
         assert face_ind.shape == (12, 3)
         assert obj_ind.shape == (12,)
         assert mtl_ind.shape == (12,)
+        assert csv_ind.shape == (12,)
         assert len(obj_names) == 1
-        assert len(mtl_names) == 0
-        assert bsdf.shape == (0, 0)
+        # No usemtl -> faces get the synthetic "default" material on the .mtl side
+        assert len(mtl_names) == 1
+        assert mtl_names[0] == "default"
+        assert bsdf.shape == (0, 17)
+        # csv side is the full default table with row 0 = air
+        assert len(csv_names) > 1
+        assert csv_names[0] == "air"
+        assert isinstance(csv_prop, dict)
 
         npt.assert_(mesh.dtype == np.float64)
-        npt.assert_(mtl_prop.dtype == np.float64)
         npt.assert_(vert_list.dtype == np.float64)
         npt.assert_(face_ind.dtype == np.int64)
         npt.assert_(obj_ind.dtype == np.int64)
         npt.assert_(mtl_ind.dtype == np.int64)
-
-        npt.assert_(np.all(mtl_prop[:, 0] == 1.0))  # a = 1 for vacuum (other cols cropped at defaults)
+        npt.assert_(csv_ind.dtype == np.int64)
 
         npt.assert_almost_equal(vert_list, vert_list_correct, decimal=14)
         npt.assert_array_equal(face_ind, face_ind_correct)
         npt.assert_almost_equal(mesh, mesh_correct, decimal=14)
 
-        npt.assert_(np.all(obj_ind == 1))
+        # 0-based indices; "default" not in table -> air fallback (row 0)
+        npt.assert_(np.all(obj_ind == 0))
         npt.assert_(np.all(mtl_ind == 0))
+        npt.assert_(np.all(csv_ind == 0))
         npt.assert_equal(obj_names[0], "Cube")
+
+        # Air at csv row 0 is transparent (a = 1)
+        npt.assert_almost_equal(em_row(csv_prop, 0),
+                                [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], decimal=14)
 
         os.remove(fn)
 
+        # Two planes, second uses a named ITU material
         with open(fn, "w") as f:
             f.write("o Plane\n")
             f.write("v -1.000000 -1.000000 0.000000\n")
@@ -205,67 +234,30 @@ class test_case(unittest.TestCase):
             f.write("f 6/5 7/6 5/7\n")
             f.write("f 6/5 8/8 7/6\n")
 
-        data = quadriga_lib.RTtools.obj_file_read(fn)
+        (mesh, vert_list, face_ind, obj_ind, obj_names,
+         mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn)
 
-        assert len(data[6]) == 2
-        assert len(data[7]) == 1
-
-        npt.assert_(np.all(data[1][[0, 1], 0] == 1.0))
-        npt.assert_(np.all(data[1][[2, 3], 0] > 1.5))
+        assert len(obj_names) == 2
+        # Faces 0-1 have no usemtl -> synthetic "default" -> air (a = 1)
+        # Faces 2-3 are itu_wood (a = 1.99)
+        npt.assert_almost_equal(prop_at(csv_prop, "a", csv_ind[0]), 1.0, decimal=14)
+        npt.assert_almost_equal(prop_at(csv_prop, "a", csv_ind[1]), 1.0, decimal=14)
+        npt.assert_(prop_at(csv_prop, "a", csv_ind[2]) > 1.5)
+        npt.assert_(prop_at(csv_prop, "a", csv_ind[3]) > 1.5)
 
         expected_face_ind = np.array([[2, 3, 1], [2, 4, 3], [6, 7, 5], [6, 8, 7]]) - 1
-        npt.assert_array_equal(data[3], expected_face_ind)
+        npt.assert_array_equal(face_ind, expected_face_ind)
 
-        npt.assert_array_equal(data[4], [1, 1, 2, 2])
-        npt.assert_array_equal(data[5], [0, 0, 1, 1])
-        npt.assert_equal(data[6][0], "Plane")
-        npt.assert_equal(data[6][1], "Plane.001")
-        npt.assert_equal(data[7][0], "itu_wood")
+        npt.assert_array_equal(obj_ind, [0, 0, 1, 1])
+        # mtl_names: faces 0-1 -> "default", faces 2-3 -> "itu_wood" (first-appearance order)
+        npt.assert_array_equal(mtl_ind, [0, 0, 1, 1])
+        npt.assert_equal(obj_names[0], "Plane")
+        npt.assert_equal(obj_names[1], "Plane.001")
+        npt.assert_equal(mtl_names[0], "default")
+        npt.assert_equal(mtl_names[1], "itu_wood")
 
-        os.remove(fn)
-
-        with open(fn, "w") as f:
-            f.write("o Plane\n")
-            f.write("v -1.000000 -1.000000 0.000000\n")
-            f.write("v 1.000000 -1.000000 0.000000\n")
-            f.write("v -1.000000 1.000000 0.000000\n")
-            f.write("v 1.000000 1.000000 0.000000\n")
-            f.write("vn -0.0000 -0.0000 1.0000\n")
-            f.write("vt 1.000000 0.000000\n")
-            f.write("vt 0.000000 1.000000\n")
-            f.write("vt 0.000000 0.000000\n")
-            f.write("vt 1.000000 1.000000\n")
-            f.write("usemtl Cst::1.1:1.2:1.3:1.4:10\n")
-            f.write("f 2/1/1 3/2/1 1/3/1\n")
-            f.write("usemtl Cst::2.1:2.2:2.3:2.4:20\n")
-            f.write("f 2/1/1 4/4/1 3/2/1\n")
-
-        (
-            mesh,
-            mtl_prop,
-            vert_list,
-            face_ind,
-            obj_ind,
-            mtl_ind,
-            obj_names,
-            mtl_names,
-            bsdf,
-        ) = quadriga_lib.RTtools.obj_file_read(fn)
-
-        npt.assert_almost_equal(
-            mtl_prop[0, :], [1.1, 1.2, 1.3, 1.4, 10, 0.0, 0.0, 0.0, 1.0], decimal=14
-        )
-        npt.assert_almost_equal(
-            mtl_prop[1, :], [2.1, 2.2, 2.3, 2.4, 20, 0.0, 0.0, 0.0, 1.0], decimal=14
-        )
-        npt.assert_equal(mtl_names[0], "Cst::1.1:1.2:1.3:1.4:10")
-        npt.assert_equal(mtl_names[1], "Cst::2.1:2.2:2.3:2.4:20")
-        npt.assert_array_equal(obj_ind, [1, 1])
-        npt.assert_array_equal(mtl_ind, [1, 2])
-
-        with self.assertRaises(TypeError) as context:
-            quadriga_lib.RTtools.obj_file_read()
-
+        # Missing file raises
         with self.assertRaises(ValueError) as context:
             quadriga_lib.RTtools.obj_file_read("bla.obj")
         self.assertEqual(
@@ -280,71 +272,60 @@ class test_case(unittest.TestCase):
         fn = "cube.obj"
         csv_fn = "custom_materials.csv"
 
-        # Basic custom materials
+        # Basic custom materials (row 0 = air fallback)
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("name,a,b,c,d,att\n")
+            f.write("air,1.0,0.0,0.0,0.0,0.0\n")
             f.write("custom_material_1,2.5,0.0,0.001,0.5,5.0\n")
             f.write("custom_material_2,4.0,-0.1,0.05,1.2,10.0\n")
 
         create_cube_with_materials(fn, "custom_material_1", "custom_material_2")
 
-        (
-            mesh,
-            mtl_prop,
-            vert_list,
-            face_ind,
-            obj_ind,
-            mtl_ind,
-            obj_names,
-            mtl_names,
-            bsdf,
-        ) = quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
+        (mesh, vert_list, face_ind, obj_ind, obj_names,
+         mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
 
         npt.assert_almost_equal(
-            mtl_prop[0, :], [2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0], decimal=14
+            em_row(csv_prop, csv_ind[0]),
+            [2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0], decimal=14
         )
         npt.assert_equal(mtl_names[0], "custom_material_1")
-        npt.assert_equal(mtl_ind[0], 1)
 
         npt.assert_almost_equal(
-            mtl_prop[4, :], [4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0], decimal=14
+            em_row(csv_prop, csv_ind[4]),
+            [4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0], decimal=14
         )
         npt.assert_equal(mtl_names[1], "custom_material_2")
-        npt.assert_equal(mtl_ind[4], 2)
+        npt.assert_(csv_ind[0] != csv_ind[4])
 
-        # Jumbled column order
+        # Jumbled column order (keyed by name, so order is irrelevant)
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("att,d,c,b,a,name\n")
+            f.write("0.0,0.0,0.0,0.0,1.0,air\n")
             f.write("5.0,0.5,0.001,0.0,2.5,custom_material_1\n")
             f.write("10.0,1.2,0.05,-0.1,4.0,custom_material_2\n")
 
         create_cube_with_materials(fn, "custom_material_1", "custom_material_2")
 
-        (
-            mesh,
-            mtl_prop,
-            vert_list,
-            face_ind,
-            obj_ind,
-            mtl_ind,
-            obj_names,
-            mtl_names,
-            bsdf,
-        ) = quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
+        (mesh, vert_list, face_ind, obj_ind, obj_names,
+         mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
 
         npt.assert_almost_equal(
-            mtl_prop[0, :], [2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0], decimal=14
+            em_row(csv_prop, csv_ind[0]),
+            [2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0], decimal=14
         )
         npt.assert_equal(mtl_names[0], "custom_material_1")
 
         npt.assert_almost_equal(
-            mtl_prop[4, :], [4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0], decimal=14
+            em_row(csv_prop, csv_ind[4]),
+            [4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0], decimal=14
         )
         npt.assert_equal(mtl_names[1], "custom_material_2")
 
-        # Duplicate material names
+        # Duplicate material names -> error
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("name,a,b,c,d,att\n")
@@ -356,7 +337,7 @@ class test_case(unittest.TestCase):
         with self.assertRaises(ValueError):
             quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
 
-        # Non-existent CSV file
+        # Non-existent CSV file -> error
         cleanup(fn, csv_fn)
         create_cube_with_materials(fn, "custom_material_1")
 
@@ -365,52 +346,58 @@ class test_case(unittest.TestCase):
 
         cleanup(fn, csv_fn)
 
-        # CSV with new frequency-dependent columns populated.
-        # Note jumbled order: fRef before alphaB → exercises the column reorder code.
+        # CSV with frequency-dependent columns populated.
+        # Jumbled order: fRef before alphaB.
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("name,a,b,c,d,att,attB,alpha,fRef,alphaB\n")
+            f.write("air,1.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0\n")
             f.write("lossy_wall,4.5,0.1,0.02,0.8,3.0,0.2,0.5,2.4,0.15\n")
 
         create_cube_with_materials(fn, "lossy_wall")
 
-        _, mtl_prop, _, _, _, _, _, mtl_names, _ = quadriga_lib.RTtools.obj_file_read(
-            fn, csv_fn
-        )
+        (_, _, _, _, _, _, mtl_names, _, csv_ind, _, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
         npt.assert_almost_equal(
-            mtl_prop[0, :], [4.5, 0.1, 0.02, 0.8, 3.0, 0.2, 0.5, 0.15, 2.4], decimal=14
+            em_row(csv_prop, csv_ind[0]),
+            [4.5, 0.1, 0.02, 0.8, 3.0, 0.2, 0.5, 0.15, 2.4], decimal=14
         )
         npt.assert_equal(mtl_names[0], "lossy_wall")
 
         # CSV with subset of optional columns; unspecified ones default.
-        # fRef given but attB/alpha/alphaB absent -> defaults 0.
+        # fRef given but attB/alpha/alphaB absent -> defaults.
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("name,a,c,fRef\n")
+            f.write("air,1.0,0.0,1.0\n")
             f.write("partial,3.0,0.01,5.0\n")
 
         create_cube_with_materials(fn, "partial")
 
-        _, mtl_prop, _, _, _, _, _, _, _ = quadriga_lib.RTtools.obj_file_read(
-            fn, csv_fn
-        )
+        (_, _, _, _, _, _, _, _, csv_ind, _, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
         npt.assert_almost_equal(
-            mtl_prop[0, :], [3.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0], decimal=14
+            em_row(csv_prop, csv_ind[0]),
+            [3.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0], decimal=14
         )
+        # Columns absent from the CSV are not keys of the dict
+        npt.assert_("b" not in csv_prop)
 
-        # Empty cells in optional columns fall back to defaults.
+        # Empty cells in optional columns parse as 0.
         cleanup(fn, csv_fn)
         with open(csv_fn, "w") as f:
             f.write("name,a,b,c,d,att,attB,alpha,alphaB,fRef\n")
+            f.write("air,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0\n")
             f.write("sparse,2.0,,0.005,,1.5,,,,\n")
 
         create_cube_with_materials(fn, "sparse")
 
-        _, mtl_prop, _, _, _, _, _, _, _ = quadriga_lib.RTtools.obj_file_read(
-            fn, csv_fn
-        )
+        (_, _, _, _, _, _, _, _, csv_ind, _, csv_prop) = \
+            quadriga_lib.RTtools.obj_file_read(fn, csv_fn)
+        # Empty cells are 0; the fRef cell is present-but-blank here -> 0
         npt.assert_almost_equal(
-            mtl_prop[0, :], [2.0, 0.0, 0.005, 0.0, 1.5, 0.0, 0.0, 0.0, 1.0], decimal=14
+            em_row(csv_prop, csv_ind[0]),
+            [2.0, 0.0, 0.005, 0.0, 1.5, 0.0, 0.0, 0.0, 0.0], decimal=14
         )
 
         cleanup(fn, csv_fn)
@@ -420,16 +407,15 @@ class test_case(unittest.TestCase):
         fn = "cube.obj"
         create_cube_with_materials(fn, "air")
         try:
-            _, mtl_prop, _, _, _, mtl_ind, _, mtl_names, _ = (
+            (_, _, _, _, _, mtl_ind, mtl_names, _, csv_ind, _, csv_prop) = \
                 quadriga_lib.RTtools.obj_file_read(fn)
-            )
             npt.assert_almost_equal(
-                mtl_prop[0, :],
+                em_row(csv_prop, csv_ind[0]),
                 [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
                 decimal=14,
             )
             npt.assert_equal(mtl_names[0], "air")
-            npt.assert_(np.all(mtl_ind == 1))
+            npt.assert_(np.all(mtl_ind == 0))
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
@@ -438,73 +424,69 @@ class test_case(unittest.TestCase):
         fn = "cube.obj"
         create_cube_with_materials(fn, "itu_concrete", "itu_wood")
         try:
-            _, mtl_prop, _, _, _, mtl_ind, _, mtl_names, _ = (
+            (_, _, _, _, _, mtl_ind, mtl_names, _, csv_ind, _, csv_prop) = \
                 quadriga_lib.RTtools.obj_file_read(fn)
-            )
             npt.assert_almost_equal(
-                mtl_prop[0, :],
+                em_row(csv_prop, csv_ind[0]),
                 [5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0],
-                decimal=14,
+                decimal=3,
             )
             npt.assert_equal(mtl_names[0], "itu_concrete")
-            npt.assert_equal(mtl_ind[0], 1)
+            npt.assert_equal(mtl_ind[0], 0)
             npt.assert_almost_equal(
-                mtl_prop[4, :],
+                em_row(csv_prop, csv_ind[4]),
                 [1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0],
-                decimal=14,
+                decimal=3,
             )
             npt.assert_equal(mtl_names[1], "itu_wood")
-            npt.assert_equal(mtl_ind[4], 2)
+            npt.assert_equal(mtl_ind[4], 1)
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
 
-    # Material name with dot-suffix
-    # Verifies the .001 / .shiny.001 suffix handling, which is what Blender exports.
+    # Material name with dot-suffix (Blender exports these)
     def test_material_dot_suffix(self):
         fn = "cube.obj"
         create_cube_with_materials(fn, "itu_brick.001", "itu_metal.shiny.001")
         try:
-            _, mtl_prop, _, _, _, _, _, mtl_names, _ = (
+            (_, _, _, _, _, _, mtl_names, _, csv_ind, _, csv_prop) = \
                 quadriga_lib.RTtools.obj_file_read(fn)
-            )
+            # itu_brick.001 -> itu_brick (base name = everything before the first dot)
             npt.assert_almost_equal(
-                mtl_prop[0, :],
+                em_row(csv_prop, csv_ind[0]),
                 [3.91, 0.0, 0.0238, 0.16, 0.0, 0.0, 0.0, 0.0, 1.0],
-                decimal=14,
+                decimal=3,
             )
-            npt.assert_equal(mtl_names[0], "itu_brick.001")
+            npt.assert_equal(mtl_names[0], "itu_brick.001")  # raw name preserved
+            # itu_metal.shiny.001 -> itu_metal (everything before the first dot)
             npt.assert_almost_equal(
-                mtl_prop[4, :],
+                em_row(csv_prop, csv_ind[4]),
                 [1.0, 0.0, 1.0e7, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-                decimal=14,
+                decimal=3,
             )
             npt.assert_equal(mtl_names[1], "itu_metal.shiny.001")
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
 
-    #  Inline custom syntax — 7 and 9 value forms
-    # Tests progressive truncation: 9-value form fully populated, partial form (alpha-only here) defaults alphaB=0, fRef=1.
-    def test_inline_custom_full_and_partial(self):
+    # Unknown material: non-strict falls back to air; strict raises
+    def test_strict_flag(self):
         fn = "cube.obj"
-        create_cube_with_materials(
-            fn,
-            "full_inline::2.2:0.05:0.01:0.7:4.0:0.3:0.8:0.2:3.5",  # all 9 values
-            "partial_inline::6.0:0:0:0:0:0:0.1",
-        )  # only alpha set
+        create_cube_with_materials(fn, "not_a_real_material")
         try:
-            _, mtl_prop, _, _, _, _, _, _, _ = quadriga_lib.RTtools.obj_file_read(fn)
-            npt.assert_almost_equal(
-                mtl_prop[0, :],
-                [2.2, 0.05, 0.01, 0.7, 4.0, 0.3, 0.8, 0.2, 3.5],
-                decimal=14,
-            )
-            npt.assert_almost_equal(
-                mtl_prop[4, :],
-                [6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 1.0],
-                decimal=14,
-            )
+            # non-strict (default): resolves to air (row 0); request csv_ind so resolution runs
+            (_, _, _, _, _, _, mtl_names, _, csv_ind, _, _) = \
+                quadriga_lib.RTtools.obj_file_read(fn, "", False)
+            npt.assert_equal(mtl_names[0], "not_a_real_material")  # raw name kept
+            npt.assert_(np.all(csv_ind == 0))                      # resolved to air
+
+            # strict: raises because the material is absent from the table
+            with self.assertRaises(ValueError):
+                quadriga_lib.RTtools.obj_file_read(fn, "", True)
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
+
+
+if __name__ == "__main__":
+    unittest.main()

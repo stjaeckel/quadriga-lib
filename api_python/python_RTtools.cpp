@@ -24,14 +24,15 @@ namespace py = pybind11;
 void quadriga_lib_RTtools(py::module_ &m)
 {
     m.def("calc_diffraction_gain", &calc_diffraction_gain,
-          py::arg("orig") = py::array_t<double>(),
-          py::arg("dest") = py::array_t<double>(),
-          py::arg("mesh") = py::array_t<double>(),
-          py::arg("mtl_prop") = py::array_t<double>(),
-          py::arg("center_frequency") = 1.0e9,
+          py::arg("orig"),
+          py::arg("dest"),
+          py::arg("mesh"),
+          py::arg("mtl_ind"),
+          py::arg("mtl_prop"),
+          py::arg("center_frequency"),
           py::arg("lod") = 2,
           py::arg("verbose") = 0,
-          py::arg("sub_mesh_index") = py::array_t<unsigned>(),
+          py::arg("sub_mesh_index") = py::none(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0,
           py::arg("scalar_mode") = false);
@@ -51,9 +52,9 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("map_to_itu") = false);
 
     m.def("obj_file_read", &obj_file_read,
-          py::arg("fn"),
-          py::arg("materials_csv") = "",
-          py::arg("trim") = true);
+          py::arg("fn") = std::string(""),
+          py::arg("fn_csv") = std::string(""),
+          py::arg("csv_strict") = false);
 
     m.def("obj_file_write", &obj_file_write,
           py::arg("fn") = "",
@@ -107,8 +108,8 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("vec_size") = 1);
 
     m.def("triangle_mesh_segmentation", &triangle_mesh_segmentation,
-          py::arg("triangles") = py::array_t<double>(),
+          py::arg("triangles"),
           py::arg("target_size") = 1024,
           py::arg("vec_size") = 1,
-          py::arg("mtl_prop") = py::array_t<double>());
+          py::arg("mtl_ind") = py::none());
 }

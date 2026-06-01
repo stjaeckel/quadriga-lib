@@ -1619,4 +1619,82 @@ inline mxArray *qd_mex_get_field(const mxArray *strct, const std::string &field,
     return data;
 }
 
+// Convert std::unordered_map<std::string, std::vector<dtype>> to a 1x1 MATLAB struct.
+// Each map key becomes a field; each value vector becomes a column vector [n_mtl, 1].
+// Field order follows 'field_order' when given (e.g. the CSV column order); otherwise the
+// map's iteration order is used. An empty map yields an empty struct.
+template <typename dtype>
+inline mxArray *qd_mex_map2struct(const std::unordered_map<std::string, std::vector<dtype>> &map,
+                                  const std::vector<std::string> &field_order = {})
+{
+    // Decide field order: explicit list (filtered to keys present), else map iteration order
+    std::vector<std::string> fields;
+    fields.reserve(map.size());
+    if (!field_order.empty())
+    {
+        for (const auto &k : field_order)
+            if (map.find(k) != map.end())
+                fields.push_back(k);
+    }
+    else
+        for (const auto &kv : map)
+            fields.push_back(kv.first);
+
+    mxClassID classID = qd_mex_class_id<dtype>();
+    mxArray *output = qd_mex_make_struct(fields, 1); // 1x1 struct, one field per key
+
+    for (const auto &key : fields)
+    {
+        const std::vector<dtype> &vec = map.at(key);
+        mxArray *col = mxCreateNumericMatrix((mwSize)vec.size(), vec.empty() ? 0 : 1, classID, mxREAL);
+        if (!vec.empty())
+            std::memcpy((dtype *)mxGetData(col), vec.data(), sizeof(dtype) * vec.size());
+        qd_mex_set_field(output, key, col);
+    }
+
+    return output;
+}
+
+// Convert a 1x1 MATLAB struct to std::unordered_map<std::string, std::vector<dtype>>.
+// Each field becomes a key; the field data (any numeric class) is read as a flat vector
+// and cast to dtype. All fields must have the same number of elements (n_mtl); a mismatch
+// throws. A non-struct input or an empty struct yields an empty map.
+template <typename dtype>
+inline std::unordered_map<std::string, std::vector<dtype>> qd_mex_struct2map(const mxArray *strct)
+{
+    std::unordered_map<std::string, std::vector<dtype>> map;
+    if (strct == nullptr || !mxIsStruct(strct))
+        return map;
+
+    int n_fields = mxGetNumberOfFields(strct);
+    if (n_fields == 0)
+        return map;
+
+    size_t n_mtl = 0;
+    bool n_mtl_set = false;
+    for (int f = 0; f < n_fields; ++f)
+    {
+        const char *name = mxGetFieldNameByNumber(strct, f);
+        const mxArray *data = mxGetFieldByNumber(strct, 0, f);
+        if (data == nullptr)
+            continue;
+
+        auto [d1, d2, d3, d4, n_data] = qd_mex_get_dims(data);
+
+        if (!n_mtl_set)
+            n_mtl = n_data, n_mtl_set = true;
+        else if (n_data != n_mtl)
+            mexErrMsgIdAndTxt("quadriga_lib:CPPerror", ("Material property field '" + std::string(name) +
+                               "' has " + std::to_string(n_data) + " elements, expected " +
+                               std::to_string(n_mtl) + " (all fields must have the same length).").c_str());
+
+        std::vector<dtype> vec(n_data);
+        if (n_data != 0)
+            qd_mex_copy_convert<dtype>(data, vec.data(), n_data, name);
+        map[std::string(name)] = std::move(vec);
+    }
+
+    return map;
+}
+
 #endif
