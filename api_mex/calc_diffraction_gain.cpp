@@ -20,10 +20,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   generalized to arbitrary 3D shapes
 - Optional sub-mesh indexing (see [[triangle_mesh_segmentation]]) accelerates computation by skipping
   triangles whose bounding box does not intersect the TX-RX path
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
-[ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_prop, ...
+[ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
     center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
 ```
 
@@ -31,7 +32,9 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, n_param]`
+- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output of
+  [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`center_freq`** — Center frequency
 - **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]; default: 2
 - **`verbose`** — Verbosity level; default: 0 (no output)
@@ -52,7 +55,7 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 5 || nrhs > 10)
+    if (nrhs < 6 || nrhs > 11)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
     if (nlhs > 2)
@@ -62,20 +65,27 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
     arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
     arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
-    arma::mat mtl_prop = qd_mex_get_Mat<double>(prhs[3]);
 
-    double center_freq = qd_mex_get_scalar<double>(prhs[4], "center_frequency", 1.0e9);
-    int lod = (nrhs < 6) ? 2 : qd_mex_get_scalar<int>(prhs[5], "lod", 2);
-    int verbose = (nrhs < 7) ? 0 : qd_mex_get_scalar<int>(prhs[6], "verbose", 0);
-    arma::u32_vec sub_mesh_index = (nrhs < 8) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[7], true);
+    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], true);
+    if (!mtl_ind.is_empty())
+        mtl_ind -= 1;
+
+    // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
+    auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);
+
+    double center_freq = qd_mex_get_scalar<double>(prhs[5], "center_frequency", 1.0e9);
+    int lod = (nrhs < 7) ? 2 : qd_mex_get_scalar<int>(prhs[6], "lod", 2);
+    int verbose = (nrhs < 8) ? 0 : qd_mex_get_scalar<int>(prhs[7], "verbose", 0);
+    arma::u32_vec sub_mesh_index = (nrhs < 9) ? arma::u32_vec() : qd_mex_get_Col<unsigned>(prhs[8], true);
 
     if (!sub_mesh_index.empty() && arma::any(sub_mesh_index == 0))
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Entries in 'sub_mesh_index' cannot be 0 (1-based index).");
     else // Convert to 0-based
         sub_mesh_index -= 1;
 
-    int use_kernel = (nrhs < 9) ? 0 : qd_mex_get_scalar<int>(prhs[8], "use_kernel", 0);
-    int gpu_id = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "gpu_id", 0);
+    int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
+    int gpu_id = (nrhs < 11) ? 0 : qd_mex_get_scalar<int>(prhs[10], "gpu_id", 0);
 
     arma::uword n_pos = orig.n_rows;
     arma::uword n_seg = 0;
@@ -102,7 +112,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::cube *p_coord = coord.empty() ? nullptr : &coord;
     arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
-    CALL_QD(quadriga_lib::calc_diffraction_gain(&orig, &dest, &mesh, &mtl_prop,
+    CALL_QD(quadriga_lib::calc_diffraction_gain(&orig, &dest, &mesh, &mtl_ind, &mtl_prop,
                                                 center_freq, lod, p_gain, p_coord, verbose,
                                                 p_sub_mesh_index, use_kernel, gpu_id));
 }

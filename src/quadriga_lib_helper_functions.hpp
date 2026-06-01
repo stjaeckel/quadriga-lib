@@ -9,15 +9,55 @@
 
 #include <cstring>
 #include <complex>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <stdexcept>
 
-// Material defaults (16 parameters)
-static constexpr double MTL_DEFAULT[16] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-
-// Helper thar reads a material either from a mtl_prop or default
+// Validate a named material-property map and return the material count (n_mtl).
+// - Every present (non-empty) column must have the same length; throws otherwise.
+// - Empty columns are treated as absent (consumers apply per-column defaults).
+// - An empty map returns 0.
+// Call once per public entry point; internal mtl_col / mtl_val accesses are then safe
+// for any material index < the returned n_mtl.
 template <typename dtype>
-static inline double mtl_get(const arma::Mat<dtype> &ml_prop, arma::uword iM, arma::uword k)
+static inline arma::uword mtl_validate(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
 {
-    return (k < ml_prop.n_cols) ? (double)ml_prop.at(iM, k) : MTL_DEFAULT[k];
+    arma::uword n_mtl = 0;
+    bool seen = false;
+    for (const auto &kv : mtl_prop)
+    {
+        if (kv.second.empty())
+            continue;
+        arma::uword len = (arma::uword)kv.second.size();
+        if (!seen)
+        {
+            n_mtl = len;
+            seen = true;
+        }
+        else if (len != n_mtl)
+            throw std::invalid_argument("Material property column '" + kv.first + "' has length " +
+                                        std::to_string(len) + ", expected " + std::to_string(n_mtl) +
+                                        " (all columns must have the same number of materials).");
+    }
+    return n_mtl;
+}
+
+// Resolve a named material-property column to a raw pointer (map-based material model).
+// Returns nullptr if the column is absent; the consumer then applies its own default.
+template <typename dtype>
+static inline const dtype *mtl_col(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, const std::string &key)
+{
+    auto it = mtl_prop.find(key);
+    return (it == mtl_prop.end() || it->second.empty()) ? nullptr : it->second.data();
+}
+
+// Read a material value for material index iM from a resolved column pointer.
+// Falls back to 'def' when the column is absent.
+template <typename dtype>
+static inline double mtl_val(const dtype *col, arma::uword iM, double def)
+{
+    return (col == nullptr) ? def : (double)col[iM];
 }
 
 // Assemble complex-valued eta from mtl coefficients
@@ -45,6 +85,28 @@ static inline double medium_loss_dB(std::complex<double> eta, double alpha, doub
     double loss = dist * 8.686 / Delta;
     loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
     return loss;
+}
+
+// In-medium gain for material index iM. No validation: the caller guarantees a
+// column-consistent map (via mtl_validate / obj_file_read) and iM < n_mtl.
+template <typename dtype>
+static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
+{
+    double fGHz = (double)center_frequency * 1e-9;
+    const dtype *m_a = mtl_col(mtl_prop, "a");
+    const dtype *m_b = mtl_col(mtl_prop, "b");
+    const dtype *m_c = mtl_col(mtl_prop, "c");
+    const dtype *m_d = mtl_col(mtl_prop, "d");
+    const dtype *m_alpha = mtl_col(mtl_prop, "alpha");
+    const dtype *m_alphaB = mtl_col(mtl_prop, "alphaB");
+    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
+
+    std::complex<double> eta = eta_from_coeffs(mtl_val(m_a, iM, 1.0), mtl_val(m_b, iM, 0.0),
+                                               mtl_val(m_c, iM, 0.0), mtl_val(m_d, iM, 0.0),
+                                               mtl_val(m_fRef, iM, 1.0), fGHz);
+    double A = medium_loss_dB(eta, mtl_val(m_alpha, iM, 0.0), mtl_val(m_alphaB, iM, 0.0),
+                              mtl_val(m_fRef, iM, 1.0), fGHz, (double)dist);
+    return (dtype)std::pow(10.0, -0.1 * A);
 }
 
 // Calculate length
@@ -562,8 +624,5 @@ inline void qd_coeff_combine(const dtype *pVrr, const dtype *pVri, // RX V-pol p
         p_coeff_im[R] = (-re * sp + im * cp) * path_amplitude;
     }
 }
-
-
-
 
 #endif

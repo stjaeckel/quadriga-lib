@@ -169,24 +169,22 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
                        {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
                        {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
 
-    arma::fmat mtl_prop = {{1.5, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8}};
-    mtl_prop = repmat(mtl_prop, 12, 1);
-    mtl_prop.col(0) = arma::regspace<arma::fvec>(1.1f, 0.1f, 2.2f);
-
+    // Per-face 0-based material index (each face its own material, to test reordering)
+    arma::uvec mtl_ind = arma::regspace<arma::uvec>(0, 11);
     // Subdivide the mesh into smaller chunks
-    arma::fmat cube_sub = cube, mtl_prop_sub = mtl_prop;
-    quadriga_lib::subdivide_triangles(3, &cube, &cube_sub, &mtl_prop, &mtl_prop_sub);
-
+    arma::fmat cube_sub = cube;
+    arma::uvec mtl_ind_sub;
+    quadriga_lib::subdivide_triangles(3, &cube, &cube_sub, &mtl_ind, &mtl_ind_sub);
     // Case 1 - Mesh size is already below threshold, test padding
-    arma::fmat cube_re, mtl_prop_re;
+    arma::fmat cube_re;
+    arma::uvec mtl_ind_re;
     arma::u32_vec cube_index, mesh_index;
     auto n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 1024, 8,
-                                                          &mtl_prop_sub, &mtl_prop_re, &mesh_index);
+                                                          &mtl_ind_sub, &mtl_ind_re, &mesh_index);
 
     CHECK(n_sub == 1);
-    CHECK(cube_re.n_rows == 112);     // Multiple of 8
-    CHECK(mtl_prop_re.n_rows == 112); // Multiple of 8
-    CHECK(mtl_prop_re.n_cols == 9);
+    CHECK(cube_re.n_rows == 112);    // Multiple of 8
+    CHECK(mtl_ind_re.n_elem == 112); // Multiple of 8
     CHECK(cube_index.n_elem == 1);
     CHECK(cube_index.at(0) == 0);
 
@@ -194,12 +192,9 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
     CHECK(arma::approx_equal(cube_re.submat(0, 0, 107, 8), cube_sub, "absdiff", 1e-14));
     CHECK(arma::approx_equal(cube_re.submat(108, 0, 111, 8), T, "absdiff", 1e-14));
 
-    T.zeros(4, 9);
-    T.col(0).ones();
-    T.col(8).ones();
-    CHECK(arma::approx_equal(mtl_prop_re.submat(0, 0, 107, 8), mtl_prop_sub, "absdiff", 1e-14));
-    CHECK(arma::approx_equal(mtl_prop_re.submat(108, 0, 111, 8), T, "absdiff", 1e-14));
-
+    CHECK(arma::all(mtl_ind_re.subvec(0, 107) == mtl_ind_sub));
+    arma::uvec Z(4, arma::fill::zeros);
+    CHECK(arma::all(mtl_ind_re.subvec(108, 111) == Z));
     auto U = arma::regspace<arma::u32_vec>(1, 108);
     CHECK(arma::all(mesh_index.subvec(0, 107) == U));
 
@@ -208,11 +203,10 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
 
     // Case 2 - Subdivide, no padding
     n_sub = quadriga_lib::triangle_mesh_segmentation(&cube_sub, &cube_re, &cube_index, 64, 1,
-                                                     &mtl_prop_sub, &mtl_prop_re, &mesh_index);
-
+                                                     &mtl_ind_sub, &mtl_ind_re, &mesh_index);
     CHECK(n_sub == 3);
     CHECK(cube_re.n_rows == 108);
-    CHECK(mtl_prop_re.n_rows == 108);
+    CHECK(mtl_ind_re.n_elem == 108);
     CHECK(cube_index.n_elem == n_sub);
     CHECK(cube_index.at(0) == 0);
 
@@ -222,7 +216,7 @@ TEST_CASE("Quadriga tools - Mesh Segmentation")
 
     auto I = arma::conv_to<arma::uvec>::from(mesh_index - 1);
     CHECK(arma::approx_equal(cube_re, cube_sub.rows(I), "absdiff", 1e-14));
-    CHECK(arma::approx_equal(mtl_prop_re, mtl_prop_sub.rows(I), "absdiff", 1e-14));
+    CHECK(arma::all(mtl_ind_re == mtl_ind_sub.elem(I)));
 }
 
 TEST_CASE("Quadriga tools - Point Cloud Segmentation")

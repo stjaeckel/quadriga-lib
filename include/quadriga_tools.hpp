@@ -113,19 +113,20 @@ namespace quadriga_lib
                    bool log_transform = false);  // Transform data to log-domain (10*log10(data))
 
     // Calculate diffraction gain for multiple transmit and receive positions
-    template <typename dtype>                                                 // Supported types: float or double
-    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                  // TX positions; Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *dest,                  // RX positions; Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *mesh,                  // Triangle vertices; Size: [ no_mesh, 9 ]
-                               const arma::Mat<dtype> *mtl_prop,              // Material properties; Size: [ no_mesh, 5 ]
-                               dtype center_frequency,                        // Center frequency in [Hz]
-                               int lod = 2,                                   // Level of detail, 0-6
-                               arma::Col<dtype> *gain = nullptr,              // Diffraction gain, linear scale; Size: [ n_pos ]
-                               arma::Cube<dtype> *coord = nullptr,            // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
-                               int verbose = 0,                               // Verbosity level
-                               const arma::u32_vec *sub_mesh_index = nullptr, // Sub-mesh index, 0-based; Length: [ no_mesh ]
-                               int use_kernel = 0,                            // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
-                               int gpu_id = 0,                                // CUDA device ID, ignored otherwise
+    template <typename dtype>                                                                       // Supported types: float or double
+    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                                        // TX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *dest,                                        // RX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> *mesh,                                        // Triangle vertices; Size: [ no_mesh, 9 ]
+                               const arma::uvec *mtl_ind,                                           // 0-based material index, Size: [n_mesh]
+                               const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties; Length: [n_mtl]
+                               dtype center_frequency,                                              // Center frequency in [Hz]
+                               int lod = 2,                                                         // Level of detail, 0-6
+                               arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
+                               arma::Cube<dtype> *coord = nullptr,                                  // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
+                               int verbose = 0,                                                     // Verbosity level
+                               const arma::u32_vec *sub_mesh_index = nullptr,                       // Sub-mesh index, 0-based; Length: [ no_mesh ]
+                               int use_kernel = 0,                                                  // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
+                               int gpu_id = 0,                                                      // CUDA device ID, ignored otherwise
                                bool scalar_mode = false);
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
@@ -218,20 +219,22 @@ namespace quadriga_lib
                                 const arma::Mat<dtype> &bsdf = {},         // BSDF data, size [mtl_names.size(), 17]
                                 bool map_to_itu_materials = false);        // Optional mapping to ITU default materials used by Sionna
 
-    // Read Wavefront .obj file — see obj_file_read documentation block for details.
-    template <typename dtype>                                                // Supported types: float or double
-    arma::uword obj_file_read(std::string fn,                                // File name
-                              arma::Mat<dtype> *mesh = nullptr,              // Triangle vertices, Size: [n_mesh, 9]
-                              arma::Mat<dtype> *mtl_prop = nullptr,          // Material properties, Size: [n_mesh, 1..16]
-                              arma::Mat<dtype> *vert_list = nullptr,         // Vertex list, Size: [n_vert, 3]
-                              arma::umat *face_ind = nullptr,                // 0-based vertex indices per face, Size: [n_mesh, 3]
-                              arma::uvec *obj_ind = nullptr,                 // 1-based object index, Size: [n_mesh]
-                              arma::uvec *mtl_ind = nullptr,                 // 1-based material index, Size: [n_mesh]
-                              std::vector<std::string> *obj_names = nullptr, // Object names, Size: [max(obj_ind)]
-                              std::vector<std::string> *mtl_names = nullptr, // Material names, Size: [max(mtl_ind)]
-                              arma::Mat<dtype> *bsdf = nullptr,              // BSDF data from .mtl file, Size: [mtl_names.size, 17]
-                              const std::string &materials_csv = "",         // Optional material CSV file
-                              bool trim = true);                             // Trim mtl_prop to columns containing non-default values
+    // Read Wavefront .obj file — see obj_file_read documentation block for details
+    template <typename dtype>
+    arma::uword obj_file_read(const std::string &fn_obj = "",                                          // File name, must end with .obj
+                              arma::Mat<dtype> *mesh = nullptr,                                        // Triangle vertices, Size: [n_mesh, 9]
+                              arma::Mat<dtype> *vert_list = nullptr,                                   // Vertex list, Size: [n_vert, 3]
+                              arma::umat *face_ind = nullptr,                                          // 0-based vertex indices per face, Size: [n_mesh, 3]
+                              arma::uvec *obj_ind = nullptr,                                           // 0-based object index, Size: [n_mesh]
+                              std::vector<std::string> *obj_names = nullptr,                           // Object names, Size: [max(obj_ind)-1]
+                              arma::uvec *mtl_ind = nullptr,                                           // 0-based material index from .mtl file, Size: [n_mesh]
+                              std::vector<std::string> *mtl_names = nullptr,                           // Material names from .mtl file, Size: [no_mtl = max(mtl_ind)-1]
+                              arma::Mat<dtype> *bsdf = nullptr,                                        // BSDF data from .mtl file, Size: [no_mtl, 17]
+                              const std::string &fn_csv = "",                                          // Optional EM/acoustic material CSV file
+                              arma::uvec *csv_ind = nullptr,                                           // 0-based material index from .csv file, Size: [n_mesh]
+                              std::vector<std::string> *csv_names = nullptr,                           // Material names from .csv file, Size: [n_csv = max(csv_ind)-1]
+                              std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr, // Material properties; Keys=csv col names; Length: [n_csv]
+                              bool csv_strict = false);                                                // If true, throw if material in obj is not also in csv; false defaults to first scv materia
 
     // Write Wavefront .obj file
     template <typename dtype>                                                // Supported types: float or double
@@ -321,38 +324,39 @@ namespace quadriga_lib
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
-    void ray_mesh_interact(int interaction_type,                          // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
-                           dtype center_frequency,                        // Center frequency in [Hz]
-                           const arma::Mat<dtype> *orig,                  // Ray origins in GCS, [n_ray, 3]
-                           const arma::Mat<dtype> *dest,                  // Ray destinations in GCS, [n_ray, 3]
-                           const arma::Mat<dtype> *fbs,                   // First interaction points in GCS, [n_ray, 3]
-                           const arma::Mat<dtype> *sbs,                   // Second interaction points in GCS, [n_ray, 3]
-                           const arma::Mat<dtype> *mesh,                  // Triangle mesh faces, [n_mesh, 9]
-                           const arma::Mat<dtype> *mtl_prop,              // Material properties, [n_mesh, 5]
-                           const arma::u32_vec *fbs_ind,                  // 1-based FBS mesh index (0 = no hit), [n_ray]
-                           const arma::u32_vec *sbs_ind,                  // 1-based SBS mesh index (0 = no hit), [n_ray]
-                           const arma::Mat<dtype> *trivec = nullptr,      // Beam wavefront vertices relative to origin, [n_ray, 9]
-                           const arma::Mat<dtype> *tridir = nullptr,      // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
-                           const arma::Col<dtype> *orig_length = nullptr, // Accumulated path length at origin, [n_ray]
-                           arma::Mat<dtype> *origN = nullptr,             // New origins after interaction, [n_rayN, 3]
-                           arma::Mat<dtype> *destN = nullptr,             // New destinations after interaction, [n_rayN, 3]
-                           arma::Col<dtype> *gainN = nullptr,             // Interaction gain (linear, excl. FSPL), [n_rayN]
-                           arma::Mat<dtype> *xprmatN = nullptr,           // Polarization transfer matrix [ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH], [n_rayN, 8]
-                           arma::Mat<dtype> *trivecN = nullptr,           // Updated beam wavefront vertices, [n_rayN, 9]
-                           arma::Mat<dtype> *tridirN = nullptr,           // Updated vertex-ray directions, format matches input
-                           arma::Col<dtype> *orig_lengthN = nullptr,      // Accumulated path length at new origin, [n_rayN]
-                           arma::Col<dtype> *fbs_angleN = nullptr,        // Incidence angle at FBS in [rad], [n_rayN]
-                           arma::Col<dtype> *thicknessN = nullptr,        // Material thickness (FBS-SBS distance) in [m], [n_rayN]
-                           arma::Col<dtype> *edge_lengthN = nullptr,      // Max beam triangle edge length at new origin, [n_rayN, 3]
-                           arma::Mat<dtype> *normal_vecN = nullptr,       // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
-                           arma::s32_vec *out_typeN = nullptr);           // Interaction type code, [n_rayN]
+    void ray_mesh_interact(int interaction_type,                                                // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+                           dtype center_frequency,                                              // Center frequency in [Hz]
+                           const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *fbs,                                         // First interaction points in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *sbs,                                         // Second interaction points in GCS, [n_ray, 3]
+                           const arma::Mat<dtype> *mesh,                                        // Triangle mesh faces, [n_mesh, 9]
+                           const arma::uvec *mtl_ind,                                           // 0-based material index, Size: [n_mesh]
+                           const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties; Length: [n_mtl]
+                           const arma::u32_vec *fbs_ind,                                        // 1-based FBS mesh index (0 = no hit), [n_ray]
+                           const arma::u32_vec *sbs_ind,                                        // 1-based SBS mesh index (0 = no hit), [n_ray]
+                           const arma::Mat<dtype> *trivec = nullptr,                            // Beam wavefront vertices relative to origin, [n_ray, 9]
+                           const arma::Mat<dtype> *tridir = nullptr,                            // Vertex-ray directions, spherical [n_ray, 6] or Cartesian [n_ray, 9]
+                           const arma::Col<dtype> *orig_length = nullptr,                       // Accumulated path length at origin, [n_ray]
+                           arma::Mat<dtype> *origN = nullptr,                                   // New origins after interaction, [n_rayN, 3]
+                           arma::Mat<dtype> *destN = nullptr,                                   // New destinations after interaction, [n_rayN, 3]
+                           arma::Col<dtype> *gainN = nullptr,                                   // Interaction gain (linear, excl. FSPL), [n_rayN]
+                           arma::Mat<dtype> *xprmatN = nullptr,                                 // Polarization transfer matrix [ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH], [n_rayN, 8]
+                           arma::Mat<dtype> *trivecN = nullptr,                                 // Updated beam wavefront vertices, [n_rayN, 9]
+                           arma::Mat<dtype> *tridirN = nullptr,                                 // Updated vertex-ray directions, format matches input
+                           arma::Col<dtype> *orig_lengthN = nullptr,                            // Accumulated path length at new origin, [n_rayN]
+                           arma::Col<dtype> *fbs_angleN = nullptr,                              // Incidence angle at FBS in [rad], [n_rayN]
+                           arma::Col<dtype> *thicknessN = nullptr,                              // Material thickness (FBS-SBS distance) in [m], [n_rayN]
+                           arma::Col<dtype> *edge_lengthN = nullptr,                            // Max beam triangle edge length at new origin, [n_rayN, 3]
+                           arma::Mat<dtype> *normal_vecN = nullptr,                             // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
+                           arma::s32_vec *out_typeN = nullptr);                                 // Interaction type code, [n_rayN]
 
     // Calculate in-medium gain
     template <typename dtype>
-    dtype medium_gain(const arma::Mat<dtype> &mtl_prop, // Material properties, [n_mesh, 9]
-                      arma::uword iM,                   // Material index, 0-based
-                      dtype dist,                       // Length of the ray inside the medium
-                      dtype center_frequency);          // Frequency in Hz
+    dtype medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
+                      arma::uword iM,                                                      // 0-based material index
+                      dtype dist,                                                          // Length of the ray inside the medium
+                      dtype center_frequency);                                             // Frequency in Hz
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
@@ -409,15 +413,12 @@ namespace quadriga_lib
                                const double ray_offset = 0.0);         // Offset of new ray origin from face plane
 
     // Subdivide triangles into smaller triangles
-    // - Returns the number of triangles after subdivision
-    // - Attempts to change the size of the output if it does not match [n_triangles_out, 9]
-    // - Optional processing of materials (copy of the original material)
-    template <typename dtype>                                                   // Supported types: float or double
-    arma::uword subdivide_triangles(arma::uword n_div,                          // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
-                                    const arma::Mat<dtype> *triangles_in,       // Input, matrix of size [n_triangles_in, 9]
-                                    arma::Mat<dtype> *triangles_out,            // Output, matrix of size [n_triangles_out, 9]
-                                    const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_triangles_in, 5 ], optional
-                                    arma::Mat<dtype> *mtl_prop_out = nullptr);  // Material properties (output), Size: [ n_triangles_out, 5 ], optional
+    template <typename dtype>
+    arma::uword subdivide_triangles(arma::uword n_div,                    // Number of divisions per edge, results in: n_triangles_out = n_triangles_in * n_div^2
+                                    const arma::Mat<dtype> *triangles_in, // Input, matrix of size [n_triangles_in, 9]
+                                    arma::Mat<dtype> *triangles_out,      // Output, matrix of size [n_triangles_out, 9]
+                                    const arma::uvec *mtl_ind = nullptr,  // Material indices (input); [ n_triangles_in ]
+                                    arma::uvec *mtl_ind_out = nullptr);   // Material indices (output); [ n_triangles_out ]
 
     // Calculate the axis-aligned bounding box (AABB) of a 3D mesh
     // - The mesh can be composed of sub-meshes, where each new sub_mesh is indicated by an index (=row number)
@@ -428,22 +429,15 @@ namespace quadriga_lib
                                         arma::uword vec_size = 1);                     // Vector size for SIMD processing (e.g. 8 for AVX2)
 
     // Reorganize a 3D mesh into smaller sub-meshes for faster processing
-    // - Recursively calls "mesh_split" until number of elements per sub-mesh is below a target size
-    // - Creates the "sub_mesh_index" indicating the start index of each sub-mesh
-    // - A "vec_size" can be used to align the sub-meshes to a given vector size for SIMD processing (AVX or CUDA)
-    // - For vec_size > 1, unused elements in a sub-mesh are padded with 0-size faces at the center of the sub-mesh AABB
-    // - If "mtl_prop" is given as an input, "mtl_propR" contains the reorganized materials, padded with "Air" for vec_size > 1
-    // - "mesh_index" contains the map of elements in "mesh" to "meshR" in 1-based notation, padded with 0s for vec_size > 1
-    // - Returns number of sub-meshes "n_sub"
     template <typename dtype>
-    arma::uword triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,               // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
-                                           arma::Mat<dtype> *meshR,                    // Reorganized mesh (output), Size: [ n_meshR, 9 ]
-                                           arma::u32_vec *sub_mesh_index,              // Sub-mesh index, 0-based, Length: [ n_sub ]
-                                           arma::uword target_size = 1024,             // Target value for the sub-mesh size
-                                           arma::uword vec_size = 1,                   // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
-                                           const arma::Mat<dtype> *mtl_prop = nullptr, // Material properties (input), Size: [ n_mesh, 5 ], optional
-                                           arma::Mat<dtype> *mtl_propR = nullptr,      // Material properties (output), Size: [ n_meshR, 5 ], optional
-                                           arma::u32_vec *mesh_index = nullptr);       // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
+    arma::uword triangle_mesh_segmentation(const arma::Mat<dtype> *mesh,         // Faces of the triangular mesh (input), Size: [ n_mesh, 9 ]
+                                           arma::Mat<dtype> *meshR,              // Reorganized mesh (output), Size: [ n_meshR, 9 ]
+                                           arma::u32_vec *sub_mesh_index,        // Sub-mesh index, 0-based, Length: [ n_sub ]
+                                           arma::uword target_size = 1024,       // Target value for the sub-mesh size
+                                           arma::uword vec_size = 1,             // Vector size for SIMD processing (e.g. 8 for AVX2, 32 for CUDA)
+                                           const arma::uvec *mtl_ind = nullptr,  // Material indices (input); [ n_mesh ]
+                                           arma::uvec *mtl_ind_out = nullptr,    // Material indices (output); [ n_meshR ]
+                                           arma::u32_vec *mesh_index = nullptr); // Index mapping elements of "mesh" to "meshR", 1-based, Length: [ n_meshR ]
 
     // Split a 3D mesh into two sub-meshes along a given axis
     // - Returns the axis along which the split was attempted (1 = x, 2 = y, 3 = z)

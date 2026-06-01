@@ -23,21 +23,31 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
 - Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
   simulation with impedance-mapped material parameters (ε derived from Z).
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Declaration:
 ```
 void quadriga_lib::ray_mesh_interact(
-    int interaction_type, dtype center_frequency,
-    const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs, const arma::Mat<dtype> *sbs,
-    const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
-    const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
+    int interaction_type,
+    dtype center_frequency,
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *fbs,
+    const arma::Mat<dtype> *sbs,
+    const arma::Mat<dtype> *mesh,
+    const arma::uvec *mtl_ind,
+    const std::unordered_map<std::string, td::vector<dtype>> *mtl_prop,
+    const arma::u32_vec *fbs_ind,
+    const arma::u32_vec *sbs_ind,
     const arma::Mat<dtype> *trivec = nullptr,
     const arma::Mat<dtype> *tridir = nullptr,
     const arma::Col<dtype> *orig_length = nullptr,
-    arma::Mat<dtype> *origN = nullptr, arma::Mat<dtype> *destN = nullptr,
-    arma::Col<dtype> *gainN = nullptr, arma::Mat<dtype> *xprmatN = nullptr,
-    arma::Mat<dtype> *trivecN = nullptr, arma::Mat<dtype> *tridirN = nullptr,
+    arma::Mat<dtype> *origN = nullptr,
+    arma::Mat<dtype> *destN = nullptr,
+    arma::Col<dtype> *gainN = nullptr,
+    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::Mat<dtype> *trivecN = nullptr,
+    arma::Mat<dtype> *tridirN = nullptr,
     arma::Col<dtype> *orig_lengthN = nullptr,
     arma::Col<dtype> *fbs_angleN = nullptr,
     arma::Col<dtype> *thicknessN = nullptr,
@@ -51,8 +61,9 @@ void quadriga_lib::ray_mesh_interact(
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangle mesh faces; ee [[obj_file_read]]; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see [[obj_file_read]]; `[n_mesh, n_param]`
+- **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
+- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. NULL → all faces treated as air.
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`. NULL → air defaults used.
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
@@ -96,15 +107,32 @@ void quadriga_lib::ray_mesh_interact(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequency,
-                                     const arma::Mat<dtype> *orig, const arma::Mat<dtype> *dest, const arma::Mat<dtype> *fbs, const arma::Mat<dtype> *sbs,
-                                     const arma::Mat<dtype> *mesh, const arma::Mat<dtype> *mtl_prop,
-                                     const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
-                                     const arma::Mat<dtype> *trivec, const arma::Mat<dtype> *tridir, const arma::Col<dtype> *orig_length,
-                                     arma::Mat<dtype> *origN, arma::Mat<dtype> *destN, arma::Col<dtype> *gainN, arma::Mat<dtype> *xprmatN,
-                                     arma::Mat<dtype> *trivecN, arma::Mat<dtype> *tridirN, arma::Col<dtype> *orig_lengthN,
-                                     arma::Col<dtype> *fbs_angleN, arma::Col<dtype> *thicknessN, arma::Col<dtype> *edge_lengthN,
-                                     arma::Mat<dtype> *normal_vecN, arma::s32_vec *out_typeN)
+void quadriga_lib::ray_mesh_interact(int interaction_type,
+                                     dtype center_frequency,
+                                     const arma::Mat<dtype> *orig,
+                                     const arma::Mat<dtype> *dest,
+                                     const arma::Mat<dtype> *fbs,
+                                     const arma::Mat<dtype> *sbs,
+                                     const arma::Mat<dtype> *mesh,
+                                     const arma::uvec *mtl_ind,
+                                     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+                                     const arma::u32_vec *fbs_ind,
+                                     const arma::u32_vec *sbs_ind,
+                                     const arma::Mat<dtype> *trivec,
+                                     const arma::Mat<dtype> *tridir,
+                                     const arma::Col<dtype> *orig_length,
+                                     arma::Mat<dtype> *origN,
+                                     arma::Mat<dtype> *destN,
+                                     arma::Col<dtype> *gainN,
+                                     arma::Mat<dtype> *xprmatN,
+                                     arma::Mat<dtype> *trivecN,
+                                     arma::Mat<dtype> *tridirN,
+                                     arma::Col<dtype> *orig_lengthN,
+                                     arma::Col<dtype> *fbs_angleN,
+                                     arma::Col<dtype> *thicknessN,
+                                     arma::Col<dtype> *edge_lengthN,
+                                     arma::Mat<dtype> *normal_vecN,
+                                     arma::s32_vec *out_typeN)
 {
 
     // Internal documentation: out_typeN mapping logic
@@ -161,8 +189,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         throw std::invalid_argument("Input 'sbs' cannot be NULL.");
     if (mesh == nullptr)
         throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (mtl_prop == nullptr)
-        throw std::invalid_argument("Input 'mtl_prop' cannot be NULL.");
     if (fbs_ind == nullptr)
         throw std::invalid_argument("Input 'fbs_ind' cannot be NULL.");
     if (sbs_ind == nullptr)
@@ -179,8 +205,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         throw std::invalid_argument("Input 'sbs' must have 3 columns containing x,y,z coordinates.");
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-    if (mtl_prop->n_cols < 1)
-        throw std::invalid_argument("Input 'mtl_prop' must have at least 1 column.");
 
     const arma::uword n_ray = orig->n_rows;     // Number of rays
     const arma::uword n_mesh = mesh->n_rows;    // Number of mesh elements
@@ -199,8 +223,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         throw std::invalid_argument("Number of rows in 'orig' and 'fbs' dont match.");
     if (sbs->n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'orig' and 'sbs' dont match.");
-    if (mtl_prop->n_rows != n_mesh)
-        throw std::invalid_argument("Number of rows in 'mesh' and 'mtl_prop' dont match.");
+    if (mtl_ind != nullptr && !mtl_ind->is_empty() && mtl_ind->n_elem != n_mesh)
+        throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
     if (fbs_ind->n_elem != n_ray)
         throw std::invalid_argument("Number of elements in 'fbs_ind' does not match number of rows in 'orig'.");
     if (sbs_ind->n_elem != n_ray)
@@ -239,6 +263,27 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
     const dtype *p_trivec = (trivec == nullptr) ? nullptr : trivec->memptr();
     const dtype *p_tridir = (tridir == nullptr) ? nullptr : tridir->memptr();
     const dtype *p_orig_length = (orig_length == nullptr) ? nullptr : orig_length->memptr();
+
+    // Resolve material columns once; nullptr -> per-column default applied in the ray loop
+    const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
+    const dtype *m_a = nullptr, *m_b = nullptr, *m_c = nullptr, *m_d = nullptr;
+    const dtype *m_att = nullptr, *m_attB = nullptr, *m_alpha = nullptr, *m_alphaB = nullptr, *m_fRef = nullptr;
+    arma::uword n_mtl = 0;
+    if (mtl_prop != nullptr)
+    {
+        n_mtl = mtl_validate(*mtl_prop); // all columns share length n_mtl; throws on mismatch
+        m_a = mtl_col(*mtl_prop, "a");
+        m_b = mtl_col(*mtl_prop, "b");
+        m_c = mtl_col(*mtl_prop, "c");
+        m_d = mtl_col(*mtl_prop, "d");
+        m_att = mtl_col(*mtl_prop, "att");
+        m_attB = mtl_col(*mtl_prop, "attB");
+        m_alpha = mtl_col(*mtl_prop, "alpha");
+        m_alphaB = mtl_col(*mtl_prop, "alphaB");
+        m_fRef = mtl_col(*mtl_prop, "fRef");
+    }
+    if (p_mtl_ind != nullptr && n_mtl > 0 && mtl_ind->max() >= n_mtl)
+        throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
 
     // Get number of output rays and build output ray index
     // - Only consider rays that have at least one interaction with the mesh, i.e. 'fbs_ind != 0'
@@ -331,6 +376,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
         size_t iSBS = (size_t)sbs_ind->at(iRx); // Mesh SBS index, 1-based
         if (iSBS > n_mesh_t)
             throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
+
+        // Material indices for FBS and SBS faces (0 if no material table)
+        arma::uword iMF = (p_mtl_ind == nullptr) ? 0 : (arma::uword)p_mtl_ind[iFBS];
+        arma::uword iMS = (p_mtl_ind == nullptr || iSBS == 0) ? 0 : (arma::uword)p_mtl_ind[iSBS - 1];
 
         double Ox = (double)p_orig[iRx], Oy = (double)p_orig[iRy], Oz = (double)p_orig[iRz]; // Origin position
         double Dx = (double)p_dest[iRx], Dy = (double)p_dest[iRy], Dz = (double)p_dest[iRz]; // Destination position
@@ -436,52 +485,51 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
         if (theta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
         {
-            kS1 = mtl_get(*mtl_prop, iFBS, 0);
-            kS2 = mtl_get(*mtl_prop, iFBS, 1);
-            kS3 = mtl_get(*mtl_prop, iFBS, 2);
-            kS4 = mtl_get(*mtl_prop, iFBS, 3);
-            double att = mtl_get(*mtl_prop, iFBS, 4);
-            double attB = mtl_get(*mtl_prop, iFBS, 5);
-            kS_alpha = mtl_get(*mtl_prop, iFBS, 6);
-            kS_alphaB = mtl_get(*mtl_prop, iFBS, 7);
-            kS_fRef = mtl_get(*mtl_prop, iFBS, 8);
+            kS1 = mtl_val(m_a, iMF, 1.0);
+            kS2 = mtl_val(m_b, iMF, 0.0);
+            kS3 = mtl_val(m_c, iMF, 0.0);
+            kS4 = mtl_val(m_d, iMF, 0.0);
+            double att = mtl_val(m_att, iMF, 0.0);
+            double attB = mtl_val(m_attB, iMF, 0.0);
+            kS_alpha = mtl_val(m_alpha, iMF, 0.0);
+            kS_alphaB = mtl_val(m_alphaB, iMF, 0.0);
+            kS_fRef = mtl_val(m_fRef, iMF, 1.0);
             transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
         }
         else // Ray hits back side of FBS face, set first material to object material
         {
-            kR1 = mtl_get(*mtl_prop, iFBS, 0);
-            kR2 = mtl_get(*mtl_prop, iFBS, 1);
-            kR3 = mtl_get(*mtl_prop, iFBS, 2);
-            kR4 = mtl_get(*mtl_prop, iFBS, 3);
-            kR_alpha = mtl_get(*mtl_prop, iFBS, 6);
-            kR_alphaB = mtl_get(*mtl_prop, iFBS, 7);
-            kR_fRef = mtl_get(*mtl_prop, iFBS, 8);
+            kR1 = mtl_val(m_a, iMF, 1.0);
+            kR2 = mtl_val(m_b, iMF, 0.0);
+            kR3 = mtl_val(m_c, iMF, 0.0);
+            kR4 = mtl_val(m_d, iMF, 0.0);
+            kR_alpha = mtl_val(m_alpha, iMF, 0.0);
+            kR_alphaB = mtl_val(m_alphaB, iMF, 0.0);
+            kR_fRef = mtl_val(m_fRef, iMF, 1.0);
         }
 
         if (material_to_material) // Material to material transition
         {
             if (theta >= 0.0) // SBS (front side) is hit first
             {
-                kR1 = mtl_get(*mtl_prop, iSBS - 1, 0);
-                kR2 = mtl_get(*mtl_prop, iSBS - 1, 1);
-                kR3 = mtl_get(*mtl_prop, iSBS - 1, 2);
-                kR4 = mtl_get(*mtl_prop, iSBS - 1, 3);
-                kR_alpha = mtl_get(*mtl_prop, iSBS - 1, 6);
-                kR_alphaB = mtl_get(*mtl_prop, iSBS - 1, 7);
-                kR_fRef = mtl_get(*mtl_prop, iSBS - 1, 8);
+                kR1 = mtl_val(m_a, iMS, 1.0);
+                kR2 = mtl_val(m_b, iMS, 0.0);
+                kR3 = mtl_val(m_c, iMS, 0.0);
+                kR4 = mtl_val(m_d, iMS, 0.0);
+                kR_alpha = mtl_val(m_alpha, iMS, 0.0);
+                kR_alphaB = mtl_val(m_alphaB, iMS, 0.0);
+                kR_fRef = mtl_val(m_fRef, iMS, 1.0);
             }
             else // FBS (back side) is hit first
             {
-                kS1 = mtl_get(*mtl_prop, iSBS - 1, 0);
-                kS2 = mtl_get(*mtl_prop, iSBS - 1, 1);
-                kS3 = mtl_get(*mtl_prop, iSBS - 1, 2);
-                kS4 = mtl_get(*mtl_prop, iSBS - 1, 3);
-                double att = mtl_get(*mtl_prop, iSBS - 1, 4);
-                double attB = mtl_get(*mtl_prop, iSBS - 1, 5);
-                kS_alpha = mtl_get(*mtl_prop, iSBS - 1, 6);
-                kS_alphaB = mtl_get(*mtl_prop, iSBS - 1, 7);
-                kS_fRef = mtl_get(*mtl_prop, iSBS - 1, 8);
-                transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
+                kS1 = mtl_val(m_a, iMS, 1.0);
+                kS2 = mtl_val(m_b, iMS, 0.0);
+                kS3 = mtl_val(m_c, iMS, 0.0);
+                kS4 = mtl_val(m_d, iMS, 0.0);
+                double att = mtl_val(m_att, iMS, 0.0);
+                double attB = mtl_val(m_attB, iMS, 0.0);
+                kS_alpha = mtl_val(m_alpha, iMS, 0.0);
+                kS_alphaB = mtl_val(m_alphaB, iMS, 0.0);
+                kS_fRef = mtl_val(m_fRef, iMS, 1.0);
                 transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
             }
         }
@@ -946,7 +994,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type, dtype center_frequenc
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, float center_frequency,
                                               const arma::Mat<float> *orig, const arma::Mat<float> *dest, const arma::Mat<float> *fbs, const arma::Mat<float> *sbs,
-                                              const arma::Mat<float> *mesh, const arma::Mat<float> *mtl_prop,
+                                              const arma::Mat<float> *mesh, const arma::uvec *mtl_ind,
+                                              const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
                                               const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, const arma::Col<float> *orig_length,
                                               arma::Mat<float> *origN, arma::Mat<float> *destN, arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
@@ -956,7 +1005,8 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, double center_frequency,
                                               const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
-                                              const arma::Mat<double> *mesh, const arma::Mat<double> *mtl_prop,
+                                              const arma::Mat<double> *mesh, const arma::uvec *mtl_ind,
+                                              const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
                                               const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, const arma::Col<double> *orig_length,
                                               arma::Mat<double> *origN, arma::Mat<double> *destN, arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
@@ -980,17 +1030,17 @@ Linear gain of a ray traversing a homogeneous lossy medium
 ## Declaration:
 ```
 dtype quadriga_lib::medium_gain(
-        const arma::Mat<dtype> &mtl_prop,
-        arma::uword iM,
-        dtype dist,
-        dtype fGHz);
+    const arma::Mat<dtype> &mtl_prop,
+    arma::uword iM,
+    dtype dist,
+    dtype fGHz);
 ```
 
 ## Inputs:
-- **`mtl_prop`** — Material properties; see [[obj_file_read]] for the column layout; `[n_mesh, 9]`
-- **`iM`** — Row index selecting the material from `mtl_prop`
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
+- **`iM`** — 0-based material index selecting the material from `mtl_prop`
 - **`dist`** — Path length of the ray inside the medium
-- **`center_frequency`** — Center frequency; Hu
+- **`center_frequency`** — Center frequency in [Hz]
 
 ## Returns:
 - Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
@@ -1001,26 +1051,16 @@ dtype quadriga_lib::medium_gain(
 MD!*/
 
 template <typename dtype>
-dtype quadriga_lib::medium_gain(const arma::Mat<dtype> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
+dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                                arma::uword iM, dtype dist, dtype center_frequency)
 {
-    if (mtl_prop.n_cols < 1 || mtl_prop.n_cols > 16)
-        throw std::invalid_argument("Input 'mtl_prop' must have between 1 and 16 columns.");
-    if (iM >= mtl_prop.n_rows)
-        throw std::invalid_argument("Material index out of bound.");
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-
-    double fGHz = (double)center_frequency * 1e-9;
-
-    std::complex<double> eta = eta_from_coeffs(mtl_get(mtl_prop, iM, 0), mtl_get(mtl_prop, iM, 1),
-                                               mtl_get(mtl_prop, iM, 2), mtl_get(mtl_prop, iM, 3),
-                                               mtl_get(mtl_prop, iM, 8), fGHz);
-
-    double A = medium_loss_dB(eta, mtl_get(mtl_prop, iM, 6), mtl_get(mtl_prop, iM, 7),
-                              mtl_get(mtl_prop, iM, 8), fGHz, (double)dist);
-
-    return (dtype)std::pow(10.0, -0.1 * A);
+    arma::uword n_mtl = mtl_validate(mtl_prop);
+    if (iM >= n_mtl)
+        throw std::invalid_argument("Material index out of bound.");
+    return medium_gain_impl(mtl_prop, iM, dist, center_frequency);
 }
 
-template float quadriga_lib::medium_gain(const arma::Mat<float> &mtl_prop, arma::uword iM, float dist, float fGHz);
-template double quadriga_lib::medium_gain(const arma::Mat<double> &mtl_prop, arma::uword iM, double dist, double fGHz);
+template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_frequency);
+template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_frequency);

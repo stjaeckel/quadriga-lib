@@ -47,18 +47,13 @@ static std::string_view map_to_itu(std::string_view name)
         {"irr_glass", "itu_glass"},
     };
 
-    // C++ 20 version:
-    // for (auto [prefix, itu] : kPrefixMap)
-    //     if (name.starts_with(prefix) || name.starts_with(itu))
-    //         return itu;
-
     // C++ 17 version:
     for (auto [prefix, itu] : kPrefixMap)
         if ((name.size() >= prefix.size() && name.compare(0, prefix.size(), prefix) == 0) ||
             (name.size() >= itu.size() && name.compare(0, itu.size(), itu) == 0))
             return itu;
 
-    return "vacuum";
+    return "air";
 }
 
 /*!SECTION
@@ -69,13 +64,13 @@ SECTION!*/
 # mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
-- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for 
+- Converts quadriga-lib mesh data structures to Mitsuba 3 XML format, loadable by NVIDIA Sionna RT for
   differentiable radio-propagation simulations
 - Supports grouping faces into named objects with per-face material assignments
 - Optionally maps material names to ITU-defined presets used by Sionna RT
-- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it; 
+- Creates a subdirectory `<stem>_meshes/` next to the XML file and writes one binary PLY file per object into it;
   both the XML and the mesh folder must be distributable together
-- Objects whose faces reference more than one material are automatically split into sub-objects (one per material) 
+- Objects whose faces reference more than one material are automatically split into sub-objects (one per material)
   and renamed `<obj_name>_<mtl_name>`; the effective object count in the output may therefore exceed the length of `obj_names`
 
 ## Declaration:
@@ -96,10 +91,10 @@ void quadriga_lib::mitsuba_xml_file_write(
 - **`fn`** — Output file path including `.xml` extension
 - **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
-- **`obj_ind`** — 1-based object index per triangle; length must match `obj_names`; `[n_mesh]`
-- **`mtl_ind`** — 1-based material index per triangle; length must match `mtl_names`; `[n_mesh]`
-- **`obj_names`** — Object names; length must equal `max(obj_ind)`
-- **`mtl_names`** — Material names; length must equal `max(mtl_ind)`
+- **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 0-based material index per triangle; `[n_mesh]`
+- **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
+- **`mtl_names`** — Material names; length must equal `max(mtl_ind)+1`
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
@@ -120,10 +115,10 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         throw std::invalid_argument("Face indices 'face_ind' must have 3 columns (triangle mesh).");
 
     arma::uvec unique_obj_ind = arma::unique(obj_ind);
-    arma::uword n_obj = arma::max(unique_obj_ind); // Number of mesh objects
+    arma::uword n_obj = arma::max(unique_obj_ind) + 1; // Number of mesh objects
 
     arma::uvec unique_mtl_ind = arma::unique(mtl_ind);
-    arma::uword n_mtl = arma::max(unique_mtl_ind); // Number of mesh materials
+    arma::uword n_mtl = arma::max(unique_mtl_ind) + 1; // Number of mesh materials
 
     arma::uvec unique_face_ind = arma::unique(face_ind);
     arma::uword n_vert = arma::max(unique_face_ind) + 1; // Number of mesh vertices
@@ -205,12 +200,12 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         {
             auto itu_name = map_to_itu(mtl_names[i_mtl]);
 
-            // insert if not seen yet; value == next available 1-based index
-            auto [it, inserted] = itu_index.emplace(itu_name, itu_index.size() + 1);
+            // insert if not seen yet; value == next available index
+            auto [it, inserted] = itu_index.emplace(itu_name, itu_index.size());
 
             // Remap every occurrence of the old material index to the ITU index
-            const arma::uword old_idx = i_mtl + 1;  // original is 1-based
-            const arma::uword new_idx = it->second; // also 1-based
+            const arma::uword old_idx = i_mtl;      // 0-based
+            const arma::uword new_idx = it->second; // also 0-based
 
             mtl_ind_local.elem(arma::find(mtl_ind == old_idx)).fill(new_idx);
         }
@@ -220,12 +215,12 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         mtl_names_local.resize(itu_index.size());
 
         for (auto &&[itu_name, one_based_idx] : itu_index)
-            mtl_names_local[one_based_idx - 1] = std::string{itu_name};
+            mtl_names_local[one_based_idx] = std::string{itu_name};
     }
     n_mtl = mtl_names_local.size();
     unique_mtl_ind = arma::unique(mtl_ind_local);
 
-    if (n_mtl != arma::max(unique_mtl_ind))
+    if (n_mtl != arma::max(unique_mtl_ind) + 1)
         throw std::invalid_argument("Mismatch in material index.");
 
     // Check for duplicate material names
@@ -243,11 +238,11 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     auto obj_ind_local = obj_ind;
     obj_names_local.reserve(2 * n_obj);
 
-    arma::uword next_obj_id = n_obj + 1;
-    for (arma::uword i_obj = 1; i_obj <= n_obj; ++i_obj)
+    arma::uword next_obj_id = n_obj;
+    for (arma::uword i_obj = 0; i_obj < n_obj; ++i_obj)
     {
         // Get the the original object name
-        const std::string base_name = obj_names_valid[i_obj - 1];
+        const std::string base_name = obj_names_valid[i_obj];
 
         // Find all faces whose obj_ind == i_obj
         arma::uvec face_idx = arma::find(obj_ind == i_obj);
@@ -262,16 +257,16 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
 
         // Rename the original object entry for the first material in unique_mtls
         {
-            const arma::uword mtl_id = unique_mtls[0]; // 1-based
-            std::string new_name = base_name + "_" + mtl_names_local[mtl_id - 1];
-            obj_names_local[i_obj - 1] = new_name;
+            const arma::uword mtl_id = unique_mtls[0]; // 0-based
+            std::string new_name = base_name + "_" + mtl_names_local[mtl_id];
+            obj_names_local[i_obj] = new_name;
         }
 
         // For any additional materials, append new objects at the end of obj_names:
         for (arma::uword i_mtl = 1; i_mtl < unique_mtls.n_elem; ++i_mtl)
         {
-            const arma::uword mtl_id = unique_mtls[i_mtl]; // 1-based
-            std::string new_name = base_name + "_" + mtl_names_local[mtl_id - 1];
+            const arma::uword mtl_id = unique_mtls[i_mtl]; // 0-based
+            std::string new_name = base_name + "_" + mtl_names_local[mtl_id];
             obj_names_local.push_back(std::move(new_name));
 
             // Find all faces of this orig_obj that use mtl_id
@@ -284,7 +279,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
             ++next_obj_id;
         }
     }
-    n_obj = next_obj_id - 1;
+    n_obj = next_obj_id;
 
     // Check for duplicate object names
     seen.clear();
@@ -323,7 +318,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         fileW.write(bin_data.c_str(), bin_data.size());
 
         // Find all faces whose obj_ind == i_obj
-        arma::uvec face_idx = arma::find(obj_ind_local == i_obj + 1);
+        arma::uvec face_idx = arma::find(obj_ind_local == i_obj);
         arma::uword n_faces = face_idx.n_elem;
 
         // Gather the vertex IDs for these faces
@@ -558,14 +553,14 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
         node_boolean.append_attribute("name").set_value("face_normals");
         node_boolean.append_attribute("value").set_value("true");
 
-        arma::uvec face_idx = arma::find(obj_ind_local == i_obj + 1, 1);
+        arma::uvec face_idx = arma::find(obj_ind_local == i_obj, 1);
         arma::uword mtl_idx = mtl_ind_local.at(face_idx.at(0));
 
-        if (mtl_idx - 1 >= n_mtl)
+        if (mtl_idx >= n_mtl)
             throw std::runtime_error("Material index out of bound. This should not happen! Ever!");
 
         auto node_ref = node_shape.append_child("ref");
-        node_ref.append_attribute("id").set_value(mtl_names_local[mtl_idx - 1].c_str());
+        node_ref.append_attribute("id").set_value(mtl_names_local[mtl_idx].c_str());
         node_ref.append_attribute("name").set_value("bsdf");
     }
 

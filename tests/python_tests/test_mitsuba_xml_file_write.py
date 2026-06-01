@@ -26,17 +26,7 @@ class test_case(unittest.TestCase):
         # -----------------------------------------------------------------
         obj_file = os.path.join(current_dir, '../data/test_scene_pbr.obj')
 
-        (
-            mesh,
-            mtl_prop,
-            vert_list,
-            face_ind,
-            obj_ind,
-            mtl_ind,
-            obj_names,
-            mtl_names,
-            bsdf,
-        ) = quadriga_lib.RTtools.obj_file_read(obj_file)
+        mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, *_, = quadriga_lib.RTtools.obj_file_read(obj_file)
 
         # Minimal sanity check
         self.assertTrue(vert_list.size, "No vertices loaded from OBJ")

@@ -2,8 +2,10 @@ function test_obj_file_write
 
 fn = 'cube.obj';
 mtl_fn = 'cube.mtl';
+csv_fn = 'custom_materials.csv';
 if exist(fn,'file');     delete(fn);     end
 if exist(mtl_fn,'file'); delete(mtl_fn); end
+if exist(csv_fn,'file'); delete(csv_fn); end
 
 % Reconstruct a [n_face, 9] mesh from a vertex list and 1-based face indices
 mk = @(V,F) [ V(F(:,1),:), V(F(:,2),:), V(F(:,3),:) ];
@@ -23,17 +25,20 @@ assertTrue( isa(fio, 'uint64') );
 assertElementsAlmostEqual( mk(vlo, fio), mesh, 'absolute', 1e-12 );
 assertTrue( exist(mtl_fn,'file') ~= 2 );   % no materials -> no .mtl
 
-[ mesh_rd, ~, vert_list_rd, face_ind_rd, obj_ind_rd, mtl_ind_rd, obj_names_rd, mtl_names_rd ] = ...
-    quadriga_lib.obj_file_read( fn );
+[ mesh_rd, vert_list_rd, face_ind_rd, obj_ind_rd, obj_names_rd, mtl_ind_rd, mtl_names_rd, ~, ...
+    csv_ind_rd ] = quadriga_lib.obj_file_read( fn );
 
 assertEqual( size(vert_list_rd), [8,3] );
 assertElementsAlmostEqual( mesh_rd, mesh, 'absolute', 1e-12 );
 assertElementsAlmostEqual( mk(vert_list_rd, face_ind_rd), mesh, 'absolute', 1e-12 );
 assertEqual( size(obj_names_rd), [1,1] );
 assertEqual( obj_names_rd{1,1}, 'object' );
-assertTrue( isempty(mtl_names_rd) );
+% No usemtl written -> faces get the synthetic "default" material on the .mtl side
+assertEqual( size(mtl_names_rd), [1,1] );
+assertEqual( mtl_names_rd{1,1}, 'default' );
 assertTrue( all( obj_ind_rd == 1 ) );
-assertTrue( all( mtl_ind_rd == 0 ) );
+assertTrue( all( mtl_ind_rd == 1 ) );
+assertTrue( all( csv_ind_rd == 1 ) );   % "default" -> air fallback (row 1)
 delete(fn);
 
 %% vert_list / face_ind round-trip
@@ -43,7 +48,7 @@ delete(fn);
 assertElementsAlmostEqual( vlo, vert_list, 'absolute', 1e-14 );
 assertEqual( fio, uint64(face_ind) );
 
-[ ~, ~, vert_list_rd, face_ind_rd ] = quadriga_lib.obj_file_read( fn );
+[ ~, vert_list_rd, face_ind_rd ] = quadriga_lib.obj_file_read( fn );
 assertElementsAlmostEqual( mk(vert_list_rd, face_ind_rd), mesh, 'absolute', 1e-12 );
 delete(fn);
 
@@ -56,30 +61,43 @@ mtl_names = { 'itu_concrete', 'itu_wood' };
 quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names );
 assertTrue( exist(mtl_fn,'file') == 2 );
 
-[ ~, mtl_prop, ~, ~, ~, mtl_ind_rd, ~, mtl_names_rd ] = quadriga_lib.obj_file_read( fn );
+% Resolve EM properties from the built-in default table (names are ITU materials)
+[ ~, ~, ~, ~, ~, mtl_ind_rd, mtl_names_rd, ~, csv_ind_rd, ~, csv_prop_rd ] = ...
+    quadriga_lib.obj_file_read( fn );
 
 assertEqual( size(mtl_names_rd), [2,1] );
 assertEqual( mtl_names_rd{1,1}, 'itu_concrete' );
 assertEqual( mtl_names_rd{2,1}, 'itu_wood' );
-assertElementsAlmostEqual( mtl_prop(1,:), [5.24, 0, 0.0462, 0.7822], 'absolute', 1e-12 );
-assertElementsAlmostEqual( mtl_prop(5,:), [1.99, 0, 0.0047, 1.0718], 'absolute', 1e-12 );
+
+assertElementsAlmostEqual( prop_at(csv_prop_rd, 'a', csv_ind_rd(1)), 5.24, 'absolute', 1e-2 );
+assertElementsAlmostEqual( prop_at(csv_prop_rd, 'a', csv_ind_rd(5)), 1.99, 'absolute', 1e-2 );
 assertEqual( mtl_ind_rd, uint64([1;1;1;1;2;2;2;2;2;2;2;2]) );
 delete(fn); delete(mtl_fn);
 
-%% Materials round-trip (custom inline :: syntax)
+%% Materials round-trip (custom material via CSV)
 obj_ind = ones(12,1);
 mtl_ind = ones(12,1);
 obj_names = { 'Cube' };
-mtl_names = { 'glass::6.0:0:0.1:1.2' };
+mtl_names = { 'glass' };
 
 quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names );
 
-[ ~, mtl_prop, ~, ~, ~, mtl_ind_rd, ~, mtl_names_rd ] = quadriga_lib.obj_file_read( fn );
+% EM properties come from a CSV, not from the OBJ/MTL
+f = fopen(csv_fn,'w');
+fprintf(f,'%s\n','name,a,b,c,d,att');
+fprintf(f,'%s\n','air,1.0,0.0,0.0,0.0,0.0');
+fprintf(f,'%s\n','glass,6.0,0.0,0.1,1.2,0.0');
+fclose(f);
 
-assertEqual( mtl_names_rd{1,1}, 'glass::6.0:0:0.1:1.2' );
-assertElementsAlmostEqual( mtl_prop(1,:), [6.0, 0, 0.1, 1.2], 'absolute', 1e-12 );
+[ ~, ~, ~, ~, ~, mtl_ind_rd, mtl_names_rd, ~, csv_ind_rd, ~, csv_prop_rd ] = ...
+    quadriga_lib.obj_file_read( fn, csv_fn );
+
+assertEqual( mtl_names_rd{1,1}, 'glass' );
+assertElementsAlmostEqual( prop_at(csv_prop_rd, 'a', csv_ind_rd(1)), 6.0, 'absolute', 1e-12 );
+assertElementsAlmostEqual( prop_at(csv_prop_rd, 'c', csv_ind_rd(1)), 0.1, 'absolute', 1e-12 );
+assertElementsAlmostEqual( prop_at(csv_prop_rd, 'd', csv_ind_rd(1)), 1.2, 'absolute', 1e-12 );
 assertTrue( all( mtl_ind_rd == 1 ) );
-delete(fn); delete(mtl_fn);
+delete(fn); delete(mtl_fn); delete(csv_fn);
 
 %% BSDF round-trip
 obj_ind = ones(12,1);
@@ -92,7 +110,7 @@ bsdf = [ 0.1 0.2 0.3, 0.7, 0.4, 0.6, 1.7, 0.8, 0.05 0.15 0.25, 0.3, 0.35, 0.45, 
 
 quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names, [], [], bsdf );
 
-[ ~, ~, ~, ~, ~, ~, ~, mtl_names_rd, bsdf_rd ] = quadriga_lib.obj_file_read( fn );
+[ ~, ~, ~, ~, ~, ~, mtl_names_rd, bsdf_rd ] = quadriga_lib.obj_file_read( fn );
 
 assertEqual( mtl_names_rd{1,1}, 'painted' );
 assertEqual( size(bsdf_rd), [1,17] );
@@ -110,7 +128,7 @@ obj_names = { 'CubeA', 'CubeB' };
 [ vlo, ~ ] = quadriga_lib.obj_file_write( fn, mesh2, obj_ind, [], obj_names );
 assertEqual( size(vlo), [16,3] );   % no cross-object merging -> 8 + 8
 
-[ ~, ~, vert_list_rd, face_ind_rd, obj_ind_rd, ~, obj_names_rd ] = quadriga_lib.obj_file_read( fn );
+[ ~, vert_list_rd, face_ind_rd, obj_ind_rd, obj_names_rd ] = quadriga_lib.obj_file_read( fn );
 
 assertEqual( size(vert_list_rd), [16,3] );
 assertEqual( size(obj_names_rd), [2,1] );
@@ -231,5 +249,21 @@ assertTrue( exist('cube.txt','file') ~= 2 );
 
 if exist(fn,'file');     delete(fn);     end
 if exist(mtl_fn,'file'); delete(mtl_fn); end
+if exist(csv_fn,'file'); delete(csv_fn); end
 
+end
+
+% Read a property value for 1-based material index iM from struct field 'key',
+% applying the documented per-column default when the field is absent.
+function v = prop_at(s, key, iM)
+defaults = struct('a',1.0,'b',0.0,'c',0.0,'d',0.0,'att',0.0, ...
+                  'attB',0.0,'alpha',0.0,'alphaB',0.0,'fRef',1.0);
+if isfield(s, key)
+    col = s.(key);
+    v = col(iM);
+elseif isfield(defaults, key)
+    v = defaults.(key);
+else
+    v = 0.0;
+end
 end

@@ -20,7 +20,7 @@ Write a Wavefront .obj file
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind` and `obj_names`, a single object named `object` is written
-- Without `mtl_ind` (or if all entries are 0), no `usemtl` tags and no `.mtl` file are written
+- Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray
   material when `bsdf` is omitted
 
@@ -34,9 +34,9 @@ Write a Wavefront .obj file
 - **`fn`** — Path to the output `.obj` file; must end in `.obj`; if empty, no file is written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{X1,Y1,Z1,...,X3,Y3,Z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list` and `face_ind`
 - **`obj_ind`** — 1-based object index per face; `[n_mesh]`; each object must form a contiguous block
-- **`mtl_ind`** — 1-based material index per face (0 = unassigned); `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per face; `[n_mesh]`; omit or pass `[]` for no materials
 - **`obj_names`** — Object names; cell array of strings; length >= max(obj_ind); required if `obj_ind` is given
-- **`mtl_names`** — Material names; cell array of strings; length >= max(mtl_ind); required if `mtl_ind` has nonzero entries
+- **`mtl_names`** — Material names; cell array of strings; length >= max(mtl_ind); required if `mtl_ind` is given
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only valid with `face_ind`; written unchanged
 - **`face_ind`** — 1-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF values for the `.mtl` file; `[n_mtl, 17]`; see [[obj_file_read]] for the column layout
@@ -62,8 +62,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     std::string fn = qd_mex_get_string(prhs[0]);
 
     const arma::mat mesh = (nrhs < 2) ? arma::mat() : qd_mex_get_Mat<double>(prhs[1]);
-    const arma::uvec obj_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2]);
-    const arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3]);
+
+    // Copy obj_ind / mtl_ind so we can convert MATLAB 1-based indices to C++ 0-based.
+    // Empty input -> no objects / no materials (passed as nullptr below).
+    arma::uvec obj_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true);
+    if (!obj_ind.is_empty())
+        obj_ind -= 1;
+
+    arma::uvec mtl_ind = (nrhs < 4) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[3], true);
+    if (!mtl_ind.is_empty())
+        mtl_ind -= 1;
+
     std::vector<std::string> obj_names = (nrhs < 5) ? std::vector<std::string>() : qd_mex_get_strings(prhs[4]);
     std::vector<std::string> mtl_names = (nrhs < 6) ? std::vector<std::string>() : qd_mex_get_strings(prhs[5]);
     const arma::mat vert_list = (nrhs < 7) ? arma::mat() : qd_mex_get_Mat<double>(prhs[6]);

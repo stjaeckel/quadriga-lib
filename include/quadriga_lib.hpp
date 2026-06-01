@@ -5,7 +5,7 @@
 #ifndef quadriga_lib_H
 #define quadriga_lib_H
 
-#define QUADRIGA_LIB_VERSION_STR "0.11.6"
+#define QUADRIGA_LIB_VERSION_STR "0.11.7"
 
 #include <armadillo>
 #include <string>

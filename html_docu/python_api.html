@@ -46,7 +46,7 @@
 
       <!-- CONTENT BEGIN -->
 
-<span class="qd-heading"><b>Python API Documentation for Quadriga-Lib v0.11.6</b></span>
+<span class="qd-heading"><b>Python API Documentation for Quadriga-Lib v0.11.7</b></span>
 <br><br><br>
 
 <b>Notes</b>
@@ -151,7 +151,7 @@ import quadriga_lib
   <tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
-  <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront .obj file and extract geometry and material information</td></tr>
+  <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
   <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a Wavefront .obj file</td></tr>
   <tr><td><a href="#point_cloud_aabb">point_cloud_aabb</a></td><td>Compute the axis-aligned bounding boxes (AABB) of a 3D point cloud</td></tr>
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
@@ -2458,45 +2458,47 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <li>Estimates diffraction gain by evaluating Fresnel ellipsoid obstruction; each TX-RX path is divided into <code>n_path</code> elliptic-arc paths (controlled by <code>lod</code>), each approximated by <code>n_seg</code> line segments</li>
 <li>Segment attenuation is combined via weighted summation calibrated to 2D UTD coefficients, generalized to arbitrary 3D shapes</li>
 <li>Optional sub-mesh indexing (see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>) accelerates computation by skipping triangles whose bounding box does not intersect the TX-RX path</li>
+<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a> section</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
 # Output as tuple
-data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
-    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 
 # Unpacked outputs
-gain, coord = RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_prop, center_frequency, \
-    lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+gain, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>orig</code></b> — TX positions; <code>(n_pos, 3)</code></li>
 <li><b><code>dest</code></b> — RX positions; <code>(n_pos, 3)</code></li>
-<li><b><code>mesh</code></b> — Triangle vertices, each row <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code>; <code>(n_mesh, 9)</code></li>
-<li><b><code>mtl_prop</code></b> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, n_param)</code></li>
+<li><b><code>mesh</code></b> — Triangle vertices, each row <code>[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]</code>; <code>(n_mesh, 9)</code></li>
+<li><b><code>mtl_ind</code></b> — 0-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>(n_mesh,)</code></li>
+<li><b><code>mtl_prop</code></b> — Material properties as a <code>dict</code>; each key is one column (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>) mapping to a 1D array of length <code>n_mtl</code></li>
 <li><b><code>center_frequency</code></b> — Center frequency</li>
-<li><b><code>lod</code></b> <i>(optional)</i> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a></li>
-<li><b><code>verbose</code></b> <i>(optional)</i> — Verbosity level</li>
-<li><b><code>sub_mesh_index</code></b> <i>(optional)</i> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; uint32; <code>(n_mesh,)</code></li>
-<li><b><code>use_kernel</code></b> <i>(optional)</i> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable</li>
-<li><b><code>gpu_id</code></b> <i>(optional)</i> — CUDA device ID; ignored for non-CUDA kernels</li>
-<li><b><code>scalar_mode</code></b> <i>(optional)</i> — If <code>true</code>, uses scalar transmission (TE-only reflection coefficient, energy-conservation transmission) instead of EM TE/TM averaging. Default <code>false</code> (EM mode).</li>
+<li><b><code>lod</code></b> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a>; default: 2</li>
+<li><b><code>verbose</code></b> — Verbosity level; default: 0</li>
+<li><b><code>sub_mesh_index</code></b> — 0-based sub-mesh index for acceleration; see <a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a>; <code>(n_mesh,)</code> or <code>None</code>; default: <code>None</code></li>
+<li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0</li>
+<li><b><code>gpu_id</code></b> — CUDA device ID; ignored for non-CUDA kernels; default: 0</li>
+<li><b><code>scalar_mode</code></b> — If <code>True</code>, uses scalar transmission (TE-only reflection coefficient, energy-conservation transmission) instead of EM TE/TM averaging; default: <code>False</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>gain</code></b> <i>(optional)</i> — Diffraction gain per TX-RX pair, linear scale; <code>(n_pos,)</code></li>
-<li><b><code>coord</code></b> <i>(optional)</i> — Diffracted path coordinates excluding endpoints; <code>(3, n_seg-1, n_pos)</code></li>
+<li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear scale; <code>(n_pos,)</code></li>
+<li><b><code>coord</code></b> — Diffracted path coordinates excluding endpoints; <code>(3, n_seg-1, n_pos)</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
 <li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (controls path/segment count via <code>lod</code>)</li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)</li>
-<li><a href="#obj_file_read">obj_file_read</a> (defines <code>mtl_prop</code> format)</li>
+<li><a href="#obj_file_read">obj_file_read</a> (defines the material format)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -2543,11 +2545,12 @@ Write a triangular mesh to a Mitsuba 3 XML scene file
 <li>Optionally maps material names to ITU-defined presets used by Sionna RT</li>
 <li>Creates a subdirectory <code>&lt;stem&gt;_meshes/</code> next to the XML file and writes one binary PLY file per object into it; both the XML and the mesh folder must be distributable together</li>
 <li>Objects whose faces reference more than one material are automatically split into sub-objects (one per material) and renamed <code>&lt;obj_name&gt;_&lt;mtl_name&gt;</code>; the effective object count in the output may therefore exceed the length of <code>obj_names</code></li>
+<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mtl_id, obj_names, mtl_names, bsdf, map_to_itu )
+quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf, map_to_itu )
 </pre>
 
 <b>Input Arguments:</b><br>
@@ -2555,10 +2558,10 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mt
 <li><b><code>fn</code></b> — Output file path including <code>.xml</code> extension</li>
 <li><b><code>vert_list</code></b> — Vertex coordinates (x, y, z); <code>(n_vert, 3)</code></li>
 <li><b><code>face_ind</code></b> — Triangle definitions as 0-based vertex indices; uint64; <code>(n_mesh, 3)</code></li>
-<li><b><code>obj_ind</code></b> — 1-based object index per triangle; length must match <code>obj_names</code>; uint64; <code>(n_mesh,)</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; length must match <code>mtl_names</code>; uint64; <code>(n_mesh,)</code></li>
-<li><b><code>obj_names</code></b> — Object names; list of strings; length must equal <code>max(obj_ind)</code></li>
-<li><b><code>mtl_names</code></b> — Material names; list of strings; length must equal <code>max(mtl_ind)</code></li>
+<li><b><code>obj_ind</code></b> — 0-based object index per triangle; length <code>obj_names</code> must equal <code>max(obj_ind) + 1</code>; uint64; <code>(n_mesh,)</code></li>
+<li><b><code>mtl_ind</code></b> — 0-based material index per triangle; length <code>mtl_names</code> must equal <code>max(mtl_ind) + 1</code>; uint64; <code>(n_mesh,)</code></li>
+<li><b><code>obj_names</code></b> — Object names; list of strings; length must equal <code>max(obj_ind) + 1</code></li>
+<li><b><code>mtl_names</code></b> — Material names; list of strings; length must equal <code>max(mtl_ind) + 1</code></li>
 <li><b><code>bsdf</code></b> <i>(optional)</i> — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see <a href="#obj_file_read">obj_file_read</a> for field definitions; <code>(mtl_names.size(), 17)</code></li>
 <li><b><code>map_to_itu_materials</code></b> <i>(optional)</i> — If <code>true</code>, maps material names to ITU presets recognised by Sionna RT</li>
 </ul>
@@ -2571,460 +2574,54 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_id, mt
 <hr class="greyline"><br>
 <span id="obj_file_read" class="qd-func"><b>obj_file_read</b></span><br>
 <hr class="thin">
-Read a Wavefront .obj file and extract geometry and material information
+Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials
 <ul>
-<li>Parses a triangulated Wavefront <code>.obj</code> file; quads and n-gons are not supported</li>
-<li>Materials applied per triangle via <code>usemtl</code> tag; unknown/missing materials default to <code>"vacuum"</code> (ε_r = 1, σ = 0, Att = 0, α = 0)</li>
-<li>Material name matching is case-sensitive</li>
-<li>Default materials follow ITU-R P.2040-3 Table 3 (1–40 GHz; ground materials limited to 1–10 GHz)</li>
-<li>Default material tag syntax: <code>usemtl itu_concrete</code> (or <code>itu_brick</code>, <code>itu_wood</code>, etc.)</li>
-<li>Custom material tag syntax: <code>usemtl Name::a:b:c:d:att:attB:alpha:alphaB:fRef</code><br>
+<li>Parses a triangulated <code>.obj</code>; quads and n-gons are rejected</li>
+<li>Parses a triangulated <code>.obj</code>; quads and n-gons are rejected. Two independent material systems are returned:
 <ul>
-<li>ε_r(f)   = a · (f/fRef)^b          (relative permittivity)<br></li>
-<li>σ(f)     = c · (f/fRef)^d    [S/m] (conductivity)<br></li>
-<li>Att(f)   = att · (f/fRef)^attB     [dB] (fixed penetration loss)<br></li>
-<li>α(f)     = alpha · (f/fRef)^alphaB [dB/m] (distance-dependent absorption)<br></li>
-<li>Trailing fields are optional; defaults are <code>b=c=d=att=attB=alpha=alphaB=0</code>, <code>fRef=1</code> GHz</li>
+<li>Visual side, from the companion <code>.mtl</code>: <code>mtl_ind</code>, <code>mtl_names</code> (raw <code>usemtl</code> names), and <code>bsdf</code>.</li>
+<li>EM/acoustic side, from a material table (<code>fn_csv</code>, or a built-in ITU-R P.2040 default): <code>csv_ind</code>,<code>csv_names</code>, <code>csv_prop</code>.</li>
 </ul>
 </li>
+<li>A face's <code>usemtl</code> name is matched to the table by exact name, then by the base name (everything before the first dot, so Blender sub-materials like <code>concrete.gray</code> map to <code>concrete</code>)</li>
+<li>Unmatched names raise an error when <code>csv_strict = True</code>; otherwise they map to row 0 of the table (the transparent fallback)</li>
+<li>With an empty <code>fn</code>, geometry and <code>.mtl</code> outputs are empty and only the table (<code>csv_names</code>, <code>csv_prop</code>) is populated; if <code>fn_csv</code> is also empty, the built-in default table is returned</li>
+<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a> section</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-# Return as separate variables
-mesh, mtl_prop, vert_list, face_ind, obj_ind, mtl_ind, obj_names, mtl_names, bsdf = \
-    quadriga_lib.RTtools.obj_file_read( fn )
-
-# Return as tuple with 9 elements
-data = quadriga_lib.RTtools.obj_file_read( fn )
-
-# Use a custom material definition file
-data = quadriga_lib.RTtools.obj_file_read( fn, materials_csv )
+mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind, csv_names, csv_prop = \
+    quadriga_lib.RTtools.obj_file_read( fn, fn_csv, csv_strict )
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
-<li><b><code>fn</code></b> — Path to the <code>.obj</code> file</li>
-<li><b><code>materials_csv</code></b> <i>(optional)</i> — Path to CSV file with custom material properties. Required columns: <code>name</code>, <code>a</code>. Optional columns: <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code>, <code>attB</code>, <code>alpha</code>, <code>alphaB</code>, <code>fRef</code>. Column order is flexible; missing optional columns default to <code>0</code> (<code>fRef</code> → <code>1</code>). If empty, ITU-R P.2040-3 defaults are used.</li>
+<li><b><code>fn</code></b> — Path to the <code>.obj</code> file; empty loads only the material table</li>
+<li><b><code>fn_csv</code></b> — Path to an EM/acoustic material CSV; must contain a <code>name</code> column, and row 0 is the fallback material (should be transparent, e.g. air); empty uses the built-in default table; default: <code>""</code></li>
+<li><b><code>csv_strict</code></b> — If <code>True</code>, raise when a <code>usemtl</code> material is absent from the table; otherwise map to row 0; default: <code>False</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>mesh</code></b> — Triangle vertex coordinates as <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code> per row; <code>(n_mesh, 9)</code></li>
-<li><b><code>mtl_prop</code></b> — Material properties; <code>(n_mesh, 9)</code>; Columns:<br><br>
-<table class="md">
-<tr>
-  <th>Index</th>
-  <th>Symbol</th>
-  <th>Property</th>
-</tr>
-<tr>
-  <td>0</td>
-  <td>a</td>
-  <td>ε_r at fRef</td>
-</tr>
-<tr>
-  <td>1</td>
-  <td>b</td>
-  <td>Frequency exponent for ε_r</td>
-</tr>
-<tr>
-  <td>2</td>
-  <td>c</td>
-  <td>σ at fRef [S/m]</td>
-</tr>
-<tr>
-  <td>3</td>
-  <td>d</td>
-  <td>Frequency exponent for σ</td>
-</tr>
-<tr>
-  <td>4</td>
-  <td>att</td>
-  <td>Penetration loss at fRef [dB]</td>
-</tr>
-<tr>
-  <td>5</td>
-  <td>attB</td>
-  <td>Frequency exponent for att</td>
-</tr>
-<tr>
-  <td>6</td>
-  <td>alpha</td>
-  <td>Distance absorption at fRef [dB/m]</td>
-</tr>
-<tr>
-  <td>7</td>
-  <td>alphaB</td>
-  <td>Frequency exponent for alpha</td>
-</tr>
-<tr>
-  <td>8</td>
-  <td>fRef</td>
-  <td>Reference frequency [GHz]</td>
-</tr>
-</table>
-</li>
+<li><b><code>mesh</code></b> — Triangle vertex coordinates <code>[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]</code> per row; <code>(n_mesh, 9)</code></li>
 <li><b><code>vert_list</code></b> — All vertex positions in the file; <code>(n_vert, 3)</code></li>
-<li><b><code>face_ind</code></b> — 0-based indices into <code>vert_list</code> per triangle; uint64; <code>(n_mesh, 3)</code></li>
-<li><b><code>obj_ind</code></b> — 1-based object index per triangle; uint64; <code>(n_mesh, )</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per triangle; uint64; <code>(n_mesh, )</code></li>
-<li><b><code>obj_names</code></b> — Object names; list of strings; length = <code>max(obj_ind)</code></li>
-<li><b><code>mtl_names</code></b> — Material names; list os strings; length = <code>max(mtl_ind)</code></li>
-<li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code> file; <code>(n_mtl, 17)</code>; columns:<br><br>
-<table class="md">
-<tr>
-  <th>Index</th>
-  <th>Property</th>
-  <th>Range</th>
-  <th>Default</th>
-</tr>
-<tr>
-  <td>0</td>
-  <td>Base Color Red</td>
-  <td>0–1</td>
-  <td>0.8</td>
-</tr>
-<tr>
-  <td>1</td>
-  <td>Base Color Green</td>
-  <td>0–1</td>
-  <td>0.8</td>
-</tr>
-<tr>
-  <td>2</td>
-  <td>Base Color Blue</td>
-  <td>0–1</td>
-  <td>0.8</td>
-</tr>
-<tr>
-  <td>3</td>
-  <td>Transparency (alpha)</td>
-  <td>0–1</td>
-  <td>1.0</td>
-</tr>
-<tr>
-  <td>4</td>
-  <td>Roughness</td>
-  <td>0–1</td>
-  <td>0.5</td>
-</tr>
-<tr>
-  <td>5</td>
-  <td>Metallic</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>6</td>
-  <td>Index of refraction (IOR)</td>
-  <td>0–4</td>
-  <td>1.45</td>
-</tr>
-<tr>
-  <td>7</td>
-  <td>Specular IOR adjustment</td>
-  <td>0–1</td>
-  <td>0.5</td>
-</tr>
-<tr>
-  <td>8</td>
-  <td>Emission Red</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>9</td>
-  <td>Emission Green</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>10</td>
-  <td>Emission Blue</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>11</td>
-  <td>Sheen</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>12</td>
-  <td>Clearcoat</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>13</td>
-  <td>Clearcoat roughness</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>14</td>
-  <td>Anisotropic</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>15</td>
-  <td>Anisotropic rotation</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-<tr>
-  <td>16</td>
-  <td>Transmission</td>
-  <td>0–1</td>
-  <td>0.0</td>
-</tr>
-</table>
-</li>
-</ul>
-
-<b>Default material table:</b><br>
-<ul>
-<li>For all defaults below: <code>attB = alpha = alphaB = 0</code> and <code>fRef = 1 GHz</code>:<br><br>
-<table class="md">
-<tr>
-  <th>Name</th>
-  <th>a</th>
-  <th>b</th>
-  <th>c</th>
-  <th>d</th>
-  <th>att</th>
-  <th>max fGHz</th>
-</tr>
-<tr>
-  <td>vacuum / air</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>textiles</td>
-  <td>1.5</td>
-  <td>0.0</td>
-  <td>5e-5</td>
-  <td>0.62</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>plastic</td>
-  <td>2.44</td>
-  <td>0.0</td>
-  <td>2.33e-5</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>ceramic</td>
-  <td>6.5</td>
-  <td>0.0</td>
-  <td>0.0023</td>
-  <td>1.32</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>sea_water</td>
-  <td>80.0</td>
-  <td>-0.25</td>
-  <td>4.0</td>
-  <td>0.58</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>sea_ice</td>
-  <td>3.2</td>
-  <td>-0.022</td>
-  <td>1.1</td>
-  <td>1.5</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>water</td>
-  <td>80.0</td>
-  <td>-0.18</td>
-  <td>0.6</td>
-  <td>1.52</td>
-  <td>0.0</td>
-  <td>20</td>
-</tr>
-<tr>
-  <td>water_ice</td>
-  <td>3.17</td>
-  <td>-0.005</td>
-  <td>5.6e-5</td>
-  <td>1.7</td>
-  <td>0.0</td>
-  <td>20</td>
-</tr>
-<tr>
-  <td>itu_concrete</td>
-  <td>5.24</td>
-  <td>0.0</td>
-  <td>0.0462</td>
-  <td>0.7822</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_brick</td>
-  <td>3.91</td>
-  <td>0.0</td>
-  <td>0.0238</td>
-  <td>0.16</td>
-  <td>0.0</td>
-  <td>40</td>
-</tr>
-<tr>
-  <td>itu_plasterboard</td>
-  <td>2.73</td>
-  <td>0.0</td>
-  <td>0.0085</td>
-  <td>0.9395</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_wood</td>
-  <td>1.99</td>
-  <td>0.0</td>
-  <td>0.0047</td>
-  <td>1.0718</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_glass</td>
-  <td>6.31</td>
-  <td>0.0</td>
-  <td>0.0036</td>
-  <td>1.3394</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_ceiling_board</td>
-  <td>1.48</td>
-  <td>0.0</td>
-  <td>0.0011</td>
-  <td>1.075</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_chipboard</td>
-  <td>2.58</td>
-  <td>0.0</td>
-  <td>0.0217</td>
-  <td>0.78</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_plywood</td>
-  <td>2.71</td>
-  <td>0.0</td>
-  <td>0.33</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>40</td>
-</tr>
-<tr>
-  <td>itu_marble</td>
-  <td>7.074</td>
-  <td>0.0</td>
-  <td>0.0055</td>
-  <td>0.9262</td>
-  <td>0.0</td>
-  <td>60</td>
-</tr>
-<tr>
-  <td>itu_floorboard</td>
-  <td>3.66</td>
-  <td>0.0</td>
-  <td>0.0044</td>
-  <td>1.3515</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_metal</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>1.0e7</td>
-  <td>0.0</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>itu_very_dry_ground</td>
-  <td>3.0</td>
-  <td>0.0</td>
-  <td>0.00015</td>
-  <td>2.52</td>
-  <td>0.0</td>
-  <td>10</td>
-</tr>
-<tr>
-  <td>itu_medium_dry_ground</td>
-  <td>15.0</td>
-  <td>-0.1</td>
-  <td>0.035</td>
-  <td>1.63</td>
-  <td>0.0</td>
-  <td>10</td>
-</tr>
-<tr>
-  <td>itu_wet_ground</td>
-  <td>30.0</td>
-  <td>-0.4</td>
-  <td>0.15</td>
-  <td>1.3</td>
-  <td>0.0</td>
-  <td>10</td>
-</tr>
-<tr>
-  <td>itu_vegetation</td>
-  <td>1.0</td>
-  <td>0.0</td>
-  <td>1.0e-4</td>
-  <td>1.1</td>
-  <td>0.0</td>
-  <td>100</td>
-</tr>
-<tr>
-  <td>irr_glass</td>
-  <td>6.27</td>
-  <td>0.0</td>
-  <td>0.0043</td>
-  <td>1.1925</td>
-  <td>23.0</td>
-  <td>100</td>
-</tr>
-</table>
-</li>
+<li><b><code>face_ind</code></b> — 0-based vertex indices into <code>vert_list</code> per triangle; <code>(n_mesh, 3)</code></li>
+<li><b><code>obj_ind</code></b> — 0-based object index per triangle; <code>(n_mesh,)</code></li>
+<li><b><code>obj_names</code></b> — Object names; list of <code>str</code>; length <code>max(obj_ind) + 1</code></li>
+<li><b><code>mtl_ind</code></b> — 0-based visual-material index per triangle; <code>(n_mesh,)</code></li>
+<li><b><code>mtl_names</code></b> — Visual material names (raw <code>usemtl</code>); list of <code>str</code>; length <code>no_mtl</code></li>
+<li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code>; <code>(no_mtl, 17)</code></li>
+<li><b><code>csv_ind</code></b> — 0-based EM/acoustic-material index per triangle; <code>(n_mesh,)</code></li>
+<li><b><code>csv_names</code></b> — Material names from the table; list of <code>str</code>; length <code>n_csv</code></li>
+<li><b><code>csv_prop</code></b> — Material properties as a <code>dict</code>; each key is one CSV column (excluding <code>name</code>) mapping to a 1D array of length <code>n_csv</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
 <li><a href="#obj_file_write">obj_file_write</a> (for writing OBJ files)</li>
-<li><a href="#obj_overlap_test">obj_overlap_test</a> (for testing mesh geometry)</li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (used to calculate indexed mesh for faster processing)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (calculating interactions between rays and the triangular mesh)</li>
-<li><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a> (for exporting to Mitsuba scene file format)</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -3036,9 +2633,10 @@ Write a Wavefront .obj file
 <li>With <code>mesh</code>, <code>vert_list_out</code> and <code>face_ind_out</code> are derived from it, merging vertices of the same object that are closer than <code>threshold</code> (no merging across objects)</li>
 <li>With <code>vert_list</code> and <code>face_ind</code>, the geometry is written unchanged</li>
 <li>Faces are written grouped by object; the faces of each object must form a contiguous block in <code>obj_ind</code></li>
-<li>Without <code>obj_ind</code> and <code>obj_names</code>, a single object named <code>object</code> is written</li>
+<li>Without <code>mtl_ind</code>, no <code>usemtl</code> tags and no <code>.mtl</code> file are written</li>
 <li>Without <code>mtl_ind</code> (or if all entries are 0), no <code>usemtl</code> tags and no <code>.mtl</code> file are written</li>
 <li>The <code>.mtl</code> file is named after the <code>.obj</code> and lists each used material; values default to a gray material when <code>bsdf</code> is omitted</li>
+<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
 
 <b>Usage:</b><br>
@@ -3051,10 +2649,10 @@ vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj
 <ul>
 <li><b><code>fn</code></b> — Path to the output <code>.obj</code> file; must end in <code>.obj</code>; if empty, no file is written (outputs are still computed); default: <code>""</code></li>
 <li><b><code>mesh</code></b> — Triangle coordinates <code>{X1,Y1,Z1,...,X3,Y3,Z3}</code> per row; <code>(n_mesh, 9)</code>; mutually exclusive with <code>vert_list</code> and <code>face_ind</code>; default: None</li>
-<li><b><code>obj_ind</code></b> — 1-based object index per face; <code>(n_mesh,)</code>; each object must form a contiguous block; default: None</li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = unassigned); <code>(n_mesh,)</code>; default: None</li>
-<li><b><code>obj_names</code></b> — Object names; list of str; length >= max(obj_ind); required if <code>obj_ind</code> is given; default: None</li>
-<li><b><code>mtl_names</code></b> — Material names; list of str; length >= max(mtl_ind); required if <code>mtl_ind</code> has nonzero entries; default: None</li>
+<li><b><code>obj_ind</code></b> — 0-based object index per face; <code>(n_mesh,)</code>; each object must form a contiguous block; default: None</li>
+<li><b><code>mtl_ind</code></b> — 0-based material index per face (the <code>csv_ind</code>/<code>mtl_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>(n_mesh,)</code>; omit (None) for no materials; default: None</li>
+<li><b><code>obj_names</code></b> — Object names; list of str; length > max(obj_ind); required if <code>obj_ind</code> is given; default: None</li>
+<li><b><code>mtl_names</code></b> — Material names; list of str; length > max(mtl_ind); required if <code>mtl_ind</code> is given; default: None</li>
 <li><b><code>vert_list</code></b> — Vertex positions; <code>(n_vert, 3)</code>; only valid with <code>face_ind</code>; written unchanged; default: None</li>
 <li><b><code>face_ind</code></b> — 0-based vertex indices per face; <code>(n_mesh, 3)</code>; required with <code>vert_list</code>; default: None</li>
 <li><b><code>bsdf</code></b> — Principled BSDF values for the <code>.mtl</code> file; <code>(n_mtl, 17)</code>; see <a href="#obj_file_read">obj_file_read</a> for the column layout; default: None</li>
@@ -3303,33 +2901,33 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
 <li>Recursively partitions mesh by axis-aligned bounding box until each sub-mesh contains no more than <code>target_size</code> triangles</li>
 <li>Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with zero-sized dummy triangles to align row counts to <code>vec_size</code></li>
 <li>Dummy triangles are placed at the AABB center of their sub-mesh; <code>mesh_index</code> uses 0 to mark padding entries</li>
-<li>If <code>mtl_prop</code> is provided, material rows are reordered and padded in the same way</li>
+<li>If <code>mtl_ind</code> is provided, material indices are reordered and padded in the same way; padding entries get index 0</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
 # Output as tuple
-data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+data = quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 
 # Unpacked outputs
-triangles_out, sub_mesh_index, mesh_index, mtl_propR = \
-    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_prop )
+triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
+    quadriga_lib.RTtools.triangle_mesh_segmentation( triangles, target_size, vec_size, mtl_ind )
 </pre>
 
 <b>Inputs:</b><br>
 <ul>
-<li><b><code>triangles</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>(n_mesh, 9)</code></li>
-<li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024</li>
-<li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count is rounded up to a multiple of this value; default: 1</li>
-<li><b><code>mtl_prop</code></b> <i>(optional)</i> — Material properties; see <a href="#obj_file_read">obj_file_read</a>; <code>(n_mesh, n_param)</code></li>
+<li><b><code>triangles</code></b> — Triangle vertices, each row <code>[x1,y1,z1,x2,y2,z2,x3,y3,z3]</code>; <code>(n_mesh, 9)</code></li>
+<li><b><code>target_size</code></b> — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024</li>
+<li><b><code>vec_size</code></b> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count is rounded up to a multiple of this value; default: 1</li>
+<li><b><code>mtl_ind</code></b> — 0-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>(n_mesh,)</code> or <code>None</code>; default: <code>None</code></li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
 <li><b><code>triangles_out</code></b> — Reordered and padded triangle vertices; <code>(n_triangles_out, 9)</code></li>
 <li><b><code>sub_mesh_index</code></b> — 0-based start indices of sub-meshes in <code>triangles_out</code>; uint32; <code>(n_sub,)</code></li>
-<li><b><code>mesh_index</code></b> — 1-based mapping from original to reorganized mesh (0 = padding); uint32; <code>(n_triangles_out, )</code></li>
-<li><b><code>mtl_prop_out</code></b> — Reordered and padded material properties; <code>(n_triangles_out, n_param)</code></li>
+<li><b><code>mesh_index</code></b> — 0-based mapping from original to reorganized mesh (0 = padding); uint32; <code>(n_triangles_out,)</code></li>
+<li><b><code>mtl_ind_out</code></b> — Reordered and padded material indices; <code>(n_triangles_out,)</code>; empty if <code>mtl_ind</code> is not provided</li>
 </ul>
 
     <!-- CONTENT END -->

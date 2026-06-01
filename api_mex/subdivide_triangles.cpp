@@ -16,21 +16,23 @@ Subdivide triangles into smaller triangles
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in · n_div · n_div`
-- Material properties are duplicated from parent triangle to all sub-triangles
+- Material indices are duplicated from the parent triangle to all sub-triangles
 
 ## Usage:
 ```
-[ triangles_out, mtl_prop_out ] = quadriga_lib.subdivide_triangles( triangles_in, n_div, mtl_prop_in );
+[ triangles_out, mtl_ind_out ] = quadriga_lib.subdivide_triangles( triangles_in, n_div, mtl_ind_in );
 ```
 
 ## Inputs:
 - **`triangles_in`** — Mesh vertices as `[ v1x, v1y, v1z, v2x, v2y, v2z, v3x, v3y, v3z ]`; `[n_triangles_in, 9]`
 - **`n_div`** — Number of subdivisions per edge
-- **`mtl_prop_in`** — Material properties; see `obj_file_read`; `[n_triangles_in, n_param]`; default: `[]`
+- **`mtl_ind_in`** — 1-based material index per triangle (the `csv_ind` output of [[obj_file_read]]);
+ `[n_triangles_in]`; default: `[]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** — Material properties for subdivided triangles; `[n_triangles_out, n_param]`
+- **`mtl_ind_out`** — Material indices for the subdivided triangles; `[n_triangles_out]`; only
+  populated if `mtl_ind_in` is given
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
@@ -44,31 +46,40 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     // Read input data
     const arma::mat triangles_in = qd_mex_get_Mat<double>(prhs[0]);
     const arma::uword n_div = (nrhs < 2) ? 1 : qd_mex_get_scalar<arma::uword>(prhs[1], "n_div", 1);
-    const arma::mat mtl_prop = (nrhs < 3) ? arma::mat() : qd_mex_get_Mat<double>(prhs[2]);
+
+    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    arma::uvec mtl_ind = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true);
+    if (!mtl_ind.is_empty())
+        mtl_ind -= 1;
 
     // Compute output sizes
     arma::uword n_triangles_in = triangles_in.n_rows;
     arma::uword n_triangles_out = n_triangles_in * n_div * n_div;
 
     // Output allocation
-    arma::mat triangles_out, mtl_prop_out;
+    arma::mat triangles_out;
+    arma::uvec mtl_ind_out;
 
     if (nlhs > 0)
         plhs[0] = qd_mex_init_output(&triangles_out, n_triangles_out, 9);
 
     if (nlhs > 1)
     {
-        if (!mtl_prop.empty())
-            plhs[1] = qd_mex_init_output(&mtl_prop_out, n_triangles_out, 9);
+        if (!mtl_ind.is_empty())
+            plhs[1] = qd_mex_init_output(&mtl_ind_out, n_triangles_out);
         else
             plhs[1] = mxCreateDoubleMatrix(0, 0, mxREAL);
     }
 
     // Wrap optional pointers
-    const arma::mat *p_mtl_prop = mtl_prop.empty() ? nullptr : &mtl_prop;
-    arma::mat *p_mtl_prop_out = mtl_prop_out.empty() ? nullptr : &mtl_prop_out;
+    // Wrap optional pointers
+    const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
+    arma::uvec *p_mtl_ind_out = mtl_ind_out.is_empty() ? nullptr : &mtl_ind_out;
 
     // Call library function
-    CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, &triangles_in, &triangles_out,
-                                                      p_mtl_prop, p_mtl_prop_out));
+    CALL_QD(quadriga_lib::subdivide_triangles<double>(n_div, &triangles_in, &triangles_out, p_mtl_ind, p_mtl_ind_out));
+
+    // Convert material index from 0-based (C++) to 1-based (MATLAB)
+    if (!mtl_ind_out.is_empty())
+        mtl_ind_out += 1;
 }

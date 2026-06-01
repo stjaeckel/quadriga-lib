@@ -24,12 +24,13 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves)
 - Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for
   acoustic simulation with impedance-mapped material parameters (ε derived from Z)
+- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
 [ origN, destN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, ...
     normal_vecN, out_typeN ] = quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, ...
-    orig, dest, fbs, sbs, mesh, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
+    orig, dest, fbs, sbs, mesh, mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
 ```
 
 ## Inputs:
@@ -38,7 +39,9 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
-- **`mtl_prop`** — Material properties; see `obj_file_read`; `[n_mesh, n_param]`
+- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
+  of [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
 - **`trivec`** — Beam wavefront triangle vertices relative to origin; order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
 - **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
@@ -49,8 +52,8 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear, includes in-medium attenuation, excludes FSPL);
   averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; 
-  for types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient; includes interaction gain, 
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
+  for types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient; includes interaction gain,
   TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if `trivec`/`tridir` not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
@@ -76,12 +79,18 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
    |  13   | Edge hit, outside→inside                            |
    |  14   | Edge hit, inside→outside                            |
    |  15   | Edge hit, inside→outside, total reflection          |
+
+## See also:
+- [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
+- [[icosphere]] (for generating beams)
+- [[ray_triangle_intersect]] (for computing FBS and SBS positions)
+- [[ray_point_intersect]] (for calculating beam interactions with sampling points)
 MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 10 || nrhs > 13)
+    if (nrhs < 11 || nrhs > 14)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
     if (nlhs > 12)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
@@ -94,12 +103,20 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto fbs = qd_mex_get_Mat<double>(prhs[4]);
     const auto sbs = qd_mex_get_Mat<double>(prhs[5]);
     const auto mesh = qd_mex_get_Mat<double>(prhs[6]);
-    const auto mtl_prop = qd_mex_get_Mat<double>(prhs[7]);
-    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[8]);
-    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[9]);
-    const auto trivec = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
-    const auto tridir = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
-    const auto orig_length = (nrhs < 13) ? arma::vec() : qd_mex_get_Col<double>(prhs[12]);
+
+    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[7], true);
+    if (!mtl_ind.is_empty())
+        mtl_ind -= 1;
+
+    // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
+    const auto mtl_prop = qd_mex_struct2map<double>(prhs[8]);
+
+    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[9]);
+    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[10]);
+    const auto trivec = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
+    const auto tridir = (nrhs < 13) ? arma::mat() : qd_mex_get_Mat<double>(prhs[12]);
+    const auto orig_length = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13]);
 
     // Get number of output rays (fbs_ind != 0)
     arma::uword n_rayN = 0;
@@ -111,6 +128,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::mat *p_trivec = trivec.empty() ? nullptr : &trivec;
     const arma::mat *p_tridir = tridir.empty() ? nullptr : &tridir;
     const arma::vec *p_orig_length = orig_length.empty() ? nullptr : &orig_length;
+    const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
+    const auto *p_mtl_prop = mtl_prop.empty() ? nullptr : &mtl_prop;
 
     // Output containers
     arma::mat origN, destN, xprmatN, trivecN, tridirN, normal_vecN;
@@ -156,10 +175,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     arma::mat *p_normal_vecN = (nlhs > 10) ? &normal_vecN : nullptr;
     arma::s32_vec *p_out_typeN = (nlhs > 11) ? &out_typeN : nullptr;
 
+    
     // Call library function
     CALL_QD(quadriga_lib::ray_mesh_interact<double>(
         interaction_type, center_frequency,
-        &orig, &dest, &fbs, &sbs, &mesh, &mtl_prop, &fbs_ind, &sbs_ind,
+        &orig, &dest, &fbs, &sbs, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
         p_trivec, p_tridir, p_orig_length,
         p_origN, p_destN, p_gainN, p_xprmatN,
         p_trivecN, p_tridirN, p_orig_lengthN,

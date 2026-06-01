@@ -18,9 +18,9 @@ TEST_CASE("Test Mitsuba XML File Write")
 
     quadriga_lib::obj_file_read<double>(
         "tests/data/test_scene_pbr.obj",
-        nullptr, nullptr,
-        &vert_list, &face_ind, &obj_ind, &mtl_ind,
-        &obj_names, &mtl_names, &bsdf);
+        nullptr, // mesh (not needed)
+        &vert_list, &face_ind, &obj_ind, &obj_names,
+        &mtl_ind, &mtl_names, &bsdf);
 
     // ---------------------------------------------------------------------
     // 2. Write the Mitsuba XML scene

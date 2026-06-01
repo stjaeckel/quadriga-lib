@@ -14,7 +14,7 @@ Subdivide triangles into smaller triangles
 
 - Uniformly subdivides each input triangle into `n_div x n_div` smaller triangles
 - Output count: `n_triangles_out = n_triangles_in x n_div x n_div`
-- Material properties are duplicated from parent triangle to all sub-triangles
+- Material indices are duplicated from the parent triangle to all sub-triangles
 
 ## Declaration:
 ```
@@ -22,18 +22,18 @@ arma::uword quadriga_lib::subdivide_triangles(
     arma::uword n_div,
     const arma::Mat<dtype> *triangles_in,
     arma::Mat<dtype> *triangles_out,
-    const arma::Mat<dtype> *mtl_prop = nullptr,
-    arma::Mat<dtype> *mtl_prop_out = nullptr);
+    const arma::uvec *mtl_ind = nullptr,
+    arma::uvec *mtl_ind_out = nullptr);
 ```
 
 ## Inputs:
 - **`n_div`** — Number of subdivisions per edge
 - **`triangles_in`** — Mesh vertices as `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_triangles_in, 9]`
-- **`mtl_prop`** *(optional)* — Material properties; see [[obj_file_read]]; `[n_triangles_in, n_param]`
+- **`mtl_ind`** — Material indices per triangle (the `csv_ind` output of [[obj_file_read]]); `[n_triangles_in]`
 
 ## Outputs:
 - **`triangles_out`** — Subdivided mesh vertices, same column layout as `triangles_in`; `[n_triangles_out, 9]`
-- **`mtl_prop_out`** *(optional)* — Material properties for subdivided triangles; `[n_triangles_out, n_param]`
+- **`mtl_ind_out`** — Material indices for subdivided triangles; `[n_triangles_out]`
 
 ## Returns:
 - `n_triangles_out` — Number of generated triangles
@@ -41,8 +41,11 @@ MD!*/
 
 // Subdivide triangles into smaller triangles
 template <typename dtype>
-arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<dtype> *triangles_in, arma::Mat<dtype> *triangles_out,
-                                              const arma::Mat<dtype> *mtl_prop, arma::Mat<dtype> *mtl_prop_out)
+arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div,
+                                              const arma::Mat<dtype> *triangles_in,
+                                              arma::Mat<dtype> *triangles_out,
+                                              const arma::uvec *mtl_ind,
+                                              arma::uvec *mtl_ind_out)
 {
     if (n_div == 0)
         throw std::invalid_argument("Input 'n_div' cannot be 0.");
@@ -62,19 +65,15 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
     if (triangles_out->n_cols != 9 || triangles_out->n_rows != n_triangles_out)
         triangles_out->set_size(n_triangles_out, 9);
 
-    bool process_mtl_prop = (mtl_prop != nullptr) && (mtl_prop_out != nullptr) && (mtl_prop->n_elem != 0);
-    arma::uword n_mtl_cols = process_mtl_prop ? mtl_prop->n_cols : 0;
+    bool process_mtl_ind = (mtl_ind != nullptr) && (mtl_ind_out != nullptr) && (mtl_ind->n_elem != 0);
 
-    if (process_mtl_prop)
+    if (process_mtl_ind)
     {
-        if (mtl_prop->n_cols < 1)
-            throw std::invalid_argument("Input 'mtl_prop' must have at least 1 column.");
+        if (mtl_ind->n_elem != n_triangles_in)
+            throw std::invalid_argument("Number of triangles in 'triangles_in' and length of 'mtl_ind' do not match.");
 
-        if (mtl_prop->n_rows != n_triangles_in)
-            throw std::invalid_argument("Number of rows in 'triangles_in' and 'mtl_prop' dont match.");
-
-        if (mtl_prop_out->n_cols != n_mtl_cols || mtl_prop_out->n_rows != n_triangles_out)
-            mtl_prop_out->set_size(n_triangles_out, n_mtl_cols);
+        if (mtl_ind_out->n_elem != n_triangles_out)
+            mtl_ind_out->set_size(n_triangles_out);
     }
 
     // Process each triangle
@@ -82,13 +81,12 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
     dtype stp = dtype(1.0) / dtype(n_div);                // Step size
     const dtype *p_triangles_in = triangles_in->memptr(); // Pointer to input memory
     dtype *p_triangles_out = triangles_out->memptr();     // Pointer to output memory
-    const dtype *p_mtl_prop = process_mtl_prop ? mtl_prop->memptr() : nullptr;
-    dtype *p_mtl_prop_out = process_mtl_prop ? mtl_prop_out->memptr() : nullptr;
+    const arma::uword *p_mtl_ind = process_mtl_ind ? mtl_ind->memptr() : nullptr;
+    arma::uword *p_mtl_ind_out = process_mtl_ind ? mtl_ind_out->memptr() : nullptr;
 
     auto copy_mtl = [&](arma::uword src, arma::uword dst)
     {
-        for (arma::uword k = 0; k < n_mtl_cols; ++k)
-            p_mtl_prop_out[dst + k * n_triangles_out] = p_mtl_prop[src + k * n_triangles_in];
+        p_mtl_ind_out[dst] = p_mtl_ind[src];
     };
 
     for (arma::uword n = 0; n < n_triangles_in; ++n)
@@ -130,7 +128,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
                 p_triangles_out[cnt + 8 * n_triangles_out] = v1z + fvl * e12z + fuu * e13z; // w3z
 
                 // Material
-                if (process_mtl_prop)
+                if (process_mtl_ind)
                     copy_mtl(n, cnt);
 
                 ++cnt;
@@ -153,7 +151,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
                     p_triangles_out[cnt + 5 * n_triangles_out] = v1z + fvu * e12z + ful * e13z; // w3z
 
                     // Material
-                    if (process_mtl_prop)
+                    if (process_mtl_ind)
                         copy_mtl(n, cnt);
 
                     ++cnt;
@@ -165,7 +163,7 @@ arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat
 }
 
 template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<float> *triangles_in, arma::Mat<float> *triangles_out,
-                                                       const arma::Mat<float> *mtl_prop, arma::Mat<float> *mtl_prop_out);
+                                                       const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out);
 
 template arma::uword quadriga_lib::subdivide_triangles(arma::uword n_div, const arma::Mat<double> *triangles_in, arma::Mat<double> *triangles_out,
-                                                       const arma::Mat<double> *mtl_prop, arma::Mat<double> *mtl_prop_out);
+                                                       const arma::uvec *mtl_ind, arma::uvec *mtl_ind_out);
