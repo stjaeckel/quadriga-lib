@@ -759,11 +759,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (ray_starts_inside)
         {
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-
-            if (kR_mass > 0.0 && thickness < 0.01)
-                fprintf(stdout, "mass over short path: thickness=%g gt=%d out_type=%d\n",
-                        thickness, geometry_type, out_type);
-
             double loss_dB = medium_loss_dB(eta1_med, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }

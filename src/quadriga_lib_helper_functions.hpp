@@ -100,10 +100,11 @@ static inline double medium_loss_dB(std::complex<double> eta, double alpha, doub
     double loss = dist * 8.686 / Delta;
     loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
 
-    // Mass-law slope (acoustic): adds max(0, mass * log10((f/fRef) * dist)) dB.
-    // Guarded so mass == 0 is an exact no-op (avoids 0 * log10(0) = NaN), a zero
-    // path contributes nothing, and a negative slope is ignored rather than amplifying.
-    if (mass > 0.0 && dist > 0.0)
+    // Mass is a bulk-propagation term: never apply it over the ~1 mm co-location
+    // epsilon (ray_offset). Real traversals are at least the panel thickness (cm),
+    // so a small path floor removes the spurious slope without touching them.
+    constexpr double mass_min_path = 0.0015; // m, above ray_offset (0.001)
+    if (mass > 0.0 && dist > mass_min_path)
     {
         double m_dB = mass * std::log10((fGHz / fRef) * dist);
         if (m_dB > 0.0)
