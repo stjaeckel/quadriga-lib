@@ -21,9 +21,9 @@ TEST_CASE("Test Point inside Mesh")
                       {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
 
     arma::mat points = {{0.0, 0.0, 0.5}, {-1.1, 0.0, 0.0}};
-    arma::u32_vec obj_ind(12, arma::fill::value(2)), res;
+    arma::uvec obj_ind(12, arma::fill::value(1)), res; // 0-based object 1 -> returns 2
 
-    res = quadriga_lib::point_inside_mesh(&points, &mesh, &obj_ind);
+    res = quadriga_lib::point_inside_mesh<double>(&points, &mesh, &obj_ind);
     CHECK(res.n_elem == 2);
     CHECK(res.at(0) == 2);
     CHECK(res.at(1) == 0);

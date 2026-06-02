@@ -312,15 +312,12 @@ namespace quadriga_lib
                           arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = pointsA, 2 = pointsB, 0 = Error, Length: [ n_points ]
 
     // Tests whether points are inside a triangle mesh using raycasting
-    // - Casts 20 rays from each point in multiple directions. If any ray intersects the mesh with a negative incidence angle,
-    //   the point is classified as "inside".
-    // - Returns a vector of length n_points with values: 0 for "outside", 1 for "inside".
-    // - If obj_ind is provided, the return vector contains the 1-based index of the object that the point is inside.
+    // - 0 = outside, 1 = inside any object (no obj_ind), or 1-based object index (with obj_ind)
     template <typename dtype>
-    arma::u32_vec point_inside_mesh(const arma::Mat<dtype> *points,         // Points in 3D space, size: [n_points, 3]
-                                    const arma::Mat<dtype> *mesh,           // Triangular mesh faces, size: [n_mesh, 9]
-                                    const arma::u32_vec *obj_ind = nullptr, // Optional object indices, 1-based, size: [n_mesh]
-                                    dtype distance = 0.0);                  // Optional minimum distance from objects in [m]
+    arma::uvec point_inside_mesh(const arma::Mat<dtype> *points,      // Points in 3D space, size: [n_points, 3]
+                                 const arma::Mat<dtype> *mesh,        // Triangular mesh faces, size: [n_mesh, 9]
+                                 const arma::uvec *obj_ind = nullptr, // Optional object indices, 0-based, size: [n_mesh]
+                                 dtype distance = 0.0);               // Optional minimum distance from objects in [m]
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
@@ -357,6 +354,12 @@ namespace quadriga_lib
                       arma::uword iM,                                                      // 0-based material index
                       dtype dist,                                                          // Length of the ray inside the medium
                       dtype center_frequency);                                             // Frequency in Hz
+
+    // Calculate lumped interface transmission gain (att + coincidence)
+    template <typename dtype>
+    dtype interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
+                         arma::uword iM,                                                      // 0-based material index of the entered material
+                         dtype center_frequency);                                             // Frequency in Hz
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point

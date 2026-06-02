@@ -46,10 +46,10 @@ static inline arma::uword mtl_validate(const std::unordered_map<std::string, std
 // Resolve a named material-property column to a raw pointer (map-based material model).
 // Returns nullptr if the column is absent; the consumer then applies its own default.
 template <typename dtype>
-static inline const dtype *mtl_col(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, const std::string &key)
+static inline const dtype *mtl_col(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, const std::string &key)
 {
-    auto it = mtl_prop.find(key);
-    return (it == mtl_prop.end() || it->second.empty()) ? nullptr : it->second.data();
+    auto it = mtl_prop->find(key);
+    return (it == mtl_prop->end() || it->second.empty()) ? nullptr : it->second.data();
 }
 
 // Read a material value for material index iM from a resolved column pointer.
@@ -72,8 +72,23 @@ static inline std::complex<double> eta_from_coeffs(double a, double b, double c,
     return std::complex<double>(eta_r, eta_i);
 }
 
+// Permittivity resonance (acoustic): complex Lorentz pole added to the interface (Fresnel)
+// permittivity only. Inactive unless resF > 0, resQ > 0 and resS != 0, so the EM path is
+// unchanged. The +i denominator makes resS > 0 add loss (negative imaginary part), consistent
+// with the conductivity term. Deliberately NOT applied to the in-medium loss: a strong pole can
+// push Re(eta) < 0, and medium_loss_dB uses a real sqrt(Re eta).
+static inline std::complex<double> eta_resonance(double resF, double resQ, double resS, double fGHz)
+{
+    if (resF <= 0.0 || resQ <= 0.0 || resS == 0.0)
+        return std::complex<double>(0.0, 0.0);
+    double resF2 = resF * resF;
+    std::complex<double> denom(resF2 - fGHz * fGHz, (resF / resQ) * fGHz);
+    return (resS * resF2) / denom;
+}
+
 // Calculate in-medium loss
-static inline double medium_loss_dB(std::complex<double> eta, double alpha, double alphaB, double fRef, double fGHz, double dist)
+static inline double medium_loss_dB(std::complex<double> eta, double alpha, double alphaB,
+                                    double fRef, double fGHz, double dist, double mass = 0.0)
 {
     if (fRef <= 0.0)
         fRef = 1.0;
@@ -84,14 +99,27 @@ static inline double medium_loss_dB(std::complex<double> eta, double alpha, doub
     Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
     double loss = dist * 8.686 / Delta;
     loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
+
+    // Mass-law slope (acoustic): adds max(0, mass * log10((f/fRef) * dist)) dB.
+    // Guarded so mass == 0 is an exact no-op (avoids 0 * log10(0) = NaN), a zero
+    // path contributes nothing, and a negative slope is ignored rather than amplifying.
+    if (mass > 0.0 && dist > 0.0)
+    {
+        double m_dB = mass * std::log10((fGHz / fRef) * dist);
+        if (m_dB > 0.0)
+            loss += m_dB;
+    }
     return loss;
 }
 
 // In-medium gain for material index iM. No validation: the caller guarantees a
 // column-consistent map (via mtl_validate / obj_file_read) and iM < n_mtl.
 template <typename dtype>
-static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, arma::uword iM, dtype dist, dtype center_frequency)
+static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, arma::uword iM,
+                                     dtype dist, dtype center_frequency)
 {
+    if (!mtl_prop)
+        return (dtype)1.0;
     double fGHz = (double)center_frequency * 1e-9;
     const dtype *m_a = mtl_col(mtl_prop, "a");
     const dtype *m_b = mtl_col(mtl_prop, "b");
@@ -99,13 +127,57 @@ static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::
     const dtype *m_d = mtl_col(mtl_prop, "d");
     const dtype *m_alpha = mtl_col(mtl_prop, "alpha");
     const dtype *m_alphaB = mtl_col(mtl_prop, "alphaB");
+    const dtype *m_mass = mtl_col(mtl_prop, "m");
     const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
 
     std::complex<double> eta = eta_from_coeffs(mtl_val(m_a, iM, 1.0), mtl_val(m_b, iM, 0.0),
                                                mtl_val(m_c, iM, 0.0), mtl_val(m_d, iM, 0.0),
                                                mtl_val(m_fRef, iM, 1.0), fGHz);
+
     double A = medium_loss_dB(eta, mtl_val(m_alpha, iM, 0.0), mtl_val(m_alphaB, iM, 0.0),
-                              mtl_val(m_fRef, iM, 1.0), fGHz, (double)dist);
+                              mtl_val(m_fRef, iM, 1.0), fGHz, (double)dist, mtl_val(m_mass, iM, 0.0));
+
+    return (dtype)std::pow(10.0, -0.1 * A);
+}
+
+// Lumped per-entry interface attenuation in dB: power-law penetration loss plus an optional
+// Lorentzian coincidence feature. Coincidence is active only when coiF > 0 and coiA != 0.
+// Total is clamped to >= 0 (a coincidence dip cannot create transmission gain).
+static inline double interface_loss_dB(double att, double attB,
+                                       double coiF, double coiQ, double coiA,
+                                       double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double loss = att * std::pow(fGHz / fRef, attB);
+    if (coiF > 0.0 && coiA != 0.0)
+    {
+        double x = coiQ * (fGHz - coiF) / coiF;
+        loss += coiA / (1.0 + x * x);
+    }
+    return (loss < 0.0) ? 0.0 : loss;
+}
+
+// Lumped interface transmission gain for material index iM (the material being entered).
+// No validation: the caller guarantees a column-consistent map (via mtl_validate /
+// obj_file_read) and iM < n_mtl. Path-independent; applied once on entry.
+template <typename dtype>
+static inline dtype interface_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, arma::uword iM, dtype center_frequency)
+{
+    if (!mtl_prop)
+        return (dtype)1.0;
+
+    double fGHz = (double)center_frequency * 1e-9;
+    const dtype *m_att = mtl_col(mtl_prop, "att");
+    const dtype *m_attB = mtl_col(mtl_prop, "attB");
+    const dtype *m_coiF = mtl_col(mtl_prop, "coiF");
+    const dtype *m_coiQ = mtl_col(mtl_prop, "coiQ");
+    const dtype *m_coiA = mtl_col(mtl_prop, "coiA");
+    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
+
+    double A = interface_loss_dB(mtl_val(m_att, iM, 0.0), mtl_val(m_attB, iM, 0.0),
+                                 mtl_val(m_coiF, iM, 0.0), mtl_val(m_coiQ, iM, 0.0),
+                                 mtl_val(m_coiA, iM, 0.0), mtl_val(m_fRef, iM, 1.0), fGHz);
     return (dtype)std::pow(10.0, -0.1 * A);
 }
 

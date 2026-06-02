@@ -267,20 +267,23 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     // Resolve material columns once; nullptr -> per-column default applied in the ray loop
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
     const dtype *m_a = nullptr, *m_b = nullptr, *m_c = nullptr, *m_d = nullptr;
-    const dtype *m_att = nullptr, *m_attB = nullptr, *m_alpha = nullptr, *m_alphaB = nullptr, *m_fRef = nullptr;
+    const dtype *m_alpha = nullptr, *m_alphaB = nullptr, *m_mass = nullptr, *m_fRef = nullptr;
+    const dtype *m_resF = nullptr, *m_resQ = nullptr, *m_resS = nullptr;
     arma::uword n_mtl = 0;
     if (mtl_prop != nullptr)
     {
         n_mtl = mtl_validate(*mtl_prop); // all columns share length n_mtl; throws on mismatch
-        m_a = mtl_col(*mtl_prop, "a");
-        m_b = mtl_col(*mtl_prop, "b");
-        m_c = mtl_col(*mtl_prop, "c");
-        m_d = mtl_col(*mtl_prop, "d");
-        m_att = mtl_col(*mtl_prop, "att");
-        m_attB = mtl_col(*mtl_prop, "attB");
-        m_alpha = mtl_col(*mtl_prop, "alpha");
-        m_alphaB = mtl_col(*mtl_prop, "alphaB");
-        m_fRef = mtl_col(*mtl_prop, "fRef");
+        m_a = mtl_col(mtl_prop, "a");
+        m_b = mtl_col(mtl_prop, "b");
+        m_c = mtl_col(mtl_prop, "c");
+        m_d = mtl_col(mtl_prop, "d");
+        m_alpha = mtl_col(mtl_prop, "alpha");
+        m_alphaB = mtl_col(mtl_prop, "alphaB");
+        m_mass = mtl_col(mtl_prop, "m");
+        m_fRef = mtl_col(mtl_prop, "fRef");
+        m_resF = mtl_col(mtl_prop, "resF");
+        m_resQ = mtl_col(mtl_prop, "resQ");
+        m_resS = mtl_col(mtl_prop, "resS");
     }
     if (p_mtl_ind != nullptr && n_mtl > 0 && mtl_ind->max() >= n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
@@ -481,6 +484,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double kR_alpha = 0.0, kR_alphaB = 0.0, kR_fRef = 1.0; // medium 1: alpha, alphaB, fRef
         double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0;     // medium 2: a, b, c, d
         double kS_alpha = 0.0, kS_alphaB = 0.0, kS_fRef = 1.0; // medium 2: alpha, alphaB, fRef
+        double kR_mass = 0.0, kS_mass = 0.0;
+        double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
+        double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
         double transition_gain = 1.0;
 
         if (theta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
@@ -489,12 +495,14 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kS2 = mtl_val(m_b, iMF, 0.0);
             kS3 = mtl_val(m_c, iMF, 0.0);
             kS4 = mtl_val(m_d, iMF, 0.0);
-            double att = mtl_val(m_att, iMF, 0.0);
-            double attB = mtl_val(m_attB, iMF, 0.0);
             kS_alpha = mtl_val(m_alpha, iMF, 0.0);
             kS_alphaB = mtl_val(m_alphaB, iMF, 0.0);
+            kS_mass = mtl_val(m_mass, iMF, 0.0);
             kS_fRef = mtl_val(m_fRef, iMF, 1.0);
-            transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
+            kS_resF = mtl_val(m_resF, iMF, 0.0);
+            kS_resQ = mtl_val(m_resQ, iMF, 0.0);
+            kS_resS = mtl_val(m_resS, iMF, 0.0);
+            transition_gain = (double)interface_gain_impl(mtl_prop, iMF, center_frequency);
         }
         else // Ray hits back side of FBS face, set first material to object material
         {
@@ -504,7 +512,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kR4 = mtl_val(m_d, iMF, 0.0);
             kR_alpha = mtl_val(m_alpha, iMF, 0.0);
             kR_alphaB = mtl_val(m_alphaB, iMF, 0.0);
+            kR_mass = mtl_val(m_mass, iMF, 0.0);
             kR_fRef = mtl_val(m_fRef, iMF, 1.0);
+            kR_resF = mtl_val(m_resF, iMF, 0.0);
+            kR_resQ = mtl_val(m_resQ, iMF, 0.0);
+            kR_resS = mtl_val(m_resS, iMF, 0.0);
         }
 
         if (material_to_material) // Material to material transition
@@ -517,7 +529,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kR4 = mtl_val(m_d, iMS, 0.0);
                 kR_alpha = mtl_val(m_alpha, iMS, 0.0);
                 kR_alphaB = mtl_val(m_alphaB, iMS, 0.0);
+                kR_mass = mtl_val(m_mass, iMS, 0.0);
                 kR_fRef = mtl_val(m_fRef, iMS, 1.0);
+                kR_resF = mtl_val(m_resF, iMS, 0.0);
+                kR_resQ = mtl_val(m_resQ, iMS, 0.0);
+                kR_resS = mtl_val(m_resS, iMS, 0.0);
             }
             else // FBS (back side) is hit first
             {
@@ -525,18 +541,27 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kS2 = mtl_val(m_b, iMS, 0.0);
                 kS3 = mtl_val(m_c, iMS, 0.0);
                 kS4 = mtl_val(m_d, iMS, 0.0);
-                double att = mtl_val(m_att, iMS, 0.0);
-                double attB = mtl_val(m_attB, iMS, 0.0);
                 kS_alpha = mtl_val(m_alpha, iMS, 0.0);
                 kS_alphaB = mtl_val(m_alphaB, iMS, 0.0);
+                kS_mass = mtl_val(m_mass, iMS, 0.0);
                 kS_fRef = mtl_val(m_fRef, iMS, 1.0);
-                transition_gain = std::pow(10.0, -0.1 * att * std::pow(fGHz / kS_fRef, attB));
+                kS_resF = mtl_val(m_resF, iMS, 0.0);
+                kS_resQ = mtl_val(m_resQ, iMS, 0.0);
+                kS_resS = mtl_val(m_resS, iMS, 0.0);
+                transition_gain = (double)interface_gain_impl(mtl_prop, iMS, center_frequency);
             }
         }
 
         // Complex-valued relative permittivity, ITU-R P.2040-1 eq. (9b)
         std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, fGHz);
         std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, fGHz);
+
+        // base permittivity for the in-medium loss (no resonance: keeps the real-sqrt loss well-posed)
+        std::complex<double> eta1_med = eta1, eta2_med = eta2;
+        // resonance enters the interface permittivity only
+        eta1 += eta_resonance(kR_resF, kR_resQ, kR_resS, fGHz);
+        eta2 += eta_resonance(kS_resF, kS_resQ, kS_resS, fGHz);
+
         bool dense_to_light = std::real(eta1) > std::real(eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
@@ -734,12 +759,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (ray_starts_inside)
         {
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            double loss_dB = medium_loss_dB(eta1, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness);
+            double loss_dB = medium_loss_dB(eta1_med, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }
         if (geometry_type != 0)
         {
-            double loss_dB = medium_loss_dB(eta2, kS_alpha, kS_alphaB, kS_fRef, fGHz, ray_offset);
+            double loss_dB = medium_loss_dB(eta2_med, kS_alpha, kS_alphaB, kS_fRef, fGHz, ray_offset, kS_mass);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }
 
@@ -795,7 +820,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Transmission mode assumed no change of direction (unlike refraction) and no total reflection is possible.
         // This may violate the conservation of energy principle (e.g. cause false amplification).
         // To obtain meaningful results, we ignore the losses in this case.
-        if (geometry_type == 1 && dense_to_light)
+        if (geometry_type == 1 && dense_to_light && !is_scalar)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type
@@ -1059,8 +1084,60 @@ dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vecto
     arma::uword n_mtl = mtl_validate(mtl_prop);
     if (iM >= n_mtl)
         throw std::invalid_argument("Material index out of bound.");
-    return medium_gain_impl(mtl_prop, iM, dist, center_frequency);
+    return medium_gain_impl(&mtl_prop, iM, dist, center_frequency);
 }
 
 template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_frequency);
 template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_frequency);
+
+/*!MD
+# interface_gain
+Linear gain of a wave crossing a thin interface (lumped penetration loss)
+
+- Computes `g = 10^(-A/10)`, where `A` [dB] is the lumped transmission loss applied once when a
+  ray enters a material (the air-to-material or material-to-material front-side crossing). It is
+  independent of path length and is applied on top of the Fresnel interface term `1 - abs(R)²`:
+  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss).
+  - An optional Lorentzian coincidence feature `coiA / (1 + (coiQ·(f - coiF)/coiF)²)`, active only
+    when `coiF > 0` and `coiA != 0`; negative `coiA` is a transmission dip (acoustic coincidence),
+    positive `coiA` a stop-band. The total is clamped to `>= 0`.
+- The reflection / conductivity columns (`a`, `b`, `c`, `d`) and the in-medium columns
+  (`alpha`, `alphaB`, `m`) of `mtl_prop` are not used here — the Fresnel reflection is handled by
+  the caller and the distance-dependent loss by [[medium_gain]].
+
+## Declaration:
+```
+dtype quadriga_lib::interface_gain(
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+    arma::uword iM,
+    dtype center_frequency);
+```
+
+## Inputs:
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
+- **`iM`** — 0-based material index selecting the entered material from `mtl_prop`
+- **`center_frequency`** — Center frequency in [Hz]
+
+## Returns:
+- Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
+
+## See also:
+- [[medium_gain]] (for the distance-dependent in-medium loss)
+- [[ray_mesh_interact]] (for complex ray-material interactions)
+- [[obj_file_read]] (defines mtl_prop format)
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                                   arma::uword iM, dtype center_frequency)
+{
+    if (center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+    arma::uword n_mtl = mtl_validate(mtl_prop);
+    if (iM >= n_mtl)
+        throw std::invalid_argument("Material index out of bound.");
+    return interface_gain_impl(&mtl_prop, iM, center_frequency);
+}
+
+template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
+template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_frequency);

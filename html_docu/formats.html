@@ -74,30 +74,17 @@
 <hr class="greyline"><br><br>
 <span id="9f6922f9" class="qd-section"><b>Material Properties</b></span><br>
 <br>
-Material properties describe how surfaces and bodies in a triangular scene mesh 
-interact with a propagating wave. Each triangle carries a material whose 
-parameters are stored as one row of a property matrix (<code>mtl_prop</code>). The model is 
-formulated for electromagnetic propagation — complex relative permittivity ε and 
-conductivity σ following Rec. ITU-R P.2040 — and reuses the same parameters for an 
-acoustic interpretation (mass law, coincidence, resonant absorption).<br><br> 
+Materials are stored in a name-keyed table: each triangle references a material by row index (<code>csv_ind</code> or <code>mtl_ind</code>), the row names are returned in <code>csv_names</code> / <code>mtl_names</code>, and the per-material parameters are returned in <code>csv_prop</code> — a map from parameter name to a vector with one entry per material row (so a value is read as <code>csv_prop["a"][csv_ind[face]]</code>). The model is formulated for electromagnetic propagation — complex relative permittivity ε and conductivity σ following Rec. ITU-R P.2040 — and reuses the same parameters for an acoustic interpretation (mass law, coincidence, resonant absorption).<br><br> 
  
-A material row has between 1 and 16 columns. Only the first column (<code>a</code>) is 
-required; every other column may be omitted and is then substituted with its 
-default. The parameters split into three physical roles: 
+The table is schema-blind: the only required column is <code>name</code> (the join key for <code>.obj</code> materials); every other column is an optional numeric parameter. A parameter the table does not define is simply absent from <code>csv_prop</code>, and downstream consumers substitute its default (listed below). Empty cells parse as 0. The recognized parameters split into three physical roles: 
 <ul>
-<li><b>Interface reflection</b> (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>resF</code>, <code>resQ</code>, <code>resS</code>) — set the complex permittivity ε, which fixes the Fresnel reflection coefficient and therefore the room-side absorption <code>1 − abs(R)²</code>. Applied once per surface hit, independent of path length.</li>
-<li><b>Interface transmission</b> (<code>att</code>, <code>attB</code>, <code>coiF</code>, <code>coiQ</code>, <code>coiA</code>) — a lumped through-surface loss in dB, applied once per transmission, independent of path length.</li>
-<li><b>In-medium attenuation</b> (<code>c</code>, <code>d</code> via ε, <code>alpha</code>, <code>alphaB</code>, <code>m</code>) — loss accumulated along the path traversed inside a body; depends on the in-medium distance.<br><br></li>
+<li><b>Interface reflection / transmission</b> (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>resF</code>, <code>resQ</code>, <code>resS</code>) — set the complex permittivity ε, which fixes the Fresnel coefficient at every surface crossing. ε therefore governs <i>both</i> the room-side absorption <code>1 − abs(R)²</code> and the complementary per-interface power transmission <code>1 − abs(R)²</code>. Applied once per surface hit, independent of path length.</li>
+<li><b>Lumped interface transmission</b> (<code>att</code>, <code>attB</code>, <code>coiF</code>, <code>coiQ</code>, <code>coiA</code>) — an <i>additional</i> through-surface loss in dB applied once when entering a material (the front-side air→material or material→material crossing), on top of the Fresnel term. Independent of path length and not applied on exit.</li>
+<li><b>In-medium attenuation</b> (<code>c</code>, <code>d</code> via ε; <code>alpha</code>, <code>alphaB</code>; <code>m</code>) — loss accumulated along the path traversed inside a body. The σ-driven loss from <code>Im(ε)</code> and the explicit <code>alpha</code> term sum, and <code>m</code> adds a mass-law slope; all scale with the in-medium distance.</li>
 </ul>
-Both domains use the same 16 columns but populate them very differently: EM 
-materials have εr > 1 with σ-based loss, whereas acoustic materials map to 
-εr ≪ 1 with σ held at 0 and loss carried by the att/alpha and mass-law terms. 
-See the Electromagnetic and Acoustic interpretation sections below. 
+Both domains use the same parameter set but populate it very differently: EM materials have εr > 1 with σ-based loss, whereas acoustic materials map to εr ≪ 1 with σ held at 0 and loss carried by the att/alpha and mass-law terms. See the Electromagnetic and Acoustic interpretation sections below. 
  
-A separate set of Principled BSDF parameters describes the <i>visual</i> appearance of 
-each material (color, roughness, metallic, etc.). These are read from the companion 
-<code>.mtl</code> file, do not affect propagation, and are documented in the Principled BSDF 
-section below.<br><br> 
+A separate set of Principled BSDF parameters describes the <i>visual</i> appearance of each material (color, roughness, metallic, etc.). These are read from the companion <code>.mtl</code> file, do not affect propagation, and are documented in the Principled BSDF section below.<br><br> 
  
 See related functions that produce or consume material properties: 
 <ul>
@@ -111,125 +98,107 @@ See related functions that produce or consume material properties:
 <hr class="thin">
 Complex permittivity, conductivity, and loss parameters with their frequency dependence
 <br><br>
-<b>Parameter columns:</b><br>
-Each material maps to the following columns. <code>Index</code> is the 0-based column in 
-<code>mtl_prop</code>; columns absent from the matrix are substituted with the listed default.<br><br> 
+<b>Parameters:</b><br>
+Each parameter is one numeric column of the material table and one key of <code>csv_prop</code>. <code>Key</code> is the CSV column name (and the <code>csv_prop</code> key); a parameter absent from the table is substituted with the listed default by downstream consumers. Only the <code>name</code> column is mandatory, and column order does not matter.<br><br> 
  
 <table class="md">
 <tr>
-  <th class="c">Index</th>
-  <th class="c">Symbol</th>
+  <th class="c">Key</th>
   <th>Property</th>
   <th class="c">Units</th>
   <th class="c">Default</th>
 </tr>
 <tr>
-  <td class="c">0</td>
   <td class="c">a</td>
   <td>εr at fRef</td>
   <td class="c">—</td>
   <td class="c">1.0</td>
 </tr>
 <tr>
-  <td class="c">1</td>
   <td class="c">b</td>
   <td>Frequency exponent for εr</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">2</td>
   <td class="c">c</td>
   <td>σ at fRef</td>
   <td class="c">S/m</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">3</td>
   <td class="c">d</td>
   <td>Frequency exponent for σ</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">4</td>
   <td class="c">att</td>
   <td>Penetration loss at fRef</td>
   <td class="c">dB</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">5</td>
   <td class="c">attB</td>
   <td>Frequency exponent for att</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">6</td>
   <td class="c">alpha</td>
   <td>In-medium absorption at fRef</td>
   <td class="c">dB/m</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">7</td>
   <td class="c">alphaB</td>
   <td>Frequency exponent for alpha</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">8</td>
   <td class="c">fRef</td>
   <td>Reference frequency</td>
   <td class="c">GHz</td>
   <td class="c">1.0</td>
 </tr>
 <tr>
-  <td class="c">9</td>
   <td class="c">m</td>
   <td>Mass-law transmission slope</td>
   <td class="c">dB/decade</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">10</td>
   <td class="c">resF</td>
   <td>Permittivity resonance frequency</td>
   <td class="c">GHz</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">11</td>
   <td class="c">resQ</td>
   <td>Permittivity resonance quality factor</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">12</td>
   <td class="c">resS</td>
   <td>Permittivity resonance strength</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">13</td>
   <td class="c">coiF</td>
   <td>Coincidence frequency</td>
   <td class="c">GHz</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">14</td>
   <td class="c">coiQ</td>
   <td>Coincidence quality factor</td>
   <td class="c">—</td>
   <td class="c">0</td>
 </tr>
 <tr>
-  <td class="c">15</td>
   <td class="c">coiA</td>
   <td>Coincidence loss amplitude</td>
   <td class="c">dB</td>
@@ -250,7 +219,7 @@ absolute GHz.<br><br>
 </tr>
 <tr>
   <td>ε(f)</td>
-  <td><code>a·(f/fRef)^b + resS·resF² / (resF² − f² − i·(resF/resQ)·f)</code></td>
+  <td><code>a·(f/fRef)^b − i·17.98·σ/f + resS·resF² / (resF² − f² + i·(resF/resQ)·f)</code></td>
   <td>—</td>
   <td>relative permittivity (complex)</td>
 </tr>
@@ -258,33 +227,37 @@ absolute GHz.<br><br>
   <td>σ(f)</td>
   <td><code>c·(f/fRef)^d</code></td>
   <td>[S/m]</td>
-  <td>conductivity</td>
+  <td>conductivity (enters ε as the −i term)</td>
 </tr>
 <tr>
   <td>att(f)</td>
   <td><code>att·(f/fRef)^attB + coiA / (1 + (coiQ·(f − coiF)/coiF)²)</code></td>
   <td>[dB]</td>
-  <td>per-interface transmission loss</td>
+  <td>lumped loss added once on entering</td>
 </tr>
 <tr>
   <td>α(f)</td>
   <td><code>alpha·(f/fRef)^alphaB</code></td>
   <td>[dB/m]</td>
-  <td>in-medium loss × in-medium path length</td>
+  <td>explicit in-medium loss × path length</td>
 </tr>
 <tr>
   <td>mass(f, L)</td>
   <td><code>max(0, m·log10((f/fRef)·L))</code></td>
   <td>[dB]</td>
-  <td>in-medium, L = path length in meters</td>
+  <td>mass-law slope, L = in-medium path length</td>
 </tr>
 </table>
+ 
+<ul>
+<li>Loss appears as a negative imaginary part of ε (Rec. ITU-R P.2040-1, eq. 9b). Both the σ term and the resonance are written so that <code>c &gt; 0</code> and <code>resS &gt; 0</code> add loss. The total in-medium attenuation over a path of length <code>L</code> is <code>8.686·L/Δ</code> (from <code>Im(ε)</code>, where Δ is the σ-derived attenuation length) plus <code>α(f)·L</code> plus <code>mass(f, L)</code>, summed; <code>att</code> is separate and is not path-dependent.</li>
+</ul>
 
 <b>Mechanisms:</b><br>
 <ul>
 <li><b>Permittivity resonance</b> (<code>resF</code>, <code>resQ</code>, <code>resS</code>): a Lorentz pole that adds a peak to absorption (acoustic α) and a feature to reflection near <code>resF</code>; <code>resQ</code> sets sharpness (higher = narrower). Active only when <code>resF &gt; 0</code> and <code>resS ≠ 0</code>. Models resonant dielectrics / frequency-selective media (EM) and Helmholtz / membrane absorbers (acoustic).</li>
 <li><b>Coincidence term</b> (<code>coiF</code>, <code>coiQ</code>, <code>coiA</code>): a Lorentzian added to the transmission loss at <code>coiF</code>. Negative <code>coiA</code> produces a transmission dip (acoustic coincidence / pass-band); positive <code>coiA</code> produces a stop-band. Total loss is clamped to ≥ 0. Active only when <code>coiF &gt; 0</code> and <code>coiA ≠ 0</code>.</li>
-<li><b>Mass-law term</b> (<code>m</code>): a transmission loss that is logarithmic in both frequency and in-medium path length. <code>m = 20</code> reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 0 (EM through-loss is the linear <code>alpha</code> term). The imaginary sign of the ε resonance follows the library's loss convention (consistent with σ).</li>
+<li><b>Mass-law term</b> (<code>m</code>): a transmission loss that is logarithmic in both frequency and in-medium path length. <code>m = 20</code> reproduces the acoustic mass law (+6 dB/octave and +6 dB per thickness doubling). Default 0 (EM through-loss is the linear <code>alpha</code> term). The resonance denominator uses <code>+i·(resF/resQ)·f</code> so that <code>resS &gt; 0</code> adds loss under the library's negative-imaginary loss convention (consistent with σ).</li>
 </ul>
 
 <hr class="greyline"><br>
@@ -294,18 +267,13 @@ Mapping the column model onto a physical EM material (the model's native domain)
 <ul>
 <li><code>a</code>…<code>d</code> define the complex relative permittivity: real part <code>εr(f) = a·(f/fRef)^b</code>, imaginary part <code>ε'' = 17.98·σ/f</code> with <code>σ(f) = c·(f/fRef)^d</code> and <code>f</code> in GHz.</li>
 <li>Interface reflection uses the Fresnel coefficient from ε; at normal incidence <code>R = (1 − √ε)/(1 + √ε)</code>, and the RT tool applies the angle-dependent form.</li>
-<li>Built-in EM materials have <code>εr &gt; 1</code>, use only columns <code>a</code>…<code>att</code>, and set <code>fRef = 1 GHz</code>; the extended columns (<code>m</code>, <code>res<i></code>, <code>coi</i></code>) are normally 0 for EM.</li>
+<li>Built-in EM materials have <code>εr &gt; 1</code>, use only parameters <code>a</code>…<code>att</code>, and set <code>fRef = 1 GHz</code>; the extended parameters (<code>m</code>, <code>res<i></code>, <code>coi</i></code>) are normally 0 for EM.</li>
 <li>See Electromagnetic Default Materials for the built-in library and Background and References for the standards (ITU-R P.2040, P.833, 3GPP TR 38.901).</li>
 </ul>
 
 <b>Electromagnetic Default Materials</b><br>
-Built-in material library used when no <code>materials_csv</code> is provided 
+Built-in material library used when no <code>materials_csv</code> is provided. Values follow Rec. ITU-R P.2040-3, Table 3, valid for 1–40 GHz (ground materials limited to 1–10 GHz). The built-in table defines only the parameters <code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code>; every other parameter is absent (consumers default it) and <code>fRef = 1 GHz</code>. A scene using only built-in materials therefore exposes the keys <code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code> in <code>csv_prop</code>, each a vector with one entry per table row. <code>max fGHz</code> is the upper frequency for which each fit is considered valid.<br><br> 
  
-Values follow Rec. ITU-R P.2040-3, Table 3, valid for 1–40 GHz (ground materials limited 
-to 1–10 GHz). All built-in materials use only columns 0–4 (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>, <code>att</code>); every 
-extended parameter is zero and <code>fRef = 1 GHz</code>. A scene using only built-in materials therefore 
-yields a 5-column <code>mtl_prop</code> (4 columns if no material sets <code>att</code>; only <code>irr_glass</code> does). 
-<code>max fGHz</code> is the upper frequency for which each fit is considered valid.<br><br> 
  
 <table class="md">
 <tr>
@@ -318,7 +286,16 @@ yields a 5-column <code>mtl_prop</code> (4 columns if no material sets <code>att
   <th class="r">max fGHz</th>
 </tr>
 <tr>
-  <td>vacuum / air</td>
+  <td>air</td>
+  <td class="r">1.0</td>
+  <td class="r">0.0</td>
+  <td class="r">0.0</td>
+  <td class="r">0.0</td>
+  <td class="r">0.0</td>
+  <td class="r">100</td>
+</tr>
+<tr>
+  <td>vacuum</td>
   <td class="r">1.0</td>
   <td class="r">0.0</td>
   <td class="r">0.0</td>
@@ -537,7 +514,7 @@ yields a 5-column <code>mtl_prop</code> (4 columns if no material sets <code>att
  
 Notes: 
 <ul>
-<li><code>vacuum</code> and <code>air</code> are identical (lossless free space) and both resolve to the default material.</li>
+<li><code>air</code> is row 0 of the table — the transparent fallback used for unmatched materials  when <code>csv_strict = false</code>. <code>vacuum</code> is a separate, identical row (lossless free space).</li>
 <li><code>itu_vegetation</code> follows Rec. ITU-R P.833-9, Figure 2.</li>
 <li><code>irr_glass</code> (infrared-reflective glass) follows 3GPP TR 38.901 V17.0.0, Table 7.4.3-1 and is the only built-in material with a non-zero <code>att</code>.</li>
 </ul>
@@ -548,6 +525,7 @@ Notes:
 Reusing the column model to simulate acoustic propagation with a radio-wave ray tracer
 <ul>
 <li>Acoustic waves at kHz frequencies share wavelengths with radio waves at GHz frequencies, so the EM material model can be reused for acoustic planning. The mapping is an analogy: it holds for interface reflection, bulk absorption, and the resonance / mass-law mechanisms below, and does not model phase or diffraction.</li>
+<li>Acoustic interactions use the scalar interaction types of <a href="cpp_api.html#ray_mesh_interact">ray_mesh_interact</a> (3 = reflection, 4 = transmission): a single TE-mode pressure coefficient, energy-conserving (<code>transmitted = 1 − abs(R)²</code>), with no total internal reflection and no refractive bending of the ray. ε &lt; 1 is handled by the complex Fresnel coefficient directly — beyond the critical angle <code>abs(R) → 1</code> — rather than by a separate total-reflection branch.</li>
 </ul>
 
 <b>Wave mapping:</b><br>
@@ -564,7 +542,7 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 <table class="md">
 <tr>
   <th>Acoustic effect</th>
-  <th>Columns</th>
+  <th>Parameters</th>
   <th>Notes</th>
 </tr>
 <tr>
@@ -604,7 +582,7 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 </tr>
 </table>
 </li>
-<li>Room-side absorption <code>α = 1 − abs(R)²</code> (which sets reverberation) is governed by <code>(a, b)</code> alone. Through-material transmission loss is governed by <code>att/alpha/m/coi*</code> on top of the interface term. Tuning the transmission knobs never changes the reverberant field — an absorption miss is always an <code>(a, b)</code> fix.</li>
+<li>Room-side absorption <code>α = 1 − abs(R)²</code> (which sets reverberation) is governed by <code>(a, b)</code> alone, via the reflection branch. The same <code>(a, b)</code> also sets the per-interface power transmission <code>1 − abs(R)²</code>, so <code>a</code> carries the <i>level</i> of the through-material isolation; <code>att</code>, <code>alpha</code>, <code>m</code>, and the coincidence term add loss on top of it. Because the reflection branch never depends on the transmission knobs, tuning <code>att</code>/<code>alpha</code>/<code>m</code>/<code>coi*</code> never changes the reverberant field — an absorption miss is always an <code>(a, b)</code> fix.</li>
 </ul>
 
 <b>Reflection from ε:</b><br>
@@ -645,12 +623,22 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 </tr>
 </table>
 </li>
-<li>Because <code>ε ≪ 1</code>, acoustic materials are "optically rarer" than air: the critical angle <code>sinθ_c = √ε</code> is tiny, so the RT tool must handle <code>ε &amp;lt; 1</code>, including total internal reflection.</li>
+<li>Because <code>ε ≪ 1</code>, acoustic materials are "optically rarer" than air, with a tiny critical angle <code>sinθ_c = √ε</code>. The scalar interaction types handle this through the complex Fresnel coefficient: past the critical angle <code>abs(R) → 1</code> (near-total reflection), with no separate total-internal-reflection branch and no change of ray direction. Each interface — entry, exit, and internal material-to-material — applies its own <code>1 − abs(R)²</code>, so a slab embedded in air pays two air-interface transmissions (entry and exit); calibrate <code>a</code> accordingly.</li>
+</ul>
+
+<b>Layered materials (no air gap):</b><br>
+Stacked materials with no air between them (a porous absorber glued to a wall, carpet on a wooden floor, wood on concrete) are modeled as two watertight bodies whose shared faces are coincident (within the 1 mm interaction tolerance) with opposing normals. <a href="#ray_mesh_interact">ray_mesh_interact</a> detects this as a material-to-material interface and computes the Fresnel coefficient from the two real materials' ε directly (no air). The reflection and transmission branches are energy-conserving, so the wave cascade (entry → internal interface(s) → exit) is traced as separate ray segments by the ray tracer, which must split each interaction into its reflected and transmitted children. 
+ 
+<ul>
+<li><b>Porous absorber on a rigid backing</b> (carpet on wood, foam on concrete): the air→absorber face sets the surface reflection from the absorber's <code>(a, b)</code>; the absorber→backing interface reflects strongly (the backing's <code>a ≈ 0</code> gives <code>abs(R) → 1</code>); the porous <code>alpha</code> is accumulated on both the inbound and the reflected outbound traversal. Absorption is set by the reflection path and is unaffected by what transmits into the backing.</li>
+<li><b>Rigid on rigid</b> (wood on concrete): the two materials have similar (small) <code>a</code>, so their mutual interface reflects little and transmits most of the energy; isolation is dominated by the air-interface transmissions and the summed in-medium losses of the two layers.</li>
+<li>The lumped <code>att</code> is applied once per material entry, including at an internal material-to-material interface (using the entered material's <code>att</code>). If both stacked layers carry an <code>att</code>, the loss is counted at each entry — set <code>att</code> on at most one layer of a glued stack to avoid double counting.</li>
+<li>Geometry requirement: the glued faces must be coincident within 1 mm with opposing normals, or the pair is treated as two air interfaces separated by a thin air layer, which changes the result.</li>
 </ul>
 
 <b>Material classes:</b><br>
 <ul>
-<li><b>Rigid reflectors</b> (concrete, glass, steel, brick, gypsum, wood panels): tiny <code>a</code> from impedance (~1e-9 … 1e-3), <code>b = 0</code>. Transmission via <code>m</code> (mass law); add <code>coiF/coiQ/coiA</code> for thin stiff panels with a coincidence dip.</li>
+<li><b>Rigid reflectors</b> (concrete, glass, steel, brick, gypsum, wood panels): tiny <code>a</code> from impedance (~1e-9 … 1e-3), <code>b = 0</code>. The tiny <code>a</code> gives both near-total reflection (<code>abs(R) → 1</code>, low room-side absorption) and the through-material isolation <code>1 − abs(R)²</code> per interface. <code>m</code> adds the mass-law frequency/thickness slope on top of that level; <code>coiF/coiQ/coiA</code> add a coincidence dip for thin stiff panels.</li>
 <li><b>Porous absorbers</b> (foam, mineral wool, fiberglass, carpet, curtains): <code>a</code> from the α target, <code>b &gt; 0</code> (more HF absorption), <code>alpha ≥ 20/thickness</code> to saturate.</li>
 <li><b>Empirical absorbers</b> (furniture, audience, people): measured α coefficients via <code>(a, b)</code>; geometry sized to the effective absorption depth.</li>
 <li><b>Resonant absorbers</b> (Helmholtz, membrane, micro-perforated): <code>resF/resQ/resS</code> for the peak, on top of a baseline <code>(a, b)</code>.</li>
@@ -662,12 +650,13 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 <li>LF floor: P.2040 is nominal above 100 MHz ≡ 114 Hz acoustic; the 16 / 31.5 / 63 Hz bands are extrapolation.</li>
 <li>The smooth dispersion exponents (<code>b</code>, <code>alphaB</code>, <code>attB</code>) are single power laws over ~3 decades; use the resonance and coincidence terms for non-monotonic features rather than forcing a power-law fit.</li>
 <li>Geometry: model each material at its installed thickness as a watertight body; see the OBJ geometry guidance for object dimensions.</li>
+<li>The mass-law term sets only the frequency/thickness <i>slope</i> (<code>m = 20</code> → +6 dB/octave and +6 dB per thickness doubling); the absolute transmission-loss <i>level</i> comes from <code>a</code> (the interface term), not from <code>m</code>. Because <code>mass(f, L)</code> scales with the in-medium path length <code>L = thickness / cosθ</code>, the modeled mass-law loss <i>increases</i> at oblique incidence, opposite to the real mass law (which falls as ≈ 20·log10 cosθ). Treat this as a known approximation.</li>
 </ul>
 
 <b>Acoustic Default Materials</b><br>
 <ul>
 <li>Built-in acoustic material library (under construction)</li>
-<li>Acoustic materials use the same columns as the EM model with <code>fRef = 0.875 GHz</code>, <code>σ = 0</code>, and <code>εr ≪ 1</code>. The table below is a work-in-progress template grouped by the material classes above. Values are illustrative only.<br><br>
+<li>Acoustic materials use the same parameters as the EM model with <code>fRef = 0.875 GHz</code>, <code>σ = 0</code>, and <code>εr ≪ 1</code>. The table below is a work-in-progress template grouped by the material classes above. Values are illustrative only.<br><br>
 <table class="md">
 <tr>
   <th>Name</th>
@@ -739,17 +728,14 @@ Reusing the column model to simulate acoustic propagation with a radio-wave ray 
 </tr>
 </table>
 </li>
-<li>Note: the concrete row replaces the earlier <code>att/attB/alpha</code> mass-law approximation with a single <code>m = 20</code>.</li>
+<li>Note: in the concrete row the <code>m = 20</code> term supplies only the mass-law slope; the absolute transmission loss is carried by <code>a</code> (the interface term), not by <code>m</code>.</li>
 </ul>
 
 <hr class="greyline"><br>
 <span id="4. Principled BSDF" class="qd-func"><b>4. Principled BSDF</b></span><br>
 <hr class="thin">
 Visual material parameters read from the companion .mtl file
-When an OBJ file references an <code>.mtl</code> library, the per-material Principled BSDF parameters can be 
-returned as an <code>[n_mtl, 17]</code> matrix (<code>bsdf</code>). These describe visual appearance only and do not 
-affect propagation. Each row corresponds to one entry of <code>mtl_names</code>; if no matching <code>.mtl</code> file 
-is found, the matrix is empty. All color, alpha, and 0–1 parameters are clamped to [0, 1].<br><br> 
+When an OBJ file references an <code>.mtl</code> library, the per-material Principled BSDF parameters can be returned as an <code>[n_mtl, 17]</code> matrix (<code>bsdf</code>). These describe visual appearance only and do not affect propagation. Each row corresponds to one entry of <code>mtl_names</code>; if no matching <code>.mtl</code> file is found, the matrix is empty. All color, alpha, and 0–1 parameters are clamped to [0, 1].<br><br> 
  
 <table class="md">
 <tr>

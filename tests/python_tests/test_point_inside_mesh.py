@@ -43,8 +43,8 @@ class test_case(unittest.TestCase):
             [-1.1,  0.0,  0.0]
         ])
 
-        # Define obj_ind = [2, 2, 2, ..., 2]
-        obj_ind = np.full(12, 2)
+        # Define obj_ind = [1, 1, 1, ..., 1]
+        obj_ind = np.full(12, 1)
 
         # ──────────── Case 1: Provide (points, mesh, obj_ind) ────────────
         # C++ expected:  res.n_elem == 2; res[0] == 2; res[1] == 0
