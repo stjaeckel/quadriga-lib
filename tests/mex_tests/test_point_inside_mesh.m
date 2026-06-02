@@ -32,8 +32,8 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind);
     assertEqual(2, numel(res), 'Number of results must be 2');
-    assertEqual(uint32(2), res(1), 'First point should map to object index 2');
-    assertEqual(uint32(0), res(2), 'Second point is outside → 0');
+    assertEqual(uint64(2), res(1), 'First point should map to object index 2');
+    assertEqual(uint64(0), res(2), 'Second point is outside → 0');
 
     % ───────────────────────────────────────────────────────────────
     % Case 2: Provide only (points, mesh), no obj_ind, no distance
@@ -43,8 +43,8 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     res = quadriga_lib.point_inside_mesh(points, mesh);
     assertEqual(2, numel(res), 'Number of results must be 2');
-    assertEqual(uint32(1), res(1), 'Without obj_ind, returns face index+1 = 1');
-    assertEqual(uint32(0), res(2), 'Outside → 0');
+    assertEqual(uint64(1), res(1), 'Without obj_ind, returns face index+1 = 1');
+    assertEqual(uint64(0), res(2), 'Outside → 0');
 
     % ───────────────────────────────────────────────────────────────
     % Case 3: Provide (points, mesh, [], distance = 0.12)
@@ -55,8 +55,8 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     res = quadriga_lib.point_inside_mesh(points, mesh, [], 0.12);
     assertEqual(2, numel(res), 'Number of results must be 2');
-    assertEqual(uint32(1), res(1), 'First point within 0.12 → face index+1 = 1');
-    assertEqual(uint32(1), res(2), 'Second point within 0.12 of face 0 → 1');
+    assertEqual(uint64(1), res(1), 'First point within 0.12 → face index+1 = 1');
+    assertEqual(uint64(1), res(2), 'Second point within 0.12 of face 0 → 1');
 
     % ───────────────────────────────────────────────────────────────
     % Case 4: Provide (points, mesh, obj_ind, distance = 0.09)
@@ -66,8 +66,8 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind, 0.09);
     assertEqual(2, numel(res), 'Number of results must be 2');
-    assertEqual(uint32(2), res(1), 'First point exactly inside → obj_ind=2');
-    assertEqual(uint32(0), res(2), 'Second still outside → 0');
+    assertEqual(uint64(2), res(1), 'First point exactly inside → obj_ind=2');
+    assertEqual(uint64(0), res(2), 'Second still outside → 0');
 
     % ───────────────────────────────────────────────────────────────
     % Case 5: Provide (points, mesh, obj_ind, distance = 2.0)
@@ -78,6 +78,6 @@ function test_point_inside_mesh
     % ───────────────────────────────────────────────────────────────
     res = quadriga_lib.point_inside_mesh(points, mesh, obj_ind, 2.0);
     assertEqual(2, numel(res), 'Number of results must be 2');
-    assertEqual(uint32(2), res(1), 'First point → obj_ind = 2');
-    assertEqual(uint32(2), res(2), 'Second point within 2.0 → obj_ind = 2');
+    assertEqual(uint64(2), res(1), 'First point → obj_ind = 2');
+    assertEqual(uint64(2), res(2), 'Second point within 2.0 → obj_ind = 2');
 end

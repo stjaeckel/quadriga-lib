@@ -20,7 +20,7 @@ Test whether 3D points are inside a triangle mesh using raycasting
 - A point is inside if any ray hits a face with a negative incidence angle, or if the ray
   thickness at FBS is below 1 mm (surface proximity)
 - Mesh must be watertight with all normals pointing outward
-- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- If `obj_ind` is provided (0-based), returns the enclosing object as a 1-based index (so 0 stays reserved for "outside")
 
 ## Usage:
 ```
@@ -30,7 +30,7 @@ result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance
 ## Input Arguments:
 - **`points`** — 3D coordinates of test points; `(n_points, 3)`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
-- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `(n_mesh,)`
+- **`obj_ind`** *(optional)* — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`
 - **`distance`** *(optional)* — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m; Default: 0
@@ -45,14 +45,22 @@ MD!*/
 
 py::array_t<py::ssize_t> point_inside_mesh(const py::array_t<double> &points,
                                            const py::array_t<double> &mesh,
-                                           const py::array_t<unsigned> &obj_ind,
+                                           const py::handle &obj_ind,
                                            double distance)
 {
-    const auto points_arma = qd_python_numpy2arma_Mat(points, true);
-    const auto mesh_arma = qd_python_numpy2arma_Mat(mesh, true);
-    const auto obj_ind_arma = qd_python_numpy2arma_Col(obj_ind, true);
+    const auto points_arma = qd_python_numpy2arma_Mat<double>(points, true);
+    const auto mesh_arma = qd_python_numpy2arma_Mat<double>(mesh, true);
+    const auto obj_ind_arma = qd_python_numpy2arma_Col<arma::uword>(obj_ind, true);
 
-    auto res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, &obj_ind_arma, distance);
+    const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
 
-    return qd_python_copy2numpy(&res);
+    auto res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, p_obj_ind, distance);
+
+    return qd_python_copy2numpy<arma::uword, py::ssize_t>(&res);
 }
+
+// m.def("point_inside_mesh", &point_inside_mesh,
+//       py::arg("points"),
+//       py::arg("mesh"),
+//       py::arg("obj_ind") = py::none(),
+//       py::arg("distance") = 0.0);

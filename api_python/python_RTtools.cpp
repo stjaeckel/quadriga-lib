@@ -79,9 +79,9 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("vec_size") = 1);
 
     m.def("point_inside_mesh", &point_inside_mesh,
-          py::arg("points") = py::array_t<double>(),
-          py::arg("mesh") = py::array_t<double>(),
-          py::arg("obj_ind") = py::array_t<unsigned>(),
+          py::arg("points"),
+          py::arg("mesh"),
+          py::arg("obj_ind") = py::none(),
           py::arg("distance") = 0.0);
 
     m.def("ray_point_intersect", &ray_point_intersect,

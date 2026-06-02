@@ -32,7 +32,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object index per mesh element; enables per-object output; `[n_mesh]`
-- **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are 
+- **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are
   classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
 
 ## Output:
@@ -50,11 +50,17 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     const auto points_arma = qd_mex_get_Mat<double>(prhs[0]);
     const auto mesh_arma = qd_mex_get_Mat<double>(prhs[1]);
-    const auto obj_ind_arma = (nrhs < 3) ? arma::u32_vec() : qd_mex_typecast_Col<unsigned>(prhs[2]);
     double distance = (nrhs < 4) ? 0.0 : qd_mex_get_scalar<double>(prhs[3], "distance", 0.0);
 
-    arma::u32_vec res;
-    CALL_QD(res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, &obj_ind_arma, distance));
+    // Material/object index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
+    arma::uvec obj_ind_arma = (nrhs < 3) ? arma::uvec() : qd_mex_get_Col<arma::uword>(prhs[2], true);
+    if (!obj_ind_arma.is_empty())
+        obj_ind_arma -= 1;
+
+    const arma::uvec *p_obj_ind = obj_ind_arma.is_empty() ? nullptr : &obj_ind_arma;
+
+    arma::uvec res;
+    CALL_QD(res = quadriga_lib::point_inside_mesh(&points_arma, &mesh_arma, p_obj_ind, distance));
 
     if (nlhs == 1)
         plhs[0] = qd_mex_copy2matlab(&res);

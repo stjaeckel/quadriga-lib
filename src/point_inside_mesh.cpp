@@ -24,33 +24,33 @@ Test whether 3D points are inside a triangle mesh using raycasting
 
 ## Declaration:
 ```
-arma::u32_vec quadriga_lib::point_inside_mesh(
+arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat<dtype> *points,
     const arma::Mat<dtype> *mesh,
-    const arma::u32_vec *obj_ind = nullptr,
+    const arma::uvec *obj_ind = nullptr,
     dtype distance = 0.0);
 ```
 
 ## Inputs:
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
 - **`mesh`** — Triangle faces in row-major vertex format  `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `[n_mesh]`
+- **`obj_ind`** *(optional)* — 0-based object index per mesh element; enables per-object output; `[n_mesh]`
 - **`distance`** *(optional)* — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m (default: 0)
 
 ## Returns:
-- `arma::u32_vec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
+- `arma::uvec`, size `[n_points]`; `0` = outside, `1` = inside any object (no `obj_ind`), or 1-based object index (with `obj_ind`)
 
 ## See also:
 - [[obj_file_read]] (for reading `mesh` and `obj_ind` from an .obj file)
 MD!*/
 
 template <typename dtype>
-arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
-                                              const arma::Mat<dtype> *mesh,
-                                              const arma::u32_vec *obj_ind,
-                                              dtype distance)
+arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
+                                           const arma::Mat<dtype> *mesh,
+                                           const arma::uvec *obj_ind,
+                                           dtype distance)
 {
     if (points == nullptr || points->n_cols != 3)
         throw std::invalid_argument("Input 'points' must have 3 columns.");
@@ -65,7 +65,7 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
         throw std::invalid_argument("Distance must be in between 0 and 20 meters.");
 
     if (points->n_rows == 0)
-        return arma::u32_vec();
+        return arma::uvec();
 
     arma::uword n_points = points->n_rows;
     arma::uword n_mesh = mesh->n_rows;
@@ -134,7 +134,13 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
     arma::u32_vec sub_mesh_index(1);
     size_t target_size = 10 * (size_t)std::ceil(std::sqrt((double)n_mesh));
     target_size = (target_size < 1024) ? 1024 : target_size;
-    quadriga_lib::triangle_mesh_segmentation(mesh, &meshR, &sub_mesh_index, target_size, 8);
+
+    // Carry obj_ind through the reordering/padding so fbs_ind (into meshR) maps correctly.
+    arma::uvec obj_ind_R;
+    bool have_obj = (obj_ind != nullptr && obj_ind->n_elem != 0);
+    quadriga_lib::triangle_mesh_segmentation(mesh, &meshR, &sub_mesh_index, target_size, 8,
+                                             have_obj ? obj_ind : nullptr,
+                                             have_obj ? &obj_ind_R : nullptr);
 
     // Calculate intersections
     arma::Mat<dtype> fbs, sbs;
@@ -148,13 +154,14 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
                                            nullptr, nullptr, nullptr, &fbs_angle, &thickness);
 
     // Check inside condition
-    arma::u32_vec output(n_points);
-    unsigned *p_out = output.memptr();
+    arma::uvec output(n_points);
+    arma::uword *p_out = output.memptr();
     unsigned *p_fbs_ind = fbs_ind.memptr();
-    const unsigned *p_obj_ind = (obj_ind == nullptr || obj_ind->n_elem == 0) ? nullptr : obj_ind->memptr();
+    const arma::uword *p_obj_R = have_obj ? obj_ind_R.memptr() : nullptr;
     dtype *p_fbs_angle = fbs_angle.memptr();
     dtype *p_thickness = thickness.memptr();
 
+    arma::uword n_ang = fbs_angle.n_elem;
     arma::uword i_ang = 0;
     for (arma::uword i_point = 0; i_point < n_points; ++i_point)
         for (arma::uword i_cast = 0; i_cast < n_cast; ++i_cast)
@@ -162,10 +169,12 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
             arma::uword i_ray = i_point * n_cast + i_cast;
             if (p_fbs_ind[i_ray] == 0) // No interaction with the mesh
                 continue;
+            if (i_ang >= n_ang) // safety: angle/thickness arrays are compacted to hits
+                break;
             if (p_out[i_point] == 0 && (p_fbs_angle[i_ang] < 0.0 || p_thickness[i_ang] < 0.001))
             {
-                if (p_obj_ind) // Return object index
-                    p_out[i_point] = p_obj_ind[p_fbs_ind[i_ray] - 1];
+                if (p_obj_R)
+                    p_out[i_point] = p_obj_R[p_fbs_ind[i_ray] - 1] + 1;
                 else
                     p_out[i_point] = 1;
             }
@@ -175,12 +184,12 @@ arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<dtype> *points,
     return output;
 }
 
-template arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<float> *points,
-                                                       const arma::Mat<float> *mesh,
-                                                       const arma::u32_vec *obj_ind,
-                                                       float distance);
+template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<float> *points,
+                                                    const arma::Mat<float> *mesh,
+                                                    const arma::uvec *obj_ind,
+                                                    float distance);
 
-template arma::u32_vec quadriga_lib::point_inside_mesh(const arma::Mat<double> *points,
-                                                       const arma::Mat<double> *mesh,
-                                                       const arma::u32_vec *obj_ind,
-                                                       double distance);
+template arma::uvec quadriga_lib::point_inside_mesh(const arma::Mat<double> *points,
+                                                    const arma::Mat<double> *mesh,
+                                                    const arma::uvec *obj_ind,
+                                                    double distance);
