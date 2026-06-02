@@ -816,13 +816,18 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        // Scalar (acoustic) transmission partition: pass-through is only needed when entering a rarer
-        // medium (eps2 < eps1, i.e. dense_to_light), where the refracted-wave Fresnel 1-|R|^2 would impose
-        // a spurious critical-angle total reflection that kills oblique transmission. Entering an
-        // equal-or-denser medium (eps2 >= eps1, e.g. an eps>1 absorber face) has no TIR, so the
-        // energy-conserving split above (refraction_gain = 1 - reflection_gain) stands and the transmitted
-        // ray carries (1-|R|^2). EM transmission keeps the dense->light clamp (condition unchanged for EM).
-        if (geometry_type == 1 && dense_to_light)
+        // Scalar (acoustic) transmission: apply the energy-conserving Fresnel split (transmitted ray carries
+        // 1-|R|²) only when entering a genuinely dense medium — ε2 > 1, a real impedance interface such as an
+        // absorber face — where reflection and transmission share one budget and there is no TIR. Otherwise
+        // force pass-through, leaving the through-wall gain as the calibrated isolation (att/coincidence/mass/
+        // alpha in 'gain') alone. Pass-through (ε2 <= 1) covers both the rarer-medium entry (ε2 < 1), where the
+        // refracted-wave Fresnel would impose a spurious critical-angle dropout on oblique rays, and the exit of
+        // a rigid mirror into air (ε2 = 1, e.g. a concrete back face), where |R| ≈ 1 would otherwise null a
+        // transmission whose real TL is the separately-calibrated att/mass. Note eta2 holds √ε here (set by the
+        // std::sqrt above), so the test reads √ε2 <= 1, i.e. ε2 <= 1.
+        // EM transmission is unchanged: it keeps the dense->light false-amplification clamp (dense_to_light).
+        bool force_passthrough = is_scalar ? (std::real(eta2) <= 1.0) : dense_to_light;
+        if (geometry_type == 1 && force_passthrough)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type
