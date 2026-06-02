@@ -46,7 +46,7 @@
 
       <!-- CONTENT BEGIN -->
 
-<span class="qd-heading"><b>C++ API Documentation for Quadriga-Lib v0.11.7</b></span>
+<span class="qd-heading"><b>C++ API Documentation for Quadriga-Lib v0.11.8</b></span>
 <br><br><br>
 
 <b>Markdown version of this page:</b>
@@ -197,6 +197,7 @@
   <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length, and angles</td></tr>
   <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
+  <tr><td><a href="#interface_gain">interface_gain</a></td><td>Linear gain of a wave crossing a thin interface (lumped penetration loss)</td></tr>
   <tr><td><a href="#medium_gain">medium_gain</a></td><td>Linear gain of a ray traversing a homogeneous lossy medium</td></tr>
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
@@ -4223,6 +4224,47 @@ arma::uword quadriga_lib::icosphere(
 </ul>
 
 <hr class="greyline"><br>
+<span id="interface_gain" class="qd-func"><b>interface_gain</b></span><br>
+<hr class="thin">
+Linear gain of a wave crossing a thin interface (lumped penetration loss)
+<ul>
+<li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the lumped transmission loss applied once when a ray enters a material (the air-to-material or material-to-material front-side crossing). It is independent of path length and is applied on top of the Fresnel interface term <code>1 - abs(R)²</code>:
+<ul>
+<li>Power-law penetration loss <code>att·(f/fRef)^attB</code> (e.g. 3GPP TR 38.901 building-entry loss).</li>
+<li>An optional Lorentzian coincidence feature <code>coiA / (1 + (coiQ·(f - coiF)/coiF)²)</code>, active only when <code>coiF &gt; 0</code> and <code>coiA != 0</code>; negative <code>coiA</code> is a transmission dip (acoustic coincidence), positive <code>coiA</code> a stop-band. The total is clamped to <code>&gt;= 0</code>.</li>
+</ul>
+</li>
+<li>The reflection / conductivity columns (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>) and the in-medium columns (<code>alpha</code>, <code>alphaB</code>, <code>m</code>) of <code>mtl_prop</code> are not used here — the Fresnel reflection is handled by the caller and the distance-dependent loss by <a href="#medium_gain">medium_gain</a>.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+dtype quadriga_lib::interface_gain(
+    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; &amp;mtl_prop,
+    arma::uword iM,
+    dtype center_frequency);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
+<li><b><code>iM</code></b> — 0-based material index selecting the entered material from <code>mtl_prop</code></li>
+<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
+</ul>
+
+<b>Returns:</b><br>
+<ul>
+<li>Linear interface gain in <code>[0, 1]</code>; multiply by the incident field/power gain to get the value after the interface</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#medium_gain">medium_gain</a> (for the distance-dependent in-medium loss)</li>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
+<li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
+</ul>
+
+<hr class="greyline"><br>
 <span id="medium_gain" class="qd-func"><b>medium_gain</b></span><br>
 <hr class="thin">
 Linear gain of a ray traversing a homogeneous lossy medium
@@ -4654,10 +4696,10 @@ Test whether 3D points are inside a triangle mesh using raycasting
 
 <b>Declaration:</b><br>
 <pre>
-arma::u32_vec quadriga_lib::point_inside_mesh(
+arma::uvec quadriga_lib::point_inside_mesh(
     const arma::Mat&lt;dtype&gt; *points,
     const arma::Mat&lt;dtype&gt; *mesh,
-    const arma::u32_vec *obj_ind = nullptr,
+    const arma::uvec *obj_ind = nullptr,
     dtype distance = 0.0);
 </pre>
 
@@ -4665,13 +4707,13 @@ arma::u32_vec quadriga_lib::point_inside_mesh(
 <ul>
 <li><b><code>points</code></b> — 3D coordinates of test points; <code>[n_points, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle faces in row-major vertex format  <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>obj_ind</code></b> <i>(optional)</i> — 1-based object index per mesh element; enables per-object output; <code>[n_mesh]</code></li>
+<li><b><code>obj_ind</code></b> <i>(optional)</i> — 0-based object index per mesh element; enables per-object output; <code>[n_mesh]</code></li>
 <li><b><code>distance</code></b> <i>(optional)</i> — Surface proximity threshold; points within this distance of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m (default: 0)</li>
 </ul>
 
 <b>Returns:</b><br>
 <ul>
-<li><code>arma::u32_vec</code>, size <code>[n_points]</code>; <code>0</code> = outside, <code>1</code> = inside any object (no <code>obj_ind</code>), or 1-based object index (with <code>obj_ind</code>)</li>
+<li><code>arma::uvec</code>, size <code>[n_points]</code>; <code>0</code> = outside, <code>1</code> = inside any object (no <code>obj_ind</code>), or 1-based object index (with <code>obj_ind</code>)</li>
 </ul>
 
 <b>See also:</b><br>

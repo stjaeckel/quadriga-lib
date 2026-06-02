@@ -1,7 +1,7 @@
 ---
-title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.7"
+title: "MATLAB / Octave API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "01.06.2026"
+date: "02.06.2026"
 lang: en-US
 ---
 
@@ -2147,7 +2147,7 @@ result = quadriga_lib.point_inside_mesh( points, mesh, obj_ind, distance );
 - **`points`** — 3D coordinates of test points; `[n_points, 3]`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
 - **`obj_ind`** — Object index per mesh element; enables per-object output; `[n_mesh]`
-- **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are 
+- **`distance`** — Surface proximity threshold; points within this distance of the mesh surface are
   classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1); range: 0–20 m; Default: 0
 
 ### Output:

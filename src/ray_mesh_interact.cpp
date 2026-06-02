@@ -816,12 +816,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        // Scalar (acoustic) transmission is a partition model: the through-wall gain is the calibrated
-        // isolation (att / coincidence / mass / alpha, already in 'gain'), not the refracted-wave Fresnel
-        // 1-|R|^2 — which for eps<1 imposes a spurious critical-angle total reflection that kills oblique
-        // transmission. Force a pass-through so the measured isolation propagates at all angles.
-        // EM transmission keeps the dense->light false-amplification clamp.
-        if (geometry_type == 1 && (is_scalar || dense_to_light))
+        // Scalar (acoustic) transmission partition: pass-through is only needed when entering a rarer
+        // medium (eps2 < eps1, i.e. dense_to_light), where the refracted-wave Fresnel 1-|R|^2 would impose
+        // a spurious critical-angle total reflection that kills oblique transmission. Entering an
+        // equal-or-denser medium (eps2 >= eps1, e.g. an eps>1 absorber face) has no TIR, so the
+        // energy-conserving split above (refraction_gain = 1 - reflection_gain) stands and the transmitted
+        // ray carries (1-|R|^2). EM transmission keeps the dense->light clamp (condition unchanged for EM).
+        if (geometry_type == 1 && dense_to_light)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type

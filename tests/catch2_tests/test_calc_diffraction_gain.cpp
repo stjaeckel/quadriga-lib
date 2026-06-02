@@ -310,9 +310,9 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
                       {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
                       {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
 
-    // ε_r = 2 (EM path keeps a Fresnel boundary reflection) + att = 6 dB isolation.
-    // Under the partition model 'att' is the only through-wall loss on the scalar path; the
-    // EM path additionally loses (1 - |R(θ)|²) at the boundary.
+    // ε_r = 2 (light->dense boundary) + att = 6 dB isolation. With the energy-conserving partition the
+    // scalar path now carries the same Fresnel boundary loss (1 - |R_TE(θ)|²) as EM on a light->dense
+    // crossing — no longer pure pass-through. Only eps<1 (dense->light) stays pass-through.
     arma::mat mtl_prop = {{2.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0}}; // col 4 = att
     mtl_prop = repmat(mtl_prop, 12, 1);
     arma::uvec mtl_ind;
@@ -337,16 +337,21 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
     quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
                                                 &g_sc_o, nullptr, 0, nullptr, 0, 0, true);
 
-    // Scalar transmission is pure pass-through scaled by the calibrated isolation only:
-    // gain = 10^(-att/10) at every angle, no Fresnel boundary loss, no angle dependence.
-    double att_lin = std::pow(10.0, -0.6); // -6 dB
-    CHECK(std::abs(g_sc_n(0) - att_lin) < 1e-9);
-    CHECK(std::abs(g_sc_o(0) - att_lin) < 1e-9);
-    CHECK(std::abs(g_sc_n(0) - g_sc_o(0)) < 1e-12); // angle-independent
+    // Scalar transmission conserves energy on light->dense: gain = att_lin*(1 - |R_TE(θ)|²),
+    // angle-dependent, and equal to EM at normal incidence (TE == TM there).
+    double att_lin = std::pow(10.0, -0.6); // -6 dB isolation
+    double s = std::sqrt(2.0);             // sqrt(eps_r)
+    double R0 = (1.0 - s) / (1.0 + s);     // normal-incidence reflection coefficient
+    double g_expect_n = att_lin * (1.0 - R0 * R0);
 
-    // EM carries the same isolation plus the Fresnel boundary loss (1 - |R(θ)|²), so it sits
-    // below the scalar value and gets more lossy at oblique incidence.
+    CHECK(std::abs(g_sc_n(0) - g_expect_n) < 1e-9); // exact at normal incidence
+    CHECK(std::abs(g_sc_n(0) - g_em_n(0)) < 1e-9);  // scalar == EM at normal (TE == TM)
+    CHECK(g_sc_o(0) > 0.0);
+    CHECK(g_sc_o(0) < g_sc_n(0)); // more reflection at oblique -> less transmission
+
+    // EM also loses more toward oblique; at oblique it transmits slightly more than scalar because the
+    // TM component reflects less than TE (only TE enters the scalar coefficient).
     CHECK(g_em_n(0) > 0.0);
-    CHECK(g_em_n(0) < g_sc_n(0));
     CHECK(g_em_o(0) < g_em_n(0));
+    CHECK(g_em_o(0) > g_sc_o(0));
 }

@@ -1,7 +1,7 @@
 ---
-title: "Python API Documentation for Quadriga-Lib v0.11.7"
+title: "Python API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "01.06.2026"
+date: "02.06.2026"
 lang: en-US
 ---
 
@@ -2350,7 +2350,7 @@ Test whether 3D points are inside a triangle mesh using raycasting
 - A point is inside if any ray hits a face with a negative incidence angle, or if the ray
   thickness at FBS is below 1 mm (surface proximity)
 - Mesh must be watertight with all normals pointing outward
-- If `obj_ind` is provided, returns the 1-based enclosing object index instead of binary 0/1
+- If `obj_ind` is provided (0-based), returns the enclosing object as a 1-based index (so 0 stays reserved for "outside")
 
 ### Usage:
 ```
@@ -2360,7 +2360,7 @@ result = quadriga_lib.RTtools.point_inside_mesh( points, mesh, obj_ind, distance
 ### Input Arguments:
 - **`points`** — 3D coordinates of test points; `(n_points, 3)`
 - **`mesh`** — Triangle faces in row-major vertex format `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `(n_mesh, 9)`
-- **`obj_ind`** *(optional)* — 1-based object index per mesh element; enables per-object output; `(n_mesh,)`
+- **`obj_ind`** *(optional)* — 0-based object index per mesh element; enables per-object output; `(n_mesh,)`
 - **`distance`** *(optional)* — Surface proximity threshold; points within this distance
   of the mesh surface are classified as inside; increases ray count to 4 + N_icosphere(⌈distance⌉ + 1);
   range: 0–20 m; Default: 0
