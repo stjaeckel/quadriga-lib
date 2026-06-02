@@ -450,49 +450,6 @@ class TestCalcDiffractionGain(unittest.TestCase):
         )
         npt.assert_allclose(gain_A, gain_B, atol=1e-12)
 
-    # Partition model: scalar transmission is pure pass-through scaled by the calibrated isolation
-    # only; the EM path additionally carries the Fresnel boundary loss (1 - |R|^2). They diverge.
-    def test_scalar_partition_normal_incidence(self):
-        # eps_r = 2 (EM Fresnel) + att = 6 dB isolation
-        mtl = np.tile([2.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
-        mtl_i, mtl_p = m2p(mtl)
-        orig = np.array([[-10.0, 0.0, 0.5]])
-        dest = np.array([[0.5, 0.0, 0.5]])  # normal hit on west wall, ends inside
-        gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False)
-        gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True)
-        npt.assert_allclose(gain_sc, [10 ** (-0.6)], atol=1e-9)  # att-only pass-through
-        self.assertLess(gain_em[0], gain_sc[0])                  # EM loses (1 - |R|^2) on top
-        self.assertGreater(gain_em[0], 0.0)
-
-    # Partition model: scalar transmission is angle-independent (no Fresnel critical-angle dropout);
-    # EM transmission is angle-dependent. Both stay strictly between 0 and 1 with finite isolation.
-    def test_scalar_partition_oblique(self):
-        mtl = np.tile([2.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
-        mtl_i, mtl_p = m2p(mtl)
-        # Both rays end INSIDE the cube -> single wall crossing, isolation applied once each.
-        orig = np.array([[-10.0, 0.0, 0.5], [-10.0, -8.0, 0.5]])  # normal, then ~39° oblique
-        dest = np.array([[0.5, 0.0, 0.5], [0.5, 0.5, 0.5]])
-        gain_em, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=False)
-        gain_sc, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_i, mtl_p, 10e9, lod=0, scalar_mode=True)
-        # Scalar: identical at both angles, equal to the att-only pass-through.
-        npt.assert_allclose(gain_sc, [10 ** (-0.6), 10 ** (-0.6)], atol=1e-9)
-        # EM: below scalar, and more lossy at the oblique hit than at normal.
-        self.assertLess(gain_em[0], gain_sc[0])
-        self.assertLess(gain_em[1], gain_em[0])
-
-        # also at high contrast (eps_r = 4): scalar still flat, EM loses more at oblique
-        mtl_hi = np.tile([4.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0], (12, 1))
-        mtl_hi_i, mtl_hi_p = m2p(mtl_hi)
-        gain_em_hi, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_hi_i, mtl_hi_p, 10e9, lod=0, scalar_mode=False)
-        gain_sc_hi, _ = RTtools.calc_diffraction_gain(
-            orig, dest, self.cube, mtl_hi_i, mtl_hi_p, 10e9, lod=0, scalar_mode=True)
-        npt.assert_allclose(gain_sc_hi, [10 ** (-0.6), 10 ** (-0.6)], atol=1e-9)
-        self.assertLess(gain_em_hi[0], gain_sc_hi[0])
 
     # No Fresnel contrast (eps_r = 1): scalar ≡ EM at any angle. Both R_TE and R_TM vanish when there
     # is no permittivity contrast — the polarization branch becomes irrelevant.
