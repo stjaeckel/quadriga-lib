@@ -58,6 +58,16 @@ using Catch::Approx; // so the bare `Approx(...)` calls compile unchanged
 //      between the two engines, and it is the test that catches any disagreement on the single
 //      dense->light crossing every slab has — EM agrees regardless (both override the exit),
 //      scalar agrees only if transition_gain_linear's guard matches ray_mesh_interact's gating.
+//
+//   7. Embedded-material transition (the calc_diffraction_gain virtual i-i path) — a panel or
+//      volume sitting inside another medium (a window in a wall, a duct through a slab, a cabinet
+//      in a room) crosses a material-to-material boundary routed through transition_gain_linear,
+//      the one gain path that plain wall crossings bypass (those go through ray_mesh_interact's
+//      interaction_gain). The partition model requires this crossing to be pure pass-through scaled
+//      by the entered material's isolation only, with no permittivity dependence; otherwise an
+//      inner medium with eps < 1 reintroduces a spurious critical-angle cutoff that silently kills
+//      oblique transmission through embedded elements. Verified by holding att fixed and varying
+//      only the inner permittivity: the scalar transmission must not move.
 
 // Speed of light and a fixed speed of sound used for the acoustic frequency mapping.
 // c_sound = 342.77 m/s reproduces the format_materials.md constant (c_light/c_sound ~= 874636),
@@ -475,10 +485,14 @@ TEST_CASE("Acoustic - Convergence away from resonance and coincidence")
 // A ray passing through a slab pays entry + exit interface losses and the in-medium traversal.
 // calc_diffraction_gain does the same for a bundle of rays on the Fresnel arc. If the slab is large
 // enough to fully obstruct the bundle (no edge diffraction) and thin/flat (all rays ~normal, same
-// thickness), both methods must yield the same pass-through gain. This also validates that the two
-// reflection paths agree on the single dense->light crossing every slab has: EM passes regardless
-// (both override the exit), scalar passes only if transition_gain_linear has the `|| scalar_mode`
-// guard matching ray_mesh_interact's gated override.
+// thickness), both methods must yield the same pass-through gain.
+//
+// This also validates that both methods agree on the single dense->light crossing every slab
+// has. The exit override lives in ray_mesh_interact (gated on is_scalar || dense_to_light): the
+// diffraction path takes the exit gain from interaction_gain at the i-o crossing (NT == 0), not
+// from transition_gain_linear. transition_gain_linear is reached only on virtual i-i transitions
+// (overlapping/embedded mesh), which a lone slab does not produce — so this case does not cover it.
+
 TEST_CASE("Acoustic - Pass-through calibration: ray_mesh_interact vs calc_diffraction_gain")
 {
     double t = 0.1;  // slab thickness [m] (thin)
@@ -545,4 +559,54 @@ TEST_CASE("Acoustic - Pass-through calibration: ray_mesh_interact vs calc_diffra
         INFO("mode " << (scalar ? "scalar" : "EM") << ": rmi=" << dB_rmi << " dB, diff=" << dB_diff << " dB");
         CHECK(std::abs(dB_rmi - dB_diff) < 0.02);
     }
+}
+
+TEST_CASE("Acoustic - Overlapping-material transition is pass-through (calc_diffraction_gain, scalar)")
+{
+    // Cube B pokes through the east wall of cube A, different materials. A scalar ray along +x:
+    //   x=-1   enter A         (o-i, state -> A)
+    //   x=0.4  enter B in A    (o-i while inside A -> buffer NT = B; transition itself ignored)
+    //   x=1    exit A's wall    (i-o with NT = B, A != B -> virtual A->B via transition_gain_linear)
+    //   x=1.2  exit B           (i-o, NT = 0 -> interaction_gain, scalar pass-through)
+    // The A->B crossing at x=1 is the only place the overlapping material's permittivity 'a' can
+    // enter the gain. Under the partition model it must NOT — the crossing is pass-through scaled by
+    // the entered material's isolation (att) only. So holding att fixed and changing only B's 'a'
+    // must leave the scalar gain unchanged. Before the partition fix this FAILS: 'a' drives
+    // |R(A->B)|^2 and hence the gain.
+
+    arma::mat A = make_cube();             // material 0, spans +/-1
+    arma::mat B = make_cube() * 0.4;       // side 0.8
+    for (arma::uword c = 0; c < 9; c += 3) // shift B +0.8 in x: spans x in [0.4, 1.2], y,z in [-0.4, 0.4]
+        B.col(c) += 0.8;
+    arma::mat mesh = arma::join_vert(A, B); // 24 faces; B interpenetrates A's east wall
+
+    arma::uvec mtl_ind(24);
+    mtl_ind.head(12).zeros(); // A faces -> material 0
+    mtl_ind.tail(12).ones();  // B faces -> material 1
+
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+
+    // Ray ends past both cubes (x=1.5) so the buffered A->B transition is consumed at x=1.
+    arma::mat orig = {{-10.0, 0.15, 0.1}};
+    arma::mat dest = {{1.5, 0.15, 0.1}};
+
+    auto run_overlap_eps = [&](double a_B)
+    {
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        mtl["a"] = {4.0, a_B};   // A: dense (eps = 4); B: lighter, variable -> A->B is dense->light
+        mtl["att"] = {0.0, 6.0}; // isolation only on B
+        mtl["fRef"] = {fRef_GHz, fRef_GHz};
+
+        arma::vec gain;
+        quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &mesh, &mtl_ind, &mtl,
+                                                    ac2rf(4000.0), 0, &gain, nullptr, 0, nullptr, 0, 0, true);
+        return gain(0);
+    };
+
+    double g_eps4 = run_overlap_eps(4.0);   // strong permittivity contrast at the A->B crossing
+    double g_eps1p2 = run_overlap_eps(1.2); // weak contrast
+
+    // Partition invariant: B's permittivity must not change the scalar transmission.
+    CHECK(g_eps4 == Approx(g_eps1p2).epsilon(1e-9));
+    CHECK(g_eps4 > 0.0);
 }

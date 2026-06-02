@@ -816,11 +816,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        // Special Case: Transmission from a dense medium (such as glass) to a light medium (e.g. air)
-        // Transmission mode assumed no change of direction (unlike refraction) and no total reflection is possible.
-        // This may violate the conservation of energy principle (e.g. cause false amplification).
-        // To obtain meaningful results, we ignore the losses in this case.
-        if (geometry_type == 1 && dense_to_light && !is_scalar)
+        // Scalar (acoustic) transmission is a partition model: the through-wall gain is the calibrated
+        // isolation (att / coincidence / mass / alpha, already in 'gain'), not the refracted-wave Fresnel
+        // 1-|R|^2 — which for eps<1 imposes a spurious critical-angle total reflection that kills oblique
+        // transmission. Force a pass-through so the measured isolation propagates at all angles.
+        // EM transmission keeps the dense->light false-amplification clamp.
+        if (geometry_type == 1 && (is_scalar || dense_to_light))
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type

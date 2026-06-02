@@ -310,36 +310,43 @@ TEST_CASE("Calc Diffraction Gain - Scalar mode")
                       {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
                       {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
 
-    // ε_r = 2 → non-trivial reflection contrast
-    arma::mat mtl_prop = {{2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    // ε_r = 2 (EM path keeps a Fresnel boundary reflection) + att = 6 dB isolation.
+    // Under the partition model 'att' is the only through-wall loss on the scalar path; the
+    // EM path additionally loses (1 - |R(θ)|²) at the boundary.
+    arma::mat mtl_prop = {{2.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 1.0}}; // col 4 = att
     mtl_prop = repmat(mtl_prop, 12, 1);
     arma::uvec mtl_ind;
     std::unordered_map<std::string, std::vector<double>> mtl_map;
     mtl_matrix_to_map(mtl_prop, mtl_ind, mtl_map);
 
-    arma::vec gain_em, gain_scalar;
+    arma::vec g_em_n, g_sc_n, g_em_o, g_sc_o;
 
-    // --- Normal incidence: ray along +x axis ---
+    // Normal incidence: dest INSIDE the cube -> single wall crossing
     arma::mat orig = {{-10.0, 0.0, 0.5}};
     arma::mat dest = {{0.5, 0.0, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
-                                                &gain_em, nullptr, 0, nullptr, 0, 0, false);
+                                                &g_em_n, nullptr, 0, nullptr, 0, 0, false);
     quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
-                                                &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
-    CHECK(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-12));
+                                                &g_sc_n, nullptr, 0, nullptr, 0, 0, true);
 
-    // --- Oblique incidence: ray hits west wall at ~23° off-normal ---
-    orig = {{-3.0, 0.0, 0.5}};
-    dest = {{0.5, 1.5, 0.5}};
+    // Oblique incidence (~39° off normal at the west wall): dest still INSIDE -> single crossing
+    orig = {{-10.0, -8.0, 0.5}};
+    dest = {{0.5, 0.5, 0.5}};
     quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
-                                                &gain_em, nullptr, 0, nullptr, 0, 0, false);
+                                                &g_em_o, nullptr, 0, nullptr, 0, 0, false);
     quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &cube, &mtl_ind, &mtl_map, 10.0e9, 0,
-                                                &gain_scalar, nullptr, 0, nullptr, 0, 0, true);
-    // Scalar uses |R_TE|²; EM uses ½(|R_TE|² + |R_TM|²). These differ at oblique hits.
-    CHECK_FALSE(arma::approx_equal(gain_em, gain_scalar, "absdiff", 1e-4));
-    // Sanity
-    CHECK(gain_em(0) > 0.0);
-    CHECK(gain_em(0) < 1.0);
-    CHECK(gain_scalar(0) > 0.0);
-    CHECK(gain_scalar(0) < 1.0);
+                                                &g_sc_o, nullptr, 0, nullptr, 0, 0, true);
+
+    // Scalar transmission is pure pass-through scaled by the calibrated isolation only:
+    // gain = 10^(-att/10) at every angle, no Fresnel boundary loss, no angle dependence.
+    double att_lin = std::pow(10.0, -0.6); // -6 dB
+    CHECK(std::abs(g_sc_n(0) - att_lin) < 1e-9);
+    CHECK(std::abs(g_sc_o(0) - att_lin) < 1e-9);
+    CHECK(std::abs(g_sc_n(0) - g_sc_o(0)) < 1e-12); // angle-independent
+
+    // EM carries the same isolation plus the Fresnel boundary loss (1 - |R(θ)|²), so it sits
+    // below the scalar value and gets more lossy at oblique incidence.
+    CHECK(g_em_n(0) > 0.0);
+    CHECK(g_em_n(0) < g_sc_n(0));
+    CHECK(g_em_o(0) < g_em_n(0));
 }

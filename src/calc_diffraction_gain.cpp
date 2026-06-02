@@ -137,7 +137,11 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     bool dense_to_light = std::real(eta1) > std::real(eta2);
 
     double reflection_gain = 0.0;
-    if (!dense_to_light || scalar_mode) // scalar always conserves energy, even dense->light
+    // Partition model: scalar (acoustic) transmission is pure pass-through — the through-wall
+    // isolation lives entirely in 'transition_gain' (att / coincidence / mass / alpha), not in a
+    // Fresnel 1-|R|^2 term. Only EM light->dense incurs a boundary reflection loss; EM dense->light
+    // keeps the false-amplification clamp. Matches ray_mesh_interact's transmission branch.
+    if (!dense_to_light && !scalar_mode)
     {
         std::complex<double> eta1_div_eta2 = eta1 / eta2;
         std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
@@ -145,14 +149,9 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
         eta2 = std::sqrt(eta2);
         std::complex<double> R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) /
                                      (eta1 * abs_cos_theta + eta2 * cos_theta2);
-        if (scalar_mode)
-            reflection_gain = std::norm(R_eTE);
-        else
-        {
-            std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
-                                         (eta2 * abs_cos_theta + eta1 * cos_theta2);
-            reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
-        }
+        std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
+                                     (eta2 * abs_cos_theta + eta1 * cos_theta2);
+        reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
     }
     return dtype(transition_gain * (1.0 - reflection_gain));
 }
