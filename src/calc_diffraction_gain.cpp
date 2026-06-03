@@ -134,14 +134,14 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz) +
                                 eta_resonance(kS_resF, kS_resQ, kS_resS, (double)fGHz);
 
-    bool dense_to_light = std::real(eta1) > std::real(eta2);
+    bool force_passthrough = partition_passthrough(scalar_mode, eta1, eta2);
 
     double reflection_gain = 0.0;
     // Partition model: scalar (acoustic) transmission is pure pass-through — the through-wall
     // isolation lives entirely in 'transition_gain' (att / coincidence / mass / alpha), not in a
     // Fresnel 1-|R|^2 term. Only EM light->dense incurs a boundary reflection loss; EM dense->light
     // keeps the false-amplification clamp. Matches ray_mesh_interact's transmission branch.
-    if (!dense_to_light && !scalar_mode)
+    if (!force_passthrough)
     {
         std::complex<double> eta1_div_eta2 = eta1 / eta2;
         std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
