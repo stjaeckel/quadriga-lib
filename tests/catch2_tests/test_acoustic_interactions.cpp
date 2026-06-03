@@ -561,52 +561,128 @@ TEST_CASE("Acoustic - Pass-through calibration: ray_mesh_interact vs calc_diffra
     }
 }
 
-TEST_CASE("Acoustic - Overlapping-material transition is pass-through (calc_diffraction_gain, scalar)")
+TEST_CASE("Acoustic - Interpenetrating material's isolation is counted exactly once")
 {
-    // Cube B pokes through the east wall of cube A, different materials. A scalar ray along +x:
-    //   x=-1   enter A         (o-i, state -> A)
-    //   x=0.4  enter B in A    (o-i while inside A -> buffer NT = B; transition itself ignored)
-    //   x=1    exit A's wall    (i-o with NT = B, A != B -> virtual A->B via transition_gain_linear)
-    //   x=1.2  exit B           (i-o, NT = 0 -> interaction_gain, scalar pass-through)
-    // The A->B crossing at x=1 is the only place the overlapping material's permittivity 'a' can
-    // enter the gain. Under the partition model it must NOT — the crossing is pass-through scaled by
-    // the entered material's isolation (att) only. So holding att fixed and changing only B's 'a'
-    // must leave the scalar gain unchanged. Before the partition fix this FAILS: 'a' drives
-    // |R(A->B)|^2 and hence the gain.
-
-    arma::mat A = make_cube();             // material 0, spans +/-1
-    arma::mat B = make_cube() * 0.4;       // side 0.8
-    for (arma::uword c = 0; c < 9; c += 3) // shift B +0.8 in x: spans x in [0.4, 1.2], y,z in [-0.4, 0.4]
+    // B pokes through A's east wall. B shares A's permittivity, so every A/B boundary is zero-
+    // contrast and the partition is a pure no-op -- only B's through-wall 'att' can vary. A correct
+    // buffer/enter/exit state machine applies that att exactly once, so the gain scales as
+    // 10^(-att/10) and the ratio of two att settings equals the ratio of their linear isolations.
+    arma::mat A = make_cube();
+    arma::mat B = make_cube() * 0.4;
+    for (arma::uword c = 0; c < 9; c += 3)
         B.col(c) += 0.8;
-    arma::mat mesh = arma::join_vert(A, B); // 24 faces; B interpenetrates A's east wall
-
+    arma::mat mesh = arma::join_vert(A, B);
     arma::uvec mtl_ind(24);
-    mtl_ind.head(12).zeros(); // A faces -> material 0
-    mtl_ind.tail(12).ones();  // B faces -> material 1
-
+    mtl_ind.head(12).zeros();
+    mtl_ind.tail(12).ones();
     double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+    arma::mat orig = {{-10.0, 0.15, 0.1}}, dest = {{1.5, 0.15, 0.1}};
 
-    // Ray ends past both cubes (x=1.5) so the buffered A->B transition is consumed at x=1.
-    arma::mat orig = {{-10.0, 0.15, 0.1}};
-    arma::mat dest = {{1.5, 0.15, 0.1}};
-
-    auto run_overlap_eps = [&](double a_B)
+    auto run_att = [&](double att_B)
     {
         std::unordered_map<std::string, std::vector<double>> mtl;
-        mtl["a"] = {4.0, a_B};   // A: dense (eps = 4); B: lighter, variable -> A->B is dense->light
-        mtl["att"] = {0.0, 6.0}; // isolation only on B
+        mtl["a"] = {4.0, 4.0};     // zero contrast everywhere -> partition is a no-op
+        mtl["att"] = {0.0, att_B}; // isolation only on B
         mtl["fRef"] = {fRef_GHz, fRef_GHz};
-
         arma::vec gain;
         quadriga_lib::calc_diffraction_gain<double>(&orig, &dest, &mesh, &mtl_ind, &mtl,
                                                     ac2rf(4000.0), 0, &gain, nullptr, 0, nullptr, 0, 0, true);
         return gain(0);
     };
+    double g6 = run_att(6.0);
+    double g12 = run_att(12.0);
+    CHECK(g6 > 0.0);
+    CHECK(g6 / g12 == Approx(std::pow(10.0, 0.6)).epsilon(1e-6)); // 10^((12-6)/10)
+}
 
-    double g_eps4 = run_overlap_eps(4.0);   // strong permittivity contrast at the A->B crossing
-    double g_eps1p2 = run_overlap_eps(1.2); // weak contrast
+TEST_CASE("Acoustic - ray_mesh_interact and calc_diffraction_gain agree through a medium")
+{
+    // A single normal-incidence ray through a thin slab must give the same pass-through gain whether
+    // built from staged ray_mesh_interact calls (entry * exit) or from a single-ray (lod = 0)
+    // calc_diffraction_gain -- both share partition_passthrough and the same ray_offset bookkeeping.
+    //
+    // The exit call is chained from the origin the entry call EMITS (oA), not from a hand-picked
+    // offset: ray_mesh_interact already advances the ray by ray_offset into the medium and charges
+    // that stub of medium loss on entry, so starting the exit anywhere else double-counts (or skips)
+    // exactly that slice. Chaining via oA is what the real tracer does between segments, so the
+    // staged path totals alpha*thickness and matches the single-ray diffraction to numeric noise.
+    //
+    // Covers a dense absorber (eps > 1, faces conserve 1-|R|^2) and a light rigid reflector
+    // (eps < 1, faces pass through), each with non-zero att and alpha so a divergence in the
+    // permittivity partition, in att, or in the in-medium alpha loss trips the check.
 
-    // Partition invariant: B's permittivity must not change the scalar transmission.
-    CHECK(g_eps4 == Approx(g_eps1p2).epsilon(1e-9));
-    CHECK(g_eps4 > 0.0);
+    double t = 0.1, L = 20.0, d = 50.0; // thin slab, large face, distant endpoints (normal ray)
+    arma::mat slab = make_cube();
+    for (arma::uword c = 0; c < 9; ++c)
+        slab.col(c) *= (c % 3 == 0) ? (t / 2.0) : L;
+
+    double f_rf = ac2rf(4000.0);
+    double fRef_GHz = ac2rf(1000.0) / 1.0e9;
+
+    struct Case { const char *name; double a; double att; double alpha; };
+    std::vector<Case> cases = {
+        {"dense absorber", 4.0, 3.0, 20.0},  // eps > 1: front/back conserve
+        {"light reflector", 0.3, 12.0, 8.0}, // eps < 1: front/back pass through, att carries isolation
+    };
+
+    // Staged ray_mesh_interact (entry chained into exit) vs single-ray calc_diffraction_gain.
+    auto eval = [&](double a, double att, double alpha, double &g_rmi, double &g_diff, double &olen)
+    {
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl;
+        single_material({{"a", a}, {"att", att}, {"alpha", alpha}, {"fRef", fRef_GHz}}, mtl_ind, mtl);
+
+        // Entry: outside -> front face. Emits oA (continuation origin = front + ray_offset along the
+        // refracted direction) and dA (onward dest).
+        arma::mat origA = {{-d, 0.0, 0.0}}, destA = {{d, 0.0, 0.0}}, fbsA, sbsA, oA, dA;
+        arma::u32_vec fiA, siA;
+        arma::vec gA;
+        quadriga_lib::ray_triangle_intersect(&origA, &destA, &slab, &fbsA, &sbsA, NULL, &fiA, &siA);
+        quadriga_lib::ray_mesh_interact<double>(4, f_rf, &origA, &destA, &fbsA, &sbsA, &slab,
+                                                &mtl_ind, &mtl, &fiA, &siA, nullptr, nullptr, nullptr,
+                                                &oA, &dA, &gA);
+
+        // Exit: continue from the emitted origin (no hand-picked offset -> no double count).
+        arma::mat origB = oA, destB = dA, fbsB, sbsB, oB, dB_;
+        arma::u32_vec fiB, siB;
+        arma::vec gB, olenB;
+        quadriga_lib::ray_triangle_intersect(&origB, &destB, &slab, &fbsB, &sbsB, NULL, &fiB, &siB);
+        quadriga_lib::ray_mesh_interact<double>(4, f_rf, &origB, &destB, &fbsB, &sbsB, &slab,
+                                                &mtl_ind, &mtl, &fiB, &siB, nullptr, nullptr, nullptr,
+                                                &oB, &dB_, &gB, nullptr, nullptr, nullptr, &olenB);
+        g_rmi = gA(0) * gB(0);
+        olen = olenB(0); // ~ t: OF_length + ray_offset = (t - ray_offset) + ray_offset
+
+        // Single-ray diffraction (lod = 0) through the same slab.
+        arma::vec gD;
+        quadriga_lib::calc_diffraction_gain<double>(&origA, &destA, &slab, &mtl_ind, &mtl, f_rf,
+                                                    0, &gD, nullptr, 0, nullptr, 0, 0, true);
+        g_diff = gD(0);
+    };
+
+    for (const auto &C : cases)
+    {
+        INFO("case: " << C.name);
+
+        double g_rmi, g_diff, olen;
+        eval(C.a, C.att, C.alpha, g_rmi, g_diff, olen);
+        INFO("  rmi=" << g_rmi << "  diff=" << g_diff << "  olen=" << olen);
+
+        // (1) the two methods agree to numeric noise (partition + att + alpha all live)
+        CHECK(g_diff > 0.0);
+        CHECK(std::abs(10.0 * std::log10(g_diff / g_rmi)) < 1.0e-3);
+        CHECK(std::abs(olen - t) < 1e-3);
+
+        // (2) alpha is applied over the full thickness in BOTH methods: turning it off raises the
+        //     gain by exactly alpha * t [dB].
+        double g_rmi0, g_diff0, olen0;
+        eval(C.a, C.att, 0.0, g_rmi0, g_diff0, olen0);
+        CHECK(-10.0 * std::log10(g_diff / g_diff0) == Approx(C.alpha * t).epsilon(1e-3));
+        CHECK(-10.0 * std::log10(g_rmi / g_rmi0) == Approx(C.alpha * t).epsilon(1e-3));
+
+        // (3) att is live: with it on, the gain is strictly lower than the att-off reference.
+        double g_rmiN, g_diffN, olenN;
+        eval(C.a, 0.0, 0.0, g_rmiN, g_diffN, olenN);
+        CHECK(g_diff0 < g_diffN);
+    }
 }

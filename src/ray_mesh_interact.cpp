@@ -562,7 +562,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         eta1 += eta_resonance(kR_resF, kR_resQ, kR_resS, fGHz);
         eta2 += eta_resonance(kS_resF, kS_resQ, kS_resS, fGHz);
 
-        bool dense_to_light = std::real(eta1) > std::real(eta2);
+        bool force_passthrough = partition_passthrough(is_scalar, eta1, eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
         double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);  // Trigonometric identity
@@ -816,17 +816,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        // Scalar (acoustic) transmission: apply the energy-conserving Fresnel split (transmitted ray carries
-        // 1-|R|²) only when entering a genuinely dense medium — ε2 > 1, a real impedance interface such as an
-        // absorber face — where reflection and transmission share one budget and there is no TIR. Otherwise
-        // force pass-through, leaving the through-wall gain as the calibrated isolation (att/coincidence/mass/
-        // alpha in 'gain') alone. Pass-through (ε2 <= 1) covers both the rarer-medium entry (ε2 < 1), where the
-        // refracted-wave Fresnel would impose a spurious critical-angle dropout on oblique rays, and the exit of
-        // a rigid mirror into air (ε2 = 1, e.g. a concrete back face), where |R| ≈ 1 would otherwise null a
-        // transmission whose real TL is the separately-calibrated att/mass. Note eta2 holds √ε here (set by the
-        // std::sqrt above), so the test reads √ε2 <= 1, i.e. ε2 <= 1.
-        // EM transmission is unchanged: it keeps the dense->light false-amplification clamp (dense_to_light).
-        bool force_passthrough = is_scalar ? (std::real(eta2) <= 1.0) : dense_to_light;
         if (geometry_type == 1 && force_passthrough)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
