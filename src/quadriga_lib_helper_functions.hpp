@@ -182,17 +182,6 @@ static inline dtype interface_gain_impl(const std::unordered_map<std::string, st
     return (dtype)std::pow(10.0, -0.1 * A);
 }
 
-// Single source of truth for the transmission partition, decided purely from the two media.
-// Scalar (acoustic): conserve 1-|R|^2 at any interface between two real media (eps >= 1); pass
-// through only when an eps<1 rigid-wall proxy is involved (isolation lives in 'att' there).
-// EM: pass through dense->light (false-amplification clamp), reflect light->dense.
-static inline bool partition_passthrough(bool is_scalar, std::complex<double> eta1, std::complex<double> eta2)
-{
-    if (!is_scalar)
-        return std::real(eta1) > std::real(eta2);            // EM: dense->light
-    return std::min(std::real(eta1), std::real(eta2)) < 1.0; // scalar: eps<1 proxy only
-}
-
 // Calculate length
 template <typename dtype>
 static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
