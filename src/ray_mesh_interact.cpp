@@ -562,7 +562,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         eta1 += eta_resonance(kR_resF, kR_resQ, kR_resS, fGHz);
         eta2 += eta_resonance(kS_resF, kS_resQ, kS_resS, fGHz);
 
-        bool force_passthrough = partition_passthrough(is_scalar, eta1, eta2);
+        bool dense2light = std::real(eta1) > std::real(eta2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
         double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);  // Trigonometric identity
@@ -816,7 +816,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        if (geometry_type == 1 && force_passthrough)
+        if (geometry_type == 1 && dense2light)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type

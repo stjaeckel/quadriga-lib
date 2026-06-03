@@ -38,7 +38,7 @@ template <typename dtype>
 static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
                                            const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
                                            unsigned iMa, unsigned iMb, // 1-based face indices (0 = none)
-                                           dtype theta, dtype fGHz, bool scalar_mode)
+                                           dtype theta, dtype fGHz)
 {
     unsigned n_mesh = (unsigned)mtl_ind->n_elem;
     if (iMa > n_mesh || iMb > n_mesh) // Illegal state
@@ -134,14 +134,14 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz) +
                                 eta_resonance(kS_resF, kS_resQ, kS_resS, (double)fGHz);
 
-    bool force_passthrough = partition_passthrough(scalar_mode, eta1, eta2);
+    bool dense2light = std::real(eta1) > std::real(eta2);;
 
     double reflection_gain = 0.0;
     // Partition model: scalar (acoustic) transmission is pure pass-through — the through-wall
     // isolation lives entirely in 'transition_gain' (att / coincidence / mass / alpha), not in a
     // Fresnel 1-|R|^2 term. Only EM light->dense incurs a boundary reflection loss; EM dense->light
     // keeps the false-amplification clamp. Matches ray_mesh_interact's transmission branch.
-    if (!force_passthrough)
+    if (!dense2light)
     {
         std::complex<double> eta1_div_eta2 = eta1 / eta2;
         std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
@@ -501,7 +501,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                         {
                             dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
+                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
                             dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), dist, center_frequency);
                             p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
@@ -512,7 +512,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                     {
                         dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                         power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                        power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
+                        power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz);
                         p_ray_state[iG] = 0;       // Change state to outside
                         p_next_transition[iG] = 0; // Clear next transition buffer
                     }
@@ -582,7 +582,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                         else
                         {
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
+                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
                             p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                             p_next_transition[iG] = 0; // Clear next transition buffer
@@ -649,7 +649,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                         {
                             dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
+                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz);
                             dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
                             power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM1 - 1), dist, center_frequency);
                             p_ray_state[iG] = iM1; // Continue in M1
@@ -734,7 +734,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                                 else
                                 {
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
+                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
                                     p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                                     p_next_transition[iG] = 0; // Clear next transition buffer
@@ -765,7 +765,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                             {
                                 dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
                                 power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
+                                power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz);
                                 p_ray_state[iG] = 0;       // Change state to outside
                                 p_next_transition[iG] = 0; // Clear next transition buffer
                             }
@@ -788,7 +788,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                                 else // Add i-i transition
                                 {
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
+                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz);
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM1 - 1), ray_offset, center_frequency);
                                     p_ray_state[iG] = iM1; // Continue in M1
                                 }
@@ -804,7 +804,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                                 else
                                 {
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
+                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz);
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
                                     p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
                                     p_next_transition[iG] = 0; // Clear next transition buffer
@@ -832,7 +832,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                                 else // Add i-i transition
                                 {    // Somewhat fake, since FBS and SBS normals are not aligned
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM2, fbs_angleN.at(iH), fGHz, scalar_mode);
+                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM2, fbs_angleN.at(iH), fGHz);
                                     power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM2 - 1), ray_offset, center_frequency);
                                     p_ray_state[iG] = iM2;
                                 }
