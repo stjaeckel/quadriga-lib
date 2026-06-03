@@ -13,8 +13,6 @@
 #include <string>
 
 // Function to calculate the gain
-#ifndef calc_transition_gain_HELPER
-#define calc_transition_gain_HELPER
 static inline double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
                                           double incidence_angle_deg, // Angle between face normal and ray (as in ITU P.2040-1) (degree)
                                           double dist1,               // Medium 1 travel distance (meters)
@@ -72,7 +70,85 @@ static inline double calc_transition_gain(int interaction_type,       // (0) Ref
 
     return total_gain;
 }
-#endif
+
+// mu-aware reference Fresnel: an independent oracle for the e,f,g,h (permeability) path.
+// Mirrors calc_transition_gain but with the index ratio formed from eps*mu, the TE/scalar
+// quantity replaced by the admittance sqrt(eps/mu), and the in-medium loss driven by the
+// product eps*mu (= n^2). At mu = 1 it reduces exactly to calc_transition_gain.
+static inline double calc_transition_gain_mu(int interaction_type,
+                                             double incidence_angle_deg,
+                                             double dist1, double dist2,
+                                             std::complex<double> eta1, std::complex<double> eta2,
+                                             std::complex<double> mu1, std::complex<double> mu2)
+{
+    double deg2rad = arma::datum::pi / 180.0;
+    double cos_th = std::cos(incidence_angle_deg * deg2rad);
+    double sin_th = std::sqrt(1.0 - cos_th * cos_th);
+
+    std::complex<double> ratio = (eta1 * mu1) / (eta2 * mu2); // (n1/n2)^2
+    std::complex<double> cos_th2 = std::sqrt(1.0 - ratio * sin_th * sin_th);
+
+    // In-medium loss from Im(sqrt(eps*mu)) via the ITU attenuation distance (10 GHz test freq)
+    auto bulk_gain = [](std::complex<double> em, double dist)
+    {
+        double tan_delta = std::imag(em) / std::real(em);
+        double cos_delta = std::cos(std::atan(tan_delta));
+        double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+        Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(em)));
+        return std::pow(10.0, -0.1 * (8.686 * dist / Delta));
+    };
+    std::complex<double> em1 = eta1 * mu1;
+    std::complex<double> em2 = (interaction_type != 0) ? eta2 * mu2 : em1;
+    double medium_1_gain = bulk_gain(em1, dist1);
+    double medium_2_gain = bulk_gain(em2, dist2);
+
+    std::complex<double> Y1 = std::sqrt(eta1 / mu1); // TE/scalar admittance
+    std::complex<double> Y2 = std::sqrt(eta2 / mu2);
+
+    std::complex<double> R_te = (Y1 * cos_th - Y2 * cos_th2) / (Y1 * cos_th + Y2 * cos_th2);
+    std::complex<double> R_tm = (Y2 * cos_th - Y1 * cos_th2) / (Y2 * cos_th + Y1 * cos_th2);
+    std::complex<double> T_te = (2.0 * Y1 * cos_th) / (Y1 * cos_th + Y2 * cos_th2);
+    std::complex<double> T_tm = (2.0 * Y1 * cos_th) / (Y2 * cos_th + Y1 * cos_th2);
+
+    double reflection_gain = 0.5 * (std::norm(R_te) + std::norm(R_tm));
+    double refraction_gain = 0.5 * (std::norm(T_te) + std::norm(T_tm));
+
+    if (interaction_type == 0)
+        return medium_1_gain * reflection_gain * medium_2_gain;
+    else if (interaction_type == 1)
+        return medium_1_gain * (1.0 - reflection_gain) * medium_2_gain;
+    return medium_1_gain * refraction_gain * medium_2_gain; // interaction_type == 2
+}
+
+// Shared unit cube (same 12 faces every existing test redefines inline)
+static inline arma::mat make_cube()
+{
+    return arma::mat{{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
+                     {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
+                     {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
+                     {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
+                     {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
+                     {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
+                     {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
+                     {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
+                     {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
+                     {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
+                     {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
+                     {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
+}
+
+// Append constant permeability columns e,f,g,h to an existing material map (assumes a
+// uniform mu across the deduplicated materials, which is all the mu tests below need).
+template <typename dtype>
+static inline void set_mu(std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                          dtype e, dtype f, dtype g, dtype h)
+{
+    size_t nm = mtl_prop.at("a").size();
+    mtl_prop["e"] = std::vector<dtype>(nm, e);
+    mtl_prop["f"] = std::vector<dtype>(nm, f);
+    mtl_prop["g"] = std::vector<dtype>(nm, g);
+    mtl_prop["h"] = std::vector<dtype>(nm, h);
+}
 
 // Convert a per-face material matrix [n_face, 9] with columns
 // {a,b,c,d,att,attB,alpha,alphaB,fRef} into the new (mtl_ind, mtl_prop-map) pair.
@@ -980,4 +1056,223 @@ TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption")
 
     arma::vec U = {refl_gain * alpha_loss};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-9));
+}
+
+TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+
+    arma::mat orig = {{-1.5, 0.0, 0.0}};
+    arma::mat dest = {{0.0, 0.0, 1.5}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
+    arma::mat tridir = {{0.0, 45.0, 0.0, 45.0, 0.0, 45.0}};
+    tridir = tridir * deg2rad;
+
+    arma::mat mtl = {{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl = repmat(mtl, 12, 1);
+
+    arma::uvec ind0, ind1;
+    std::unordered_map<std::string, std::vector<double>> map0, map1;
+    mtl_matrix_to_map<double>(mtl, ind0, map0); // mu absent -> default
+    mtl_matrix_to_map<double>(mtl, ind1, map1);
+    set_mu<double>(map1, 1.0, 0.0, 0.0, 0.0); // mu explicitly 1
+
+    arma::mat o0, d0, x0, tv0, td0, o1, d1, x1, tv1, td1;
+    arma::vec g0, g1;
+
+    for (int it : {0, 1, 2}) // reflection, transmission, refraction
+    {
+        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind0, &map0, &fbs_ind, &sbs_ind,
+                                        &trivec, &tridir, (arma::vec *)nullptr, &o0, &d0, &g0, &x0, &tv0, &td0);
+        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
+                                        &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, &g1, &x1, &tv1, &td1);
+        CHECK(arma::approx_equal(g0, g1, "absdiff", 1e-12));
+        CHECK(arma::approx_equal(x0, x1, "absdiff", 1e-12)); // xprmat must be bit-stable too
+        CHECK(arma::approx_equal(d0, d1, "absdiff", 1e-12));
+        CHECK(arma::approx_equal(td0, td1, "absdiff", 1e-12));
+    }
+
+    // Anchor mu=1 to the oracle (single-eps reflection)
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, &g1, &x1, &tv1, &td1);
+    arma::vec U = {calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {1.5, 0.0}, {1.0, 0.0}, {1.0, 0.0})};
+    CHECK(arma::approx_equal(g1, U, "absdiff", 1e-9));
+}
+
+TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+
+    arma::mat orig = {{-1.5, 0.0, 0.0}};
+    arma::mat dest = {{0.0, 0.0, 1.5}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
+    arma::mat tridir = {{0.0, 45.0, 0.0, 45.0, 0.0, 45.0}};
+    tridir = tridir * deg2rad;
+
+    // A: eps=2, mu=3   B: eps=6, mu=1 (absent)   -> eps*mu = 6 for both (same index n)
+    arma::mat mtlA = {{2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    arma::mat mtlB = {{6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtlA = repmat(mtlA, 12, 1);
+    mtlB = repmat(mtlB, 12, 1);
+    arma::uvec indA, indB;
+    std::unordered_map<std::string, std::vector<double>> mapA, mapB;
+    mtl_matrix_to_map<double>(mtlA, indA, mapA);
+    set_mu<double>(mapA, 3.0, 0.0, 0.0, 0.0);
+    mtl_matrix_to_map<double>(mtlB, indB, mapB); // mu defaults to 1
+
+    arma::mat oA, dA, xA, tvA, tdA, oB, dB, xB, tvB, tdB;
+    arma::vec gA, gB;
+
+    // Refraction: identical n -> identical bending and path
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+    CHECK(arma::approx_equal(tdA, tdB, "absdiff", 1e-9));
+    CHECK(arma::approx_equal(dA, dB, "absdiff", 1e-9));
+
+    // Reflection: different admittance sqrt(eps/mu) -> different reflected power
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+    double refA = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {2.0, 0.0}, {1.0, 0.0}, {3.0, 0.0});
+    double refB = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {6.0, 0.0}, {1.0, 0.0}, {1.0, 0.0});
+    CHECK(std::abs(refA - refB) > 0.05); // the two genuinely differ
+    arma::vec UA = {refA}, UB = {refB};
+    CHECK(arma::approx_equal(gA, UA, "absdiff", 1e-9));
+    CHECK(arma::approx_equal(gB, UB, "absdiff", 1e-9));
+}
+
+TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium")
+{
+    arma::mat cube = make_cube();
+
+    // Normal incidence on the west wall
+    arma::mat orig = {{-2.0, 0.0, 0.5}};
+    arma::mat dest = {{2.0, 0.0, 0.5}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.01, 0.01, 0.0, -0.01, -0.01, 0.0, 0.01, 0.0}};
+    arma::mat tridir = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
+
+    arma::mat mtl = {{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl = repmat(mtl, 12, 1);
+
+    arma::uvec indM, indU;
+    std::unordered_map<std::string, std::vector<double>> mapM, mapU;
+    mtl_matrix_to_map<double>(mtl, indM, mapM);
+    set_mu<double>(mapM, 4.0, 0.0, 0.0, 0.0);   // matched: eps = mu = 4 -> admittance 1, n = 4
+    mtl_matrix_to_map<double>(mtl, indU, mapU); // unmatched: eps = 4, mu = 1 (pre-mu behavior)
+
+    arma::mat o, d, x, tv, td;
+    arma::vec g, U;
+
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    U = {0.0};
+    CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // matched -> no reflection
+
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    U = {1.0};
+    CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // matched -> full transmission
+
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indU, &mapU, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    U = {1.0 / 9.0};
+    CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // unmatched -> ((1-2)/(1+2))^2
+}
+
+TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant")
+{
+    // Swapping eps and mu preserves n = sqrt(eps*mu) and, at normal incidence, |R|, so the
+    // reflected power must be identical. Tripwire: if the Fresnel term reverts to sqrt(eps),
+    // A and B diverge.
+    arma::mat cube = make_cube();
+
+    arma::mat orig = {{-2.0, 0.0, 0.5}};
+    arma::mat dest = {{2.0, 0.0, 0.5}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.01, 0.01, 0.0, -0.01, -0.01, 0.0, 0.01, 0.0}};
+    arma::mat tridir = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
+
+    arma::mat mtlA = {{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    arma::mat mtlB = {{1.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtlA = repmat(mtlA, 12, 1);
+    mtlB = repmat(mtlB, 12, 1);
+    arma::uvec indA, indB;
+    std::unordered_map<std::string, std::vector<double>> mapA, mapB;
+    mtl_matrix_to_map<double>(mtlA, indA, mapA);
+    set_mu<double>(mapA, 1.7, 0.0, 0.0, 0.0); // A: eps=2.5, mu=1.7
+    mtl_matrix_to_map<double>(mtlB, indB, mapB);
+    set_mu<double>(mapB, 2.5, 0.0, 0.0, 0.0); // B: eps=1.7, mu=2.5 (swapped)
+
+    arma::mat oA, dA, xA, tvA, tdA, oB, dB, xB, tvB, tdB;
+    arma::vec gA, gB;
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+
+    CHECK(arma::approx_equal(gA, gB, "absdiff", 1e-10));
+    CHECK(gA(0) > 1e-6); // non-trivial reflection, so the equality is not vacuous
+}
+
+TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+
+    // Ray starts INSIDE and reflects off the east wall, so the in-medium path accrues loss.
+    // eps is real; all bulk loss lives in mu's imaginary part.
+    arma::mat orig = {{0.5, 0.1, 0.0}};
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
+    arma::mat tridir = {{45.0, 0.0, 45.0, 0.0, 45.0, 0.0}};
+    tridir = tridir * deg2rad;
+
+    // eps = 1.5 (real), mu = 1 - j*(17.98*0.003/10) at fRef = 1, exponents 0
+    arma::mat mtl = {{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl = repmat(mtl, 12, 1);
+    arma::uvec ind;
+    std::unordered_map<std::string, std::vector<double>> map;
+    mtl_matrix_to_map<double>(mtl, ind, map);
+    set_mu<double>(map, 1.0, 0.0, 0.003, 0.0);
+
+    arma::mat o, d, x, tv, td;
+    arma::vec g;
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind, &map, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+
+    std::complex<double> eta1(1.5, 0.0), eta2(1.0, 0.0);
+    std::complex<double> mu1(1.0, -17.98 * 0.003 / 10.0), mu2(1.0, 0.0);
+    double thickness = std::sqrt(0.5 * 0.5 + 0.5 * 0.5) + 0.001; // in-medium path + ray_offset
+
+    double full = calc_transition_gain_mu(0, 45.0, thickness, 0.0, eta1, eta2, mu1, mu2);
+    double refl_only = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, eta1, eta2, mu1, mu2);
+
+    arma::vec U = {full};
+    CHECK(arma::approx_equal(g, U, "absdiff", 1e-9));
+    CHECK(full < 0.7 * refl_only); // mu attenuates the path; this factor is exactly 1 if the
+                                   // loss feed reverts to eps (which is real here)
 }

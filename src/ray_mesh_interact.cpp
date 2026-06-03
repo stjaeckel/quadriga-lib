@@ -267,6 +267,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     // Resolve material columns once; nullptr -> per-column default applied in the ray loop
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
     const dtype *m_a = nullptr, *m_b = nullptr, *m_c = nullptr, *m_d = nullptr;
+    const dtype *m_e = nullptr, *m_f = nullptr, *m_g = nullptr, *m_h = nullptr;
     const dtype *m_alpha = nullptr, *m_alphaB = nullptr, *m_mass = nullptr, *m_fRef = nullptr;
     const dtype *m_resF = nullptr, *m_resQ = nullptr, *m_resS = nullptr;
     arma::uword n_mtl = 0;
@@ -277,6 +278,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         m_b = mtl_col(mtl_prop, "b");
         m_c = mtl_col(mtl_prop, "c");
         m_d = mtl_col(mtl_prop, "d");
+        m_e = mtl_col(mtl_prop, "e");
+        m_f = mtl_col(mtl_prop, "f");
+        m_g = mtl_col(mtl_prop, "g");
+        m_h = mtl_col(mtl_prop, "h");
         m_alpha = mtl_col(mtl_prop, "alpha");
         m_alphaB = mtl_col(mtl_prop, "alphaB");
         m_mass = mtl_col(mtl_prop, "m");
@@ -481,8 +486,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
         // Select the properties of the two materials
         double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0;     // medium 1: a, b, c, d
+        double kR5 = 1.0, kR6 = 0.0, kR7 = 0.0, kR8 = 0.0;     // medium 1: e, f, g, h (mu)
         double kR_alpha = 0.0, kR_alphaB = 0.0, kR_fRef = 1.0; // medium 1: alpha, alphaB, fRef
         double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0;     // medium 2: a, b, c, d
+        double kS5 = 1.0, kS6 = 0.0, kS7 = 0.0, kS8 = 0.0;     // medium 2: e, f, g, h (mu)
         double kS_alpha = 0.0, kS_alphaB = 0.0, kS_fRef = 1.0; // medium 2: alpha, alphaB, fRef
         double kR_mass = 0.0, kS_mass = 0.0;
         double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
@@ -495,6 +502,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kS2 = mtl_val(m_b, iMF, 0.0);
             kS3 = mtl_val(m_c, iMF, 0.0);
             kS4 = mtl_val(m_d, iMF, 0.0);
+            kS5 = mtl_val(m_e, iMF, 1.0);
+            kS6 = mtl_val(m_f, iMF, 0.0);
+            kS7 = mtl_val(m_g, iMF, 0.0);
+            kS8 = mtl_val(m_h, iMF, 0.0);
             kS_alpha = mtl_val(m_alpha, iMF, 0.0);
             kS_alphaB = mtl_val(m_alphaB, iMF, 0.0);
             kS_mass = mtl_val(m_mass, iMF, 0.0);
@@ -510,6 +521,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kR2 = mtl_val(m_b, iMF, 0.0);
             kR3 = mtl_val(m_c, iMF, 0.0);
             kR4 = mtl_val(m_d, iMF, 0.0);
+            kR5 = mtl_val(m_e, iMF, 1.0);
+            kR6 = mtl_val(m_f, iMF, 0.0);
+            kR7 = mtl_val(m_g, iMF, 0.0);
+            kR8 = mtl_val(m_h, iMF, 0.0);
             kR_alpha = mtl_val(m_alpha, iMF, 0.0);
             kR_alphaB = mtl_val(m_alphaB, iMF, 0.0);
             kR_mass = mtl_val(m_mass, iMF, 0.0);
@@ -527,6 +542,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kR2 = mtl_val(m_b, iMS, 0.0);
                 kR3 = mtl_val(m_c, iMS, 0.0);
                 kR4 = mtl_val(m_d, iMS, 0.0);
+                kR5 = mtl_val(m_e, iMS, 1.0);
+                kR6 = mtl_val(m_f, iMS, 0.0);
+                kR7 = mtl_val(m_g, iMS, 0.0);
+                kR8 = mtl_val(m_h, iMS, 0.0);
                 kR_alpha = mtl_val(m_alpha, iMS, 0.0);
                 kR_alphaB = mtl_val(m_alphaB, iMS, 0.0);
                 kR_mass = mtl_val(m_mass, iMS, 0.0);
@@ -541,6 +560,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kS2 = mtl_val(m_b, iMS, 0.0);
                 kS3 = mtl_val(m_c, iMS, 0.0);
                 kS4 = mtl_val(m_d, iMS, 0.0);
+                kS5 = mtl_val(m_e, iMS, 1.0);
+                kS6 = mtl_val(m_f, iMS, 0.0);
+                kS7 = mtl_val(m_g, iMS, 0.0);
+                kS8 = mtl_val(m_h, iMS, 0.0);
                 kS_alpha = mtl_val(m_alpha, iMS, 0.0);
                 kS_alphaB = mtl_val(m_alphaB, iMS, 0.0);
                 kS_mass = mtl_val(m_mass, iMS, 0.0);
@@ -555,6 +578,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Complex-valued relative permittivity, ITU-R P.2040-1 eq. (9b)
         std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, fGHz);
         std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, fGHz);
+        std::complex<double> mu1 = mu_from_coeffs(kR5, kR6, kR7, kR8, kR_fRef, fGHz);
+        std::complex<double> mu2 = mu_from_coeffs(kS5, kS6, kS7, kS8, kS_fRef, fGHz);
 
         // base permittivity for the in-medium loss (no resonance: keeps the real-sqrt loss well-posed)
         std::complex<double> eta1_med = eta1, eta2_med = eta2;
@@ -562,11 +587,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         eta1 += eta_resonance(kR_resF, kR_resQ, kR_resS, fGHz);
         eta2 += eta_resonance(kS_resF, kS_resQ, kS_resS, fGHz);
 
-        bool dense2light = std::real(eta1) > std::real(eta2);
+        bool dense2light = std::real(eta1 * mu1) > std::real(eta2 * mu2);
 
         // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
         double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);  // Trigonometric identity
-        std::complex<double> eta1_div_eta2 = eta1 / eta2;                   // Complex division
+        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);   // (n1/n2)^2 = eps*mu ratio
         double eta = std::sqrt(std::abs(eta1_div_eta2));                    // sgrt( abs( eta1 / eta2 ) )
         bool total_reflection = is_scalar ? false : eta * sin_theta >= 1.0; // Total reflection condition
 
@@ -759,12 +784,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (ray_starts_inside)
         {
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            double loss_dB = medium_loss_dB(eta1_med, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass);
+            double loss_dB = medium_loss_dB(eta1_med * mu1, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }
         if (geometry_type != 0)
         {
-            double loss_dB = medium_loss_dB(eta2_med, kS_alpha, kS_alphaB, kS_fRef, fGHz, ray_offset, kS_mass);
+            double loss_dB = medium_loss_dB(eta2_med * mu2, kS_alpha, kS_alphaB, kS_fRef, fGHz, ray_offset, kS_mass);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }
 
@@ -773,8 +798,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             gain *= transition_gain;
 
         // Calculate sqrt(eta1) and sqrt(eta2) needed for ITU-R P.2040-1, eq. (31) and (32)
-        eta1 = std::sqrt(eta1); // Complex square root
-        eta2 = std::sqrt(eta2); // Complex square root
+        eta1 = std::sqrt(eta1 / mu1); // TE/scalar admittance sqrt(eps/mu)
+        eta2 = std::sqrt(eta2 / mu2);
 
         // Calculate Reflection coefficients  ITU-R P.2040-1, eq. (31)
         std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;

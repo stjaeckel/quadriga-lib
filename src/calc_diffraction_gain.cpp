@@ -49,6 +49,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     const dtype *m_b = mtl_col(mtl_prop, "b");
     const dtype *m_c = mtl_col(mtl_prop, "c");
     const dtype *m_d = mtl_col(mtl_prop, "d");
+    const dtype *m_e = mtl_col(mtl_prop, "e");
+    const dtype *m_f = mtl_col(mtl_prop, "f");
+    const dtype *m_g = mtl_col(mtl_prop, "g");
+    const dtype *m_h = mtl_col(mtl_prop, "h");
     const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
     const dtype *m_resF = mtl_col(mtl_prop, "resF");
     const dtype *m_resQ = mtl_col(mtl_prop, "resQ");
@@ -68,7 +72,9 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
 
     // Defaults: air for both media
     double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0, kR_fRef = 1.0;
+    double kR5 = 1.0, kR6 = 0.0, kR7 = 0.0, kR8 = 0.0;
     double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0, kS_fRef = 1.0;
+    double kS5 = 1.0, kS6 = 0.0, kS7 = 0.0, kS8 = 0.0;
     double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
     double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
     double transition_gain = 1.0;
@@ -81,6 +87,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
             kS2 = mtl_val(m_b, mF, 0.0);
             kS3 = mtl_val(m_c, mF, 0.0);
             kS4 = mtl_val(m_d, mF, 0.0);
+            kS5 = mtl_val(m_e, mF, 1.0);
+            kS6 = mtl_val(m_f, mF, 0.0);
+            kS7 = mtl_val(m_g, mF, 0.0);
+            kS8 = mtl_val(m_h, mF, 0.0);
             kS_fRef = mtl_val(m_fRef, mF, 1.0);
             kS_resF = mtl_val(m_resF, mF, 0.0);
             kS_resQ = mtl_val(m_resQ, mF, 0.0);
@@ -93,6 +103,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
             kR2 = mtl_val(m_b, mF, 0.0);
             kR3 = mtl_val(m_c, mF, 0.0);
             kR4 = mtl_val(m_d, mF, 0.0);
+            kR5 = mtl_val(m_e, mF, 1.0);
+            kR6 = mtl_val(m_f, mF, 0.0);
+            kR7 = mtl_val(m_g, mF, 0.0);
+            kR8 = mtl_val(m_h, mF, 0.0);
             kR_fRef = mtl_val(m_fRef, mF, 1.0);
             kR_resF = mtl_val(m_resF, mF, 0.0);
             kR_resQ = mtl_val(m_resQ, mF, 0.0);
@@ -108,6 +122,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
             kR2 = mtl_val(m_b, mS, 0.0);
             kR3 = mtl_val(m_c, mS, 0.0);
             kR4 = mtl_val(m_d, mS, 0.0);
+            kR5 = mtl_val(m_e, mS, 1.0);
+            kR6 = mtl_val(m_f, mS, 0.0);
+            kR7 = mtl_val(m_g, mS, 0.0);
+            kR8 = mtl_val(m_h, mS, 0.0);
             kR_fRef = mtl_val(m_fRef, mS, 1.0);
             kR_resF = mtl_val(m_resF, mS, 0.0);
             kR_resQ = mtl_val(m_resQ, mS, 0.0);
@@ -119,6 +137,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
             kS2 = mtl_val(m_b, mS, 0.0);
             kS3 = mtl_val(m_c, mS, 0.0);
             kS4 = mtl_val(m_d, mS, 0.0);
+            kS5 = mtl_val(m_e, mS, 1.0);
+            kS6 = mtl_val(m_f, mS, 0.0);
+            kS7 = mtl_val(m_g, mS, 0.0);
+            kS8 = mtl_val(m_h, mS, 0.0);
             kS_fRef = mtl_val(m_fRef, mS, 1.0);
             kS_resF = mtl_val(m_resF, mS, 0.0);
             kS_resQ = mtl_val(m_resQ, mS, 0.0);
@@ -134,7 +156,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz) +
                                 eta_resonance(kS_resF, kS_resQ, kS_resS, (double)fGHz);
 
-    bool dense2light = std::real(eta1) > std::real(eta2);;
+    std::complex<double> mu1 = mu_from_coeffs(kR5, kR6, kR7, kR8, kR_fRef, (double)fGHz);
+    std::complex<double> mu2 = mu_from_coeffs(kS5, kS6, kS7, kS8, kS_fRef, (double)fGHz);
+
+    bool dense2light = std::real(eta1 * mu1) > std::real(eta2 * mu2);
 
     double reflection_gain = 0.0;
     // Partition model: scalar (acoustic) transmission is pure pass-through — the through-wall
@@ -143,10 +168,10 @@ static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
     // keeps the false-amplification clamp. Matches ray_mesh_interact's transmission branch.
     if (!dense2light)
     {
-        std::complex<double> eta1_div_eta2 = eta1 / eta2;
+        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
         std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
-        eta1 = std::sqrt(eta1);
-        eta2 = std::sqrt(eta2);
+        eta1 = std::sqrt(eta1 / mu1);
+        eta2 = std::sqrt(eta2 / mu2);
         std::complex<double> R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) /
                                      (eta1 * abs_cos_theta + eta2 * cos_theta2);
         std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
