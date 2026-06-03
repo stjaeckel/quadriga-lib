@@ -72,6 +72,17 @@ static inline std::complex<double> eta_from_coeffs(double a, double b, double c,
     return std::complex<double>(eta_r, eta_i);
 }
 
+// Relative permeability from mtl coefficients (mu = 1 when columns absent -> EM unchanged)
+static inline std::complex<double> mu_from_coeffs(double e, double f, double g, double h, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double f_rel = fGHz / fRef;
+    double mu_r = e * std::pow(f_rel, f);
+    double sigma_m = g * std::pow(f_rel, h);
+    return std::complex<double>(mu_r, -17.98 * sigma_m / fGHz);
+}
+
 // Permittivity resonance (acoustic): complex Lorentz pole added to the interface (Fresnel)
 // permittivity only. Inactive unless resF > 0, resQ > 0 and resS != 0, so the EM path is
 // unchanged. The +i denominator makes resS > 0 add loss (negative imaginary part), consistent
@@ -126,6 +137,10 @@ static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::
     const dtype *m_b = mtl_col(mtl_prop, "b");
     const dtype *m_c = mtl_col(mtl_prop, "c");
     const dtype *m_d = mtl_col(mtl_prop, "d");
+    const dtype *m_e = mtl_col(mtl_prop, "e");
+    const dtype *m_f = mtl_col(mtl_prop, "f");
+    const dtype *m_g = mtl_col(mtl_prop, "g");
+    const dtype *m_h = mtl_col(mtl_prop, "h");
     const dtype *m_alpha = mtl_col(mtl_prop, "alpha");
     const dtype *m_alphaB = mtl_col(mtl_prop, "alphaB");
     const dtype *m_mass = mtl_col(mtl_prop, "m");
@@ -135,7 +150,11 @@ static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::
                                                mtl_val(m_c, iM, 0.0), mtl_val(m_d, iM, 0.0),
                                                mtl_val(m_fRef, iM, 1.0), fGHz);
 
-    double A = medium_loss_dB(eta, mtl_val(m_alpha, iM, 0.0), mtl_val(m_alphaB, iM, 0.0),
+    std::complex<double> mu = mu_from_coeffs(mtl_val(m_e, iM, 1.0), mtl_val(m_f, iM, 0.0),
+                                             mtl_val(m_g, iM, 0.0), mtl_val(m_h, iM, 0.0),
+                                             mtl_val(m_fRef, iM, 1.0), fGHz);
+
+    double A = medium_loss_dB(eta * mu, mtl_val(m_alpha, iM, 0.0), mtl_val(m_alphaB, iM, 0.0),
                               mtl_val(m_fRef, iM, 1.0), fGHz, (double)dist, mtl_val(m_mass, iM, 0.0));
 
     return (dtype)std::pow(10.0, -0.1 * A);
