@@ -156,7 +156,7 @@ static inline double interface_loss_dB(double att, double attB,
         double x = coiQ * (fGHz - coiF) / coiF;
         loss += coiA / (1.0 + x * x);
     }
-    return (loss < 0.0) ? 0.0 : loss;
+    return loss;
 }
 
 // Lumped interface transmission gain for material index iM (the material being entered).
