@@ -123,7 +123,7 @@ import quadriga_lib
 
 <b>Channel generation functions</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
-  <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Calculate channel coefficients for spherical waves across multiple frequencies</td></tr>
+  <tr><td><a href="#get_channels_multifreq">get_channels_multifreq</a></td><td>Compute channel coefficients for spherical waves across multiple frequencies</td></tr>
   <tr><td><a href="#get_channels_planar">get_channels_planar</a></td><td>Calculate channel coefficients for planar waves</td></tr>
   <tr><td><a href="#get_channels_spherical">get_channels_spherical</a></td><td>Calculate channel coefficients from path data and antenna patterns</td></tr>
   <tr><td><a href="#get_ieee_indoor">get_ieee_indoor</a></td><td>Generate indoor MIMO channel realizations for IEEE TGn/TGac/TGax/TGah models</td></tr>
@@ -1554,171 +1554,64 @@ coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( \
 <hr class="greyline"><br>
 <span id="get_channels_multifreq" class="qd-func"><b>get_channels_multifreq</b></span><br>
 <hr class="thin">
-Calculate channel coefficients for spherical waves across multiple frequencies
-<br><br>
-<b>Description:</b><br>
+Compute channel coefficients for spherical waves across multiple frequencies
 <ul>
-<li>Extends <code>get_channels_spherical</code> to support frequency-dependent antenna patterns, path gains, and polarization transfer (Jones) matrices across multiple output frequencies.</li>
-<li><b>Geometry is computed once</b>: departure angles, arrival angles, element-resolved path delays, and LOS path detection are frequency-independent and reused for all output frequencies. This avoids redundant trigonometry and distance calculations.</li>
-<table class="md">
-<tr>
-  <td><li><b>Four frequency grids</b> are aligned by interpolation: 1.</td>
-  <td>TX array frequencies (defined by <code>center_freq</code> in the <code>ant_tx</code> dictionary) 2.</td>
-  <td>RX array frequencies (defined by <code>center_freq</code> in the <code>ant_rx</code> dictionary) 3.</td>
-  <td>Input sample frequencies (<code>freq_in</code>) at which <code>path_gain</code> and <code>M</code> are provided 4.</td>
-  <td>Target output frequencies (<code>freq_out</code>) at which coefficients and delays are returned</li></td>
-</tr>
-</table>
-<li>For each output frequency, TX and RX antenna patterns are interpolated from their respective multi-frequency entries using spherical interpolation (SLERP) with linear fallback, the same algorithm used in <code>arrayant_interpolate_multi</code>.</li>
-<li>Path gain is interpolated linearly across frequency. The Jones matrix <code>M</code> is interpolated using SLERP for each complex entry pair to preserve phase coherence.</li>
-<li><b>Extrapolation</b> is handled by clamping to the nearest available frequency entry in all four grids.</li>
-<li><b>Propagation speed</b> can be set to support both radio (speed of light, default) and acoustic (speed of sound, ~343 m/s) simulations. This affects wavelength, wave number, and delay calculations.</li>
-<li>The Jones matrix <code>M</code> supports two formats: 8 rows for full polarimetric (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH), or 2 rows for scalar pressure waves (ReVV, ImVV only), where VH, HV, and HH entries are implicitly zero.</li>
-<li>Antenna element coupling is applied using the coupling matrices from the antenna dictionary. If coupling varies with frequency, provide 3D coupling arrays <code>(n_elem, n_ports, n_freq)</code>.</li>
-<li>Antenna dictionaries accept both 3D patterns (single-frequency, clamped for all output frequencies) and 4D patterns (multi-frequency, 4th dimension = frequency).</li>
+<li>Multi-frequency extension of <a href="#get_channels_spherical">get_channels_spherical</a> with frequency-dependent antenna patterns, path gains, and Jones matrices</li>
+<li>Geometry (angles, element delays, LOS detection) is computed once and reused across all output frequencies</li>
+<li>Aligns four frequency grids: TX array (<code>ant_tx['center_freq']</code>), RX array (<code>ant_rx['center_freq']</code>), input samples (<code>freq_in</code>), and output (<code>freq_out</code>)</li>
+<li>Antenna pattern fields may be 3D (single-frequency, clamped for all output frequencies) or 4D (multi-frequency, 4th axis = frequency)</li>
+<li>TX/RX patterns are interpolated per output frequency via SLERP with linear fallback</li>
+<li><code>path_gain</code> is interpolated linearly; <code>M</code> is interpolated via SLERP per complex entry pair to preserve phase</li>
+<li>Coupling matrices are interpolated across frequencies (SLERP for complex pairs); pass 3D coupling <code>(n_elem, n_ports, n_freq)</code> for per-frequency coupling</li>
+<li>Extrapolation clamps to the nearest frequency entry on all four grids</li>
+<li><code>M</code> accepts 8 rows (full polarimetric: ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH) or 2 rows (scalar pressure: ReVV, ImVV only)</li>
+<li><code>propagation_speed</code> supports EM (speed of light, default) and acoustic (343 m/s) simulations</li>
+<li><code>n_path_out = n_path + 1</code> if <code>add_fake_los_path</code> else <code>n_path</code></li>
+<li><code>complex=True</code> returns one combined complex coefficient array <code>coeff</code>; <code>complex=False</code> (default) returns separate real <code>coeff_re</code> and <code>coeff_im</code> via a zero-copy fast path</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-from quadriga_lib import arrayant
-import numpy as np
+coeff_re, coeff_im, delay = quadriga_lib.arrayant.get_channels_multifreq( ant_tx, ant_rx, fbs_pos, \
+    lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, freq_in, \
+    freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
 
-coeff_re, coeff_im, delays = arrayant.get_channels_multifreq( ant_tx, ant_rx, \
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    freq_in, freq_out, use_absolute_delays, add_fake_los_path, propagation_speed )
+coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
 </pre>
 
-<b>Input Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<table class="md">
-<tr>
-  <td><li><b><code>ant_tx</code></b> (required)<br> Dictionary containing the transmit (TX) arrayant data. Pattern fields may be 3D (single-frequency) or 4D (multi-frequency, 4th dimension = frequency). The following keys are expected: <code>e_theta_re</code></td>
-  <td>e-theta field component, real part</td>
-  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code> <code>e_theta_im</code></td>
-  <td>e-theta field component, imaginary part</td>
-  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code> <code>e_phi_re</code></td>
-  <td>e-phi field component, real part</td>
-  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code> <code>e_phi_im</code></td>
-  <td>e-phi field component, imaginary part</td>
-  <td>Shape: <code>(n_el, n_az, n_elem)</code> or <code>(n_el, n_az, n_elem, n_freq)</code> <code>azimuth_grid</code></td>
-  <td>Azimuth angles in [rad], -pi to pi, sorted</td>
-  <td>Shape: <code>(n_azimuth)</code> <code>elevation_grid</code></td>
-  <td>Elevation angles in [rad], -pi/2 to pi/2, sorted</td>
-  <td>Shape: <code>(n_elevation)</code> <code>element_pos</code></td>
-  <td>Antenna element (x,y,z) positions, optional</td>
-  <td>Shape: <code>(3, n_elements)</code> <code>coupling_re</code></td>
-  <td>Coupling matrix, real part, optional</td>
-  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code> <code>coupling_im</code></td>
-  <td>Coupling matrix, imaginary part, optional</td>
-  <td>Shape: <code>(n_elem, n_ports)</code> or <code>(n_elem, n_ports, n_freq)</code> <code>center_freq</code></td>
-  <td>Center frequency in [Hz], optional</td>
-  <td>Scalar or 1D array <code>(n_freq)</code> <code>name</code></td>
-  <td>Name of the array antenna object, optional</td>
-  <td>String</li></td>
-</tr>
-</table>
-<li><b><code>ant_rx</code></b> (required)<br> Dictionary containing the receive (RX) arrayant data (same format as <code>ant_tx</code>).</li>
-<li><b><code>fbs_pos</code></b> (required)<br> First-bounce scatterer positions. For single-bounce models, identical to <code>lbs_pos</code>. Shape: <code>( 3, n_path )</code></li>
-<li><b><code>lbs_pos</code></b> (required)<br> Last-bounce scatterer positions. For single-bounce models, identical to <code>fbs_pos</code>. Shape: <code>( 3, n_path )</code></li>
-<li><b><code>path_gain</code></b> (required)<br> Path gain in linear scale. Each column corresponds to one input frequency. Shape: <code>( n_path, n_freq_in )</code></li>
-<li><b><code>path_length</code></b> (required)<br> Absolute path lengths from TX to RX phase center in meters. Shape: <code>( n_path )</code></li>
-<li><b><code>M</code></b> (required)<br> Polarization transfer matrix in interleaved complex format. Each slice along the 3rd dimension corresponds to one input frequency. Full polarimetric format uses 8 rows: (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH). Scalar pressure format uses 2 rows: (ReVV, ImVV), with VH, HV, and HH implicitly zero. Shape: <code>( 8, n_path, n_freq_in )</code> or <code>( 2, n_path, n_freq_in )</code></li>
-<li><b><code>tx_pos</code></b> (required)<br> Transmitter position in 3D Cartesian coordinates [m], Shape: <code>(3)</code></li>
-<li><b><code>tx_orientation</code></b> (required)<br> Transmitter antenna orientation in Euler angles (bank, tilt, heading) [rad], Shape: <code>(3)</code></li>
-<li><b><code>rx_pos</code></b> (required)<br> Receiver position in 3D Cartesian coordinates [m], Shape: <code>(3)</code></li>
-<li><b><code>rx_orientation</code></b> (required)<br> Receiver antenna orientation in Euler angles (bank, tilt, heading) [rad], Shape: <code>(3)</code></li>
-<li><b><code>freq_in</code></b> (required)<br> Input sample frequencies in [Hz] at which <code>path_gain</code> and <code>M</code> are defined. Shape: <code>( n_freq_in )</code></li>
-<li><b><code>freq_out</code></b> (required)<br> Target frequencies in [Hz] at which to compute output coefficients and delays. Shape: <code>( n_freq_out )</code></li>
-<li><b><code>use_absolute_delays</code></b> (optional)<br> If true, the LOS delay is included in all path delays. Default: <code>False</code>, i.e. delays are normalized so that the LOS path has zero delay.</li>
-<li><b><code>add_fake_los_path</code></b> (optional)<br> If true, adds a zero-power LOS path as the first path when no LOS path was detected. Default: <code>False</code></li>
-<li><b><code>propagation_speed</code></b> (optional)<br> Wave propagation speed in [m/s]. Default: <code>299792458.0</code> (speed of light for radio simulations). Set to ~<code>343.0</code> for acoustic simulations in air.</li>
+<li><b><code>ant_tx</code></b> — Multi-frequency TX arrayant dict; pattern fields 3D <code>(n_el, n_az, n_elem)</code> or 4D <code>(n_el, n_az, n_elem, n_freq)</code>; see <a href="#generate">generate</a></li>
+<li><b><code>ant_rx</code></b> — RX arrayant dict; same format as <code>ant_tx</code></li>
+<li><b><code>fbs_pos</code></b> — First-bounce scatterer positions; <code>(3, n_path)</code></li>
+<li><b><code>lbs_pos</code></b> — Last-bounce scatterer positions; <code>(3, n_path)</code></li>
+<li><b><code>path_gain</code></b> — Linear-scale path gains, one column per input frequency; <code>(n_path, n_freq_in)</code></li>
+<li><b><code>path_length</code></b> — Absolute TX-to-RX path lengths; <code>(n_path,)</code></li>
+<li><b><code>M</code></b> — Polarization transfer matrix, interleaved Re/Im; <code>(8, n_path, n_freq_in)</code> full pol (VV, VH, HV, HH) or <code>(2, n_path, n_freq_in)</code> scalar pressure (ReVV, ImVV only)</li>
+<li><b><code>tx_pos</code></b> — Transmitter position; <code>(3,)</code></li>
+<li><b><code>tx_orientation</code></b> — Transmitter orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
+<li><b><code>rx_pos</code></b> — Receiver position; <code>(3,)</code></li>
+<li><b><code>rx_orientation</code></b> — Receiver orientation as Euler angles (bank, tilt, heading); <code>(3,)</code></li>
+<li><b><code>freq_in</code></b> — Input sample frequencies for <code>path_gain</code> and <code>M</code>; <code>(n_freq_in,)</code></li>
+<li><b><code>freq_out</code></b> — Target output frequencies; <code>(n_freq_out,)</code></li>
+<li><b><code>use_absolute_delays</code></b> — If <code>True</code>, delays include the LOS component; default: <code>False</code></li>
+<li><b><code>add_fake_los_path</code></b> — If <code>True</code>, prepends a zero-power LOS path when none is present; default: <code>False</code></li>
+<li><b><code>propagation_speed</code></b> — Wave speed in m/s; use ~343.0 for acoustics; default: <code>299792458.0</code></li>
+<li><b><code>complex</code></b> — If <code>True</code>, combine coefficients into a single complex array <code>coeff</code>; if <code>False</code>, return separate <code>coeff_re</code> and <code>coeff_im</code>; default: <code>False</code></li>
 </ul>
 
-<b>Derived inputs:</b><br>
-<table class="md">
-<tr>
-  <td><code>n_freq_in</code></td>
-  <td>Number of input frequency samples (columns of <code>path_gain</code>, slices of <code>M</code>)</td>
-</tr>
-<tr>
-  <td><code>n_freq_out</code></td>
-  <td>Number of output frequency samples (length of <code>freq_out</code>)</td>
-</tr>
-<tr>
-  <td><code>n_path</code></td>
-  <td>Number of propagation paths (columns of <code>fbs_pos</code>)</td>
-</tr>
-<tr>
-  <td><code>n_ports_tx</code></td>
-  <td>Number of TX antenna ports after coupling</td>
-</tr>
-<tr>
-  <td><code>n_ports_rx</code></td>
-  <td>Number of RX antenna ports after coupling</td>
-</tr>
-</table>
-
-<b>Output Arguments:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><b><code>coeff_re</code></b><br> Channel coefficients, real part, 4D array with the 4th dimension being frequency. Shape: <code>( n_ports_rx, n_ports_tx, n_path, n_freq_out )</code></li>
-<li><b><code>coeff_im</code></b><br> Channel coefficients, imaginary part, 4D array with the 4th dimension being frequency. Shape: <code>( n_ports_rx, n_ports_tx, n_path, n_freq_out )</code></li>
-<li><b><code>delays</code></b><br> Propagation delays in seconds, 4D array with the 4th dimension being frequency. Shape: <code>( n_ports_rx, n_ports_tx, n_path, n_freq_out )</code></li>
-</ul>
-
-<b>Example:</b><br>
-<pre>
-from quadriga_lib import arrayant
-import numpy as np
-
-# Build a 2-way speaker as TX (source)
-tx_woofer = arrayant.generate_speaker(
-    driver_type='piston', radius=0.083,
-    lower_cutoff=50.0, upper_cutoff=3000.0,
-    lower_rolloff_slope=12.0, upper_rolloff_slope=24.0, sensitivity=87.0,
-    radiation_type='hemisphere', baffle_width=0.20, baffle_height=0.30,
-    frequencies=np.array([100.0, 500.0, 1000.0, 5000.0, 10000.0]),
-    angular_resolution=10.0)
-
-# Omnidirectional microphone as RX (single-frequency, clamped for all output frequencies)
-rx = arrayant.generate('omni')
-
-# Simple LOS path setup
-fbs_pos = np.array([[0.5], [0.0], [0.0]])     # Scatterer at RX position
-lbs_pos = np.array([[0.5], [0.0], [0.0]])
-path_length = np.array([1.0])                 # 1 meter distance
-
-# Frequency-flat path gain and scalar Jones matrix at two input frequencies
-freq_in = np.array([100.0, 10000.0])
-path_gain = np.ones((1, 2))                   # Unit gain at both frequencies
-M = np.zeros((2, 1, 2))                       # Scalar pressure (2 rows)
-M[0, 0, 0] = 1.0; M[0, 0, 1] = 1.0            # ReVV = 1 at both frequencies
-
-# Compute channel at 3 output frequencies using speed of sound
-freq_out = np.array([200.0, 1000.0, 5000.0])
-coeff_re, coeff_im, delays = arrayant.get_channels_multifreq(
-    tx_woofer, rx, fbs_pos, lbs_pos, path_gain, path_length, M,
-    np.zeros(3),                               # TX at origin
-    np.zeros(3),                               # TX orientation (no rotation)
-    np.array([1.0, 0.0, 0.0]),                 # RX at (1, 0, 0)
-    np.zeros(3),                               # RX orientation (no rotation)
-    freq_in, freq_out,
-    propagation_speed=343.0)                   # Speed of sound for acoustics
-
-# coeff_re.shape = (1, n_tx_ports, 1, 3) — one RX port, one path, 3 output frequencies
-</pre>
-
-<b>Caveat:</b><br>
-<ul>
-<li>Input data is directly accessed from Python memory, without copying if it is provided in <b>double</b> precision and is in F-contiguous (column-major) order.</li>
-<li>Other formats (e.g. single precision inputs or C-contiguous (row-major) order) will be converted to double automatically, causing additional computation steps.</li>
-<li>To improve performance of repeated computations (e.g. in loops), consider preparing the data in F-contiguous double precision to avoid unnecessary copies.</li>
+<li><b><code>coeff_re</code></b> — Real part of channel coefficients (<code>complex=False</code>); <code>(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)</code></li>
+<li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients (<code>complex=False</code>); same shape as <code>coeff_re</code></li>
+<li><b><code>coeff</code></b> — Complex channel coefficients (<code>complex=True</code>), replaces <code>coeff_re</code>/<code>coeff_im</code>; same shape</li>
+<li><b><code>delay</code></b> — Propagation delays in seconds; <code>(n_ports_rx, n_ports_tx, n_path_out, n_freq_out)</code></li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
-<li><a href="#get_channels_spherical">get_channels_spherical</a> — single-frequency version</li>
-<li><a href="#interpolate">interpolate</a> — multi-frequency antenna interpolation</li>
-<li><a href="#generate_speaker">generate_speaker</a> — parametric loudspeaker directivity model</li>
+<li><a href="#get_channels_spherical">get_channels_spherical</a> (single-frequency equivalent)</li>
+<li><a href="#generate_speaker">generate_speaker</a> (acoustic source construction)</li>
 </ul>
 
 <hr class="greyline"><br>

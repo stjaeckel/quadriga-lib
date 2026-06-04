@@ -32,31 +32,40 @@ static inline void find_freq_bracket(const arma::Col<dtype> &center_freqs, dtype
         return;
     }
 
-    if (freq <= center_freqs[0])
+    // Order-independent bracket search: i_lo = largest entry <= freq,
+    // i_hi = smallest entry >= freq. Track true min/max for extrapolation.
+    bool have_lo = false, have_hi = false;
+    arma::uword idx_min = 0, idx_max = 0;
+    for (arma::uword i = 0; i < n; ++i)
+    {
+        dtype fi = center_freqs[i];
+        if (fi < center_freqs[idx_min])
+            idx_min = i;
+        if (fi > center_freqs[idx_max])
+            idx_max = i;
+        if (fi <= freq && (!have_lo || fi > center_freqs[i_lo]))
+            i_lo = i, have_lo = true;
+        if (fi >= freq && (!have_hi || fi < center_freqs[i_hi]))
+            i_hi = i, have_hi = true;
+    }
+
+    // Extrapolation below the smallest / above the largest entry: clamp
+    if (!have_lo)
     {
         exact = true;
+        i_lo = idx_min;
+        return;
+    }
+    if (!have_hi)
+    {
+        exact = true;
+        i_lo = idx_max;
         return;
     }
 
-    if (freq >= center_freqs[n - 1])
-    {
-        exact = true;
-        i_lo = n - 1;
-        return;
-    }
-
-    // Find bracket: i_lo is the last entry <= freq
-    for (arma::uword i = 1; i < n; ++i)
-    {
-        if (center_freqs[i] <= freq)
-            i_lo = i;
-        else
-            break;
-    }
-    i_hi = i_lo + 1;
-
-    // Check for exact match (relative tolerance 1e-6)
-    if (std::abs((double)center_freqs[i_lo] - (double)freq) < 1.0e-6 * std::abs((double)center_freqs[i_lo]))
+    // Exact match (bracket collapses to one entry, or coincides within tolerance)
+    if (i_lo == i_hi ||
+        std::abs((double)center_freqs[i_lo] - (double)freq) < 1.0e-6 * std::abs((double)center_freqs[i_lo]))
     {
         exact = true;
         return;
