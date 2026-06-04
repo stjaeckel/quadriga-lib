@@ -873,20 +873,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             p_destN[i_rayN + 2 * n_rayN_t] = dtype(Fz + FD_length * FDz);
         }
 
-        if (p_gainN != nullptr)
-        {
-            // Include average medium transition gain
-            if (geometry_type == 0)
-                scl = gain * reflection_gain;
-            else if (geometry_type == 1)
-                scl = gain * (1.0 - reflection_gain);
-            else
-                scl = gain * refraction_gain;
-
-            p_gainN[i_rayN] = dtype(scl);
-        }
-
-        if (p_xprmatN != nullptr)
+        if (p_xprmatN || p_gainN)
         {
             if (is_scalar)
             {
@@ -894,14 +881,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 double coeff_Re = amplitude * eTE_Re;
                 double coeff_Im = amplitude * eTE_Im;
 
-                p_xprmatN[i_rayN] = (dtype)coeff_Re;
-                p_xprmatN[i_rayN + n_rayN_t] = (dtype)coeff_Im;
-                p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)0.0;
-                p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)0.0;
-                p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)0.0;
-                p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)0.0;
-                p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)0.0;
-                p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)0.0;
+                if (p_xprmatN)
+                {
+                    p_xprmatN[i_rayN] = (dtype)coeff_Re;
+                    p_xprmatN[i_rayN + n_rayN_t] = (dtype)coeff_Im;
+                    p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)0.0;
+                    p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)0.0;
+                    p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)0.0;
+                    p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)0.0;
+                    p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)0.0;
+                    p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)0.0;
+                }
+                if (p_gainN)
+                    p_gainN[i_rayN] = (dtype)(coeff_Re * coeff_Re + coeff_Im * coeff_Im);
             }
             else
             {
@@ -952,14 +944,22 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                        HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
 
                 // Write XPRMAT
-                p_xprmatN[i_rayN] = (dtype)VV_Re;
-                p_xprmatN[i_rayN + n_rayN_t] = (dtype)VV_Im;
-                p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)HV_Re;
-                p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)HV_Im;
-                p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)VH_Re;
-                p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)VH_Im;
-                p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)HH_Re;
-                p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)HH_Im;
+                if (p_xprmatN)
+                {
+                    p_xprmatN[i_rayN] = (dtype)VV_Re;
+                    p_xprmatN[i_rayN + n_rayN_t] = (dtype)VV_Im;
+                    p_xprmatN[i_rayN + 2 * n_rayN_t] = (dtype)HV_Re;
+                    p_xprmatN[i_rayN + 3 * n_rayN_t] = (dtype)HV_Im;
+                    p_xprmatN[i_rayN + 4 * n_rayN_t] = (dtype)VH_Re;
+                    p_xprmatN[i_rayN + 5 * n_rayN_t] = (dtype)VH_Im;
+                    p_xprmatN[i_rayN + 6 * n_rayN_t] = (dtype)HH_Re;
+                    p_xprmatN[i_rayN + 7 * n_rayN_t] = (dtype)HH_Im;
+                }
+                if (p_gainN)
+                    p_gainN[i_rayN] = (dtype)(0.5 * (VV_Re * VV_Re + VV_Im * VV_Im +
+                                                     HV_Re * HV_Re + HV_Im * HV_Im +
+                                                     VH_Re * VH_Re + VH_Im * VH_Im +
+                                                     HH_Re * HH_Re + HH_Im * HH_Im));
             }
         }
 
