@@ -1157,3 +1157,64 @@ TEST_CASE("Multifreq - Reversed freq_out order gives consistent results")
     CHECK(arma::approx_equal(dl_f[0], dl_r[1], "absdiff", 1e-14));
     CHECK(arma::approx_equal(dl_f[1], dl_r[0], "absdiff", 1e-14));
 }
+
+// SECTION 26: Unsorted freq_in / freq_out (reference-first ordering)
+//
+// Regression guard: get_channels_multifreq must not assume freq_in / freq_out are sorted.
+// Acoustic ray tracing puts the path-culling reference frequency first, so the grid is
+// intentionally unordered, e.g. {125, 16, 31.5, 63, 250} where entries 1..3 fall BELOW
+// entry 0. An earlier frequency-bracket implementation clamped everything <= freq_in[0]
+// to column 0, silently collapsing the sub-reference bands onto the reference value.
+TEST_CASE("Multifreq - Unsorted freq_in is not clamped to first entry")
+{
+    auto tx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
+    auto rx = wrap_single(quadriga_lib::generate_arrayant_omni<double>());
+
+    // Single path, omni patterns: coefficient magnitude reduces to sqrt(path_gain),
+    // so a per-frequency gain maps directly to a per-frequency amplitude.
+    arma::mat fbs(3, 1, arma::fill::zeros), lbs(3, 1, arma::fill::zeros);
+    fbs(0, 0) = 10.0; lbs(0, 0) = 10.0;
+    arma::vec pl = {10.0};
+
+    // Reference frequency (125) first, three lower bands after it, one higher band last
+    arma::vec fi = {125.0, 16.0, 31.5, 63.0, 250.0};
+
+    // Distinct, identifiable gains per input frequency (perfect squares for clean sqrt)
+    arma::mat pg = {{4.0, 9.0, 16.0, 25.0, 36.0}}; // [1 x n_freq_in]
+
+    // Frequency-independent scalar pressure transfer (ReVV = 1) at every input frequency
+    arma::cube M(2, 1, 5, arma::fill::zeros);
+    for (arma::uword s = 0; s < 5; ++s) M(0, 0, s) = 1.0;
+
+    // Output grid identical to input grid: every output frequency has an exact match,
+    // so the result must be a pure passthrough of the matching column (no interpolation).
+    arma::vec fo = fi;
+    std::vector<arma::cube> cr, ci, dl;
+
+    quadriga_lib::get_channels_multifreq(tx, rx, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                          10.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                          fbs, lbs, pg, pl, M, fi, fo, cr, ci, dl,
+                                          true, false, 343.0);
+
+    REQUIRE(cr.size() == 5);
+
+    auto amp = [&](arma::uword k)
+    {
+        return std::sqrt(cr[k](0, 0, 0) * cr[k](0, 0, 0) + ci[k](0, 0, 0) * ci[k](0, 0, 0));
+    };
+
+    // Amplitude must track the gain of the matching input column, not column 0.
+    // Ratios against the reference cancel any constant antenna / M / phase factor.
+    double a_ref = amp(0); // freq 125 -> col 0, gain 4
+    REQUIRE(a_ref > 0.0);
+    CHECK(std::abs(amp(1) / a_ref - std::sqrt(9.0 / 4.0)) < 1e-9);  // 16   -> col 1
+    CHECK(std::abs(amp(2) / a_ref - std::sqrt(16.0 / 4.0)) < 1e-9); // 31.5 -> col 2
+    CHECK(std::abs(amp(3) / a_ref - std::sqrt(25.0 / 4.0)) < 1e-9); // 63   -> col 3
+    CHECK(std::abs(amp(4) / a_ref - std::sqrt(36.0 / 4.0)) < 1e-9); // 250  -> col 4
+
+    // Explicit statement of the regression: the sub-reference bands must NOT
+    // collapse onto the reference amplitude (the exact failure of the old clamp).
+    CHECK(std::abs(amp(1) - a_ref) > 1e-6);
+    CHECK(std::abs(amp(2) - a_ref) > 1e-6);
+    CHECK(std::abs(amp(3) - a_ref) > 1e-6);
+}

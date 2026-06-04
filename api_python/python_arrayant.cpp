@@ -180,5 +180,6 @@ void quadriga_lib_arrayant(py::module_ &m)
           py::arg("freq_out"),
           py::arg("use_absolute_delays") = false,
           py::arg("add_fake_los_path") = false,
-          py::arg("propagation_speed") = 299792458.0);
+          py::arg("propagation_speed") = 299792458.0,
+          py::arg("complex") = false);
 }
