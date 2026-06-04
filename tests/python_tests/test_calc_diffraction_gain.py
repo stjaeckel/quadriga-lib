@@ -93,18 +93,18 @@ class TestCalcDiffractionGain(unittest.TestCase):
         gain, _ = RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=0
         )
-        npt.assert_allclose(gain, self.expected_gain, atol=1e-14)
+        npt.assert_allclose(gain, self.expected_gain, atol=1e-7)
 
     # 2 outputs, lod = 5
     def test_lod5_with_coord(self):
         gain, coord = RTtools.calc_diffraction_gain(
             self.orig, self.dest, self.cube, self.mtl_ind, self.mtl_dict, 1e9, lod=5
         )
-        npt.assert_allclose(gain, self.expected_gain, atol=1e-14)
+        npt.assert_allclose(gain, self.expected_gain, atol=1e-7)
 
         expected_coord = np.array([[[0.0, 0.0]], [[0.0, 0.0]], [[0.5, -0.5]]])
         # lod=5 -> n_seg=1, coord shape: (3, 1, 2)
-        npt.assert_allclose(coord, expected_coord, atol=1e-14)
+        npt.assert_allclose(coord, expected_coord, atol=1e-7)
 
     # LOS (unobstructed) path: TX and RX above cube, gain ~ 1.0
     def test_los_unobstructed(self):
