@@ -77,7 +77,7 @@ py::tuple obj_file_read(const std::string &fn,
     // Stable dict key order: standard EM columns first, then any extra CSV columns
     std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h",
                                       "att", "attB", "alpha", "alphaB", "fRef", "m",
-                                      "resF", "resQ", "resS", "coiF", "coiQ", "coiA"};
+                                      "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
 
     return py::make_tuple(
         qd_python_copy2numpy(&mesh),
