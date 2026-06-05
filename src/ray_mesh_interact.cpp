@@ -844,7 +844,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
         if (interaction_type == 4) // Energy-conservation based transmission for scalar transmission
         {
-            double T_mag = std::sqrt(1.0 - std::norm(R_eTE)); // sqrt(1 - |R_TE|²)
+            double rn = std::norm(R_eTE);
+            double T_mag = std::sqrt(rn < 1.0 ? 1.0 - rn : 0.0); // clamp: |R|^2 can round just above 1
+
             // Use phase from TE transmission coefficient
             T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
             double T_phase = std::arg(T_eTE);
