@@ -270,6 +270,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const dtype *m_e = nullptr, *m_f = nullptr, *m_g = nullptr, *m_h = nullptr;
     const dtype *m_alpha = nullptr, *m_alphaB = nullptr, *m_mass = nullptr, *m_fRef = nullptr;
     const dtype *m_resF = nullptr, *m_resQ = nullptr, *m_resS = nullptr;
+    const dtype *m_tf = nullptr, *m_tfB = nullptr;
     arma::uword n_mtl = 0;
     if (mtl_prop != nullptr)
     {
@@ -289,6 +290,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         m_resF = mtl_col(mtl_prop, "resF");
         m_resQ = mtl_col(mtl_prop, "resQ");
         m_resS = mtl_col(mtl_prop, "resS");
+        m_tf = mtl_col(mtl_prop, "tf");
+        m_tfB = mtl_col(mtl_prop, "tfB");
     }
     if (p_mtl_ind != nullptr && n_mtl > 0 && mtl_ind->max() >= n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
@@ -494,6 +497,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double kR_mass = 0.0, kS_mass = 0.0;
         double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
         double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
+        double kR_tf = 0.0, kR_tfB = 0.0, kS_tf = 0.0, kS_tfB = 0.0;
         double transition_gain = 1.0;
 
         if (theta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
@@ -513,6 +517,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kS_resF = mtl_val(m_resF, iMF, 0.0);
             kS_resQ = mtl_val(m_resQ, iMF, 0.0);
             kS_resS = mtl_val(m_resS, iMF, 0.0);
+            kS_tf = mtl_val(m_tf, iMF, 0.0);
+            kS_tfB = mtl_val(m_tfB, iMF, 0.0);
             transition_gain = (double)interface_gain_impl(mtl_prop, iMF, center_frequency);
         }
         else // Ray hits back side of FBS face, set first material to object material
@@ -532,6 +538,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             kR_resF = mtl_val(m_resF, iMF, 0.0);
             kR_resQ = mtl_val(m_resQ, iMF, 0.0);
             kR_resS = mtl_val(m_resS, iMF, 0.0);
+            kR_tf = mtl_val(m_tf, iMF, 0.0);
+            kR_tfB = mtl_val(m_tfB, iMF, 0.0);
         }
 
         if (material_to_material) // Material to material transition
@@ -553,6 +561,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kR_resF = mtl_val(m_resF, iMS, 0.0);
                 kR_resQ = mtl_val(m_resQ, iMS, 0.0);
                 kR_resS = mtl_val(m_resS, iMS, 0.0);
+                kR_tf = mtl_val(m_tf, iMS, 0.0);
+                kR_tfB = mtl_val(m_tfB, iMS, 0.0);
             }
             else // FBS (back side) is hit first
             {
@@ -571,6 +581,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 kS_resF = mtl_val(m_resF, iMS, 0.0);
                 kS_resQ = mtl_val(m_resQ, iMS, 0.0);
                 kS_resS = mtl_val(m_resS, iMS, 0.0);
+                kS_tf = mtl_val(m_tf, iMS, 0.0);
+                kS_tfB = mtl_val(m_tfB, iMS, 0.0);
                 transition_gain = (double)interface_gain_impl(mtl_prop, iMS, center_frequency);
             }
         }
@@ -841,7 +853,28 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 1.0 - reflection_gain; // energy conservation
         }
 
-        if (geometry_type == 1 && dense2light)
+        // Scalar transmission factor: redistribute reflection/transmission energy keeping their
+        // sum at 1 (always conserved). tf = 0 leaves the physical Fresnel split; tf > 0 leaks
+        // reflected energy into transmission, tf < 0 the reverse. tf_eff is the FBS face material's
+        // factor (kS at front, kR at back) so it is independent of entry/exit segment placement.
+        if (is_scalar)
+        {
+            double tf_eff = tf_value((theta >= 0.0) ? kS_tf : kR_tf,
+                                     (theta >= 0.0) ? kS_tfB : kR_tfB,
+                                     (theta >= 0.0) ? kS_fRef : kR_fRef, fGHz);
+            double R0 = reflection_gain;        // physical |R_TE|^2
+            double refl = tf_apply(R0, tf_eff); // redistributed
+            double scaleR = (R0 > 1.0e-12) ? std::sqrt(refl / R0) : 0.0;
+            double scaleT = ((1.0 - R0) > 1.0e-12) ? std::sqrt((1.0 - refl) / (1.0 - R0)) : 0.0;
+            R_eTE *= scaleR;
+            R_eTM = R_eTE;
+            T_eTE *= scaleT;
+            T_eTM = T_eTE;
+            reflection_gain = refl;
+            refraction_gain = 1.0 - refl;
+        }
+
+        if (geometry_type == 1 && dense2light && !is_scalar)
             T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
 
         // Select corresponding type

@@ -201,6 +201,24 @@ static inline dtype interface_gain_impl(const std::unordered_map<std::string, st
     return (dtype)std::pow(10.0, -0.1 * A);
 }
 
+// Transmission factor at fGHz with optional power-law slope tfB about fRef, clamped to [-1, 1].
+// Redistributes energy between the reflected and transmitted paths (see tf_apply).
+static inline double tf_value(double tf, double tfB, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double v = tf * std::pow(fGHz / fRef, tfB);
+    return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
+}
+
+// Redistribute physical reflection energy R0 in [0,1] by tf in [-1,1], keeping refl + trans = 1.
+// tf = 0 -> R0 (physical Fresnel); tf = +1 -> 0 (fully transparent); tf = -1 -> 1 (fully reflective).
+static inline double tf_apply(double R0, double tf)
+{
+    R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0); // guard against resonance overshoot
+    return (tf >= 0.0) ? R0 * (1.0 - tf) : R0 + (1.0 - R0) * (-tf);
+}
+
 // Calculate length
 template <typename dtype>
 static inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
