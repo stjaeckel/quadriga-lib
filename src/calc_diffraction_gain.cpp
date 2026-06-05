@@ -230,7 +230,8 @@ void calc_diffraction_gain(
     int verbose = 0,
     const arma::u32_vec *sub_mesh_index = nullptr,
     int use_kernel = 0,
-    int gpu_id = 0);
+    int gpu_id = 0,
+    bool scalar_mode = false);
 ```
 
 ## Inputs:

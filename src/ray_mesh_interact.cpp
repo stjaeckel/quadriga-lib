@@ -862,13 +862,18 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             double tf_eff = tf_value((theta >= 0.0) ? kS_tf : kR_tf,
                                      (theta >= 0.0) ? kS_tfB : kR_tfB,
                                      (theta >= 0.0) ? kS_fRef : kR_fRef, fGHz);
-            double R0 = reflection_gain;        // physical |R_TE|^2
-            double refl = tf_apply(R0, tf_eff); // redistributed
-            double scaleR = (R0 > 1.0e-12) ? std::sqrt(refl / R0) : 0.0;
-            double scaleT = ((1.0 - R0) > 1.0e-12) ? std::sqrt((1.0 - refl) / (1.0 - R0)) : 0.0;
-            R_eTE *= scaleR;
+            double R0 = reflection_gain;        // physical |R_TE|^2 (== 1 when cos_theta2 is imaginary)
+            double refl = tf_apply(R0, tf_eff); // redistributed reflection energy in [0,1]
+
+            // Rebuild both coefficients at the redistributed magnitudes, preserving the available
+            // phase. Setting the magnitude directly (rather than scaling by sqrt(refl/R0) and
+            // sqrt((1-refl)/(1-R0))) keeps tf working under the imaginary-cos_theta2 "total
+            // reflection" case, where R0 == 1 collapses the old scaleT to 0/0 and the physical T
+            // magnitude is already zero. arg() of a zero coefficient is 0, i.e. an in-phase
+            // pass-through, which is the intended phenomenological leak through a rigid partition.
+            R_eTE = std::polar(std::sqrt(refl), std::arg(R_eTE));
             R_eTM = R_eTE;
-            T_eTE *= scaleT;
+            T_eTE = std::polar(std::sqrt(1.0 - refl), std::arg(T_eTE));
             T_eTM = T_eTE;
             reflection_gain = refl;
             refraction_gain = 1.0 - refl;
