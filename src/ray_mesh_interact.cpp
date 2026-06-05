@@ -842,19 +842,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
         }
 
-        if (interaction_type == 4) // Energy-conservation based transmission for scalar transmission
-        {
-            double rn = std::norm(R_eTE);
-            double T_mag = std::sqrt(rn < 1.0 ? 1.0 - rn : 0.0); // clamp: |R|^2 can round just above 1
-
-            // Use phase from TE transmission coefficient
-            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
-            double T_phase = std::arg(T_eTE);
-            T_eTE = std::complex<double>(T_mag * std::cos(T_phase), T_mag * std::sin(T_phase));
-            T_eTM = T_eTE;
-            refraction_gain = 1.0 - reflection_gain; // energy conservation
-        }
-
         // Scalar transmission factor: redistribute reflection/transmission energy keeping their
         // sum at 1 (always conserved). tf = 0 leaves the physical Fresnel split; tf > 0 leaks
         // reflected energy into transmission, tf < 0 the reverse. tf_eff is the FBS face material's
@@ -867,15 +854,15 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             double R0 = reflection_gain;        // physical |R_TE|^2 (== 1 when cos_theta2 is imaginary)
             double refl = tf_apply(R0, tf_eff); // redistributed reflection energy in [0,1]
 
-            // Rebuild both coefficients at the redistributed magnitudes, preserving the available
-            // phase. Setting the magnitude directly (rather than scaling by sqrt(refl/R0) and
-            // sqrt((1-refl)/(1-R0))) keeps tf working under the imaginary-cos_theta2 "total
-            // reflection" case, where R0 == 1 collapses the old scaleT to 0/0 and the physical T
-            // magnitude is already zero. arg() of a zero coefficient is 0, i.e. an in-phase
-            // pass-through, which is the intended phenomenological leak through a rigid partition.
-            R_eTE = std::polar(std::sqrt(refl), std::arg(R_eTE));
+            // Capture phases from the physical coefficient before rescaling. For TE, t = 1 + r
+            // exactly, so the transmission phase is arg(1 + R_eTE). This stays well-defined under
+            // total reflection (|R| == 1, physical T magnitude == 0), where arg(T_eTE) would read
+            // arg(0) == 0 and silently drop the evanescent phase, breaking multi-bounce coherence.
+            double R_phase = std::arg(R_eTE);
+            double T_phase = std::arg(1.0 + R_eTE);
+            R_eTE = std::polar(std::sqrt(refl), R_phase);
             R_eTM = R_eTE;
-            T_eTE = std::polar(std::sqrt(1.0 - refl), std::arg(T_eTE));
+            T_eTE = std::polar(std::sqrt(1.0 - refl), T_phase);
             T_eTM = T_eTE;
             reflection_gain = refl;
             refraction_gain = 1.0 - refl;
