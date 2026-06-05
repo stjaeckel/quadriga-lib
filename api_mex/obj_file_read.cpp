@@ -135,7 +135,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         // Stable field order: standard EM columns first, then any extra CSV columns
         std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h",
                                           "att", "attB", "alpha", "alphaB", "fRef", "m", 
-                                          "resF", "resQ", "resS", "coiF", "coiQ", "coiA"};
+                                          "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
         for (const auto &kv : csv_prop)
             if (std::find(order.begin(), order.end(), kv.first) == order.end())
                 order.push_back(kv.first);
