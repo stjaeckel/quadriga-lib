@@ -3,11 +3,114 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+#include "quadriga_lib_material_helpers.hpp"
 
 /*!SECTION
 Site-specific simulation tools
 SECTION!*/
+
+/*!MD
+# medium_gain
+Linear gain of a ray traversing a homogeneous lossy medium
+
+- Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
+  of length `dist` inside the medium. The per-meter loss combines two contributions:
+  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`,
+    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
+    by `σ` (e.g. foliage, scattering media).
+- The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
+  thin-slab transmission loss, not propagation through a finite-thickness medium.
+
+## Declaration:
+```
+dtype quadriga_lib::medium_gain(
+    const arma::Mat<dtype> &mtl_prop,
+    arma::uword iM,
+    dtype dist,
+    dtype fGHz);
+```
+
+## Inputs:
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
+- **`iM`** — 0-based material index selecting the material from `mtl_prop`
+- **`dist`** — Path length of the ray inside the medium
+- **`center_frequency`** — Center frequency in [Hz]
+
+## Returns:
+- Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
+
+## See also:
+- [[ray_mesh_interact]] (for complex ray-material interactions)
+- [[obj_file_read]] (defines mtl_prop format)
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                                arma::uword iM, dtype dist, dtype center_frequency)
+{
+    if (center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+    arma::uword n_mtl = mtl_validate(mtl_prop);
+    if (iM >= n_mtl)
+        throw std::invalid_argument("Material index out of bound.");
+    return medium_gain_impl(&mtl_prop, iM, dist, center_frequency);
+}
+
+template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_frequency);
+template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_frequency);
+
+/*!MD
+# interface_gain
+Linear gain of a wave crossing a thin interface (lumped penetration loss)
+
+- Computes `g = 10^(-A/10)`, where `A` [dB] is the lumped transmission loss applied once when a
+  ray enters a material (the air-to-material or material-to-material front-side crossing). It is
+  independent of path length and is applied on top of the Fresnel interface term `1 - abs(R)²`:
+  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss).
+  - An optional Lorentzian coincidence feature `coiA / (1 + (coiQ·(f - coiF)/coiF)²)`, active only
+    when `coiF > 0` and `coiA != 0`; negative `coiA` is a transmission dip (acoustic coincidence),
+    positive `coiA` a stop-band. The total is clamped to `>= 0`.
+- The reflection / conductivity columns (`a`, `b`, `c`, `d`) and the in-medium columns
+  (`alpha`, `alphaB`, `m`) of `mtl_prop` are not used here — the Fresnel reflection is handled by
+  the caller and the distance-dependent loss by [[medium_gain]].
+
+## Declaration:
+```
+dtype quadriga_lib::interface_gain(
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+    arma::uword iM,
+    dtype center_frequency);
+```
+
+## Inputs:
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
+- **`iM`** — 0-based material index selecting the entered material from `mtl_prop`
+- **`center_frequency`** — Center frequency in [Hz]
+
+## Returns:
+- Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
+
+## See also:
+- [[medium_gain]] (for the distance-dependent in-medium loss)
+- [[ray_mesh_interact]] (for complex ray-material interactions)
+- [[obj_file_read]] (defines mtl_prop format)
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                                   arma::uword iM, dtype center_frequency)
+{
+    if (center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+    arma::uword n_mtl = mtl_validate(mtl_prop);
+    if (iM >= n_mtl)
+        throw std::invalid_argument("Material index out of bound.");
+    return interface_gain_impl(&mtl_prop, iM, center_frequency);
+}
+
+template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
+template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_frequency);
 
 /*!MD
 # ray_mesh_interact
@@ -796,7 +899,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (ray_starts_inside)
         {
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            double loss_dB = medium_loss_dB(eta1_med * mu1, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass);
+            double loss_dB = medium_loss_dB(eta1_med * mu1, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass, abs_cos_theta);
             gain *= std::pow(10.0, -0.1 * loss_dB);
         }
         if (geometry_type != 0)
@@ -1086,106 +1189,3 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN);
-
-/*!MD
-# medium_gain
-Linear gain of a ray traversing a homogeneous lossy medium
-
-- Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
-  of length `dist` inside the medium. The per-meter loss combines two contributions:
-  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`,
-    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
-  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
-    by `σ` (e.g. foliage, scattering media).
-- The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
-  thin-slab transmission loss, not propagation through a finite-thickness medium.
-
-## Declaration:
-```
-dtype quadriga_lib::medium_gain(
-    const arma::Mat<dtype> &mtl_prop,
-    arma::uword iM,
-    dtype dist,
-    dtype fGHz);
-```
-
-## Inputs:
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`iM`** — 0-based material index selecting the material from `mtl_prop`
-- **`dist`** — Path length of the ray inside the medium
-- **`center_frequency`** — Center frequency in [Hz]
-
-## Returns:
-- Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
-
-## See also:
-- [[ray_mesh_interact]] (for complex ray-material interactions)
-- [[obj_file_read]] (defines mtl_prop format)
-MD!*/
-
-template <typename dtype>
-dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                arma::uword iM, dtype dist, dtype center_frequency)
-{
-    if (center_frequency <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    arma::uword n_mtl = mtl_validate(mtl_prop);
-    if (iM >= n_mtl)
-        throw std::invalid_argument("Material index out of bound.");
-    return medium_gain_impl(&mtl_prop, iM, dist, center_frequency);
-}
-
-template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_frequency);
-template double quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double dist, double center_frequency);
-
-/*!MD
-# interface_gain
-Linear gain of a wave crossing a thin interface (lumped penetration loss)
-
-- Computes `g = 10^(-A/10)`, where `A` [dB] is the lumped transmission loss applied once when a
-  ray enters a material (the air-to-material or material-to-material front-side crossing). It is
-  independent of path length and is applied on top of the Fresnel interface term `1 - abs(R)²`:
-  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss).
-  - An optional Lorentzian coincidence feature `coiA / (1 + (coiQ·(f - coiF)/coiF)²)`, active only
-    when `coiF > 0` and `coiA != 0`; negative `coiA` is a transmission dip (acoustic coincidence),
-    positive `coiA` a stop-band. The total is clamped to `>= 0`.
-- The reflection / conductivity columns (`a`, `b`, `c`, `d`) and the in-medium columns
-  (`alpha`, `alphaB`, `m`) of `mtl_prop` are not used here — the Fresnel reflection is handled by
-  the caller and the distance-dependent loss by [[medium_gain]].
-
-## Declaration:
-```
-dtype quadriga_lib::interface_gain(
-    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    arma::uword iM,
-    dtype center_frequency);
-```
-
-## Inputs:
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`iM`** — 0-based material index selecting the entered material from `mtl_prop`
-- **`center_frequency`** — Center frequency in [Hz]
-
-## Returns:
-- Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
-
-## See also:
-- [[medium_gain]] (for the distance-dependent in-medium loss)
-- [[ray_mesh_interact]] (for complex ray-material interactions)
-- [[obj_file_read]] (defines mtl_prop format)
-MD!*/
-
-template <typename dtype>
-dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-                                   arma::uword iM, dtype center_frequency)
-{
-    if (center_frequency <= (dtype)0.0)
-        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    arma::uword n_mtl = mtl_validate(mtl_prop);
-    if (iM >= n_mtl)
-        throw std::invalid_argument("Material index out of bound.");
-    return interface_gain_impl(&mtl_prop, iM, center_frequency);
-}
-
-template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
-template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_frequency);
