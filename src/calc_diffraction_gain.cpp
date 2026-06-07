@@ -4,6 +4,7 @@
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
+#include "quadriga_lib_material_helpers.hpp"
 
 // FUNCTION: Number formatter
 static std::string MioNum(size_t number)
