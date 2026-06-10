@@ -88,7 +88,7 @@ static inline void single_material(const std::vector<std::pair<std::string, doub
                                    std::unordered_map<std::string, std::vector<double>> &mtl_prop)
 {
     mtl_ind.set_size(12);
-    mtl_ind.zeros(); // all faces share material 0
+    mtl_ind.ones(); // all faces share material 1
     mtl_prop.clear();
     for (const auto &kv : cols)
         mtl_prop[kv.first] = std::vector<double>(1, kv.second);
@@ -573,8 +573,8 @@ TEST_CASE("Acoustic - Interpenetrating material's isolation is counted exactly o
         B.col(c) += 0.8;
     arma::mat mesh = arma::join_vert(A, B);
     arma::uvec mtl_ind(24);
-    mtl_ind.head(12).zeros();
-    mtl_ind.tail(12).ones();
+    mtl_ind.head(12).ones();  // material 1 -> column 0 (att 0)
+    mtl_ind.tail(12).fill(2); // material 2 -> column 1 (att_B)
     double fRef_GHz = ac2rf(1000.0) / 1.0e9;
     arma::mat orig = {{-10.0, 0.15, 0.1}}, dest = {{1.5, 0.15, 0.1}};
 
@@ -619,7 +619,13 @@ TEST_CASE("Acoustic - ray_mesh_interact and calc_diffraction_gain agree through 
     double f_rf = ac2rf(4000.0);
     double fRef_GHz = ac2rf(1000.0) / 1.0e9;
 
-    struct Case { const char *name; double a; double att; double alpha; };
+    struct Case
+    {
+        const char *name;
+        double a;
+        double att;
+        double alpha;
+    };
     std::vector<Case> cases = {
         {"dense absorber", 4.0, 3.0, 20.0},  // eps > 1: front/back conserve
         {"light reflector", 0.3, 12.0, 8.0}, // eps < 1: front/back pass through, att carries isolation

@@ -178,7 +178,7 @@ static inline void mtl_matrix_to_map(const arma::Mat<dtype> &M,
             m = (arma::uword)uniq.size();
             uniq.push_back(f);
         }
-        mtl_ind(f) = m;
+        mtl_ind(f) = m + 1;
     }
 
     mtl_prop.clear();

@@ -227,7 +227,7 @@ namespace
         // In-medium gain, linear
         double medium_gain(double dist, double fGHz = 1.0, double abs_cos_theta = 1.0) const
         {
-            std::complex<double> eta_val = eta(fGHz);
+            std::complex<double> eta_val = eta(fGHz) * mu(fGHz);
             double er = std::real(eta_val);
             double tan_delta = std::imag(eta_val) / er;
             double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
@@ -307,16 +307,18 @@ namespace
         // types (0/3), the energy-conserving forward power 1 - R for EM/scalar transmission (1/4), and the raw Fresnel transmittance
         // for EM refraction (2). The selected coefficient pair/ satisfies 0.5*(|cTE|^2 + |cTM|^2) == gain (and |cTE|^2 == gain in
         // scalar mode, where cTM == cTE).
-        double interact_with(const Material &other,                      // Material that the path enters into / reflects of
-                             int interaction_type,                       // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
-                             double theta,                               // Incidence angle
-                             double fGHz,                                // Frequency
-                             std::complex<double> *cTE = nullptr,        // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
-                             std::complex<double> *cTM = nullptr,        // Out: M-field coefficient
-                             std::complex<double> *cos_theta2 = nullptr, // Out: Refraction cosine (type-2 direction)
-                             double *Snell_ratio = nullptr,              // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
-                             bool *total_reflection = nullptr,           // Out: Total reflection indicator
-                             bool *dense2light = nullptr) const          // Out: Dense to light medium indicator
+        double interact_with(const Material &other,                         // Material that the path enters into / reflects of
+                             int interaction_type,                          // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+                             double theta,                                  // Incidence angle
+                             double fGHz,                                   // Frequency
+                             std::complex<double> *cTE = nullptr,           // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
+                             std::complex<double> *cTM = nullptr,           // Out: M-field coefficient
+                             std::complex<double> *cos_theta2 = nullptr,    // Out: Refraction cosine (type-2 direction)
+                             std::complex<double> *eta1_div_eta2 = nullptr, // Out: eta1/eta2
+                             double *Snell_ratio = nullptr,                 // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
+                             bool *total_reflection = nullptr,              // Out: Total reflection indicator
+                             bool *dense2light = nullptr,                   // Out: Dense to light medium indicator
+                             bool force_tir = false) const                  // Switch to force total internat reflection
         {
             const bool is_scalar = interaction_type >= 3;
             int geometry_type = interaction_type;
@@ -338,10 +340,10 @@ namespace
 
             bool d2l = std::real(eta1 * mu1) > std::real(eta2 * mu2);
 
-            std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
-            double snell = std::sqrt(std::abs(eta1_div_eta2));
-            bool tir = is_scalar ? false : (snell * sin_theta >= 1.0);
-            std::complex<double> ct2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
+            std::complex<double> eta1_d_eta2 = (eta1 * mu1) / (eta2 * mu2);
+            double snell = std::sqrt(std::abs(eta1_d_eta2));
+            bool tir = is_scalar ? false : (force_tir || (snell * sin_theta >= 1.0));
+            std::complex<double> ct2 = std::sqrt(1.0 - eta1_d_eta2 * sin_theta * sin_theta);
 
             // Admittances sqrt(eps/mu)
             std::complex<double> z1 = std::sqrt(eta1 / mu1);
@@ -428,6 +430,8 @@ namespace
                 *cTM = coeff_TM;
             if (cos_theta2)
                 *cos_theta2 = ct2;
+            if (eta1_div_eta2)
+                *eta1_div_eta2 = eta1_d_eta2;
             if (Snell_ratio)
                 *Snell_ratio = snell;
             if (total_reflection)
@@ -754,7 +758,7 @@ dtype quadriga_lib::medium_gain(
 
 ## Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`iM`** — 0-based material index selecting the material from `mtl_prop`
+- **`iM`** —  1-based material index (0 = no material / air)
 - **`dist`** — Path length of the ray inside the medium
 - **`center_frequency`** — Center frequency in [Hz]
 
@@ -772,10 +776,10 @@ dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vecto
 {
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    arma::uword n_mtl = mtl_validate(mtl_prop);
-    if (iM >= n_mtl)
+    MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
+    if (iM > cols.n_mtl)
         throw std::invalid_argument("Material index out of bound.");
-    return medium_gain_impl(&mtl_prop, iM, dist, center_frequency);
+    return (dtype)Material(cols, iM).medium_gain((double)dist, (double)center_frequency * 1e-9);
 }
 
 template float quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float dist, float center_frequency);
@@ -806,7 +810,7 @@ dtype quadriga_lib::interface_gain(
 
 ## Inputs:
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
-- **`iM`** — 0-based material index selecting the entered material from `mtl_prop`
+- **`iM`** — 1-based material index (0 = no material / air)
 - **`center_frequency`** — Center frequency in [Hz]
 
 ## Returns:
@@ -824,10 +828,10 @@ dtype quadriga_lib::interface_gain(const std::unordered_map<std::string, std::ve
 {
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    arma::uword n_mtl = mtl_validate(mtl_prop);
-    if (iM >= n_mtl)
+    MaterialCols<dtype> cols(mtl_prop);
+    if (iM > cols.n_mtl)
         throw std::invalid_argument("Material index out of bound.");
-    return interface_gain_impl(&mtl_prop, iM, center_frequency);
+    return (dtype)Material(cols, iM).interface_gain((double)center_frequency * 1e-9);
 }
 
 template float quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
@@ -886,7 +890,7 @@ void quadriga_lib::ray_mesh_interact(
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. NULL → all faces treated as air.
+- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. 0 = face has no material (air). NULL → all faces treated as air.
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`. NULL → air defaults used.
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
@@ -1088,36 +1092,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const dtype *p_tridir = (tridir == nullptr) ? nullptr : tridir->memptr();
     const dtype *p_orig_length = (orig_length == nullptr) ? nullptr : orig_length->memptr();
 
-    // Resolve material columns once; nullptr -> per-column default applied in the ray loop
+    // Resolve material columns once; air (empty) table when no material model is supplied.
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
-    const dtype *m_a = nullptr, *m_b = nullptr, *m_c = nullptr, *m_d = nullptr;
-    const dtype *m_e = nullptr, *m_f = nullptr, *m_g = nullptr, *m_h = nullptr;
-    const dtype *m_alpha = nullptr, *m_alphaB = nullptr, *m_mass = nullptr, *m_fRef = nullptr;
-    const dtype *m_resF = nullptr, *m_resQ = nullptr, *m_resS = nullptr;
-    const dtype *m_tf = nullptr, *m_tfB = nullptr;
-    arma::uword n_mtl = 0;
-    if (mtl_prop != nullptr)
-    {
-        n_mtl = mtl_validate(*mtl_prop); // all columns share length n_mtl; throws on mismatch
-        m_a = mtl_col(mtl_prop, "a");
-        m_b = mtl_col(mtl_prop, "b");
-        m_c = mtl_col(mtl_prop, "c");
-        m_d = mtl_col(mtl_prop, "d");
-        m_e = mtl_col(mtl_prop, "e");
-        m_f = mtl_col(mtl_prop, "f");
-        m_g = mtl_col(mtl_prop, "g");
-        m_h = mtl_col(mtl_prop, "h");
-        m_alpha = mtl_col(mtl_prop, "alpha");
-        m_alphaB = mtl_col(mtl_prop, "alphaB");
-        m_mass = mtl_col(mtl_prop, "m");
-        m_fRef = mtl_col(mtl_prop, "fRef");
-        m_resF = mtl_col(mtl_prop, "resF");
-        m_resQ = mtl_col(mtl_prop, "resQ");
-        m_resS = mtl_col(mtl_prop, "resS");
-        m_tf = mtl_col(mtl_prop, "tf");
-        m_tfB = mtl_col(mtl_prop, "tfB");
-    }
-    if (p_mtl_ind != nullptr && n_mtl > 0 && mtl_ind->max() >= n_mtl)
+    MaterialCols<dtype> cols = (mtl_prop != nullptr) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
+    if (p_mtl_ind != nullptr && cols.n_mtl > 0 && (arma::uword)mtl_ind->max() > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
 
     // Get number of output rays and build output ray index
@@ -1311,129 +1289,30 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
         double abs_cos_theta = std::abs(cos_theta);
 
-        // Select the properties of the two materials
-        double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0;     // medium 1: a, b, c, d
-        double kR5 = 1.0, kR6 = 0.0, kR7 = 0.0, kR8 = 0.0;     // medium 1: e, f, g, h (mu)
-        double kR_alpha = 0.0, kR_alphaB = 0.0, kR_fRef = 1.0; // medium 1: alpha, alphaB, fRef
-        double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0;     // medium 2: a, b, c, d
-        double kS5 = 1.0, kS6 = 0.0, kS7 = 0.0, kS8 = 0.0;     // medium 2: e, f, g, h (mu)
-        double kS_alpha = 0.0, kS_alphaB = 0.0, kS_fRef = 1.0; // medium 2: alpha, alphaB, fRef
-        double kR_mass = 0.0, kS_mass = 0.0;
-        double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
-        double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
-        double kR_tf = 0.0, kR_tfB = 0.0, kS_tf = 0.0, kS_tfB = 0.0;
-        double transition_gain = 1.0;
-
-        if (theta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
+        // Incidence-side (medium 1) and entered/reflected-off (medium 2) materials, default air.
+        // 1-based: Material(cols, 0) -> air. M2 always carries the FBS-face material whose
+        // interface_gain is the transition gain (front: iMF; back: air, or iMS for M2M).
+        Material M1, M2;
+        if (theta >= 0.0) // front hit: entered material = FBS face (iMF)
         {
-            kS1 = mtl_val(m_a, iMF, 1.0);
-            kS2 = mtl_val(m_b, iMF, 0.0);
-            kS3 = mtl_val(m_c, iMF, 0.0);
-            kS4 = mtl_val(m_d, iMF, 0.0);
-            kS5 = mtl_val(m_e, iMF, 1.0);
-            kS6 = mtl_val(m_f, iMF, 0.0);
-            kS7 = mtl_val(m_g, iMF, 0.0);
-            kS8 = mtl_val(m_h, iMF, 0.0);
-            kS_alpha = mtl_val(m_alpha, iMF, 0.0);
-            kS_alphaB = mtl_val(m_alphaB, iMF, 0.0);
-            kS_mass = mtl_val(m_mass, iMF, 0.0);
-            kS_fRef = mtl_val(m_fRef, iMF, 1.0);
-            kS_resF = mtl_val(m_resF, iMF, 0.0);
-            kS_resQ = mtl_val(m_resQ, iMF, 0.0);
-            kS_resS = mtl_val(m_resS, iMF, 0.0);
-            kS_tf = mtl_val(m_tf, iMF, 0.0);
-            kS_tfB = mtl_val(m_tfB, iMF, 0.0);
-            transition_gain = (double)interface_gain_impl(mtl_prop, iMF, center_frequency);
+            M2 = Material(cols, iMF);
+            if (material_to_material) // SBS (front) hit first
+                M1 = Material(cols, iMS);
         }
-        else // Ray hits back side of FBS face, set first material to object material
+        else // back hit: incidence material = FBS face (iMF)
         {
-            kR1 = mtl_val(m_a, iMF, 1.0);
-            kR2 = mtl_val(m_b, iMF, 0.0);
-            kR3 = mtl_val(m_c, iMF, 0.0);
-            kR4 = mtl_val(m_d, iMF, 0.0);
-            kR5 = mtl_val(m_e, iMF, 1.0);
-            kR6 = mtl_val(m_f, iMF, 0.0);
-            kR7 = mtl_val(m_g, iMF, 0.0);
-            kR8 = mtl_val(m_h, iMF, 0.0);
-            kR_alpha = mtl_val(m_alpha, iMF, 0.0);
-            kR_alphaB = mtl_val(m_alphaB, iMF, 0.0);
-            kR_mass = mtl_val(m_mass, iMF, 0.0);
-            kR_fRef = mtl_val(m_fRef, iMF, 1.0);
-            kR_resF = mtl_val(m_resF, iMF, 0.0);
-            kR_resQ = mtl_val(m_resQ, iMF, 0.0);
-            kR_resS = mtl_val(m_resS, iMF, 0.0);
-            kR_tf = mtl_val(m_tf, iMF, 0.0);
-            kR_tfB = mtl_val(m_tfB, iMF, 0.0);
+            M1 = Material(cols, iMF);
+            if (material_to_material) // FBS (back) hit first, entered = SBS
+                M2 = Material(cols, iMS);
         }
+        double transition_gain = M2.interface_gain(fGHz);
 
-        if (material_to_material) // Material to material transition
-        {
-            if (theta >= 0.0) // SBS (front side) is hit first
-            {
-                kR1 = mtl_val(m_a, iMS, 1.0);
-                kR2 = mtl_val(m_b, iMS, 0.0);
-                kR3 = mtl_val(m_c, iMS, 0.0);
-                kR4 = mtl_val(m_d, iMS, 0.0);
-                kR5 = mtl_val(m_e, iMS, 1.0);
-                kR6 = mtl_val(m_f, iMS, 0.0);
-                kR7 = mtl_val(m_g, iMS, 0.0);
-                kR8 = mtl_val(m_h, iMS, 0.0);
-                kR_alpha = mtl_val(m_alpha, iMS, 0.0);
-                kR_alphaB = mtl_val(m_alphaB, iMS, 0.0);
-                kR_mass = mtl_val(m_mass, iMS, 0.0);
-                kR_fRef = mtl_val(m_fRef, iMS, 1.0);
-                kR_resF = mtl_val(m_resF, iMS, 0.0);
-                kR_resQ = mtl_val(m_resQ, iMS, 0.0);
-                kR_resS = mtl_val(m_resS, iMS, 0.0);
-                kR_tf = mtl_val(m_tf, iMS, 0.0);
-                kR_tfB = mtl_val(m_tfB, iMS, 0.0);
-            }
-            else // FBS (back side) is hit first
-            {
-                kS1 = mtl_val(m_a, iMS, 1.0);
-                kS2 = mtl_val(m_b, iMS, 0.0);
-                kS3 = mtl_val(m_c, iMS, 0.0);
-                kS4 = mtl_val(m_d, iMS, 0.0);
-                kS5 = mtl_val(m_e, iMS, 1.0);
-                kS6 = mtl_val(m_f, iMS, 0.0);
-                kS7 = mtl_val(m_g, iMS, 0.0);
-                kS8 = mtl_val(m_h, iMS, 0.0);
-                kS_alpha = mtl_val(m_alpha, iMS, 0.0);
-                kS_alphaB = mtl_val(m_alphaB, iMS, 0.0);
-                kS_mass = mtl_val(m_mass, iMS, 0.0);
-                kS_fRef = mtl_val(m_fRef, iMS, 1.0);
-                kS_resF = mtl_val(m_resF, iMS, 0.0);
-                kS_resQ = mtl_val(m_resQ, iMS, 0.0);
-                kS_resS = mtl_val(m_resS, iMS, 0.0);
-                kS_tf = mtl_val(m_tf, iMS, 0.0);
-                kS_tfB = mtl_val(m_tfB, iMS, 0.0);
-                transition_gain = (double)interface_gain_impl(mtl_prop, iMS, center_frequency);
-            }
-        }
-
-        // Complex-valued relative permittivity, ITU-R P.2040-1 eq. (9b)
-        std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, fGHz);
-        std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, fGHz);
-        std::complex<double> mu1 = mu_from_coeffs(kR5, kR6, kR7, kR8, kR_fRef, fGHz);
-        std::complex<double> mu2 = mu_from_coeffs(kS5, kS6, kS7, kS8, kS_fRef, fGHz);
-
-        // base permittivity for the in-medium loss (no resonance: keeps the real-sqrt loss well-posed)
-        std::complex<double> eta1_med = eta1, eta2_med = eta2;
-        // resonance enters the interface permittivity only
-        eta1 += eta_resonance(kR_resF, kR_resQ, kR_resS, fGHz);
-        eta2 += eta_resonance(kS_resF, kS_resQ, kS_resS, fGHz);
-
-        bool dense2light = std::real(eta1 * mu1) > std::real(eta2 * mu2);
-
-        // Evaluate total reflection condition in ITU-R P.2040-1, eq. (31) and (32)
-        double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);  // Trigonometric identity
-        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);   // (n1/n2)^2 = eps*mu ratio
-        double eta = std::sqrt(std::abs(eta1_div_eta2));                    // sgrt( abs( eta1 / eta2 ) )
-        bool total_reflection = is_scalar ? false : eta * sin_theta >= 1.0; // Total reflection condition
-
-        // Calculate cos_theta2 from Rec. ITU-R P.2040-1, eq. (33)
-        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
-
+        // Interface evaluation (single source): coefficients + geometry quantities.
+        std::complex<double> cTE, cTM, cos_theta2, eta1_div_eta2;
+        double eta; // Snell ratio sqrt|eta1*mu1 / eta2*mu2|
+        bool total_reflection;
+        M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
+        bool tir_central = total_reflection; // pre-ray-tube TIR state
         // Calculate the center path direction after medium interaction (normalized to length 1)
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz;              // Vector from FBS to destination
         double FD_length = std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz); // Length of path from FBS to destination
@@ -1620,86 +1499,22 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (ray_starts_inside)
         {
             double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            double loss_dB = medium_loss_dB(eta1_med * mu1, kR_alpha, kR_alphaB, kR_fRef, fGHz, thickness, kR_mass, abs_cos_theta);
-            gain *= std::pow(10.0, -0.1 * loss_dB);
+            gain *= M1.medium_gain(thickness, fGHz, abs_cos_theta);
         }
         if (geometry_type != 0)
-        {
-            double loss_dB = medium_loss_dB(eta2_med * mu2, kS_alpha, kS_alphaB, kS_fRef, fGHz, ray_offset, kS_mass);
-            gain *= std::pow(10.0, -0.1 * loss_dB);
-        }
+            gain *= M2.medium_gain(ray_offset, fGHz);
 
         // Add additional transition gain
         if (geometry_type != 0)
             gain *= transition_gain;
 
-        // Calculate sqrt(eta1) and sqrt(eta2) needed for ITU-R P.2040-1, eq. (31) and (32)
-        eta1 = std::sqrt(eta1 / mu1); // TE/scalar admittance sqrt(eps/mu)
-        eta2 = std::sqrt(eta2 / mu2);
+        // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices)
+        if (total_reflection != tir_central)
+            M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM,
+                             nullptr, nullptr, nullptr, nullptr, nullptr, true);
 
-        // Calculate Reflection coefficients  ITU-R P.2040-1, eq. (31)
-        std::complex<double> R_eTE = total_reflection ? 1.0 : 0.0;
-        std::complex<double> R_eTM = total_reflection ? 1.0 : 0.0;
-        double reflection_gain = total_reflection ? 1.0 : 0.0;
-
-        if (is_scalar)
-        {
-            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
-            R_eTM = R_eTE;                      // not used, but keeps downstream code safe
-            reflection_gain = std::norm(R_eTE); // no 0.5 factor
-        }
-        else if (interaction_type == 1 || (interaction_type == 0 && !total_reflection)) // Reflection and Transmission
-        {
-            R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
-            R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
-            reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
-        }
-
-        // Calculate Transmission coefficients  ITU-R P.2040-1, eq. (32)
-        std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
-        double refraction_gain = 0.0;
-
-        if (!total_reflection && !is_scalar && interaction_type != 0) // Transmission and Refraction
-        {
-            T_eTE = (2.0 * eta1 * abs_cos_theta) / (eta1 * abs_cos_theta + eta2 * cos_theta2);
-            T_eTM = (2.0 * eta1 * abs_cos_theta) / (eta2 * abs_cos_theta + eta1 * cos_theta2);
-            refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
-        }
-
-        // Scalar transmission factor: redistribute reflection/transmission energy keeping their
-        // sum at 1 (always conserved). tf = 0 leaves the physical Fresnel split; tf > 0 leaks
-        // reflected energy into transmission, tf < 0 the reverse. tf_eff is the FBS face material's
-        // factor (kS at front, kR at back) so it is independent of entry/exit segment placement.
-        if (is_scalar)
-        {
-            double tf_eff = tf_value((theta >= 0.0) ? kS_tf : kR_tf,
-                                     (theta >= 0.0) ? kS_tfB : kR_tfB,
-                                     (theta >= 0.0) ? kS_fRef : kR_fRef, fGHz);
-            double R0 = reflection_gain;        // physical |R_TE|^2 (== 1 when cos_theta2 is imaginary)
-            double refl = tf_apply(R0, tf_eff); // redistributed reflection energy in [0,1]
-
-            // Capture phases from the physical coefficient before rescaling. For TE, t = 1 + r
-            // exactly, so the transmission phase is arg(1 + R_eTE). This stays well-defined under
-            // total reflection (|R| == 1, physical T magnitude == 0), where arg(T_eTE) would read
-            // arg(0) == 0 and silently drop the evanescent phase, breaking multi-bounce coherence.
-            double R_phase = std::arg(R_eTE);
-            double T_phase = std::arg(1.0 + R_eTE);
-            R_eTE = std::polar(std::sqrt(refl), R_phase);
-            R_eTM = R_eTE;
-            T_eTE = std::polar(std::sqrt(1.0 - refl), T_phase);
-            T_eTM = T_eTE;
-            reflection_gain = refl;
-            refraction_gain = 1.0 - refl;
-        }
-
-        if (geometry_type == 1 && dense2light && !is_scalar)
-            T_eTE = 1.0, T_eTM = 1.0, refraction_gain = 1.0, reflection_gain = 0.0;
-
-        // Select corresponding type
-        double eTE_Re = (geometry_type == 0) ? std::real(R_eTE) : std::real(T_eTE),
-               eTE_Im = (geometry_type == 0) ? std::imag(R_eTE) : std::imag(T_eTE),
-               eTM_Re = (geometry_type == 0) ? std::real(R_eTM) : std::real(T_eTM),
-               eTM_Im = (geometry_type == 0) ? std::imag(R_eTM) : std::imag(T_eTM);
+        double eTE_Re = std::real(cTE), eTE_Im = std::imag(cTE),
+               eTM_Re = std::real(cTM), eTM_Im = std::imag(cTM);
 
         // Read the output ray index
         size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
@@ -1782,8 +1597,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 // Note: eTE = perpendicular to face normal vector = Horizontal polarization
                 //       eTM = parallel to face normal vector = Vertical polarization
                 double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
-                if (interaction_type == 1)          // Scale amplitude in case of transmission
-                    amplitude *= std::sqrt((1.0 - reflection_gain) / refraction_gain);
 
                 double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
                        VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
