@@ -482,7 +482,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             arma::Col<size_t> c_iRAY(n_continue); // New ray index
 
             // Update path weights, taking material effects into account
-            n_continue = 0;                         // Rest counter
+            n_continue = 0;                         // Reset counter
             for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
             {
                 unsigned nH = p_no_interact[iR]; // Number of mesh-hits between "orig" and "dest"

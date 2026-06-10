@@ -210,6 +210,7 @@
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
   <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
+  <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
   <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
   <tr><td><a href="#subdivide_rays">subdivide_rays</a></td><td>Subdivide ray beams into four smaller sub-beams</td></tr>
   <tr><td><a href="#subdivide_triangles">subdivide_triangles</a></td><td>Subdivide triangles into smaller triangles</td></tr>
@@ -3939,7 +3940,8 @@ void calc_diffraction_gain(
     int verbose = 0,
     const arma::u32_vec *sub_mesh_index = nullptr,
     int use_kernel = 0,
-    int gpu_id = 0);
+    int gpu_id = 0,
+    bool scalar_mode = false);
 </pre>
 
 <b>Inputs:</b><br>
@@ -4923,6 +4925,73 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 <li><a href="#subdivide_rays">subdivide_rays</a> (subdivide beams into sub-beams)</li>
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (ray–triangle intersection)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (beam–mesh interaction)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="ray_state_update" class="qd-func"><b>ray_state_update</b></span><br>
+<hr class="thin">
+Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
+<ul>
+<li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w & 0x7FFF<code>, </code>flag = w & 0x8000`).</li>
+<li>Ports the inside/outside state machine formerly embedded in <a href="#calc_diffraction_gain">calc_diffraction_gain</a> and overlays a closed-form thin-slab factor <code>S</code> (the Airy sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on the tracer to follow every internal bounce.</li>
+<li>Called twice per interaction by the ray tracer: once for the reflection pass (<code>interaction_type</code> 0 or 3) and once for the transmission/refraction pass (<code>interaction_type</code> 1, 2 or 4). With <code>S</code> suppressed (the survival gate re-emits) the transmission/refraction path reproduces <a href="#calc_diffraction_gain">calc_diffraction_gain</a> bit-for-bit.</li>
+</ul>
+
+<b>Declaration:</b><br>
+<pre>
+void quadriga_lib::ray_state_update(
+    int interaction_type,
+    dtype center_frequency,
+    const arma::Mat&lt;dtype&gt; *orig,
+    const arma::Mat&lt;dtype&gt; *dest,
+    const arma::Mat&lt;dtype&gt; *fbs,
+    const arma::Mat&lt;dtype&gt; *sbs,
+    const arma::u32_vec *no_interact,
+    const arma::Col&lt;dtype&gt; *fbs_angleN,
+    const arma::s32_vec *out_typeN,
+    const arma::Mat&lt;dtype&gt; *normal_vecN,
+    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; *mtl_prop,
+    const arma::Col&lt;short&gt; *mtl_ind_fbs,
+    const arma::Col&lt;short&gt; *mtl_ind_sbs,
+    const arma::Col&lt;short&gt; *mtl_ind_prev_in = nullptr,
+    const arma::Col&lt;short&gt; *mtl_ind_current_in = nullptr,
+    const arma::Col&lt;short&gt; *mtl_ind_buffer_in = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_prev_out = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_current_out = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_buffer_out = nullptr,
+    arma::Col&lt;dtype&gt; *gainN = nullptr,
+    arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
+    arma::u32_vec *ray_ind = nullptr,
+    double eps = 0.15);
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>interaction_type</code></b> — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission</li>
+<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
+<li><b><code>orig</code></b>, <b><code>dest</code></b>, <b><code>fbs</code></b>, <b><code>sbs</code></b> — Ray origin, destination, first and second interaction points in GCS, full ray set; <code>[n_ray, 3]</code>, read at <code>g = ray_ind[i]</code></li>
+<li><b><code>no_interact</code></b> — Mesh-hit count per ray, full ray set; <code>[n_ray]</code>, read at <code>g</code></li>
+<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (ITU convention), compact set; <code>[n_rayN]</code></li>
+<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code></li>
+<li><b><code>normal_vecN</code></b> <i>(optional)</i> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. NULL disables the parallelism (wedge) test</li>
+<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>)</li>
+<li><b><code>mtl_ind_fbs</code></b>, <b><code>mtl_ind_sbs</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air)</li>
+<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> <i>(optional)</i> — Old state words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
+<li><b><code>eps</code></b> — Resolve threshold for the thin-slab (Fabry-Pérot) factor <code>S</code>. A slab is solved analytically only when its round-trip amplitude <code>rho = sqrt(R_near · R_far · medium_gain(slab, 2L))</code> reaches <code>eps</code>; below it, the bounce is re-emitted for the tracer to follow. Range <code>[0, 1]</code>. <code>eps = 0</code> always resolves — required for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more weak cavities back to the tracer (<code>eps ≈ drop_threshold^(1/N_max)</code>, ~0.1–0.25); <code>eps &gt;= 1</code> disables <code>S</code>.</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>mtl_ind_prev_out</code></b>, <b><code>mtl_ind_current_out</code></b>, <b><code>mtl_ind_buffer_out</code></b> <i>(optional)</i> — New state words, compact set; <code>[n_rayN]</code>, written at <code>i</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
+<li><b><code>gainN</code></b> <i>(optional, in/out)</i> — Per-interaction gain, patched in place; <code>[n_rayN]</code></li>
+<li><b><code>xprmatN</code></b> <i>(optional, in/out)</i> — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; <code>[n_rayN, 8]</code></li>
+<li><b><code>ray_ind</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> -> <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
+</ul>
+
+<b>See also:</b><br>
+<ul>
+<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (computes the per-interaction Fresnel/Jones result this function corrects)</li>
+<li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (the reference state machine this function ports)</li>
 </ul>
 
 <hr class="greyline"><br>

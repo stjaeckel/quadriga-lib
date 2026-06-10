@@ -348,6 +348,32 @@ namespace quadriga_lib
                            arma::Mat<dtype> *normal_vecN = nullptr,                             // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
                            arma::s32_vec *out_typeN = nullptr);                                 // Interaction type code, [n_rayN]
 
+    // Update inside/outside ray state and correct gainN / xprmatN
+    template <typename dtype>
+    void ray_state_update(int interaction_type,                                                // 0 = EM refl, 1 = EM trans, 2 = EM refr, 3 = scalar refl, 4 = scalar trans
+                          dtype center_frequency,                                              // Center frequency in [Hz]
+                          const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, read at g; [n_ray, 3]
+                          const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, read at g; [n_ray, 3]
+                          const arma::Mat<dtype> *fbs,                                         // First interaction points in GCS, read at g; [n_ray, 3]
+                          const arma::Mat<dtype> *sbs,                                         // Second interaction points in GCS, read at g; [n_ray, 3]
+                          const arma::u32_vec *no_interact,                                    // Mesh-hit count between orig and dest, read at g; [n_ray]
+                          const arma::Col<dtype> *fbs_angleN,                                  // Incidence angle at FBS in [rad]; [n_rayN]
+                          const arma::s32_vec *out_typeN,                                      // Interaction type code from ray_mesh_interact; [n_rayN]
+                          const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties keyed by column name; n_mtl materials
+                          const arma::Col<short> *mtl_ind_fbs,                                 // FBS material index (0 = air); [n_rayN]
+                          const arma::Col<short> *mtl_ind_sbs,                                 // SBS material index (0 = air); [n_rayN]
+                          const arma::Col<short> *mtl_ind_prev_in = nullptr,                   // In (read-only): previous medium (0 = outside), read at g; [n_ray]
+                          const arma::Col<short> *mtl_ind_current_in = nullptr,                // In (read-only): current medium (0 = outside), read at g; [n_ray]
+                          const arma::Col<short> *mtl_ind_buffer_in = nullptr,                 // In (read-only): next-transition buffer (0 = empty), read at g; [n_ray]
+                          const arma::Mat<dtype> *normal_vecN = nullptr,                       // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]; NULL disables wedge test; [n_rayN, 6]
+                          arma::Col<short> *mtl_ind_prev_out = nullptr,                        // Out: previous medium (0 = outside), written at i; [n_rayN]
+                          arma::Col<short> *mtl_ind_current_out = nullptr,                     // Out: current medium (0 = outside), written at i; [n_rayN]
+                          arma::Col<short> *mtl_ind_buffer_out = nullptr,                      // Out: next-transition buffer (0 = empty), written at i; [n_rayN]
+                          arma::Col<dtype> *gainN = nullptr,                                   // In/Out: interaction gain, patched in place; [n_rayN]
+                          arma::Mat<dtype> *xprmatN = nullptr,                                 // In/Out: polarization transfer matrix, patched in place; [n_rayN, 8]
+                          arma::u32_vec *ray_ind = nullptr,                                    // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
+                          double eps = 0.15);                                                  // Airy resolve threshold in [0, 1]; 0 = always resolve
+
     // Calculate in-medium gain
     template <typename dtype>
     dtype medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
