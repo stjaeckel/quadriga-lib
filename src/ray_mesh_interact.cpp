@@ -3,7 +3,227 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_material_helpers.hpp"
+#include "quadriga_lib_helper_functions.hpp"
+
+#include <complex>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <cstring>
+
+// Material-interaction helpers. Formerly in "quadriga_lib_material_helpers.hpp"; merged here so
+// that ray_mesh_interact and ray_state_update share one translation unit (the include is dropped).
+
+// Validate a named material-property map and return the material count (n_mtl).
+// - Every present (non-empty) column must have the same length; throws otherwise.
+// - Empty columns are treated as absent (consumers apply per-column defaults).
+// - An empty map returns 0.
+// Call once per public entry point; internal mtl_col / mtl_val accesses are then safe
+// for any material index < the returned n_mtl.
+template <typename dtype>
+static inline arma::uword mtl_validate(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
+{
+    arma::uword n_mtl = 0;
+    bool seen = false;
+    for (const auto &kv : mtl_prop)
+    {
+        if (kv.second.empty())
+            continue;
+        arma::uword len = (arma::uword)kv.second.size();
+        if (!seen)
+        {
+            n_mtl = len;
+            seen = true;
+        }
+        else if (len != n_mtl)
+            throw std::invalid_argument("Material property column '" + kv.first + "' has length " +
+                                        std::to_string(len) + ", expected " + std::to_string(n_mtl) +
+                                        " (all columns must have the same number of materials).");
+    }
+    return n_mtl;
+}
+
+// Resolve a named material-property column to a raw pointer (map-based material model).
+// Returns nullptr if the column is absent; the consumer then applies its own default.
+template <typename dtype>
+static inline const dtype *mtl_col(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, const std::string &key)
+{
+    auto it = mtl_prop->find(key);
+    return (it == mtl_prop->end() || it->second.empty()) ? nullptr : it->second.data();
+}
+
+// Read a material value for material index iM from a resolved column pointer.
+// Falls back to 'def' when the column is absent.
+template <typename dtype>
+static inline double mtl_val(const dtype *col, arma::uword iM, double def)
+{
+    return (col == nullptr) ? def : (double)col[iM];
+}
+
+// Assemble complex-valued eta from mtl coefficients
+static inline std::complex<double> eta_from_coeffs(double a, double b, double c, double d, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double f_rel = fGHz / fRef;
+    double eta_r = a * std::pow(f_rel, b);
+    double sigma = c * std::pow(f_rel, d);
+    double eta_i = -17.98 * sigma / fGHz;
+    return std::complex<double>(eta_r, eta_i);
+}
+
+// Relative permeability from mtl coefficients (mu = 1 when columns absent -> EM unchanged)
+static inline std::complex<double> mu_from_coeffs(double e, double f, double g, double h, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double f_rel = fGHz / fRef;
+    double mu_r = e * std::pow(f_rel, f);
+    double sigma_m = g * std::pow(f_rel, h);
+    return std::complex<double>(mu_r, -17.98 * sigma_m / fGHz);
+}
+
+// Permittivity resonance (acoustic): complex Lorentz pole added to the interface (Fresnel)
+// permittivity only. Inactive unless resF > 0, resQ > 0 and resS != 0, so the EM path is
+// unchanged. The +i denominator makes resS > 0 add loss (negative imaginary part), consistent
+// with the conductivity term. Deliberately NOT applied to the in-medium loss: a strong pole can
+// push Re(eta) < 0, and medium_loss_dB uses a real sqrt(Re eta).
+static inline std::complex<double> eta_resonance(double resF, double resQ, double resS, double fGHz)
+{
+    if (resF <= 0.0 || resQ <= 0.0 || resS == 0.0)
+        return std::complex<double>(0.0, 0.0);
+    double resF2 = resF * resF;
+    std::complex<double> denom(resF2 - fGHz * fGHz, (resF / resQ) * fGHz);
+    return (resS * resF2) / denom;
+}
+
+// Calculate in-medium loss
+static inline double medium_loss_dB(std::complex<double> eta, double alpha, double alphaB,
+                                    double fRef, double fGHz, double dist, double mass = 0.0,
+                                    double abs_cos_theta = 1.0)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double er = std::real(eta);
+    double tan_delta = std::imag(eta) / er;
+    double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
+    double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+    Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
+    double loss = dist * 8.686 / Delta;
+    loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
+
+    // Mass is a bulk-propagation term: never apply it over the ~1 mm co-location
+    // epsilon (ray_offset). Real traversals are at least the panel thickness (cm),
+    // so a small path floor removes the spurious slope without touching them.
+    constexpr double mass_min_path = 0.0015; // m, above ray_offset (0.001)
+    if (mass > 0.0 && dist > mass_min_path)
+    {
+        // Mass law is a surface-impedance term: its angle factor is cos(theta), not the
+        // 1/cos(theta) of the slant traversal. dist is the slant path d/cos(theta), so
+        // dist * cos^2(theta) = d * cos(theta) recovers the mass-law surface mass.
+        double mass_path = dist * abs_cos_theta * abs_cos_theta;
+        double m_dB = mass * std::log10((fGHz / fRef) * mass_path);
+        if (m_dB > 0.0)
+            loss += m_dB;
+    }
+    return loss;
+}
+
+// In-medium gain for material index iM. No validation: the caller guarantees a
+// column-consistent map (via mtl_validate / obj_file_read) and iM < n_mtl.
+template <typename dtype>
+static inline dtype medium_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, arma::uword iM,
+                                     dtype dist, dtype center_frequency)
+{
+    if (!mtl_prop)
+        return (dtype)1.0;
+    double fGHz = (double)center_frequency * 1e-9;
+    const dtype *m_a = mtl_col(mtl_prop, "a");
+    const dtype *m_b = mtl_col(mtl_prop, "b");
+    const dtype *m_c = mtl_col(mtl_prop, "c");
+    const dtype *m_d = mtl_col(mtl_prop, "d");
+    const dtype *m_e = mtl_col(mtl_prop, "e");
+    const dtype *m_f = mtl_col(mtl_prop, "f");
+    const dtype *m_g = mtl_col(mtl_prop, "g");
+    const dtype *m_h = mtl_col(mtl_prop, "h");
+    const dtype *m_alpha = mtl_col(mtl_prop, "alpha");
+    const dtype *m_alphaB = mtl_col(mtl_prop, "alphaB");
+    const dtype *m_mass = mtl_col(mtl_prop, "m");
+    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
+
+    std::complex<double> eta = eta_from_coeffs(mtl_val(m_a, iM, 1.0), mtl_val(m_b, iM, 0.0),
+                                               mtl_val(m_c, iM, 0.0), mtl_val(m_d, iM, 0.0),
+                                               mtl_val(m_fRef, iM, 1.0), fGHz);
+
+    std::complex<double> mu = mu_from_coeffs(mtl_val(m_e, iM, 1.0), mtl_val(m_f, iM, 0.0),
+                                             mtl_val(m_g, iM, 0.0), mtl_val(m_h, iM, 0.0),
+                                             mtl_val(m_fRef, iM, 1.0), fGHz);
+
+    double A = medium_loss_dB(eta * mu, mtl_val(m_alpha, iM, 0.0), mtl_val(m_alphaB, iM, 0.0),
+                              mtl_val(m_fRef, iM, 1.0), fGHz, (double)dist, mtl_val(m_mass, iM, 0.0));
+
+    return (dtype)std::pow(10.0, -0.1 * A);
+}
+
+// Lumped per-entry interface attenuation in dB: power-law penetration loss plus an optional
+// Lorentzian coincidence feature. Coincidence is active only when coiF > 0 and coiA != 0.
+// Total is clamped to >= 0 (a coincidence dip cannot create transmission gain).
+static inline double interface_loss_dB(double att, double attB,
+                                       double coiF, double coiQ, double coiA,
+                                       double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double loss = att * std::pow(fGHz / fRef, attB);
+    if (coiF > 0.0 && coiA != 0.0)
+    {
+        double x = coiQ * (fGHz - coiF) / coiF;
+        loss += coiA / (1.0 + x * x);
+    }
+    return loss;
+}
+
+// Lumped interface transmission gain for material index iM (the material being entered).
+// No validation: the caller guarantees a column-consistent map (via mtl_validate /
+// obj_file_read) and iM < n_mtl. Path-independent; applied once on entry.
+template <typename dtype>
+static inline dtype interface_gain_impl(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, arma::uword iM, dtype center_frequency)
+{
+    if (!mtl_prop)
+        return (dtype)1.0;
+
+    double fGHz = (double)center_frequency * 1e-9;
+    const dtype *m_att = mtl_col(mtl_prop, "att");
+    const dtype *m_attB = mtl_col(mtl_prop, "attB");
+    const dtype *m_coiF = mtl_col(mtl_prop, "coiF");
+    const dtype *m_coiQ = mtl_col(mtl_prop, "coiQ");
+    const dtype *m_coiA = mtl_col(mtl_prop, "coiA");
+    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
+
+    double A = interface_loss_dB(mtl_val(m_att, iM, 0.0), mtl_val(m_attB, iM, 0.0),
+                                 mtl_val(m_coiF, iM, 0.0), mtl_val(m_coiQ, iM, 0.0),
+                                 mtl_val(m_coiA, iM, 0.0), mtl_val(m_fRef, iM, 1.0), fGHz);
+    return (dtype)std::pow(10.0, -0.1 * A);
+}
+
+// Transmission factor at fGHz with optional power-law slope tfB about fRef, clamped to [-1, 1].
+// Redistributes energy between the reflected and transmitted paths (see tf_apply).
+static inline double tf_value(double tf, double tfB, double fRef, double fGHz)
+{
+    if (fRef <= 0.0)
+        fRef = 1.0;
+    double v = tf * std::pow(fGHz / fRef, tfB);
+    return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
+}
+
+// Redistribute physical reflection energy R0 in [0,1] by tf in [-1,1], keeping refl + trans = 1.
+// tf = 0 -> R0 (physical Fresnel); tf = +1 -> 0 (fully transparent); tf = -1 -> 1 (fully reflective).
+static inline double tf_apply(double R0, double tf)
+{
+    R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0); // guard against resonance overshoot
+    return (tf >= 0.0) ? R0 * (1.0 - tf) : R0 + (1.0 - R0) * (-tf);
+}
 
 /*!SECTION
 Site-specific simulation tools
@@ -1189,3 +1409,1058 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
                                               arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN);
+
+// ray_state_update — support code.
+//
+// The helpers below back the inside/outside ray-state machine ported out of
+// calc_diffraction_gain.cpp (its dispatch, source lines 495-907) and the analytic thin-slab
+// (Fabry-Perot) overlay. They sit in the same translation unit as ray_mesh_interact and the
+// merged material helpers above, so no extra include is required.
+//
+// State / material-index convention (see Section 7 of the design spec):
+//   - Material indices (M1 = mtl_ind_fbs, M2 = mtl_ind_sbs, and the three state words) index
+//     mtl_prop directly. The value 0 is reserved for "outside / air / empty"; real materials use
+//     indices >= 1. medium_gain_impl / transition_gain_linear therefore receive the index as-is
+//     and a value of 0 maps to air (gain 1, unit index). This reserves mtl_prop[0] for air and is
+//     what makes the port bit-identical to calc_diffraction_gain, whose state stores 1-based face
+//     indices that resolve to the same material indices.
+//   - State words are bit-masked, never abs(): mat = w & 0x7FFF, flag = w & 0x8000. A flag is set
+//     by OR, (short)(X | 0x8000), never by negation.
+
+// Check whether two media are the same material. Material-index variant of the former
+// face-index helper (the mtl_ind argument is dropped, Section 11): on indices this reduces to a
+// plain equality, which is exactly the face-table comparison the source performed.
+static inline bool same_materials(int iMa, int iMb) // material indices (0 = air/none)
+{
+    return iMa == iMb;
+}
+
+// Medium-to-medium transition gain (transmission power gain across one interface, including the
+// lumped interface gain). Material-index variant of the former face-index helper (the mtl_ind
+// argument is dropped, Section 11): iMa / iMb are material indices, 0 = air. The body is the port
+// of transition_gain_linear from calc_diffraction_gain.cpp with face->material resolution removed.
+template <typename dtype>
+static inline dtype transition_gain_linear(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+                                           int iMa, int iMb, // material indices (0 = air/none)
+                                           dtype theta, dtype fGHz, bool is_scalar)
+{
+    if (mtl_prop == nullptr) // No material model: air-to-air, full transmission
+        return (dtype)1.0;
+
+    // Resolve named material columns (nullptr -> default applied)
+    const dtype *m_a = mtl_col(mtl_prop, "a");
+    const dtype *m_b = mtl_col(mtl_prop, "b");
+    const dtype *m_c = mtl_col(mtl_prop, "c");
+    const dtype *m_d = mtl_col(mtl_prop, "d");
+    const dtype *m_e = mtl_col(mtl_prop, "e");
+    const dtype *m_f = mtl_col(mtl_prop, "f");
+    const dtype *m_g = mtl_col(mtl_prop, "g");
+    const dtype *m_h = mtl_col(mtl_prop, "h");
+    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
+    const dtype *m_resF = mtl_col(mtl_prop, "resF");
+    const dtype *m_resQ = mtl_col(mtl_prop, "resQ");
+    const dtype *m_resS = mtl_col(mtl_prop, "resS");
+    const dtype *m_tf = mtl_col(mtl_prop, "tf");
+    const dtype *m_tfB = mtl_col(mtl_prop, "tfB");
+
+    // Material indices used directly (0 = air, handled by the iMa/iMb != 0 guards below)
+    arma::uword mF = (arma::uword)((iMa < 0) ? 0 : iMa);
+    arma::uword mS = (arma::uword)((iMb < 0) ? 0 : iMb);
+
+    // Convert to double
+    double dTheta = (double)theta;
+
+    // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
+    double abs_cos_theta = std::abs(std::cos(dTheta + 1.570796326794897));
+    abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
+    double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
+
+    // Defaults: air for both media
+    double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0, kR_fRef = 1.0;
+    double kR5 = 1.0, kR6 = 0.0, kR7 = 0.0, kR8 = 0.0;
+    double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0, kS_fRef = 1.0;
+    double kS5 = 1.0, kS6 = 0.0, kS7 = 0.0, kS8 = 0.0;
+    double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
+    double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
+    double kR_tf = 0.0, kR_tfB = 0.0, kS_tf = 0.0, kS_tfB = 0.0;
+    double transition_gain = 1.0;
+
+    if (iMa != 0)
+    {
+        if (dTheta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
+        {
+            kS1 = mtl_val(m_a, mF, 1.0);
+            kS2 = mtl_val(m_b, mF, 0.0);
+            kS3 = mtl_val(m_c, mF, 0.0);
+            kS4 = mtl_val(m_d, mF, 0.0);
+            kS5 = mtl_val(m_e, mF, 1.0);
+            kS6 = mtl_val(m_f, mF, 0.0);
+            kS7 = mtl_val(m_g, mF, 0.0);
+            kS8 = mtl_val(m_h, mF, 0.0);
+            kS_fRef = mtl_val(m_fRef, mF, 1.0);
+            kS_resF = mtl_val(m_resF, mF, 0.0);
+            kS_resQ = mtl_val(m_resQ, mF, 0.0);
+            kS_resS = mtl_val(m_resS, mF, 0.0);
+            kS_tf = mtl_val(m_tf, mF, 0.0);
+            kS_tfB = mtl_val(m_tfB, mF, 0.0);
+            transition_gain = (double)interface_gain_impl(mtl_prop, mF, fGHz * (dtype)1e9);
+        }
+        else // Ray hits back side of FBS face, set first material to object material
+        {
+            kR1 = mtl_val(m_a, mF, 1.0);
+            kR2 = mtl_val(m_b, mF, 0.0);
+            kR3 = mtl_val(m_c, mF, 0.0);
+            kR4 = mtl_val(m_d, mF, 0.0);
+            kR5 = mtl_val(m_e, mF, 1.0);
+            kR6 = mtl_val(m_f, mF, 0.0);
+            kR7 = mtl_val(m_g, mF, 0.0);
+            kR8 = mtl_val(m_h, mF, 0.0);
+            kR_fRef = mtl_val(m_fRef, mF, 1.0);
+            kR_resF = mtl_val(m_resF, mF, 0.0);
+            kR_resQ = mtl_val(m_resQ, mF, 0.0);
+            kR_resS = mtl_val(m_resS, mF, 0.0);
+            kR_tf = mtl_val(m_tf, mF, 0.0);
+            kR_tfB = mtl_val(m_tfB, mF, 0.0);
+        }
+    }
+
+    if (iMb != 0) // Material to material transition
+    {
+        if (dTheta >= 0.0) // SBS (front side) is hit first
+        {
+            kR1 = mtl_val(m_a, mS, 1.0);
+            kR2 = mtl_val(m_b, mS, 0.0);
+            kR3 = mtl_val(m_c, mS, 0.0);
+            kR4 = mtl_val(m_d, mS, 0.0);
+            kR5 = mtl_val(m_e, mS, 1.0);
+            kR6 = mtl_val(m_f, mS, 0.0);
+            kR7 = mtl_val(m_g, mS, 0.0);
+            kR8 = mtl_val(m_h, mS, 0.0);
+            kR_fRef = mtl_val(m_fRef, mS, 1.0);
+            kR_resF = mtl_val(m_resF, mS, 0.0);
+            kR_resQ = mtl_val(m_resQ, mS, 0.0);
+            kR_resS = mtl_val(m_resS, mS, 0.0);
+            kR_tf = mtl_val(m_tf, mS, 0.0);
+            kR_tfB = mtl_val(m_tfB, mS, 0.0);
+        }
+        else // FBS (back side) is hit first
+        {
+            kS1 = mtl_val(m_a, mS, 1.0);
+            kS2 = mtl_val(m_b, mS, 0.0);
+            kS3 = mtl_val(m_c, mS, 0.0);
+            kS4 = mtl_val(m_d, mS, 0.0);
+            kS5 = mtl_val(m_e, mS, 1.0);
+            kS6 = mtl_val(m_f, mS, 0.0);
+            kS7 = mtl_val(m_g, mS, 0.0);
+            kS8 = mtl_val(m_h, mS, 0.0);
+            kS_fRef = mtl_val(m_fRef, mS, 1.0);
+            kS_resF = mtl_val(m_resF, mS, 0.0);
+            kS_resQ = mtl_val(m_resQ, mS, 0.0);
+            kS_resS = mtl_val(m_resS, mS, 0.0);
+            kS_tf = mtl_val(m_tf, mS, 0.0);
+            kS_tfB = mtl_val(m_tfB, mS, 0.0);
+            transition_gain = (double)interface_gain_impl(mtl_prop, mS, fGHz * (dtype)1e9);
+        }
+    }
+
+    // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
+    std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, (double)fGHz) +
+                                eta_resonance(kR_resF, kR_resQ, kR_resS, (double)fGHz);
+
+    std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz) +
+                                eta_resonance(kS_resF, kS_resQ, kS_resS, (double)fGHz);
+
+    std::complex<double> mu1 = mu_from_coeffs(kR5, kR6, kR7, kR8, kR_fRef, (double)fGHz);
+    std::complex<double> mu2 = mu_from_coeffs(kS5, kS6, kS7, kS8, kS_fRef, (double)fGHz);
+
+    bool dense2light = std::real(eta1 * mu1) > std::real(eta2 * mu2);
+
+    double reflection_gain = 0.0;
+    if (is_scalar)
+    {
+        // Scalar: physical Fresnel reflection (TE), redistributed by the transmission factor.
+        // Energy conserved by construction (refl + trans = 1); no dense2light pass-through.
+        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
+        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
+        std::complex<double> z1 = std::sqrt(eta1 / mu1);
+        std::complex<double> z2 = std::sqrt(eta2 / mu2);
+        std::complex<double> R_eTE = (z1 * abs_cos_theta - z2 * cos_theta2) /
+                                     (z1 * abs_cos_theta + z2 * cos_theta2);
+        double tf_eff = tf_value((dTheta >= 0.0) ? kS_tf : kR_tf,
+                                 (dTheta >= 0.0) ? kS_tfB : kR_tfB,
+                                 (dTheta >= 0.0) ? kS_fRef : kR_fRef, (double)fGHz);
+        reflection_gain = tf_apply(std::norm(R_eTE), tf_eff);
+    }
+    else if (!dense2light) // EM: Fresnel on light->dense, pass-through on dense->light
+    {
+        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
+        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
+        eta1 = std::sqrt(eta1 / mu1);
+        eta2 = std::sqrt(eta2 / mu2);
+        std::complex<double> R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) /
+                                     (eta1 * abs_cos_theta + eta2 * cos_theta2);
+        std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
+                                     (eta2 * abs_cos_theta + eta1 * cos_theta2);
+        reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
+    }
+    return dtype(transition_gain * (1.0 - reflection_gain));
+}
+
+// Parallelism gate (Section 9.3). Two faces bound a slab when their planes share orientation,
+// regardless of normal sign: the magnitude of the normal dot product is tested, so both
+// dot ~ +1 and dot ~ -1 count as parallel. Only genuine wedges/edges (|dot| well below 1) fail.
+// tol = 3.8e-3 (~5 deg).
+static inline bool faces_parallel(double nfx, double nfy, double nfz,
+                                  double nsx, double nsy, double nsz)
+{
+    const double tol = 3.8e-3;
+    double d = nfx * nsx + nfy * nsy + nfz * nsz;
+    return std::abs(d) > 1.0 - tol;
+}
+
+// Analytic thin-slab (Fabry-Perot) factor S = 1 / (1 - r_near * r_far * phi^2) with the survival
+// gate (Section 9.4), the near-pole clamp (Section 9.7) and tf-effective, Stokes-consistent
+// coefficients (Section 9.5). Returns true and writes S when the slab is resolved; returns false
+// (re-emit) when the parallelism flag is set, when the round-trip amplitude rho is below eps, or
+// when the denominator is near the pole. On a false return S_re / S_im are left untouched.
+//
+//   slab_mat   medium inside the cavity (Section 9.1: the current medium; air, index 0, for the
+//              i-o-i air-gap case). For air, |phi| = 1 and the index is unity.
+//   near_mat   medium on the far side of the interface being processed (r_near, slab side).
+//   far_mat    medium on the far side of the opposite interface (r_far).
+//   theta      incidence angle in the fbs_angleN convention (theta = acos(cos_inc) - pi/2).
+//   L          one-way in-slab path d(orig, fbs).
+//
+// TODO(QRT): the exact r_near/r_far adjacent-material assignment and the in-slab one-way
+// loss/phase ownership (dispatch MED vs QRT geometric per-segment, Section 9.2) are finalized at
+// tracer integration. S supplies only the round-trip resonant factor phi^2 inside the series.
+template <typename dtype>
+static inline bool slab_airy_factor(const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+                                    int slab_mat, int near_mat, int far_mat,
+                                    double theta, double L, dtype center_frequency,
+                                    bool is_scalar, bool parallel_ok, double eps,
+                                    double &S_re, double &S_im)
+{
+    (void)is_scalar;  // the TE Fresnel form below already matches the scalar interface model
+    if (!parallel_ok) // known wedge/edge -> re-emit
+        return false;
+
+    const double fGHz = (double)center_frequency * 1e-9;
+    const double c0 = 299792458.0;
+    const double omega = 2.0 * 3.14159265358979323846 * (double)center_frequency;
+
+    // Resolve named material columns once (nullptr -> per-column air defaults)
+    const dtype *m_a = mtl_prop ? mtl_col(mtl_prop, "a") : nullptr;
+    const dtype *m_b = mtl_prop ? mtl_col(mtl_prop, "b") : nullptr;
+    const dtype *m_c = mtl_prop ? mtl_col(mtl_prop, "c") : nullptr;
+    const dtype *m_d = mtl_prop ? mtl_col(mtl_prop, "d") : nullptr;
+    const dtype *m_e = mtl_prop ? mtl_col(mtl_prop, "e") : nullptr;
+    const dtype *m_f = mtl_prop ? mtl_col(mtl_prop, "f") : nullptr;
+    const dtype *m_g = mtl_prop ? mtl_col(mtl_prop, "g") : nullptr;
+    const dtype *m_h = mtl_prop ? mtl_col(mtl_prop, "h") : nullptr;
+    const dtype *m_fRef = mtl_prop ? mtl_col(mtl_prop, "fRef") : nullptr;
+    const dtype *m_resF = mtl_prop ? mtl_col(mtl_prop, "resF") : nullptr;
+    const dtype *m_resQ = mtl_prop ? mtl_col(mtl_prop, "resQ") : nullptr;
+    const dtype *m_resS = mtl_prop ? mtl_col(mtl_prop, "resS") : nullptr;
+    const dtype *m_tf = mtl_prop ? mtl_col(mtl_prop, "tf") : nullptr;
+    const dtype *m_tfB = mtl_prop ? mtl_col(mtl_prop, "tfB") : nullptr;
+
+    // eta_if: resonance-included permittivity (interface / Fresnel). eta_med: resonance-excluded
+    // permittivity (medium path / phase). mu: relative permeability. tfv: transmission factor.
+    auto resolve_eta = [&](int mat, std::complex<double> &eta_if, std::complex<double> &mu,
+                           std::complex<double> &eta_med, double &tfv)
+    {
+        if (mat == 0 || mtl_prop == nullptr) // air / vacuum
+        {
+            eta_if = std::complex<double>(1.0, 0.0);
+            mu = std::complex<double>(1.0, 0.0);
+            eta_med = std::complex<double>(1.0, 0.0);
+            tfv = 0.0;
+            return;
+        }
+        arma::uword im = (arma::uword)mat;
+        std::complex<double> e0 = eta_from_coeffs(mtl_val(m_a, im, 1.0), mtl_val(m_b, im, 0.0),
+                                                  mtl_val(m_c, im, 0.0), mtl_val(m_d, im, 0.0),
+                                                  mtl_val(m_fRef, im, 1.0), fGHz);
+        mu = mu_from_coeffs(mtl_val(m_e, im, 1.0), mtl_val(m_f, im, 0.0),
+                            mtl_val(m_g, im, 0.0), mtl_val(m_h, im, 0.0),
+                            mtl_val(m_fRef, im, 1.0), fGHz);
+        eta_med = e0;
+        eta_if = e0 + eta_resonance(mtl_val(m_resF, im, 0.0), mtl_val(m_resQ, im, 0.0),
+                                    mtl_val(m_resS, im, 0.0), fGHz);
+        tfv = tf_value(mtl_val(m_tf, im, 0.0), mtl_val(m_tfB, im, 0.0), mtl_val(m_fRef, im, 1.0), fGHz);
+    };
+
+    // Slab medium
+    std::complex<double> eta_s_if, mu_s, eta_s_med;
+    double tf_s;
+    resolve_eta(slab_mat, eta_s_if, mu_s, eta_s_med, tf_s);
+
+    // Incidence cosine (fbs_angleN convention)
+    double abs_cos = std::abs(std::cos(theta + 1.570796326794897));
+    abs_cos = (abs_cos > 1.0) ? 1.0 : abs_cos;
+    double sin2 = 1.0 - abs_cos * abs_cos;
+
+    // Fresnel (TE) amplitude reflection at slab|adjacent from the slab side, with tf folded into
+    // the magnitude and the Fresnel phase preserved (Section 9.5). Returns r and R = |r|^2.
+    auto fresnel_r = [&](int adj_mat, std::complex<double> &r, double &R)
+    {
+        std::complex<double> eta_a_if, mu_a, eta_a_med;
+        double tf_a;
+        resolve_eta(adj_mat, eta_a_if, mu_a, eta_a_med, tf_a);
+        std::complex<double> z1 = std::sqrt(eta_s_if / mu_s); // slab admittance
+        std::complex<double> z2 = std::sqrt(eta_a_if / mu_a); // adjacent admittance
+        std::complex<double> ratio = (eta_s_if * mu_s) / (eta_a_if * mu_a);
+        std::complex<double> cos_t2 = std::sqrt(1.0 - ratio * sin2);
+        std::complex<double> r_te = (z1 * abs_cos - z2 * cos_t2) / (z1 * abs_cos + z2 * cos_t2);
+        double R0 = std::norm(r_te);
+        double Reff = tf_apply(R0, tf_a); // tf carried by the adjacent (entered) material
+        r = std::polar(std::sqrt(Reff), std::arg(r_te));
+        R = Reff;
+    };
+
+    std::complex<double> r_near, r_far;
+    double R_near = 0.0, R_far = 0.0;
+    fresnel_r(near_mat, r_near, R_near);
+    fresnel_r(far_mat, r_far, R_far);
+
+    // One-way in-slab propagation phi (Section 9.1): magnitude from the full medium_gain (dielectric
+    // + alpha + mass), phase from the resonance-excluded permittivity only. Air slab -> lossless,
+    // unit index.
+    double gL, n_re;
+    if (slab_mat == 0 || mtl_prop == nullptr)
+        gL = 1.0, n_re = 1.0;
+    else
+    {
+        gL = (double)medium_gain_impl(mtl_prop, (arma::uword)slab_mat, (dtype)L, center_frequency);
+        n_re = std::real(std::sqrt(eta_s_med * mu_s)); // real refractive index
+    }
+    double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
+    double arg_phi = -(omega / c0) * n_re * L;
+    std::complex<double> phi2 = std::polar(abs_phi * abs_phi, 2.0 * arg_phi); // phi^2
+
+    std::complex<double> denom = std::complex<double>(1.0, 0.0) - r_near * r_far * phi2;
+
+    // Survival gate (Section 9.4): rho^2 = R_near * R_far * medium_gain(2L)
+    double g2L = (slab_mat == 0 || mtl_prop == nullptr)
+                     ? 1.0
+                     : (double)medium_gain_impl(mtl_prop, (arma::uword)slab_mat, (dtype)(2.0 * L), center_frequency);
+    double rr = R_near * R_far;
+    rr = (rr < 0.0) ? 0.0 : rr;
+    g2L = (g2L < 0.0) ? 0.0 : g2L;
+    double rho = std::sqrt(rr * g2L);
+
+    // Survival + near-pole clamp (Section 9.7): hand the near-pole / low-amplitude case back to
+    // the tracer as a re-emit.
+    if (rho < eps || std::abs(denom) < 1.0e-2)
+        return false;
+
+    std::complex<double> S = std::complex<double>(1.0, 0.0) / denom;
+    S_re = std::real(S);
+    S_im = std::imag(S);
+    return true;
+}
+
+// Gain / xprmat patch operations (Section 5). xprmatN columns are VV(0,1) HV(2,3) VH(4,5) HH(6,7),
+// re/im per entry. Either output may be null; the other is still patched.
+
+// Uniform complex scale by c = (cr + j*ci): multiply each Jones entry by c and keep gainN
+// consistent (gainN *= |c|^2). Backs IG (c = 1), IG*MED (c = sqrt(g)), IG*S (c = S) and
+// IG*S*MED (c = S*sqrt(g)). Mode-agnostic: scalar mode keeps its zero off-diagonal entries zero.
+// With xprmatN == nullptr an IG*S row degrades to the magnitude-only gainN *= |S|^2 (Section 5).
+template <typename dtype>
+static inline void rsu_scale(dtype *p_xprmatN, dtype *p_gainN, size_t i, size_t n_rayN_t,
+                             double cr, double ci)
+{
+    if (p_xprmatN != nullptr)
+        for (int k = 0; k < 4; ++k)
+        {
+            size_t re_i = i + (size_t)(2 * k) * n_rayN_t;
+            size_t im_i = i + (size_t)(2 * k + 1) * n_rayN_t;
+            double re = (double)p_xprmatN[re_i];
+            double im = (double)p_xprmatN[im_i];
+            p_xprmatN[re_i] = (dtype)(re * cr - im * ci);
+            p_xprmatN[im_i] = (dtype)(re * ci + im * cr);
+        }
+    if (p_gainN != nullptr)
+        p_gainN[i] = (dtype)((double)p_gainN[i] * (cr * cr + ci * ci));
+}
+
+// Isotropic replace with in-medium / transition power gain g (field sqrt(g)): discards the
+// (spurious) interaction. EM lays sqrt(g) on VV and HH (gainN = 0.5*(g+g) = g); scalar lays it on
+// VV only (gainN = |VV|^2 = g). Backs the MED(...) and MED*TRN*MED rows. gainN is set to g to stay
+// bit-identical with the diffraction reference even where the unclamped path yields g > 1.
+template <typename dtype>
+static inline void rsu_replace(dtype *p_xprmatN, dtype *p_gainN, size_t i, size_t n_rayN_t,
+                               double g, bool is_scalar)
+{
+    if (p_xprmatN != nullptr)
+    {
+        for (int c = 0; c < 8; ++c)
+            p_xprmatN[i + (size_t)c * n_rayN_t] = (dtype)0.0;
+        double a = std::sqrt((g < 0.0) ? 0.0 : g);
+        p_xprmatN[i] = (dtype)a; // VV_re
+        if (!is_scalar)
+            p_xprmatN[i + (size_t)6 * n_rayN_t] = (dtype)a; // HH_re
+    }
+    if (p_gainN != nullptr)
+        p_gainN[i] = (dtype)g;
+}
+
+// KILL: zero the interaction (Section 5).
+template <typename dtype>
+static inline void rsu_kill(dtype *p_xprmatN, dtype *p_gainN, size_t i, size_t n_rayN_t)
+{
+    if (p_xprmatN != nullptr)
+        for (int c = 0; c < 8; ++c)
+            p_xprmatN[i + (size_t)c * n_rayN_t] = (dtype)0.0;
+    if (p_gainN != nullptr)
+        p_gainN[i] = (dtype)0.0;
+}
+
+/*!MD
+# ray_state_update
+Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
+
+- Corrects the per-interaction `gainN` / `xprmatN` produced by [[ray_mesh_interact]] using a tracked
+  per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
+  current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
+  0x7FFF`, `flag = w & 0x8000`).
+- Ports the inside/outside state machine formerly embedded in [[calc_diffraction_gain]] and overlays
+  a closed-form thin-slab factor `S` (the Airy sum) so a single coefficient captures the full
+  internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on
+  the tracer to follow every internal bounce.
+- Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
+  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
+  suppressed (the survival gate re-emits) the transmission/refraction path reproduces
+  [[calc_diffraction_gain]] bit-for-bit.
+
+## Declaration:
+```
+void quadriga_lib::ray_state_update(
+    int interaction_type,
+    dtype center_frequency,
+    const arma::Mat<dtype> *orig,
+    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> *fbs,
+    const arma::Mat<dtype> *sbs,
+    const arma::u32_vec *no_interact,
+    const arma::Col<dtype> *fbs_angleN,
+    const arma::s32_vec *out_typeN,
+    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+    const arma::Col<short> *mtl_ind_fbs,
+    const arma::Col<short> *mtl_ind_sbs,
+    const arma::Col<short> *mtl_ind_prev_in = nullptr,
+    const arma::Col<short> *mtl_ind_current_in = nullptr,
+    const arma::Col<short> *mtl_ind_buffer_in = nullptr,
+    const arma::Mat<dtype> *normal_vecN = nullptr,
+    arma::Col<short> *mtl_ind_prev_out = nullptr,
+    arma::Col<short> *mtl_ind_current_out = nullptr,
+    arma::Col<short> *mtl_ind_buffer_out = nullptr,
+    arma::Col<dtype> *gainN = nullptr,
+    arma::Mat<dtype> *xprmatN = nullptr,
+    arma::u32_vec *ray_ind = nullptr,
+    double eps = 0.15);
+```
+
+## Inputs:
+- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission
+- **`center_frequency`** — Center frequency in [Hz]
+- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in GCS, full ray set; `[n_ray, 3]`, read at `g = ray_ind[i]`
+- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`, read at `g`
+- **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
+- **`out_typeN`** — Interaction type code from [[ray_mesh_interact]], compact set; `[n_rayN]`
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]])
+- **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — Old state words,
+  full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
+- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. NULL disables the parallelism (wedge) test
+- **`eps`** — Resolve threshold for the thin-slab (Fabry-Pérot) factor `S`. A slab is solved analytically only
+  when its round-trip amplitude `rho = sqrt(R_near · R_far · medium_gain(slab, 2L))` reaches `eps`; below it,
+  the bounce is re-emitted for the tracer to follow. Range `[0, 1]`. `eps = 0` always resolves — required
+  for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more
+  weak cavities back to the tracer (`eps ≈ drop_threshold^(1/N_max)`, ~0.1–0.25); `eps >= 1` disables `S`.
+
+## Outputs:
+- **`mtl_ind_prev_out`**, **`mtl_ind_current_out`**, **`mtl_ind_buffer_out`** — New state words,
+  compact set; `[n_rayN]`, written at `i`. NULL skips the write. Passing all six state args NULL disables tracking —
+  each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
+  reflection-bounce `S` need the tracked medium.
+- **`gainN`** *(in/out)* — Per-interaction gain, patched in place; `[n_rayN]`
+- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; `[n_rayN, 8]`
+- **`ray_ind`** — Compact-to-full ray index map; `[n_rayN]` -> `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+
+## See also:
+- [[ray_mesh_interact]] (computes the per-interaction Fresnel/Jones result this function corrects)
+- [[calc_diffraction_gain]] (the reference state machine this function ports)
+MD!*/
+
+template <typename dtype>
+void quadriga_lib::ray_state_update(int interaction_type,
+                                    dtype center_frequency,
+                                    const arma::Mat<dtype> *orig,
+                                    const arma::Mat<dtype> *dest,
+                                    const arma::Mat<dtype> *fbs,
+                                    const arma::Mat<dtype> *sbs,
+                                    const arma::u32_vec *no_interact,
+                                    const arma::Col<dtype> *fbs_angleN,
+                                    const arma::s32_vec *out_typeN,
+                                    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
+                                    const arma::Col<short> *mtl_ind_fbs,
+                                    const arma::Col<short> *mtl_ind_sbs,
+                                    const arma::Col<short> *mtl_ind_prev_in,
+                                    const arma::Col<short> *mtl_ind_current_in,
+                                    const arma::Col<short> *mtl_ind_buffer_in,
+                                    const arma::Mat<dtype> *normal_vecN,
+                                    arma::Col<short> *mtl_ind_prev_out,
+                                    arma::Col<short> *mtl_ind_current_out,
+                                    arma::Col<short> *mtl_ind_buffer_out,
+                                    arma::Col<dtype> *gainN,
+                                    arma::Mat<dtype> *xprmatN,
+                                    arma::u32_vec *ray_ind,
+                                    double eps)
+{
+    // Ray offset is used to detect co-location of points, value in meters
+    const double ray_offset = 0.001;
+
+    if (interaction_type < 0 || interaction_type > 4)
+        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission");
+
+    if (center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+
+    if (orig == nullptr || dest == nullptr || fbs == nullptr || sbs == nullptr)
+        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' cannot be NULL.");
+    if (out_typeN == nullptr)
+        throw std::invalid_argument("Input 'out_typeN' cannot be NULL.");
+
+    // Validate the material map once; internal mtl_col / mtl_val accesses are then safe for any
+    // material index < n_mtl (the caller guarantees M1, M2 and the state words are in range).
+    if (mtl_prop != nullptr)
+        (void)mtl_validate(*mtl_prop);
+
+    const bool is_scalar = interaction_type >= 3;
+    const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
+
+    const arma::uword n_rayN = out_typeN->n_elem;
+    if (n_rayN >= INT32_MAX)
+        throw std::invalid_argument("Number of interaction rays exceeds maximum supported number.");
+    const size_t n_rayN_t = (size_t)n_rayN;
+    const int n_rayN_i = (int)n_rayN;
+
+    // Allocate / size the output state arrays (compact set)
+    if (mtl_ind_prev_out != nullptr && mtl_ind_prev_out->n_elem != n_rayN)
+        mtl_ind_prev_out->set_size(n_rayN);
+    if (mtl_ind_current_out != nullptr && mtl_ind_current_out->n_elem != n_rayN)
+        mtl_ind_current_out->set_size(n_rayN);
+    if (mtl_ind_buffer_out != nullptr && mtl_ind_buffer_out->n_elem != n_rayN)
+        mtl_ind_buffer_out->set_size(n_rayN);
+
+    // Input / output pointers
+    const unsigned *p_no_interact = (no_interact == nullptr) ? nullptr : no_interact->memptr();
+    const int *p_out_typeN = out_typeN->memptr();
+    const dtype *p_fbs_angleN = (fbs_angleN == nullptr) ? nullptr : fbs_angleN->memptr();
+    const dtype *p_normal_vecN = (normal_vecN == nullptr) ? nullptr : normal_vecN->memptr();
+    const short *p_M1 = (mtl_ind_fbs == nullptr) ? nullptr : mtl_ind_fbs->memptr();
+    const short *p_M2 = (mtl_ind_sbs == nullptr) ? nullptr : mtl_ind_sbs->memptr();
+    const short *p_prev_in = (mtl_ind_prev_in == nullptr) ? nullptr : mtl_ind_prev_in->memptr();
+    const short *p_cur_in = (mtl_ind_current_in == nullptr) ? nullptr : mtl_ind_current_in->memptr();
+    const short *p_buf_in = (mtl_ind_buffer_in == nullptr) ? nullptr : mtl_ind_buffer_in->memptr();
+    short *p_prev_out = (mtl_ind_prev_out == nullptr) ? nullptr : mtl_ind_prev_out->memptr();
+    short *p_cur_out = (mtl_ind_current_out == nullptr) ? nullptr : mtl_ind_current_out->memptr();
+    short *p_buf_out = (mtl_ind_buffer_out == nullptr) ? nullptr : mtl_ind_buffer_out->memptr();
+    dtype *p_gainN = (gainN == nullptr) ? nullptr : gainN->memptr();
+    dtype *p_xprmatN = (xprmatN == nullptr) ? nullptr : xprmatN->memptr();
+    const unsigned *p_ray_ind = (ray_ind == nullptr) ? nullptr : ray_ind->memptr();
+
+#pragma omp parallel for
+    for (int i = 0; i < n_rayN_i; ++i) // Interaction loop (compact set)
+    {
+        size_t ii = (size_t)i;
+        size_t g = (p_ray_ind == nullptr) ? ii : (size_t)p_ray_ind[ii]; // Full-set index
+
+        // Old state at g (full set). Defaults to copy-through into the compact outputs at i.
+        short s_prev = (p_prev_in == nullptr) ? (short)0 : p_prev_in[g];
+        short s_cur = (p_cur_in == nullptr) ? (short)0 : p_cur_in[g];
+        short s_buf = (p_buf_in == nullptr) ? (short)0 : p_buf_in[g];
+        int cur = s_cur & 0x7FFF;
+        bool resolved = (s_cur & 0x8000) != 0;
+        int buf = s_buf & 0x7FFF;
+        int prev_mat = s_prev & 0x7FFF;
+        bool prev_nonpar = (s_prev & 0x8000) != 0;
+        short out_prev = s_prev, out_cur = s_cur, out_buf = s_buf;
+
+        // Compact-set reads at i
+        unsigned nH = (p_no_interact == nullptr) ? 1u : p_no_interact[g];
+        int typeH = p_out_typeN[ii];
+        int M1 = (p_M1 == nullptr) ? 0 : (int)(p_M1[ii] & (short)0x7FFF);
+        int M2 = (p_M2 == nullptr) ? 0 : (int)(p_M2[ii] & (short)0x7FFF);
+        double theta = (p_fbs_angleN == nullptr) ? 0.0 : (double)p_fbs_angleN[ii];
+        dtype fGHz = (dtype)((double)center_frequency * 1e-9);
+
+        // Euclidean distance between two full-set geometry rows at g
+        auto D = [&](const arma::Mat<dtype> *A, const arma::Mat<dtype> *B) -> double
+        {
+            return (double)qd_calc_length(A->at(g, 0), A->at(g, 1), A->at(g, 2),
+                                          B->at(g, 0), B->at(g, 1), B->at(g, 2));
+        };
+
+        // Wedge test (Section 9.3): true when FBS and SBS faces sit at a real angle. No-op (false)
+        // when normals are absent or the two faces are a single point. Run only at o-i entries that
+        // capture both faces (nH >= 2 types 1/7/13).
+        auto wedge_nonparallel = [&]() -> bool
+        {
+            if (p_normal_vecN == nullptr)
+                return false;
+            if (!(D(fbs, sbs) > 1.0e-6))
+                return false;
+            double nfx = (double)p_normal_vecN[ii];
+            double nfy = (double)p_normal_vecN[ii + n_rayN_t];
+            double nfz = (double)p_normal_vecN[ii + 2 * n_rayN_t];
+            double nsx = (double)p_normal_vecN[ii + 3 * n_rayN_t];
+            double nsy = (double)p_normal_vecN[ii + 4 * n_rayN_t];
+            double nsz = (double)p_normal_vecN[ii + 5 * n_rayN_t];
+            return !faces_parallel(nfx, nfy, nfz, nsx, nsy, nsz);
+        };
+
+        // Medium gain shorthand: MED(m, d) with material index m used directly (0 = air -> 1).
+        auto MED = [&](int m, double d) -> double
+        {
+            return (double)medium_gain_impl(mtl_prop, (arma::uword)((m < 0) ? 0 : m), (dtype)d, center_frequency);
+        };
+        auto TRN = [&](int a, int b) -> double
+        {
+            return (double)transition_gain_linear(mtl_prop, a, b, (dtype)theta, fGHz, is_scalar);
+        };
+
+        if (refl_pass) // Reflection pass, interaction_type in {0, 3} (Section 10.0, 10.7)
+        {
+            if (resolved)
+            {
+                // Resolved-ray reflection: the front reflection is already summed inside S -> KILL.
+                rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+            }
+            else if (cur == 0)
+            {
+                // Entry / order-0 front reflection: bare Fresnel r12 (naturally |R| = 1 under TIR).
+                // IG, state copy-through.
+            }
+            else
+            {
+                // Internal / back reflection of a resolvable parallel slab: r23 * S, set the
+                // RESOLVED flag so the ray then exits the front transparently (Section 9.2, 10.7).
+                double L = D(orig, fbs);
+                double Sre = 0.0, Sim = 0.0;
+                bool res = slab_airy_factor(mtl_prop, cur, 0, 0, theta, L, center_frequency,
+                                            is_scalar, !prev_nonpar, eps, Sre, Sim);
+                if (res)
+                {
+                    rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim); // IG * S
+                    out_cur = (short)((cur & 0x7FFF) | (int)0x8000);       // set resolved flag
+                }
+                // else: ordinary reflection / re-emit -> IG, copy-through
+            }
+        }
+        else // Transmission / refraction pass, interaction_type in {1, 2, 4}
+        {
+            bool is_TR = (typeH == 3 || typeH == 6 || typeH == 9 || typeH == 12 || typeH == 15);
+
+            if (is_TR)
+            {
+                // TR forward-kill (Section 10.6). TR out-codes occur only for interaction_type == 2
+                // and win over the resolved flag (Section 10.0): no transmitted field. State unchanged.
+                rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+            }
+            else if (resolved)
+            {
+                // Resolved-ray out-coupling (Section 10.0). iM = the next medium for an i-i.
+                int iM = (typeH == 5) ? M2 : M1;
+                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o: out-coupling t21
+                {
+                    out_cur = (short)0; // current_out <- 0, clear resolved flag
+                }
+                else if (typeH == 4 || typeH == 5) // i-i: stay resolved, advance medium
+                {
+                    out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // keep resolved flag
+                    out_prev = (short)cur;                          // prev_out <- old cur
+                }
+                // else: o-i / edges -> transparent pass-through, IG, state copy-through
+            }
+            else if (nH == 0)
+            {
+                // Not processed: the caller applies any whole-segment in-medium loss. Copy-through.
+            }
+            else if ((nH == 1 && typeH == 1) || (nH == 2 && typeH == 7) || (nH == 2 && typeH == 13))
+            {
+                // o-i family, entry / overlapping-entry (Section 10.1, Branch A)
+                if (cur == 0) // enter
+                {
+                    double dist = D(fbs, dest);
+                    dist = (dist > ray_offset) ? dist - ray_offset : dist;                      // clamped
+                    rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, std::sqrt(MED(M1, dist)), 0.0); // IG * MED
+                    out_cur = (short)M1;
+                    bool nonpar = (nH >= 2) && wedge_nonparallel();
+                    out_prev = (short)(nonpar ? (int)0x8000 : 0); // prev <- 0, +flag
+                }
+                else // nested
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, dest)), is_scalar);
+                    out_buf = (short)M1;
+                }
+            }
+            else if ((nH == 1 && typeH == 2) || (nH == 2 && typeH == 8) || (nH == 2 && typeH == 14))
+            {
+                // i-o family, exit / false-inside / virtual transitions (Section 10.2, Branch A)
+                if (cur == 0) // false inside
+                {
+                    // IG, copy-through
+                }
+                else if (buf == 0) // cavity exit, IG * S
+                {
+                    double Sre = 0.0, Sim = 0.0;
+                    bool res = slab_airy_factor(mtl_prop, cur, 0, 0, theta, D(orig, fbs), center_frequency,
+                                                is_scalar, !prev_nonpar, eps, Sre, Sim);
+                    if (res)
+                        rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim);
+                    out_cur = (short)0;
+                }
+                else if (nH == 1 && typeH == 2) // virtual i-i
+                {
+                    if (same_materials(buf, M1)) // M2 embedded in M1, ignore M2
+                    {
+                        rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, dest)), is_scalar);
+                        out_buf = (short)0;
+                    }
+                    else
+                    {
+                        double g = MED(cur, D(orig, fbs)) * TRN(cur, buf) * MED(buf, D(fbs, dest));
+                        rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                        out_cur = (short)buf;
+                        out_buf = (short)0;
+                    }
+                }
+                else // nH == 2 types 8/14, buf != 0: ii-oo
+                {
+                    double g = MED(cur, D(orig, fbs)) * TRN(cur, 0);
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                    out_cur = (short)0;
+                    out_buf = (short)0;
+                }
+            }
+            else if (nH == 2 && typeH == 1)
+            {
+                // o-i-o (Section 10.1, Branch B)
+                if (cur == 0)
+                {
+                    // IG (bare); current_out <- M1, +flag
+                    out_cur = (short)M1;
+                    bool nonpar = wedge_nonparallel();
+                    out_prev = (short)(nonpar ? (int)0x8000 : 0);
+                }
+                else // nested o-i-o
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs)), is_scalar);
+                    out_buf = (short)M1;
+                }
+            }
+            else if (nH == 2 && typeH == 2)
+            {
+                // i-o-i (Section 10.2, Branch B)
+                if (buf == 0)
+                {
+                    if (M2 == 0) // illegal
+                        rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                    else // cavity exit, air gap: slab is air, bounded by M1 / M2 (Section 9.1)
+                    {
+                        double Sre = 0.0, Sim = 0.0;
+                        bool res = slab_airy_factor(mtl_prop, 0, M1, M2, theta, D(orig, fbs), center_frequency,
+                                                    is_scalar, !prev_nonpar, eps, Sre, Sim);
+                        if (res)
+                            rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim);
+                        out_cur = (short)0; // survives
+                    }
+                }
+                else if (cur != 0)
+                {
+                    if (same_materials(buf, M1))
+                    {
+                        rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                        out_buf = (short)0; // survives
+                    }
+                    else
+                    {
+                        double g = MED(cur, D(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
+                        rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                        out_cur = (short)buf;
+                        out_buf = (short)0; // survives
+                    }
+                }
+                else // buf != 0 and cur == 0: terminate (source lines 649-650)
+                    rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+            }
+            else if (nH == 2 && (typeH == 4 || typeH == 5))
+            {
+                // M2M (i-i) family (Section 10.3, nH == 2)
+                if (cur == 0) // illegal
+                    rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                else if (buf == 0)
+                {
+                    if (M1 == 0 || M2 == 0) // illegal
+                        rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                    else // cavity transition: IG * S * MED(iM, d(fbs,dest) - off (unclamped))
+                    {
+                        int iM = (typeH == 5) ? M2 : M1;
+                        double gmed = MED(iM, D(fbs, dest) - ray_offset); // unclamped
+                        double Sre = 0.0, Sim = 0.0;
+                        bool res = slab_airy_factor(mtl_prop, cur, iM, prev_mat, theta, D(orig, fbs), center_frequency,
+                                                    is_scalar, !prev_nonpar, eps, Sre, Sim);
+                        double cr = std::sqrt(gmed), ci = 0.0;
+                        if (res)
+                            cr = Sre * std::sqrt(gmed), ci = Sim * std::sqrt(gmed);
+                        rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, cr, ci);
+                        out_cur = (short)iM;   // current_out <- iM
+                        out_prev = (short)cur; // prev_out <- old cur
+                    }
+                }
+                else // buf != 0: ignore hit, continue in cur, swap buffer
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, dest)), is_scalar);
+                    out_buf = (short)(same_materials(buf, M1) ? M2 : M1);
+                }
+            }
+            else if (nH == 2 && typeH == 10)
+            {
+                // Edge o-i-o (Section 10.4, nH == 2). No S (graze, not a slab).
+                if (cur == 0)
+                {
+                    // IG; current_out <- 0
+                    out_cur = (short)0;
+                }
+                else if (same_materials(M1, M2)) // ignore hit
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, dest)), is_scalar);
+                }
+                else // i-i transition
+                {
+                    double g = MED(cur, D(orig, fbs)) * TRN(cur, M1) * MED(M1, D(fbs, dest));
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                    out_cur = (short)M1;
+                }
+            }
+            else if (nH == 2 && typeH == 11)
+            {
+                // Edge i-o-i (Section 10.5, nH == 2). No S, no flag (edge normals not a slab pair).
+                if (cur == 0)
+                {
+                    // IG; current_out <- (d(fbs,sbs) > 1e-6 ? M2 : 0)
+                    out_cur = (short)((D(fbs, sbs) > 1.0e-6) ? M2 : 0);
+                }
+                else if (same_materials(M1, M2)) // ignore hit
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, dest)), is_scalar);
+                }
+                else // i-i transition: MED(M2, d(fbs,dest) - off (unclamped))
+                {
+                    rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(M2, D(fbs, dest) - ray_offset), is_scalar);
+                    out_cur = (short)M2;
+                }
+            }
+            else if (nH > 2)
+            {
+                // Multi-hit (Section 10.1-10.5, nH > 2)
+                if (cur == 0) // outside
+                {
+                    if (buf != 0) // cannot have i-i transition in buffer
+                        rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                    else if (typeH == 1 || typeH == 7) // o-i
+                    {
+                        // IG; current_out <- M1, +flag
+                        out_cur = (short)M1;
+                        bool nonpar = wedge_nonparallel();
+                        out_prev = (short)(nonpar ? (int)0x8000 : 0);
+                    }
+                    else if (typeH == 2) // false inside: IG
+                    {
+                    }
+                    else if (typeH == 10) // edge o-i-o, stay outside: IG
+                    {
+                    }
+                    else if (typeH == 13) // edge o-i
+                    {
+                        // IG; current_out <- M1, buffer_out <- M2, +flag
+                        out_cur = (short)M1;
+                        out_buf = (short)M2;
+                        bool nonpar = wedge_nonparallel();
+                        out_prev = (short)(nonpar ? (int)0x8000 : 0);
+                    }
+                    else // some other hit type
+                        rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                }
+                else // inside
+                {
+                    if (typeH == 1 || typeH == 7 || typeH == 13) // nested o-i, overlapping mesh
+                    {
+                        rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                        out_buf = (short)M1;
+                    }
+                    else if (typeH == 2 || typeH == 14) // i-o
+                    {
+                        if (buf == 0) // cavity exit, IG * S
+                        {
+                            double Sre = 0.0, Sim = 0.0;
+                            bool res = slab_airy_factor(mtl_prop, cur, 0, 0, theta, D(orig, fbs), center_frequency,
+                                                        is_scalar, !prev_nonpar, eps, Sre, Sim);
+                            if (res)
+                                rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim);
+                            out_cur = (short)0;
+                        }
+                        else if (same_materials(buf, M1)) // M2 embedded in M1
+                        {
+                            rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                            out_buf = (short)0;
+                        }
+                        else
+                        {
+                            double g = MED(cur, D(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
+                            rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                            out_cur = (short)buf;
+                            out_buf = (short)0;
+                        }
+                    }
+                    else if (typeH == 4 || typeH == 5) // i-i
+                    {
+                        if (buf != 0) // spurious (probable false detection): IG
+                        {
+                            out_buf = (short)0;
+                        }
+                        else // cavity transition, IG * S
+                        {
+                            int iM = (typeH == 5) ? M2 : M1;
+                            double Sre = 0.0, Sim = 0.0;
+                            bool res = slab_airy_factor(mtl_prop, cur, iM, prev_mat, theta, D(orig, fbs), center_frequency,
+                                                        is_scalar, !prev_nonpar, eps, Sre, Sim);
+                            if (res)
+                                rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim);
+                            out_cur = (short)iM;   // current_out <- iM
+                            out_prev = (short)cur; // prev_out <- old cur
+                        }
+                    }
+                    else if (typeH == 8) // overlapping i-o
+                    {
+                        if (buf == 0) // cavity exit, IG * S
+                        {
+                            double Sre = 0.0, Sim = 0.0;
+                            bool res = slab_airy_factor(mtl_prop, cur, 0, 0, theta, D(orig, fbs), center_frequency,
+                                                        is_scalar, !prev_nonpar, eps, Sre, Sim);
+                            if (res)
+                                rsu_scale(p_xprmatN, p_gainN, ii, n_rayN_t, Sre, Sim);
+                            out_cur = (short)0;
+                        }
+                        else
+                        {
+                            double g = MED(cur, D(orig, fbs)) * TRN(cur, 0);
+                            rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                            out_cur = (short)0;
+                            out_buf = (short)0;
+                        }
+                    }
+                    else if (typeH == 10) // edge o-i-o (the cur == 0 guard at source 824-828 is dead)
+                    {
+                        if (buf == 0)
+                        {
+                            if (same_materials(M1, M2)) // ignore hit
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                            else // i-i transition
+                            {
+                                double g = MED(cur, D(orig, fbs)) * TRN(cur, M1) * MED(M1, ray_offset);
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                                out_cur = (short)M1;
+                            }
+                        }
+                        else // buf != 0: virtual i-i
+                        {
+                            if (same_materials(buf, M1))
+                            {
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                                out_buf = (short)0;
+                            }
+                            else
+                            {
+                                double g = MED(cur, D(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                                out_cur = (short)buf;
+                                out_buf = (short)0;
+                            }
+                        }
+                    }
+                    else if (typeH == 11) // edge i-o-i (the cur == 0 guard at source 865-871 is dead)
+                    {
+                        if (buf == 0)
+                        {
+                            if (same_materials(M1, M2)) // ignore hit
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, MED(cur, D(orig, fbs) + ray_offset), is_scalar);
+                            else // i-i transition
+                            {
+                                double g = MED(cur, D(orig, fbs)) * TRN(cur, M2) * MED(M2, ray_offset);
+                                rsu_replace(p_xprmatN, p_gainN, ii, n_rayN_t, g, is_scalar);
+                                out_cur = (short)M2;
+                            }
+                        }
+                        else // buf != 0: spurious, IG
+                        {
+                            out_buf = (short)0;
+                        }
+                    }
+                    else
+                    {
+                        // Unmatched inside type (TR or a degenerate out_type 0). The source leaves
+                        // power unchanged (no-op pass-through); the unified global-default KILL
+                        // replaces it (Section 10.0). Not exercised on the diffraction reference path.
+                        rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+                    }
+                }
+            }
+            else
+            {
+                // Global default: any unmatched (out_type, nH, state) -> KILL (Section 10.0).
+                rsu_kill(p_xprmatN, p_gainN, ii, n_rayN_t);
+            }
+        }
+
+        // Write the new state words (compact set)
+        if (p_prev_out != nullptr)
+            p_prev_out[ii] = out_prev;
+        if (p_cur_out != nullptr)
+            p_cur_out[ii] = out_cur;
+        if (p_buf_out != nullptr)
+            p_buf_out[ii] = out_buf;
+    }
+}
+
+template void quadriga_lib::ray_state_update(int interaction_type, float center_frequency,
+                                             const arma::Mat<float> *orig, const arma::Mat<float> *dest,
+                                             const arma::Mat<float> *fbs, const arma::Mat<float> *sbs,
+                                             const arma::u32_vec *no_interact, const arma::Col<float> *fbs_angleN,
+                                             const arma::s32_vec *out_typeN,
+                                             const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
+                                             const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
+                                             const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
+                                             const arma::Col<short> *mtl_ind_buffer_in,
+                                             const arma::Mat<float> *normal_vecN,
+                                             arma::Col<short> *mtl_ind_prev_out, arma::Col<short> *mtl_ind_current_out,
+                                             arma::Col<short> *mtl_ind_buffer_out,
+                                             arma::Col<float> *gainN, arma::Mat<float> *xprmatN, arma::u32_vec *ray_ind, double eps);
+
+template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
+                                             const arma::Mat<double> *orig, const arma::Mat<double> *dest,
+                                             const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
+                                             const arma::u32_vec *no_interact, const arma::Col<double> *fbs_angleN,
+                                             const arma::s32_vec *out_typeN,
+                                             const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
+                                             const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
+                                             const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
+                                             const arma::Col<short> *mtl_ind_buffer_in,
+                                             const arma::Mat<double> *normal_vecN,
+                                             arma::Col<short> *mtl_ind_prev_out, arma::Col<short> *mtl_ind_current_out,
+                                             arma::Col<short> *mtl_ind_buffer_out,
+                                             arma::Col<double> *gainN, arma::Mat<double> *xprmatN, arma::u32_vec *ray_ind, double eps);
