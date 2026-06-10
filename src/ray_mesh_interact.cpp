@@ -15,6 +15,507 @@
 // Material-interaction helpers. Formerly in "quadriga_lib_material_helpers.hpp"; merged here so
 // that ray_mesh_interact and ray_state_update share one translation unit (the include is dropped).
 
+// Materials
+namespace
+{
+    template <typename dtype>
+    struct MaterialCols
+    {
+        arma::uword n_mtl = 0;         // Number of materials
+        const dtype *fRef = nullptr;   // Reference frequency, GHz
+        const dtype *a = nullptr;      // εr at fRef
+        const dtype *b = nullptr;      // Frequency exponent for εr
+        const dtype *c = nullptr;      // σ at fRef, S/m
+        const dtype *d = nullptr;      // Frequency exponent for σ
+        const dtype *e = nullptr;      // μr at fRef
+        const dtype *f = nullptr;      // Frequency exponent for μr
+        const dtype *g = nullptr;      // σμ (magnetic loss) at fRef
+        const dtype *h = nullptr;      // Frequency exponent for σμ
+        const dtype *att = nullptr;    // Penetration loss at fRef, dB
+        const dtype *attB = nullptr;   // Frequency exponent for att
+        const dtype *alpha = nullptr;  // In-medium absorption at fRef, dB/m
+        const dtype *alphaB = nullptr; // Frequency exponent for alpha
+        const dtype *m = nullptr;      // Mass-law transmission slope, dB/decade
+        const dtype *resF = nullptr;   // Permittivity resonance frequency, GHz
+        const dtype *resQ = nullptr;   // Permittivity resonance quality factor
+        const dtype *resS = nullptr;   // Permittivity resonance strength
+        const dtype *coiF = nullptr;   // Coincidence frequency, GHz
+        const dtype *coiQ = nullptr;   // Coincidence quality factor
+        const dtype *coiA = nullptr;   // Coincidence loss amplitude, dB
+        const dtype *tf = nullptr;     // Transmission factor at fRef
+        const dtype *tfB = nullptr;    // Frequency exponent for tf
+
+        MaterialCols() = default; // All pointers stay nullptr
+
+        MaterialCols(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop)
+        {
+            // Validate: all non-empty columns must have the same length
+            n_mtl = 0;
+            bool seen = false;
+            for (const auto &kv : mtl_prop)
+            {
+                if (kv.second.empty())
+                    continue;
+                arma::uword len = (arma::uword)kv.second.size();
+                if (!seen)
+                {
+                    n_mtl = len;
+                    seen = true;
+                }
+                else if (len != n_mtl)
+                    throw std::invalid_argument("Material property column '" + kv.first + "' has length " +
+                                                std::to_string(len) + ", expected " + std::to_string(n_mtl) +
+                                                " (all columns must have the same number of materials).");
+            }
+
+            // Lambda to resolve a column to its pointer (or nullptr if absent/empty)
+            auto resolve = [&mtl_prop](const std::string &key) -> const dtype *
+            {
+                auto it = mtl_prop.find(key);
+                return (it == mtl_prop.end() || it->second.empty()) ? nullptr : it->second.data();
+            };
+
+            // Assign columns
+            fRef = resolve("fRef");
+            a = resolve("a");
+            b = resolve("b");
+            c = resolve("c");
+            d = resolve("d");
+            e = resolve("e");
+            f = resolve("f");
+            g = resolve("g");
+            h = resolve("h");
+            att = resolve("att");
+            attB = resolve("attB");
+            alpha = resolve("alpha");
+            alphaB = resolve("alphaB");
+            m = resolve("m");
+            resF = resolve("resF");
+            resQ = resolve("resQ");
+            resS = resolve("resS");
+            coiF = resolve("coiF");
+            coiQ = resolve("coiQ");
+            coiA = resolve("coiA");
+            tf = resolve("tf");
+            tfB = resolve("tfB");
+
+            // Physical sanity: reject corrupt input rather than silently clamping it. Loss-like terms must
+            // be non-negative (a negative would be gain); material constants must be positive. Reported
+            // material index is 1-based to match the public material indexing.
+            auto require = [this](const dtype *col, const char *name, bool strict_positive)
+            {
+                if (col == nullptr)
+                    return;
+                for (arma::uword i = 0; i < n_mtl; ++i)
+                {
+                    double v = (double)col[i];
+                    if (strict_positive ? (v <= 0.0) : (v < 0.0))
+                        throw std::invalid_argument(std::string("Material property '") + name + "' = " +
+                                                    std::to_string(v) + " at material " + std::to_string(i + 1) +
+                                                    (strict_positive ? " must be positive." : " must be non-negative."));
+                }
+            };
+
+            require(fRef, "fRef", true);    // reference frequency > 0
+            require(a, "a", true);          // relative permittivity > 0 (use >= 1 for a strict vacuum floor)
+            require(e, "e", true);          // relative permeability > 0 (diamagnets < 1 allowed)
+            require(c, "c", false);         // conductivity >= 0
+            require(g, "g", false);         // magnetic loss >= 0
+            require(att, "att", false);     // penetration loss >= 0
+            require(alpha, "alpha", false); // in-medium absorption >= 0
+            require(m, "m", false);         // mass-law slope >= 0
+            require(resF, "resF", false);   // resonance frequency >= 0 (0 disables)
+            require(resQ, "resQ", false);   // resonance Q >= 0 (0 disables)
+            require(coiF, "coiF", false);   // coincidence frequency >= 0 (0 disables)
+            require(coiQ, "coiQ", false);   // coincidence Q >= 0
+        }
+    };
+
+    // Material struct
+    struct Material
+    {
+        double fRef = 1.0;   // Reference frequency, GHz
+        double a = 1.0;      // εr at fRef
+        double b = 0.0;      // Frequency exponent for εr
+        double c = 0.0;      // σ at fRef, S/m
+        double d = 0.0;      // Frequency exponent for σ
+        double e = 1.0;      // μr at fRef
+        double f = 0.0;      // Frequency exponent for μr
+        double g = 0.0;      // σμ (magnetic loss) at fRef
+        double h = 0.0;      // Frequency exponent for σμ
+        double att = 0.0;    // Penetration loss at fRef, dB
+        double attB = 0.0;   // Frequency exponent for att
+        double alpha = 0.0;  // In-medium absorption at fRef, dB/m
+        double alphaB = 0.0; // Frequency exponent for alpha
+        double m = 0.0;      // Mass-law transmission slope, dB/decade
+        double resF = 0.0;   // Permittivity resonance frequency, GHz
+        double resQ = 0.0;   // Permittivity resonance quality factor
+        double resS = 0.0;   // Permittivity resonance strength
+        double coiF = 0.0;   // Coincidence frequency, GHz
+        double coiQ = 0.0;   // Coincidence quality factor
+        double coiA = 0.0;   // Coincidence loss amplitude, dB
+        double tfR = 0.0;    // Transmission factor at fRef
+        double tfB = 0.0;    // Frequency exponent for tf
+
+        Material() = default; // All pointers stay nullptr
+
+        template <typename dtype>
+        Material(const MaterialCols<dtype> &cols, arma::uword idx = 0) // 1-based index, 0 = default (no material)
+        {
+            if (idx > cols.n_mtl)
+                throw std::out_of_range("Material index " + std::to_string(idx) +
+                                        " out of range [0, " + std::to_string(cols.n_mtl) + "]");
+
+            if (idx == 0) // no material -> keep defaults (air / vacuum)
+                return;
+
+            arma::uword i = idx - 1; // 1-based index -> 0-based column position
+
+            fRef = cols.fRef ? (double)cols.fRef[i] : fRef;
+            a = cols.a ? (double)cols.a[i] : a;
+            b = cols.b ? (double)cols.b[i] : b;
+            c = cols.c ? (double)cols.c[i] : c;
+            d = cols.d ? (double)cols.d[i] : d;
+            e = cols.e ? (double)cols.e[i] : e;
+            f = cols.f ? (double)cols.f[i] : f;
+            g = cols.g ? (double)cols.g[i] : g;
+            h = cols.h ? (double)cols.h[i] : h;
+            att = cols.att ? (double)cols.att[i] : att;
+            attB = cols.attB ? (double)cols.attB[i] : attB;
+            alpha = cols.alpha ? (double)cols.alpha[i] : alpha;
+            alphaB = cols.alphaB ? (double)cols.alphaB[i] : alphaB;
+            m = cols.m ? (double)cols.m[i] : m;
+            resF = cols.resF ? (double)cols.resF[i] : resF;
+            resQ = cols.resQ ? (double)cols.resQ[i] : resQ;
+            resS = cols.resS ? (double)cols.resS[i] : resS;
+            coiF = cols.coiF ? (double)cols.coiF[i] : coiF;
+            coiQ = cols.coiQ ? (double)cols.coiQ[i] : coiQ;
+            coiA = cols.coiA ? (double)cols.coiA[i] : coiA;
+            tfR = cols.tf ? (double)cols.tf[i] : tfR;
+            tfB = cols.tfB ? (double)cols.tfB[i] : tfB;
+        }
+
+        // Relative permittivity
+        std::complex<double> eta(double fGHz = 1.0) const
+        {
+            double f_rel = fGHz / fRef;
+            double eta_r = a * std::pow(f_rel, b);
+            double sigma = c * std::pow(f_rel, d);
+            double eta_i = -17.98 * sigma / fGHz;
+            return std::complex<double>(eta_r, eta_i);
+        }
+
+        // Relative permeability
+        std::complex<double> mu(double fGHz = 1.0) const
+        {
+            double f_rel = fGHz / fRef;
+            double mu_r = e * std::pow(f_rel, f);
+            double sigma_m = g * std::pow(f_rel, h);
+            return std::complex<double>(mu_r, -17.98 * sigma_m / fGHz);
+        }
+
+        // Permittivity resonance (acoustic): complex Lorentz pole added to the interface (Fresnel)
+        std::complex<double> eta_resonance(double fGHz = 1.0) const
+        {
+            if (resF <= 0.0 || resQ <= 0.0 || resS == 0.0)
+                return std::complex<double>(0.0, 0.0);
+            double resF2 = resF * resF;
+            std::complex<double> denom(resF2 - fGHz * fGHz, (resF / resQ) * fGHz);
+            return (resS * resF2) / denom;
+        }
+
+        // In-medium gain, linear
+        double medium_gain(double dist, double fGHz = 1.0, double abs_cos_theta = 1.0) const
+        {
+            std::complex<double> eta_val = eta(fGHz);
+            double er = std::real(eta_val);
+            double tan_delta = std::imag(eta_val) / er;
+            double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
+            double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+            Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
+            double loss = dist * 8.686 / Delta;
+            loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
+            constexpr double mass_min_path = 0.0015;
+            if (m > 0.0 && dist > mass_min_path)
+            {
+                double mass_path = dist * abs_cos_theta * abs_cos_theta;
+                double m_dB = m * std::log10((fGHz / fRef) * mass_path);
+                if (m_dB > 0.0)
+                    loss += m_dB;
+            }
+            return std::pow(10.0, -0.1 * loss);
+        }
+
+        // Per-entry interface gain, linear
+        double interface_gain(double fGHz = 1.0) const
+        {
+            double loss = att * std::pow(fGHz / fRef, attB);
+            if (coiF > 0.0 && coiA != 0.0)
+            {
+                double x = coiQ * (fGHz - coiF) / coiF;
+                loss += coiA / (1.0 + x * x);
+            }
+            return std::pow(10.0, -0.1 * loss);
+        }
+
+        // Transmission factor at fGHz, clamped to [-1, 1]
+        double tf(double fGHz = 1.0) const
+        {
+            double v = tfR * std::pow(fGHz / fRef, tfB);
+            return (v < -1.0) ? -1.0 : ((v > 1.0) ? 1.0 : v);
+        }
+
+        // Redistribute physical reflection energy R0 in [0,1] by tf in [-1,1], keeping refl + trans = 1
+        double apply_tf(double R0, double fGHz = 1.0) const
+        {
+            double tf_val = tf(fGHz);
+            R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0); // guard against resonance overshoot
+            return (tf_val >= 0.0) ? R0 * (1.0 - tf_val) : R0 + (1.0 - R0) * (-tf_val);
+        }
+
+        // Check whether two materials are the same
+        bool same_as(const Material &other) const
+        {
+            return fRef == other.fRef &&
+                   a == other.a &&
+                   b == other.b &&
+                   c == other.c &&
+                   d == other.d &&
+                   e == other.e &&
+                   f == other.f &&
+                   g == other.g &&
+                   h == other.h &&
+                   att == other.att &&
+                   attB == other.attB &&
+                   alpha == other.alpha &&
+                   alphaB == other.alphaB &&
+                   m == other.m &&
+                   resF == other.resF &&
+                   resQ == other.resQ &&
+                   resS == other.resS &&
+                   coiF == other.coiF &&
+                   coiQ == other.coiQ &&
+                   coiA == other.coiA &&
+                   tfR == other.tfR &&
+                   tfB == other.tfB;
+        }
+
+        // Medium-medium interaction
+        // 'this' is the medium the ray travels in (incidence side, medium 1); 'other' is the medium it enters into / reflects off
+        // (medium 2). Computes the ITU-R P.2040-1 interface coefficients and returns the interface power gain (excludes in-medium
+        // distance loss and the lumped interface_gain, which the caller applies separately): reflection power for the reflection
+        // types (0/3), the energy-conserving forward power 1 - R for EM/scalar transmission (1/4), and the raw Fresnel transmittance
+        // for EM refraction (2). The selected coefficient pair/ satisfies 0.5*(|cTE|^2 + |cTM|^2) == gain (and |cTE|^2 == gain in
+        // scalar mode, where cTM == cTE).
+        double interact_with(const Material &other,                      // Material that the path enters into / reflects of
+                             int interaction_type,                       // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+                             double theta,                               // Incidence angle
+                             double fGHz,                                // Frequency
+                             std::complex<double> *cTE = nullptr,        // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
+                             std::complex<double> *cTM = nullptr,        // Out: M-field coefficient
+                             std::complex<double> *cos_theta2 = nullptr, // Out: Refraction cosine (type-2 direction)
+                             double *Snell_ratio = nullptr,              // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
+                             bool *total_reflection = nullptr,           // Out: Total reflection indicator
+                             bool *dense2light = nullptr) const          // Out: Dense to light medium indicator
+        {
+            const bool is_scalar = interaction_type >= 3;
+            int geometry_type = interaction_type;
+            if (interaction_type == 3)
+                geometry_type = 0; // scalar reflection -> reflection geometry
+            if (interaction_type == 4)
+                geometry_type = 1; // scalar transmission -> transmission geometry
+
+            // Incidence cosine (fbs_angleN convention); identical to |OF . N| in ray_mesh_interact
+            double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897));
+            abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
+            double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
+
+            // Interface permittivity (resonance included) and permeability for both media
+            std::complex<double> eta1 = eta(fGHz) + eta_resonance(fGHz);
+            std::complex<double> eta2 = other.eta(fGHz) + other.eta_resonance(fGHz);
+            std::complex<double> mu1 = mu(fGHz);
+            std::complex<double> mu2 = other.mu(fGHz);
+
+            bool d2l = std::real(eta1 * mu1) > std::real(eta2 * mu2);
+
+            std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
+            double snell = std::sqrt(std::abs(eta1_div_eta2));
+            bool tir = is_scalar ? false : (snell * sin_theta >= 1.0);
+            std::complex<double> ct2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
+
+            // Admittances sqrt(eps/mu)
+            std::complex<double> z1 = std::sqrt(eta1 / mu1);
+            std::complex<double> z2 = std::sqrt(eta2 / mu2);
+
+            // Reflection coefficients, ITU-R P.2040-1 eq. (31)
+            std::complex<double> R_eTE = tir ? std::complex<double>(1.0, 0.0) : std::complex<double>(0.0, 0.0);
+            std::complex<double> R_eTM = R_eTE;
+            double reflection_gain = tir ? 1.0 : 0.0;
+
+            if (is_scalar)
+            {
+                R_eTE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                R_eTM = R_eTE;
+                reflection_gain = std::norm(R_eTE);
+            }
+            else if (interaction_type == 1 || (interaction_type == 0 && !tir))
+            {
+                R_eTE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                R_eTM = (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
+                reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
+            }
+
+            // Transmission coefficients, ITU-R P.2040-1 eq. (32)
+            std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
+            double refraction_gain = 0.0;
+            if (!tir && !is_scalar && interaction_type != 0)
+            {
+                T_eTE = (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
+                T_eTM = (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
+                refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
+            }
+
+            // Scalar transmission factor: redistribute reflection/transmission energy keeping the sum at 1.
+            // tf is the FBS-face material's factor: the entered material ('other') on a front hit, the
+            // incidence material ('this') on a back hit, selected by the sign of theta.
+            if (is_scalar)
+            {
+                double tf_eff = (theta >= 0.0) ? other.tf(fGHz) : tf(fGHz);
+                double R0 = (reflection_gain < 0.0) ? 0.0 : ((reflection_gain > 1.0) ? 1.0 : reflection_gain);
+                double refl = (tf_eff >= 0.0) ? R0 * (1.0 - tf_eff) : R0 + (1.0 - R0) * (-tf_eff);
+                double R_phase = std::arg(R_eTE);
+                double T_phase = std::arg(1.0 + R_eTE);
+                R_eTE = std::polar(std::sqrt(refl), R_phase);
+                R_eTM = R_eTE;
+                T_eTE = std::polar(std::sqrt(1.0 - refl), T_phase);
+                T_eTM = T_eTE;
+                reflection_gain = refl;
+                refraction_gain = 1.0 - refl;
+            }
+
+            // EM dense->light transmission: full pass-through
+            if (geometry_type == 1 && d2l && !is_scalar)
+            {
+                T_eTE = std::complex<double>(1.0, 0.0);
+                T_eTM = std::complex<double>(1.0, 0.0);
+                refraction_gain = 1.0;
+                reflection_gain = 0.0;
+            }
+
+            // Select coefficient set and interface power gain
+            std::complex<double> coeff_TE = (geometry_type == 0) ? R_eTE : T_eTE;
+            std::complex<double> coeff_TM = (geometry_type == 0) ? R_eTM : T_eTM;
+            double gain;
+
+            if (geometry_type == 0) // reflection (types 0, 3)
+                gain = reflection_gain;
+            else if (interaction_type == 1) // EM transmission: energy-conserving forward beam, power = 1 - R
+            {
+                gain = 1.0 - reflection_gain;
+                if (refraction_gain > 0.0) // fold the (1-R)/refraction_gain rescale into the coefficients
+                {
+                    double s = std::sqrt(gain / refraction_gain);
+                    coeff_TE *= s;
+                    coeff_TM *= s;
+                }
+            }
+            else // EM refraction (2): raw Fresnel power; scalar transmission (4): refraction_gain == 1 - refl
+                gain = refraction_gain;
+
+            if (cTE)
+                *cTE = coeff_TE;
+            if (cTM)
+                *cTM = coeff_TM;
+            if (cos_theta2)
+                *cos_theta2 = ct2;
+            if (Snell_ratio)
+                *Snell_ratio = snell;
+            if (total_reflection)
+                *total_reflection = tir;
+            if (dense2light)
+                *dense2light = d2l;
+
+            return gain;
+        }
+
+        // Analytic thin-slab (Fabry-Perot) factor S = 1 / (1 - r_near * r_far * phi^2)
+        // Returns S, or a NaN complex on re-emit: when parallel_ok is false (known wedge/edge), when the
+        // round-trip amplitude rho falls below eps, or when the denominator sits near the pole. Callers
+        // test the result with std::isnan(std::real(S)).
+        std::complex<double> slab_airy_factor(const Material &near,    // Material on the far side of the interface being processed (r_near, slab side)
+                                              const Material &far,     // Material on the far side of the opposite interface (r_far)
+                                              double theta,            // Incidence angle
+                                              double dist,             // One-way in-slab path d(orig, fbs)
+                                              double fGHz = 1.0,       // Frequency
+                                              double eps = 0.15,       // Resolve threshold
+                                              bool parallel_ok = true) // Set false if near/far interface are known not-parallel
+        {
+            const std::complex<double> nan_c(std::nan(""), std::nan(""));
+            if (!parallel_ok) // known wedge/edge -> re-emit
+                return nan_c;
+
+            const double c0 = 299792458.0;
+            const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
+
+            // Slab medium (= *this). eta_if includes the resonance pole (interface / Fresnel); eta_med excludes it (medium path / phase).
+            std::complex<double> eta_s_if = eta(fGHz) + eta_resonance(fGHz);
+            std::complex<double> mu_s = mu(fGHz);
+            std::complex<double> eta_s_med = eta(fGHz);
+
+            // Incidence cosine (fbs_angleN convention)
+            double abs_cos = std::abs(std::cos(theta + 1.570796326794897));
+            abs_cos = (abs_cos > 1.0) ? 1.0 : abs_cos;
+            double sin2 = 1.0 - abs_cos * abs_cos;
+
+            // Fresnel (TE) amplitude reflection at slab|adjacent from the slab side, with tf folded into
+            // the magnitude and the Fresnel phase preserved. Returns r and R = |r|^2.
+            auto fresnel_r = [&](const Material &adj, std::complex<double> &r, double &R)
+            {
+                std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
+                std::complex<double> mu_a = adj.mu(fGHz);
+                std::complex<double> z1 = std::sqrt(eta_s_if / mu_s); // slab admittance
+                std::complex<double> z2 = std::sqrt(eta_a_if / mu_a); // adjacent admittance
+                std::complex<double> ratio = (eta_s_if * mu_s) / (eta_a_if * mu_a);
+                std::complex<double> cos_t2 = std::sqrt(1.0 - ratio * sin2);
+                std::complex<double> r_te = (z1 * abs_cos - z2 * cos_t2) / (z1 * abs_cos + z2 * cos_t2);
+                double R0 = std::norm(r_te);
+                double Reff = adj.apply_tf(R0, fGHz); // tf carried by the adjacent (entered) material
+                r = std::polar(std::sqrt(Reff), std::arg(r_te));
+                R = Reff;
+            };
+
+            std::complex<double> r_near, r_far;
+            double R_near = 0.0, R_far = 0.0;
+            fresnel_r(near, r_near, R_near);
+            fresnel_r(far, r_far, R_far);
+
+            // One-way in-slab propagation phi: magnitude from the full medium_gain (dielectric + alpha +
+            // mass, with the mass-law angle factor evaluated at the actual incidence cosine so that
+            // dist * cos^2 = d * cos(theta) recovers the surface mass), phase from the resonance-excluded
+            // permittivity only. Air slab -> lossless, unit index.
+            double gL = medium_gain(dist, fGHz, abs_cos);
+            double n_re = std::real(std::sqrt(eta_s_med * mu_s)); // real refractive index
+            double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
+            double arg_phi = -(omega / c0) * n_re * dist;
+            std::complex<double> phi2 = std::polar(abs_phi * abs_phi, 2.0 * arg_phi); // phi^2
+            std::complex<double> denom = std::complex<double>(1.0, 0.0) - r_near * r_far * phi2;
+
+            // Survival gate: rho^2 = R_near * R_far * medium_gain(2L)
+            double g2L = medium_gain(2.0 * dist, fGHz, abs_cos);
+            double rr = R_near * R_far;
+            rr = (rr < 0.0) ? 0.0 : rr;
+            g2L = (g2L < 0.0) ? 0.0 : g2L;
+            double rho = std::sqrt(rr * g2L);
+
+            // Survival + near-pole clamp -> re-emit
+            if (rho < eps || std::abs(denom) < 1.0e-2)
+                return nan_c;
+
+            return std::complex<double>(1.0, 0.0) / denom;
+        }
+    };
+}
+
 // Validate a named material-property map and return the material count (n_mtl).
 // - Every present (non-empty) column must have the same length; throws otherwise.
 // - Empty columns are treated as absent (consumers apply per-column defaults).
@@ -1418,12 +1919,11 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
 // merged material helpers above, so no extra include is required.
 //
 // State / material-index convention (see Section 7 of the design spec):
-//   - Material indices (M1 = mtl_ind_fbs, M2 = mtl_ind_sbs, and the three state words) index
-//     mtl_prop directly. The value 0 is reserved for "outside / air / empty"; real materials use
-//     indices >= 1. medium_gain_impl / transition_gain_linear therefore receive the index as-is
-//     and a value of 0 maps to air (gain 1, unit index). This reserves mtl_prop[0] for air and is
-//     what makes the port bit-identical to calc_diffraction_gain, whose state stores 1-based face
-//     indices that resolve to the same material indices.
+//   - Material indices (M1 = mtl_ind_fbs, M2 = mtl_ind_sbs, and the three state words) are
+//     1-based: the value 0 is reserved for "outside / air / empty" and never reads the table;
+//     material w >= 1 reads mtl_prop row w - 1. mtl_prop is the csv_prop table of obj_file_read
+//     (0-based rows, no air row). This matches calc_diffraction_gain, whose 1-based face state
+//     resolved to the same rows through the face->material table.
 //   - State words are bit-masked, never abs(): mat = w & 0x7FFF, flag = w & 0x8000. A flag is set
 //     by OR, (short)(X | 0x8000), never by negation.
 
@@ -1463,9 +1963,9 @@ static inline dtype transition_gain_linear(const std::unordered_map<std::string,
     const dtype *m_tf = mtl_col(mtl_prop, "tf");
     const dtype *m_tfB = mtl_col(mtl_prop, "tfB");
 
-    // Material indices used directly (0 = air, handled by the iMa/iMb != 0 guards below)
-    arma::uword mF = (arma::uword)((iMa < 0) ? 0 : iMa);
-    arma::uword mS = (arma::uword)((iMb < 0) ? 0 : iMb);
+    // Material indices are 1-based (0 = no-material, default to air); table rows are 0-based
+    arma::uword mF = (arma::uword)((iMa < 1) ? 0 : iMa - 1);
+    arma::uword mS = (arma::uword)((iMb < 1) ? 0 : iMb - 1);
 
     // Convert to double
     double dTheta = (double)theta;
@@ -1678,7 +2178,7 @@ static inline bool slab_airy_factor(const std::unordered_map<std::string, std::v
             tfv = 0.0;
             return;
         }
-        arma::uword im = (arma::uword)mat;
+        arma::uword im = (arma::uword)(mat - 1); // 1-based index -> 0-based table row
         std::complex<double> e0 = eta_from_coeffs(mtl_val(m_a, im, 1.0), mtl_val(m_b, im, 0.0),
                                                   mtl_val(m_c, im, 0.0), mtl_val(m_d, im, 0.0),
                                                   mtl_val(m_fRef, im, 1.0), fGHz);
@@ -1732,7 +2232,7 @@ static inline bool slab_airy_factor(const std::unordered_map<std::string, std::v
         gL = 1.0, n_re = 1.0;
     else
     {
-        gL = (double)medium_gain_impl(mtl_prop, (arma::uword)slab_mat, (dtype)L, center_frequency);
+        gL = (double)medium_gain_impl(mtl_prop, arma::uword(slab_mat - 1), (dtype)L, center_frequency);
         n_re = std::real(std::sqrt(eta_s_med * mu_s)); // real refractive index
     }
     double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
@@ -1744,7 +2244,7 @@ static inline bool slab_airy_factor(const std::unordered_map<std::string, std::v
     // Survival gate (Section 9.4): rho^2 = R_near * R_far * medium_gain(2L)
     double g2L = (slab_mat == 0 || mtl_prop == nullptr)
                      ? 1.0
-                     : (double)medium_gain_impl(mtl_prop, (arma::uword)slab_mat, (dtype)(2.0 * L), center_frequency);
+                     : (double)medium_gain_impl(mtl_prop, arma::uword(slab_mat - 1), (dtype)(2.0 * L), center_frequency);
     double rr = R_near * R_far;
     rr = (rr < 0.0) ? 0.0 : rr;
     g2L = (g2L < 0.0) ? 0.0 : g2L;
@@ -1936,8 +2436,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
     // Validate the material map once; internal mtl_col / mtl_val accesses are then safe for any
     // material index < n_mtl (the caller guarantees M1, M2 and the state words are in range).
+    arma::uword n_mtl = 0;
     if (mtl_prop != nullptr)
-        (void)mtl_validate(*mtl_prop);
+        n_mtl = mtl_validate(*mtl_prop);
+    if (mtl_ind_fbs != nullptr && mtl_ind_fbs->n_elem != 0 && (arma::uword)(mtl_ind_fbs->max() & (short)0x7FFF) > n_mtl)
+        throw std::invalid_argument("Values in 'mtl_ind_fbs' exceed the number of materials in 'mtl_prop'.");
+    if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != 0 && (arma::uword)(mtl_ind_sbs->max() & (short)0x7FFF) > n_mtl)
+        throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
     const bool is_scalar = interaction_type >= 3;
     const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
@@ -2023,10 +2528,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return !faces_parallel(nfx, nfy, nfz, nsx, nsy, nsz);
         };
 
-        // Medium gain shorthand: MED(m, d) with material index m used directly (0 = air -> 1).
+        // Medium gain shorthand: 1-based material index m, 0 = air -> gain 1 (no table read)
         auto MED = [&](int m, double d) -> double
         {
-            return (double)medium_gain_impl(mtl_prop, (arma::uword)((m < 0) ? 0 : m), (dtype)d, center_frequency);
+            if (m < 1)
+                return 1.0;
+            return (double)medium_gain_impl(mtl_prop, arma::uword(m - 1), (dtype)d, center_frequency);
         };
         auto TRN = [&](int a, int b) -> double
         {
