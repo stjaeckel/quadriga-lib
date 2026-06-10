@@ -239,7 +239,7 @@ void calc_diffraction_gain(
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[n_mesh, 9]`
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
 - **`center_frequency`** — Center frequency
 - **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [[generate_diffraction_paths]]
@@ -315,8 +315,15 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
     dtype fGHz = center_frequency * (dtype)1.0e-9;
 
     arma::uword n_mtl = mtl_validate(*mtl_prop);
-    if (!mtl_ind->is_empty() && mtl_ind->max() >= n_mtl)
+    if (!mtl_ind->is_empty() && mtl_ind->max() > n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
+
+    // mtl_ind holds 1-based material indices (0 = no material). ray_mesh_interact consumes these
+    // directly, but the per-face table lookups in this function expect 0-based columns. Keep the
+    // original for the trace call and use a 0-based copy for the lookups.
+    const arma::uvec *mtl_ind_1based = mtl_ind;
+    arma::uvec mtl_ind_0 = (*mtl_ind) - 1; // each 1-based index -> 0-based column
+    mtl_ind = &mtl_ind_0;
 
     // Check range of LOD
     if ((unsigned)lod > 6U)
@@ -461,7 +468,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             arma::Col<int> typeN;        // Medium to medium transition indicator
 
             if (no_mesh_hit != 0)
-                quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_ind, mtl_prop,
+                quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_ind_1based, mtl_prop,
                                                        &fbs_ind, &sbs_ind, nullptr, nullptr, nullptr, &origN, nullptr,
                                                        &gainN, nullptr, nullptr, nullptr, nullptr, &fbs_angleN, nullptr,
                                                        nullptr, nullptr, &typeN);
