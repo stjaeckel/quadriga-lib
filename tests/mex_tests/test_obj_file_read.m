@@ -66,15 +66,13 @@ assertElementsAlmostEqual( mesh, mesh_correct, 'absolute', 1e-14 );
 assertTrue( all( obj_ind == 1 ) );
 assertEqual( obj_names{1,1}, 'Cube' );
 
-% No usemtl in the file -> faces get the synthetic "default" material (.mtl side),
-% csv side is the full default table with row 1 = air
-assertEqual( size(mtl_names), [1,1] );
-assertEqual( mtl_names{1,1}, 'default' );
+% No usemtl in the file -> no materials assigned (no synthetic "default");
+% csv side is still the full default table with air at row 1
+assertTrue( isempty(mtl_names) );
 assertTrue( numel(csv_names) > 1 );
 assertEqual( csv_names{1,1}, 'air' );
-assertTrue( all( mtl_ind == 1 ) );
-assertTrue( all( csv_ind == 1 ) );   % "default" not in table -> air fallback (row 1)
-
+assertTrue( all( mtl_ind == 0 ) );   % no material
+assertTrue( all( csv_ind == 0 ) );   % no material
 % Air at csv row 1 is transparent (a = 1)
 assertElementsAlmostEqual( prop_at(csv_prop, 'a', 1), 1.0, 'absolute', 1e-14 );
 
@@ -116,18 +114,15 @@ assertEqual( size(obj_names), [2,1] );
 assertTrue( isa(mesh, "double") );
 assertTrue( isa(vert_list, "double") );
 
-% Faces 1-2 have no usemtl -> synthetic "default" (air on csv side, a = 1)
-% Faces 3-4 are itu_wood (a = 1.99)
-assertElementsAlmostEqual( prop_at(csv_prop, 'a', csv_ind(1)), 1.0,  'absolute', 1e-14 );
+% Faces 1-2 have no usemtl -> no material (csv_ind = 0); faces 3-4 are itu_wood (a = 1.99)
+assertTrue( all( csv_ind(1:2) == 0 ) );
 assertElementsAlmostEqual( prop_at(csv_prop, 'a', csv_ind(3)), 1.99, 'absolute', 1e-3 );
-
 assertEqual( face_ind, uint64([2,3,1;2,4,3;6,7,5;6,8,7]) );
 assertEqual( obj_ind, uint64([1;1;2;2]) );
 
-% mtl_names: faces 1-2 -> "default", faces 3-4 -> "itu_wood" (first-appearance order)
-assertEqual( mtl_names{1,1}, 'default' );
-assertEqual( mtl_names{2,1}, 'itu_wood' );
-assertEqual( mtl_ind, uint64([1;1;2;2]) );
+% mtl_names: only itu_wood (faces 1-2 unassigned -> mtl_ind 0, faces 3-4 -> itu_wood)
+assertEqual( mtl_names{1,1}, 'itu_wood' );
+assertEqual( mtl_ind, uint64([0;0;1;1]) );
 
 % Custom material via CSV
 delete(fn);
@@ -135,7 +130,7 @@ csv_fn = 'custom_materials.csv';
 
 f = fopen(csv_fn,'w');
 fprintf(f,'%s\n','name,a,b,c,d,att');
-fprintf(f,'%s\n','air,1.0,0.0,0.0,0.0,0.0');             % row 1 = transparent fallback
+fprintf(f,'%s\n','air,1.0,0.0,0.0,0.0,0.0');
 fprintf(f,'%s\n','custom_material_1,2.5,0.0,0.001,0.5,5.0');
 fprintf(f,'%s\n','custom_material_2,4.0,-0.1,0.05,1.2,10.0');
 fclose(f);
@@ -201,7 +196,7 @@ assertFalse( isfield(csv_prop, 'b') );
 delete(fn);
 delete(csv_fn);
 
-% Unknown material, non-strict -> air fallback (row 1)
+% Unknown material, non-strict -> no material (csv_ind 0)
 f = fopen(fn,'w');
 fprintf(f,'%s\n','o Obj');
 fprintf(f,'%s\n','v -1 -1 0');
@@ -213,7 +208,7 @@ fclose(f);
 
 [ ~, ~, ~, ~, ~, ~, mtl_names, ~, csv_ind ] = quadriga_lib.obj_file_read(fn, '', false);
 assertEqual( mtl_names{1,1}, 'not_a_real_material' );  % raw name kept on .mtl side
-assertTrue( all( csv_ind == 1 ) );                     % resolved to air
+assertTrue( all( csv_ind == 0 ) );                     % unmatched, non-strict -> no material
 
 % Same scene, strict -> error
 try
@@ -244,7 +239,7 @@ catch ME
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end
-end
+end 
 
 % Too many outputs (12 requested, max 11)
 try

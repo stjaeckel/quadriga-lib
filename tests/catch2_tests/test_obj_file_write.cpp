@@ -14,18 +14,6 @@
 #include <fstream>
 #include <filesystem>
 
-// Reader signature (argument order):
-//   fn_obj, mesh, vert_list, face_ind, obj_ind, obj_names,
-//   mtl_ind, mtl_names, bsdf,
-//   fn_csv, csv_ind, csv_names, csv_prop, csv_strict
-//
-// Writer signature (argument order):
-//   fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
-//   vert_list_out, face_ind_out, vert_list, face_ind, bsdf, threshold
-//
-// Both obj_ind and mtl_ind are 0-based. "No material" is expressed by mtl_ind == nullptr,
-// not by a reserved index.
-
 // A unit cube: 8 vertices, 12 triangular faces (same geometry as the reader test)
 static inline arma::mat cube_vertices()
 {
@@ -83,6 +71,7 @@ static inline bool em_row_matches(const std::unordered_map<std::string, std::vec
 
 TEST_CASE("Test OBJ File Write - Mesh round-trip (geometry only)")
 {
+    std::remove("cube.mtl"); // clear any stale file from a prior (randomly-ordered) test
     arma::mat V = cube_vertices();
     arma::umat F = cube_faces();
     arma::mat mesh = make_mesh(V, F);
@@ -121,14 +110,13 @@ TEST_CASE("Test OBJ File Write - Mesh round-trip (geometry only)")
     CHECK(obj_names_rd.size() == 1);
     CHECK(obj_names_rd[0] == "object");
 
-    // No usemtl written -> faces get the synthetic "default" material on the .mtl side
-    REQUIRE(mtl_names_rd.size() == 1);
-    CHECK(mtl_names_rd[0] == "default");
+    // No usemtl written -> no materials on read-back (no synthetic "default")
+    CHECK(mtl_names_rd.size() == 0);
 
-    // 0-based indices throughout
+    // obj_ind 0-based; no materials -> mtl_ind / csv_ind are all 0 (no material)
     CHECK(arma::all(obj_ind_rd == 0U));
     CHECK(arma::all(mtl_ind_rd == 0U));
-    CHECK(arma::all(csv_ind_rd == 0U)); // "default" not in table -> air fallback (row 0)
+    CHECK(arma::all(csv_ind_rd == 0U));
 
     std::remove("cube.obj");
 }
@@ -174,8 +162,8 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
 
     SECTION("Named ITU materials")
     {
-        arma::uvec mtl_ind = arma::zeros<arma::uvec>(12);
-        mtl_ind.subvec(4, 11).fill(1); // faces 0-3 = material 0, 4-11 = material 1 (0-based)
+        arma::uvec mtl_ind = arma::ones<arma::uvec>(12);
+        mtl_ind.subvec(4, 11).fill(2); // faces 0-3 = material 1, 4-11 = material 2 (1-based)
         std::vector<std::string> mtl_names = {"itu_concrete", "itu_wood"};
 
         quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &vlo, &fio);
@@ -193,12 +181,12 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
         CHECK(mtl_names_rd[0] == "itu_concrete");
         CHECK(mtl_names_rd[1] == "itu_wood");
 
-        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(0), {5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}));
-        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(4), {1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(0) - 1, {5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(4) - 1, {1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}));
 
-        // .mtl side index round-trips 0-based
-        CHECK(arma::all(mtl_ind_rd.subvec(0, 3) == 0U));
-        CHECK(arma::all(mtl_ind_rd.subvec(4, 11) == 1U));
+        // .mtl side index round-trips 1-based
+        CHECK(arma::all(mtl_ind_rd.subvec(0, 3) == 1U));
+        CHECK(arma::all(mtl_ind_rd.subvec(4, 11) == 2U));
 
         std::remove("cube.obj");
         std::remove("cube.mtl");
@@ -206,7 +194,7 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
 
     SECTION("Custom material via CSV")
     {
-        arma::uvec mtl_ind = arma::zeros<arma::uvec>(12);
+        arma::uvec mtl_ind = arma::ones<arma::uvec>(12); // 1-based: material 1 = "glass"
         std::vector<std::string> mtl_names = {"glass"};
 
         quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names, &vlo, &fio);
@@ -229,8 +217,8 @@ TEST_CASE("Test OBJ File Write - Materials round-trip")
         REQUIRE(mtl_names_rd.size() == 1);
         CHECK(mtl_names_rd[0] == "glass");
 
-        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(0), {6.0, 0.0, 0.1, 1.2, 0.0, 0.0, 0.0, 0.0, 1.0}));
-        CHECK(arma::all(mtl_ind_rd == 0U));
+        CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(0) - 1, {6.0, 0.0, 0.1, 1.2, 0.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(arma::all(mtl_ind_rd == 1U));
 
         std::remove("cube.obj");
         std::remove("cube.mtl");
@@ -245,7 +233,7 @@ TEST_CASE("Test OBJ File Write - BSDF round-trip")
     arma::mat mesh = make_mesh(V, F);
 
     arma::uvec obj_ind = arma::zeros<arma::uvec>(12);
-    arma::uvec mtl_ind = arma::zeros<arma::uvec>(12);
+    arma::uvec mtl_ind = arma::ones<arma::uvec>(12); // 1-based: material 1 = "painted"
     std::vector<std::string> obj_names = {"Cube"};
     std::vector<std::string> mtl_names = {"painted"};
 
@@ -377,9 +365,10 @@ TEST_CASE("Test OBJ File Write - Error handling")
                         std::invalid_argument);
     }
 
-    // mtl_names too short for mtl_ind (0-based: max index 1 needs 2 names)
+    // mtl_names too short for mtl_ind (1-based: max index 2 needs 2 names)
     {
-        arma::uvec mtl_ind = arma::join_cols(arma::zeros<arma::uvec>(6), arma::ones<arma::uvec>(6));
+        arma::uvec mtl_ind = arma::ones<arma::uvec>(12);
+        mtl_ind.subvec(6, 11).fill(2);
         std::vector<std::string> mn = {"OnlyOne"};
         CHECK_THROWS_AS(quadriga_lib::obj_file_write<double>("x.obj", &mesh, nullptr, &mtl_ind, nullptr, &mn,
                                                              &vlo, &fio),
@@ -415,4 +404,160 @@ TEST_CASE("Test OBJ File Write - Outputs only (empty filename)")
     CHECK(fio.n_rows == 12);
     CHECK(fio.n_cols == 3);
     CHECK(arma::approx_equal(make_mesh(vlo, fio), mesh, "absdiff", 1e-12));
+}
+
+TEST_CASE("Test OBJ File Write - CSV material table round-trip")
+{
+    arma::mat V = cube_vertices();
+    arma::umat F = cube_faces();
+    arma::mat mesh = make_mesh(V, F);
+
+    arma::uvec obj_ind = arma::zeros<arma::uvec>(12);
+    std::vector<std::string> obj_names = {"Cube"};
+
+    // 1-based material indices: faces 0-3 -> concrete, faces 4-11 -> wood
+    arma::uvec mtl_ind = arma::ones<arma::uvec>(12);
+    mtl_ind.subvec(4, 11).fill(2);
+    std::vector<std::string> mtl_names = {"concrete", "wood"};
+
+    // EM/acoustic table; names must match the usemtl names so the read-back resolves by name
+    std::vector<std::string> csv_names = {"concrete", "wood"};
+    std::unordered_map<std::string, std::vector<double>> csv_prop;
+    csv_prop["a"] = {5.24, 1.99};
+    csv_prop["c"] = {0.0462, 0.0047};
+    csv_prop["d"] = {0.7822, 1.0718};
+    csv_prop["fRef"] = {1.0, 1.0};
+
+    // csv_ind is 1-based, validated against csv_names
+    arma::uvec csv_ind = arma::ones<arma::uvec>(12);
+    csv_ind.subvec(4, 11).fill(2);
+
+    arma::mat vlo;
+    arma::umat fio;
+    quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                         &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                         &csv_ind, &csv_names, &csv_prop, /*csv_write_defaults=*/false);
+
+    REQUIRE(std::filesystem::exists("cube.obj"));
+    REQUIRE(std::filesystem::exists("cube.mtl"));
+    REQUIRE(std::filesystem::exists("cube.csv"));
+
+    arma::uvec mtl_ind_rd, csv_ind_rd;
+    std::vector<std::string> mtl_names_rd, csv_names_rd;
+    std::unordered_map<std::string, std::vector<double>> csv_prop_rd;
+    quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
+                                        &mtl_ind_rd, &mtl_names_rd, nullptr,
+                                        "cube.csv", &csv_ind_rd, &csv_names_rd, &csv_prop_rd);
+
+    // CSV table preserved (full table, in written order)
+    REQUIRE(csv_names_rd.size() == 2);
+    CHECK(csv_names_rd[0] == "concrete");
+    CHECK(csv_names_rd[1] == "wood");
+
+    // EM properties resolve per face (csv_ind is 1-based -> -1 for the table row)
+    CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(0) - 1, {5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop_rd, csv_ind_rd(4) - 1, {1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}));
+
+    // Visual side round-trips 1-based
+    CHECK(arma::all(mtl_ind_rd.subvec(0, 3) == 1U));
+    CHECK(arma::all(mtl_ind_rd.subvec(4, 11) == 2U));
+
+    std::remove("cube.obj");
+    std::remove("cube.mtl");
+    std::remove("cube.csv");
+}
+
+TEST_CASE("Test OBJ File Write - CSV columns, defaults and validation")
+{
+    arma::mat V = cube_vertices();
+    arma::umat F = cube_faces();
+    arma::mat mesh = make_mesh(V, F);
+
+    arma::uvec obj_ind = arma::zeros<arma::uvec>(12);
+    std::vector<std::string> obj_names = {"Cube"};
+    arma::uvec mtl_ind = arma::ones<arma::uvec>(12);
+    std::vector<std::string> mtl_names = {"slab"};
+
+    std::vector<std::string> csv_names = {"slab"};
+    std::unordered_map<std::string, std::vector<double>> csv_prop;
+    csv_prop["c"] = {0.05};  // canonical, present
+    csv_prop["tf"] = {2.0};  // canonical, present
+    csv_prop["zzz"] = {7.0}; // extra (non-canonical)
+
+    arma::mat vlo;
+    arma::umat fio;
+
+    SECTION("csv_write_defaults = false -> only present columns, canonical order then extras")
+    {
+        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                             nullptr, &csv_names, &csv_prop, /*csv_write_defaults=*/false);
+        REQUIRE(std::filesystem::exists("cube.csv"));
+
+        std::ifstream f("cube.csv");
+        std::string header, row;
+        std::getline(f, header);
+        std::getline(f, row);
+        f.close();
+
+        CHECK(header == "name,c,tf,zzz"); // c before tf (canonical), zzz last (extra)
+        CHECK(row == "slab,0.05,2,7");
+
+        std::remove("cube.obj");
+        std::remove("cube.mtl");
+        std::remove("cube.csv");
+    }
+
+    SECTION("csv_write_defaults = true -> full canonical set with defaults")
+    {
+        quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                             &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                             nullptr, &csv_names, &csv_prop, /*csv_write_defaults=*/true);
+        REQUIRE(std::filesystem::exists("cube.csv"));
+
+        std::ifstream f("cube.csv");
+        std::string header, row;
+        std::getline(f, header);
+        std::getline(f, row);
+        f.close();
+
+        CHECK(header == "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,coiA,tf,tfB,zzz");
+        // a=1, e=1, fRef=1 by default; c=0.05 and tf=2 from csv_prop; rest 0; zzz=7 last
+        CHECK(row == "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,0,7");
+
+        std::remove("cube.obj");
+        std::remove("cube.mtl");
+        std::remove("cube.csv");
+    }
+
+    SECTION("Validation: csv_prop column with wrong length throws")
+    {
+        std::unordered_map<std::string, std::vector<double>> bad_prop;
+        bad_prop["a"] = {1.0, 2.0}; // length 2, csv_names has 1 entry
+        CHECK_THROWS_AS(
+            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                                 nullptr, &csv_names, &bad_prop, false),
+            std::invalid_argument);
+    }
+
+    SECTION("Validation: csv_ind out of range throws")
+    {
+        arma::uvec csv_ind_bad = arma::ones<arma::uvec>(12);
+        csv_ind_bad(0) = 5; // csv_names has 1 entry -> max valid index is 1
+        CHECK_THROWS_AS(
+            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                                 &csv_ind_bad, &csv_names, &csv_prop, false),
+            std::invalid_argument);
+    }
+
+    SECTION("Validation: csv inputs without csv_names throw")
+    {
+        CHECK_THROWS_AS(
+            quadriga_lib::obj_file_write<double>("cube.obj", &mesh, &obj_ind, &mtl_ind, &obj_names, &mtl_names,
+                                                 &vlo, &fio, nullptr, nullptr, nullptr, 0.001,
+                                                 nullptr, nullptr, &csv_prop, false),
+            std::invalid_argument);
+    }
 }

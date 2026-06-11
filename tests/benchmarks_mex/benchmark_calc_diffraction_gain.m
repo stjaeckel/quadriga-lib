@@ -16,7 +16,7 @@ s2  = 2.5;
 xo2 = -1;
 yo2 = 2;
 
-[cube, ~, vert, face] = quadriga_lib.obj_file_read('cube.obj');
+[cube, vert, face] = quadriga_lib.obj_file_read('cube.obj');
 cube2 = s1*cube;
 cube2(:,[1,4,7]) = cube2(:,[1,4,7]) + xo1;
 cube2(:,[2,5,8]) = cube2(:,[2,5,8]) + yo1;
@@ -25,9 +25,11 @@ cube3(:,[1,4,7]) = cube3(:,[1,4,7]) + xo2;
 cube3(:,[2,5,8]) = cube3(:,[2,5,8]) + yo2;
 msh = [ cube; cube2; cube3 ];
 
-mtl_prop = repmat([1.0, 0.0, 0.0003, 0.0, 1.0, 0.0,0.0,0.0,0.0],12,1);
-mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 0.0, 0.0,0.0,0.0,0.0],12,1) ];
-mtl_prop = [ mtl_prop ; repmat([1.0, 0.0, 0.0001, 0.0, 1.0, 0.0,0.0,0.0,0.0],12,1) ];
+mtl_ind = [ ones(12,1); 2*ones(12,1); 3*ones(12,1) ];   % 36 faces -> materials 1, 2, 3
+mtl_prop = struct();
+mtl_prop.a   = [ 1.0;    1.0;    1.0    ];
+mtl_prop.c   = [ 0.0003; 0.0001; 0.0001 ];
+mtl_prop.att = [ 1.0;    0.0;    1.0    ];
 
 x = -scl : res : scl;
 y = -scl : res : scl;
@@ -38,10 +40,10 @@ orig = [ -2, 5, 0.1 ];
 orig = repmat( orig, size(dest,1), 1 );
 
 tic
-gain = quadriga_lib.calc_diffraction_gain( orig, dest, msh, mtl_prop, 1e9, lod, 1 );
+gain = quadriga_lib.calc_diffraction_gain( orig, dest, msh, mtl_ind, mtl_prop, 1e9, lod, 1 );
 toc
 
-%gainX = quadriga_lib.calc_diffraction_gain( orig(1,:), [4.3, -3.4, 0], msh, mtl_prop, 1e9, lod,2 );
+%gainX = quadriga_lib.calc_diffraction_gain( orig(1,:), [4.3, -3.4, 0], msh, mtl_ind, mtl_prop, 1e9, lod,2 );
 
 
 

@@ -92,9 +92,10 @@ void quadriga_lib::mitsuba_xml_file_write(
 - **`vert_list`** — Vertex coordinates (x, y, z); `[n_vert, 3]`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; `[n_mesh, 3]`
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
-- **`mtl_ind`** — 0-based material index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per triangle (0 = no material; every face must reference a 
+  material — 0 is rejected); `[n_mesh]`
 - **`obj_names`** — Object names; length must equal `max(obj_ind)+1`
-- **`mtl_names`** — Material names; length must equal `max(mtl_ind)+1`
+- **`mtl_names`** — Material names; length must equal `max(mtl_ind)` (mtl_ind is 1-based)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `[mtl_names.size(), 17]`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
@@ -118,7 +119,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     arma::uword n_obj = arma::max(unique_obj_ind) + 1; // Number of mesh objects
 
     arma::uvec unique_mtl_ind = arma::unique(mtl_ind);
-    arma::uword n_mtl = arma::max(unique_mtl_ind) + 1; // Number of mesh materials
+    arma::uword n_mtl = mtl_names.size(); // Number of mesh materials (mtl_ind is 1-based; 0 = no material)
 
     arma::uvec unique_face_ind = arma::unique(face_ind);
     arma::uword n_vert = arma::max(unique_face_ind) + 1; // Number of mesh vertices
@@ -129,11 +130,12 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
     if (obj_names.size() != n_obj)
         throw std::invalid_argument("Found " + std::to_string(obj_names.size()) + " object names, but expected " + std::to_string(n_obj) + ".");
 
-    if (unique_mtl_ind.n_elem != n_mtl)
-        throw std::invalid_argument("Found " + std::to_string(unique_mtl_ind.n_elem) + " material indices, but expected " + std::to_string(n_mtl) + ".");
+    // mtl_ind is 1-based; 0 marks a face with no material, which cannot be exported.
+    if (!unique_mtl_ind.is_empty() && unique_mtl_ind.min() == 0)
+        throw std::invalid_argument("Found faces with no material (mtl_ind == 0); every face must reference a material for Mitsuba/Sionna export.");
 
-    if (mtl_names.size() != n_mtl)
-        throw std::invalid_argument("Found " + std::to_string(mtl_names.size()) + " material names, but expected " + std::to_string(n_mtl) + ".");
+    if (!unique_mtl_ind.is_empty() && unique_mtl_ind.max() > n_mtl)
+        throw std::invalid_argument("Material index " + std::to_string(unique_mtl_ind.max()) + " exceeds the " + std::to_string(n_mtl) + " available material names.");
 
     if (unique_face_ind.n_elem != n_vert)
         throw std::invalid_argument("Found " + std::to_string(unique_face_ind.n_elem) + " reference in 'face_ind', but expected " + std::to_string(n_vert) + ".");
@@ -186,7 +188,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
 
     // Map materials to ITU materials used by Sionna
     std::vector<std::string> mtl_names_local{mtl_names}; // copy for local edits
-    arma::uvec mtl_ind_local{mtl_ind};                   // 1‒1 copy
+    arma::uvec mtl_ind_local = mtl_ind - 1;              // 1-based input -> 0-based local index
 
     if (map_to_itu_materials)
     {
@@ -204,7 +206,7 @@ void quadriga_lib::mitsuba_xml_file_write(const std::string &fn,
             auto [it, inserted] = itu_index.emplace(itu_name, itu_index.size());
 
             // Remap every occurrence of the old material index to the ITU index
-            const arma::uword old_idx = i_mtl;      // 0-based
+            const arma::uword old_idx = i_mtl + 1;  // 1-based input value for material i_mtl
             const arma::uword new_idx = it->second; // also 0-based
 
             mtl_ind_local.elem(arma::find(mtl_ind == old_idx)).fill(new_idx);

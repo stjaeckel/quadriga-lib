@@ -32,7 +32,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 - **`orig`** — TX positions; `[n_pos, 3]`
 - **`dest`** — RX positions; `[n_pos, 3]`
 - **`mesh`** — Triangle vertices, each row `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}`; `[n_mesh, 9]`
-- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output of
   [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`center_freq`** — Center frequency
@@ -62,14 +62,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
     // Load inputs (cast to double if needed)
-    arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
-    arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
-    arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
-
-    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3], true);
-    if (!mtl_ind.is_empty())
-        mtl_ind -= 1;
+    const arma::mat orig = qd_mex_get_Mat<double>(prhs[0]);
+    const arma::mat dest = qd_mex_get_Mat<double>(prhs[1]);
+    const arma::mat mesh = qd_mex_get_Mat<double>(prhs[2]);
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[3]);
 
     // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
     auto mtl_prop = qd_mex_struct2map<double>(prhs[4]);

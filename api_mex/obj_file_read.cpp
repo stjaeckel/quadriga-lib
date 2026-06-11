@@ -21,7 +21,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
   before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`)
-- Unmatched names throw when `csv_strict` is true; otherwise they map to row 1 of the table (the transparent fallback)
+- Unmatched names throw when `csv_strict` is true; otherwise they map to index 0 (no material)
 - With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`,
   `csv_prop`) is populated; if `fn_csv` is also empty, the built-in default table is returned
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
@@ -34,10 +34,10 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column, and
-  row 1 is the fallback material (should be transparent, e.g. air); empty uses the built-in default table
+- **`fn_csv`** *(optional)* — Path to an EM/acoustic material CSV; must contain a `name` column;
+  unmatched faces map to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table
 - **`csv_strict`** *(optional)* — If true, throw when a `usemtl` material is absent from the table;
-  otherwise map to row 1; default: false
+  otherwise map to index 0 (no material); default: false
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates `{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}` per row; `[n_mesh, 9]`
@@ -45,10 +45,10 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 - **`face_ind`** — 1-based vertex indices into `vert_list` per triangle; uint64; `[n_mesh, 3]`
 - **`obj_ind`** — 1-based object index per triangle; uint64; `[n_mesh]`
 - **`obj_names`** — Object names; cell array of strings; length `max(obj_ind)`
-- **`mtl_ind`** — 1-based visual-material index per triangle; uint64; `[n_mesh]`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); uint64; `[n_mesh]`
 - **`mtl_names`** — Visual material names (raw `usemtl`); cell array of strings; length `no_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
-- **`csv_ind`** — 1-based EM/acoustic-material index per triangle; uint64; `[n_mesh]`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; `[n_mesh]`
 - **`csv_names`** — Material names from the table; cell array of strings; length `n_csv`
 - **`csv_prop`** — Material properties as a struct; each field is one CSV column (excluding `name`)
   holding a column vector of length `n_csv`
@@ -97,7 +97,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
                                                 p_mtl_ind, p_mtl_names, p_bsdf,
                                                 fn_csv, p_csv_ind, p_csv_names, p_csv_prop, csv_strict));
 
-    // Copy to MATLAB (convert 0-based C++ indices to 1-based)
+    // Copy to MATLAB. face_ind and obj_ind are 0-based in C++ -> shift to 1-based.
+    // mtl_ind and csv_ind are already 1-based (0 = no material) and pass through unchanged.
     if (nlhs > 0)
         plhs[0] = qd_mex_copy2matlab(&mesh);
     if (nlhs > 1)
@@ -114,27 +115,21 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
     if (nlhs > 4)
         plhs[4] = qd_mex_copy2matlab(&obj_names);
-    if (nlhs > 5)
-    {
-        mtl_ind += 1;
+    if (nlhs > 5) // already 1-based from the library (0 = no material), no shift
         plhs[5] = qd_mex_copy2matlab(&mtl_ind);
-    }
     if (nlhs > 6)
         plhs[6] = qd_mex_copy2matlab(&mtl_names);
     if (nlhs > 7)
         plhs[7] = qd_mex_copy2matlab(&bsdf);
-    if (nlhs > 8)
-    {
-        csv_ind += 1;
+    if (nlhs > 8) // already 1-based from the library (0 = no material), no shift
         plhs[8] = qd_mex_copy2matlab(&csv_ind);
-    }
     if (nlhs > 9)
         plhs[9] = qd_mex_copy2matlab(&csv_names);
     if (nlhs > 10)
     {
         // Stable field order: standard EM columns first, then any extra CSV columns
         std::vector<std::string> order = {"a", "b", "c", "d", "e", "f", "g", "h",
-                                          "att", "attB", "alpha", "alphaB", "fRef", "m", 
+                                          "att", "attB", "alpha", "alphaB", "fRef", "m",
                                           "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
         for (const auto &kv : csv_prop)
             if (std::find(order.begin(), order.end(), kv.first) == order.end())

@@ -146,20 +146,19 @@ TEST_CASE("Test OBJ File Read - Simple test")
 
     CHECK(obj_names.size() == 1);
 
-    // No usemtl in the file -> .mtl side empty (faces default), csv side is the full default table
-    CHECK(mtl_names.size() == 1);
-    CHECK(mtl_names[0] == "default");
+    // No usemtl in the file -> .mtl side empty (no material assigned), csv side is the full default table
+    CHECK(mtl_names.size() == 0);
 
-    CHECK(csv_names.size() > 1);            // full default table returned
-    CHECK(csv_names[0] == "air");           // row 0 is the transparent fallback
-    CHECK(csv_prop.count("a") == 1);        // table has at least the 'a' column
+    CHECK(csv_names.size() > 1);     // full default table returned
+    CHECK(csv_names[0] == "air");    // air is the first table entry
+    CHECK(csv_prop.count("a") == 1); // table has at least the 'a' column
 
     // Geometry equality
     CHECK(arma::approx_equal(vert_list, vert_list_correct, "absdiff", 1e-14));
     CHECK(arma::approx_equal(face_ind, face_ind_correct_u32, "absdiff", 1e-14));
     CHECK(arma::approx_equal(mesh, mesh_correct, "absdiff", 1e-14));
 
-    // No materials referenced -> all faces fall back to index 0 (air)
+    // No materials referenced -> all faces are index 0 (no material)
     CHECK(arma::all(obj_ind == 0U)); // single object, 0-based
     CHECK(arma::all(mtl_ind == 0U));
     CHECK(arma::all(csv_ind == 0U));
@@ -187,7 +186,7 @@ TEST_CASE("Test OBJ File Read - Default-table materials")
     CHECK(mtl_names.size() == 1);
     CHECK(mtl_names[0] == "air");
     // csv side resolves every face to the 'air' row of the table
-    CHECK(em_row_matches(csv_prop, csv_ind(0), {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
     CHECK(arma::all(csv_ind == csv_ind(0)));
 
     // Two distinct materials, first four faces vs. the rest
@@ -200,8 +199,8 @@ TEST_CASE("Test OBJ File Read - Default-table materials")
     CHECK(mtl_names[0] == "itu_concrete");
     CHECK(mtl_names[1] == "itu_wood");
 
-    CHECK(em_row_matches(csv_prop, csv_ind(0), {5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}));
-    CHECK(em_row_matches(csv_prop, csv_ind(4), {1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {5.24, 0.0, 0.0462, 0.7822, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop, csv_ind(4) - 1, {1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0}));
     CHECK(csv_ind(0) != csv_ind(4)); // different table rows
 
     // Blender duplicate suffix ".NNN" is stripped for the csv lookup,
@@ -214,8 +213,8 @@ TEST_CASE("Test OBJ File Read - Default-table materials")
     CHECK(mtl_names[0] == "itu_brick.001");
     CHECK(mtl_names[1] == "itu_metal.shiny.001"); // everything after the first dot is stripped
 
-    CHECK(em_row_matches(csv_prop, csv_ind(0), {3.91, 0.0, 0.0238, 0.16, 0.0, 0.0, 0.0, 0.0, 1.0}));
-    CHECK(em_row_matches(csv_prop, csv_ind(4), {1.0, 0.0, 1.0e7, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {3.91, 0.0, 0.0238, 0.16, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(em_row_matches(csv_prop, csv_ind(4) - 1, {1.0, 0.0, 1.0e7, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
 
     std::remove("cube.obj");
 }
@@ -226,15 +225,14 @@ TEST_CASE("Test OBJ File Read - Unknown materials and strict flag")
     std::vector<std::string> mtl_names, csv_names;
     std::unordered_map<std::string, std::vector<double>> csv_prop;
 
-    // Material not in the table, non-strict -> falls back to row 0 (air)
+    // Material not in the table, non-strict -> index 0 (no material)
     REQUIRE(my_fancy_cube("cube.obj", "not_a_real_material"));
     quadriga_lib::obj_file_read<double>("cube.obj", nullptr, nullptr, nullptr, nullptr, nullptr,
                                         nullptr, &mtl_names, nullptr,
                                         "", &csv_ind, &csv_names, &csv_prop, false);
 
     CHECK(mtl_names[0] == "not_a_real_material"); // raw name still recorded on the .mtl side
-    CHECK(csv_ind(0) == 0U);                      // resolved to the air fallback
-    CHECK(em_row_matches(csv_prop, 0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
+    CHECK(csv_ind(0) == 0U);                      // unmatched, non-strict -> 0 (no material)
 
     // Same scene, strict -> throws because the material is absent from the table
     REQUIRE(my_fancy_cube("cube.obj", "not_a_real_material"));
@@ -257,8 +255,8 @@ TEST_CASE("Test OBJ File Read - Table-only (empty fn_obj)")
                                                         nullptr, nullptr, nullptr,
                                                         "", &csv_ind, &csv_names, &csv_prop);
     CHECK(n == 0ULL);
-    CHECK(csv_ind.is_empty());          // no faces
-    CHECK(csv_names.size() > 1);        // full table
+    CHECK(csv_ind.is_empty());   // no faces
+    CHECK(csv_names.size() > 1); // full table
     CHECK(csv_names[0] == "air");
     CHECK(em_row_matches(csv_prop, 0, {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
 
@@ -279,7 +277,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         REQUIRE(csv_file.is_open());
 
         csv_file << "name,a,b,c,d,att\n";
-        csv_file << "air,1.0,0.0,0.0,0.0,0.0\n"; // row 0 = transparent fallback
+        csv_file << "air,1.0,0.0,0.0,0.0,0.0\n"; // air at table row 0
         csv_file << "custom_material_1,2.5,0.0,0.001,0.5,5.0\n";
         csv_file << "custom_material_2,4.0,-0.1,0.05,1.2,10.0\n";
         csv_file.close();
@@ -290,10 +288,10 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
                                             nullptr, &mtl_names, nullptr,
                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop);
 
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}));
         CHECK(mtl_names[0] == "custom_material_1");
 
-        CHECK(em_row_matches(csv_prop, csv_ind(4), {4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(4) - 1, {4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}));
         CHECK(mtl_names[1] == "custom_material_2");
 
         CHECK(csv_ind(0) != csv_ind(4));
@@ -319,8 +317,8 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
                                             nullptr, &mtl_names, nullptr,
                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop);
 
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}));
-        CHECK(em_row_matches(csv_prop, csv_ind(4), {4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {2.5, 0.0, 0.001, 0.5, 5.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(4) - 1, {4.0, -0.1, 0.05, 1.2, 10.0, 0.0, 0.0, 0.0, 1.0}));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -365,7 +363,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
         // Only 'a' is present in the map; b..alphaB default to 0, fRef defaults to 1
         CHECK(csv_prop.count("a") == 1);
         CHECK(csv_prop.count("c") == 0);
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -420,7 +418,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
                                             nullptr, &mtl_names, nullptr,
                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop);
 
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {4.5, 0.1, 0.02, 0.8, 3.0, 0.2, 0.5, 0.15, 2.4}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {4.5, 0.1, 0.02, 0.8, 3.0, 0.2, 0.5, 0.15, 2.4}));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -443,7 +441,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
                                             nullptr, &mtl_names, nullptr,
                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop);
 
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {3.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {3.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0}));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");
@@ -466,7 +464,7 @@ TEST_CASE("Test OBJ File Read - Custom material CSV")
                                             "custom_materials.csv", &csv_ind, &csv_names, &csv_prop);
 
         // Empty cells are 0; fRef cell is empty here so it parses as 0 (cell present but blank)
-        CHECK(em_row_matches(csv_prop, csv_ind(0), {2.0, 0.0, 0.005, 0.0, 1.5, 0.0, 0.0, 0.0, 0.0}));
+        CHECK(em_row_matches(csv_prop, csv_ind(0) - 1, {2.0, 0.0, 0.005, 0.0, 1.5, 0.0, 0.0, 0.0, 0.0}));
 
         std::remove("cube.obj");
         std::remove("custom_materials.csv");

@@ -17,7 +17,8 @@ cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top N
            1     1     1   ,    1    -1     1   ,    1    -1    -1;   % 11 East Upper
           -1     1     1   ,    1     1     1   ,    1     1    -1 ]; % 12 North Upper
 
-mtl_prop = repmat([1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],12,1); % Air
+mtl_ind  = ones(12,1);       % all faces -> material 1 (1-based; 0 would mean "no material")
+mtl_prop = struct('a', 1.5); % one material; each field is a length-n_mtl column (here n_mtl = 1)
 
 orig(1,:) = [ -10.0,  0.0,   0.5 ]; dest(1,:) = [  10.0,  0.0,   0.5];
 [ fbs, sbs, ~, fbs_ind, sbs_ind ] = quadriga_lib.ray_triangle_intersect( orig, dest, cube );
@@ -36,10 +37,10 @@ orig_length = ones(no_pos,1);
 
 tic
 [ origN, destN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, normal_vecN]  = ...
-    quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, cube, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
+    quadriga_lib.ray_mesh_interact( 2, 10e9, orig, dest, fbs, sbs, cube, mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
 toc
-% 35 seconds, single core @ 100 million rays
-% 3.7 seconds, 16 cores (32 threads) @ 100 million rays
+% 4.52 seconds, 16 cores (32 threads) @ 100 million rays
+
 
 
 

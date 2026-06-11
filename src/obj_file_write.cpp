@@ -142,9 +142,12 @@ Write a triangulated Wavefront .obj (and .mtl) file
   are closer than `threshold` (no merging across objects). With `vert_list`/`face_ind`: data is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `obj_ind`/`obj_names`: a single object named `object` is written
-- Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, every face is
-  assigned a (0-based) material; pass `mtl_ind = nullptr` to leave geometry unassigned
+- Without `mtl_ind`: no `usemtl` tags and no `.mtl` file are written. With `mtl_ind`, each face carries a
+  1-based material index (0 = no material, leaving that face unassigned); pass `mtl_ind = nullptr` to omit materials entirely
 - The `.mtl` (named after the `.obj`) lists each used material; values default to a gray material when `bsdf` is omitted
+- If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the `.obj`):
+  columns follow a fixed canonical order, then any extra `csv_prop` columns (alphabetical); `csv_write_defaults`
+  additionally emits canonical columns absent from `csv_prop`, filled with their defaults (`a`, `e`, `fRef` = 1, else 0)
 
 ## Declaration:
 ```
@@ -160,20 +163,28 @@ void obj_file_write(
     const arma::Mat<dtype> *vert_list = nullptr,
     const arma::umat *face_ind = nullptr,
     const arma::Mat<dtype> *bsdf = nullptr,
-    const dtype threshold = 0.001);
+    const dtype threshold = 0.001,
+    const arma::uvec *csv_ind = nullptr,
+    const std::vector<std::string> *csv_names = nullptr,
+    const std::unordered_map<std::string, std::vector<dtype>> *csv_prop = nullptr,
+    bool csv_write_defaults = false);
 ```
 
 ## Inputs:
 - **`fn`** — Output path; must end in `.obj`; if empty, no files are written (outputs are still computed)
 - **`mesh`** — Triangle coordinates `{x1,y1,z1,...,x3,y3,z3}` per row; `[n_mesh, 9]`; mutually exclusive with `vert_list`/`face_ind`
 - **`obj_ind`** — 0-based object index per face; `[n_mesh]`; each object must be a contiguous block
-- **`mtl_ind`** — 0-based material index per face; `[n_mesh]`; omit (`nullptr`) for no materials
+- **`mtl_ind`** — 1-based material index per face (0 = no material); `[n_mesh]`; omit (`nullptr`) for no materials
 - **`obj_names`** — Object names; length > `max(obj_ind)`; required if `obj_ind` is given
-- **`mtl_names`** — Material names; length > `max(mtl_ind)`; required if `mtl_ind` is given
+- **`mtl_names`** — Material names; length ≥ `max(mtl_ind)` (1-based); required if `mtl_ind` is given
 - **`vert_list`** — Vertex positions; `[n_vert, 3]`; only with `face_ind`, written unchanged
 - **`face_ind`** — 0-based vertex indices per face; `[n_mesh, 3]`; required with `vert_list`
 - **`bsdf`** — Principled BSDF for the `.mtl`; `[n_mtl, 17]`; see [[obj_file_read]] for columns
 - **`threshold`** — Vertex co-location distance for merging within an object; default 1 mm
+- **`csv_ind`** — 1-based EM/acoustic-material index per face (0 = no material); `[n_mesh]`; optional, validated if given
+- **`csv_names`** — EM/acoustic material names (the full table); writing the `.csv` requires this
+- **`csv_prop`** — Material properties keyed by column name; each vector must have one value per `csv_names` entry
+- **`csv_write_defaults`** — If `true`, also write canonical columns absent from `csv_prop`, using their defaults
 
 ## Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `[n_vert, 3]`
@@ -196,7 +207,11 @@ void quadriga_lib::obj_file_write(const std::string &fn,
                                   const arma::Mat<dtype> *vert_list,
                                   const arma::umat *face_ind,
                                   const arma::Mat<dtype> *bsdf,
-                                  const dtype threshold)
+                                  const dtype threshold,
+                                  const arma::uvec *csv_ind,
+                                  const std::vector<std::string> *csv_names,
+                                  const std::unordered_map<std::string, std::vector<dtype>> *csv_prop,
+                                  bool csv_write_defaults)
 {
     // Mode selection: mesh XOR (vert_list + face_ind)
     const bool has_mesh = (mesh != nullptr);
@@ -263,7 +278,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         if (mtl_ind->n_elem != n_mesh)
             throw std::invalid_argument("Input 'mtl_ind' must have one element per face.");
 
-        const arma::uword n_mtl = mtl_ind->max() + 1;
+        const arma::uword n_mtl = mtl_ind->max(); // mtl_ind is 1-based; 0 = no material
         if (mtl_names == nullptr || mtl_names->size() < n_mtl)
             throw std::invalid_argument("'mtl_names' is missing or too short for the given 'mtl_ind'.");
         if (bsdf != nullptr && (bsdf->n_cols != 17 || bsdf->n_rows < n_mtl))
@@ -271,6 +286,29 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     }
     else if (bsdf != nullptr)
         throw std::invalid_argument("'bsdf' requires 'mtl_ind' and 'mtl_names'.");
+
+    // Validate CSV material-table inputs (EM/acoustic side)
+    const bool want_csv = (csv_ind != nullptr || csv_names != nullptr || csv_prop != nullptr);
+    if (want_csv)
+    {
+        if (csv_names == nullptr || csv_names->empty())
+            throw std::invalid_argument("Writing the material CSV requires a non-empty 'csv_names'.");
+
+        const arma::uword n_csv = (arma::uword)csv_names->size();
+
+        if (csv_prop != nullptr)
+            for (const auto &kv : *csv_prop)
+                if ((arma::uword)kv.second.size() != n_csv)
+                    throw std::invalid_argument("Column '" + kv.first + "' in 'csv_prop' must have one value per entry in 'csv_names'.");
+
+        if (csv_ind != nullptr)
+        {
+            if (csv_ind->n_elem != n_mesh)
+                throw std::invalid_argument("Input 'csv_ind' must have one element per face.");
+            if (csv_ind->max() > n_csv) // csv_ind is 1-based; 0 = no material
+                throw std::invalid_argument("Input 'csv_ind' references a material outside 'csv_names'.");
+        }
+    }
 
     // Build / reference the indexed geometry
     arma::Mat<dtype> VL_local;
@@ -323,16 +361,24 @@ void quadriga_lib::obj_file_write(const std::string &fn,
 
     // Per-face accessors
     constexpr arma::uword NO_MTL = std::numeric_limits<arma::uword>::max();
+
     auto objid = [&](arma::uword f) -> arma::uword
     { return (obj_ind != nullptr) ? obj_ind->at(f) : (arma::uword)0; };
+
     auto mtlid = [&](arma::uword f) -> arma::uword
-    { return (mtl_ind != nullptr) ? mtl_ind->at(f) : NO_MTL; };
+    {
+        if (mtl_ind == nullptr)
+            return NO_MTL;
+        const arma::uword v = mtl_ind->at(f);
+        return (v == 0) ? NO_MTL : v - 1; // 1-based -> 0-based; 0 = no material
+    };
 
     // Materials actually used (nonzero, sorted, unique)
     std::set<arma::uword> used_mtl;
     if (mtl_ind != nullptr)
         for (arma::uword f = 0; f < n_mesh; ++f)
-            used_mtl.insert(mtlid(f)); // every entry is a valid 0-based material
+            if (const arma::uword m = mtlid(f); m != NO_MTL)
+                used_mtl.insert(m); // 0-based material row (no-material faces skipped)
     const bool write_materials = !used_mtl.empty();
 
     // Shortest round-trip number formatter (also maps -0 -> 0)
@@ -402,7 +448,7 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         for (arma::uword i = f; i < g; ++i)
         {
             if (write_materials)
-                if (const arma::uword m = mtlid(i); m != last_mtl)
+                if (const arma::uword m = mtlid(i); m != NO_MTL && m != last_mtl)
                 {
                     obj << "usemtl " << (*mtl_names)[m] << "\n";
                     last_mtl = m;
@@ -473,6 +519,73 @@ void quadriga_lib::obj_file_write(const std::string &fn,
         }
         mtl.close();
     }
+
+    // Write the EM/acoustic material table to a companion .csv
+    if (want_csv)
+    {
+        static const std::vector<std::string> kOrder = {
+            "a", "b", "c", "d", "e", "f", "g", "h",
+            "att", "attB", "alpha", "alphaB", "fRef", "m",
+            "resF", "resQ", "resS", "coiF", "coiQ", "coiA", "tf", "tfB"};
+
+        auto default_for = [](const std::string &col) -> dtype
+        {
+            if (col == "a" || col == "e" || col == "fRef")
+                return (dtype)1.0;
+            return (dtype)0.0;
+        };
+
+        const arma::uword n_csv = (arma::uword)csv_names->size();
+
+        // Output columns: canonical order first (present, or all if csv_write_defaults), then extra csv_prop columns
+        std::vector<std::string> columns;
+        std::unordered_set<std::string> emitted;
+        for (const std::string &col : kOrder)
+        {
+            const bool present = (csv_prop != nullptr && csv_prop->count(col) != 0);
+            if (present || csv_write_defaults)
+            {
+                columns.push_back(col);
+                emitted.insert(col);
+            }
+        }
+        if (csv_prop != nullptr)
+        {
+            std::set<std::string> extra; // sorted -> deterministic
+            for (const auto &kv : *csv_prop)
+                if (emitted.find(kv.first) == emitted.end())
+                    extra.insert(kv.first);
+            for (const std::string &col : extra)
+                columns.push_back(col);
+        }
+
+        std::filesystem::path csv_path = obj_path;
+        csv_path.replace_extension(".csv");
+
+        std::ofstream csv(csv_path, std::ios::out | std::ios::trunc);
+        if (!csv.is_open())
+            throw std::invalid_argument("Error opening file: failed to open '" + csv_path.string() + "'.");
+
+        csv << "name";
+        for (const std::string &col : columns)
+            csv << "," << col;
+        csv << "\n";
+
+        for (arma::uword r = 0; r < n_csv; ++r)
+        {
+            csv << (*csv_names)[r];
+            for (const std::string &col : columns)
+            {
+                dtype val = default_for(col);
+                if (csv_prop != nullptr)
+                    if (auto it = csv_prop->find(col); it != csv_prop->end())
+                        val = it->second[r];
+                csv << "," << fmt(val);
+            }
+            csv << "\n";
+        }
+        csv.close();
+    }
 }
 
 template void quadriga_lib::obj_file_write(const std::string &fn,
@@ -486,7 +599,11 @@ template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::Mat<float> *vert_list,
                                            const arma::umat *face_ind,
                                            const arma::Mat<float> *bsdf,
-                                           const float threshold);
+                                           const float threshold,
+                                           const arma::uvec *csv_ind,
+                                           const std::vector<std::string> *csv_names,
+                                           const std::unordered_map<std::string, std::vector<float>> *csv_prop,
+                                           bool csv_write_defaults);
 
 template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::Mat<double> *mesh,
@@ -499,4 +616,8 @@ template void quadriga_lib::obj_file_write(const std::string &fn,
                                            const arma::Mat<double> *vert_list,
                                            const arma::umat *face_ind,
                                            const arma::Mat<double> *bsdf,
-                                           const double threshold);
+                                           const double threshold,
+                                           const arma::uvec *csv_ind,
+                                           const std::vector<std::string> *csv_names,
+                                           const std::unordered_map<std::string, std::vector<double>> *csv_prop,
+                                           bool csv_write_defaults);
