@@ -39,12 +39,14 @@
 #include <vector>
 
 // Function to calculate the gain
-static inline double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
-                                          double incidence_angle_deg, // Angle between face normal and ray (as in ITU P.2040-1) (degree)
-                                          double dist1,               // Medium 1 travel distance (meters)
-                                          double dist2,               // Medium 2 travel distance (meters) OR distance after reflection
-                                          std::complex<double> eta1,  // relative permittivity of medium 1
-                                          std::complex<double> eta2)  // relative permittivity of medium 2
+#ifndef calc_transition_gain_HELPER
+#define calc_transition_gain_HELPER
+static double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
+                                   double incidence_angle_deg, // Angle between face normal and ray (as in ITU P.2040-1) (degree)
+                                   double dist1,               // Medium 1 travel distance (meters)
+                                   double dist2,               // Medium 2 travel distance (meters) OR distance after reflection
+                                   std::complex<double> eta1,  // relative permittivity of medium 1
+                                   std::complex<double> eta2)  // relative permittivity of medium 2
 {
     double deg2rad = arma::datum::pi / 180.0;
 
@@ -96,6 +98,7 @@ static inline double calc_transition_gain(int interaction_type,       // (0) Ref
 
     return total_gain;
 }
+#endif
 
 // mu-aware reference Fresnel: an independent oracle for the e,f,g,h (permeability) path.
 // At mu = 1 it reduces exactly to calc_transition_gain.
@@ -199,11 +202,11 @@ static inline void mtl_matrix_to_map(const arma::Mat<dtype> &M,
 }
 
 // Constants of the suite
-static const double C0 = 299792458.0;      // speed of light, m/s
-static const double QPI = arma::datum::pi; // pi
-static const double OFF = 0.001;           // ray_offset (design spec, section 4)
-static const double TOL = 1.0e-9;          // double tolerance (test spec)
-static const double FRQ = 1.0e9;           // default test frequency, Hz
+static const double C0 = 299792458.0;           // speed of light, m/s
+static const double QPI = arma::datum::pi;      // pi
+static const double OFF = 0.001;                // ray_offset (design spec, section 4)
+static const double TOL = 1.0e-9;               // double tolerance (test spec)
+static const double FRQ = 1.0e9;                // default test frequency, Hz
 
 // Assumed extended material keys (see file header). Adjust here if the library differs.
 static const char *MTL_KEY_MASS = "m";
@@ -557,22 +560,25 @@ TEST_CASE("ray_state_update - dispatch: resolved-ray precedence")
         check_keep(C);
         check_state(C, 0, 0, 0);
 
+        // The resolved exit owns the in-medium loss of its incoming segment (up trip):
+        // factor sqrt(MED(cur, d(orig, fbs))), here over the default d(orig, fbs) = 1
         auto D = disp(8, 2, 4, 0, 0, enc(1, true), 0);
-        check_keep(D);
+        check_mult(D, std::sqrt(medg(1, 1.0)), TOL);
         check_state(D, 0, 0, 0);
 
         auto E = disp(14, 2, 4, 0, 0, enc(1, true), 0);
-        check_keep(E);
+        check_mult(E, std::sqrt(medg(1, 1.0)), TOL);
         check_state(E, 0, 0, 0);
     }
     SECTION("transmission pass, resolved i-i crossing keeps the flag and shifts prev") // spec 10.0
     {
+        // Resolved i-i also charges its incoming segment: sqrt(MED(cur, d(orig, fbs)))
         auto C = disp(4, 2, 2, 3, 0, enc(1, true), 0);
-        check_keep(C);
+        check_mult(C, std::sqrt(medg(1, 1.0)), TOL);
         check_state(C, 1, enc(2, true), 0); // iM = M1 for type 4, prev <- old cur material
 
         auto D = disp(5, 2, 2, 3, 0, enc(1, true), 0);
-        check_keep(D);
+        check_mult(D, std::sqrt(medg(1, 1.0)), TOL);
         check_state(D, 1, enc(3, true), 0); // iM = M2 for type 5
     }
     SECTION("transmission pass, resolved transparent pass-through elsewhere") // spec 10.0
@@ -1435,7 +1441,7 @@ TEST_CASE("ray_state_update - gain operation semantics and probe handling")
         C.gain(0) = 0.5 * p;
         C.run();
         check_mult(C, S, TOL);
-        check_state(C, 0, enc(4, true), 0);
+        check_state(C, 0, 0, 0); // transmission exit clears cur (spec 10.2)
     }
     SECTION("replace ignores the incoming field entirely")
     {
@@ -1677,14 +1683,18 @@ TEST_CASE("ray_state_update - mass-law material feeds |phi| from medium_gain")
     mtl_matrix_to_map<double>(M, ind, mtl);
     mtl[MTL_KEY_MASS] = {10.0}; // assumed mass-law key, see file header
 
-    const double L = 4.0 * half_wave(2.0, FRQ); // resonance phase, n = 2
+    // The mass law engages only above its clamp region (fGHz * path > 1), so run at
+    // 10 GHz with about 0.3 m of path, still on a resonance phase (n = 2)
+    const double F10 = 10.0e9;
+    const double L = 40.0 * half_wave(2.0, F10);
 
     // Measure medium_gain over L and 2L with the replace row (spec 10.1 branch A nested):
     // gain out = MED(cur, d(orig, dest))
     auto med_of = [&](double d)
     {
         // nested-entry geometry with d(orig, dest) = d
-        auto C = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 1, 0, 0.4 * d, 0.6 * d, 0.5, QPI / 2.0, 1.5);
+        auto C = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 1, 0, 0.4 * d, 0.6 * d, 0.5, QPI / 2.0, 1.5,
+                               std::complex<double>(0.5, 0.3), F10);
         C.run();
         return (double)C.gain(0);
     };
@@ -1699,11 +1709,12 @@ TEST_CASE("ray_state_update - mass-law material feeds |phi| from medium_gain")
     CHECK_NOFAIL(g_2L > g_L * g_L + 1e-9);
 
     // Cavity exit with eps = 0: S must use the measured medium gain
-    auto C = make1<double>(mtl, 4, 2, 1, 1, 0, 0, 1, 0, L, 2.0, 0.5, QPI / 2.0, 0.0);
+    auto C = make1<double>(mtl, 4, 2, 1, 1, 0, 0, 1, 0, L, 2.0, 0.5, QPI / 2.0, 0.0,
+                           std::complex<double>(0.5, 0.3), F10);
     C.run();
     std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
-    std::complex<double> S_right = airy_S(r, r, phi_one_way(2.0, g_L, FRQ, L));
-    std::complex<double> S_wrong = airy_S(r, r, phi_one_way(2.0, 1.0, FRQ, L)); // eta-only
+    std::complex<double> S_right = airy_S(r, r, phi_one_way(2.0, g_L, F10, L));
+    std::complex<double> S_wrong = airy_S(r, r, phi_one_way(2.0, 1.0, F10, L)); // eta-only
     std::complex<double> S_func = vvf(C);
 
     CHECK(std::abs(S_func - S_right) < 1e-6);
@@ -1887,7 +1898,7 @@ TEST_CASE("ray_state_update - resolve clamp near the Airy pole")
         double theta_n = 89.8 * QPI / 180.0;
         double theta_i = std::asin(std::sin(theta_n) / n);
         std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, theta_i).r;
-        double L = 2.0 * half_wave(n, FRQ);  // phi^2 = 1
+        double L = 2.0 * half_wave(n, FRQ); // phi^2 = 1
         CHECK(std::abs(1.0 - r * r) < 1e-2); // the configuration is inside the clamp
 
         auto C = exit_at(theta_n, L);
@@ -1930,7 +1941,7 @@ TEST_CASE("ray_state_update - cross-pass invariance of the resolve decision")
     // internal bounce of the same slab segment must make the same resolve-vs-re-emit
     // decision and apply the same S.
     static const auto mtl = base_palette<double>();
-    const double L = 0.123;                                             // generic, off resonance
+    const double L = 0.123; // generic, off resonance
     std::complex<double> r = fresnel_te({9.0, 0.0}, {1.0, 0.0}, 0.0).r; // NINE, rho = 0.25
     std::complex<double> S = airy_S(r, r, phi_one_way(3.0, 1.0, FRQ, L));
 
@@ -1975,13 +1986,13 @@ TEST_CASE("ray_state_update - resolved flag persists across internal crossings")
     static const auto mtl = base_palette<double>();
 
     auto A = disp(4, 2, 2, 3, 0, enc(1, true), 0); // resolved i-i crossing
-    check_keep(A);
+    check_mult(A, std::sqrt(medg(1, 1.0)), TOL);   // charges its incoming segment in FOG1
     CHECK((int)A.cur_out(0) == (int)enc(2, true));
     CHECK((int)A.prev_out(0) == 1);
 
     auto B = make1<double>(mtl, 4, 2, 1, 2, 0, 1, A.cur_out(0), 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
-    B.run(); // resolved exit to air
-    check_keep(B);
+    B.run();                                     // resolved exit to air
+    check_mult(B, std::sqrt(medg(2, 1.0)), TOL); // up-trip loss in FOG2
     check_state(B, 1, 0, 0);
 }
 
@@ -2297,45 +2308,43 @@ TEST_CASE("ray_state_update - input validation")
         C7.normals = arma::join_vert(C7.normals, C7.normals);
         CHECK_THROWS_AS(C7.run(), std::invalid_argument);
     }
-    SECTION("each required pointer is mandatory") // 9.8
+    SECTION("required and optional pointers") // 9.8
     {
-        for (int k = 0; k < 10; ++k)
+        // Unconditionally required: geometry and out_typeN
+        for (int k = 0; k < 5; ++k)
         {
             auto C = make_valid9();
             switch (k)
             {
-            case 0:
-                C.has_orig = false;
-                break;
-            case 1:
-                C.has_dest = false;
-                break;
-            case 2:
-                C.has_fbs = false;
-                break;
-            case 3:
-                C.has_sbs = false;
-                break;
-            case 4:
-                C.has_ni = false;
-                break;
-            case 5:
-                C.has_angle = false;
-                break;
-            case 6:
-                C.has_otype = false;
-                break;
-            case 7:
-                C.has_mtl = false;
-                break;
-            case 8:
-                C.has_m1 = false;
-                break;
-            case 9:
-                C.has_m2 = false;
-                break;
+            case 0: C.has_orig = false; break;
+            case 1: C.has_dest = false; break;
+            case 2: C.has_fbs = false; break;
+            case 3: C.has_sbs = false; break;
+            case 4: C.has_otype = false; break;
             }
             CHECK_THROWS_AS(C.run(), std::invalid_argument);
+        }
+
+        // mtl_prop is required whenever a nonzero material index is referenced
+        {
+            auto C = make_valid9();
+            C.has_mtl = false; // baseline has M1 = 1
+            CHECK_THROWS_AS(C.run(), std::invalid_argument);
+        }
+
+        // Optional with defaults: no_interact (nH = 1), fbs_angleN, mtl_ind_fbs and
+        // mtl_ind_sbs (0 = air). The baseline entry then runs against air, gain-neutral.
+        for (int k = 0; k < 4; ++k)
+        {
+            auto C = make_valid9();
+            switch (k)
+            {
+            case 0: C.has_ni = false; break;
+            case 1: C.has_angle = false; break;
+            case 2: C.has_m1 = false; break;
+            case 3: C.has_m2 = false; break;
+            }
+            CHECK_NOTHROW(C.run());
         }
     }
     SECTION("ray_ind bounds and the identity requirement") // 9.9
@@ -2366,12 +2375,14 @@ TEST_CASE("ray_state_update - input validation")
         F.cur_in = sv({enc(7, true), enc(7, true)}); // flagged but in range
         CHECK_NOTHROW(F.run());
     }
-    SECTION("the material map must be complete and consistent") // 9.11
+    SECTION("the material map may be sparse but must be consistent") // 9.11
     {
+        // Missing columns fall back to their defaults (sparse maps are supported)
         auto C = make_valid9();
         C.mtl.erase("a");
-        CHECK_THROWS_AS(C.run(), std::invalid_argument);
+        CHECK_NOTHROW(C.run());
 
+        // Columns of unequal length are an error
         auto D = make_valid9();
         D.mtl["alpha"].resize(6); // others have 7 entries
         CHECK_THROWS_AS(D.run(), std::invalid_argument);

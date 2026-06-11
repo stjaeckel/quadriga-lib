@@ -11,6 +11,7 @@
 #include <string>
 #include <stdexcept>
 #include <cstring>
+#include <cmath>
 
 // Materials
 namespace
@@ -469,6 +470,7 @@ namespace
             const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
 
             // Slab medium (= *this). eta_if includes the resonance pole (interface / Fresnel); eta_med excludes it (medium path / phase).
+            bool slab_is_air = same_as(Material());
             std::complex<double> eta_s_if = eta(fGHz) + eta_resonance(fGHz);
             std::complex<double> mu_s = mu(fGHz);
             std::complex<double> eta_s_med = eta(fGHz);
@@ -490,7 +492,10 @@ namespace
                 std::complex<double> cos_t2 = std::sqrt(1.0 - ratio * sin2);
                 std::complex<double> r_te = (z1 * abs_cos - z2 * cos_t2) / (z1 * abs_cos + z2 * cos_t2);
                 double R0 = std::norm(r_te);
-                double Reff = adj.apply_tf(R0, fGHz); // tf carried by the adjacent (entered) material
+
+                // tf of the face owner: the slab if solid, the adjacent solid for an air gap
+                double Reff = (slab_is_air ? adj : *this).apply_tf(R0, fGHz);
+
                 r = std::polar(std::sqrt(Reff), std::arg(r_te));
                 R = Reff;
             };
@@ -571,7 +576,7 @@ template <typename dtype>
 dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
                                 arma::uword iM, dtype dist, dtype center_frequency)
 {
-    if (center_frequency <= (dtype)0.0)
+    if (!std::isfinite((double)center_frequency) || center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
     MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
     if (iM > cols.n_mtl)
@@ -831,15 +836,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     if (mesh->n_cols != 9)
         throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
 
-    const arma::uword n_ray = orig->n_rows;     // Number of rays
-    const arma::uword n_mesh = mesh->n_rows;    // Number of mesh elements
-    const int n_ray_i = (int)n_ray;             // Number of rays as int
-    const unsigned n_mesh_u = (unsigned)n_mesh; // Number of mesh elements as unsigned int
-    const size_t n_ray_t = (size_t)n_ray;       // Number of rays as size_t
-    const size_t n_mesh_t = (size_t)n_mesh;     // Number of mesh elements as size_t
-
-    if (n_ray >= INT32_MAX)
-        throw std::invalid_argument("Number of rays exceeds maximum supported number.");
+    const arma::uword n_ray = orig->n_rows;  // Number of rays
+    const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
 
     // Check for correct number of rows
     if (dest->n_rows != n_ray)
@@ -885,6 +883,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const dtype *p_sbs = sbs->memptr();
     const dtype *p_mesh = mesh->memptr();
     const unsigned *p_fbs_ind = fbs_ind->memptr();
+    const unsigned *p_sbs_ind = sbs_ind->memptr();
     const dtype *p_trivec = (trivec == nullptr) ? nullptr : trivec->memptr();
     const dtype *p_tridir = (tridir == nullptr) ? nullptr : tridir->memptr();
     const dtype *p_orig_length = (orig_length == nullptr) ? nullptr : orig_length->memptr();
@@ -892,18 +891,20 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     // Resolve material columns once; air (empty) table when no material model is supplied.
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
     MaterialCols<dtype> cols = (mtl_prop != nullptr) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
-    if (p_mtl_ind != nullptr && cols.n_mtl > 0 && (arma::uword)mtl_ind->max() > cols.n_mtl)
+    if (p_mtl_ind != nullptr && (arma::uword)mtl_ind->max() > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
 
     // Get number of output rays and build output ray index
     // - Only consider rays that have at least one interaction with the mesh, i.e. 'fbs_ind != 0'
     unsigned n_rayN_u = 0;
-    unsigned *output_ray_index = new unsigned[n_ray_t]; // 1-based
-    for (size_t i_ray = 0; i_ray < n_ray_t; ++i_ray)    // Ray loop
-        if (p_fbs_ind[i_ray] == 0)                      // No hit
+    unsigned *output_ray_index = new unsigned[n_ray]; // 1-based
+    for (size_t i_ray = 0; i_ray < n_ray; ++i_ray)    // Ray loop
+        if (p_fbs_ind[i_ray] == 0)                    // No hit
             output_ray_index[i_ray] = 0;
-        else if (p_fbs_ind[i_ray] > n_mesh_u) // Invalid, must be 1 ... n_mesh (1-based index)
+        else if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
             throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
+        else if (p_sbs_ind[i_ray] > n_mesh)
+            throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
         else // Store value
             output_ray_index[i_ray] = ++n_rayN_u;
 
@@ -971,20 +972,16 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         use_ray_tube = 0;
 
 #pragma omp parallel for
-    for (int i_ray = 0; i_ray < n_ray_i; ++i_ray) // Ray loop
+    for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray) // Ray loop
     {
         if (p_fbs_ind[i_ray] == 0) // Skip non-hits
             continue;
 
-        size_t iRx = (size_t)i_ray;                 // Ray x-index
-        size_t iRy = iRx + n_ray_t;                 // Ray y-index
-        size_t iRz = iRy + n_ray_t;                 // Ray z-index
-        size_t iFBS = (size_t)p_fbs_ind[i_ray] - 1; // Mesh FBS index, 0-based
-
-        // SBS index
-        size_t iSBS = (size_t)sbs_ind->at(iRx); // Mesh SBS index, 1-based
-        if (iSBS > n_mesh_t)
-            throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
+        size_t iRx = (size_t)i_ray;               // Ray x-index
+        size_t iRy = iRx + n_ray;                 // Ray y-index
+        size_t iRz = iRy + n_ray;                 // Ray z-index
+        size_t iFBS = (size_t)p_fbs_ind[iRx] - 1; // Mesh FBS index, 0-based
+        size_t iSBS = (size_t)p_sbs_ind[iRx];     // Mesh SBS index, 1-based
 
         // Material indices for FBS and SBS faces (0 if no material table)
         arma::uword iMF = (p_mtl_ind == nullptr) ? 0 : (arma::uword)p_mtl_ind[iFBS];
@@ -1013,14 +1010,14 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Surface normal vector of the FBS mesh element calculated by taking the vector cross product of two edges of the triangle
         // Note: Order of the vertices determines side (front or back) of the element
         double V1x = (double)p_mesh[iFBS],
-               V1y = (double)p_mesh[iFBS + n_mesh_t],
-               V1z = (double)p_mesh[iFBS + 2 * n_mesh_t];
-        double E1x = (double)p_mesh[iFBS + 3 * n_mesh_t] - V1x,
-               E1y = (double)p_mesh[iFBS + 4 * n_mesh_t] - V1y,
-               E1z = (double)p_mesh[iFBS + 5 * n_mesh_t] - V1z;
-        double E2x = (double)p_mesh[iFBS + 6 * n_mesh_t] - V1x,
-               E2y = (double)p_mesh[iFBS + 7 * n_mesh_t] - V1y,
-               E2z = (double)p_mesh[iFBS + 8 * n_mesh_t] - V1z;
+               V1y = (double)p_mesh[iFBS + n_mesh],
+               V1z = (double)p_mesh[iFBS + 2 * n_mesh];
+        double E1x = (double)p_mesh[iFBS + 3 * n_mesh] - V1x,
+               E1y = (double)p_mesh[iFBS + 4 * n_mesh] - V1y,
+               E1z = (double)p_mesh[iFBS + 5 * n_mesh] - V1z;
+        double E2x = (double)p_mesh[iFBS + 6 * n_mesh] - V1x,
+               E2y = (double)p_mesh[iFBS + 7 * n_mesh] - V1y,
+               E2z = (double)p_mesh[iFBS + 8 * n_mesh] - V1z;
         double Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x; // Mesh surface normal
         scl = 1.0 / std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz), Nx *= scl, Ny *= scl, Nz *= scl;       // Normalize to 1
 
@@ -1035,14 +1032,14 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (iSBS != 0 && (FS_length < ray_offset || p_normal_vecN != nullptr))
         {
             V1x = (double)p_mesh[iSBS - 1],
-            V1y = (double)p_mesh[iSBS - 1 + n_mesh_t],
-            V1z = (double)p_mesh[iSBS - 1 + 2 * n_mesh_t];
-            E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh_t] - V1x,
-            E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh_t] - V1y,
-            E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh_t] - V1z;
-            E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh_t] - V1x,
-            E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh_t] - V1y,
-            E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh_t] - V1z;
+            V1y = (double)p_mesh[iSBS - 1 + n_mesh],
+            V1z = (double)p_mesh[iSBS - 1 + 2 * n_mesh];
+            E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh] - V1x,
+            E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh] - V1y,
+            E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh] - V1z;
+            E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh] - V1x,
+            E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh] - V1y,
+            E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh] - V1z;
             Mx = E1y * E2z - E1z * E2y, My = E1z * E2x - E1x * E2z, Mz = E1x * E2y - E1y * E2x;  // Mesh surface normal
             scl = 1.0 / std::sqrt(Mx * Mx + My * My + Mz * Mz), Mx *= scl, My *= scl, Mz *= scl; // Normalize to 1
 
@@ -1146,19 +1143,19 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 }
                 else if (iTube == 2)
                 {
-                    Tx += (double)p_trivec[iRx + 3 * n_ray_t], Ty += (double)p_trivec[iRx + 4 * n_ray_t], Tz += (double)p_trivec[iRx + 5 * n_ray_t];
+                    Tx += (double)p_trivec[iRx + 3 * n_ray], Ty += (double)p_trivec[iRx + 4 * n_ray], Tz += (double)p_trivec[iRx + 5 * n_ray];
                     if (use_ray_tube == 1)
-                        az = (double)p_tridir[iRx + 2 * n_ray_t], el = (double)p_tridir[iRx + 3 * n_ray_t];
+                        az = (double)p_tridir[iRx + 2 * n_ray], el = (double)p_tridir[iRx + 3 * n_ray];
                     else
-                        Vx = (double)p_tridir[iRx + 3 * n_ray_t], Vy = (double)p_tridir[iRx + 4 * n_ray_t], Vz = (double)p_tridir[iRx + 5 * n_ray_t];
+                        Vx = (double)p_tridir[iRx + 3 * n_ray], Vy = (double)p_tridir[iRx + 4 * n_ray], Vz = (double)p_tridir[iRx + 5 * n_ray];
                 }
                 else if (iTube == 3)
                 {
-                    Tx += (double)p_trivec[iRx + 6 * n_ray_t], Ty += (double)p_trivec[iRx + 7 * n_ray_t], Tz += (double)p_trivec[iRx + 8 * n_ray_t];
+                    Tx += (double)p_trivec[iRx + 6 * n_ray], Ty += (double)p_trivec[iRx + 7 * n_ray], Tz += (double)p_trivec[iRx + 8 * n_ray];
                     if (use_ray_tube == 1)
-                        az = (double)p_tridir[iRx + 4 * n_ray_t], el = (double)p_tridir[iRx + 5 * n_ray_t];
+                        az = (double)p_tridir[iRx + 4 * n_ray], el = (double)p_tridir[iRx + 5 * n_ray];
                     else
-                        Vx = (double)p_tridir[iRx + 6 * n_ray_t], Vy = (double)p_tridir[iRx + 7 * n_ray_t], Vz = (double)p_tridir[iRx + 8 * n_ray_t];
+                        Vx = (double)p_tridir[iRx + 6 * n_ray], Vy = (double)p_tridir[iRx + 7 * n_ray], Vz = (double)p_tridir[iRx + 8 * n_ray];
                 }
 
                 // Calculate vertex ray direction (V)
@@ -1623,8 +1620,11 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (interaction_type < 0 || interaction_type > 4)
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission");
 
-    if (center_frequency <= (dtype)0.0)
+    if (!std::isfinite((double)center_frequency) || center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+
+    if (!std::isfinite(eps) || eps < 0.0)
+        throw std::invalid_argument("Input 'eps' must be finite and >= 0.");
 
     if (orig == nullptr || dest == nullptr || fbs == nullptr || sbs == nullptr)
         throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' cannot be NULL.");
@@ -1640,10 +1640,54 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != 0 && arma::uword(mtl_ind_sbs->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
+    auto check_state_words = [&](const arma::Col<short> *v, const char *name)
+    {
+        if (v == nullptr || v->n_elem == 0)
+            return;
+        for (const short *p = v->memptr(), *pe = p + v->n_elem; p < pe; ++p)
+            if (arma::uword(*p & (short)0x7FFF) > cols.n_mtl)
+                throw std::invalid_argument(std::string("Values in '") + name + "' exceed the number of materials in 'mtl_prop'.");
+    };
+    check_state_words(mtl_ind_prev_in, "mtl_ind_prev_in");
+    check_state_words(mtl_ind_current_in, "mtl_ind_current_in");
+    check_state_words(mtl_ind_buffer_in, "mtl_ind_buffer_in");
+
     const bool is_scalar = interaction_type >= 3;
     const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
 
     const arma::uword n_rayN = out_typeN->n_elem;
+    const arma::uword n_ray = orig->n_rows;
+
+    if (orig->n_cols != 3 || dest->n_cols != 3 || fbs->n_cols != 3 || sbs->n_cols != 3)
+        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' must have 3 columns.");
+    if (dest->n_rows != n_ray || fbs->n_rows != n_ray || sbs->n_rows != n_ray)
+        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' must have the same number of rows.");
+    if (no_interact != nullptr && no_interact->n_elem != n_ray)
+        throw std::invalid_argument("Input 'no_interact' must match the number of rays in 'orig'.");
+    if (mtl_ind_prev_in != nullptr && mtl_ind_prev_in->n_elem != n_ray)
+        throw std::invalid_argument("Input 'mtl_ind_prev_in' must match the number of rays in 'orig'.");
+    if (mtl_ind_current_in != nullptr && mtl_ind_current_in->n_elem != n_ray)
+        throw std::invalid_argument("Input 'mtl_ind_current_in' must match the number of rays in 'orig'.");
+    if (mtl_ind_buffer_in != nullptr && mtl_ind_buffer_in->n_elem != n_ray)
+        throw std::invalid_argument("Input 'mtl_ind_buffer_in' must match the number of rays in 'orig'.");
+    if (fbs_angleN != nullptr && fbs_angleN->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'fbs_angleN' must match the length of 'out_typeN'.");
+    if (mtl_ind_fbs != nullptr && mtl_ind_fbs->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
+    if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'mtl_ind_sbs' must match the length of 'out_typeN'.");
+    if (normal_vecN != nullptr && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
+        throw std::invalid_argument("Input 'normal_vecN' must have size [n_rayN, 6].");
+    if (gainN != nullptr && gainN->n_elem != n_rayN)
+        throw std::invalid_argument("In-out 'gainN' must match the length of 'out_typeN'.");
+    if (xprmatN != nullptr && (xprmatN->n_rows != n_rayN || xprmatN->n_cols != 8))
+        throw std::invalid_argument("In-out 'xprmatN' must have size [n_rayN, 8].");
+    if (ray_ind != nullptr && ray_ind->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'ray_ind' must match the length of 'out_typeN'.");
+    if (ray_ind != nullptr && ray_ind->n_elem != 0 && (arma::uword)ray_ind->max() >= n_ray)
+        throw std::invalid_argument("Values in 'ray_ind' exceed the number of rays in 'orig'.");
+    if (ray_ind == nullptr && n_ray != n_rayN)
+        throw std::invalid_argument("Without 'ray_ind', the full and compact sets must have the same size.");
 
     // Allocate / size the output state arrays (compact set)
     if (mtl_ind_prev_out != nullptr && mtl_ind_prev_out->n_elem != n_rayN)
@@ -1734,12 +1778,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
 
         // Transmission gain shorthand
         auto TRN = [&](int a, int b) -> double
-        {
-            int tt = is_scalar ? 4 : 1;      // transmission geometry (EM = 1, scalar = 4)
-            int m1 = (theta >= 0.0) ? b : a; // medium 1 (incidence side / "this")
-            int m2 = (theta >= 0.0) ? a : b; // medium 2 (object entered / "other")
-            return MAT(m1).interact_with(MAT(m2), tt, theta, fGHz);
-        };
+        { return MAT(a).interact_with(MAT(b), (is_scalar ? 4 : 1), theta, fGHz); };
 
         // Gain / xprmat patch operations
         auto rsu_scale = [&](double cr, double ci)
@@ -1791,8 +1830,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
             else // Internal / back reflection of a resolvable parallel slab
             {
+                // Processed interface: cur|air at an i-o face, cur|iM at an i-i face (types 4/5)
+                int nearM = (typeH == 5) ? M2 : ((typeH == 4) ? M1 : 0);
                 double dist = distance(orig, fbs);
-                std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(0), theta, dist, fGHz, eps, !prev_nonpar);
+                std::complex<double> S = MAT(cur).slab_airy_factor(MAT(nearM), MAT(prev_mat), theta, dist, fGHz, eps, !prev_nonpar);
                 if (!std::isnan(std::real(S)))
                 {
                     rsu_scale(std::real(S), std::imag(S));           // IG * S
@@ -1807,11 +1848,18 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 rsu_kill();
             else if (resolved) // Resolved-ray out-coupling: iM = the next medium for an i-i
             {
+                // Resolved rows charge the in-medium loss of their INCOMING segment (the unresolved
+                // entry / M2M rows charge forward, the resolving reflection charges nothing), so every
+                // segment of the resolved return path is charged exactly once.
                 int iM = (typeH == 5) ? M2 : M1;
-                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o: out-coupling t21
-                    out_cur = (short)0;                      // current_out <- 0, clear resolved flag
-                else if (typeH == 4 || typeH == 5)           // i-i: stay resolved, advance medium
+                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o: out-coupling t21, up-trip loss
                 {
+                    rsu_scale(std::sqrt(MED(cur, distance(orig, fbs))), 0.0);
+                    out_cur = (short)0; // current_out <- 0, clear resolved flag
+                }
+                else if (typeH == 4 || typeH == 5) // i-i: stay resolved, advance medium, incoming-segment loss
+                {
+                    rsu_scale(std::sqrt(MED(cur, distance(orig, fbs))), 0.0);
                     out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // keep resolved flag
                     out_prev = (short)cur;                          // prev_out <- old cur
                 }
@@ -1825,8 +1873,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (cur == 0) // enter
                 {
                     double dist = distance(fbs, dest);
-                    dist = (dist > ray_offset) ? dist - ray_offset : dist; // clamped
-                    rsu_scale(std::sqrt(MED(M1, dist)), 0.0);              // IG * MED
+                    dist = (dist > ray_offset) ? dist - ray_offset : 0.0; // clamped
+                    rsu_scale(std::sqrt(MED(M1, dist)), 0.0);             // IG * MED
                     out_cur = (short)M1;
                     bool nonpar = (nH >= 2) && fbs_sbs_not_parallel();
                     out_prev = (short)(nonpar ? (int)0x8000 : 0); // prev <- 0, +flag
@@ -1844,7 +1892,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 }
                 else if (buf == 0) // cavity exit, IG * S
                 {
-                    std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(0), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                    std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
                     if (!std::isnan(std::real(S)))
                         rsu_scale(std::real(S), std::imag(S));
                     out_cur = (short)0;
@@ -1932,10 +1980,13 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         double gmed = MED(iM, distance(fbs, dest) - ray_offset); // unclamped
                         std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
                         double cr = std::sqrt(gmed), ci = 0.0;
+                        out_cur = (short)iM; // current_out <- iM
                         if (!std::isnan(std::real(S)))
+                        {
                             cr = std::real(S) * std::sqrt(gmed), ci = std::imag(S) * std::sqrt(gmed);
+                            out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // resolved: later crossings are transparent
+                        }
                         rsu_scale(cr, ci);
-                        out_cur = (short)iM;   // current_out <- iM
                         out_prev = (short)cur; // prev_out <- old cur
                     }
                 }
@@ -2009,7 +2060,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     {
                         if (buf == 0) // cavity exit, IG * S
                         {
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(0), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
                             if (!std::isnan(std::real(S)))
                                 rsu_scale(std::real(S), std::imag(S));
                             out_cur = (short)0;
@@ -2035,9 +2086,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         {
                             int iM = (typeH == 5) ? M2 : M1;
                             std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                            out_cur = (short)iM; // current_out <- iM
                             if (!std::isnan(std::real(S)))
+                            {
                                 rsu_scale(std::real(S), std::imag(S));
-                            out_cur = (short)iM;   // current_out <- iM
+                                out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // resolved: later crossings are transparent
+                            }
                             out_prev = (short)cur; // prev_out <- old cur
                         }
                     }
@@ -2045,7 +2099,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     {
                         if (buf == 0) // cavity exit, IG * S
                         {
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(0), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
                             if (!std::isnan(std::real(S)))
                                 rsu_scale(std::real(S), std::imag(S));
                             out_cur = (short)0;
