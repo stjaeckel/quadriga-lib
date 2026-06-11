@@ -730,7 +730,9 @@ void quadriga_lib::ray_mesh_interact(
    |  15   | Edge hit, inside→outside, total reflection          |
 
 ## See also:
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
+- [[ray_state_update]] (inside/outside state machine)
 - [[icosphere]] (for generating beams)
 - [[ray_triangle_intersect]] (for computing FBS and SBS positions)
 - [[ray_point_intersect]] (for calculating beam interactions with sampling points)
@@ -1585,6 +1587,7 @@ void quadriga_lib::ray_state_update(
 - **`ray_ind`** — Compact-to-full ray index map; `[n_rayN]` -> `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 
 ## See also:
+- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
 - [[ray_mesh_interact]] (computes the per-interaction Fresnel/Jones result this function corrects)
 - [[calc_diffraction_gain]] (the reference state machine this function ports)
 MD!*/

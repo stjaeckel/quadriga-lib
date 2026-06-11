@@ -18,7 +18,7 @@
 
 // Built-in EM/acoustic material table (Rec. ITU-R P.2040-3; irr_glass: 3GPP TR 38.901 V17.0.0, Table 7.4.3-1).
 // Stored as a CSV literal so it is parsed through the exact same path as a user-supplied CSV file.
-// Row 0 is the transparent fallback used when a referenced material is not found and csv_strict == false.
+// Faces referencing a material not present here (csv_strict == false) are assigned index 0 (no material).
 // Only columns carrying non-default data are listed; consumers supply their own defaults for absent columns.
 static const char *DEFAULT_MATERIAL_CSV =
     "name,a,b,c,d,att\n"
@@ -397,10 +397,12 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   - Visual side, from the companion `.mtl`: `mtl_ind`, `mtl_names` (raw `usemtl` names), and `bsdf`.
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by name with a trailing Blender
-  `.NNN` suffix removed. Unmatched names throw when `csv_strict = true`; otherwise they map to row 0
-  of the table (the transparent fallback). The two index spaces are decoupled, so several visual
+  `.NNN` suffix removed. Unmatched names throw when `csv_strict = true`; otherwise they map to index 0
+  (no material). The two index spaces are decoupled, so several visual
   materials (e.g. `wall.001`, `wall.002`) may resolve to a single EM material.
-- All returned indices are 0-based.
+- Geometry indices (`face_ind`, `obj_ind`) are 0-based. Material indices (`mtl_ind`, `csv_ind`) are
+  1-based, with 0 reserved for the outside / no-material state (faces with no assigned material;
+  for `csv_ind` in non-strict mode, also materials absent from the table).
 - With an empty `fn_obj`, geometry and `.mtl` outputs are empty and only the table (`csv_names`, `csv_prop`) 
   is populated — useful for inspecting a CSV or the default library. If `fn_csv` is also empty, the built-in default table is returned.
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
@@ -426,9 +428,9 @@ arma::uword quadriga_lib::obj_file_read(
 
 ## Inputs:
 - **`fn_obj`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column, and row 0 is the
-  fallback material (should be transparent, e.g. air). Empty uses the built-in ITU-R P.2040 default table.
-- **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to row 0
+- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
+  to index 0 (no material) unless `csv_strict` is set. Empty uses the built-in ITU-R P.2040 default table.
+- **`csv_strict`** — If `true`, throw when a `usemtl` material is absent from the table; otherwise map to index 0 (no material)
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates `{x1,y1,z1,x2,y2,z2,x3,y3,z3}` per row; `[n_mesh, 9]`
@@ -436,10 +438,10 @@ arma::uword quadriga_lib::obj_file_read(
 - **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `[n_mesh, 3]`
 - **`obj_ind`** — 0-based object index per triangle; `[n_mesh]`
 - **`obj_names`** — Object names; length `max(obj_ind)+1`
-- **`mtl_ind`** — 0-based visual-material index per triangle; `[n_mesh]`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `[n_mesh]`
 - **`mtl_names`** — Visual material names (raw `usemtl`); length `no_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `[no_mtl, 17]`
-- **`csv_ind`** — 0-based EM/acoustic-material index per triangle; `[n_mesh]`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `[n_mesh]`
 - **`csv_names`** — Material names from the table; length `n_csv` (the full table)
 - **`csv_prop`** — Material properties keyed by CSV column name (excluding `name`); each value has
   length `n_csv`. Columns absent from the table are defaulted by consumers; empty cells parse as 0.
@@ -642,17 +644,17 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     {
         auto it = table.index.find(raw);
         if (it != table.index.end())
-            return it->second;
+            return it->second + 1;
         std::string stripped = base_material_name(raw);
         if (stripped != raw)
         {
             auto it2 = table.index.find(stripped);
             if (it2 != table.index.end())
-                return it2->second;
+                return it2->second + 1;
         }
         if (csv_strict)
             throw std::invalid_argument("Error: material '" + raw + "' referenced in '" + fn_obj + "' is not present in the material table.");
-        return 0; // row 0 = transparent fallback
+        return 0; // 0 = no material (outside)
     };
 
     // Pass 2: parse geometry, objects and materials
@@ -663,7 +665,6 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
     arma::uword cur_obj = 0;
     bool have_obj = false;
     arma::uword cur_mtl = 0;
-    bool mtl_set = false;
     arma::uword cur_csv = 0;
     bool simple_face_format = true;
     std::string mtllib_fn;
@@ -716,8 +717,6 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
                 throw std::invalid_argument("Mesh in '" + fn_obj + "' is not triangulated (quads/n-gons unsupported).");
 
             // Assign material (lazily create a "default" entry for faces before any usemtl)
-            if (collect_mtl && !mtl_set)
-                cur_mtl = intern_mtl("default");
             if (p_mtl != nullptr)
                 p_mtl[i_face] = cur_mtl;
             if (p_csv != nullptr)
@@ -750,7 +749,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
             cur_obj = (arma::uword)local_obj_names.size() - 1;
             have_obj = true;
             // A new object resets the active material
-            mtl_set = false;
+            cur_mtl = 0;
             cur_csv = 0;
             continue;
         }
@@ -760,8 +759,7 @@ arma::uword quadriga_lib::obj_file_read(const std::string &fn_obj, arma::Mat<dty
         {
             std::string raw = trim_ws(line.substr(7));
             if (collect_mtl)
-                cur_mtl = intern_mtl(raw); // raw name -> .mtl / bsdf
-            mtl_set = true;
+                cur_mtl = intern_mtl(raw) + 1; // 1-based; 0 = no material
             if (csv_ind != nullptr)
                 cur_csv = resolve_csv(raw); // stripped name -> EM/acoustic table
             continue;

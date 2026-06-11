@@ -39,7 +39,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
-- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
   of [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
@@ -103,15 +103,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto fbs = qd_mex_get_Mat<double>(prhs[4]);
     const auto sbs = qd_mex_get_Mat<double>(prhs[5]);
     const auto mesh = qd_mex_get_Mat<double>(prhs[6]);
-
-    // Material index: MATLAB 1-based -> C++ 0-based (copy so we don't mutate caller memory)
-    arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[7], true);
-    if (!mtl_ind.is_empty())
-        mtl_ind -= 1;
-
-    // Material properties: MATLAB struct -> std::unordered_map<std::string, std::vector<double>>
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[7]);
     const auto mtl_prop = qd_mex_struct2map<double>(prhs[8]);
-
     const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[9]);
     const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[10]);
     const auto trivec = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);

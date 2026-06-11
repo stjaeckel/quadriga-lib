@@ -3949,7 +3949,7 @@ void calc_diffraction_gain(
 <li><b><code>orig</code></b> — TX positions; <code>[n_pos, 3]</code></li>
 <li><b><code>dest</code></b> — RX positions; <code>[n_pos, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>mtl_ind</code></b> — 0-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face, 0 = no material (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
 <li><b><code>center_frequency</code></b> — Center frequency</li>
 <li><b><code>lod</code></b> <i>(optional)</i> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a></li>
@@ -4250,7 +4250,7 @@ dtype quadriga_lib::interface_gain(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
-<li><b><code>iM</code></b> — 0-based material index selecting the entered material from <code>mtl_prop</code></li>
+<li><b><code>iM</code></b> — 1-based material index (0 = no material / air)</li>
 <li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
 </ul>
 
@@ -4292,7 +4292,7 @@ dtype quadriga_lib::medium_gain(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
-<li><b><code>iM</code></b> — 0-based material index selecting the material from <code>mtl_prop</code></li>
+<li><b><code>iM</code></b> —  1-based material index (0 = no material / air)</li>
 <li><b><code>dist</code></b> — Path length of the ray inside the medium</li>
 <li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
 </ul>
@@ -4340,9 +4340,9 @@ void quadriga_lib::mitsuba_xml_file_write(
 <li><b><code>vert_list</code></b> — Vertex coordinates (x, y, z); <code>[n_vert, 3]</code></li>
 <li><b><code>face_ind</code></b> — Triangle definitions as 0-based vertex indices; <code>[n_mesh, 3]</code></li>
 <li><b><code>obj_ind</code></b> — 0-based object index per triangle; <code>[n_mesh]</code></li>
-<li><b><code>mtl_ind</code></b> — 0-based material index per triangle; <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per triangle (0 = no material; every face must reference a material — 0 is rejected); <code>[n_mesh]</code></li>
 <li><b><code>obj_names</code></b> — Object names; length must equal <code>max(obj_ind)+1</code></li>
-<li><b><code>mtl_names</code></b> — Material names; length must equal <code>max(mtl_ind)+1</code></li>
+<li><b><code>mtl_names</code></b> — Material names; length must equal <code>max(mtl_ind)</code> (mtl_ind is 1-based)</li>
 <li><b><code>bsdf</code></b> <i>(optional)</i> — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see <a href="#obj_file_read">obj_file_read</a> for field definitions; <code>[mtl_names.size(), 17]</code></li>
 <li><b><code>map_to_itu_materials</code></b> <i>(optional)</i> — If <code>true</code>, maps material names to ITU presets recognised by Sionna RT</li>
 </ul>
@@ -4363,8 +4363,8 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 <li>EM/acoustic side, from a material table (<code>fn_csv</code>, or a built-in ITU-R P.2040 default): <code>csv_ind</code>,<code>csv_names</code>, <code>csv_prop</code>.</li>
 </ul>
 </li>
-<li>A face's <code>usemtl</code> name is matched to the table by exact name, then by name with a trailing Blender <code>.NNN</code> suffix removed. Unmatched names throw when <code>csv_strict = true</code>; otherwise they map to row 0 of the table (the transparent fallback). The two index spaces are decoupled, so several visual materials (e.g. <code>wall.001</code>, <code>wall.002</code>) may resolve to a single EM material.</li>
-<li>All returned indices are 0-based.</li>
+<li>A face's <code>usemtl</code> name is matched to the table by exact name, then by name with a trailing Blender <code>.NNN</code> suffix removed. Unmatched names throw when <code>csv_strict = true</code>; otherwise they map to index 0 (no material). The two index spaces are decoupled, so several visual materials (e.g. <code>wall.001</code>, <code>wall.002</code>) may resolve to a single EM material.</li>
+<li>Geometry indices (<code>face_ind</code>, <code>obj_ind</code>) are 0-based. Material indices (<code>mtl_ind</code>, <code>csv_ind</code>) are 1-based, with 0 reserved for the outside / no-material state (faces with no assigned material; for <code>csv_ind</code> in non-strict mode, also materials absent from the table).</li>
 <li>With an empty <code>fn_obj</code>, geometry and <code>.mtl</code> outputs are empty and only the table (<code>csv_names</code>, <code>csv_prop</code>) is populated — useful for inspecting a CSV or the default library. If <code>fn_csv</code> is also empty, the built-in default table is returned.</li>
 <li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
@@ -4391,8 +4391,8 @@ arma::uword quadriga_lib::obj_file_read(
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>fn_obj</code></b> — Path to the <code>.obj</code> file; empty loads only the material table</li>
-<li><b><code>fn_csv</code></b> — Path to an EM/acoustic material CSV; must contain a <code>name</code> column, and row 0 is the fallback material (should be transparent, e.g. air). Empty uses the built-in ITU-R P.2040 default table.</li>
-<li><b><code>csv_strict</code></b> — If <code>true</code>, throw when a <code>usemtl</code> material is absent from the table; otherwise map to row 0</li>
+<li><b><code>fn_csv</code></b> — Path to an EM/acoustic material CSV; must contain a <code>name</code> column. Unmatched faces map to index 0 (no material) unless <code>csv_strict</code> is set. Empty uses the built-in ITU-R P.2040 default table.</li>
+<li><b><code>csv_strict</code></b> — If <code>true</code>, throw when a <code>usemtl</code> material is absent from the table; otherwise map to index 0 (no material)</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4402,10 +4402,10 @@ arma::uword quadriga_lib::obj_file_read(
 <li><b><code>face_ind</code></b> — 0-based vertex indices into <code>vert_list</code> per triangle; <code>[n_mesh, 3]</code></li>
 <li><b><code>obj_ind</code></b> — 0-based object index per triangle; <code>[n_mesh]</code></li>
 <li><b><code>obj_names</code></b> — Object names; length <code>max(obj_ind)+1</code></li>
-<li><b><code>mtl_ind</code></b> — 0-based visual-material index per triangle; <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based visual-material index per triangle (0 = no material); <code>[n_mesh]</code></li>
 <li><b><code>mtl_names</code></b> — Visual material names (raw <code>usemtl</code>); length <code>no_mtl</code></li>
 <li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code>; <code>[no_mtl, 17]</code></li>
-<li><b><code>csv_ind</code></b> — 0-based EM/acoustic-material index per triangle; <code>[n_mesh]</code></li>
+<li><b><code>csv_ind</code></b> — 1-based EM/acoustic-material index per triangle (0 = no material); <code>[n_mesh]</code></li>
 <li><b><code>csv_names</code></b> — Material names from the table; length <code>n_csv</code> (the full table)</li>
 <li><b><code>csv_prop</code></b> — Material properties keyed by CSV column name (excluding <code>name</code>); each value has length <code>n_csv</code>. Columns absent from the table are defaulted by consumers; empty cells parse as 0.</li>
 </ul>
@@ -4433,8 +4433,9 @@ Write a triangulated Wavefront .obj (and .mtl) file
 <li>With <code>mesh</code>: <code>vert_list_out</code> + <code>face_ind_out</code> are derived from it, merging vertices of the same object that are closer than <code>threshold</code> (no merging across objects). With <code>vert_list</code>/<code>face_ind</code>: data is written unchanged</li>
 <li>Faces are written grouped by object; the faces of each object must form a contiguous block in <code>obj_ind</code></li>
 <li>Without <code>obj_ind</code>/<code>obj_names</code>: a single object named <code>object</code> is written</li>
-<li>Without <code>mtl_ind</code>: no <code>usemtl</code> tags and no <code>.mtl</code> file are written. With <code>mtl_ind</code>, every face is assigned a (0-based) material; pass <code>mtl_ind = nullptr</code> to leave geometry unassigned</li>
+<li>Without <code>mtl_ind</code>: no <code>usemtl</code> tags and no <code>.mtl</code> file are written. With <code>mtl_ind</code>, each face carries a 1-based material index (0 = no material, leaving that face unassigned); pass <code>mtl_ind = nullptr</code> to omit materials entirely</li>
 <li>The <code>.mtl</code> (named after the <code>.obj</code>) lists each used material; values default to a gray material when <code>bsdf</code> is omitted</li>
+<li>If <code>csv_names</code> is given, the EM/acoustic material table is written to a companion <code>.csv</code> (named after the <code>.obj</code>): columns follow a fixed canonical order, then any extra <code>csv_prop</code> columns (alphabetical); <code>csv_write_defaults</code> additionally emits canonical columns absent from <code>csv_prop</code>, filled with their defaults (<code>a</code>, <code>e</code>, <code>fRef</code> = 1, else 0)</li>
 </ul>
 
 <b>Declaration:</b><br>
@@ -4451,7 +4452,11 @@ void obj_file_write(
     const arma::Mat&lt;dtype&gt; *vert_list = nullptr,
     const arma::umat *face_ind = nullptr,
     const arma::Mat&lt;dtype&gt; *bsdf = nullptr,
-    const dtype threshold = 0.001);
+    const dtype threshold = 0.001,
+    const arma::uvec *csv_ind = nullptr,
+    const std::vector&lt;std::string&gt; *csv_names = nullptr,
+    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; *csv_prop = nullptr,
+    bool csv_write_defaults = false);
 </pre>
 
 <b>Inputs:</b><br>
@@ -4459,13 +4464,17 @@ void obj_file_write(
 <li><b><code>fn</code></b> — Output path; must end in <code>.obj</code>; if empty, no files are written (outputs are still computed)</li>
 <li><b><code>mesh</code></b> — Triangle coordinates <code>{x1,y1,z1,...,x3,y3,z3}</code> per row; <code>[n_mesh, 9]</code>; mutually exclusive with <code>vert_list</code>/<code>face_ind</code></li>
 <li><b><code>obj_ind</code></b> — 0-based object index per face; <code>[n_mesh]</code>; each object must be a contiguous block</li>
-<li><b><code>mtl_ind</code></b> — 0-based material index per face; <code>[n_mesh]</code>; omit (<code>nullptr</code>) for no materials</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = no material); <code>[n_mesh]</code>; omit (<code>nullptr</code>) for no materials</li>
 <li><b><code>obj_names</code></b> — Object names; length > <code>max(obj_ind)</code>; required if <code>obj_ind</code> is given</li>
-<li><b><code>mtl_names</code></b> — Material names; length > <code>max(mtl_ind)</code>; required if <code>mtl_ind</code> is given</li>
+<li><b><code>mtl_names</code></b> — Material names; length ≥ <code>max(mtl_ind)</code> (1-based); required if <code>mtl_ind</code> is given</li>
 <li><b><code>vert_list</code></b> — Vertex positions; <code>[n_vert, 3]</code>; only with <code>face_ind</code>, written unchanged</li>
 <li><b><code>face_ind</code></b> — 0-based vertex indices per face; <code>[n_mesh, 3]</code>; required with <code>vert_list</code></li>
 <li><b><code>bsdf</code></b> — Principled BSDF for the <code>.mtl</code>; <code>[n_mtl, 17]</code>; see <a href="#obj_file_read">obj_file_read</a> for columns</li>
 <li><b><code>threshold</code></b> — Vertex co-location distance for merging within an object; default 1 mm</li>
+<li><b><code>csv_ind</code></b> — 1-based EM/acoustic-material index per face (0 = no material); <code>[n_mesh]</code>; optional, validated if given</li>
+<li><b><code>csv_names</code></b> — EM/acoustic material names (the full table); writing the <code>.csv</code> requires this</li>
+<li><b><code>csv_prop</code></b> — Material properties keyed by column name; each vector must have one value per <code>csv_names</code> entry</li>
+<li><b><code>csv_write_defaults</code></b> — If <code>true</code>, also write canonical columns absent from <code>csv_prop</code>, using their defaults</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -4776,7 +4785,7 @@ void quadriga_lib::ray_mesh_interact(
 <li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>fbs</code></b>, <b><code>sbs</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code></li>
-<li><b><code>mtl_ind</code></b> — 0-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. NULL → all faces treated as air.</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. 0 = face has no material (air). NULL → all faces treated as air.</li>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code>. NULL → air defaults used.</li>
 <li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); <code>[n_ray]</code></li>
 <li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code></li>
@@ -4868,7 +4877,9 @@ void quadriga_lib::ray_mesh_interact(
 
 <b>See also:</b><br>
 <ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (for loading <code>mesh</code> and <code>mtl_prop</code> from OBJ file)</li>
+<li><a href="#ray_state_update">ray_state_update</a> (inside/outside state machine)</li>
 <li><a href="#icosphere">icosphere</a> (for generating beams)</li>
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for computing FBS and SBS positions)</li>
 <li><a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)</li>
@@ -4949,13 +4960,13 @@ void quadriga_lib::ray_state_update(
     const arma::u32_vec *no_interact,
     const arma::Col&lt;dtype&gt; *fbs_angleN,
     const arma::s32_vec *out_typeN,
-    const arma::Mat&lt;dtype&gt; *normal_vecN,
     const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; *mtl_prop,
     const arma::Col&lt;short&gt; *mtl_ind_fbs,
     const arma::Col&lt;short&gt; *mtl_ind_sbs,
     const arma::Col&lt;short&gt; *mtl_ind_prev_in = nullptr,
     const arma::Col&lt;short&gt; *mtl_ind_current_in = nullptr,
     const arma::Col&lt;short&gt; *mtl_ind_buffer_in = nullptr,
+    const arma::Mat&lt;dtype&gt; *normal_vecN = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_prev_out = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_current_out = nullptr,
     arma::Col&lt;short&gt; *mtl_ind_buffer_out = nullptr,
@@ -4973,23 +4984,24 @@ void quadriga_lib::ray_state_update(
 <li><b><code>no_interact</code></b> — Mesh-hit count per ray, full ray set; <code>[n_ray]</code>, read at <code>g</code></li>
 <li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (ITU convention), compact set; <code>[n_rayN]</code></li>
 <li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code></li>
-<li><b><code>normal_vecN</code></b> <i>(optional)</i> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. NULL disables the parallelism (wedge) test</li>
 <li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>)</li>
 <li><b><code>mtl_ind_fbs</code></b>, <b><code>mtl_ind_sbs</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air)</li>
-<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> <i>(optional)</i> — Old state words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
+<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — Old state words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
+<li><b><code>normal_vecN</code></b> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. NULL disables the parallelism (wedge) test</li>
 <li><b><code>eps</code></b> — Resolve threshold for the thin-slab (Fabry-Pérot) factor <code>S</code>. A slab is solved analytically only when its round-trip amplitude <code>rho = sqrt(R_near · R_far · medium_gain(slab, 2L))</code> reaches <code>eps</code>; below it, the bounce is re-emitted for the tracer to follow. Range <code>[0, 1]</code>. <code>eps = 0</code> always resolves — required for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more weak cavities back to the tracer (<code>eps ≈ drop_threshold^(1/N_max)</code>, ~0.1–0.25); <code>eps &gt;= 1</code> disables <code>S</code>.</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
-<li><b><code>mtl_ind_prev_out</code></b>, <b><code>mtl_ind_current_out</code></b>, <b><code>mtl_ind_buffer_out</code></b> <i>(optional)</i> — New state words, compact set; <code>[n_rayN]</code>, written at <code>i</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
-<li><b><code>gainN</code></b> <i>(optional, in/out)</i> — Per-interaction gain, patched in place; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> <i>(optional, in/out)</i> — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; <code>[n_rayN, 8]</code></li>
+<li><b><code>mtl_ind_prev_out</code></b>, <b><code>mtl_ind_current_out</code></b>, <b><code>mtl_ind_buffer_out</code></b> — New state words, compact set; <code>[n_rayN]</code>, written at <code>i</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
+<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction gain, patched in place; <code>[n_rayN]</code></li>
+<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; <code>[n_rayN, 8]</code></li>
 <li><b><code>ray_ind</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> -> <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
 </ul>
 
 <b>See also:</b><br>
 <ul>
+<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (computes the per-interaction Fresnel/Jones result this function corrects)</li>
 <li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (the reference state machine this function ports)</li>
 </ul>
@@ -5207,7 +5219,7 @@ arma::uword triangle_mesh_segmentation(
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>{x1,y1,z1,x2,y2,z2,x3,y3,z3}</code>; <code>[n_mesh, 9]</code></li>
 <li><b><code>target_size</code></b> <i>(optional)</i> — Target triangle count per sub-mesh; for best performance set near <code>sqrt(n_mesh)</code></li>
 <li><b><code>vec_size</code></b> <i>(optional)</i> — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count rounded up to a multiple of this value</li>
-<li><b><code>mtl_ind</code></b> <i>(optional)</i> — 0-based material indices per triangle (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> <i>(optional)</i> — Material indices per triangle (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
 </ul>
 
 <b>Outputs:</b><br>

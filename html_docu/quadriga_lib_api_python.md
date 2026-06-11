@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "10.06.2026"
+date: "11.06.2026"
 lang: en-US
 ---
 
