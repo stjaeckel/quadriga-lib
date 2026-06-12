@@ -4,7 +4,6 @@
 
 #include "quadriga_tools.hpp"
 #include "quadriga_lib_helper_functions.hpp"
-#include "quadriga_lib_material_helpers.hpp"
 
 // FUNCTION: Number formatter
 static std::string MioNum(size_t number)
@@ -21,187 +20,6 @@ static std::string MioNum(size_t number)
         str += " Mio.";
     }
     return str;
-}
-
-// FUNCTION: Check if two faces reference the same material
-static inline bool same_materials(const arma::uvec *mtl_ind, unsigned iMa, unsigned iMb) // 1-based face indices (0 = none)
-{
-    if (iMa == iMb)
-        return true;
-    unsigned n_mesh = (unsigned)mtl_ind->n_elem;
-    if (iMa == 0 || iMb == 0 || iMa > n_mesh || iMb > n_mesh)
-        return false;
-    return mtl_ind->at(iMa - 1) == mtl_ind->at(iMb - 1);
-}
-
-// FUNCTION: Calculate the medium-to-medium transition gain
-template <typename dtype>
-static inline dtype transition_gain_linear(const arma::uvec *mtl_ind,
-                                           const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
-                                           unsigned iMa, unsigned iMb, // 1-based face indices (0 = none)
-                                           dtype theta, dtype fGHz, bool is_scalar)
-{
-    unsigned n_mesh = (unsigned)mtl_ind->n_elem;
-    if (iMa > n_mesh || iMb > n_mesh) // Illegal state
-        return (dtype)0.0;
-
-    // Resolve named material columns (nullptr -> default applied)
-    const dtype *m_a = mtl_col(mtl_prop, "a");
-    const dtype *m_b = mtl_col(mtl_prop, "b");
-    const dtype *m_c = mtl_col(mtl_prop, "c");
-    const dtype *m_d = mtl_col(mtl_prop, "d");
-    const dtype *m_e = mtl_col(mtl_prop, "e");
-    const dtype *m_f = mtl_col(mtl_prop, "f");
-    const dtype *m_g = mtl_col(mtl_prop, "g");
-    const dtype *m_h = mtl_col(mtl_prop, "h");
-    const dtype *m_fRef = mtl_col(mtl_prop, "fRef");
-    const dtype *m_resF = mtl_col(mtl_prop, "resF");
-    const dtype *m_resQ = mtl_col(mtl_prop, "resQ");
-    const dtype *m_resS = mtl_col(mtl_prop, "resS");
-    const dtype *m_tf = mtl_col(mtl_prop, "tf");
-    const dtype *m_tfB = mtl_col(mtl_prop, "tfB");
-
-    // Resolve face -> 0-based material index (valid only when face index != 0)
-    arma::uword mF = (iMa == 0) ? 0 : mtl_ind->at(iMa - 1);
-    arma::uword mS = (iMb == 0) ? 0 : mtl_ind->at(iMb - 1);
-
-    // Convert to double
-    double dTheta = (double)theta;
-
-    // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
-    double abs_cos_theta = std::abs(std::cos(dTheta + 1.570796326794897));
-    abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
-    double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta); // Trigonometric identity
-
-    // Defaults: air for both media
-    double kR1 = 1.0, kR2 = 0.0, kR3 = 0.0, kR4 = 0.0, kR_fRef = 1.0;
-    double kR5 = 1.0, kR6 = 0.0, kR7 = 0.0, kR8 = 0.0;
-    double kS1 = 1.0, kS2 = 0.0, kS3 = 0.0, kS4 = 0.0, kS_fRef = 1.0;
-    double kS5 = 1.0, kS6 = 0.0, kS7 = 0.0, kS8 = 0.0;
-    double kR_resF = 0.0, kR_resQ = 0.0, kR_resS = 0.0;
-    double kS_resF = 0.0, kS_resQ = 0.0, kS_resS = 0.0;
-    double kR_tf = 0.0, kR_tfB = 0.0, kS_tf = 0.0, kS_tfB = 0.0;
-    double transition_gain = 1.0;
-
-    if (iMa != 0)
-    {
-        if (dTheta >= 0.0) // Ray hits front side of FBS/SBS face, set second material to object material
-        {
-            kS1 = mtl_val(m_a, mF, 1.0);
-            kS2 = mtl_val(m_b, mF, 0.0);
-            kS3 = mtl_val(m_c, mF, 0.0);
-            kS4 = mtl_val(m_d, mF, 0.0);
-            kS5 = mtl_val(m_e, mF, 1.0);
-            kS6 = mtl_val(m_f, mF, 0.0);
-            kS7 = mtl_val(m_g, mF, 0.0);
-            kS8 = mtl_val(m_h, mF, 0.0);
-            kS_fRef = mtl_val(m_fRef, mF, 1.0);
-            kS_resF = mtl_val(m_resF, mF, 0.0);
-            kS_resQ = mtl_val(m_resQ, mF, 0.0);
-            kS_resS = mtl_val(m_resS, mF, 0.0);
-            kS_tf = mtl_val(m_tf, mF, 0.0);
-            kS_tfB = mtl_val(m_tfB, mF, 0.0);
-            transition_gain = (double)interface_gain_impl(mtl_prop, mF, fGHz * (dtype)1e9);
-        }
-        else // Ray hits back side of FBS face, set first material to object material
-        {
-            kR1 = mtl_val(m_a, mF, 1.0);
-            kR2 = mtl_val(m_b, mF, 0.0);
-            kR3 = mtl_val(m_c, mF, 0.0);
-            kR4 = mtl_val(m_d, mF, 0.0);
-            kR5 = mtl_val(m_e, mF, 1.0);
-            kR6 = mtl_val(m_f, mF, 0.0);
-            kR7 = mtl_val(m_g, mF, 0.0);
-            kR8 = mtl_val(m_h, mF, 0.0);
-            kR_fRef = mtl_val(m_fRef, mF, 1.0);
-            kR_resF = mtl_val(m_resF, mF, 0.0);
-            kR_resQ = mtl_val(m_resQ, mF, 0.0);
-            kR_resS = mtl_val(m_resS, mF, 0.0);
-            kR_tf = mtl_val(m_tf, mF, 0.0);
-            kR_tfB = mtl_val(m_tfB, mF, 0.0);
-        }
-    }
-
-    if (iMb != 0) // Material to material transition
-    {
-        if (dTheta >= 0.0) // SBS (front side) is hit first
-        {
-            kR1 = mtl_val(m_a, mS, 1.0);
-            kR2 = mtl_val(m_b, mS, 0.0);
-            kR3 = mtl_val(m_c, mS, 0.0);
-            kR4 = mtl_val(m_d, mS, 0.0);
-            kR5 = mtl_val(m_e, mS, 1.0);
-            kR6 = mtl_val(m_f, mS, 0.0);
-            kR7 = mtl_val(m_g, mS, 0.0);
-            kR8 = mtl_val(m_h, mS, 0.0);
-            kR_fRef = mtl_val(m_fRef, mS, 1.0);
-            kR_resF = mtl_val(m_resF, mS, 0.0);
-            kR_resQ = mtl_val(m_resQ, mS, 0.0);
-            kR_resS = mtl_val(m_resS, mS, 0.0);
-            kR_tf = mtl_val(m_tf, mS, 0.0);
-            kR_tfB = mtl_val(m_tfB, mS, 0.0);
-        }
-        else // FBS (back side) is hit first
-        {
-            kS1 = mtl_val(m_a, mS, 1.0);
-            kS2 = mtl_val(m_b, mS, 0.0);
-            kS3 = mtl_val(m_c, mS, 0.0);
-            kS4 = mtl_val(m_d, mS, 0.0);
-            kS5 = mtl_val(m_e, mS, 1.0);
-            kS6 = mtl_val(m_f, mS, 0.0);
-            kS7 = mtl_val(m_g, mS, 0.0);
-            kS8 = mtl_val(m_h, mS, 0.0);
-            kS_fRef = mtl_val(m_fRef, mS, 1.0);
-            kS_resF = mtl_val(m_resF, mS, 0.0);
-            kS_resQ = mtl_val(m_resQ, mS, 0.0);
-            kS_resS = mtl_val(m_resS, mS, 0.0);
-            kS_tf = mtl_val(m_tf, mS, 0.0);
-            kS_tfB = mtl_val(m_tfB, mS, 0.0);
-            transition_gain = (double)interface_gain_impl(mtl_prop, mS, fGHz * (dtype)1e9);
-        }
-    }
-
-    // Calculate complex-valued relative permittivity of medium 1 and 2, ITU-R P.2040-1, eq. (9b)
-    std::complex<double> eta1 = eta_from_coeffs(kR1, kR2, kR3, kR4, kR_fRef, (double)fGHz) +
-                                eta_resonance(kR_resF, kR_resQ, kR_resS, (double)fGHz);
-
-    std::complex<double> eta2 = eta_from_coeffs(kS1, kS2, kS3, kS4, kS_fRef, (double)fGHz) +
-                                eta_resonance(kS_resF, kS_resQ, kS_resS, (double)fGHz);
-
-    std::complex<double> mu1 = mu_from_coeffs(kR5, kR6, kR7, kR8, kR_fRef, (double)fGHz);
-    std::complex<double> mu2 = mu_from_coeffs(kS5, kS6, kS7, kS8, kS_fRef, (double)fGHz);
-
-    bool dense2light = std::real(eta1 * mu1) > std::real(eta2 * mu2);
-
-    double reflection_gain = 0.0;
-    if (is_scalar)
-    {
-        // Scalar: physical Fresnel reflection (TE), redistributed by the transmission factor.
-        // Energy conserved by construction (refl + trans = 1); no dense2light pass-through.
-        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
-        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
-        std::complex<double> z1 = std::sqrt(eta1 / mu1);
-        std::complex<double> z2 = std::sqrt(eta2 / mu2);
-        std::complex<double> R_eTE = (z1 * abs_cos_theta - z2 * cos_theta2) /
-                                     (z1 * abs_cos_theta + z2 * cos_theta2);
-        double tf_eff = tf_value((dTheta >= 0.0) ? kS_tf : kR_tf,
-                                 (dTheta >= 0.0) ? kS_tfB : kR_tfB,
-                                 (dTheta >= 0.0) ? kS_fRef : kR_fRef, (double)fGHz);
-        reflection_gain = tf_apply(std::norm(R_eTE), tf_eff);
-    }
-    else if (!dense2light) // EM: Fresnel on light->dense, pass-through on dense->light
-    {
-        std::complex<double> eta1_div_eta2 = (eta1 * mu1) / (eta2 * mu2);
-        std::complex<double> cos_theta2 = std::sqrt(1.0 - eta1_div_eta2 * sin_theta * sin_theta);
-        eta1 = std::sqrt(eta1 / mu1);
-        eta2 = std::sqrt(eta2 / mu2);
-        std::complex<double> R_eTE = (eta1 * abs_cos_theta - eta2 * cos_theta2) /
-                                     (eta1 * abs_cos_theta + eta2 * cos_theta2);
-        std::complex<double> R_eTM = (eta2 * abs_cos_theta - eta1 * cos_theta2) /
-                                     (eta2 * abs_cos_theta + eta1 * cos_theta2);
-        reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
-    }
-    return dtype(transition_gain * (1.0 - reflection_gain));
 }
 
 /*!SECTION
@@ -275,8 +93,9 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
                                          const arma::u32_vec *sub_mesh_index,
                                          int use_kernel, int gpu_id, bool scalar_mode)
 {
-    // Ray offset is used to detect co-location of points, value in meters
-    const dtype ray_offset = (dtype)0.001;
+    // Thin-slab resolution threshold for ray_state_update. Values >= 1 disable the Airy
+    // resolution entirely and reproduce the legacy calc_diffraction_gain gains.
+    const double eps_slab = 1.0;
 
     // Check for NULL pointers
     if (orig == nullptr)
@@ -312,18 +131,11 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
     // Frequency in GHz
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
-    dtype fGHz = center_frequency * (dtype)1.0e-9;
 
-    arma::uword n_mtl = mtl_validate(*mtl_prop);
-    if (!mtl_ind->is_empty() && mtl_ind->max() > n_mtl)
-        throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
-
-    // mtl_ind holds 1-based material indices (0 = no material). ray_mesh_interact consumes these
-    // directly, but the per-face table lookups in this function expect 0-based columns. Keep the
-    // original for the trace call and use a 0-based copy for the lookups.
-    const arma::uvec *mtl_ind_1based = mtl_ind;
-    arma::uvec mtl_ind_0 = (*mtl_ind) - 1; // each 1-based index -> 0-based column
-    mtl_ind = &mtl_ind_0;
+    // Material indices are carried in signed 16-bit state words by ray_state_update.
+    // Range and table validation happens inside ray_mesh_interact / ray_state_update.
+    if (!mtl_ind->is_empty() && mtl_ind->max() > 32767)
+        throw std::invalid_argument("Material indices must not exceed 32767.");
 
     // Check range of LOD
     if ((unsigned)lod > 6U)
@@ -344,9 +156,11 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
     if (n_path_t > 61) // Just to be sure for future updates
         throw std::invalid_argument("Max. number of paths is currently fixed to 61.");
 
-    // Track the state of each path:
-    unsigned *p_ray_state = new unsigned[n_ray_t]();       // Current state, 0 = outside, otherwise index of last interaction
-    unsigned *p_next_transition = new unsigned[n_ray_t](); // Next transition buffer (for overlapping mesh)
+    // Track the state of each path: three signed-short words per ray (see ray_state_update),
+    // mat = w & 0x7FFF (0 = outside), flag = w & 0x8000. Zero-initialized = outside.
+    arma::Col<short> g_prev(n_ray_t, arma::fill::zeros); // previous medium + non-parallel flag
+    arma::Col<short> g_cur(n_ray_t, arma::fill::zeros);  // current medium + resolved flag
+    arma::Col<short> g_buf(n_ray_t, arma::fill::zeros);  // next-transition buffer
 
     // Pointer to the path weights
     dtype *p_weight = weight.memptr();
@@ -468,7 +282,7 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             arma::Col<int> typeN;        // Medium to medium transition indicator
 
             if (no_mesh_hit != 0)
-                quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_ind_1based, mtl_prop,
+                quadriga_lib::ray_mesh_interact<dtype>(interaction_type, center_frequency, &s_orig, &s_dest, &fbs, &sbs, mesh, mtl_ind, mtl_prop,
                                                        &fbs_ind, &sbs_ind, nullptr, nullptr, nullptr, &origN, nullptr,
                                                        &gainN, nullptr, nullptr, nullptr, nullptr, &fbs_angleN, nullptr,
                                                        nullptr, nullptr, &typeN);
@@ -476,6 +290,40 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             // Pointers
             dtype *p_gainN = gainN.memptr(); // Pointer to 'gainN'
             int *p_typeN = typeN.memptr();   // Pointer to 'typeN'
+
+            // Build the compact-set inputs for ray_state_update and patch gainN in place
+            arma::Col<short> prev_out, cur_out, buf_out; // new state, compact set [n_rayN]
+            if (no_mesh_hit != 0)
+            {
+                arma::u32_vec ray_ind((arma::uword)no_mesh_hit);    // compact -> reduced-set index
+                arma::Col<short> mtl_fbs((arma::uword)no_mesh_hit); // FBS face material, 1-based
+                arma::Col<short> mtl_sbs((arma::uword)no_mesh_hit); // SBS face material, 1-based
+                arma::Col<short> prev_in((arma::uword)n_ray_r);     // old state, reduced set
+                arma::Col<short> cur_in((arma::uword)n_ray_r);
+                arma::Col<short> buf_in((arma::uword)n_ray_r);
+
+                for (size_t iR = 0; iR < n_ray_r; ++iR)
+                {
+                    size_t iG = s_iRAY.at(iR);
+                    prev_in.at(iR) = g_prev.at(iG);
+                    cur_in.at(iR) = g_cur.at(iG);
+                    buf_in.at(iR) = g_buf.at(iG);
+                    if (p_fbs_ind[iR] != 0U)
+                    {
+                        size_t iH = p_hit_ind[iR];
+                        ray_ind.at(iH) = (unsigned)iR;
+                        mtl_fbs.at(iH) = (short)mtl_ind->at(p_fbs_ind[iR] - 1);
+                        mtl_sbs.at(iH) = (p_sbs_ind[iR] == 0U) ? (short)0 : (short)mtl_ind->at(p_sbs_ind[iR] - 1);
+                    }
+                }
+
+                quadriga_lib::ray_state_update<dtype>(interaction_type, center_frequency,
+                                                      &s_orig, &s_dest, &fbs, &sbs, &no_interact,
+                                                      &fbs_angleN, &typeN, mtl_prop, &mtl_fbs, &mtl_sbs,
+                                                      &prev_in, &cur_in, &buf_in, nullptr,
+                                                      &prev_out, &cur_out, &buf_out,
+                                                      &gainN, nullptr, &ray_ind, eps_slab);
+            }
 
             // Count double and multi-interactions
             size_t n_continue = 0;                  // Counter for continued rays
@@ -492,439 +340,49 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             n_continue = 0;                         // Reset counter
             for (size_t iR = 0; iR < n_ray_r; ++iR) // Iterate through all rays
             {
-                unsigned nH = p_no_interact[iR]; // Number of mesh-hits between "orig" and "dest"
-                unsigned iM1 = p_fbs_ind[iR];    // Material index of FBS, 1-based
-                unsigned iM2 = p_sbs_ind[iR];    // Material index of SBS, 1-based
-
+                unsigned nH = p_no_interact[iR];           // Number of mesh-hits between "orig" and "dest"
                 size_t iG = s_iRAY.at(iR);                 // Ray index in global set
-                unsigned RS = p_ray_state[iG];             // Ray state, 0 = outside, otherwise material index of current material
-                unsigned NT = p_next_transition[iG];       // Next transition buffer, usually 0 unless mesh overlap
                 dtype power = p_weight[iS * n_ray_t + iG]; // Current segment weight
 
-                size_t iH = p_hit_ind[iR];                                     // Ray index in reduced set
-                int typeH = (nH == 0) ? 0 : p_typeN[iH];                       // Hit-type
-                dtype interaction_gain = (nH == 0) ? (dtype)1.0 : p_gainN[iH]; // Gain calculated by "quadriga_lib::ray_mesh_interact"
-
-                if (nH == 0 && RS != 0) // Entire ray is inside the object
+                if (nH == 0) // No interaction: whole-segment in-medium loss is the caller's job
                 {
-                    dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
+                    arma::uword cur = (arma::uword)(g_cur.at(iG) & (short)0x7FFF);
+                    if (cur != 0)
+                    {
+                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2),
+                                                    s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
+                        power *= quadriga_lib::medium_gain<dtype>(*mtl_prop, cur, dist, center_frequency);
+                    }
                 }
-                else if (nH == 0) // Entire ray is outside
-                {                 // Nothing changes
-                }
-                else if ((nH == 1 && typeH == 1) || // Single hit, o-i transition
-                         (nH == 2 && typeH == 7) || // Double hit at overlapping faces, oo-ii
-                         (nH == 2 && typeH == 13))  // Edge Hit, o-i
+                else // The state machine has patched gainN and produced the new state
                 {
-                    if (RS == 0) // State (o) + o-i transition
-                    {
-                        dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                        dist = dist > ray_offset ? dist - ray_offset : dist;
-                        power *= interaction_gain * medium_gain_impl(mtl_prop, mtl_ind->at(iM1 - 1), dist, center_frequency);
-                        p_ray_state[iG] = iM1; // Change state to inside
-                    }
-                    else // State (i) + o-i transition, Overlapping mesh
-                    {
-                        // Ignore o-i transition @ FBS, Entire ray is inside material 1
-                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                        power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                        p_next_transition[iG] = iM1;
-                    }
-                }
-                else if ((nH == 1 && typeH == 2) || // Single hit, i-o transition
-                         (nH == 2 && typeH == 8) || // Double hit at overlapping faces, ii-oo
-                         (nH == 2 && typeH == 14))  // Edge Hit, i-o
-                {
-                    if (RS == 0) // State (o) + i-o transition
-                    {            // False inside state
-                        power *= interaction_gain;
-                    }
-                    else if (NT == 0) // No material in buffer, State (i) + i-o transition
-                    {
-                        power *= interaction_gain; // Medium loss already included in interaction gain
-                        p_ray_state[iG] = 0;       // Change state to outside
-                    }
-                    else if (nH == 1) // Material is in buffer, State (i) + virtual i-i transition
-                    {
-                        if (same_materials(mtl_ind, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
-                        {
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency); // M1 medium defined by RS
-                            p_next_transition[iG] = 0;                                                        // Clear next transition buffer
-                        }
-                        else
-                        {
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
-                            dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), dist, center_frequency);
-                            p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
-                            p_next_transition[iG] = 0; // Clear next transition buffer
-                        }
-                    }
-                    else if (nH == 2) // Material is in buffer, Double hit, State (i) + virtual ii-oo transition from M1 to Air
-                    {
-                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                        power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                        power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
-                        p_ray_state[iG] = 0;       // Change state to outside
-                        p_next_transition[iG] = 0; // Clear next transition buffer
-                    }
-                }
-                else if (nH == 2 && typeH == 1)
-                {
-                    if (RS == 0) // Double hit, (o) + o-i-o
-                    {
-                        power *= interaction_gain; // Include o-i transition loss @ FBS
-                        p_ray_state[iG] = iM1;     // Change state to inside
+                    size_t iH = p_hit_ind[iR];
+                    int typeH = p_typeN[iH];
+                    power *= p_gainN[iH];
 
-                        // Add path to next iteration
-                        if (power > (dtype)1.0e-20)
-                        {
-                            size_t iC = n_continue++;
-                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
-                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
-                            c_iRAY.at(iC) = iG;
-                        }
-                    }
-                    else // Double hit, (i) + o-i-o, overlapping mesh
-                    {
-                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                        power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency); // M1 medium defined by RS
-                        p_next_transition[iG] = iM1;
+                    g_prev.at(iG) = prev_out.at(iH);
+                    g_cur.at(iG) = cur_out.at(iH);
+                    g_buf.at(iG) = buf_out.at(iH);
 
-                        // Add path to next iteration
-                        if (power > (dtype)1.0e-20)
-                        {
-                            size_t iC = n_continue++;
-                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
-                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
-                            c_iRAY.at(iC) = iG;
-                        }
-                    }
-                }
-                else if (nH == 2 && typeH == 2) // Double hit, i-o-i
-                {                               // Medium loss of first inside segment already included in interaction gain, segment 2 must be added
-                    if (NT == 0)                // No buffer, state (i/o) + i-o-i transition
-                    {
-                        if (iM2 == 0)           // No material for SBS given, illegal state
-                            power = (dtype)0.0; // Terminate ray
-                        else
-                        {
-                            power *= interaction_gain; // Medium loss of first inside segment already included in interaction gain
-                            p_ray_state[iG] = 0;       // Change state to outside
-
-                            // Add path to next iteration
-                            if (power > (dtype)1.0e-20)
-                            {
-                                size_t iC = n_continue++;
-                                c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
-                                c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
-                                c_iRAY.at(iC) = iG;
-                            }
-                        }
-                    }
-                    else if (RS != 0) // Ray state in buffer, state (i) + virtual i-i + i-o
-                    {
-                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                        if (same_materials(mtl_ind, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
-                        {
-                            // Add in-medium loss for medium 1 (from Orig to Dest), M1 medium defined by RS
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                            p_next_transition[iG] = 0; // Clear next transition buffer
-                        }
-                        else
-                        {
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
-                            p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
-                            p_next_transition[iG] = 0; // Clear next transition buffer
-                        }
-
-                        // Add path to next iteration
-                        if (power > (dtype)1.0e-20)
-                        {
-                            size_t iC = n_continue++;
-                            c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
-                            c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
-                            c_iRAY.at(iC) = iG;
-                        }
-                    }
-                    else
-                        power = (dtype)0.0; // Terminate ray
-                }
-                else if (nH == 2 && (typeH == 4 || typeH == 5)) // i-i transition
-                {
-                    if (RS == 0)            // State (o) + i-i transition, should not happen
-                        power = (dtype)0.0; // Terminate ray
-                    else if (NT == 0)       // No buffer, state (i) + i-i transition
-                    {
-                        if (iM1 == 0 || iM2 == 0) // Missing material, illegal state
-                            power = (dtype)0.0;   // Terminate ray
-                        else
-                        {
-                            // Medium loss of segment 1 already included in interaction_gain, segment 2 must be added
-                            unsigned iM = (typeH == 5) ? iM2 : iM1; // If back wall was hit first, use SBS material
-                            dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= interaction_gain * medium_gain_impl(mtl_prop, mtl_ind->at(iM - 1), dist - ray_offset, center_frequency);
-
-                            p_ray_state[iG] = iM; // Update ray state
-                        }
-                    }
-                    else if (NT != 0)
-                    {
-                        // Continue in medium defined by RS
-                        dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                        power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-
-                        // Swap the material stored in NT
-                        p_next_transition[iG] = same_materials(mtl_ind, NT, iM1) ? iM2 : iM1;
-                    }
-                    else                    // Ray state in buffer
-                        power = (dtype)0.0; // Terminate ray
-                }
-                else if (nH == 2 && typeH == 10) // Edge Hit, o-i-o
-                {
-                    if (RS == 0)
-                    {
-                        power *= interaction_gain;
-                        p_ray_state[iG] = 0; // Set state to outside
-                    }
-                    else // Ignore interaction, keep ray state
-                    {
-                        if (same_materials(mtl_ind, iM1, iM2)) // Ignore hit
-                        {
-                            // Add in-medium loss for medium 1 (from Orig to Dest)
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                        }
-                        else // Add i-i transition
-                        {
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                            power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
-                            dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM1 - 1), dist, center_frequency);
-                            p_ray_state[iG] = iM1; // Continue in M1
-                        }
-                    }
-                }
-                else if (nH == 2 && typeH == 11) // Edge Hit, i-o-i
-                {
-                    if (RS == 0) // Outdoor state
-                    {
-                        power *= interaction_gain;
-
-                        // Account for floating point precision
-                        dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
-                        p_ray_state[iG] = (dist > 1.0e-6) ? iM2 : 0; // Continue inside material defined by SBS
-                    }
-                    else // Indoor state
-                    {
-                        if (same_materials(mtl_ind, iM1, iM2)) // Ignore hit
-                        {
-                            // Add in-medium loss for medium 1 (from Orig to Dest)
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                        }
-                        else // Add i-i transition
-                        {
-                            // Medium loss of segment 1 already included in interaction_gain
-                            dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), s_dest.at(iR, 0), s_dest.at(iR, 1), s_dest.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM2 - 1), dist - ray_offset, center_frequency);
-                            p_ray_state[iG] = iM2; // Update ray state
-                        }
-                    }
-                }
-                else if (nH > 2) // Multi-hit
-                {
-                    if (RS == 0) // Outside state
-                    {
-                        if (NT != 0)                       // Cannot have i-i transition in buffer
-                            power = (dtype)0.0;            // Terminate ray
-                        else if (typeH == 1 || typeH == 7) // State (o) + o-i transition
-                        {
-                            power *= interaction_gain; // Add transition gain
-                            p_ray_state[iG] = iM1;     // Change state to inside M1
-                        }
-                        else if (typeH == 2)           // False inside state
-                            power *= interaction_gain; // Add transition and medium gain
-                        else if (typeH == 10)          // Edge hit, State (o) + o-i-o transition
-                            power *= interaction_gain; // Add transition gain, leave outside state
-                        else if (typeH == 13)
-                        {
-                            power *= interaction_gain; // Add transition gain
-                            p_ray_state[iG] = iM1;     // Change state to inside M1
-                            p_next_transition[iG] = iM2;
-                        }
-                        else                    // Some other hit type
-                            power = (dtype)0.0; // Terminate ray
-                    }
-                    else // Inside state
-                    {
-                        if (typeH == 1 || typeH == 7 || typeH == 13) // State (i) + o-i transition, Overlapping mesh
-                        {
-                            dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                            power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                            p_next_transition[iG] = iM1;
-                        }
-                        else if (typeH == 2 || typeH == 14) // State (i) + i-o transition
-                        {
-                            if (NT == 0) // No material in buffer, State (i) + i-o transition
-                            {
-                                power *= interaction_gain; // Medium loss already included in interaction gain
-                                p_ray_state[iG] = 0;       // Change state to outside
-                            }
-                            else // Material is in buffer, State (i) + virtual i-i transition
-                            {
-                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                                if (same_materials(mtl_ind, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
-                                {
-                                    // Add in-medium loss for medium 1 (from Orig to Dest)
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                                    p_next_transition[iG] = 0; // Clear next transition buffer
-                                }
-                                else
-                                {
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
-                                    p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
-                                    p_next_transition[iG] = 0; // Clear next transition buffer
-                                }
-                            }
-                        }
-                        else if (typeH == 4 || typeH == 5) // State (i) + i-i transition
-                        {
-                            if (NT != 0)                   // Material in buffer (should not happen)
-                            {                              // Probably false detection in previous interaction
-                                power *= interaction_gain; // Add transition and in-medium gain
-                                p_next_transition[iG] = 0; // Clear next transition buffer
-                            }
-                            else
-                            {
-                                power *= interaction_gain;
-                                p_ray_state[iG] = (typeH == 5) ? iM2 : iM1;
-                            }
-                        }
-                        else if (typeH == 8) // Overlapping faces
-                        {
-                            if (NT == 0) // No material in buffer, State (i) + ii-oo transition
-                            {
-                                power *= interaction_gain; // Medium loss already included in interaction gain
-                                p_ray_state[iG] = 0;       // Change state to outside
-                            }
-                            else // Material in Buffer
-                            {
-                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                                power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                power *= transition_gain_linear(mtl_ind, mtl_prop, RS, 0, fbs_angleN.at(iH), fGHz, scalar_mode);
-                                p_ray_state[iG] = 0;       // Change state to outside
-                                p_next_transition[iG] = 0; // Clear next transition buffer
-                            }
-                        }
-                        else if (typeH == 10) // State (i) + Edge Hit, o-i-o
-                        {
-                            if (RS == 0) // No material in buffer, State (i/o) + i-o transition
-                            {
-                                power *= interaction_gain; // Medium loss already included in interaction gain
-                                p_ray_state[iG] = 0;       // Change state to outside
-                            }
-                            else if (NT == 0)
-                            {
-                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                                if (same_materials(mtl_ind, iM1, iM2)) // Ignore hit
-                                {
-                                    // Add in-medium loss for medium 1 (from Orig to Dest)
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                                }
-                                else // Add i-i transition
-                                {
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM1, fbs_angleN.at(iH), fGHz, scalar_mode);
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM1 - 1), ray_offset, center_frequency);
-                                    p_ray_state[iG] = iM1; // Continue in M1
-                                }
-                            }
-                            else if (NT != 0) // Material is in buffer, State (i) + virtual i-i transition
-                            {
-                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                                if (same_materials(mtl_ind, NT, iM1)) // Entire M2 is embedded inside M1, Ignore M2 completely!
-                                {
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                                    p_next_transition[iG] = 0; // Clear next transition buffer
-                                }
-                                else
-                                {
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, NT, fbs_angleN.at(iH), fGHz, scalar_mode);
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(NT - 1), ray_offset, center_frequency);
-                                    p_ray_state[iG] = NT;      // Set ray state to NT (inside state)
-                                    p_next_transition[iG] = 0; // Clear next transition buffer
-                                }
-                            }
-                        }
-                        else if (typeH == 11) // Edge Hit, i-o-i
-                        {
-                            if (RS == 0)
-                            {
-                                power *= interaction_gain;
-
-                                // Account for floating point precision
-                                dtype dist = qd_calc_length(fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2), sbs.at(iR, 0), sbs.at(iR, 1), sbs.at(iR, 2));
-                                p_ray_state[iG] = (dist > 1.0e-6) ? iM2 : 0; // Continue inside material defined by SBS
-                            }
-                            else if (NT == 0)
-                            {
-                                dtype dist = qd_calc_length(s_orig.at(iR, 0), s_orig.at(iR, 1), s_orig.at(iR, 2), fbs.at(iR, 0), fbs.at(iR, 1), fbs.at(iR, 2));
-                                if (same_materials(mtl_ind, iM1, iM2)) // Ignore hit
-                                {
-                                    // Add in-medium loss for medium 1 (from Orig to Dest)
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist + ray_offset, center_frequency);
-                                }
-                                else // Add i-i transition
-                                {    // Somewhat fake, since FBS and SBS normals are not aligned
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(RS - 1), dist, center_frequency);
-                                    power *= transition_gain_linear(mtl_ind, mtl_prop, RS, iM2, fbs_angleN.at(iH), fGHz, scalar_mode);
-                                    power *= medium_gain_impl(mtl_prop, mtl_ind->at(iM2 - 1), ray_offset, center_frequency);
-                                    p_ray_state[iG] = iM2;
-                                }
-                            }
-                            else // Material in buffer (should not happen)
-                            {
-                                power *= interaction_gain;
-                                p_next_transition[iG] = 0;
-                            }
-                        }
-                    }
-
-                    // Add path to next iteration
-                    if (power > (dtype)1.0e-20)
+                    // Relaunch when more events remain on this segment: separated double
+                    // hits (o-i-o / i-o-i) and all multi-hit rays
+                    if (power > (dtype)1.0e-20 &&
+                        (nH > 2 || (nH == 2 && (typeH == 1 || typeH == 2))))
                     {
                         size_t iC = n_continue++;
                         c_orig.at(iC, 0) = origN.at(iH, 0), c_orig.at(iC, 1) = origN.at(iH, 1), c_orig.at(iC, 2) = origN.at(iH, 2);
                         c_dest.at(iC, 0) = s_dest.at(iR, 0), c_dest.at(iC, 1) = s_dest.at(iR, 1), c_dest.at(iC, 2) = s_dest.at(iR, 2);
                         c_iRAY.at(iC) = iG;
                     }
-                }
-                else // Drop ray
-                    power = (dtype)0.0;
 
-                // For debugging:
-                if (verbose == 2 && n_pos == 1)
-                {
-                    double gg = nH == 0 ? 1.0 : interaction_gain;
-                    std::cout << "nH = " << nH << ", tH = " << typeH
-                              << ", RS = " << RS << " -> " << p_ray_state[iG]
-                              << ", NT = " << NT << " -> " << p_next_transition[iG]
-                              << ", orig = (" << s_orig.at(iR, 0) << ", " << s_orig.at(iR, 1) << ", " << s_orig.at(iR, 2) << ")"
-                              << ", fbs = (" << fbs.at(iR, 0) << ", " << fbs.at(iR, 1) << ", " << fbs.at(iR, 2) << ")"
-                              << ", sbs = (" << sbs.at(iR, 0) << ", " << sbs.at(iR, 1) << ", " << sbs.at(iR, 2) << ")"
-                              << ", dest = (" << s_dest.at(iR, 0) << ", " << s_dest.at(iR, 1) << ", " << s_dest.at(iR, 2) << ")"
-                              << ", P = (" << p_weight[iS * n_ray_t + iG] << ", " << gg << ", " << power << ")" << std::endl;
+                    // For debugging:
+                    if (verbose == 2 && n_pos == 1)
+                        std::cout << "nH = " << nH << ", tH = " << typeH
+                                  << ", cur = " << (cur_out.at(iH) & (short)0x7FFF)
+                                  << ((cur_out.at(iH) & (short)0x8000) ? "*" : "")
+                                  << ", prev = " << (prev_out.at(iH) & (short)0x7FFF)
+                                  << ", buf = " << buf_out.at(iH)
+                                  << ", P = " << power << std::endl;
                 }
 
                 // Update segment weight with new power values
@@ -947,10 +405,6 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
             delete[] p_hit_ind;
         }
     }
-
-    // Clear ray state
-    delete[] p_ray_state;
-    delete[] p_next_transition;
 
     // Adjust size of the output containers, if needed
     const arma::uword n_seg = (arma::uword)n_seg_t - 1;
