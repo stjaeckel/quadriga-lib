@@ -17,8 +17,8 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
   than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
   zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark
-  padding entries
+- Dummy triangles are placed at the AABB center of their sub-mesh; real entries in `mesh_index` are
+  1-based, with 0 reserved to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded in the same way; padding
   entries get index 0
 
@@ -37,13 +37,13 @@ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
 - **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count
   is rounded up to a multiple of this value; default: 1
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [[obj_file_read]]);
-  `(n_mesh,)` or `None`; default: `None`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `mtl_ind`/`csv_ind` output of
+  [[obj_file_read]]); `(n_mesh,)` or `None`; default: `None`
 
 ## Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_index`** — 0-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
+- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
 - **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
 MD!*/
 

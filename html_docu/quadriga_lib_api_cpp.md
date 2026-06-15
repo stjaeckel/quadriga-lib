@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "11.06.2026"
+date: "15.06.2026"
 lang: en-US
 ---
 
@@ -119,13 +119,13 @@ lang: en-US
 | [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3523 |
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3621 |
 | [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3664 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3741 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3789 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3833 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3863 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3891 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3932 |
-| [write_png](#write_png) | Site-specific simulation tools | 3967 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3745 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3793 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3837 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3867 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3895 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3936 |
+| [write_png](#write_png) | Site-specific simulation tools | 3971 |
 
 ---
 
@@ -3696,12 +3696,16 @@ void quadriga_lib::ray_state_update(
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
     const arma::Mat<dtype> *normal_vecN = nullptr,
-    arma::Col<short> *mtl_ind_prev_out = nullptr,
-    arma::Col<short> *mtl_ind_current_out = nullptr,
-    arma::Col<short> *mtl_ind_buffer_out = nullptr,
+    const arma::Mat<dtype> *path_dir_prev = nullptr,
+    arma::Col<short> *mtl_ind_prev_outN = nullptr,
+    arma::Col<short> *mtl_ind_current_outN = nullptr,
+    arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
-    arma::u32_vec *ray_ind = nullptr,
+    arma::Mat<dtype> *path_dirN = nullptr,
+    arma::Col<dtype> *excess_delayN = nullptr,
+    const arma::u32_vec *ray_indN = nullptr,
+    const arma::Mat<dtype> *orig_correct = nullptr,
     double eps = 0.15);
 ```
 

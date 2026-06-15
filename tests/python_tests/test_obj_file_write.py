@@ -26,9 +26,13 @@ _EM_ORDER = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
 
 
 def prop_at(csv_prop, key, idx):
-    """Value of column 'key' for material index 'idx', with per-column default if absent."""
+    """Value of column 'key' for the 1-based material index 'idx', per-column default if absent.
+    idx == 0 means 'no material' (outside) -> transparent defaults."""
+    if idx == 0:
+        return _EM_DEFAULTS.get(key, 0.0)
+    arr_idx = idx - 1
     if key in csv_prop:
-        return float(csv_prop[key][idx])
+        return float(csv_prop[key][arr_idx])
     return _EM_DEFAULTS.get(key, 0.0)
 
 
@@ -41,6 +45,10 @@ def _rm(fn):
     if os.path.isfile(fn):
         os.remove(fn)
 
+def read_lines(fn):
+    """Read all lines of a text file, newlines stripped."""
+    with open(fn) as f:
+        return [line.rstrip("\n") for line in f]
 
 def cube_vertices():
     """8 vertices of a unit cube."""
@@ -128,12 +136,11 @@ class test_case(unittest.TestCase):
         npt.assert_almost_equal(make_mesh(vert_list_rd, face_ind_rd), mesh, decimal=12)
         assert len(obj_names_rd) == 1
         npt.assert_equal(obj_names_rd[0], "object")
-        # No usemtl written -> faces get the synthetic "default" material
-        assert len(mtl_names_rd) == 1
-        npt.assert_equal(mtl_names_rd[0], "default")
+        # No usemtl written -> no materials on read-back (no synthetic "default")
+        assert len(mtl_names_rd) == 0
         npt.assert_(np.all(obj_ind_rd == 0))
         npt.assert_(np.all(mtl_ind_rd == 0))
-        npt.assert_(np.all(csv_ind_rd == 0))  # "default" -> air fallback (row 0)
+        npt.assert_(np.all(csv_ind_rd == 0))  # no material
 
         _rm(fn)
 
@@ -170,8 +177,8 @@ class test_case(unittest.TestCase):
         F = cube_faces()
         mesh = make_mesh(V, F)
         obj_ind = np.zeros(12, dtype=np.uint64)        # 0-based, single object
-        mtl_ind = np.zeros(12, dtype=np.uint64)
-        mtl_ind[4:] = 1  # faces 0-3 concrete (0), 4-11 wood (1)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind[4:] = 2  # faces 0-3 concrete (1), 4-11 wood (2)
         obj_names = ["Cube"]
         mtl_names = ["itu_concrete", "itu_wood"]
 
@@ -196,7 +203,7 @@ class test_case(unittest.TestCase):
             em_row(csv_prop_rd, csv_ind_rd[4]),
             [1.99, 0.0, 0.0047, 1.0718, 0, 0, 0, 0, 1], decimal=3
         )
-        npt.assert_array_equal(mtl_ind_rd, [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1])
+        npt.assert_array_equal(mtl_ind_rd, [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
 
         _rm(fn)
         _rm(mtl_fn)
@@ -213,7 +220,7 @@ class test_case(unittest.TestCase):
         F = cube_faces()
         mesh = make_mesh(V, F)
         obj_ind = np.zeros(12, dtype=np.uint64)
-        mtl_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
 
         quadriga_lib.RTtools.obj_file_write(
             fn, mesh, obj_ind, mtl_ind, ["Cube"], ["glass"]
@@ -233,11 +240,148 @@ class test_case(unittest.TestCase):
             em_row(csv_prop_rd, csv_ind_rd[0]),
             [6.0, 0.0, 0.1, 1.2, 0, 0, 0, 0, 1], decimal=12
         )
-        npt.assert_(np.all(mtl_ind_rd == 0))
+        npt.assert_(np.all(mtl_ind_rd == 1))
 
         _rm(fn)
         _rm(mtl_fn)
         _rm(csv_fn)
+
+    def test_csv_table_roundtrip(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        csv_obj_fn = "cube.csv"  # companion CSV written next to the .obj
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+        obj_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+        mtl_ind[4:] = 2  # faces 0-3 concrete (1), 4-11 wood (2)
+        obj_names = ["Cube"]
+        mtl_names = ["concrete", "wood"]  # usemtl names must match csv_names
+
+        csv_ind = np.ones(12, dtype=np.uint64)
+        csv_ind[4:] = 2  # 1-based, same split as mtl_ind
+        csv_names = ["concrete", "wood"]
+        csv_prop = {
+            "a":    np.array([5.24, 1.99]),
+            "c":    np.array([0.0462, 0.0047]),
+            "d":    np.array([0.7822, 1.0718]),
+            "fRef": np.array([1.0, 1.0]),
+        }
+
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+            csv_ind=csv_ind, csv_names=csv_names, csv_prop=csv_prop,
+            csv_write_defaults=False,
+        )
+
+        npt.assert_(os.path.isfile(fn))
+        npt.assert_(os.path.isfile(mtl_fn))
+        npt.assert_(os.path.isfile(csv_obj_fn))  # companion .csv named after the .obj
+
+        (_, _, _, _, _, mtl_ind_rd, _, _, csv_ind_rd, csv_names_rd, csv_prop_rd) = (
+            quadriga_lib.RTtools.obj_file_read(fn, csv_obj_fn)
+        )
+
+        assert len(csv_names_rd) == 2
+        npt.assert_equal(csv_names_rd[0], "concrete")
+        npt.assert_equal(csv_names_rd[1], "wood")
+
+        # csv_ind is 1-based; prop_at maps it onto the table (helper handles the -1)
+        npt.assert_almost_equal(prop_at(csv_prop_rd, "a", csv_ind_rd[0]), 5.24, decimal=2)
+        npt.assert_almost_equal(prop_at(csv_prop_rd, "a", csv_ind_rd[4]), 1.99, decimal=2)
+        npt.assert_almost_equal(prop_at(csv_prop_rd, "d", csv_ind_rd[0]), 0.7822, decimal=3)
+
+        # Visual side round-trips 1-based
+        npt.assert_array_equal(mtl_ind_rd, [1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2])
+
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
+
+    def test_csv_columns_defaults_validation(self):
+        fn = "cube.obj"
+        mtl_fn = "cube.mtl"
+        csv_obj_fn = "cube.csv"
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
+
+        V = cube_vertices()
+        F = cube_faces()
+        mesh = make_mesh(V, F)
+        obj_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
+        obj_names = ["Cube"]
+        mtl_names = ["slab"]
+
+        csv_names = ["slab"]
+        csv_prop = {"c": np.array([0.05]), "tf": np.array([2.0]), "zzz": np.array([7.0])}
+
+        # csv_write_defaults = False -> only present columns (canonical order, then extras)
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+            csv_names=csv_names, csv_prop=csv_prop, csv_write_defaults=False,
+        )
+        npt.assert_(os.path.isfile(csv_obj_fn))
+
+        lines = read_lines(csv_obj_fn)
+        npt.assert_equal(lines[0], "name,c,tf,zzz")
+        npt.assert_equal(lines[1], "slab,0.05,2,7")
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
+
+        # csv_write_defaults = True -> full canonical set with defaults (a, e, fRef = 1, else 0)
+        quadriga_lib.RTtools.obj_file_write(
+            fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+            csv_names=csv_names, csv_prop=csv_prop, csv_write_defaults=True,
+        )
+        lines = read_lines(csv_obj_fn)
+        npt.assert_equal(
+            lines[0],
+            "name,a,b,c,d,e,f,g,h,att,attB,alpha,alphaB,fRef,m,resF,resQ,resS,coiF,coiQ,coiA,tf,tfB,zzz",
+        )
+        npt.assert_equal(
+            lines[1],
+            "slab,1,0,0.05,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,0,7",
+        )
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
+
+        # Validation: csv_prop column length must match len(csv_names)
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                csv_names=csv_names, csv_prop={"a": np.array([1.0, 2.0])},
+                csv_write_defaults=False,
+            )
+
+        # Validation: csv_ind out of range (only 1 material in csv_names)
+        with self.assertRaises(ValueError):
+            csv_ind_bad = np.ones(12, dtype=np.uint64)
+            csv_ind_bad[0] = 5
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                csv_ind=csv_ind_bad, csv_names=csv_names, csv_prop=csv_prop,
+                csv_write_defaults=False,
+            )
+
+        # Validation: csv inputs without csv_names
+        with self.assertRaises(ValueError):
+            quadriga_lib.RTtools.obj_file_write(
+                fn, mesh, obj_ind, mtl_ind, obj_names, mtl_names,
+                csv_prop=csv_prop, csv_write_defaults=False,
+            )
+
+        _rm(fn)
+        _rm(mtl_fn)
+        _rm(csv_obj_fn)
 
     def test_bsdf_roundtrip(self):
         fn = "cube.obj"
@@ -249,7 +393,7 @@ class test_case(unittest.TestCase):
         F = cube_faces()
         mesh = make_mesh(V, F)
         obj_ind = np.zeros(12, dtype=np.uint64)
-        mtl_ind = np.zeros(12, dtype=np.uint64)
+        mtl_ind = np.ones(12, dtype=np.uint64)
 
         # Distinct non-default values; clamped fields inside [0, 1], ior in a sane range
         bsdf = np.array(
@@ -375,14 +519,10 @@ class test_case(unittest.TestCase):
                 fn, mesh, obj_ind, obj_names=["OnlyOne"]
             )
 
-        # mtl_names too short for mtl_ind (0-based: max index 1 needs 2 names)
+        # mtl_names too short for mtl_ind (1-based: max index 2 needs 2 names)
         with self.assertRaises(ValueError):
-            mtl_ind = np.concatenate(
-                [np.zeros(6, dtype=np.uint64), np.ones(6, dtype=np.uint64)]
-            )
-            quadriga_lib.RTtools.obj_file_write(
-                fn, mesh, mtl_ind=mtl_ind, mtl_names=["OnlyOne"]
-            )
+            mtl_ind = np.concatenate( [np.ones(6, dtype=np.uint64), 2 * np.ones(6, dtype=np.uint64)] )
+            quadriga_lib.RTtools.obj_file_write( fn, mesh, mtl_ind=mtl_ind, mtl_names=["OnlyOne"] )
 
         # bsdf given without materials
         with self.assertRaises(ValueError):
