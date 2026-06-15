@@ -19,8 +19,9 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
   before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`)
-- Unmatched names raise an error when `csv_strict = True`; otherwise they map to row 0 of the table
-  (the transparent fallback)
+- Unmatched names raise an error when `csv_strict = True`; otherwise they map to index 0 (no material)
+- Geometry indices (`face_ind`, `obj_ind`) are 0-based; material indices (`mtl_ind`, `csv_ind`) are
+  1-based, with 0 reserved for the outside / no-material state
 - With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`,
   `csv_prop`) is populated; if `fn_csv` is also empty, the built-in default table is returned
 - For a detailed description of the material model see
@@ -34,11 +35,10 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 
 ## Inputs:
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column, and row 0 is the
-  fallback material (should be transparent, e.g. air); empty uses the built-in default table;
-  default: `""`
-- **`csv_strict`** — If `True`, raise when a `usemtl` material is absent from the table; otherwise
-  map to row 0; default: `False`
+- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
+  to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table; default: `""`
+- **`csv_strict`** — If `True`, raise when a `usemtl` material is absent from the table; otherwise map to 
+  index 0 (no material); default: `False`
 
 ## Outputs:
 - **`mesh`** — Triangle vertex coordinates `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]` per row; `(n_mesh, 9)`
@@ -46,10 +46,10 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 - **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `(n_mesh, 3)`
 - **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
 - **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
-- **`mtl_ind`** — 0-based visual-material index per triangle; `(n_mesh,)`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `(n_mesh,)`
 - **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `no_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `(no_mtl, 17)`
-- **`csv_ind`** — 0-based EM/acoustic-material index per triangle; `(n_mesh,)`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `(n_mesh,)`
 - **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
   mapping to a 1D array of length `n_csv`

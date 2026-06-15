@@ -66,7 +66,11 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("vert_list") = py::none(),
           py::arg("face_ind") = py::none(),
           py::arg("bsdf") = py::none(),
-          py::arg("threshold") = 0.001);
+          py::arg("threshold") = 0.001,
+          py::arg("csv_ind") = py::none(),
+          py::arg("csv_names") = py::none(),
+          py::arg("csv_prop") = py::none(),
+          py::arg("csv_write_defaults") = false);
 
     m.def("point_cloud_aabb", &point_cloud_aabb,
           py::arg("points") = py::array_t<double>(),

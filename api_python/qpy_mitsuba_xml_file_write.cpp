@@ -33,9 +33,9 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`vert_list`** — Vertex coordinates (x, y, z); `(n_vert, 3)`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; uint64; `(n_mesh, 3)`
 - **`obj_ind`** — 0-based object index per triangle; length `obj_names` must equal `max(obj_ind) + 1`; uint64; `(n_mesh,)`
-- **`mtl_ind`** — 0-based material index per triangle; length `mtl_names` must equal `max(mtl_ind) + 1`; uint64; `(n_mesh,)`
+- **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
-- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind) + 1`
+- **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [[obj_file_read]] for field definitions; `(mtl_names.size(), 17)`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 

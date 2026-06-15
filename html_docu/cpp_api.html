@@ -4967,12 +4967,16 @@ void quadriga_lib::ray_state_update(
     const arma::Col&lt;short&gt; *mtl_ind_current_in = nullptr,
     const arma::Col&lt;short&gt; *mtl_ind_buffer_in = nullptr,
     const arma::Mat&lt;dtype&gt; *normal_vecN = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_prev_out = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_current_out = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_buffer_out = nullptr,
+    const arma::Mat&lt;dtype&gt; *path_dir_prev = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_prev_outN = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_current_outN = nullptr,
+    arma::Col&lt;short&gt; *mtl_ind_buffer_outN = nullptr,
     arma::Col&lt;dtype&gt; *gainN = nullptr,
     arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
-    arma::u32_vec *ray_ind = nullptr,
+    arma::Mat&lt;dtype&gt; *path_dirN = nullptr,
+    arma::Col&lt;dtype&gt; *excess_delayN = nullptr,
+    const arma::u32_vec *ray_indN = nullptr,
+    const arma::Mat&lt;dtype&gt; *orig_correct = nullptr,
     double eps = 0.15);
 </pre>
 

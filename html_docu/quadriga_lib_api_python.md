@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "11.06.2026"
+date: "15.06.2026"
 lang: en-US
 ---
 
@@ -40,28 +40,28 @@ lang: en-US
 | [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1180 |
 | [get_channels_planar](#get_channels_planar) | Channel generation functions | 1238 |
 | [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1370 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1519 |
-| [acdf](#acdf) | Channel statistics | 1601 |
-| [calc_angular_spread](#calc_angular_spread) | Miscellaneous / Tools | 1636 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Miscellaneous / Tools | 1706 |
-| [calc_delay_spread](#calc_delay_spread) | Miscellaneous / Tools | 1758 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Miscellaneous / Tools | 1807 |
-| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1857 |
-| [components](#components) | Miscellaneous / Tools | 1885 |
-| [version](#version) | Miscellaneous / Tools | 1894 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1907 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1950 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1998 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 2030 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 2063 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2113 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2153 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2180 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2210 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2243 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2280 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2323 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2349 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1430 |
+| [acdf](#acdf) | Channel statistics | 1512 |
+| [calc_angular_spread](#calc_angular_spread) | Miscellaneous / Tools | 1547 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Miscellaneous / Tools | 1617 |
+| [calc_delay_spread](#calc_delay_spread) | Miscellaneous / Tools | 1669 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Miscellaneous / Tools | 1718 |
+| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1768 |
+| [components](#components) | Miscellaneous / Tools | 1796 |
+| [version](#version) | Miscellaneous / Tools | 1805 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1818 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1861 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1909 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1941 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1974 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2024 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2071 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2098 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2128 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2161 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2198 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2241 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2267 |
 
 ---
 
@@ -1368,152 +1368,63 @@ coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, a
 
 ---
 ## get_channels_spherical
-Calculate channel coefficients from path data and antenna patterns
+Calculate MIMO channel coefficients and delays for spherical wave propagation
 
-### Description:
-In this function, the wireless propagation channel between a transmitter and a receiver is calculated,
-based on a single transmit and receive position. Additionally, interaction points with the environment,
-which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are
-considered. The calculation is performed under the assumption of spherical wave propagation. For accurate
-execution of this process, several pieces of input data are required:
-
-- The 3D Cartesian (local) coordinates of both the transmitter and the receiver.
-- The specific interaction positions of the propagation paths within the environment.
-- The polarization transfer matrix for each propagation path.
-- Antenna models for both the transmitter and the receiver.
-- The orientations of the antennas.
+- Computes complex channel coefficients and propagation delays for all TX/RX element pairs and paths,
+  using the spherical wave assumption with per-element phase and delay.
+- Interpolates antenna patterns for both arrays, accounting for element positions and array orientation
+  (bank/tilt/heading Euler angles).
+- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH components).
+- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- If `use_absolute_delays == False`, the minimum delay (LOS delay) is subtracted from all paths.
+- If `add_fake_los_path == True`, a zero-power LOS path is prepended when no LOS path is detected.
+- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+  separate real `coeff_re` and `coeff_im` via a zero-copy fast path
 
 ### Usage:
 ```
-from quadriga_lib import arrayant
-
-# Return only coefficients and delays
-coeff_re, coeff_im, delays = arrayant.get_channels_spherical( ant_tx, ant_rx, \
+coeff_re, coeff_im, delays = quadriga_lib.arrayant.get_channels_spherical( ant_tx, ant_rx, \
     fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
 
-# Return additional departure and arrival angles
-coeff_re, coeff_im, delays, aod, eod, aoa, eoa = arrayant.get_channels_spherical( ant_tx, ant_rx, \
-    fbs_pos, lbs_pos, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
-    center_freq, use_absolute_delays, add_fake_los_path, angles=1 )
+coeff, delays = quadriga_lib.arrayant.get_channels_spherical( ..., complex=True )
+
+coeff_re, coeff_im, delays, aod, eod, aoa, eoa = quadriga_lib.arrayant.get_channels_spherical( ..., angles=True )
 ```
 
-### Input Arguments:
-- **`ant_tx`** (required)
-  Dictionary containing the transmit (TX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_tx)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_tx)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_tx)`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_tx, n_ports_tx)`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_tx, n_ports_tx)`
+### Inputs:
+- **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
+- **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
+- **`fbs_pos`** — First-bounce scatterer positions; `(3, n_path)`
+- **`lbs_pos`** — Last-bounce scatterer positions; `(3, n_path)`
+- **`path_gain`** — Path gains in linear scale; `(n_path,)`
+- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
+- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`angles`** — If `True`, also return departure/arrival angles in antenna-local coordinates; default: `False`
+- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
+  separate `coeff_re` and `coeff_im`; default: `False`
 
-- **`ant_rx`** (required)
-  Dictionary containing the receive (RX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_rx)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_rx)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_rx)`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_rx, n_ports_rx)`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_rx, n_ports_rx)`
+### Outputs:
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
+- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`aod`** — Azimuth of departure in rad; `(n_ports_rx, n_ports_tx, n_path)`; only when `angles=True`
+- **`eod`** — Elevation of departure in rad; same shape; only when `angles=True`
+- **`aoa`** — Azimuth of arrival in rad; same shape; only when `angles=True`
+- **`eoa`** — Elevation of arrival in rad; same shape; only when `angles=True`
 
-- **`fbs_pos`** (required)
-  First interaction point of the rays and the environment, Shape: `( 3, n_path )`
-
-- **`lbs_pos`** (required)
-  Last interaction point of the rays and the environment; For single-bounce models, this must be
-  identical to `fbs_pos`, Shape: `( 3, n_path )`
-
-- **`path_gain`** (required)
-  Path gain (linear scale), Shape: `( n_path )`
-
-- **`path_length`** (required)
-  Total path length in meters, Shape: `( n_path )`
-
-- **`M`** (required)
-  Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH),
-  Shape: `( 8, n_path )`
-
-- **`tx_pos`** (required)
-  Transmitter position in 3D Cartesian coordinates; Shape: `(3)`
-
-- **`tx_orientation`** (required)
-  3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading),
-  Shape: `(3,1)` or `(1,3)`
-
-- **`rx_pos`** (required)
-  Receiver position in 3D Cartesian coordinates, Shape: `(3)`
-
-- **`rx_orientation`** (required)]
-  3-element vector describing the orientation of the receive antenna in Euler angles,
-  Shape: `(3)`
-
-- **`center_freq`** (optional)
-  Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation
-  in coefficients is disabled, i.e. that path length has not influence on the results. This can be
-  used to calculate the antenna response for a specific angle and polarization. Scalar value
-
-- **`use_absolute_delays`** (optional)
-  If true, the LOS delay is included for all paths; Default is `false`, i.e. delays are normalized
-  to the LOS delay.
-
-- **`add_fake_los_path`** (optional)
-  If true, adds a zero-power LOS path as the first path in case where no LOS path was present.
-  Default: `false`
-
-- **`angles`** (optional flag)
-  Switch to return the angles in antenna-local coordinates. Default: 0, false
-
-### Derived inputs:
-`n_azimuth_tx`   | Number of azimuth angles in the TX antenna pattern
-  `n_elevation_tx` | Number of elevation angles in the TX antenna pattern
-  `n_elements_tx`  | Number of physical antenna elements in the TX array antenna
-  `n_ports_tx`     | Number of ports (after coupling) in the TX array antenna
-  `n_azimuth_rx`   | Number of azimuth angles in the RX antenna pattern
-  `n_elevation_rx` | Number of elevation angles in the RX antenna pattern
-  `n_elements_rx`  | Number of physical antenna elements in the RX array antenna
-  `n_ports_rx`     | Number of ports (after coupling) in the RX array antenna
-  `n_path`         | Number of propagation paths
-
-### Output Arguments:
-- **`coeff_re`**
-  Channel coefficients, real part, Shape: `( n_ports_rx, n_ports_tx, n_path )`
-
-- **`coeff_im`**
-  Channel coefficients, imaginary part, Shape: `( n_ports_rx, n_ports_tx, n_path )`
-
-- **`delays`**
-  Propagation delay in seconds, Shape: `( n_ports_rx, n_ports_tx, n_path )`
-
-- **`aod`** (optional)
-  Azimuth of Departure angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
-  Only returned when `angles` flag is set to 1.
-
-- **`eod`** (optional)
-  Elevation of Departure angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
-  Only returned when `angles` flag is set to 1.
-
-- **`aoa`** (optional)
-  Azimuth of Arrival angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
-  Only returned when `angles` flag is set to 1.
-
-- **`eoa`** (optional)
-  Elevation of Arrival angles in [rad], Shape: `( n_ports_rx, n_ports_tx, n_path )`,
-  Only returned when `angles` flag is set to 1.
-
-### Caveat:
-- Input data is directly accessed from Python memory, without copying if it is provided in
-  **double** precision and is in F-contiguous (column-major) order
-- Other formats (e.g. single precision inputs or C-contiguous (row-major) order) will be converted
-  to double automatically, causing additional computation steps.
-- To improve performance of repeated computations (e.g. in loops), consider preparing the data
-  accordingly to avoid unecessary computations.
+### See also:
+- [get_channels_multifreq](#get_channels_multifreq) (multi-frequency extension)
+- [get_channels_planar](#get_channels_planar) (planar wave variant)
+- [get_channels_irs](#get_channels_irs) (IRS-assisted communication)
 
 ---
 ## get_ieee_indoor
@@ -2050,9 +1961,9 @@ quadriga_lib.RTtools.mitsuba_xml_file_write( fn, vert_list, face_ind, obj_ind, m
 - **`vert_list`** — Vertex coordinates (x, y, z); `(n_vert, 3)`
 - **`face_ind`** — Triangle definitions as 0-based vertex indices; uint64; `(n_mesh, 3)`
 - **`obj_ind`** — 0-based object index per triangle; length `obj_names` must equal `max(obj_ind) + 1`; uint64; `(n_mesh,)`
-- **`mtl_ind`** — 0-based material index per triangle; length `mtl_names` must equal `max(mtl_ind) + 1`; uint64; `(n_mesh,)`
+- **`mtl_ind`** — 1-based material index per triangle (0 = no material); length `mtl_names` must be ≥ `max(mtl_ind)`; uint64; `(n_mesh,)`
 - **`obj_names`** — Object names; list of strings; length must equal `max(obj_ind) + 1`
-- **`mtl_names`** — Material names; list of strings; length must equal `max(mtl_ind) + 1`
+- **`mtl_names`** — Material names; list of strings; length must be ≥ `max(mtl_ind)` (1-based, so material `w` → `mtl_names[w-1]`)
 - **`bsdf`** *(optional)* — BSDF material parameters per material; ignored by Sionna RT, used only by Mitsuba renderer; see [obj_file_read](#obj_file_read) for field definitions; `(mtl_names.size(), 17)`
 - **`map_to_itu_materials`** *(optional)* — If `true`, maps material names to ITU presets recognised by Sionna RT
 
@@ -2069,8 +1980,9 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
   - EM/acoustic side, from a material table (`fn_csv`, or a built-in ITU-R P.2040 default): `csv_ind`,`csv_names`, `csv_prop`.
 - A face's `usemtl` name is matched to the table by exact name, then by the base name (everything
   before the first dot, so Blender sub-materials like `concrete.gray` map to `concrete`)
-- Unmatched names raise an error when `csv_strict = True`; otherwise they map to row 0 of the table
-  (the transparent fallback)
+- Unmatched names raise an error when `csv_strict = True`; otherwise they map to index 0 (no material)
+- Geometry indices (`face_ind`, `obj_ind`) are 0-based; material indices (`mtl_ind`, `csv_ind`) are
+  1-based, with 0 reserved for the outside / no-material state
 - With an empty `fn`, geometry and `.mtl` outputs are empty and only the table (`csv_names`,
   `csv_prop`) is populated; if `fn_csv` is also empty, the built-in default table is returned
 - For a detailed description of the material model see
@@ -2084,11 +1996,10 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 
 ### Inputs:
 - **`fn`** — Path to the `.obj` file; empty loads only the material table
-- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column, and row 0 is the
-  fallback material (should be transparent, e.g. air); empty uses the built-in default table;
-  default: `""`
-- **`csv_strict`** — If `True`, raise when a `usemtl` material is absent from the table; otherwise
-  map to row 0; default: `False`
+- **`fn_csv`** — Path to an EM/acoustic material CSV; must contain a `name` column. Unmatched faces map
+  to index 0 (no material) unless `csv_strict` is set; empty uses the built-in default table; default: `""`
+- **`csv_strict`** — If `True`, raise when a `usemtl` material is absent from the table; otherwise map to 
+  index 0 (no material); default: `False`
 
 ### Outputs:
 - **`mesh`** — Triangle vertex coordinates `[X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3]` per row; `(n_mesh, 9)`
@@ -2096,10 +2007,10 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 - **`face_ind`** — 0-based vertex indices into `vert_list` per triangle; `(n_mesh, 3)`
 - **`obj_ind`** — 0-based object index per triangle; `(n_mesh,)`
 - **`obj_names`** — Object names; list of `str`; length `max(obj_ind) + 1`
-- **`mtl_ind`** — 0-based visual-material index per triangle; `(n_mesh,)`
+- **`mtl_ind`** — 1-based visual-material index per triangle (0 = no material); `(n_mesh,)`
 - **`mtl_names`** — Visual material names (raw `usemtl`); list of `str`; length `no_mtl`
 - **`bsdf`** — Principled BSDF values from the `.mtl`; `(no_mtl, 17)`
-- **`csv_ind`** — 0-based EM/acoustic-material index per triangle; `(n_mesh,)`
+- **`csv_ind`** — 1-based EM/acoustic-material index per triangle (0 = no material); `(n_mesh,)`
 - **`csv_names`** — Material names from the table; list of `str`; length `n_csv`
 - **`csv_prop`** — Material properties as a `dict`; each key is one CSV column (excluding `name`)
   mapping to a 1D array of length `n_csv`
@@ -2114,32 +2025,39 @@ mesh, vert_list, face_ind, obj_ind, obj_names, mtl_ind, mtl_names, bsdf, csv_ind
 Write a Wavefront .obj file
 
 - Supply geometry as either `mesh`, or as `vert_list` and `face_ind`; giving both, or neither, is an error
-- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same object 
+- With `mesh`, `vert_list_out` and `face_ind_out` are derived from it, merging vertices of the same object
   that are closer than `threshold` (no merging across objects)
 - With `vert_list` and `face_ind`, the geometry is written unchanged
 - Faces are written grouped by object; the faces of each object must form a contiguous block in `obj_ind`
 - Without `mtl_ind`, no `usemtl` tags and no `.mtl` file are written
-- Without `mtl_ind` (or if all entries are 0), no `usemtl` tags and no `.mtl` file are written
 - The `.mtl` file is named after the `.obj` and lists each used material; values default to a gray material when `bsdf` is omitted
+- If `csv_names` is given, the EM/acoustic material table is written to a companion `.csv` (named after the
+  `.obj`); columns follow a fixed canonical order then any extra `csv_prop` fields (alphabetical);
+  `csv_write_defaults` also emits canonical columns absent from `csv_prop`, filled with their defaults
+  (`a`, `e`, `fRef` = 1, else 0)
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Usage:
 ```
-vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, \
-    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold )
+vert_list_out, face_ind_out = quadriga_lib.RTtools.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, \
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults )
 ```
 
 ### Inputs:
 - **`fn`** — Path to the output `.obj` file; must end in `.obj`; if empty, no file is written (outputs are still computed); default: `""`
 - **`mesh`** — Triangle coordinates `{X1,Y1,Z1,...,X3,Y3,Z3}` per row; `(n_mesh, 9)`; mutually exclusive with `vert_list` and `face_ind`; default: None
 - **`obj_ind`** — 0-based object index per face; `(n_mesh,)`; each object must form a contiguous block; default: None
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind`/`mtl_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`; omit (None) for no materials; default: None
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `mtl_ind`/`csv_ind` output of [obj_file_read](#obj_file_read)); `(n_mesh,)`; omit (None) for no materials; default: None
 - **`obj_names`** — Object names; list of str; length > max(obj_ind); required if `obj_ind` is given; default: None
 - **`mtl_names`** — Material names; list of str; length > max(mtl_ind); required if `mtl_ind` is given; default: None
 - **`vert_list`** — Vertex positions; `(n_vert, 3)`; only valid with `face_ind`; written unchanged; default: None
 - **`face_ind`** — 0-based vertex indices per face; `(n_mesh, 3)`; required with `vert_list`; default: None
 - **`bsdf`** — Principled BSDF values for the `.mtl` file; `(n_mtl, 17)`; see [obj_file_read](#obj_file_read) for the column layout; default: None
 - **`threshold`** — Vertex co-location distance for merging within an object; default: 0.001 (1 mm)
+- **`csv_ind`** — 1-based EM/acoustic-material index per face (0 = no material); `(n_mesh,)`; validated if given; default: None
+- **`csv_names`** — EM/acoustic material names (the full table); list of str; required to write the `.csv`; default: None
+- **`csv_prop`** — Material properties as a `dict`; each key is one CSV column mapping to a 1D array of length `len(csv_names)`; default: None
+- **`csv_write_defaults`** — If True, also write canonical columns absent from `csv_prop` using their defaults; default: False
 
 ### Outputs:
 - **`vert_list_out`** — Vertices derived from `mesh`, or a copy of `vert_list`; `(n_vert, 3)`
@@ -2353,8 +2271,8 @@ Reorganize a 3D triangular mesh into spatially clustered sub-meshes for faster p
   than `target_size` triangles
 - Output mesh retains all original triangles but in reordered sequence; sub-meshes are padded with
   zero-sized dummy triangles to align row counts to `vec_size`
-- Dummy triangles are placed at the AABB center of their sub-mesh; `mesh_index` uses 0 to mark
-  padding entries
+- Dummy triangles are placed at the AABB center of their sub-mesh; real entries in `mesh_index` are
+  1-based, with 0 reserved to mark padding entries
 - If `mtl_ind` is provided, material indices are reordered and padded in the same way; padding
   entries get index 0
 
@@ -2373,12 +2291,12 @@ triangles_out, sub_mesh_index, mesh_index, mtl_ind_out = \
 - **`target_size`** — Target triangle count per sub-mesh; for best performance set near sqrt(n_mesh); default: 1024
 - **`vec_size`** — SIMD/GPU alignment size (e.g. 8 for AVX2, 32 for CUDA); each sub-mesh row count
   is rounded up to a multiple of this value; default: 1
-- **`mtl_ind`** — 0-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read));
-  `(n_mesh,)` or `None`; default: `None`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `mtl_ind`/`csv_ind` output of
+  [obj_file_read](#obj_file_read)); `(n_mesh,)` or `None`; default: `None`
 
 ### Outputs:
 - **`triangles_out`** — Reordered and padded triangle vertices; `(n_triangles_out, 9)`
 - **`sub_mesh_index`** — 0-based start indices of sub-meshes in `triangles_out`; uint32; `(n_sub,)`
-- **`mesh_index`** — 0-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
+- **`mesh_index`** — 1-based mapping from original to reorganized mesh (0 = padding); uint32; `(n_triangles_out,)`
 - **`mtl_ind_out`** — Reordered and padded material indices; `(n_triangles_out,)`; empty if `mtl_ind` is not provided
 

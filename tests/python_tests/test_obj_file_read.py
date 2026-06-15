@@ -27,10 +27,14 @@ _EM_ORDER = ["a", "b", "c", "d", "att", "attB", "alpha", "alphaB", "fRef"]
 
 
 def prop_at(csv_prop, key, idx):
-    """Read the value of column 'key' for material index 'idx' from the csv_prop dict,
-    applying the documented per-column default when the column is absent."""
+    """Read column 'key' for the 1-based material index 'idx'.
+    idx == 0 means 'no material' (outside) -> documented transparent defaults.
+    Absent columns fall back to their per-column default."""
+    if idx == 0:
+        return _EM_DEFAULTS.get(key, 0.0)   # a=1, fRef=1, rest 0
+    arr_idx = idx - 1
     if key in csv_prop:
-        return float(csv_prop[key][idx])
+        return float(csv_prop[key][arr_idx])
     return _EM_DEFAULTS.get(key, 0.0)
 
 
@@ -176,9 +180,8 @@ class test_case(unittest.TestCase):
         assert mtl_ind.shape == (12,)
         assert csv_ind.shape == (12,)
         assert len(obj_names) == 1
-        # No usemtl -> faces get the synthetic "default" material on the .mtl side
-        assert len(mtl_names) == 1
-        assert mtl_names[0] == "default"
+        # No usemtl -> no material on the .mtl side (mtl_ind 0, no synthetic name)
+        assert len(mtl_names) == 0
         assert bsdf.shape == (0, 17)
         # csv side is the full default table with row 0 = air
         assert len(csv_names) > 1
@@ -196,13 +199,13 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(face_ind, face_ind_correct)
         npt.assert_almost_equal(mesh, mesh_correct, decimal=14)
 
-        # 0-based indices; "default" not in table -> air fallback (row 0)
+        # geometry 0-based; no usemtl -> no material (index 0)
         npt.assert_(np.all(obj_ind == 0))
         npt.assert_(np.all(mtl_ind == 0))
         npt.assert_(np.all(csv_ind == 0))
         npt.assert_equal(obj_names[0], "Cube")
 
-        # Air at csv row 0 is transparent (a = 1)
+        # csv_ind 0 = no material -> transparent (a = 1)
         npt.assert_almost_equal(em_row(csv_prop, 0),
                                 [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], decimal=14)
 
@@ -250,12 +253,11 @@ class test_case(unittest.TestCase):
         npt.assert_array_equal(face_ind, expected_face_ind)
 
         npt.assert_array_equal(obj_ind, [0, 0, 1, 1])
-        # mtl_names: faces 0-1 -> "default", faces 2-3 -> "itu_wood" (first-appearance order)
+        # mtl_names: only "itu_wood" (faces 0-1 have no usemtl -> mtl_ind 0)
         npt.assert_array_equal(mtl_ind, [0, 0, 1, 1])
         npt.assert_equal(obj_names[0], "Plane")
         npt.assert_equal(obj_names[1], "Plane.001")
-        npt.assert_equal(mtl_names[0], "default")
-        npt.assert_equal(mtl_names[1], "itu_wood")
+        npt.assert_equal(mtl_names[0], "itu_wood")
 
         # Missing file raises
         with self.assertRaises(ValueError) as context:
@@ -415,7 +417,7 @@ class test_case(unittest.TestCase):
                 decimal=14,
             )
             npt.assert_equal(mtl_names[0], "air")
-            npt.assert_(np.all(mtl_ind == 0))
+            npt.assert_(np.all(mtl_ind == 1))
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
@@ -432,14 +434,14 @@ class test_case(unittest.TestCase):
                 decimal=3,
             )
             npt.assert_equal(mtl_names[0], "itu_concrete")
-            npt.assert_equal(mtl_ind[0], 0)
+            npt.assert_equal(mtl_ind[0], 1)
             npt.assert_almost_equal(
                 em_row(csv_prop, csv_ind[4]),
                 [1.99, 0.0, 0.0047, 1.0718, 0.0, 0.0, 0.0, 0.0, 1.0],
                 decimal=3,
             )
             npt.assert_equal(mtl_names[1], "itu_wood")
-            npt.assert_equal(mtl_ind[4], 1)
+            npt.assert_equal(mtl_ind[4], 2)
         finally:
             if os.path.isfile(fn):
                 os.remove(fn)
@@ -474,11 +476,11 @@ class test_case(unittest.TestCase):
         fn = "cube.obj"
         create_cube_with_materials(fn, "not_a_real_material")
         try:
-            # non-strict (default): resolves to air (row 0); request csv_ind so resolution runs
+            # non-strict (default): unmatched -> no material (index 0); request csv_ind so resolution runs
             (_, _, _, _, _, _, mtl_names, _, csv_ind, _, _) = \
                 quadriga_lib.RTtools.obj_file_read(fn, "", False)
             npt.assert_equal(mtl_names[0], "not_a_real_material")  # raw name kept
-            npt.assert_(np.all(csv_ind == 0))                      # resolved to air
+            npt.assert_(np.all(csv_ind == 0))                      # resolved to no material
 
             # strict: raises because the material is absent from the table
             with self.assertRaises(ValueError):

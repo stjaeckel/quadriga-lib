@@ -2659,7 +2659,7 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <li><b><code>orig</code></b> — TX positions; <code>[n_pos, 3]</code></li>
 <li><b><code>dest</code></b> — RX positions; <code>[n_pos, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle vertices, each row <code>{X1,Y1,Z1,X2,Y2,Z2,X3,Y3,Z3}</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = no material; the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
 <li><b><code>mtl_prop</code></b> — Material properties as a struct; each field is one column (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each field holds a vector of length <code>n_mtl</code></li>
 <li><b><code>center_freq</code></b> — Center frequency</li>
 <li><b><code>lod</code></b> — Level of detail (0–6), controls <code>n_path</code> and <code>n_seg</code>; see <a href="#generate_diffraction_paths">generate_diffraction_paths</a>; default: 2</li>
@@ -2806,7 +2806,7 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 </ul>
 </li>
 <li>A face's <code>usemtl</code> name is matched to the table by exact name, then by the base name (everything before the first dot, so Blender sub-materials like <code>concrete.gray</code> map to <code>concrete</code>)</li>
-<li>Unmatched names throw when <code>csv_strict</code> is true; otherwise they map to row 1 of the table (the transparent fallback)</li>
+<li>Unmatched names throw when <code>csv_strict</code> is true; otherwise they map to index 0 (no material)</li>
 <li>With an empty <code>fn</code>, geometry and <code>.mtl</code> outputs are empty and only the table (<code>csv_names</code>, <code>csv_prop</code>) is populated; if <code>fn_csv</code> is also empty, the built-in default table is returned</li>
 <li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
 </ul>
@@ -2820,8 +2820,8 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 <b>Inputs:</b><br>
 <ul>
 <li><b><code>fn</code></b> — Path to the <code>.obj</code> file; empty loads only the material table</li>
-<li><b><code>fn_csv</code></b> <i>(optional)</i> — Path to an EM/acoustic material CSV; must contain a <code>name</code> column, and row 1 is the fallback material (should be transparent, e.g. air); empty uses the built-in default table</li>
-<li><b><code>csv_strict</code></b> <i>(optional)</i> — If true, throw when a <code>usemtl</code> material is absent from the table; otherwise map to row 1; default: false</li>
+<li><b><code>fn_csv</code></b> <i>(optional)</i> — Path to an EM/acoustic material CSV; must contain a <code>name</code> column; unmatched faces map to index 0 (no material) unless <code>csv_strict</code> is set; empty uses the built-in default table</li>
+<li><b><code>csv_strict</code></b> <i>(optional)</i> — If true, throw when a <code>usemtl</code> material is absent from the table; otherwise map to index 0 (no material); default: false</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -2831,10 +2831,10 @@ Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acou
 <li><b><code>face_ind</code></b> — 1-based vertex indices into <code>vert_list</code> per triangle; uint64; <code>[n_mesh, 3]</code></li>
 <li><b><code>obj_ind</code></b> — 1-based object index per triangle; uint64; <code>[n_mesh]</code></li>
 <li><b><code>obj_names</code></b> — Object names; cell array of strings; length <code>max(obj_ind)</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based visual-material index per triangle; uint64; <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based visual-material index per triangle (0 = no material); uint64; <code>[n_mesh]</code></li>
 <li><b><code>mtl_names</code></b> — Visual material names (raw <code>usemtl</code>); cell array of strings; length <code>no_mtl</code></li>
 <li><b><code>bsdf</code></b> — Principled BSDF values from the <code>.mtl</code>; <code>[no_mtl, 17]</code></li>
-<li><b><code>csv_ind</code></b> — 1-based EM/acoustic-material index per triangle; uint64; <code>[n_mesh]</code></li>
+<li><b><code>csv_ind</code></b> — 1-based EM/acoustic-material index per triangle (0 = no material); uint64; <code>[n_mesh]</code></li>
 <li><b><code>csv_names</code></b> — Material names from the table; cell array of strings; length <code>n_csv</code></li>
 <li><b><code>csv_prop</code></b> — Material properties as a struct; each field is one CSV column (excluding <code>name</code>) holding a column vector of length <code>n_csv</code></li>
 </ul>
@@ -2858,12 +2858,13 @@ Write a Wavefront .obj file
 <li>Without <code>obj_ind</code> and <code>obj_names</code>, a single object named <code>object</code> is written</li>
 <li>Without <code>mtl_ind</code>, no <code>usemtl</code> tags and no <code>.mtl</code> file are written</li>
 <li>The <code>.mtl</code> file is named after the <code>.obj</code> and lists each used material; values default to a gray material when <code>bsdf</code> is omitted</li>
+<li>If <code>csv_names</code> is given, the EM/acoustic material table is written to a companion <code>.csv</code> (named after the <code>.obj</code>); columns follow a fixed canonical order then any extra <code>csv_prop</code> fields; <code>csv_write_defaults</code> also emits canonical columns absent from <code>csv_prop</code>, filled with their defaults (<code>a</code>, <code>e</code>, <code>fRef</code> = 1, else 0)</li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-[ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, ...
-    obj_names, mtl_names, vert_list, face_ind, bsdf, threshold );
+[ vert_list_out, face_ind_out ] = quadriga_lib.obj_file_write( fn, mesh, obj_ind, mtl_ind, obj_names, ...
+    mtl_names, vert_list, face_ind, bsdf, threshold, csv_ind, csv_names, csv_prop, csv_write_defaults );
 </pre>
 
 <b>Inputs:</b><br>
@@ -2871,13 +2872,17 @@ Write a Wavefront .obj file
 <li><b><code>fn</code></b> — Path to the output <code>.obj</code> file; must end in <code>.obj</code>; if empty, no file is written (outputs are still computed)</li>
 <li><b><code>mesh</code></b> — Triangle coordinates <code>{X1,Y1,Z1,...,X3,Y3,Z3}</code> per row; <code>[n_mesh, 9]</code>; mutually exclusive with <code>vert_list</code> and <code>face_ind</code></li>
 <li><b><code>obj_ind</code></b> — 1-based object index per face; <code>[n_mesh]</code>; each object must form a contiguous block</li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per face; <code>[n_mesh]</code>; omit or pass <code>[]</code> for no materials</li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = no material); <code>[n_mesh]</code>; omit or pass <code>[]</code> for no materials</li>
 <li><b><code>obj_names</code></b> — Object names; cell array of strings; length >= max(obj_ind); required if <code>obj_ind</code> is given</li>
 <li><b><code>mtl_names</code></b> — Material names; cell array of strings; length >= max(mtl_ind); required if <code>mtl_ind</code> is given</li>
 <li><b><code>vert_list</code></b> — Vertex positions; <code>[n_vert, 3]</code>; only valid with <code>face_ind</code>; written unchanged</li>
 <li><b><code>face_ind</code></b> — 1-based vertex indices per face; <code>[n_mesh, 3]</code>; required with <code>vert_list</code></li>
 <li><b><code>bsdf</code></b> — Principled BSDF values for the <code>.mtl</code> file; <code>[n_mtl, 17]</code>; see <a href="#obj_file_read">obj_file_read</a> for the column layout</li>
 <li><b><code>threshold</code></b> — Vertex co-location distance for merging within an object; default: 0.001 (1 mm)</li>
+<li><b><code>csv_ind</code></b> <i>(optional)</i> — 1-based EM/acoustic-material index per face (0 = no material); <code>[n_mesh]</code>; validated if given</li>
+<li><b><code>csv_names</code></b> <i>(optional)</i> — EM/acoustic material names; cell array of strings; required to write the <code>.csv</code></li>
+<li><b><code>csv_prop</code></b> <i>(optional)</i> — Material properties as a struct; each field is one CSV column holding a vector of length <code>numel(csv_names)</code></li>
+<li><b><code>csv_write_defaults</code></b> <i>(optional)</i> — If true, also write canonical columns absent from <code>csv_prop</code> using their defaults; default: false</li>
 </ul>
 
 <b>Outputs:</b><br>
@@ -3014,7 +3019,7 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 <li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>fbs</code></b>, <b><code>sbs</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code></li>
 <li><b><code>mesh</code></b> — Triangle mesh faces; see <code>obj_file_read</code>; <code>[n_mesh, 9]</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
+<li><b><code>mtl_ind</code></b> — 1-based material index per face (0 = no material; the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code></li>
 <li><b><code>mtl_prop</code></b> — Material properties as a struct; each field is one column (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each field holds a vector of length <code>n_mtl</code></li>
 <li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); uint32; <code>[n_ray]</code></li>
 <li><b><code>trivec</code></b> — Beam wavefront triangle vertices relative to origin; order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code>; <code>[n_ray, 9]</code>; default: <code>[]</code></li>
