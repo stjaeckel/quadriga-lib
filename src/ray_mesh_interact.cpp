@@ -530,6 +530,117 @@ namespace
             return std::complex<double>(1.0, 0.0) / denom;
         }
     };
+
+    // Mirror reflection direction: d = u - 2*c*n, c = clamp(u.n)
+    inline void qd_reflect(double Ux, double Uy, double Uz,
+                           double Nx, double Ny, double Nz,
+                           double &Dx, double &Dy, double &Dz)
+    {
+        double c = Ux * Nx + Uy * Ny + Uz * Nz;
+        c = (c < -1.0) ? -1.0 : (c > 1.0 ? 1.0 : c);
+        double a = 2.0 * c;
+        Dx = Ux - a * Nx, Dy = Uy - a * Ny, Dz = Uz - a * Nz;
+    }
+
+    // Snell refraction direction: normalize(eta*u + (eta*cos_in - Re(cos_theta2))*n)
+    inline void qd_refract(double Ux, double Uy, double Uz,
+                           double Nx, double Ny, double Nz,
+                           double eta, double cos_in, std::complex<double> cos_theta2,
+                           double &Dx, double &Dy, double &Dz)
+    {
+        double s = eta * cos_in - std::real(cos_theta2);
+        double Rx = eta * Ux + s * Nx, Ry = eta * Uy + s * Ny, Rz = eta * Uz + s * Nz;
+        double inv = 1.0 / std::sqrt(Rx * Rx + Ry * Ry + Rz * Rz);
+        Dx = Rx * inv, Dy = Ry * inv, Dz = Rz * inv;
+    }
+
+    // Builds incoming Q-basis from in, outgoing U-basis from out, writes the 8-element xprmat and
+    // its power gain. is_scalar takes the single-coefficient path.
+    inline void qd_polbasis(double Qx, double Qy, double Qz,
+                            double Ux, double Uy, double Uz,
+                            double Nx, double Ny, double Nz,
+                            double amplitude, std::complex<double> cTE, std::complex<double> cTM,
+                            bool is_scalar, double xprmat[8], double &out_gain)
+    {
+        double eTE_Re = std::real(cTE), eTE_Im = std::imag(cTE);
+        double eTM_Re = std::real(cTM), eTM_Im = std::imag(cTM);
+
+        if (is_scalar)
+        {
+            double coeff_Re = amplitude * eTE_Re, coeff_Im = amplitude * eTE_Im;
+            xprmat[0] = coeff_Re, xprmat[1] = coeff_Im;
+            xprmat[2] = 0.0, xprmat[3] = 0.0, xprmat[4] = 0.0;
+            xprmat[5] = 0.0, xprmat[6] = 0.0, xprmat[7] = 0.0;
+            out_gain = coeff_Re * coeff_Re + coeff_Im * coeff_Im;
+            return;
+        }
+
+        double scl = 0.0;
+
+        // Incoming path basis from (Qx,Qy,Qz)
+        double eHx = -Qy + 3.0e-20, eHy = Qx, eHz = 0.0;
+        scl = 1.0 / std::sqrt(eHx * eHx + eHy * eHy), eHx *= scl, eHy *= scl;
+        double eVx = -Qz * eHy, eVy = Qz * eHx, eVz = Qx * eHy - Qy * eHx;
+        double eQx = Qy * Nz - Qz * Ny + 3.0e-20, eQy = Qz * Nx - Qx * Nz, eQz = Qx * Ny - Qy * Nx;
+        scl = 1.0 / std::sqrt(eQx * eQx + eQy * eQy + eQz * eQz), eQx *= scl, eQy *= scl, eQz *= scl;
+        double ePx = eQy * Qz - eQz * Qy, ePy = eQz * Qx - eQx * Qz, ePz = eQx * Qy - eQy * Qx;
+
+        bool do_base_transform = scl < 1.0e19;
+        double Q1 = (do_base_transform) ? eVx * ePx + eVy * ePy + eVz * ePz : 1.0;
+        double Q2 = (do_base_transform) ? eVx * eQx + eVy * eQy + eVz * eQz : 0.0;
+        double Q3 = (do_base_transform) ? eHx * ePx + eHy * ePy + eHz * ePz : 0.0;
+        double Q4 = (do_base_transform) ? eHx * eQx + eHy * eQy + eHz * eQz : 1.0;
+
+        // Outgoing path basis from (Ux,Uy,Uz)
+        eHx = -Uy + 3.0e-20, eHy = Ux, eHz = 0.0;
+        scl = 1.0 / std::sqrt(eHx * eHx + eHy * eHy), eHx *= scl, eHy *= scl;
+        eVx = -Uz * eHy, eVy = Uz * eHx, eVz = Ux * eHy - Uy * eHx;
+        eQx = Uy * Nz - Uz * Ny + 3.0e-20, eQy = Uz * Nx - Ux * Nz, eQz = Ux * Ny - Uy * Nx;
+        scl = 1.0 / std::sqrt(eQx * eQx + eQy * eQy + eQz * eQz), eQx *= scl, eQy *= scl, eQz *= scl;
+        ePx = eQy * Uz - eQz * Uy, ePy = eQz * Ux - eQx * Uz, ePz = eQx * Uy - eQy * Ux;
+
+        do_base_transform = scl < 1.0e19;
+        double U1 = (do_base_transform) ? eVx * ePx + eVy * ePy + eVz * ePz : 1.0;
+        double U2 = (do_base_transform) ? eVx * eQx + eVy * eQy + eVz * eQz : 0.0;
+        double U3 = (do_base_transform) ? eHx * ePx + eHy * ePy + eHz * ePz : 0.0;
+        double U4 = (do_base_transform) ? eHx * eQx + eHy * eQy + eHz * eQz : 1.0;
+
+        double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
+               VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
+               HV_Re = amplitude * (U2 * Q1 * eTM_Re + U4 * Q2 * eTE_Re),
+               HV_Im = amplitude * (U2 * Q1 * eTM_Im + U4 * Q2 * eTE_Im),
+               VH_Re = amplitude * (U1 * Q3 * eTM_Re + U3 * Q4 * eTE_Re),
+               VH_Im = amplitude * (U1 * Q3 * eTM_Im + U3 * Q4 * eTE_Im),
+               HH_Re = amplitude * (U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re),
+               HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
+
+        xprmat[0] = VV_Re, xprmat[1] = VV_Im;
+        xprmat[2] = HV_Re, xprmat[3] = HV_Im;
+        xprmat[4] = VH_Re, xprmat[5] = VH_Im;
+        xprmat[6] = HH_Re, xprmat[7] = HH_Im;
+
+        out_gain = 0.5 * (VV_Re * VV_Re + VV_Im * VV_Im +
+                          HV_Re * HV_Re + HV_Im * HV_Im +
+                          VH_Re * VH_Re + VH_Im * VH_Im +
+                          HH_Re * HH_Re + HH_Im * HH_Im);
+    }
+
+    // Per-hit in-medium charge: incidence-side leg (if ray starts inside) and transmissive offset leg
+    inline double qd_hit_charges(const Material &M1, const Material &M2,
+                                 bool ray_starts_inside, int geometry_type,
+                                 double OF_length, double ray_offset,
+                                 double fGHz, double abs_cos_theta)
+    {
+        double gain = 1.0;
+        if (ray_starts_inside)
+        {
+            double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
+            gain *= M1.medium_gain(thickness, fGHz, abs_cos_theta);
+        }
+        if (geometry_type != 0)
+            gain *= M2.medium_gain(ray_offset, fGHz);
+        return gain;
+    }
 }
 
 /*!SECTION
@@ -703,7 +814,10 @@ void quadriga_lib::ray_mesh_interact(
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
 - **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including in-medium attenuation; `[n_rayN, 8]`.
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
+  includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL);
+  `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including
+  in-medium attenuation; `[n_rayN, 8]`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
@@ -1112,17 +1226,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double FD_length = std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz); // Length of path from FBS to destination
 
         if (geometry_type == 0) // Reflection, normalized by default
-            FDx = OFx - 2.0 * cos_theta * Nx,
-            FDy = OFy - 2.0 * cos_theta * Ny,
-            FDz = OFz - 2.0 * cos_theta * Nz;
+            qd_reflect(OFx, OFy, OFz, Nx, Ny, Nz, FDx, FDy, FDz);
         else if (geometry_type == 1)         // Transmission without refraction
             FDx = OFx, FDy = OFy, FDz = OFz; // New path direction = same as incoming ray, already normalized
         else                                 // Refraction
-        {
-            scl = eta * abs_cos_theta - std::real(cos_theta2);                                            // Temporary variable, ignoring imaginary part of cos_theta2
-            FDx = eta * OFx + scl * Nx, FDy = eta * OFy + scl * Ny, FDz = eta * OFz + scl * Nz;           // Refraction into medium
-            scl = 1.0 / std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz), FDx *= scl, FDy *= scl, FDz *= scl; // Normalize
-        }
+            qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
 
         // Update origin and direction of the ray tube vertices
         double p_trivec_tmp[9] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -1202,8 +1310,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     }
 
                     // Update vertex direction
-                    double a = 2.0 * (Vx * Nx + Vy * Ny + Vz * Nz);
-                    Vx -= a * Nx, Vy -= a * Ny, Vz -= a * Nz;
+                    qd_reflect(Vx, Vy, Vz, Nx, Ny, Nz, Vx, Vy, Vz);
                     if (use_ray_tube == 1)
                     {
                         Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
@@ -1227,16 +1334,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     if (geometry_type == 2) // Refraction
                     {
                         double cos_thetaV = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);       // Cosine of incidence angle
+                        cos_thetaV = (cos_thetaV > 1.0) ? 1.0 : cos_thetaV;              // Clamp: avoids sqrt of a negative below
                         double sin_thetaV = std::sqrt(1.0 - cos_thetaV * cos_thetaV);    // Sine of incidence angle
                         total_reflection = total_reflection | (eta * sin_thetaV >= 1.0); // Check total reflection condition
 
                         // Refraction into medium
                         std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV * sin_thetaV);
-                        double scl = eta * cos_thetaV - std::real(cos_theta2V);
-                        Vx = eta * Vx + scl * Nx, Vy = eta * Vy + scl * Ny, Vz = eta * Vz + scl * Nz;
-
-                        scl = 1.0 / std::sqrt(Vx * Vx + Vy * Vy + Vz * Vz);
-                        Vx *= scl, Vy *= scl, Vz *= scl; // Normalize
+                        qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV, cos_theta2V, Vx, Vy, Vz);
                         if (use_ray_tube == 1)
                         {
                             Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
@@ -1289,22 +1393,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         }
 
         // Determine the in-medium gain
-        double gain = 1.0;
-        if (ray_starts_inside)
-        {
-            double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            gain *= M1.medium_gain(thickness, fGHz, abs_cos_theta);
-        }
-        if (geometry_type != 0)
-            gain *= M2.medium_gain(ray_offset, fGHz);
+        double gain = qd_hit_charges(M1, M2, ray_starts_inside, geometry_type,
+                                     OF_length, ray_offset, fGHz, abs_cos_theta);
 
         // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices)
         if (total_reflection != tir_central)
             M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM,
                              nullptr, nullptr, nullptr, nullptr, nullptr, true);
-
-        double eTE_Re = std::real(cTE), eTE_Im = std::imag(cTE),
-               eTM_Re = std::real(cTM), eTM_Im = std::imag(cTM);
 
         // Read the output ray index
         size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
@@ -1331,90 +1426,15 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
 
         if (p_xprmatN || p_gainN)
         {
-            if (is_scalar)
-            {
-                double amplitude = std::sqrt(gain);
-                double coeff_Re = amplitude * eTE_Re;
-                double coeff_Im = amplitude * eTE_Im;
+            double amplitude = std::sqrt(gain);
+            double xprmat[8], pgain;
+            qd_polbasis(OFx, OFy, OFz, FDx, FDy, FDz, Nx, Ny, Nz, amplitude, cTE, cTM, is_scalar, xprmat, pgain);
 
-                if (p_xprmatN)
-                {
-                    p_xprmatN[i_rayN] = (dtype)coeff_Re;
-                    p_xprmatN[i_rayN + n_rayN] = (dtype)coeff_Im;
-                    p_xprmatN[i_rayN + 2 * n_rayN] = (dtype)0.0;
-                    p_xprmatN[i_rayN + 3 * n_rayN] = (dtype)0.0;
-                    p_xprmatN[i_rayN + 4 * n_rayN] = (dtype)0.0;
-                    p_xprmatN[i_rayN + 5 * n_rayN] = (dtype)0.0;
-                    p_xprmatN[i_rayN + 6 * n_rayN] = (dtype)0.0;
-                    p_xprmatN[i_rayN + 7 * n_rayN] = (dtype)0.0;
-                }
-                if (p_gainN)
-                    p_gainN[i_rayN] = (dtype)(coeff_Re * coeff_Re + coeff_Im * coeff_Im);
-            }
-            else
-            {
-                // Calculate vectors for the polarization base transformation (incoming path)
-                double Hx = -OFy + 3.0e-20, Hy = OFx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
-                scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                                // Normalize
-                double Vx = -OFz * Hy, Vy = OFz * Hx, Vz = OFx * Hy - OFy * Hx;                                // Polarization base in eTheta direction (vertical)
-                double Qx = OFy * Nz - OFz * Ny + 3.0e-20, Qy = OFz * Nx - OFx * Nz, Qz = OFx * Ny - OFy * Nx; // Base vector perpendicular to plane normal (eQ)
-                scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;           // Normalize
-                double Px = Qy * OFz - Qz * OFy, Py = Qz * OFx - Qx * OFz, Pz = Qx * OFy - Qy * OFx;           // Base vector parallel to plane normal (eP)
-
-                // Calculate polarization base transformation matrix from global coordinates to local coordinates
-                bool do_base_transform = scl < 1.0e19;
-                double Q1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
-                double Q2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
-                double Q3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
-                double Q4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
-
-                // Calculate vectors for the polarization base transformation (outgoing path)
-                Hx = -FDy + 3.0e-20, Hy = FDx, Hz = 0.0;                                                // Polarization base in ePhi direction (horizontal)
-                scl = 1.0 / std::sqrt(Hx * Hx + Hy * Hy), Hx *= scl, Hy *= scl;                         // Normalize
-                Vx = -FDz * Hy, Vy = FDz * Hx, Vz = FDx * Hy - FDy * Hx;                                // Polarization base in eTheta direction (vertical)
-                Qx = FDy * Nz - FDz * Ny + 3.0e-20, Qy = FDz * Nx - FDx * Nz, Qz = FDx * Ny - FDy * Nx; // Base vector perpendicular to plane normal (eQ)
-                scl = 1.0 / std::sqrt(Qx * Qx + Qy * Qy + Qz * Qz), Qx *= scl, Qy *= scl, Qz *= scl;    // Normalize
-                Px = Qy * FDz - Qz * FDy, Py = Qz * FDx - Qx * FDz, Pz = Qx * FDy - Qy * FDx;           // Base vector parallel to plane normal (eP)
-
-                // Calculate polarization base transformation matrix from global coordinates to local coordinates
-                do_base_transform = scl < 1.0e19;
-                double U1 = (do_base_transform) ? Vx * Px + Vy * Py + Vz * Pz : 1.0; // dot( eV, eP )
-                double U2 = (do_base_transform) ? Vx * Qx + Vy * Qy + Vz * Qz : 0.0; // dot( eV, eQ )
-                double U3 = (do_base_transform) ? Hx * Px + Hy * Py + Hz * Pz : 0.0; // dot( eH, eP )
-                double U4 = (do_base_transform) ? Hx * Qx + Hy * Qy + Hz * Qz : 1.0; // dot( eH, eQ )
-
-                // Calculate polarization transfer matrix
-                // Note: eTE = perpendicular to face normal vector = Horizontal polarization
-                //       eTM = parallel to face normal vector = Vertical polarization
-                double amplitude = std::sqrt(gain); // Reduction in amplitude caused by conductive medium
-
-                double VV_Re = amplitude * (U1 * Q1 * eTM_Re + U3 * Q2 * eTE_Re),
-                       VV_Im = amplitude * (U1 * Q1 * eTM_Im + U3 * Q2 * eTE_Im),
-                       HV_Re = amplitude * (U2 * Q1 * eTM_Re + U4 * Q2 * eTE_Re),
-                       HV_Im = amplitude * (U2 * Q1 * eTM_Im + U4 * Q2 * eTE_Im),
-                       VH_Re = amplitude * (U1 * Q3 * eTM_Re + U3 * Q4 * eTE_Re),
-                       VH_Im = amplitude * (U1 * Q3 * eTM_Im + U3 * Q4 * eTE_Im),
-                       HH_Re = amplitude * (U2 * Q3 * eTM_Re + U4 * Q4 * eTE_Re),
-                       HH_Im = amplitude * (U2 * Q3 * eTM_Im + U4 * Q4 * eTE_Im);
-
-                // Write XPRMAT
-                if (p_xprmatN)
-                {
-                    p_xprmatN[i_rayN] = (dtype)VV_Re;
-                    p_xprmatN[i_rayN + n_rayN] = (dtype)VV_Im;
-                    p_xprmatN[i_rayN + 2 * n_rayN] = (dtype)HV_Re;
-                    p_xprmatN[i_rayN + 3 * n_rayN] = (dtype)HV_Im;
-                    p_xprmatN[i_rayN + 4 * n_rayN] = (dtype)VH_Re;
-                    p_xprmatN[i_rayN + 5 * n_rayN] = (dtype)VH_Im;
-                    p_xprmatN[i_rayN + 6 * n_rayN] = (dtype)HH_Re;
-                    p_xprmatN[i_rayN + 7 * n_rayN] = (dtype)HH_Im;
-                }
-                if (p_gainN)
-                    p_gainN[i_rayN] = (dtype)(0.5 * (VV_Re * VV_Re + VV_Im * VV_Im +
-                                                     HV_Re * HV_Re + HV_Im * HV_Im +
-                                                     VH_Re * VH_Re + VH_Im * VH_Im +
-                                                     HH_Re * HH_Re + HH_Im * HH_Im));
-            }
+            if (p_xprmatN)
+                for (int k = 0; k < 8; ++k)
+                    p_xprmatN[i_rayN + (size_t)k * n_rayN] = (dtype)xprmat[k];
+            if (p_gainN)
+                p_gainN[i_rayN] = (dtype)pgain;
         }
 
         // Write trivecN
@@ -1557,7 +1577,6 @@ void quadriga_lib::ray_state_update(
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Col<dtype> *excess_delayN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     const arma::Mat<dtype> *orig_correct = nullptr,
     double eps = 0.15);
