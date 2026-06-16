@@ -42,26 +42,26 @@ lang: en-US
 | [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1295 |
 | [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1355 |
 | [acdf](#acdf) | Channel statistics | 1437 |
-| [calc_angular_spread](#calc_angular_spread) | Miscellaneous / Tools | 1472 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Miscellaneous / Tools | 1542 |
-| [calc_delay_spread](#calc_delay_spread) | Miscellaneous / Tools | 1594 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Miscellaneous / Tools | 1643 |
-| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1693 |
-| [components](#components) | Miscellaneous / Tools | 1721 |
-| [version](#version) | Miscellaneous / Tools | 1730 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1743 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1786 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1834 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1866 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1899 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1949 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1996 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2023 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2053 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2086 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2123 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2166 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2192 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1468 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1507 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1557 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1585 |
+| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1619 |
+| [components](#components) | Miscellaneous / Tools | 1647 |
+| [version](#version) | Miscellaneous / Tools | 1656 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1669 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1712 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1760 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1792 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1825 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1875 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1922 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 1949 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 1979 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2012 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2049 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2092 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2118 |
 
 ---
 
@@ -1465,229 +1465,155 @@ cdf_per_set, bins_out, cdf_avg, mu, sig = quadriga_lib.tools.acdf( data, bins, n
 - **`sig`** — Standard deviation of the 0.1–0.9 quantiles across data sets; `(9,)`
 
 ---
-
-# Miscellaneous / Tools
-
----
 ## calc_angular_spread
 Calculate azimuth and elevation angular spreads with spherical wrapping
 
-### Description:
-- Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
-- Inputs use lists of 1D numpy arrays so that each CIR can have a different number of paths.
-- Uses optional spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
-  direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
-  on the equator before computing spreads.
-- Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread
-  despite energy being focused into a small solid angle). This method corrects for that.
-- Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
-  elevation spread, corresponding to the principal axes of the angular power distribution.
-- Setting `wrapping` to true enables spherical wrapping.
+- Computes RMS azimuth and elevation angular spreads from power-weighted angles
+- Inputs are lists of 1D arrays so each CIR can have a different number of paths
+- RMS spread uses the 3GPP TR 38.901 second-moment definition of wrapped deviations from the
+  circular mean
+- When `wrapping = True`, the power-weighted mean direction is computed in Cartesian coordinates
+  and all paths are rotated so the centroid lies on the equator before computing spreads,
+  avoiding pole singularity artifacts
+- When `wrapping = False`, spreads are computed directly from raw angles; `orientation` is zero
+  and `phi`/`theta` equal the input `az`/`el`
+- When `calc_bank_angle = True`, an optimal bank angle maximizing azimuth spread is derived
+  analytically from eigenvectors of the 2x2 power-weighted covariance matrix; only used when
+  `wrapping = True`
+- When `quantize > 0`, paths within that angular distance are grouped and their powers summed
 
 ### Usage:
 ```
-import quadriga_lib
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers)
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers, \
-   wrapping=True, calc_bank_angle=True, quantize=0.0)
+azimuth_spread, elevation_spread, orientation, phi, theta = \
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize )
 ```
 
-### Arguments:
-- `list of np.ndarray **az**` (input)
-  Azimuth angles in [rad]. List of length `n_cir`, each element is a 1D array of length `n_path`.
+### Inputs:
+- **`az`** — Azimuth angles; range -pi to pi; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`el`** — Elevation angles; range -pi/2 to pi/2; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`wrapping`** — If True, enables spherical rotation; default: False
+- **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
+- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization)
 
-- `list of np.ndarray **el**` (input)
-  Elevation angles in [rad]. List of length `n_cir`, each element is a 1D array of length `n_path`.
-
-- `list of np.ndarray **powers**` (input)
-  Path powers in [W]. List of length `n_cir`, each element is a 1D array of length `n_path`.
-
-- `bool **wrapping** = False` (input)
-  If True, enable spherical rotation. Default: False (use raw angles)
-
-- `bool **calc_bank_angle** = False` (input)
-  If True, compute the optimal bank angle analytically.
-
-- `float **quantize** = 0.0` (input)
-  Angular quantization step in [deg]. Set to 0 for no quantization.
-
-### Returns:
-- `np.ndarray **azimuth_spread**` (output)
-  RMS azimuth angular spread in [rad]. Shape `(n_cir,)`.
-
-- `np.ndarray **elevation_spread**` (output)
-  RMS elevation angular spread in [rad]. Shape `(n_cir,)`.
-
-- `np.ndarray **orientation**` (output)
-  Mean-angle orientation [bank, tilt, heading] in [rad]. Shape `(3, n_cir)`.
-
-- `list of np.ndarray **phi**` (output)
-  Rotated azimuth angles in [rad]. List of length `n_cir`.
-
-- `list of np.ndarray **theta**` (output)
-  Rotated elevation angles in [rad]. List of length `n_cir`.
-
-### Example:
-```
-import numpy as np
-import quadriga_lib
-
-az = [np.array([0.1, -0.1, 0.05]), np.array([0.2, -0.2, 0.1, -0.1])]
-el = [np.array([0.0, 0.0, 0.0]), np.array([0.05, -0.05, 0.0, 0.0])]
-powers = [np.array([1.0, 1.0, 0.5]), np.array([2.0, 1.0, 1.5, 0.5])]
-as_spread, es_spread, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers)
-```
+### Outputs:
+- **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`
+- **`elevation_spread`** — RMS elevation angular spread; `(n_cir,)`
+- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `(3, n_cir)`
+- **`phi`** — Rotated azimuth angles; list of length `n_cir`
+- **`theta`** — Rotated elevation angles; list of length `n_cir`
 
 ---
 ## calc_cross_polarization_ratio
 Calculate the cross-polarization ratio (XPR) for linear and circular polarization bases
 
-### Description:
-- Computes the aggregate cross-polarization ratio (XPR) from the polarization transfer matrices
-  of all channel impulse responses (CIRs) using the total-power-ratio method.
-- For each CIR, the total co-polarized and cross-polarized received powers are accumulated
-  across all qualifying paths, and the XPR is obtained as a single ratio of the totals.
-- In addition to the linear V/H basis, the XPR is also computed in the circular LHCP/RHCP basis.
-- The LOS path is identified by comparing each path's absolute length against the direct
-  TX-RX distance. All paths with `path_length < dTR + window_size` are excluded from
-  the XPR calculation by default (controlled by `include_los`).
-- If the total cross-polarized power is zero, the XPR is set to 0 (undefined).
+- Computes aggregate XPR from polarization transfer matrices using the total-power-ratio method:
+  co-pol and cross-pol powers are summed across all qualifying paths per CIR, and XPR is their ratio
+- Inputs are lists so each CIR can have a different number of paths
+- XPR is computed in both the linear V/H basis and the circular LHCP/RHCP basis via the Jones matrix
+  transform `M_circ = T · M_lin · T^-1`
+- `M` is stored with interleaved real/imaginary parts, 8 rows per path:
+  `[Re(M_vv); Im(M_vv); Re(M_vh); Im(M_vh); Re(M_hv); Im(M_hv); Re(M_hh); Im(M_hh)]`
+- LOS paths are identified by comparing path length against the direct TX-RX distance `dTR`; paths
+  with `path_length < dTR + window_size` are excluded by default
+- Normalization of `M` does not affect XPR (cancels in the ratio) but does affect `pg`
+- If cross-pol power is zero and co-pol is positive, XPR is set to infinity; if both are zero, XPR
+  is set to 0
+- TX/RX positions may be fixed `(3, 1)` or mobile `(3, n_cir)`
 
 ### Usage:
 ```
-import quadriga_lib
-xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos )
-xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, include_los, window_size )
+xpr, pg = quadriga_lib.tools.calc_cross_polarization_ratio( powers, M, path_length, tx_pos, rx_pos, \
+    include_los, window_size )
 ```
 
-### Arguments:
-- `list of np.ndarray **powers**` (input)
-  Path powers in Watts. List of length `n_cir`, each element is a 1D array of length `n_path`.
+### Inputs:
+- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
+  array of length `n_path`
+- **`M`** — Polarization transfer matrices with interleaved real/imag parts per CIR; list of length
+  `n_cir`, each element a 2D array of shape `(8, n_path)`
+- **`path_length`** — Absolute TX-to-RX path lengths per CIR; list of length `n_cir`, each element
+  a 1D array of length `n_path`
+- **`tx_pos`** — Transmitter position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
+- **`rx_pos`** — Receiver position [x; y; z]; `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
+- **`include_los`** — If True, includes LOS and near-LOS paths in the XPR calculation; default: False
+- **`window_size`** — LOS exclusion window; paths within `dTR + window_size` are excluded when
+  `include_los = False`; default: 0.01
 
-- `list of np.ndarray **M**` (input)
-  Polarization transfer matrices. List of length `n_cir`, each element is a 2D array of size `[8, n_path]`.
-
-- `list of np.ndarray **path_length**` (input)
-  Absolute path length from TX to RX in meters. List of length `n_cir`, each element is a 1D array of length `n_path`.
-
-- `np.ndarray **tx_pos**` (input)
-  Transmitter position. Size `[3, 1]` (fixed) or `[3, n_cir]` (mobile).
-
-- `np.ndarray **rx_pos**` (input)
-  Receiver position. Size `[3, 1]` (fixed) or `[3, n_cir]` (mobile).
-
-- `bool **include_los** = False` (input)
-  If `True`, include LOS paths in the XPR calculation.
-
-- `float **window_size** = 0.01` (input)
-  LOS window size in meters.
-
-### Returns:
-- `np.ndarray **xpr**` (output)
-  Cross-polarization ratio, linear scale. Size `[n_cir, 6]`.
-  Columns: 0=aggregate linear, 1=V-XPR, 2=H-XPR, 3=aggregate circular, 4=LHCP, 5=RHCP.
-
-- `np.ndarray **pg**` (output)
-  Total path gain over all paths. 1D array of length `[n_cir]`.
+### Outputs:
+- **`xpr`** — XPR on linear scale; `(n_cir, 6)`; columns (0-based):
+   | Col | Description                                                     |
+   | :-: | --------------------------------------------------------------- |
+   | 0   | Aggregate linear XPR (total V+H co-pol / total V+H cross-pol)   |
+   | 1   | V-XPR: sum(abs(M_vv)^2) / sum(abs(M_hv)^2)                      |
+   | 2   | H-XPR: sum(abs(M_hh)^2) / sum(abs(M_vh)^2)                      |
+   | 3   | Aggregate circular XPR (total L+R co-pol / total L+R cross-pol) |
+   | 4   | LHCP XPR: sum(abs(M_LL)^2) / sum(abs(M_RL)^2)                   |
+   | 5   | RHCP XPR: sum(abs(M_RR)^2) / sum(abs(M_LR)^2)                   |
+- **`pg`** — Total path gain summed over all paths (including LOS) as
+  `0.5 · sum(powers · (abs(M_vv)^2 + abs(M_hv)^2 + abs(M_vh)^2 + abs(M_hh)^2))`; `(n_cir,)`
 
 ---
 ## calc_delay_spread
-Calculate the RMS delay spread in [s]
+Calculates RMS delay spread from per-CIR delays and linear-scale powers
 
-### Description:
-- Computes the root-mean-square (RMS) delay spread from a given set of delays and corresponding
-  linear-scale powers for each channel impulse response (CIR).
-- An optional power threshold in [dB] relative to the strongest path can be applied. Paths with
-  power below `p_max(dB) - threshold` are excluded from the calculation.
-- An optional granularity parameter in [s] groups paths in the delay domain. Powers of paths
-  falling into the same delay bin are summed before computing the delay spread.
-- Optionally returns the mean delay for each CIR.
+- Computes RMS delay spread from a set of delays and corresponding linear-scale powers per CIR
+- Inputs are lists of 1D arrays so each CIR can have a different number of paths
+- Paths with power below `p_max / 10^(0.1 · threshold)` are excluded; the default threshold of
+  100 dB effectively includes all paths
+- When `granularity > 0`, paths falling into the same delay bin of width `granularity` have their
+  powers summed before the spread is computed
 
 ### Usage:
 ```
-import quadriga_lib
-ds, mean_delay = quadriga_lib.tools.calc_delay_spread(delays, powers, threshold=100.0, granularity=0.0)
+ds, mean_delay = quadriga_lib.tools.calc_delay_spread( delays, powers, threshold, granularity )
 ```
 
-### Arguments:
-- `list of np.ndarray **delays**` (input)
-  Delays in [s]. A list of length `n_cir`, where each element is a 1D numpy array of path delays.
+### Inputs:
+- **`delays`** — Delays per CIR; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
+  array of length `n_path`
+- **`threshold`** — Power threshold in [dB] relative to the strongest path; paths below threshold
+  are excluded; default: 100.0
+- **`granularity`** — Bin width in [s] for grouping paths in the delay domain; default: 0.0 (no grouping)
 
-- `list of np.ndarray **powers**` (input)
-  Path powers on a linear scale [W]. Same structure as `delays`.
-
-- `float **threshold** = 100.0` (input)
-  Power threshold in [dB] relative to the strongest path. Default: 100 dB.
-
-- `float **granularity** = 0.0` (input)
-  Window size in [s] for grouping paths in the delay domain. Default: 0 (no grouping).
-
-### Returns:
-- `np.ndarray **ds**` (output)
-  RMS delay spread in [s] for each CIR. Shape `(n_cir,)`.
-
-- `np.ndarray **mean_delay**` (output)
-  Mean delay in [s] for each CIR. Shape `(n_cir,)`.
-
-### Example:
-```
-import numpy as np
-import quadriga_lib
-
-delays = [np.array([0.0, 1e-6, 2e-6])]
-powers = [np.array([1.0, 0.5, 0.25])]
-ds, mean_delay = quadriga_lib.calc_delay_spread(delays, powers)
-```
+### Outputs:
+- **`ds`** — RMS delay spread per CIR; `(n_cir,)`
+- **`mean_delay`** — Mean delay per CIR; `(n_cir,)`
 
 ---
 ## calc_rician_k_factor
 Calculate the Rician K-Factor from channel impulse response data
 
-### Description:
-- The Rician K-Factor (KF) is defined as the ratio of signal power in the dominant line-of-sight
-  (LOS) path to the power in the scattered (non-line-of-sight, NLOS) paths.
-- The LOS path is identified by matching the absolute path length with the direct distance between
-  TX and RX positions (`dTR`).
-- All paths arriving within `dTR + window_size` are considered LOS and their power is summed.
-- Paths arriving after `dTR + window_size` are considered NLOS and their power is summed.
-- If the total NLOS power is zero, the K-Factor is set to infinity.
-- If the total LOS power is zero, the K-Factor is set to zero.
-- The transmitter and receiver positions can be fixed (shape `(3,)` or `(3, 1)`) or mobile
-  (shape `(3, n_cir)`). Fixed positions are reused for all channel snapshots.
-- Output `pg` returns the total path gain (sum of all path powers) for each snapshot.
+- Computes the Rician K-Factor (KF): ratio of LOS power to NLOS power per CIR
+- Inputs are lists of 1D arrays so each CIR can have a different number of paths
+- LOS paths are those with length ≤ `dTR + window_size`, where `dTR` is the direct TX-RX distance;
+  remaining paths are NLOS
+- If total NLOS power is zero, KF is set to infinity; if total LOS power is zero, KF is set to 0
+- TX/RX positions may be fixed `(3,)` / `(3, 1)` (reused for all CIRs) or mobile `(3, n_cir)`
 
 ### Usage:
 ```
-import quadriga_lib
-kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size=0.01 )
+kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, rx_pos, window_size )
 ```
 
-### Arguments:
-- `list of ndarray **powers**` (input)
-  Path powers in Watts [W]. List of length `n_cir`, where each element is a 1D numpy array of
-  length `n_path`.
+### Inputs:
+- **`powers`** — Path powers on linear scale per CIR; list of length `n_cir`, each element a 1D
+  array of length `n_path`
+- **`path_length`** — Absolute TX-to-RX path lengths per CIR; list of length `n_cir`, each element
+  a 1D array of length `n_path` matching `powers`
+- **`tx_pos`** — Transmitter position [x; y; z]; `(3,)` or `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
+- **`rx_pos`** — Receiver position [x; y; z]; `(3,)` or `(3, 1)` (fixed) or `(3, n_cir)` (mobile)
+- **`window_size`** — LOS window; paths with length ≤ `dTR + window_size` are treated as LOS;
+  default: 0.01
 
-- `list of ndarray **path_length**` (input)
-  Absolute path lengths from TX to RX phase center in meters. List of length `n_cir`, where each
-  element is a 1D numpy array of length `n_path` matching the corresponding entry in `powers`.
+### Outputs:
+- **`kf`** — Rician K-Factor on linear scale; `(n_cir,)`
+- **`pg`** — Total path gain (sum of all path powers) per CIR; `(n_cir,)`
 
-- `ndarray **tx_pos**` (input)
-  Transmitter position in Cartesian coordinates. Shape `(3,)` or `(3, 1)` for fixed TX, or
-  `(3, n_cir)` for mobile TX.
+---
 
-- `ndarray **rx_pos**` (input)
-  Receiver position in Cartesian coordinates. Shape `(3,)` or `(3, 1)` for fixed RX, or
-  `(3, n_cir)` for mobile RX.
-
-- `float **window_size** = 0.01` (input)
-  LOS window size in meters. Paths with length ≤ `dTR + window_size` are considered LOS.
-
-### Returns:
-- `ndarray **kf**` (output)
-  Rician K-Factor on linear scale. Shape `(n_cir,)`.
-
-- `ndarray **pg**` (output)
-  Total path gain (sum of path powers). Shape `(n_cir,)`.
+# Miscellaneous / Tools
 
 ---
 ## cart2geo
