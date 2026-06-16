@@ -794,7 +794,9 @@ void quadriga_lib::ray_mesh_interact(
     arma::Col<dtype> *thicknessN = nullptr,
     arma::Col<dtype> *edge_lengthN = nullptr,
     arma::Mat<dtype> *normal_vecN = nullptr,
-    arma::s32_vec *out_typeN = nullptr);
+    arma::s32_vec *out_typeN = nullptr,
+    arma::Mat<dtype> *path_dirN = nullptr,
+    arma::u32_vec *ray_indN = nullptr);
 ```
 
 ## Inputs:
@@ -803,8 +805,10 @@ void quadriga_lib::ray_mesh_interact(
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
-- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`. 0 = face has no material (air). NULL → all faces treated as air.
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`. NULL → air defaults used.
+- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`.
+  0 = face has no material (air). NULL → all faces treated as air.
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]);
+  each value has length `n_mtl`. NULL → air defaults used.
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
@@ -813,7 +817,8 @@ void quadriga_lib::ray_mesh_interact(
 ## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
+- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM
+  polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
 - **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
   includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL);
   `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including
@@ -842,6 +847,10 @@ void quadriga_lib::ray_mesh_interact(
    |  13   | Edge hit, outside→inside                            |
    |  14   | Edge hit, inside→outside                            |
    |  15   | Edge hit, inside→outside, total reflection          |
+- **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4; `[n_rayN, 3]`.
+  For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
+  (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
+- **`ray_indN`** — 0-based input ray index for each output ray (inverse of the internal compaction map; order-preserving); `[n_rayN]`
 
 ## See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
@@ -878,7 +887,9 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      arma::Col<dtype> *thicknessN,
                                      arma::Col<dtype> *edge_lengthN,
                                      arma::Mat<dtype> *normal_vecN,
-                                     arma::s32_vec *out_typeN)
+                                     arma::s32_vec *out_typeN,
+                                     arma::Mat<dtype> *path_dirN,
+                                     arma::u32_vec *ray_indN)
 {
 
     // Internal documentation: out_typeN mapping logic
@@ -1069,6 +1080,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     if (out_typeN != nullptr && out_typeN->n_elem != n_rayN)
         out_typeN->set_size(n_rayN);
 
+    if (path_dirN != nullptr && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
+        path_dirN->set_size(n_rayN, 3);
+
+    if (ray_indN != nullptr && ray_indN->n_elem != n_rayN)
+        ray_indN->set_size(n_rayN);
+
     // Get output pointers
     dtype *p_origN = (origN == nullptr) ? nullptr : origN->memptr();
     dtype *p_destN = (destN == nullptr) ? nullptr : destN->memptr();
@@ -1082,6 +1099,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     dtype *p_edge_lengthN = (edge_lengthN == nullptr) ? nullptr : edge_lengthN->memptr();
     dtype *p_normal_vecN = (normal_vecN == nullptr) ? nullptr : normal_vecN->memptr();
     int *p_out_typeN = (out_typeN == nullptr) ? nullptr : out_typeN->memptr();
+    dtype *p_path_dirN = (path_dirN == nullptr) ? nullptr : path_dirN->memptr();
+    unsigned *p_ray_indN = (ray_indN == nullptr) ? nullptr : ray_indN->memptr();
 
     // Only calculate ray tube if it is required in the output
     if (use_ray_tube && p_trivecN == nullptr && p_tridirN == nullptr)
@@ -1406,6 +1425,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         if (i_rayN >= n_rayN)                      // Just to be sure to avoid any segfaults
             throw std::invalid_argument("Something went wrong. This should never be reached!");
 
+        // Write ray_indN (inverse of the compaction map, 0-based input ray index)
+        if (p_ray_indN != nullptr)
+            p_ray_indN[i_rayN] = (unsigned)iRx;
+
         // Write origN, add a small offset to prevent it from getting stuck inside the mesh element
         if (p_origN != nullptr)
         {
@@ -1422,6 +1445,17 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             p_destN[i_rayN] = dtype(Fx + FD_length * FDx);
             p_destN[i_rayN + n_rayN] = dtype(Fy + FD_length * FDy);
             p_destN[i_rayN + 2 * n_rayN] = dtype(Fz + FD_length * FDz);
+        }
+
+        // Write path_dirN (refraction-correct direction: mirror for types 0/3, Snell for types 1/2/4).
+        if (p_path_dirN != nullptr)
+        {
+            double PDx = FDx, PDy = FDy, PDz = FDz;
+            if (geometry_type == 1)
+                qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
+            p_path_dirN[i_rayN] = (dtype)PDx;
+            p_path_dirN[i_rayN + n_rayN] = (dtype)PDy;
+            p_path_dirN[i_rayN + 2 * n_rayN] = (dtype)PDz;
         }
 
         if (p_xprmatN || p_gainN)
@@ -1521,7 +1555,8 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, float center
                                               arma::Mat<float> *origN, arma::Mat<float> *destN, arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
                                               arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Col<float> *orig_lengthN,
                                               arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
-                                              arma::Mat<float> *normal_vecN, arma::s32_vec *out_typeN);
+                                              arma::Mat<float> *normal_vecN, arma::s32_vec *out_typeN,
+                                              arma::Mat<float> *path_dirN, arma::u32_vec *ray_indN);
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, double center_frequency,
                                               const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
@@ -1532,7 +1567,8 @@ template void quadriga_lib::ray_mesh_interact(int interaction_type, double cente
                                               arma::Mat<double> *origN, arma::Mat<double> *destN, arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
-                                              arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN);
+                                              arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN,
+                                              arma::Mat<double> *path_dirN, arma::u32_vec *ray_indN);
 
 /*!MD
 # ray_state_update

@@ -1276,3 +1276,164 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss")
     CHECK(full < 0.7 * refl_only); // mu attenuates the path; this factor is exactly 1 if the
                                    // loss feed reverts to eps (which is real here)
 }
+
+TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
+
+    // 45° incidence on the West face
+    arma::mat orig = {{-1.5, 0.0, 0.0}};
+    arma::mat dest = {{0.0, 0.0, 1.5}};
+
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat mtl_prop = {{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; // eps_r = 1.5
+    mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+
+    arma::mat origN, destN, path_dirN;
+    arma::u32_vec ray_indN;
+
+    auto run = [&](int type)
+    {
+        quadriga_lib::ray_mesh_interact(
+            type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+            (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+            &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr,
+            (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+            (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+            (arma::mat *)nullptr, (arma::s32_vec *)nullptr,
+            &path_dirN, &ray_indN);
+    };
+
+    // Manual unit-norm helpers (avoid arma::norm / arma::normalise, which pull in BLAS)
+    auto vnorm = [](const arma::rowvec &v) { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
+    auto dir = [&](const arma::mat &m) -> arma::rowvec { arma::rowvec v = m.row(0); return v / vnorm(v); };
+
+    arma::rowvec incoming = dir(dest - orig); // origin->FBS direction (== origin->dest here)
+
+    // Reflection (type 0): mirror direction == normalized (destN - origN), unit norm
+    run(0);
+    arma::rowvec pd_refl = path_dirN.row(0);
+    CHECK(arma::approx_equal(pd_refl, dir(destN - origN), "absdiff", 1e-6));
+    CHECK(std::abs(vnorm(pd_refl) - 1.0) < 1e-6);
+
+    // Refraction (type 2): Snell direction == normalized (destN - origN), unit norm
+    run(2);
+    arma::rowvec pd_refr = path_dirN.row(0);
+    CHECK(arma::approx_equal(pd_refr, dir(destN - origN), "absdiff", 1e-6));
+    CHECK(std::abs(vnorm(pd_refr) - 1.0) < 1e-6);
+
+    // Undeviated transmission (type 1): path_dirN is the SNELL direction (same as type 2),
+    // NOT the incoming direction. The geometric path (destN - origN) stays along the incoming ray.
+    run(1);
+    arma::rowvec pd_trans = path_dirN.row(0);
+    CHECK(std::abs(vnorm(pd_trans) - 1.0) < 1e-6);
+    CHECK(arma::approx_equal(pd_trans, pd_refr, "absdiff", 1e-6));            // == Snell direction
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-6)); // geometry undeviated
+    CHECK(vnorm(pd_trans - incoming) > 1e-2);                                // and differs from incoming
+
+    // Scalar reflection (type 3): mirror direction, identical to type 0
+    run(3);
+    arma::rowvec pd_srefl = path_dirN.row(0);
+    CHECK(arma::approx_equal(pd_srefl, dir(destN - origN), "absdiff", 1e-6));
+    CHECK(arma::approx_equal(pd_srefl, pd_refl, "absdiff", 1e-6));
+    CHECK(std::abs(vnorm(pd_srefl) - 1.0) < 1e-6);
+
+    // Scalar transmission (type 4): Snell direction, identical to type 2; geometry undeviated
+    run(4);
+    arma::rowvec pd_strans = path_dirN.row(0);
+    CHECK(std::abs(vnorm(pd_strans) - 1.0) < 1e-6);
+    CHECK(arma::approx_equal(pd_strans, pd_refr, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-6));
+}
+
+TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
+{
+    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
+                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
+                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
+                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
+                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
+                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
+                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
+                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
+                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
+                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
+
+    arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; // air (irrelevant to ray_indN)
+    mtl_prop = repmat(mtl_prop, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+
+    auto interact = [&](const arma::mat &orig, const arma::mat &dest,
+                        arma::u32_vec &fbs_ind, arma::u32_vec &ray_indN)
+    {
+        arma::mat fbs, sbs;
+        arma::u32_vec sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat origN, destN, path_dirN;
+        quadriga_lib::ray_mesh_interact(
+            1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+            (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+            &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr,
+            (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+            (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+            (arma::mat *)nullptr, (arma::s32_vec *)nullptr,
+            &path_dirN, &ray_indN);
+    };
+
+    SECTION("mixed hits and misses")
+    {
+        // Rays 0 and 2 hit the West face; ray 1 is offset in y and misses the cube.
+        arma::mat orig = {{-1.5, 0.0, 0.0}, {-1.5, 3.0, 0.0}, {-1.5, 0.5, 0.5}};
+        arma::mat dest = {{0.0, 0.0, 0.0}, {0.0, 3.0, 0.0}, {0.0, 0.5, 0.5}};
+
+        arma::u32_vec fbs_ind, ray_indN;
+        interact(orig, dest, fbs_ind, ray_indN);
+
+        // Round-trip oracle: ascending list of surviving (fbs_ind != 0) input indices, 0-based.
+        std::vector<unsigned> expected;
+        for (arma::uword i = 0; i < fbs_ind.n_elem; ++i)
+            if (fbs_ind(i) != 0)
+                expected.push_back((unsigned)i);
+
+        REQUIRE(expected.size() == 2); // ray 1 missed
+        REQUIRE(ray_indN.n_elem == expected.size());
+        for (size_t k = 0; k < expected.size(); ++k)
+            CHECK(ray_indN(k) == expected[k]); // inverse map, 0-based, order-preserving
+    }
+
+    SECTION("identity when all rays survive")
+    {
+        arma::mat orig = {{-1.5, 0.0, 0.0}, {-1.5, 0.5, 0.0}, {-1.5, -0.5, 0.0}};
+        arma::mat dest = {{0.0, 0.0, 0.0}, {0.0, 0.5, 0.0}, {0.0, -0.5, 0.0}};
+
+        arma::u32_vec fbs_ind, ray_indN;
+        interact(orig, dest, fbs_ind, ray_indN);
+
+        REQUIRE(fbs_ind.min() != 0); // all three survive
+        REQUIRE(ray_indN.n_elem == 3);
+        for (arma::uword k = 0; k < ray_indN.n_elem; ++k)
+            CHECK(ray_indN(k) == (unsigned)k);
+    }
+}
