@@ -85,7 +85,7 @@ inline quadriga_lib::arrayant<double> qd_mex_struct2arrayant(const mxArray *inpu
     if (qd_mex_has_field(input, "coupling_im") && !mxIsEmpty(qd_mex_get_field(input, "coupling_im")))
         ant.coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im"), copy);
     else
-        ant.coupling_im.zeros(n_elements, n_elements);
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
 
     if (qd_mex_has_field(input, "center_freq") && !mxIsEmpty(qd_mex_get_field(input, "center_freq")))
         ant.center_frequency = qd_mex_get_scalar<double>(qd_mex_get_field(input, "center_freq"), "center_freq", 299792458.0);
@@ -144,7 +144,7 @@ inline std::vector<quadriga_lib::arrayant<double>> qd_mex_struct2arrayant_multi(
         if (has_coupling_im && !mxIsEmpty(qd_mex_get_field(input, "coupling_im", n)))
             ant[n].coupling_im = qd_mex_get_Mat<double>(qd_mex_get_field(input, "coupling_im", n), copy);
         else
-            ant[n].coupling_im.zeros(n_elements, n_elements);
+            ant[n].coupling_im.zeros(ant[n].coupling_re.n_rows, ant[n].coupling_re.n_cols);
 
         if (has_name && !mxIsEmpty(qd_mex_get_field(input, "name", n)))
             ant[n].name = qd_mex_get_string(qd_mex_get_field(input, "name", n));

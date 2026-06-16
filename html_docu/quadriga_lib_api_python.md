@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "15.06.2026"
+date: "16.06.2026"
 lang: en-US
 ---
 
@@ -39,29 +39,29 @@ lang: en-US
 | [quantize_delays](#quantize_delays) | Channel functions | 1118 |
 | [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1180 |
 | [get_channels_planar](#get_channels_planar) | Channel generation functions | 1238 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1370 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1430 |
-| [acdf](#acdf) | Channel statistics | 1512 |
-| [calc_angular_spread](#calc_angular_spread) | Miscellaneous / Tools | 1547 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Miscellaneous / Tools | 1617 |
-| [calc_delay_spread](#calc_delay_spread) | Miscellaneous / Tools | 1669 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Miscellaneous / Tools | 1718 |
-| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1768 |
-| [components](#components) | Miscellaneous / Tools | 1796 |
-| [version](#version) | Miscellaneous / Tools | 1805 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1818 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1861 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1909 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1941 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1974 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 2024 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 2071 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2098 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2128 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2161 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2198 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2241 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2267 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1295 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1355 |
+| [acdf](#acdf) | Channel statistics | 1437 |
+| [calc_angular_spread](#calc_angular_spread) | Miscellaneous / Tools | 1472 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Miscellaneous / Tools | 1542 |
+| [calc_delay_spread](#calc_delay_spread) | Miscellaneous / Tools | 1594 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Miscellaneous / Tools | 1643 |
+| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1693 |
+| [components](#components) | Miscellaneous / Tools | 1721 |
+| [version](#version) | Miscellaneous / Tools | 1730 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1743 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1786 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1834 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1866 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1899 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1949 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1996 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 2023 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2053 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2086 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2123 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2166 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2192 |
 
 ---
 
@@ -1236,135 +1236,60 @@ coeff, delay = quadriga_lib.arrayant.get_channels_multifreq( ..., complex=True )
 
 ---
 ## get_channels_planar
-Calculate channel coefficients for planar waves
+Calculate MIMO channel coefficients for planar wave paths
 
-### Description:
-In this function, the wireless propagation channel between a transmitter and a receiver is calculated,
-based on a single transmit and receive position. Additionally, interaction points with the environment,
-which are derived from either Ray Tracing or Geometric Stochastic Models such as QuaDRiGa, are
-considered. The calculation is performed under the assumption of planar wave propagation. For accurate
-execution of this process, several pieces of input data are required:
-
-- The 3D Cartesian (local) coordinates of both the transmitter and the receiver.
-- The azimuth/elevation departure and arrval angles.
-- The polarization transfer matrix for each propagation path.
-- Antenna models for both the transmitter and the receiver.
-- The orientations of the antennas.
+- Computes complex channel coefficients and delays for all TX/RX port pairs across `n_path` propagation
+  paths under the planar wave assumption.
+- Interpolates antenna patterns for both arrays, accounting for element positions, orientation, and polarization.
+- LOS path detection is distance-based; the input angles are not used for LOS detection.
+- Polarization coupling is applied via the 8-row transfer matrix `M` (interleaved Re/Im for VV, VH, HV, HH).
+- If `center_freq == 0`, phase calculation is disabled and only delays are computed.
+- If `use_absolute_delays == False`, the straight-line TX-RX delay (LOS delay) is subtracted from all paths.
+- If `add_fake_los_path == True`, a zero-power LOS path is prepended when none is present, making the
+  output size `n_path + 1`.
+- `complex=True` returns one combined complex coefficient array `coeff`; `complex=False` (default) returns
+  separate real `coeff_re` and `coeff_im` via a zero-copy fast path.
 
 ### Usage:
 ```
-from quadriga_lib import arrayant
-
-coeff_re, coeff_im, delays, rx_Doppler = arrayant.get_channels_planar( ant_tx, ant_rx, \
+coeff_re, coeff_im, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ant_tx, ant_rx, \
     aod, eod, aoa, eoa, path_gain, path_length, M, tx_pos, tx_orientation, rx_pos, rx_orientation, \
     center_freq, use_absolute_delays, add_fake_los_path )
+
+coeff, delays, rx_Doppler = quadriga_lib.arrayant.get_channels_planar( ..., complex=True )
 ```
 
-### Input Arguments:
-- **`ant_tx`** (required)
-  Dictionary containing the transmit (TX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_tx, n_azimuth_tx, n_elements_tx)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_tx)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_tx)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_tx)`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_tx, n_ports_tx)`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_tx, n_ports_tx)`
+### Inputs:
+- **`ant_tx`** — Transmit arrayant dict; see [generate](#generate)
+- **`ant_rx`** — Receive arrayant dict; see [generate](#generate)
+- **`aod`** — Departure azimuth angles in rad; `(n_path,)`
+- **`eod`** — Departure elevation angles in rad; `(n_path,)`
+- **`aoa`** — Arrival azimuth angles in rad; `(n_path,)`
+- **`eoa`** — Arrival elevation angles in rad; `(n_path,)`
+- **`path_gain`** — Path gains in linear scale; `(n_path,)`
+- **`path_length`** — Total path lengths from TX to RX phase center; `(n_path,)`
+- **`M`** — Polarization transfer matrix, interleaved Re/Im; `(8, n_path)` (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH)
+- **`tx_pos`** — Transmitter position in Cartesian coordinates; `(3,)`
+- **`tx_orientation`** — Transmitter orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`rx_pos`** — Receiver position in Cartesian coordinates; `(3,)`
+- **`rx_orientation`** — Receiver orientation as Euler angles (bank, tilt, heading); `(3,)`
+- **`center_freq`** — Center frequency in Hz; set to `0` to skip phase computation; default: `0.0`
+- **`use_absolute_delays`** — If `True`, delays include the LOS component; default: `False`
+- **`add_fake_los_path`** — If `True`, prepends a zero-power LOS path when none is present; default: `False`
+- **`complex`** — If `True`, combine coefficients into a single complex array `coeff`; if `False`, return
+  separate `coeff_re` and `coeff_im`; default: `False`
 
-- **`ant_rx`** (required)
-  Dictionary containing the receive (RX) arrayant data with the following keys:
-  `e_theta_re`     | e-theta field component, real part                    | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_theta_im`     | e-theta field component, imaginary part               | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_phi_re`       | e-phi field component, real part                      | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `e_phi_im`       | e-phi field component, imaginary part                 | Shape: `(n_elevation_rx, n_azimuth_rx, n_elements_rx)`
-  `azimuth_grid`   | Azimuth angles in [rad], -pi to pi, sorted            | Shape: `(n_azimuth_rx)`
-  `elevation_grid` | Elevation angles in [rad], -pi/2 to pi/2, sorted      | Shape: `(n_elevation_rx)`
-  `element_pos`    | Antenna element (x,y,z) positions, optional           | Shape: `(3, n_elements_rx)`
-  `coupling_re`    | Coupling matrix, real part, optional                  | Shape: `(n_elements_rx, n_ports_rx)`
-  `coupling_im`    | Coupling matrix, imaginary part, optional             | Shape: `(n_elements_rx, n_ports_rx)`
+### Outputs:
+- **`coeff_re`** — Real part of channel coefficients (`complex=False`); `(n_ports_rx, n_ports_tx, n_path)`
+- **`coeff_im`** — Imaginary part of channel coefficients (`complex=False`); same shape as `coeff_re`
+- **`coeff`** — Complex channel coefficients (`complex=True`), replaces `coeff_re`/`coeff_im`; same shape
+- **`delays`** — Propagation delays in seconds; `(n_ports_rx, n_ports_tx, n_path)`
+- **`rx_Doppler`** — Doppler weights for moving RX; positive = toward path, negative = away; `(n_path,)`
 
-- **`aod`** (required)
-  Departure azimuth angles in [rad], Shape: `( n_path )`
-
-- **`eod`** (required)
-  Departure elevation angles in [rad], Shape: `( n_path )`
-
-- **`aoa`** (required)
-  Arrival azimuth angles in [rad], Shape: `( n_path )`
-
-- **`eoa`** (required)
-  Arrival elevation angles in [rad], Shape: `( n_path )`
-
-- **`path_gain`** (required)
-  Path gain (linear scale), Shape: `( n_path )`
-
-- **`path_length`** (required)
-  Total path length in meters, Shape: `( n_path )`
-
-- **`M`** (required)
-  Polarization transfer matrix, interleaved complex values (ReVV, ImVV, ReVH, ImVH, ReHV, ImHV, ReHH, ImHH),
-  Shape: `( 8, n_path )`
-
-- **`tx_pos`** (required)
-  Transmitter position in 3D Cartesian coordinates; Shape: `(3)`
-
-- **`tx_orientation`** (required)
-  3-element vector describing the orientation of the transmit antenna in Euler angles (bank, tilt, heading),
-  Shape: `(3,1)` or `(1,3)`
-
-- **`rx_pos`** (required)
-  Receiver position in 3D Cartesian coordinates, Shape: `(3)`
-
-- **`rx_orientation`** (required)]
-  3-element vector describing the orientation of the receive antenna in Euler angles,
-  Shape: `(3)`
-
-- **`center_freq`** (optional)
-  Center frequency in [Hz]; optional; If the value is not provided or set to 0, phase calculation
-  in coefficients is disabled, i.e. that path length has not influence on the results. This can be
-  used to calculate the antenna response for a specific angle and polarization. Scalar value
-
-- **`use_absolute_delays`** (optional)
-  If true, the LOS delay is included for all paths; Default is `false`, i.e. delays are normalized
-  to the LOS delay.
-
-- **`add_fake_los_path`** (optional)
-  If true, adds a zero-power LOS path as the first path in case where no LOS path was present.
-  Default: `false`
-
-### Derived inputs:
-`n_azimuth_tx`   | Number of azimuth angles in the TX antenna pattern
-  `n_elevation_tx` | Number of elevation angles in the TX antenna pattern
-  `n_elements_tx`  | Number of physical antenna elements in the TX array antenna
-  `n_ports_tx`     | Number of ports (after coupling) in the TX array antenna
-  `n_azimuth_rx`   | Number of azimuth angles in the RX antenna pattern
-  `n_elevation_rx` | Number of elevation angles in the RX antenna pattern
-  `n_elements_rx`  | Number of physical antenna elements in the RX array antenna
-  `n_ports_rx`     | Number of ports (after coupling) in the RX array antenna
-  `n_path`         | Number of propagation paths
-
-### Output Arguments:
-- **`coeff_re`**
-  Channel coefficients, real part, Shape: `( n_ports_tx, n_ports_rx, n_path )`
-
-- **`coeff_im`**
-  Channel coefficients, imaginary part, Shape: `( n_ports_tx, n_ports_rx, n_path )`
-
-- **`delays`**
-  Propagation delay in seconds, Shape: `( n_ports_tx, n_ports_rx, n_path )`
-
-- **`rx_Doppler`**
-  Doppler weights for moving RX, Shape: `( 1, n_path )`
-
-### Caveat:
-- Input data is directly accessed from Python memory, without copying if it is provided in
-  **double** precision and is in F-contiguous (column-major) order
-- Other formats (e.g. single precision inputs or C-contiguous (row-major) order) will be converted
-  to double automatically, causing additional computation steps.
-- To improve performance of repeated computations (e.g. in loops), consider preparing the data
-  accordingly to avoid unecessary computations.
+### See also:
+- [get_channels_spherical](#get_channels_spherical) (spherical wave variant)
+- [get_channels_ieee_indoor](#get_channels_ieee_indoor) (IEEE compliant channels using `get_channels_planar` internally)
+- [generate](#generate) (antenna array generator)
 
 ---
 ## get_channels_spherical

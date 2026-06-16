@@ -40,6 +40,26 @@ assertElementsAlmostEqual( delay(:,:,2), [e0,e2;e1,e3]/C, 'absolute', 1.2e-10 );
 Doppler = cos(aoa(2)) * cos(eoa(2));
 assertElementsAlmostEqual( rx_Doppler, [-1, Doppler], 'absolute', 1e-13 );
 
+% Rectangular coupling with omitted imaginary part (regression: the default
+% coupling_im must match coupling_re's shape, not n_elements x n_elements).
+% Omitting coupling_im must behave identically to a matching-shape zero block.
+ant_a = ant;
+ant_a.coupling_re = [1; 1];        % 2 elements -> 1 port
+ant_a = rmfield(ant_a, 'coupling_im');
+
+ant_b = ant_a;
+ant_b.coupling_im = [0; 0];        % explicit matching-shape zero imaginary part
+
+[cra, cia, dla] = quadriga_lib.get_channels_planar( ant_a, ant_a, ...
+    aod, eod, aoa, eoa, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 0.0, 1);
+[crb, cib, dlb] = quadriga_lib.get_channels_planar( ant_b, ant_b, ...
+    aod, eod, aoa, eoa, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 0.0, 1);
+
+assertEqual( size(cra), [1, 1, 2] );
+assertElementsAlmostEqual( cra, crb, 'absolute', 1e-14 );
+assertElementsAlmostEqual( cia, cib, 'absolute', 1e-14 );
+assertElementsAlmostEqual( dla, dlb, 'absolute', 1e-14 );
+
 % Exception handling
 [~] = quadriga_lib.get_channels_planar( ant, ant, aod, eod, aoa, eoa, path_gain, path_length, M, [0;0;1], [0,0,0], [20;0;1], [0,0,0], 2997924580.0, 1);
 
