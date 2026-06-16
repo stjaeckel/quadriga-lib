@@ -150,6 +150,15 @@ static inline void set_mu(std::unordered_map<std::string, std::vector<dtype>> &m
     mtl_prop["h"] = std::vector<dtype>(nm, h);
 }
 
+// Append a constant transmission-factor column (tf, tfB) to an existing material map.
+template <typename dtype>
+static inline void set_tf(std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, dtype tf, dtype tfB = (dtype)0)
+{
+    size_t nm = mtl_prop.at("a").size();
+    mtl_prop["tf"] = std::vector<dtype>(nm, tf);
+    mtl_prop["tfB"] = std::vector<dtype>(nm, tfB);
+}
+
 // Convert a per-face material matrix [n_face, 9] with columns
 // {a,b,c,d,att,attB,alpha,alphaB,fRef} into the new (mtl_ind, mtl_prop-map) pair.
 // Identical rows are deduplicated, so mtl_ind/mtl_prop match what obj_file_read would emit.
@@ -613,7 +622,7 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     quadriga_lib::ray_mesh_interact(1, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
                                     &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    U = {1.0};
+    U = {(float)calc_transition_gain(1, 45.0, 0.0, 0.0, eta1, eta2)};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     U = {0.5f * xprmatN(6) * xprmatN(6) + 0.5f * xprmatN(0) * xprmatN(0)}; // Gain without FSPL
@@ -1322,8 +1331,10 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
     };
 
     // Manual unit-norm helpers (avoid arma::norm / arma::normalise, which pull in BLAS)
-    auto vnorm = [](const arma::rowvec &v) { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
-    auto dir = [&](const arma::mat &m) -> arma::rowvec { arma::rowvec v = m.row(0); return v / vnorm(v); };
+    auto vnorm = [](const arma::rowvec &v)
+    { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
+    auto dir = [&](const arma::mat &m) -> arma::rowvec
+    { arma::rowvec v = m.row(0); return v / vnorm(v); };
 
     arma::rowvec incoming = dir(dest - orig); // origin->FBS direction (== origin->dest here)
 
@@ -1346,7 +1357,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
     CHECK(std::abs(vnorm(pd_trans) - 1.0) < 1e-6);
     CHECK(arma::approx_equal(pd_trans, pd_refr, "absdiff", 1e-6));            // == Snell direction
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-6)); // geometry undeviated
-    CHECK(vnorm(pd_trans - incoming) > 1e-2);                                // and differs from incoming
+    CHECK(vnorm(pd_trans - incoming) > 1e-2);                                 // and differs from incoming
 
     // Scalar reflection (type 3): mirror direction, identical to type 0
     run(3);
@@ -1436,4 +1447,294 @@ TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
         for (arma::uword k = 0; k < ray_indN.n_elem; ++k)
             CHECK(ray_indN(k) == (unsigned)k);
     }
+}
+
+TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invariant, interface gain")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+    arma::mat orig = {{0.5, 0.1, 0.0}}; // inside, 45 deg on the East face (dense -> air)
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat origN, destN, xprmatN;
+    arma::vec gainN, U;
+
+    auto run = [&](int type)
+    {
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr);
+    };
+    auto vnorm = [](const arma::rowvec &v)
+    { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
+    auto dir = [&](const arma::mat &m) -> arma::rowvec
+    { arma::rowvec v = m.row(0); return v / vnorm(v); };
+    auto coeff_energy = [&]()
+    { return xprmatN(0) * xprmatN(0) + xprmatN(1) * xprmatN(1); };
+    arma::rowvec incoming = dir(fbs - orig);
+
+    // Scalar pressure coefficients: R == EM TE coeff (z = sqrt(eps), mu = 1), T = 1 + R
+    double cos_th = std::cos(45.0 * deg2rad);
+    double cos_th2 = std::sqrt(1.0 - 1.5 * cos_th * cos_th); // 0.5
+    double sqrt_eps = std::sqrt(1.5);
+    double R = (sqrt_eps * cos_th - cos_th2) / (sqrt_eps * cos_th + cos_th2);
+    double Tt = 1.0 + R;
+
+    arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+
+    // Type 3 - scalar reflection: gain = |R|^2, single scalar coefficient, off-diagonal zero
+    run(3);
+    U = {R * R};
+    CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
+    CHECK(std::abs(gainN(0) - coeff_energy()) < 1e-6);
+    CHECK(std::abs(xprmatN(2)) + std::abs(xprmatN(3)) + std::abs(xprmatN(4)) +
+              std::abs(xprmatN(5)) + std::abs(xprmatN(6)) + std::abs(xprmatN(7)) <
+          1e-9);
+
+    // Type 4 - scalar transmission (undeviated): gain = 1 - |R|^2
+    run(4);
+    U = {1.0 - R * R};
+    CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
+    CHECK(std::abs(gainN(0) - coeff_energy()) < 1e-6);
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
+
+    // Type 5 (refraction) must carry the interface penetration loss, same factor as type 4 (line-430 fix).
+    // interface_gain comes from the ENTERED medium, so this has to enter the lossy cube from air.
+    arma::mat orig_in = {{-1.5, 0.0, 0.0}}, dest_in = {{0.0, 0.0, 1.5}}; // 45 deg into the West face
+    arma::mat fbs_in, sbs_in;
+    arma::u32_vec fbs_in_ind, sbs_in_ind;
+    quadriga_lib::ray_triangle_intersect(&orig_in, &dest_in, &cube, &fbs_in, &sbs_in, NULL, &fbs_in_ind, &sbs_in_ind);
+
+    auto gain_of = [&](int type, double att)
+    {
+        arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, att, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig_in, &dest_in, &fbs_in, &sbs_in, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_in_ind, &sbs_in_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr);
+        return gainN(0);
+    };
+    double t4_ratio = gain_of(4, 3.0) / gain_of(4, 0.0);
+    double t5_ratio = gain_of(5, 3.0) / gain_of(5, 0.0);
+    CHECK(std::abs(t4_ratio - t5_ratio) < 1e-6); // type 5 gets the same interface gain as type 4
+    CHECK(t5_ratio < 0.99);                      // and it is actually applied (att attenuates)
+
+    // Genuine spine TIR (eps = 2.5 at 45 deg): scalar refraction (5) collapses to undeviated, gain 0 (tf=0)
+    mtl_prop = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+    run(5);
+    CHECK(std::abs(gainN(0)) < 1e-6);
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
+}
+
+TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmission energy")
+{
+    arma::mat cube = make_cube();
+    arma::mat orig = {{0.5, 0.1, 0.0}};
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat origN, destN, xprmatN;
+    arma::vec gainN;
+
+    double deg2rad = arma::datum::pi / 180.0;
+    double cos_th = std::cos(45.0 * deg2rad);
+    double cos_th2 = std::sqrt(1.0 - 1.5 * cos_th * cos_th);
+    double se = std::sqrt(1.5);
+    double R_te = (se * cos_th - cos_th2) / (se * cos_th + cos_th2);
+    double R_tm = (cos_th - se * cos_th2) / (cos_th + se * cos_th2);
+    double reflectance = 0.5 * (R_te * R_te + R_tm * R_tm);
+
+    auto build = [&](double tf)
+    { mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map); set_tf<double>(mtl_map, tf, 0.0); };
+    auto run = [&](int type)
+    {
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr);
+        return gainN(0);
+    };
+
+    // tf = 0: baseline, ports complementary
+    build(0.0);
+    double r0 = run(0), t0 = run(1);
+    CHECK(std::abs(r0 - reflectance) < 1e-6);
+    CHECK(std::abs(t0 - (1.0 - reflectance)) < 1e-6);
+    CHECK(std::abs(r0 + t0 - 1.0) < 1e-6);
+
+    // tf = +0.5: reflected energy leaks forward; still sums to 1
+    build(0.5);
+    double rP = run(0), tP = run(1);
+    CHECK(std::abs(rP - reflectance * 0.5) < 1e-6);
+    CHECK(std::abs(tP - (1.0 - reflectance * 0.5)) < 1e-6);
+    CHECK(std::abs(rP + tP - 1.0) < 1e-6);
+    CHECK(rP < r0);
+    CHECK(tP > t0);
+
+    // tf = -0.5: forces extra reflection; still sums to 1
+    build(-0.5);
+    double R_eff_m = reflectance + (1.0 - reflectance) * 0.5;
+    double rM = run(0), tM = run(1);
+    CHECK(std::abs(rM - R_eff_m) < 1e-6);
+    CHECK(std::abs(tM - (1.0 - R_eff_m)) < 1e-6);
+    CHECK(rM > r0);
+
+    // EM reflection carries tf into its coefficients: gain == 1/2 sum|xprmat|^2
+    build(0.5);
+    run(0);
+    double ce = 0.0;
+    for (int k = 0; k < 8; ++k)
+        ce += xprmatN(k) * xprmatN(k);
+    CHECK(std::abs(gainN(0) - 0.5 * ce) < 1e-6);
+}
+
+TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-through")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+    arma::mat orig = {{0.5, 0.1, 0.0}}; // spine 45 deg on East face
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
+    arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat origN, destN, xprmatN, trivecN, tridirN;
+    arma::vec gainN;
+
+    auto vnorm = [](const arma::rowvec &v)
+    { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
+    auto dir = [&](const arma::mat &m) -> arma::rowvec
+    { arma::rowvec v = m.row(0); return v / vnorm(v); };
+    arma::rowvec incoming = dir(fbs - orig); // (0.707, 0.707, 0)
+
+    auto run = [&](arma::mat &tridir)
+    {
+        quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                        &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    };
+
+    // Baseline: all edges parallel to the spine (45 deg) -> clean refraction, spine bends
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+    arma::mat tridir_clean = arma::mat{{45.0, 0.0, 45.0, 0.0, 45.0, 0.0}} * deg2rad;
+    run(tridir_clean);
+    CHECK(gainN(0) > 0.1);
+    CHECK(vnorm(dir(destN - origN) - incoming) > 1e-2);
+
+    // Straddle: one edge at 60 deg (eps=1.5 critical ~54.7 deg) -> whole tube passes through undeviated
+    arma::mat tridir_straddle = arma::mat{{60.0, 0.0, 45.0, 0.0, 45.0, 0.0}} * deg2rad;
+    run(tridir_straddle);
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5)); // undeviated
+    CHECK(std::abs(gainN(0)) < 1e-6);                                         // tf=0 -> forced TIR, no power
+
+    // Same straddle with tf = 0.5: still undeviated, now carries 1 - R_eff = 0.5
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+    set_tf<double>(mtl_map, 0.5, 0.0);
+    run(tridir_straddle);
+    CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
+    CHECK(std::abs(gainN(0) - 0.5) < 1e-6);
+}
+
+TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR")
+{
+    arma::mat cube = make_cube();
+    arma::mat orig = {{0.5, 0.1, 0.0}};
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat mtl_prop = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1); // TIR at 45 deg
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+
+    arma::mat origN, destN, path_dirN;
+    arma::u32_vec ray_indN;
+    auto run = [&](int type)
+    {
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::s32_vec *)nullptr, &path_dirN, &ray_indN);
+    };
+    auto vnorm = [](const arma::rowvec &v)
+    { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
+    auto dir = [&](const arma::mat &m) -> arma::rowvec
+    { arma::rowvec v = m.row(0); return v / vnorm(v); };
+    arma::rowvec incoming = dir(fbs - orig);
+
+    // Reflection (0): mirror, unaffected by TIR
+    run(0);
+    CHECK(arma::approx_equal(path_dirN.row(0), dir(destN - origN), "absdiff", 1e-6));
+    arma::rowvec mirror = path_dirN.row(0);
+    CHECK(vnorm(mirror - incoming) > 1e-2);
+
+    // Transmission/refraction (1, 2, 4, 5) under spine TIR: path_dirN == undeviated incoming
+    for (int type : {1, 2, 4, 5})
+    {
+        run(type);
+        CHECK(arma::approx_equal(path_dirN.row(0), incoming, "absdiff", 1e-6));
+        CHECK(std::abs(vnorm(path_dirN.row(0)) - 1.0) < 1e-6);
+    }
+
+    // Scalar reflection (3): still mirror
+    run(3);
+    CHECK(arma::approx_equal(path_dirN.row(0), mirror, "absdiff", 1e-6));
+}
+
+TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on pass-through")
+{
+    arma::mat cube = make_cube();
+    double deg2rad = arma::datum::pi / 180.0;
+    arma::mat orig = {{0.5, 0.1, 0.0}};
+    arma::mat dest = {{2.0, 1.6, 0.0}};
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+    arma::mat trivec = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
+    arma::mat tridir = arma::mat{{45.0, 0.0, 45.0, 0.0, 45.0, 0.0}} * deg2rad; // spherical az/el
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    arma::mat origN, destN, xprmatN, trivecN, tridirN;
+    arma::vec gainN;
+
+    auto run = [&](int type)
+    {
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+                                        &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                        &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    };
+
+    // Undeviated transmission (type 1): vertex az/el unchanged (== input), NOT reset to (0,0)
+    arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+    run(1);
+    CHECK(arma::approx_equal(tridirN, tridir, "absdiff", 1e-6));
+
+    // Refraction under genuine spine TIR (eps = 2.5): also passes through with input az/el
+    mtl_prop = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
+    run(2);
+    CHECK(arma::approx_equal(tridirN, tridir, "absdiff", 1e-6));
 }

@@ -273,6 +273,21 @@ namespace
             return (tf_val >= 0.0) ? R0 * (1.0 - tf_val) : R0 + (1.0 - R0) * (-tf_val);
         }
 
+        // Combined transmission-factor reflection for a two-medium interface (symmetric in the two media).
+        // tf+ = max(tf,0) leaks reflection energy into transmission; tf- = max(-tf,0) forces reflection.
+        // Reduces to apply_tf at an air boundary (other side tf = 0); stays in [0,1]; tf = -1 on either
+        // face gives R_eff = 1.
+        double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0) const
+        {
+            double tfA = tf(fGHz), tfB = other.tf(fGHz);
+            double tfAp = (tfA > 0.0) ? tfA : 0.0, tfAm = (tfA < 0.0) ? -tfA : 0.0;
+            double tfBp = (tfB > 0.0) ? tfB : 0.0, tfBm = (tfB < 0.0) ? -tfB : 0.0;
+            R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0);
+            double R_leak = R0 * (1.0 - tfAp) * (1.0 - tfBp);
+            double tfm = (tfAm > tfBm) ? tfAm : tfBm;
+            return R_leak + (1.0 - R_leak) * tfm;
+        }
+
         // Check whether two materials are the same
         bool same_as(const Material &other) const
         {
@@ -301,12 +316,12 @@ namespace
         }
 
         // Medium-medium interaction
-        // 'this' is the medium the ray travels in (incidence side, medium 1); 'other' is the medium it enters into / reflects off
-        // (medium 2). Computes the ITU-R P.2040-1 interface coefficients and returns the interface power gain.
+        // 'this' is the medium the ray travels in (incidence side, medium 1); 'other' is the medium it enters into / reflects off (medium 2).
+        // Computes the ITU-R P.2040-1 interface coefficients and returns the interface power gain.
         // For transmission/refraction (1/2/4), the returned gain and cTE/cTM include the entered medium's lumped
         // interface_gain (att + coincidence); reflection (0/3) does not. 0.5*(|cTE|^2 + |cTM|^2) == gain in all cases.
         double interact_with(const Material &other,                         // Material that the path enters into / reflects of
-                             int interaction_type,                          // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+                             int interaction_type,                          // 0 = EM reflect, 1 = EM transmit, 2 = EM refract, 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
                              double theta,                                  // Incidence angle
                              double fGHz,                                   // Frequency
                              std::complex<double> *cTE = nullptr,           // Out: E-field coefficient, R for reflection (0/3), T for transmission/refraction (1/2/4)
@@ -315,115 +330,104 @@ namespace
                              std::complex<double> *eta1_div_eta2 = nullptr, // Out: eta1/eta2
                              double *Snell_ratio = nullptr,                 // Out: sqrt|eta1*mu1 / eta2*mu2| (Snell ratio, type-2 direction)
                              bool *total_reflection = nullptr,              // Out: Total reflection indicator
-                             bool *dense2light = nullptr,                   // Out: Dense to light medium indicator
                              bool force_tir = false) const                  // Switch to force total internal reflection
         {
-            const bool is_scalar = interaction_type >= 3;
-            int geometry_type = interaction_type;
-            if (interaction_type == 3)
-                geometry_type = 0; // scalar reflection -> reflection geometry
-            if (interaction_type == 4)
-                geometry_type = 1; // scalar transmission -> transmission geometry
-
-            // Incidence cosine (fbs_angleN convention); identical to |OF . N| in ray_mesh_interact
-            double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897));
+            // Interface geometry, shared by every interaction type
+            double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897)); // |OF . N| convention
             abs_cos_theta = (abs_cos_theta > 1.0) ? 1.0 : abs_cos_theta;
             double sin_theta = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
 
-            // Interface permittivity (resonance included) and permeability for both media
-            std::complex<double> eta1 = eta(fGHz) + eta_resonance(fGHz);
+            std::complex<double> eta1 = eta(fGHz) + eta_resonance(fGHz); // incidence medium (this)
             std::complex<double> eta2 = other.eta(fGHz) + other.eta_resonance(fGHz);
             std::complex<double> mu1 = mu(fGHz);
             std::complex<double> mu2 = other.mu(fGHz);
 
-            bool d2l = std::real(eta1 * mu1) > std::real(eta2 * mu2);
-
             std::complex<double> eta1_d_eta2 = (eta1 * mu1) / (eta2 * mu2);
             double snell = std::sqrt(std::abs(eta1_d_eta2));
-            bool tir = is_scalar ? false : (force_tir || (snell * sin_theta >= 1.0));
             std::complex<double> ct2 = std::sqrt(1.0 - eta1_d_eta2 * sin_theta * sin_theta);
-
-            // Admittances sqrt(eps/mu)
-            std::complex<double> z1 = std::sqrt(eta1 / mu1);
+            std::complex<double> z1 = std::sqrt(eta1 / mu1); // admittances sqrt(eps/mu)
             std::complex<double> z2 = std::sqrt(eta2 / mu2);
 
-            // Reflection coefficients, ITU-R P.2040-1 eq. (31)
-            std::complex<double> R_eTE = tir ? std::complex<double>(1.0, 0.0) : std::complex<double>(0.0, 0.0);
-            std::complex<double> R_eTM = R_eTE;
-            double reflection_gain = tir ? 1.0 : 0.0;
+            bool tir = force_tir || snell * sin_theta >= 1.0;
 
-            if (is_scalar)
-            {
-                R_eTE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
-                R_eTM = R_eTE;
-                reflection_gain = std::norm(R_eTE);
-            }
-            else if (interaction_type == 1 || (interaction_type == 0 && !tir))
-            {
-                R_eTE = (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
-                R_eTM = (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
-                reflection_gain = 0.5 * (std::norm(R_eTE) + std::norm(R_eTM));
-            }
-
-            // Transmission coefficients, ITU-R P.2040-1 eq. (32)
-            std::complex<double> T_eTE(0.0, 0.0), T_eTM(0.0, 0.0);
-            double refraction_gain = 0.0;
-            if (!tir && !is_scalar && interaction_type != 0)
-            {
-                T_eTE = (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
-                T_eTM = (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
-                refraction_gain = 0.5 * (std::norm(T_eTE) + std::norm(T_eTM));
-            }
-
-            // Scalar transmission factor: redistribute reflection/transmission energy keeping the sum at 1.
-            // tf is the FBS-face material's factor: the entered material ('other') on a front hit, the
-            // incidence material ('this') on a back hit, selected by the sign of theta.
-            if (is_scalar)
-            {
-                double tf_eff = (theta >= 0.0) ? other.tf(fGHz) : tf(fGHz);
-                double R0 = (reflection_gain < 0.0) ? 0.0 : ((reflection_gain > 1.0) ? 1.0 : reflection_gain);
-                double refl = (tf_eff >= 0.0) ? R0 * (1.0 - tf_eff) : R0 + (1.0 - R0) * (-tf_eff);
-                double R_phase = std::arg(R_eTE);
-                double T_phase = std::arg(1.0 + R_eTE);
-                R_eTE = std::polar(std::sqrt(refl), R_phase);
-                R_eTM = R_eTE;
-                T_eTE = std::polar(std::sqrt(1.0 - refl), T_phase);
-                T_eTM = T_eTE;
-                reflection_gain = refl;
-                refraction_gain = 1.0 - refl;
-            }
-
-            // EM dense->light transmission: full pass-through
-            if (geometry_type == 1 && d2l && !is_scalar)
-            {
-                T_eTE = std::complex<double>(1.0, 0.0);
-                T_eTM = std::complex<double>(1.0, 0.0);
-                refraction_gain = 1.0;
-                reflection_gain = 0.0;
-            }
-
-            // Select coefficient set and interface power gain
-            std::complex<double> coeff_TE = (geometry_type == 0) ? R_eTE : T_eTE;
-            std::complex<double> coeff_TM = (geometry_type == 0) ? R_eTM : T_eTM;
+            std::complex<double> coeff_TE, coeff_TM;
             double gain;
 
-            if (geometry_type == 0) // reflection (types 0, 3)
-                gain = reflection_gain;
-            else if (interaction_type == 1) // EM transmission: energy-conserving forward beam, power = 1 - R
+            if (interaction_type < 3) // EM: types 0 (reflection), 1 (transmission), 2 (refraction)
             {
-                gain = 1.0 - reflection_gain;
-                if (refraction_gain > 0.0) // fold the (1-R)/refraction_gain rescale into the coefficients
+                // Fresnel reflection (TE/TM), ITU-R P.2040-1 eq. (31); under TIR the interface is a perfect mirror
+                std::complex<double> R_TE = tir ? std::complex<double>(1.0, 0.0) : (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                std::complex<double> R_TM = tir ? std::complex<double>(1.0, 0.0) : (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
+                double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
+
+                if (interaction_type == 0) // EM reflection: tf-adjusted reflectance
                 {
-                    double s = std::sqrt(gain / refraction_gain);
-                    coeff_TE *= s;
-                    coeff_TM *= s;
+                    gain = apply_tf_pair(other, reflectance, fGHz);
+                    if (reflectance > 0.0) // rescale the Fresnel R coefficients to carry tf
+                    {
+                        double s = std::sqrt(gain / reflectance);
+                        coeff_TE = R_TE * s, coeff_TM = R_TM * s;
+                    }
+                    else // tf < 0 created reflection at a zero-reflectance interface -> flat coefficients
+                        coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
+                }
+                else // EM transmission (1) or refraction (2)
+                {
+                    // Fresnel transmission, ITU-R P.2040-1 eq. (32)
+                    std::complex<double> T_TE = tir ? std::complex<double>(0.0, 0.0) : (2.0 * z1 * abs_cos_theta) / (z1 * abs_cos_theta + z2 * ct2);
+                    std::complex<double> T_TM = tir ? std::complex<double>(0.0, 0.0) : (2.0 * z1 * abs_cos_theta) / (z2 * abs_cos_theta + z1 * ct2);
+                    double refraction_gain = tir ? 0.0 : 0.5 * (std::norm(T_TE) + std::norm(T_TM));
+
+                    double R_eff = apply_tf_pair(other, reflectance, fGHz);
+
+                    if (interaction_type == 1) // undeviated transmission (1): energy-conserving forward beam = 1 - R_eff
+                    {
+                        gain = 1.0 - R_eff;
+                        if (refraction_gain > 0.0) // rescale the Fresnel T coefficients to carry the forward gain
+                        {
+                            double s = std::sqrt(gain / refraction_gain);
+                            coeff_TE = T_TE * s, coeff_TM = T_TM * s;
+                        }
+                        else // no Fresnel forward port (TIR, or grazing) -> flat coefficients
+                            coeff_TE = coeff_TM = std::complex<double>(std::sqrt(gain), 0.0);
+                    }
+                    else // refraction (2)
+                    {
+                        double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
+                        gain = tir ? 1.0 - R_eff : refraction_gain * tf_scale;
+                        coeff_TE = tir ? std::complex<double>(std::sqrt(gain), 0.0) : T_TE * std::sqrt(tf_scale);
+                        coeff_TM = tir ? std::complex<double>(std::sqrt(gain), 0.0) : T_TM * std::sqrt(tf_scale);
+                    }
                 }
             }
-            else // EM refraction (2): raw Fresnel power; scalar transmission (4): refraction_gain == 1 - refl
-                gain = refraction_gain;
+            else // Scalar (acoustic): types 3 (reflection), 4 (transmission), 5 (refraction)
+            {
+                std::complex<double> R = tir ? std::complex<double>(1.0, 0.0) : (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
+                double reflectance = tir ? 1.0 : std::norm(R);
+                double R_eff = apply_tf_pair(other, reflectance, fGHz);
+                std::complex<double> T = 1.0 + R; // pressure transmission coefficient
 
-            // Adjust transmission / refraction by interface gain (att + coincidence)
-            if (geometry_type != 0)
+                if (interaction_type == 3) // Scalar reflection: tf-adjusted reflectance
+                {
+                    gain = R_eff;
+                    coeff_TE = std::polar(std::sqrt(gain), std::arg(R));
+                }
+                else if (interaction_type == 4 || tir) // Undeviated transmission (4), or refraction (5) collapsed under TIR
+                {
+                    gain = 1.0 - R_eff;
+                    coeff_TE = std::polar(std::sqrt(gain), std::arg(T));
+                }
+                else // interaction_type == 5, non-TIR: scalar refraction, field power |T|^2 scaled by the tf shift
+                {
+                    double tf_scale = (reflectance < 1.0) ? (1.0 - R_eff) / (1.0 - reflectance) : 0.0;
+                    gain = std::norm(T) * tf_scale;
+                    coeff_TE = T * std::sqrt(tf_scale);
+                }
+                coeff_TM = coeff_TE;
+            }
+
+            // Transmission-class interactions (1, 2, 4, 5) cross a thin interface: fold in the interface gain
+            if (interaction_type == 1 || interaction_type == 2 || interaction_type == 4 || interaction_type == 5)
             {
                 double ig = other.interface_gain(fGHz);
                 gain *= ig;
@@ -444,8 +448,6 @@ namespace
                 *Snell_ratio = snell;
             if (total_reflection)
                 *total_reflection = tir;
-            if (dense2light)
-                *dense2light = d2l;
 
             return gain;
         }
@@ -800,7 +802,7 @@ void quadriga_lib::ray_mesh_interact(
 ```
 
 ## Inputs:
-- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
 - **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
@@ -919,16 +921,11 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
     const double ray_offset = 0.001;
 
     // Check interaction_type
-    if (interaction_type < 0 || interaction_type > 4)
-        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission");
+    if (interaction_type < 0 || interaction_type > 5)
+        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
 
     bool is_scalar = interaction_type >= 3;
-
-    int geometry_type = interaction_type;
-    if (interaction_type == 3) // scalar reflection → reflection geometry
-        geometry_type = 0;
-    if (interaction_type == 4) // scalar transmission → transmission geometry
-        geometry_type = 1;
+    int geometry_type = interaction_type % 3;
 
     // Frequency in GHz
     if (center_frequency <= (dtype)0.0)
@@ -1244,11 +1241,52 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz;              // Vector from FBS to destination
         double FD_length = std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz); // Length of path from FBS to destination
 
+        // Per-vertex incidence, computed once and reused by the tube loop below
+        double Vedge[9];                     // incoming vertex directions
+        double cos_thetaV[4], sin_thetaV[4]; // incidence cosine/sine per leg
+        if (use_ray_tube)
+        {
+            cos_thetaV[0] = abs_cos_theta; // spine == center ray
+            sin_thetaV[0] = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
+            for (int iTube = 1; iTube <= 3; ++iTube)
+            {
+                double Vx, Vy, Vz;
+                if (use_ray_tube == 1) // Spherical: az/el -> direction
+                {
+                    double az = (double)p_tridir[iRx + 2 * (iTube - 1) * n_ray];
+                    double el = (double)p_tridir[iRx + (2 * (iTube - 1) + 1) * n_ray];
+                    double c = std::cos(el);
+                    Vx = std::cos(az) * c, Vy = std::sin(az) * c, Vz = std::sin(el);
+                }
+                else // Cartesian
+                {
+                    size_t o = iRx + 3 * (iTube - 1) * n_ray;
+                    Vx = (double)p_tridir[o], Vy = (double)p_tridir[o + n_ray], Vz = (double)p_tridir[o + 2 * n_ray];
+                    double s2 = Vx * Vx + Vy * Vy + Vz * Vz;
+                    if (std::abs(s2 - 1.0) > 2e-7)
+                    {
+                        double inv = 1.0 / std::sqrt(s2);
+                        Vx *= inv, Vy *= inv, Vz *= inv;
+                    }
+                }
+                Vedge[3 * (iTube - 1)] = Vx, Vedge[3 * (iTube - 1) + 1] = Vy, Vedge[3 * (iTube - 1) + 2] = Vz;
+                double c = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);
+                c = (c > 1.0) ? 1.0 : c;
+                cos_thetaV[iTube] = c, sin_thetaV[iTube] = std::sqrt(1.0 - c * c);
+            }
+
+            // Whole-tube TIR: pass through (undeviated) if the spine OR any edge is past critical
+            if (geometry_type == 2)
+                for (int i = 0; i <= 3 && !total_reflection; ++i)
+                    if (eta * sin_thetaV[i] >= 1.0)
+                        total_reflection = true;
+        }
+
         if (geometry_type == 0) // Reflection, normalized by default
             qd_reflect(OFx, OFy, OFz, Nx, Ny, Nz, FDx, FDy, FDz);
-        else if (geometry_type == 1)         // Transmission without refraction
-            FDx = OFx, FDy = OFy, FDz = OFz; // New path direction = same as incoming ray, already normalized
-        else                                 // Refraction
+        else if (geometry_type == 1 || total_reflection) // Transmission without refraction
+            FDx = OFx, FDy = OFy, FDz = OFz;             // New path direction = same as incoming ray, already normalized
+        else                                             // Refraction
             qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
 
         // Update origin and direction of the ray tube vertices
@@ -1261,47 +1299,14 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             for (int iTube = 1; iTube <= 3; ++iTube)
             {
                 // Load origin and direction
-                double Tx = Ox, Ty = Oy, Tz = Oz, az = 0.0, el = 0.0, Vx = 0.0, Vy = 0.0, Vz = 0.0;
+                double Tx = Ox, Ty = Oy, Tz = Oz, az = 0.0, el = 0.0;
+                double Vx = Vedge[3 * (iTube - 1)], Vy = Vedge[3 * (iTube - 1) + 1], Vz = Vedge[3 * (iTube - 1) + 2];
                 if (iTube == 1)
-                {
                     Tx += (double)p_trivec[iRx], Ty += (double)p_trivec[iRy], Tz += (double)p_trivec[iRz];
-                    if (use_ray_tube == 1)
-                        az = (double)p_tridir[iRx], el = (double)p_tridir[iRy];
-                    else
-                        Vx = (double)p_tridir[iRx], Vy = (double)p_tridir[iRy], Vz = (double)p_tridir[iRz];
-                }
                 else if (iTube == 2)
-                {
                     Tx += (double)p_trivec[iRx + 3 * n_ray], Ty += (double)p_trivec[iRx + 4 * n_ray], Tz += (double)p_trivec[iRx + 5 * n_ray];
-                    if (use_ray_tube == 1)
-                        az = (double)p_tridir[iRx + 2 * n_ray], el = (double)p_tridir[iRx + 3 * n_ray];
-                    else
-                        Vx = (double)p_tridir[iRx + 3 * n_ray], Vy = (double)p_tridir[iRx + 4 * n_ray], Vz = (double)p_tridir[iRx + 5 * n_ray];
-                }
-                else if (iTube == 3)
-                {
+                else // iTube == 3
                     Tx += (double)p_trivec[iRx + 6 * n_ray], Ty += (double)p_trivec[iRx + 7 * n_ray], Tz += (double)p_trivec[iRx + 8 * n_ray];
-                    if (use_ray_tube == 1)
-                        az = (double)p_tridir[iRx + 4 * n_ray], el = (double)p_tridir[iRx + 5 * n_ray];
-                    else
-                        Vx = (double)p_tridir[iRx + 6 * n_ray], Vy = (double)p_tridir[iRx + 7 * n_ray], Vz = (double)p_tridir[iRx + 8 * n_ray];
-                }
-
-                // Calculate vertex ray direction (V)
-                if (use_ray_tube == 1) // Spherical input
-                {
-                    scl = std::cos(el);
-                    Vx = std::cos(az) * scl, Vy = std::sin(az) * scl, Vz = std::sin(el);
-                }
-                else // Cartesian input
-                {
-                    double scl = Vx * Vx + Vy * Vy + Vz * Vz;
-                    if (std::abs(scl - 1.0) > 2e-7)
-                    {
-                        scl = 1.0 / std::sqrt(scl);
-                        Vx *= scl, Vy *= scl, Vz *= scl; // Normalize
-                    }
-                }
 
                 // Calculate intersect point of the vertex-ray with the face
                 double d = ((Fx - Tx) * Nx + (Fy - Ty) * Ny + (Fz - Tz) * Nz) / (Vx * Nx + Vy * Ny + Vz * Nz); // Distance from vert. origin to face (d)
@@ -1350,22 +1355,18 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     Tz = Wz - Fz - ray_offset * FDz;
 
                     // Vertex ray directions remains the same for Transmission
-                    if (geometry_type == 2) // Refraction
+                    if (geometry_type == 2 && !total_reflection) // Refraction (skipped when the whole tube passes through under TIR)
                     {
-                        double cos_thetaV = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);       // Cosine of incidence angle
-                        cos_thetaV = (cos_thetaV > 1.0) ? 1.0 : cos_thetaV;              // Clamp: avoids sqrt of a negative below
-                        double sin_thetaV = std::sqrt(1.0 - cos_thetaV * cos_thetaV);    // Sine of incidence angle
-                        total_reflection = total_reflection | (eta * sin_thetaV >= 1.0); // Check total reflection condition
-
-                        // Refraction into medium
-                        std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV * sin_thetaV);
-                        qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV, cos_theta2V, Vx, Vy, Vz);
-                        if (use_ray_tube == 1)
-                        {
-                            Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
-                            az = std::atan2(Vy, Vx), el = std::asin(Vz);     // Angles
-                        }
+                        std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV[iTube] * sin_thetaV[iTube]);
+                        qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV[iTube], cos_theta2V, Vx, Vy, Vz);
                     }
+                }
+
+                // Spherical output: derive az/el from the final vertex direction
+                if (use_ray_tube == 1)
+                {
+                    Vz = (Vz < -1.0) ? -1.0 : (Vz > 1.0 ? 1.0 : Vz); // Boundary fix
+                    az = std::atan2(Vy, Vx), el = std::asin(Vz);
                 }
 
                 // Write new vertex ray origin and direction - convert back to dtype
@@ -1418,7 +1419,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices)
         if (total_reflection != tir_central)
             M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM,
-                             nullptr, nullptr, nullptr, nullptr, nullptr, true);
+                             nullptr, nullptr, nullptr, nullptr, true);
 
         // Read the output ray index
         size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
@@ -1447,11 +1448,13 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             p_destN[i_rayN + 2 * n_rayN] = dtype(Fz + FD_length * FDz);
         }
 
-        // Write path_dirN (refraction-correct direction: mirror for types 0/3, Snell for types 1/2/4).
+        // Write path_dirN: spine output direction (FD) for reflection/refraction (geometry 0/2, follows a
+        // forced-TIR pass-through); spine Snell for undeviated transmission (geometry 1), or undeviated
+        // when the spine is in TIR (no Snell direction; any TF leak travels undeviated).
         if (p_path_dirN != nullptr)
         {
             double PDx = FDx, PDy = FDy, PDz = FDz;
-            if (geometry_type == 1)
+            if (geometry_type == 1 && !tir_central) // spine Snell; under spine TIR there is no Snell direction
                 qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
             p_path_dirN[i_rayN] = (dtype)PDx;
             p_path_dirN[i_rayN + n_rayN] = (dtype)PDy;
