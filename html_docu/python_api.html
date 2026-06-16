@@ -118,7 +118,7 @@ import quadriga_lib
   <tr><td><a href="#hdf5_write_dset">hdf5_write_dset</a></td><td>Write a single unstructured dataset to an HDF5 file</td></tr>
   <tr><td><a href="#qrt_file_parse">qrt_file_parse</a></td><td>Read metadata from a QRT file</td></tr>
   <tr><td><a href="#qrt_file_read">qrt_file_read</a></td><td>Read ray-tracing CIR data from a QRT file</td></tr>
-  <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Fixes the path delays to a grid of delay bins</td></tr>
+  <tr><td><a href="#quantize_delays">quantize_delays</a></td><td>Map path delays to a fixed tap grid using two-tap power-weighted interpolation</td></tr>
 </tbody></table><br>
 
 <b>Channel generation functions</b><br><br>
@@ -1513,39 +1513,48 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 <hr class="greyline"><br>
 <span id="quantize_delays" class="qd-func"><b>quantize_delays</b></span><br>
 <hr class="thin">
-Fixes the path delays to a grid of delay bins
-<br><br>
-<b>Description:</b><br>
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 <ul>
-<li>For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid of delay bins (taps). This function approximates each path delay using two adjacent taps with power-weighted coefficients, producing smooth transitions in the frequency domain.</li>
-<li>For a path at fractional offset &delta; between tap indices, two taps are created with complex coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power exponent.</li>
-<li>Input delays may be per-antenna <code>[n_rx, n_tx, n_path_s]</code> or shared <code>[1, 1, n_path_s]</code>. Output delay shape depends on <code>fix_taps</code> mode.</li>
-<li>The number of paths <code>n_path_s</code> may differ across snapshots.</li>
+<li>Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α, where δ is the fractional offset within the bin and α is <code>power_exponent</code></li>
+<li>Two-tap interpolation avoids discontinuities when delays cross tap boundaries</li>
+<li>Use <code>power_exponent = 1.0</code> for narrowband (linear interpolation) or <code>0.5</code> for wideband (incoherent power preservation)</li>
+<li>If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped (nearest-neighbor selection) but tap-selection logic still applies</li>
+<li>Snapshots are passed as Python lists; each list item is one snapshot and <code>n_path</code> may vary per item</li>
+<li>Coefficients are given either as one complex list <code>coeff</code>, or as split <code>coeff_re</code> + <code>coeff_im</code>; supplying both forms is an error. The input and output forms are independent</li>
+<li><code>complex=True</code> returns one combined complex coefficient output; <code>complex=False</code> (default) returns separate real <code>coeff_re_q</code> and <code>coeff_im_q</code></li>
+<li>Input <code>delay</code> items may be per-antenna <code>(n_rx, n_tx, n_path)</code> or shared <code>(1, 1, n_path)</code>; shared delays are expanded internally when <code>fix_taps</code> is 0 or 3</li>
+<li>Output arrays are zero-padded along the tap dimension so that all snapshots share the same <code>n_taps</code></li>
 </ul>
 
 <b>Usage:</b><br>
 <pre>
-import quadriga_lib
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( \
-    coeff_re, coeff_im, delay, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+# Split real / imaginary output
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+
+# Complex input and / or output (keyword)
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay, complex=True )
 </pre>
 
-<b>Arguments:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><code>list <b>*coeff_re</b></code> (input)<br> Channel coefficients, real part. List of <code>n_snap</code> numpy arrays, each of shape <code>[n_rx, n_tx, n_path_s]</code>. The number of paths may differ per snapshot.</li>
-<li><code>list <b>*coeff_im</b></code> (input)<br> Channel coefficients, imaginary part. Same shapes as <code>coeff_re</code>.</li>
-<li><code>list <b>*delay</b></code> (input)<br> Path delays in seconds. List of <code>n_snap</code> numpy arrays, each of shape <code>[n_rx, n_tx, n_path_s]</code> or <code>[1, 1, n_path_s]</code>.</li>
-<li><code>float <b>tap_spacing</b> = 5e-9</code> (input)<br> Spacing of the delay bins in seconds.</li>
-<li><code>int <b>max_no_taps</b> = 48</code> (input)<br> Maximum number of output taps. 0 means unlimited.</li>
-<li><code>float <b>power_exponent</b> = 1.0</code> (input)<br> Interpolation exponent. Use 1.0 for narrowband or 0.5 for wideband.</li>
-<li><code>int <b>fix_taps</b> = 0</code> (input)<br> Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all, 2 = per snapshot, 3 = per tx-rx pair.</li>
+<li><b><code>coeff_re</code></b> — Real part of channel coefficients; list of length <code>n_snap</code>; each item <code>(n_rx, n_tx, n_path)</code>; must be paired with <code>coeff_im</code>; mutually exclusive with <code>coeff</code>; default: <code>None</code></li>
+<li><b><code>coeff_im</code></b> — Imaginary part of channel coefficients; same layout as <code>coeff_re</code>; default: <code>None</code></li>
+<li><b><code>delay</code></b> — Path delays in seconds; list of length <code>n_snap</code>; each item <code>(n_rx, n_tx, n_path)</code> or shared <code>(1, 1, n_path)</code></li>
+<li><b><code>tap_spacing</code></b> — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate; default: 5e-9</li>
+<li><b><code>max_no_taps</code></b> — Maximum number of output taps; 0 = unlimited; default: 48</li>
+<li><b><code>power_exponent</code></b> — Interpolation exponent α; default: 1.0</li>
+<li><b><code>fix_taps</code></b> — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid, 2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0</li>
+<li><b><code>stack</code></b> — If <code>True</code>, stack snapshots into a 4D array; if <code>False</code>, return a list of per-snapshot arrays; default: <code>False</code></li>
+<li><b><code>complex</code></b> — If <code>True</code>, return combined complex coefficients <code>coeff_q</code>; if <code>False</code>, return separate <code>coeff_re_q</code> and <code>coeff_im_q</code>; default: <code>False</code></li>
+<li><b><code>coeff</code></b> — Complex channel coefficients; list of length <code>n_snap</code>; each item <code>(n_rx, n_tx, n_path)</code>; mutually exclusive with <code>coeff_re</code> / <code>coeff_im</code>; default: <code>None</code></li>
 </ul>
 
-<b>Returns:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><code>np.ndarray <b>coeff_re_q</b></code> (output)<br> Output coefficients, real part. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code>.</li>
-<li><code>np.ndarray <b>coeff_im_q</b></code> (output)<br> Output coefficients, imaginary part. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code>.</li>
-<li><code>np.ndarray <b>delay_q</b></code> (output)<br> Output delays in seconds. 4D array of shape <code>[n_rx, n_tx, n_taps, n_snap]</code> or <code>[1, 1, n_taps, n_snap]</code>.</li>
+<li><b><code>coeff_q</code></b> — Combined complex output coefficients; returned when <code>complex</code> is <code>True</code>; list of <code>(n_rx, n_tx, n_taps)</code> when <code>stack</code> is <code>False</code>, else <code>(n_rx, n_tx, n_taps, n_snap)</code></li>
+<li><b><code>coeff_re_q</code></b> — Output coefficients, real part; returned when <code>complex</code> is <code>False</code>; list of <code>(n_rx, n_tx, n_taps)</code> when <code>stack</code> is <code>False</code>, else <code>(n_rx, n_tx, n_taps, n_snap)</code></li>
+<li><b><code>coeff_im_q</code></b> — Output coefficients, imaginary part; returned when <code>complex</code> is <code>False</code>; same shape as <code>coeff_re_q</code></li>
+<li><b><code>delay_q</code></b> — Output delays in seconds; list of <code>(n_rx, n_tx, n_taps)</code> or <code>(1, 1, n_taps)</code> when <code>stack</code> is <code>False</code>, else <code>(n_rx, n_tx, n_taps, n_snap)</code> or <code>(1, 1, n_taps, n_snap)</code> depending on <code>fix_taps</code></li>
 </ul>
 
 <hr class="greyline"><br><br>

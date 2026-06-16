@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
@@ -24,90 +11,162 @@ SECTION!*/
 
 /*!MD
 # quantize_delays
-Fixes the path delays to a grid of delay bins
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
-## Description:
-- For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-  of delay bins (taps). This function approximates each path delay using two adjacent taps with
-  power-weighted coefficients, producing smooth transitions in the frequency domain.
-- For a path at fractional offset &delta; between tap indices, two taps are created with complex
-  coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-  exponent.
-- Input delays may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`. Output
-  delay shape depends on `fix_taps` mode.
-- The number of paths `n_path_s` may differ across snapshots.
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α,
+  where δ is the fractional offset within the bin and α is `power_exponent`
+- Two-tap interpolation avoids discontinuities when delays cross tap boundaries
+- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband
+  (incoherent power preservation)
+- If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped
+  (nearest-neighbor selection) but tap-selection logic still applies
+- Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
+- Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
+  supplying both forms is an error. The input and output forms are independent
+- `complex=True` returns one combined complex coefficient output; `complex=False` (default) returns
+  separate real `coeff_re_q` and `coeff_im_q`
+- Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
+  shared delays are expanded internally when `fix_taps` is 0 or 3
+- Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
 
 ## Usage:
 ```
-import quadriga_lib
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( \
-    coeff_re, coeff_im, delay, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+# Split real / imaginary output
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+
+# Complex input and / or output (keyword)
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay, complex=True )
 ```
 
-## Arguments:
-- `list ***coeff_re**` (input)<br>
-  Channel coefficients, real part. List of `n_snap` numpy arrays, each of shape
-  `[n_rx, n_tx, n_path_s]`. The number of paths may differ per snapshot.
+## Inputs:
+- **`coeff_re`** — Real part of channel coefficients; list of length `n_snap`; each item
+  `(n_rx, n_tx, n_path)`; must be paired with `coeff_im`; mutually exclusive with `coeff`;
+  default: `None`
+- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
+  shared `(1, 1, n_path)`
+- **`tap_spacing`** — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate;
+  default: 5e-9
+- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`power_exponent`** — Interpolation exponent α; default: 1.0
+- **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
+  2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
+- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+  arrays; default: `False`
+- **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
+  separate `coeff_re_q` and `coeff_im_q`; default: `False`
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
+  mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
-- `list ***coeff_im**` (input)<br>
-  Channel coefficients, imaginary part. Same shapes as `coeff_re`.
-
-- `list ***delay**` (input)<br>
-  Path delays in seconds. List of `n_snap` numpy arrays, each of shape
-  `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`.
-
-- `float **tap_spacing** = 5e-9` (input)<br>
-  Spacing of the delay bins in seconds.
-
-- `int **max_no_taps** = 48` (input)<br>
-  Maximum number of output taps. 0 means unlimited.
-
-- `float **power_exponent** = 1.0` (input)<br>
-  Interpolation exponent. Use 1.0 for narrowband or 0.5 for wideband.
-
-- `int **fix_taps** = 0` (input)<br>
-  Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all,
-  2 = per snapshot, 3 = per tx-rx pair.
-
-## Returns:
-- `np.ndarray **coeff_re_q**` (output)<br>
-  Output coefficients, real part. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]`.
-
-- `np.ndarray **coeff_im_q**` (output)<br>
-  Output coefficients, imaginary part. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]`.
-
-- `np.ndarray **delay_q**` (output)<br>
-  Output delays in seconds. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]` or
-  `[1, 1, n_taps, n_snap]`.
+## Outputs:
+- **`coeff_q`** — Combined complex output coefficients; returned when `complex` is `True`; list of
+  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
+- **`coeff_re_q`** — Output coefficients, real part; returned when `complex` is `False`; list of
+  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
+- **`coeff_im_q`** — Output coefficients, imaginary part; returned when `complex` is `False`; same
+  shape as `coeff_re_q`
+- **`delay_q`** — Output delays in seconds; list of `(n_rx, n_tx, n_taps)` or `(1, 1, n_taps)` when
+  `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)` depending on
+  `fix_taps`
 MD!*/
 
-py::tuple quantize_delays(py::list coeff_re_list,
-                          py::list coeff_im_list,
-                          py::list delay_list,
+py::tuple quantize_delays(const py::object &coeff_re,
+                          const py::object &coeff_im,
+                          const py::object &delay,
                           double tap_spacing,
-                          unsigned long long max_no_taps,
+                          arma::uword max_no_taps,
                           double power_exponent,
-                          int fix_taps)
+                          int fix_taps,
+                          bool stack,
+                          const bool complex,
+                          const py::object &coeff)
 {
-    // Convert Python lists of 3D arrays to std::vector<arma::Cube<double>>
-    auto coeff_re = qd_python_list2vector_Cube<double>(coeff_re_list);
-    auto coeff_im = qd_python_list2vector_Cube<double>(coeff_im_list);
-    auto delay = qd_python_list2vector_Cube<double>(delay_list);
+    // Coefficient input mode: complex 'coeff' or split 'coeff_re'/'coeff_im'
+    bool have_coeff = !coeff.is_none();
+    bool have_cre = !coeff_re.is_none();
+    bool have_cim = !coeff_im.is_none();
 
-    // Declare output vectors
+    if (have_coeff && (have_cre || have_cim))
+        throw std::invalid_argument("Cannot provide both 'coeff' and 'coeff_re'/'coeff_im'.");
+    if (have_cre != have_cim)
+        throw std::invalid_argument("'coeff_re' and 'coeff_im' must both be provided.");
+    if (!have_coeff && !have_cre)
+        throw std::invalid_argument("Must provide either 'coeff' or both 'coeff_re' and 'coeff_im'.");
+    if (delay.is_none())
+        throw std::invalid_argument("'delay' must be provided.");
+
+    bool use_complex = have_coeff;
+
+    // Convert coefficient lists to std::vector<arma::Cube<double>> (length = n_snap)
+    std::vector<arma::Cube<double>> coeff_re_a, coeff_im_a;
+    if (use_complex)
+    {
+        if (!py::isinstance<py::list>(coeff))
+            throw std::invalid_argument("'coeff' must be a list.");
+        qd_python_list2vector_Cube_Cplx<double>(py::cast<py::list>(coeff), coeff_re_a, coeff_im_a);
+    }
+    else
+    {
+        if (!py::isinstance<py::list>(coeff_re) || !py::isinstance<py::list>(coeff_im))
+            throw std::invalid_argument("'coeff_re' and 'coeff_im' must be lists.");
+        coeff_re_a = qd_python_list2vector_Cube<double>(py::cast<py::list>(coeff_re));
+        coeff_im_a = qd_python_list2vector_Cube<double>(py::cast<py::list>(coeff_im));
+    }
+
+    // Convert delay list (ragged path counts allowed)
+    if (!py::isinstance<py::list>(delay))
+        throw std::invalid_argument("'delay' must be a list.");
+    auto delay_a = qd_python_list2vector_Cube<double>(py::cast<py::list>(delay));
+
+    // Output vectors (size set by the C++ call)
     std::vector<arma::Cube<double>> coeff_re_q, coeff_im_q, delay_q;
 
-    // Call C++ library
-    quadriga_lib::quantize_delays<double>(
-        &coeff_re, &coeff_im, &delay,
-        &coeff_re_q, &coeff_im_q, &delay_q,
-        tap_spacing, (arma::uword)max_no_taps, power_exponent, fix_taps);
+    // Call library function
+    quadriga_lib::quantize_delays<double>(&coeff_re_a, &coeff_im_a, &delay_a,
+                                          &coeff_re_q, &coeff_im_q, &delay_q,
+                                          tap_spacing, max_no_taps, power_exponent, fix_taps);
 
-    // Convert outputs to 4D numpy arrays (all output cubes have uniform size)
-    auto coeff_re_q_p = qd_python_copy2list(&coeff_re_q);
-    auto coeff_im_q_p = qd_python_copy2list(&coeff_im_q);
-    auto delay_q_p = qd_python_copy2list(&delay_q);
+    // Delay output (always real); list (stack=False) or 4D array (stack=True)
+    py::object delay_q_py;
+    if (stack)
+        delay_q_py = qd_python_stack2numpy(&delay_q);
+    else
+        delay_q_py = qd_python_copy2list(&delay_q);
 
-    return py::make_tuple(coeff_re_q_p, coeff_im_q_p, delay_q_p);
+    // Coefficient output form set by 'complex', independent of the input form
+    if (complex)
+    {
+        py::object coeff_q_py;
+        if (stack)
+            coeff_q_py = qd_python_stack2numpy<double, std::complex<double>>(&coeff_re_q, &coeff_im_q);
+        else
+            coeff_q_py = qd_python_copy2list<arma::Cube<double>, std::complex<double>>(&coeff_re_q, &coeff_im_q);
+        return py::make_tuple(coeff_q_py, delay_q_py);
+    }
+
+    py::object coeff_re_q_py, coeff_im_q_py;
+    if (stack)
+    {
+        coeff_re_q_py = qd_python_stack2numpy(&coeff_re_q);
+        coeff_im_q_py = qd_python_stack2numpy(&coeff_im_q);
+    }
+    else
+    {
+        coeff_re_q_py = qd_python_copy2list(&coeff_re_q);
+        coeff_im_q_py = qd_python_copy2list(&coeff_im_q);
+    }
+    return py::make_tuple(coeff_re_q_py, coeff_im_q_py, delay_q_py);
 }
 
+// pybind11 declaration (channel submodule):
+// m.def("quantize_delays", &quantize_delays,
+//       py::arg("coeff_re") = py::none(),
+//       py::arg("coeff_im") = py::none(),
+//       py::arg("delay") = py::none(),
+//       py::arg("tap_spacing") = 5e-9,
+//       py::arg("max_no_taps") = 48,
+//       py::arg("power_exponent") = 1.0,
+//       py::arg("fix_taps") = 0,
+//       py::arg("stack") = false,
+//       py::arg("complex") = false,
+//       py::arg("coeff") = py::none());

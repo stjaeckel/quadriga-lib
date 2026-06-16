@@ -37,31 +37,31 @@ lang: en-US
 | [qrt_file_parse](#qrt_file_parse) | Channel functions | 1030 |
 | [qrt_file_read](#qrt_file_read) | Channel functions | 1063 |
 | [quantize_delays](#quantize_delays) | Channel functions | 1118 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1180 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1238 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1295 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1355 |
-| [acdf](#acdf) | Channel statistics | 1437 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1468 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1507 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1557 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1585 |
-| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1619 |
-| [components](#components) | Miscellaneous / Tools | 1647 |
-| [version](#version) | Miscellaneous / Tools | 1656 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1669 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1712 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1760 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1792 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1825 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1875 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1922 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 1949 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 1979 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2012 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2049 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2092 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2118 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1182 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1240 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1297 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1357 |
+| [acdf](#acdf) | Channel statistics | 1439 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1470 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1509 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1559 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1587 |
+| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1621 |
+| [components](#components) | Miscellaneous / Tools | 1649 |
+| [version](#version) | Miscellaneous / Tools | 1658 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1671 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1714 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1762 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1794 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1827 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1877 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1924 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 1951 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 1981 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2014 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2051 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2094 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2120 |
 
 ---
 
@@ -1116,61 +1116,63 @@ center_freq, tx_pos, tx_orientation, rx_pos, rx_orientation, fbs_pos, lbs_pos, p
 
 ---
 ## quantize_delays
-Fixes the path delays to a grid of delay bins
+Map path delays to a fixed tap grid using two-tap power-weighted interpolation
 
-### Description:
-- For channel emulation with finite delay resolution, path delays must be mapped to a fixed grid
-  of delay bins (taps). This function approximates each path delay using two adjacent taps with
-  power-weighted coefficients, producing smooth transitions in the frequency domain.
-- For a path at fractional offset &delta; between tap indices, two taps are created with complex
-  coefficients scaled by (1&minus;&delta;)^&alpha; and &delta;^&alpha;, where &alpha; is the power
-  exponent.
-- Input delays may be per-antenna `[n_rx, n_tx, n_path_s]` or shared `[1, 1, n_path_s]`. Output
-  delay shape depends on `fix_taps` mode.
-- The number of paths `n_path_s` may differ across snapshots.
+- Each path delay is approximated by two adjacent taps with coefficients scaled by (1−δ)^α and δ^α,
+  where δ is the fractional offset within the bin and α is `power_exponent`
+- Two-tap interpolation avoids discontinuities when delays cross tap boundaries
+- Use `power_exponent = 1.0` for narrowband (linear interpolation) or `0.5` for wideband
+  (incoherent power preservation)
+- If all fractional per-tap offsets are below 0.01 or above 0.99, weight computation is skipped
+  (nearest-neighbor selection) but tap-selection logic still applies
+- Snapshots are passed as Python lists; each list item is one snapshot and `n_path` may vary per item
+- Coefficients are given either as one complex list `coeff`, or as split `coeff_re` + `coeff_im`;
+  supplying both forms is an error. The input and output forms are independent
+- `complex=True` returns one combined complex coefficient output; `complex=False` (default) returns
+  separate real `coeff_re_q` and `coeff_im_q`
+- Input `delay` items may be per-antenna `(n_rx, n_tx, n_path)` or shared `(1, 1, n_path)`;
+  shared delays are expanded internally when `fix_taps` is 0 or 3
+- Output arrays are zero-padded along the tap dimension so that all snapshots share the same `n_taps`
 
 ### Usage:
 ```
-import quadriga_lib
-coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( \
-    coeff_re, coeff_im, delay, tap_spacing=5e-9, max_no_taps=48, power_exponent=1.0, fix_taps=0)
+# Split real / imaginary output
+coeff_re_q, coeff_im_q, delay_q = quadriga_lib.channel.quantize_delays( coeff_re, coeff_im, delay )
+
+# Complex input and / or output (keyword)
+coeff_q, delay_q = quadriga_lib.channel.quantize_delays( coeff=coeff, delay=delay, complex=True )
 ```
 
-### Arguments:
-- `list ***coeff_re**` (input)
-  Channel coefficients, real part. List of `n_snap` numpy arrays, each of shape
-  `[n_rx, n_tx, n_path_s]`. The number of paths may differ per snapshot.
+### Inputs:
+- **`coeff_re`** — Real part of channel coefficients; list of length `n_snap`; each item
+  `(n_rx, n_tx, n_path)`; must be paired with `coeff_im`; mutually exclusive with `coeff`;
+  default: `None`
+- **`coeff_im`** — Imaginary part of channel coefficients; same layout as `coeff_re`; default: `None`
+- **`delay`** — Path delays in seconds; list of length `n_snap`; each item `(n_rx, n_tx, n_path)` or
+  shared `(1, 1, n_path)`
+- **`tap_spacing`** — Delay bin spacing in seconds; 5 ns corresponds to 200 MHz sampling rate;
+  default: 5e-9
+- **`max_no_taps`** — Maximum number of output taps; 0 = unlimited; default: 48
+- **`power_exponent`** — Interpolation exponent α; default: 1.0
+- **`fix_taps`** — Delay grid sharing mode; 0 = per tx-rx pair and snapshot, 1 = single shared grid,
+  2 = per snapshot, 3 = per tx-rx pair across all snapshots; default: 0
+- **`stack`** — If `True`, stack snapshots into a 4D array; if `False`, return a list of per-snapshot
+  arrays; default: `False`
+- **`complex`** — If `True`, return combined complex coefficients `coeff_q`; if `False`, return
+  separate `coeff_re_q` and `coeff_im_q`; default: `False`
+- **`coeff`** — Complex channel coefficients; list of length `n_snap`; each item `(n_rx, n_tx, n_path)`;
+  mutually exclusive with `coeff_re` / `coeff_im`; default: `None`
 
-- `list ***coeff_im**` (input)
-  Channel coefficients, imaginary part. Same shapes as `coeff_re`.
-
-- `list ***delay**` (input)
-  Path delays in seconds. List of `n_snap` numpy arrays, each of shape
-  `[n_rx, n_tx, n_path_s]` or `[1, 1, n_path_s]`.
-
-- `float **tap_spacing** = 5e-9` (input)
-  Spacing of the delay bins in seconds.
-
-- `int **max_no_taps** = 48` (input)
-  Maximum number of output taps. 0 means unlimited.
-
-- `float **power_exponent** = 1.0` (input)
-  Interpolation exponent. Use 1.0 for narrowband or 0.5 for wideband.
-
-- `int **fix_taps** = 0` (input)
-  Delay sharing mode: 0 = per tx-rx pair and snapshot, 1 = single grid for all,
-  2 = per snapshot, 3 = per tx-rx pair.
-
-### Returns:
-- `np.ndarray **coeff_re_q**` (output)
-  Output coefficients, real part. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]`.
-
-- `np.ndarray **coeff_im_q**` (output)
-  Output coefficients, imaginary part. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]`.
-
-- `np.ndarray **delay_q**` (output)
-  Output delays in seconds. 4D array of shape `[n_rx, n_tx, n_taps, n_snap]` or
-  `[1, 1, n_taps, n_snap]`.
+### Outputs:
+- **`coeff_q`** — Combined complex output coefficients; returned when `complex` is `True`; list of
+  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
+- **`coeff_re_q`** — Output coefficients, real part; returned when `complex` is `False`; list of
+  `(n_rx, n_tx, n_taps)` when `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)`
+- **`coeff_im_q`** — Output coefficients, imaginary part; returned when `complex` is `False`; same
+  shape as `coeff_re_q`
+- **`delay_q`** — Output delays in seconds; list of `(n_rx, n_tx, n_taps)` or `(1, 1, n_taps)` when
+  `stack` is `False`, else `(n_rx, n_tx, n_taps, n_snap)` or `(1, 1, n_taps, n_snap)` depending on
+  `fix_taps`
 
 ---
 
