@@ -332,7 +332,7 @@ namespace quadriga_lib
                            const arma::Mat<dtype> *fbs,                                         // First interaction points in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *sbs,                                         // Second interaction points in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *mesh,                                        // Triangle mesh faces, [n_mesh, 9]
-                           const arma::uvec *mtl_ind,                                           // 0-based material index, Size: [n_mesh]
+                           const arma::uvec *mtl_ind,                                           // 1-based material index, Size: [n_mesh]
                            const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties; Length: [n_mtl]
                            const arma::u32_vec *fbs_ind,                                        // 1-based FBS mesh index (0 = no hit), [n_ray]
                            const arma::u32_vec *sbs_ind,                                        // 1-based SBS mesh index (0 = no hit), [n_ray]
@@ -350,7 +350,9 @@ namespace quadriga_lib
                            arma::Col<dtype> *thicknessN = nullptr,                              // Material thickness (FBS-SBS distance) in [m], [n_rayN]
                            arma::Col<dtype> *edge_lengthN = nullptr,                            // Max beam triangle edge length at new origin, [n_rayN, 3]
                            arma::Mat<dtype> *normal_vecN = nullptr,                             // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S], [n_rayN, 6]
-                           arma::s32_vec *out_typeN = nullptr);                                 // Interaction type code, [n_rayN]
+                           arma::s32_vec *out_typeN = nullptr,                                  // Interaction type code, [n_rayN]
+                           arma::Mat<dtype> *path_dirN = nullptr,                               // Refraction-correct path direction, [n_rayN, 3]
+                           arma::u32_vec *ray_indN = nullptr);                                  // 0-based input ray index for each output ray, [n_rayN]
 
     // Update inside/outside ray state and correct gainN / xprmatN
     template <typename dtype>

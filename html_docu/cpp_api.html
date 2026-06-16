@@ -197,8 +197,6 @@
   <tr><td><a href="#coord2path">coord2path</a></td><td>Convert path interaction coordinates into FBS/LBS positions, path length, and angles</td></tr>
   <tr><td><a href="#generate_diffraction_paths">generate_diffraction_paths</a></td><td>Generate elliptic propagation paths and weights for diffraction gain estimation</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
-  <tr><td><a href="#interface_gain">interface_gain</a></td><td>Linear gain of a wave crossing a thin interface (lumped penetration loss)</td></tr>
-  <tr><td><a href="#medium_gain">medium_gain</a></td><td>Linear gain of a ray traversing a homogeneous lossy medium</td></tr>
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
   <tr><td><a href="#obj_file_write">obj_file_write</a></td><td>Write a triangulated Wavefront .obj (and .mtl) file</td></tr>
@@ -208,9 +206,7 @@
   <tr><td><a href="#point_cloud_segmentation">point_cloud_segmentation</a></td><td>Reorganize a point cloud into spatial sub-clouds for efficient processing</td></tr>
   <tr><td><a href="#point_cloud_split">point_cloud_split</a></td><td>Split a point cloud into two sub-clouds along a spatial axis</td></tr>
   <tr><td><a href="#point_inside_mesh">point_inside_mesh</a></td><td>Test whether 3D points are inside a triangle mesh using raycasting</td></tr>
-  <tr><td><a href="#ray_mesh_interact">ray_mesh_interact</a></td><td>Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces</td></tr>
   <tr><td><a href="#ray_point_intersect">ray_point_intersect</a></td><td>Calculate intersections of ray beams with points in 3D space</td></tr>
-  <tr><td><a href="#ray_state_update">ray_state_update</a></td><td>Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution</td></tr>
   <tr><td><a href="#ray_triangle_intersect">ray_triangle_intersect</a></td><td>Compute ray-triangle intersections in 3D using the Möller–Trumbore algorithm</td></tr>
   <tr><td><a href="#subdivide_rays">subdivide_rays</a></td><td>Subdivide ray beams into four smaller sub-beams</td></tr>
   <tr><td><a href="#subdivide_triangles">subdivide_triangles</a></td><td>Subdivide triangles into smaller triangles</td></tr>
@@ -4226,89 +4222,6 @@ arma::uword quadriga_lib::icosphere(
 </ul>
 
 <hr class="greyline"><br>
-<span id="interface_gain" class="qd-func"><b>interface_gain</b></span><br>
-<hr class="thin">
-Linear gain of a wave crossing a thin interface (lumped penetration loss)
-<ul>
-<li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the lumped transmission loss applied once when a ray enters a material (the air-to-material or material-to-material front-side crossing). It is independent of path length and is applied on top of the Fresnel interface term <code>1 - abs(R)²</code>:
-<ul>
-<li>Power-law penetration loss <code>att·(f/fRef)^attB</code> (e.g. 3GPP TR 38.901 building-entry loss).</li>
-<li>An optional Lorentzian coincidence feature <code>coiA / (1 + (coiQ·(f - coiF)/coiF)²)</code>, active only when <code>coiF &gt; 0</code> and <code>coiA != 0</code>; negative <code>coiA</code> is a transmission dip (acoustic coincidence), positive <code>coiA</code> a stop-band. The total is clamped to <code>&gt;= 0</code>.</li>
-</ul>
-</li>
-<li>The reflection / conductivity columns (<code>a</code>, <code>b</code>, <code>c</code>, <code>d</code>) and the in-medium columns (<code>alpha</code>, <code>alphaB</code>, <code>m</code>) of <code>mtl_prop</code> are not used here — the Fresnel reflection is handled by the caller and the distance-dependent loss by <a href="#medium_gain">medium_gain</a>.</li>
-</ul>
-
-<b>Declaration:</b><br>
-<pre>
-dtype quadriga_lib::interface_gain(
-    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; &amp;mtl_prop,
-    arma::uword iM,
-    dtype center_frequency);
-</pre>
-
-<b>Inputs:</b><br>
-<ul>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
-<li><b><code>iM</code></b> — 1-based material index (0 = no material / air)</li>
-<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
-</ul>
-
-<b>Returns:</b><br>
-<ul>
-<li>Linear interface gain in <code>[0, 1]</code>; multiply by the incident field/power gain to get the value after the interface</li>
-</ul>
-
-<b>See also:</b><br>
-<ul>
-<li><a href="#medium_gain">medium_gain</a> (for the distance-dependent in-medium loss)</li>
-<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
-<li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
-</ul>
-
-<hr class="greyline"><br>
-<span id="medium_gain" class="qd-func"><b>medium_gain</b></span><br>
-<hr class="thin">
-Linear gain of a ray traversing a homogeneous lossy medium
-<ul>
-<li>Computes <code>g = 10^(-A/10)</code>, where <code>A</code> [dB] is the total attenuation accumulated over a path of length <code>dist</code> inside the medium. The per-meter loss combines two contributions:
-<ul>
-<li>Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: <code>ε_r = a·(f/fRef)^b</code>, <code>σ = c·(f/fRef)^d</code>. These give an gain distance <code>Δ</code> and a per-meter power loss <code>8.686 / Δ</code> dB/m.</li>
-<li>Distance absorption of the form <code>α·(f/fRef)^αB</code> dB/m, intended to model excess loss not captured by <code>σ</code> (e.g. foliage, scattering media).</li>
-</ul>
-</li>
-<li>The penetration-loss columns (<code>att</code>, <code>attB</code>) of <code>mtl_prop</code> are not used — they describe thin-slab transmission loss, not propagation through a finite-thickness medium.</li>
-</ul>
-
-<b>Declaration:</b><br>
-<pre>
-dtype quadriga_lib::medium_gain(
-    const arma::Mat&lt;dtype&gt; &amp;mtl_prop,
-    arma::uword iM,
-    dtype dist,
-    dtype fGHz);
-</pre>
-
-<b>Inputs:</b><br>
-<ul>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code></li>
-<li><b><code>iM</code></b> —  1-based material index (0 = no material / air)</li>
-<li><b><code>dist</code></b> — Path length of the ray inside the medium</li>
-<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
-</ul>
-
-<b>Returns:</b><br>
-<ul>
-<li>Linear in-medium gain in <code>[0, 1]</code>; multiply by the incident field/power gain to get the value after the medium</li>
-</ul>
-
-<b>See also:</b><br>
-<ul>
-<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (for complex ray-material interactions)</li>
-<li><a href="#obj_file_read">obj_file_read</a> (defines mtl_prop format)</li>
-</ul>
-
-<hr class="greyline"><br>
 <span id="mitsuba_xml_file_write" class="qd-func"><b>mitsuba_xml_file_write</b></span><br>
 <hr class="thin">
 Write a triangular mesh to a Mitsuba 3 XML scene file
@@ -4733,159 +4646,6 @@ arma::uvec quadriga_lib::point_inside_mesh(
 </ul>
 
 <hr class="greyline"><br>
-<span id="ray_mesh_interact" class="qd-func"><b>ray_mesh_interact</b></span><br>
-<hr class="thin">
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
-<ul>
-<li>Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.</li>
-<li>Supports beam-based modeling via triangular ray tubes (<code>trivec</code>, <code>tridir</code>).</li>
-<li>Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule); front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.</li>
-<li>Rays with <code>fbs_ind = 0</code> (no interaction) are omitted from output, so <code>n_rayN ≤ n_ray</code>.</li>
-<li>Output direction encoding (spherical/Cartesian) matches input <code>tridir</code> format.</li>
-<li>Overlapping mesh geometry must be avoided (materials are transparent to radio waves).</li>
-<li>Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic simulation with impedance-mapped material parameters (ε derived from Z).</li>
-<li>For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a></li>
-</ul>
-
-<b>Declaration:</b><br>
-<pre>
-void quadriga_lib::ray_mesh_interact(
-    int interaction_type,
-    dtype center_frequency,
-    const arma::Mat&lt;dtype&gt; *orig,
-    const arma::Mat&lt;dtype&gt; *dest,
-    const arma::Mat&lt;dtype&gt; *fbs,
-    const arma::Mat&lt;dtype&gt; *sbs,
-    const arma::Mat&lt;dtype&gt; *mesh,
-    const arma::uvec *mtl_ind,
-    const std::unordered_map&lt;std::string, td::vector&lt;dtype&gt;&gt; *mtl_prop,
-    const arma::u32_vec *fbs_ind,
-    const arma::u32_vec *sbs_ind,
-    const arma::Mat&lt;dtype&gt; *trivec = nullptr,
-    const arma::Mat&lt;dtype&gt; *tridir = nullptr,
-    const arma::Col&lt;dtype&gt; *orig_length = nullptr,
-    arma::Mat&lt;dtype&gt; *origN = nullptr,
-    arma::Mat&lt;dtype&gt; *destN = nullptr,
-    arma::Col&lt;dtype&gt; *gainN = nullptr,
-    arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
-    arma::Mat&lt;dtype&gt; *trivecN = nullptr,
-    arma::Mat&lt;dtype&gt; *tridirN = nullptr,
-    arma::Col&lt;dtype&gt; *orig_lengthN = nullptr,
-    arma::Col&lt;dtype&gt; *fbs_angleN = nullptr,
-    arma::Col&lt;dtype&gt; *thicknessN = nullptr,
-    arma::Col&lt;dtype&gt; *edge_lengthN = nullptr,
-    arma::Mat&lt;dtype&gt; *normal_vecN = nullptr,
-    arma::s32_vec *out_typeN = nullptr);
-</pre>
-
-<b>Inputs:</b><br>
-<ul>
-<li><b><code>interaction_type</code></b> — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission</li>
-<li><b><code>center_frequency</code></b> — Center frequency</li>
-<li><b><code>orig</code></b>, <b><code>dest</code></b> — Ray origin and destination in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>fbs</code></b>, <b><code>sbs</code></b> — First/second interaction points in GCS; <code>[n_ray, 3]</code></li>
-<li><b><code>mesh</code></b> — Triangle mesh faces; see <a href="#obj_file_read">obj_file_read</a>; <code>[n_mesh, 9]</code></li>
-<li><b><code>mtl_ind</code></b> — 1-based material index per face (the <code>csv_ind</code> output of <a href="#obj_file_read">obj_file_read</a>); <code>[n_mesh]</code>. 0 = face has no material (air). NULL → all faces treated as air.</li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>); each value has length <code>n_mtl</code>. NULL → air defaults used.</li>
-<li><b><code>fbs_ind</code></b>, <b><code>sbs_ind</code></b> — 1-based mesh face indices per ray (0 = no hit); <code>[n_ray]</code></li>
-<li><b><code>trivec</code></b> <i>(optional)</i> — Beam wavefront triangle vertices relative to origin; <code>[n_ray, 9]</code>, order <code>[v1x v1y v1z v2x v2y v2z v3x v3y v3z]</code></li>
-<li><b><code>tridir</code></b> <i>(optional)</i> — Vertex-ray directions; <code>[n_ray, 6]</code> for spherical <code>[v1az v1el v2az v2el v3az v3el]</code> or <code>[n_ray, 9]</code> for Cartesian</li>
-<li><b><code>orig_length</code></b> <i>(optional)</i> — Accumulated path length at origin; <code>[n_ray]</code>, default 0</li>
-</ul>
-
-<b>Outputs:</b><br>
-<ul>
-<li><b><code>origN</code></b> — New origins after interaction (offset 0.001 m along travel direction); <code>[n_rayN, 3]</code></li>
-<li><b><code>destN</code></b> — New destinations accounting for direction change; <code>[n_rayN, 3]</code></li>
-<li><b><code>gainN</code></b> — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> — For types 0–2: polarization transfer matrix, interleaved complex <code>[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]</code>; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); <code>[n_rayN, 8]</code>. For types 3–4 (scalar): <code>[Re Im 0 0 0 0 0 0]</code> where Re+jIm is the scalar pressure coefficient including in-medium attenuation; <code>[n_rayN, 8]</code>.</li>
-<li><b><code>trivecN</code></b>, <b><code>tridirN</code></b> — Updated beam geometry/direction (format matches input); empty if inputs not provided</li>
-<li><b><code>orig_lengthN</code></b> — Path length from <code>orig</code> to <code>origN</code>, added to input <code>orig_length</code> if given; <code>[n_rayN]</code></li>
-<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS in rad; <code>[n_rayN]</code></li>
-<li><b><code>thicknessN</code></b> — Material thickness (FBS-to-SBS distance); <code>[n_rayN]</code></li>
-<li><b><code>edge_lengthN</code></b> — Max edge length of ray tube triangle at new origin (∞ if partial hit); <code>[n_rayN]</code></li>
-<li><b><code>normal_vecN</code></b> — FBS and SBS normal vectors <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>; <code>[n_rayN, 6]</code></li>
-<li><b><code>out_typeN</code></b> — Interaction type code; <code>[n_rayN]</code><br><br>
-<table class="md">
-<tr>
-  <th class="c">Code</th>
-  <th>Description</th>
-</tr>
-<tr>
-  <td class="c">1</td>
-  <td>Single hit, outside→inside</td>
-</tr>
-<tr>
-  <td class="c">2</td>
-  <td>Single hit, inside→outside</td>
-</tr>
-<tr>
-  <td class="c">3</td>
-  <td>Single hit, inside→outside, total reflection</td>
-</tr>
-<tr>
-  <td class="c">4</td>
-  <td>Media-to-media, M2 hit first</td>
-</tr>
-<tr>
-  <td class="c">5</td>
-  <td>Media-to-media, M1 hit first</td>
-</tr>
-<tr>
-  <td class="c">6</td>
-  <td>Media-to-media, M1 hit first, total reflection</td>
-</tr>
-<tr>
-  <td class="c">7</td>
-  <td>Overlapping faces, outside→inside</td>
-</tr>
-<tr>
-  <td class="c">8</td>
-  <td>Overlapping faces, inside→outside</td>
-</tr>
-<tr>
-  <td class="c">9</td>
-  <td>Overlapping faces, inside→outside, total reflection</td>
-</tr>
-<tr>
-  <td class="c">10</td>
-  <td>Edge hit, outside→inside→outside</td>
-</tr>
-<tr>
-  <td class="c">11</td>
-  <td>Edge hit, inside→outside→inside</td>
-</tr>
-<tr>
-  <td class="c">12</td>
-  <td>Edge hit, inside→outside→inside, total reflection</td>
-</tr>
-<tr>
-  <td class="c">13</td>
-  <td>Edge hit, outside→inside</td>
-</tr>
-<tr>
-  <td class="c">14</td>
-  <td>Edge hit, inside→outside</td>
-</tr>
-<tr>
-  <td class="c">15</td>
-  <td>Edge hit, inside→outside, total reflection</td>
-</tr>
-</table>
-</li>
-</ul>
-
-<b>See also:</b><br>
-<ul>
-<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
-<li><a href="#obj_file_read">obj_file_read</a> (for loading <code>mesh</code> and <code>mtl_prop</code> from OBJ file)</li>
-<li><a href="#ray_state_update">ray_state_update</a> (inside/outside state machine)</li>
-<li><a href="#icosphere">icosphere</a> (for generating beams)</li>
-<li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (for computing FBS and SBS positions)</li>
-<li><a href="#ray_point_intersect">ray_point_intersect</a> (for calculating beam interactions with sampling points)</li>
-</ul>
-
-<hr class="greyline"><br>
 <span id="ray_point_intersect" class="qd-func"><b>ray_point_intersect</b></span><br>
 <hr class="thin">
 Calculate intersections of ray beams with points in 3D space
@@ -4936,78 +4696,6 @@ std::vector&lt;arma::u32_vec&gt; quadriga_lib::ray_point_intersect(
 <li><a href="#subdivide_rays">subdivide_rays</a> (subdivide beams into sub-beams)</li>
 <li><a href="#ray_triangle_intersect">ray_triangle_intersect</a> (ray–triangle intersection)</li>
 <li><a href="#ray_mesh_interact">ray_mesh_interact</a> (beam–mesh interaction)</li>
-</ul>
-
-<hr class="greyline"><br>
-<span id="ray_state_update" class="qd-func"><b>ray_state_update</b></span><br>
-<hr class="thin">
-Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
-<ul>
-<li>Corrects the per-interaction <code>gainN</code> / <code>xprmatN</code> produced by <a href="#ray_mesh_interact">ray_mesh_interact</a> using a tracked per-ray medium state, and carries that state forward. Three signed-<code>short</code> words per ray hold the current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w & 0x7FFF<code>, </code>flag = w & 0x8000`).</li>
-<li>Ports the inside/outside state machine formerly embedded in <a href="#calc_diffraction_gain">calc_diffraction_gain</a> and overlays a closed-form thin-slab factor <code>S</code> (the Airy sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on the tracer to follow every internal bounce.</li>
-<li>Called twice per interaction by the ray tracer: once for the reflection pass (<code>interaction_type</code> 0 or 3) and once for the transmission/refraction pass (<code>interaction_type</code> 1, 2 or 4). With <code>S</code> suppressed (the survival gate re-emits) the transmission/refraction path reproduces <a href="#calc_diffraction_gain">calc_diffraction_gain</a> bit-for-bit.</li>
-</ul>
-
-<b>Declaration:</b><br>
-<pre>
-void quadriga_lib::ray_state_update(
-    int interaction_type,
-    dtype center_frequency,
-    const arma::Mat&lt;dtype&gt; *orig,
-    const arma::Mat&lt;dtype&gt; *dest,
-    const arma::Mat&lt;dtype&gt; *fbs,
-    const arma::Mat&lt;dtype&gt; *sbs,
-    const arma::u32_vec *no_interact,
-    const arma::Col&lt;dtype&gt; *fbs_angleN,
-    const arma::s32_vec *out_typeN,
-    const std::unordered_map&lt;std::string, std::vector&lt;dtype&gt;&gt; *mtl_prop,
-    const arma::Col&lt;short&gt; *mtl_ind_fbs,
-    const arma::Col&lt;short&gt; *mtl_ind_sbs,
-    const arma::Col&lt;short&gt; *mtl_ind_prev_in = nullptr,
-    const arma::Col&lt;short&gt; *mtl_ind_current_in = nullptr,
-    const arma::Col&lt;short&gt; *mtl_ind_buffer_in = nullptr,
-    const arma::Mat&lt;dtype&gt; *normal_vecN = nullptr,
-    const arma::Mat&lt;dtype&gt; *path_dir_prev = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_prev_outN = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_current_outN = nullptr,
-    arma::Col&lt;short&gt; *mtl_ind_buffer_outN = nullptr,
-    arma::Col&lt;dtype&gt; *gainN = nullptr,
-    arma::Mat&lt;dtype&gt; *xprmatN = nullptr,
-    arma::Mat&lt;dtype&gt; *path_dirN = nullptr,
-    arma::Col&lt;dtype&gt; *excess_delayN = nullptr,
-    const arma::u32_vec *ray_indN = nullptr,
-    const arma::Mat&lt;dtype&gt; *orig_correct = nullptr,
-    double eps = 0.15);
-</pre>
-
-<b>Inputs:</b><br>
-<ul>
-<li><b><code>interaction_type</code></b> — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission</li>
-<li><b><code>center_frequency</code></b> — Center frequency in [Hz]</li>
-<li><b><code>orig</code></b>, <b><code>dest</code></b>, <b><code>fbs</code></b>, <b><code>sbs</code></b> — Ray origin, destination, first and second interaction points in GCS, full ray set; <code>[n_ray, 3]</code>, read at <code>g = ray_ind[i]</code></li>
-<li><b><code>no_interact</code></b> — Mesh-hit count per ray, full ray set; <code>[n_ray]</code>, read at <code>g</code></li>
-<li><b><code>fbs_angleN</code></b> — Incidence angle at FBS (ITU convention), compact set; <code>[n_rayN]</code></li>
-<li><b><code>out_typeN</code></b> — Interaction type code from <a href="#ray_mesh_interact">ray_mesh_interact</a>, compact set; <code>[n_rayN]</code></li>
-<li><b><code>mtl_prop</code></b> — Material properties keyed by column name (the <code>csv_prop</code> output of <a href="#obj_file_read">obj_file_read</a>)</li>
-<li><b><code>mtl_ind_fbs</code></b>, <b><code>mtl_ind_sbs</code></b> — Material indices M1 / M2 of the FBS / SBS faces, compact set; <code>[n_rayN]</code> (0 = air)</li>
-<li><b><code>mtl_ind_prev_in</code></b>, <b><code>mtl_ind_current_in</code></b>, <b><code>mtl_ind_buffer_in</code></b> — Old state words, full ray set; <code>[n_ray]</code>, read at <code>g</code>, never written. NULL reads as state <code>0</code> (outside, no flags).</li>
-<li><b><code>normal_vecN</code></b> — FBS and SBS normals <code>[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]</code>, compact set; <code>[n_rayN, 6]</code>. NULL disables the parallelism (wedge) test</li>
-<li><b><code>eps</code></b> — Resolve threshold for the thin-slab (Fabry-Pérot) factor <code>S</code>. A slab is solved analytically only when its round-trip amplitude <code>rho = sqrt(R_near · R_far · medium_gain(slab, 2L))</code> reaches <code>eps</code>; below it, the bounce is re-emitted for the tracer to follow. Range <code>[0, 1]</code>. <code>eps = 0</code> always resolves — required for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more weak cavities back to the tracer (<code>eps ≈ drop_threshold^(1/N_max)</code>, ~0.1–0.25); <code>eps &gt;= 1</code> disables <code>S</code>.</li>
-</ul>
-
-<b>Outputs:</b><br>
-<ul>
-<li><b><code>mtl_ind_prev_out</code></b>, <b><code>mtl_ind_current_out</code></b>, <b><code>mtl_ind_buffer_out</code></b> — New state words, compact set; <code>[n_rayN]</code>, written at <code>i</code>. NULL skips the write. Passing all six state args NULL disables tracking — each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap <code>S</code>); cross-interaction slab <code>S</code> and reflection-bounce <code>S</code> need the tracked medium.</li>
-<li><b><code>gainN</code></b> <i>(in/out)</i> — Per-interaction gain, patched in place; <code>[n_rayN]</code></li>
-<li><b><code>xprmatN</code></b> <i>(in/out)</i> — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; <code>[n_rayN, 8]</code></li>
-<li><b><code>ray_ind</code></b> — Compact-to-full ray index map; <code>[n_rayN]</code> -> <code>[n_ray]</code>; NULL = identity (<code>n_ray == n_rayN</code>)</li>
-</ul>
-
-<b>See also:</b><br>
-<ul>
-<li><a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)</li>
-<li><a href="#ray_mesh_interact">ray_mesh_interact</a> (computes the per-interaction Fresnel/Jones result this function corrects)</li>
-<li><a href="#calc_diffraction_gain">calc_diffraction_gain</a> (the reference state machine this function ports)</li>
 </ul>
 
 <hr class="greyline"><br>
