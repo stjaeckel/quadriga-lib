@@ -27,7 +27,7 @@ A shooting-and-bouncing-rays (SBR) tracer decomposes a propagation path into seg
 
 - **`ray_state_update`** is the *per-ray state machine*. It carries three small state words per ray across interactions (current medium, previous medium, a one-slot transition buffer), decides what each hit *means* in context — entry, exit, embedded face to ignore, illegal state to terminate — and corrects the per-interaction gain accordingly. On top of the ported state logic it adds a closed-form thin-slab resolution: when a ray crosses a parallel slab whose internal multiple reflections still carry significant energy, the first-order interaction is multiplied by the Airy factor $S$ so that one coefficient captures the entire internal bounce series [4], instead of relying on the tracer to follow every internal reflection as a separate ray.
 
-The tracer calls both functions once per interaction and per physical pass: a **reflection pass** produces the reflected child ray, and a **transmission/refraction pass** produces the forward child ray. Five interaction types select the physics:
+The tracer calls both functions once per interaction and per physical pass: a **reflection pass** produces the reflected child ray, and a **transmission/refraction pass** produces the forward child ray. Six interaction types select the physics:
 
 | `interaction_type` | Meaning             | Geometry   | Field model        |
 |:------------------:|---------------------|------------|--------------------|
@@ -36,8 +36,9 @@ The tracer calls both functions once per interaction and per physical pass: a **
 | 2                  | EM refraction       | Snell bent | full polarization  |
 | 3                  | scalar reflection   | reflection | scalar (pressure)  |
 | 4                  | scalar transmission | undeviated | scalar (pressure)  |
+| 5                  | scalar refraction   | Snell bent | scalar (pressure)  |
 
-Types 0–2 are the electromagnetic modes with a $2 \times 2$ complex polarization (Jones) transfer matrix. Types 3–4 are the scalar modes used for acoustics: a single complex pressure coefficient, TE-only Fresnel physics, and no total internal reflection. Type 2 bends the ray according to Snell's law and is the physically correct dielectric transmission path; types 1 and 4 keep the ray undeviated, which is the standard approximation for through-wall building penetration where the two refractions of a flat slab cancel and only a small parallel offset is ignored.
+Types 0–2 are the electromagnetic modes with a $2 \times 2$ complex polarization (Jones) transfer matrix. Types 3–5 are the scalar modes used for acoustics: a single complex pressure coefficient and TE-only Fresnel physics. Types 2 and 5 bend the ray according to Snell's law (the physically correct refracted path); types 1 and 4 keep the ray undeviated, which is the standard approximation for through-wall building penetration where the two refractions of a flat slab cancel and only a small parallel offset is ignored. Total internal reflection applies uniformly to all six types (Section 3.2).
 
 Conventions used throughout the code and this document:
 
@@ -181,7 +182,17 @@ R_0 + (1 - R_0)\,(-\mathrm{tf}), & \mathrm{tf} < 0 \quad \text{(shift energy tow
 \end{cases}
 $$
 
-with $R_0 \in [0,1]$ the physical Fresnel power reflectance (`Material::apply_tf`; $R_0$ is clamped first to guard against resonance overshoot). $\mathrm{tf} = +1$ makes the surface fully transparent, $\mathrm{tf} = -1$ a perfect mirror, $\mathrm{tf} = 0$ leaves Fresnel untouched. The factor modifies magnitudes only; the Fresnel phases are preserved (Section 3.4). The **owner** of the factor at any interface is the material whose face is being crossed: the entered material on a front-side hit, the exited material on a back-side hit, and — inside the thin-slab factor — the solid side of each mirror (Section 7.5). Using one consistent owner everywhere is what keeps the reflection and transmission ports of a slab energy-complementary.
+with $R_0 \in [0,1]$ the physical Fresnel power reflectance (the single-sided building block `Material::apply_tf`; $R_0$ is clamped first to guard against resonance overshoot). $\mathrm{tf} = +1$ makes the surface fully transparent, $\mathrm{tf} = -1$ a perfect mirror, $\mathrm{tf} = 0$ leaves Fresnel untouched. The factor modifies magnitudes only; the Fresnel phases are preserved (Section 3.4).
+
+At a two-medium interface the factor is combined symmetrically from both faces (`Material::apply_tf_pair`). With $\mathrm{tf}^+ = \max(\mathrm{tf}, 0)$ and $\mathrm{tf}^- = \max(-\mathrm{tf}, 0)$ on each side $A, B$,
+
+$$
+R_\mathrm{leak} = R_0\,(1 - \mathrm{tf}_A^+)(1 - \mathrm{tf}_B^+),
+\qquad
+R_\mathrm{eff} = R_\mathrm{leak} + (1 - R_\mathrm{leak})\,\max(\mathrm{tf}_A^-, \mathrm{tf}_B^-).
+$$
+
+This reduces to `apply_tf` at an air boundary (the other side's $\mathrm{tf} = 0$), stays in $[0,1]$, and gives $R_\mathrm{eff} = 1$ if either face has $\mathrm{tf} = -1$. The single-owner `apply_tf` is retained only *inside* the thin-slab factor, where each mirror has exactly one solid side (Section 7.5). Using the symmetric pair at interfaces is what keeps both reflection and transmission ports of a slab energy-complementary — including the EM reflection port, which now carries the factor as well (Section 3.4).
 
 ### 2.6 Table validation and defaults
 
@@ -239,14 +250,14 @@ $$
 
 The associated interface power gains average the two polarizations, $R = \tfrac{1}{2}(|R_\mathrm{TE}|^2 + |R_\mathrm{TM}|^2)$ and likewise for $T$.
 
-**Total internal reflection** occurs for the EM types when $n_{12}\sin\theta_i \ge 1$ (or when forced by the caller for ray-tube consistency, Section 4.6); then $R_\mathrm{TE} = R_\mathrm{TM} = 1$, the reflectance is 1, and the transmission coefficients are zero. The scalar types never take the TIR branch — beyond the would-be critical angle the complex $\cos\theta_t$ already drives $|R| \to 1$ smoothly, which is the appropriate behavior for the impedance-mapped acoustic materials of Section 6.
+**Total internal reflection** is decided uniformly for all six types: $\mathrm{tir} = \mathrm{force\_tir} \;\lor\; n_{12}\sin\theta_i \ge 1$ (the caller forces it for ray-tube consistency, Section 4.6). Under TIR the interface becomes a perfect mirror — $R_\mathrm{TE} = R_\mathrm{TM} = 1$ for the EM types, $|R| = 1$ for the scalar types — the reflectance is 1, and the bent/forward Fresnel port vanishes. Any forward energy then comes solely from the transmission factor (Section 2.5), which is zero when $\mathrm{tf} = 0$.
 
 ### 3.3 The scalar branch
 
-The scalar types use the TE coefficient only and then re-derive an energy-normalized pair under the transmission factor. With $R_0 = \min(\max(|R_\mathrm{TE}|^2, 0), 1)$ and the tf owner chosen by the hit side — the entered material `other` for $\theta \ge 0$ (front hit), the incidence material `this` for $\theta < 0$ (back hit) —
+The scalar types use the TE coefficient only and re-derive a coefficient pair under the symmetric transmission factor (Section 2.5). With $R_0 = \min(\max(|R_\mathrm{TE}|^2, 0), 1)$,
 
 $$
-R_\mathrm{eff} = \mathrm{apply\_tf}(R_0),
+R_\mathrm{eff} = \mathrm{apply\_tf\_pair}(R_0),
 \qquad
 r = \sqrt{R_\mathrm{eff}}\; e^{\,j\arg R_\mathrm{TE}},
 \qquad
@@ -255,25 +266,29 @@ $$
 
 The magnitudes are energy-complementary by construction ($|r|^2 + |t|^2 = 1$); the phases are the Fresnel reflection phase and the Stokes-consistent transmission phase $\arg(1 + R_\mathrm{TE})$ (the field just inside the boundary is $1 + r$), so the tf redistribution moves energy without touching the phase relations the thin-slab series depends on [5].
 
-### 3.4 Energy partition of the five types
+Types 3 and 4 use this energy-complementary pair ($r$ for reflection, $t$ for undeviated transmission). Type 5 (scalar refraction) instead carries the *field-power* pressure transmission — the scalar analogue of EM refraction (Section 3.4) — with $t = (1 + R_\mathrm{TE})\sqrt{s}$ and port gain $|1 + R_\mathrm{TE}|^2\,s$, where $s = (1 - R_\mathrm{eff})/(1 - R_0)$ scales the tf shift onto the raw pressure coefficient ($s = 1$ at $\mathrm{tf} = 0$). Under TIR, type 5 collapses to the type-4 form.
 
-The returned interface gain and the coefficient pair $(c_\mathrm{TE}, c_\mathrm{TM})$ depend on the interaction type:
+### 3.4 Energy partition of the six types
+
+The returned interface gain and the coefficient pair $(c_\mathrm{TE}, c_\mathrm{TM})$ depend on the interaction type. Write $R = \tfrac{1}{2}(|R_\mathrm{TE}|^2 + |R_\mathrm{TM}|^2)$ for the Fresnel reflectance, $R_\mathrm{eff} = \mathrm{apply\_tf\_pair}(R)$ for its tf-adjusted value, $T = \tfrac{1}{2}(|T_\mathrm{TE}|^2 + |T_\mathrm{TM}|^2)$ for the Fresnel transmittance, and $s = (1 - R_\mathrm{eff})/(1 - R)$ for the tf scale ($0$ if $R \ge 1$, and $s = 1$ at $\mathrm{tf} = 0$):
 
 | Type | Port gain $G$ | Coefficients |
 |------|---------------|--------------|
-| 0 (EM reflection) | $\tfrac{1}{2}(\lvert R_\mathrm{TE}\rvert^2{+}\lvert R_\mathrm{TM}\rvert^2)$; $1$ under TIR | $R_\mathrm{TE}, R_\mathrm{TM}$ |
-| 1 (EM transmission) | $1 - R$, coefficients rescaled by $\sqrt{(1-R)/T}$ | $T_\mathrm{TE}, T_\mathrm{TM}$ rescaled |
-| 2 (EM refraction) | raw Fresnel $T = \tfrac{1}{2}(\lvert T_\mathrm{TE}\rvert^2{+}\lvert T_\mathrm{TM}\rvert^2)$ | $T_\mathrm{TE}, T_\mathrm{TM}$ |
+| 0 (EM reflection) | $R_\mathrm{eff}$; $1$ under TIR | $R_\mathrm{TE}, R_\mathrm{TM}$ rescaled by $\sqrt{R_\mathrm{eff}/R}$ (flat $\sqrt{R_\mathrm{eff}}$ if $R = 0$) |
+| 1 (EM transmission) | $1 - R_\mathrm{eff}$ | $T_\mathrm{TE}, T_\mathrm{TM}$ rescaled by $\sqrt{(1 - R_\mathrm{eff})/T}$ |
+| 2 (EM refraction) | $T\,s$ (field power); $1 - R_\mathrm{eff}$ under TIR | $T_\mathrm{TE}, T_\mathrm{TM}$ scaled by $\sqrt{s}$ (flat $\sqrt{1 - R_\mathrm{eff}}$ under TIR) |
 | 3 (scalar reflection) | $R_\mathrm{eff}$ | $r$ on both slots |
 | 4 (scalar transmission) | $1 - R_\mathrm{eff}$ | $t$ on both slots |
+| 5 (scalar refraction) | $\lvert 1 + R_\mathrm{TE}\rvert^2\,s$ (field power); $1 - R_\mathrm{eff}$ under TIR | $(1 + R_\mathrm{TE})\sqrt{s}$ on both slots |
 
-Three rules complete the partition:
+The following rules complete the partition:
 
-- **Energy-conserving undeviated transmission (types 1, 4).** The straight-through beam carries *all* power not reflected: $G = 1 - R$. For type 1 the Fresnel transmission coefficients are rescaled by $\sqrt{(1-R)/T}$ so that $\tfrac{1}{2}(|c_\mathrm{TE}|^2 + |c_\mathrm{TM}|^2) = G$ holds exactly; the per-polarization *ratio* and phases stay Fresnel. This is the convention that makes the slab energy ledger of Section 9 close, because the entry and exit ports of a slab then compose to $t_{12}t_{21} = 1 - r^2$ in magnitude — the lossless Stokes relation [5].
-- **Dense-to-light pass-through (types 1, 4, EM only via the index test).** When the ray would *exit* into an optically lighter medium ($\mathrm{Re}(\varepsilon_1\mu_1) > \mathrm{Re}(\varepsilon_2\mu_2)$), the EM transmission is set to full pass-through: $T_\mathrm{TE} = T_\mathrm{TM} = 1$, $G = 1$, $R = 0$. On the undeviated path the dense-side Fresnel transmission would otherwise impose a spurious critical angle and amplitude distortion that the (missing) exit refraction would have undone; the pass-through is the consistent undeviated-path treatment, with the slab's total isolation carried by the entry side plus the lumped and in-medium terms. (The scalar branch achieves the same end through its own energy normalization.)
-- **Lumped interface loss fold-in.** For all transmissive geometries (types 1, 2, 4) the entered material's $G_\mathrm{if}$ (Section 2.4) multiplies the port gain and $\sqrt{G_\mathrm{if}}$ multiplies both coefficients. Reflection (types 0, 3) never applies it.
+- **Transmission factor on every port.** Both reflection ports (types 0, 3) and both undeviated-transmission ports (types 1, 4) are driven by the symmetric $R_\mathrm{eff}$ of Section 2.5, so the reflection and transmission halves of an interface stay energy-complementary as tf moves energy between them. The factor rescales magnitudes only; Fresnel ratios and phases are preserved.
+- **Energy-conserving undeviated transmission (types 1, 4).** The straight-through beam carries *all* power not reflected: $G = 1 - R_\mathrm{eff}$. For type 1 the Fresnel transmission coefficients are rescaled by $\sqrt{(1 - R_\mathrm{eff})/T}$ so that $\tfrac{1}{2}(|c_\mathrm{TE}|^2 + |c_\mathrm{TM}|^2) = G$ holds exactly; the per-polarization *ratio* and phases stay Fresnel. At $\mathrm{tf} = 0$ this reduces to the lossless Stokes relation $t_{12}t_{21} = 1 - r^2$ in magnitude [5], the convention that closes the slab energy ledger of Section 9.
+- **Field-power refraction (types 2, 5).** The bent ports carry the *raw* Fresnel field power — $T$ for EM, $|1 + R_\mathrm{TE}|^2$ for the scalar pressure wave — scaled by the tf factor $s$ (unity at $\mathrm{tf} = 0$, so the baseline is exact Fresnel). This is the field/bent-ray convention, deliberately distinct from the energy-conserving $1 - R_\mathrm{eff}$ of the undeviated types. Under TIR there is no propagating refracted wave, so both collapse to the undeviated form $G = 1 - R_\mathrm{eff}$ along the incidence direction.
+- **Lumped interface loss fold-in.** For every transmissive interaction (types 1, 2, 4, 5) the entered material's $G_\mathrm{if}$ (Section 2.4) multiplies the port gain and $\sqrt{G_\mathrm{if}}$ multiplies both coefficients. Reflection (types 0, 3) never applies it.
 
-Type 2, EM refraction, is the physically exact dielectric path: raw Fresnel transmission, true Snell bending, and TIR producing the *total-reflection out-codes* of Section 4.1 — under TIR there is no forward port and the state machine kills the forward ray (Section 8.1).
+Types 2 and 5 are the bent dielectric/acoustic paths: raw-Fresnel field power, true Snell bending, and TIR producing the *total-reflection out-codes* of Section 4.1. Under TIR the bent forward port collapses to the tf leak $1 - R_\mathrm{eff}$, which is zero when $\mathrm{tf} = 0$; in that lossless case there is no forward energy and the state machine kills the forward ray (Section 8.1), while a $\mathrm{tf} > 0$ leak travels undeviated.
 
 ---
 
@@ -287,7 +302,7 @@ For each ray with a valid first intersection (`fbs_ind > 0`), the face normal is
 |:----:|------------------------------------------------------|------------|
 | 1    | Single hit, outside→inside                           | $\theta \ge 0$, faces not colocated |
 | 2    | Single hit, inside→outside                           | $\theta < 0$ |
-| 3    | Single hit, inside→outside, total reflection         | as 2, TIR (type 2 only) |
+| 3    | Single hit, inside→outside, total reflection         | as 2, TIR (refraction geometry, types 2, 5) |
 | 4    | Media-to-media, M2 hit first                         | colocated, opposing normals, $\theta \ge 0$ |
 | 5    | Media-to-media, M1 hit first                         | colocated, opposing normals, $\theta < 0$ |
 | 6    | Media-to-media, M1 first, total reflection           | as 5, TIR |
@@ -301,7 +316,7 @@ For each ray with a valid first intersection (`fbs_ind > 0`), the face normal is
 | 14   | Edge hit, inside→outside                             | edge, $\theta < 0$, $\theta_\mathrm{SBS} \le 0$ |
 | 15   | Edge hit, i-o, total reflection                      | as 14, TIR |
 
-The TIR variants (3, 6, 9, 12, 15) are emitted only on the refraction pass (type 2), where total reflection genuinely removes the forward port. Rays with `fbs_ind = 0` are omitted from the output, so the compact output set has $n_\mathrm{rayN} \le n_\mathrm{ray}$ entries; the surviving rays' input indices are reported so the caller (and `ray_state_update`) can map between the sets.
+The TIR variants (3, 6, 9, 12, 15) are emitted only on the refraction geometries (types 2 and 5, i.e. `geometry_type == 2`), where total reflection removes the propagating forward port (a $\mathrm{tf} > 0$ leak still travels undeviated, Section 3.4). Rays with `fbs_ind = 0` are omitted from the output, so the compact output set has $n_\mathrm{rayN} \le n_\mathrm{ray}$ entries; the surviving rays' input indices are reported so the caller (and `ray_state_update`) can map between the sets.
 
 ### 4.2 Material assignment
 
@@ -315,7 +330,7 @@ $$
 \hat{d} = n_{12}\,\hat{u} + \big(n_{12}\cos\theta_i - \mathrm{Re}\cos\theta_t\big)\,\hat{n},
 $$
 
-normalized to unit length. The child origin is offset $1\,\mathrm{mm}$ along $\hat{d}$ (`origN = fbs + ray_offset · d̂`), and the new destination preserves the remaining segment length. The beam tube (`trivec`/`tridir`), when present, is propagated per vertex ray through the same geometry, with degenerate vertex hits flagged through an infinite edge length.
+normalized to unit length. Under TIR — the unified test of Section 3.2, or a ray-tube straddle (Section 4.6) — no refraction direction exists, so the refraction geometry reverts to the undeviated incoming direction. The child origin is offset $1\,\mathrm{mm}$ along $\hat{d}$ (`origN = fbs + ray_offset · d̂`), and the new destination preserves the remaining segment length. The beam tube (`trivec`/`tridir`), when present, is propagated per vertex ray through the same geometry, with degenerate vertex hits flagged through an infinite edge length.
 
 ### 4.4 In-medium attenuation at the hit
 
@@ -329,7 +344,9 @@ The scalar types write the single complex pressure coefficient into the first sl
 
 ### 4.6 Ray-tube TIR consistency
 
-When a beam tube straddles the critical angle — the central ray refracts but a vertex ray does not (or vice versa) — the interface coefficients are re-evaluated once with TIR forced, so the whole tube carries one consistent physical branch instead of a mixture.
+A refracted beam tube must not tear at the critical angle, where the refracted direction runs parallel to the face and the wavefront diverges. Before computing any direction, `ray_mesh_interact` runs one TIR precheck over the spine and all three vertex rays: if the spine *or any* vertex is at or beyond critical ($n_{12}\sin\theta_v \ge 1$), the whole tube — center and edges — is forced onto the undeviated pass-through direction, and the interface coefficients are re-evaluated once with TIR forced so the energy matches.
+
+The forced-TIR forward gain is $1 - R_\mathrm{eff}$: zero when $\mathrm{tf} = 0$ (the straddling tube simply reflects, the near-critical $|T|^2$ blow-up discarded along with the would-be transmission), and nonzero only when the transmission factor leaks energy forward — in which case that leak travels undeviated at the incidence angle, exactly what the mass-law transmission needs. The decision is made once for the whole tube, so every leg takes the same branch and the reported `path_dirN` follows the same forced direction.
 
 ---
 
@@ -385,7 +402,7 @@ $$
 
 so $1\,\mathrm{kHz}$ acoustic $\equiv 0.875\,\mathrm{GHz}$ radio, and every acoustic material fixes $f_\mathrm{ref} = 0.875$. Absolute frequencies (`resF`, `coiF`) convert the same way (100 Hz → 0.0875 GHz). The analogy carries interface reflection, bulk absorption, and the mass-law/coincidence/resonance mechanisms; it does not by itself model modal interference or diffraction — the thin-slab factor of Section 7.5 restores exactly the slab-interference part. Simulation results are air-normalized (atmospheric absorption per ISO 9613-1 [6] is removed and re-applied outside).
 
-Acoustic runs use the scalar types (3 = reflection, 4 = transmission): a single pressure coefficient, no polarization, no hard TIR (Section 3.2), and no refraction mode — scalar transmission is always the undeviated path. The wave variables map as
+Acoustic runs use the scalar types (3 = reflection, 4 = undeviated transmission, 5 = Snell-bent refraction): a single pressure coefficient, no polarization, and — like the EM types — total internal reflection beyond the critical angle (Section 3.2). Type 4 keeps the ray undeviated (the standard through-partition approximation); type 5 bends it by Snell's law for the cases where the refracted acoustic path matters. The wave variables map as
 
 $$
 \varepsilon \leftrightarrow \text{compressibility}, \qquad
@@ -405,7 +422,7 @@ a = \left(\frac{1 - \sqrt{1 - \alpha_\mathrm{abs}}}{1 + \sqrt{1 - \alpha_\mathrm
 \qquad (\text{small } \alpha_\mathrm{abs}: \ a \approx \alpha_\mathrm{abs}^2/16).
 $$
 
-Because $\varepsilon \ll 1$ the body is "optically rarer" than air, the dense-to-light gate makes the air→wall crossing of the undeviated path pass-through, and the partition's *isolation* is carried entirely by `att` (level), `m` (mass-law slope), and `coi*` (coincidence dip) — the acoustic transmission-loss toolbox [7].
+Because $\varepsilon \ll 1$ the body is "optically rarer" than air, so the air→wall crossing is dense-to-light with $|R| \to 1$ and the room-side reflection dominates. The partition's *isolation* — `att` (level), `m` (mass-law slope), and `coi*` (coincidence dip), the acoustic transmission-loss toolbox [7] — is carried on the through-partition transmission path. 
 
 **Porous absorbers** (foam, mineral wool, fiberglass, carpet, curtains): a genuine two-parameter medium. Given the layer's complex refractive index $n(f)$ and normalized surface impedance $z(f)$ — from a Delany–Bazley flow-resistivity fit [5] or from measurement — the columns follow in closed form:
 
