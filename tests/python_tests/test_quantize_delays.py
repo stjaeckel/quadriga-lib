@@ -18,6 +18,24 @@ import quadriga_lib
 
 class test_quantize_delays(unittest.TestCase):
 
+    @staticmethod
+    def _sample_input():
+        """Two snapshots, 2x1 ports, mixed on/off-grid delays."""
+        cre = [np.zeros((2, 1, 3)), np.zeros((2, 1, 2))]
+        cim = [np.zeros((2, 1, 3)), np.zeros((2, 1, 2))]
+        dl = [np.zeros((2, 1, 3)), np.zeros((2, 1, 2))]
+
+        cre[0][0, 0, :] = [1.0, 2.0, 0.5]; cim[0][0, 0, :] = [0.5, -1.0, 0.3]
+        dl[0][0, 0, :] = [0.0, 12.5e-9, 25.0e-9]
+        cre[0][1, 0, :] = [0.8, 1.5, 0.3]; cim[0][1, 0, :] = [0.2, -0.5, 0.1]
+        dl[0][1, 0, :] = [5.0e-9, 17.5e-9, 30.0e-9]
+
+        cre[1][0, 0, :] = [3.0, 0.7]; cim[1][0, 0, :] = [1.0, -0.3]
+        dl[1][0, 0, :] = [10.0e-9, 22.5e-9]
+        cre[1][1, 0, :] = [1.2, 0.9]; cim[1][1, 0, :] = [0.4, -0.6]
+        dl[1][1, 0, :] = [0.0, 35.0e-9]
+        return cre, cim, dl
+
     def test_input_validation(self):
         """Test that invalid inputs raise errors"""
         cre = [np.ones((2, 2, 3))]
@@ -363,6 +381,128 @@ class test_quantize_delays(unittest.TestCase):
             npt.assert_allclose(cim_q2[s], cim_q1[s], atol=1e-12, rtol=0)
             npt.assert_allclose(dl_q2[s], dl_q1[s], atol=1e-20, rtol=0)
 
+    def test_complex_input_equals_split_input(self):
+        """Complex coeff list and split re/im lists produce identical output."""
+        cre, cim, dl = self._sample_input()
+        coeff = [cre[s] + 1j * cim[s] for s in range(len(cre))]
+
+        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9)
+        cre_qc, cim_qc, dl_qc = quadriga_lib.channel.quantize_delays(
+            coeff=coeff, delay=dl, tap_spacing=5e-9)
+
+        self.assertEqual(len(cre_qc), len(cre_q))
+        for s in range(len(cre_q)):
+            npt.assert_allclose(cre_qc[s], cre_q[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(cim_qc[s], cim_q[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(dl_qc[s], dl_q[s], atol=1e-20, rtol=0)
+
+    def test_complex_output_matches_split_output(self):
+        """complex=True returns coeff == re + 1j*im of the split output (input form is independent)."""
+        cre, cim, dl = self._sample_input()
+
+        cre_q, cim_q, dl_q = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, complex=False)
+        coeff_q, dl_qc = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, complex=True)
+
+        self.assertEqual(len(coeff_q), len(cre_q))
+        for s in range(len(cre_q)):
+            self.assertTrue(np.iscomplexobj(coeff_q[s]))
+            npt.assert_allclose(coeff_q[s].real, cre_q[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(coeff_q[s].imag, cim_q[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(dl_qc[s], dl_q[s], atol=1e-20, rtol=0)
+
+    def test_complex_in_complex_out(self):
+        """Complex input with complex output returns a list of complex arrays."""
+        cre, cim, dl = self._sample_input()
+        coeff = [cre[s] + 1j * cim[s] for s in range(len(cre))]
+
+        coeff_q, dl_q = quadriga_lib.channel.quantize_delays(
+            coeff=coeff, delay=dl, tap_spacing=5e-9, complex=True)
+
+        self.assertIsInstance(coeff_q, list)
+        self.assertEqual(len(coeff_q), len(coeff))
+        for s in range(len(coeff_q)):
+            self.assertTrue(np.iscomplexobj(coeff_q[s]))
+
+    def test_stack_split_output(self):
+        """stack=True returns 4D real arrays equal to stacking the list output along axis 3."""
+        cre, cim, dl = self._sample_input()
+
+        cre_l, cim_l, dl_l = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=False)
+        cre_s, cim_s, dl_s = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True)
+
+        for arr in (cre_s, cim_s, dl_s):
+            self.assertIsInstance(arr, np.ndarray)
+            self.assertEqual(arr.ndim, 4)
+
+        n_snap = len(cre_l)
+        self.assertEqual(cre_s.shape[3], n_snap)
+        for s in range(n_snap):
+            npt.assert_allclose(cre_s[:, :, :, s], cre_l[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(cim_s[:, :, :, s], cim_l[s], atol=1e-12, rtol=0)
+            npt.assert_allclose(dl_s[:, :, :, s], dl_l[s], atol=1e-20, rtol=0)
+
+    def test_stack_complex_output(self):
+        """stack=True with complex=True returns one complex 4D array matching the split stack."""
+        cre, cim, dl = self._sample_input()
+
+        coeff_s, dl_s = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True, complex=True)
+        cre_s, cim_s, _ = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, stack=True, complex=False)
+
+        self.assertIsInstance(coeff_s, np.ndarray)
+        self.assertTrue(np.iscomplexobj(coeff_s))
+        self.assertEqual(coeff_s.ndim, 4)
+        self.assertEqual(coeff_s.shape[3], len(cre))
+        npt.assert_allclose(coeff_s.real, cre_s, atol=1e-12, rtol=0)
+        npt.assert_allclose(coeff_s.imag, cim_s, atol=1e-12, rtol=0)
+
+    def test_stack_shared_delay_shape(self):
+        """stack=True with fix_taps=1 yields a shared (1, 1, n_taps, n_snap) delay grid."""
+        cre = [np.ones((2, 1, 2)), np.ones((2, 1, 2))]
+        cim = [np.zeros((2, 1, 2)), np.zeros((2, 1, 2))]
+        dl = [np.zeros((1, 1, 2)), np.zeros((1, 1, 2))]
+        for s in range(2):
+            dl[s][0, 0, 1] = 12.5e-9
+
+        cre_s, cim_s, dl_s = quadriga_lib.channel.quantize_delays(
+            coeff_re=cre, coeff_im=cim, delay=dl, tap_spacing=5e-9, fix_taps=1, stack=True)
+
+        self.assertEqual(dl_s.ndim, 4)
+        self.assertEqual(dl_s.shape[0], 1)
+        self.assertEqual(dl_s.shape[1], 1)
+        self.assertEqual(dl_s.shape[3], 2)
+        self.assertEqual(cre_s.shape[0], 2)  # coefficients keep full RX dimension
+
+    def test_input_mode_validation(self):
+        """Coefficient input-mode exclusivity and the delay requirement."""
+        cre = [np.ones((1, 1, 2))]
+        cim = [np.zeros((1, 1, 2))]
+        dl = [np.zeros((1, 1, 2))]
+        coeff = [np.ones((1, 1, 2)) + 0j]
+
+        # Both complex and split coefficients provided
+        with self.assertRaises(Exception):
+            quadriga_lib.channel.quantize_delays(coeff=coeff, coeff_re=cre, coeff_im=cim, delay=dl)
+
+        # Only one half of the split pair
+        with self.assertRaises(Exception):
+            quadriga_lib.channel.quantize_delays(coeff_re=cre, delay=dl)
+        with self.assertRaises(Exception):
+            quadriga_lib.channel.quantize_delays(coeff_im=cim, delay=dl)
+
+        # No coefficients at all
+        with self.assertRaises(Exception):
+            quadriga_lib.channel.quantize_delays(delay=dl)
+
+        # Missing delay
+        with self.assertRaises(Exception):
+            quadriga_lib.channel.quantize_delays(coeff_re=cre, coeff_im=cim)
 
 if __name__ == '__main__':
     unittest.main()
