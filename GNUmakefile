@@ -8,7 +8,7 @@ static_lib = ON
 shared_lib = OFF
 octave = OFF
 matlab = OFF
-python = OFF
+python = ON
 avx2 = OFF
 cuda = OFF
 

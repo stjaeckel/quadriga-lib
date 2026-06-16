@@ -147,7 +147,7 @@ static quadriga_lib::arrayant<double> qd_python_dict2arrayant(const py::dict &ar
     if (arrayant.contains("coupling_im"))
         ant.coupling_im = qd_python_numpy2arma_Mat<double>(arrayant["coupling_im"], view, strict);
     else
-        ant.coupling_im.zeros(n_elements, n_elements);
+        ant.coupling_im.zeros(ant.coupling_re.n_rows, ant.coupling_re.n_cols);
 
     if (arrayant.contains("center_freq"))
         ant.center_frequency = arrayant["center_freq"].cast<double>();

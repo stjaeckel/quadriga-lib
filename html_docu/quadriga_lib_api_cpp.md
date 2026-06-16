@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "15.06.2026"
+date: "16.06.2026"
 lang: en-US
 ---
 
@@ -27,105 +27,101 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 135 |
-| [.append](#append) | Array antenna class | 186 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 208 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 240 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 261 |
-| [.copy_element](#copy_element) | Array antenna class | 286 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 306 |
-| [.interpolate](#interpolate) | Array antenna class | 336 |
-| [.is_valid](#is_valid) | Array antenna class | 388 |
-| [.qdant_write](#qdant_write) | Array antenna class | 406 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 433 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 449 |
-| [.set_size](#set_size) | Array antenna class | 485 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 511 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 545 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 579 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 619 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 678 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 705 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 737 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 763 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 813 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 838 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 855 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 872 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 926 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 943 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 971 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 988 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1063 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1089 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1116 |
-| [channel](#channel) | Channel class | 1145 |
-| [.add_paths](#add_paths) | Channel class | 1192 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1230 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1249 |
-| [any_type_id](#any_type_id) | Channel functions | 1290 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1333 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1376 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1424 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1462 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1474 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1504 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1536 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1572 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1606 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1632 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1660 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1700 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1739 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1787 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1879 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1916 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1978 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2059 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2153 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2221 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2289 |
-| [acdf](#acdf) | Channel statistics | 2365 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2400 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2442 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2494 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2527 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2562 |
-| [fast_acos](#fast_acos) | Math functions | 2595 |
-| [fast_asin](#fast_asin) | Math functions | 2614 |
-| [fast_atan2](#fast_atan2) | Math functions | 2633 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2654 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2687 |
-| [fast_sincos](#fast_sincos) | Math functions | 2732 |
-| [fast_slerp](#fast_slerp) | Math functions | 2753 |
-| [interp_2D](#interp_2d) | Math functions | 2788 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2852 |
-| [colormap](#colormap) | Site-specific simulation tools | 2905 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2924 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2967 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3005 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3049 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3083 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3119 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3154 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3196 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3263 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3324 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3355 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3383 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3412 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3451 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3487 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3523 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3621 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3664 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3745 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3793 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3837 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3867 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3895 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3936 |
-| [write_png](#write_png) | Site-specific simulation tools | 3971 |
+| [arrayant](#arrayant) | Array antenna class | 131 |
+| [.append](#append) | Array antenna class | 182 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 204 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 236 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 257 |
+| [.copy_element](#copy_element) | Array antenna class | 282 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 302 |
+| [.interpolate](#interpolate) | Array antenna class | 332 |
+| [.is_valid](#is_valid) | Array antenna class | 384 |
+| [.qdant_write](#qdant_write) | Array antenna class | 402 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 429 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 445 |
+| [.set_size](#set_size) | Array antenna class | 481 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 507 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 541 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 575 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 615 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 674 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 701 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 733 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 759 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 809 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 834 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 851 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 868 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 922 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 939 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 967 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 984 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1059 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1085 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1112 |
+| [channel](#channel) | Channel class | 1141 |
+| [.add_paths](#add_paths) | Channel class | 1188 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1226 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1245 |
+| [any_type_id](#any_type_id) | Channel functions | 1286 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1329 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1372 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1420 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1458 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1470 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1500 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1532 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1568 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1602 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1628 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1656 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1696 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1735 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1783 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1875 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1912 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1974 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2055 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2149 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2217 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2285 |
+| [acdf](#acdf) | Channel statistics | 2361 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2396 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2438 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2490 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2523 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2558 |
+| [fast_acos](#fast_acos) | Math functions | 2591 |
+| [fast_asin](#fast_asin) | Math functions | 2610 |
+| [fast_atan2](#fast_atan2) | Math functions | 2629 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2650 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2683 |
+| [fast_sincos](#fast_sincos) | Math functions | 2728 |
+| [fast_slerp](#fast_slerp) | Math functions | 2749 |
+| [interp_2D](#interp_2d) | Math functions | 2784 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2848 |
+| [colormap](#colormap) | Site-specific simulation tools | 2901 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2920 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2963 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3001 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3045 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3079 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3121 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3188 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3249 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3280 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3308 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3337 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3376 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3412 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3448 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3491 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3539 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3583 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3613 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3641 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3682 |
+| [write_png](#write_png) | Site-specific simulation tools | 3717 |
 
 ---
 
@@ -3080,77 +3076,6 @@ arma::uword quadriga_lib::icosphere(
 - Number of generated triangular faces (20 × n_div²)
 
 ---
-## interface_gain
-Linear gain of a wave crossing a thin interface (lumped penetration loss)
-
-- Computes `g = 10^(-A/10)`, where `A` [dB] is the lumped transmission loss applied once when a
-  ray enters a material (the air-to-material or material-to-material front-side crossing). It is
-  independent of path length and is applied on top of the Fresnel interface term `1 - abs(R)²`:
-  - Power-law penetration loss `att·(f/fRef)^attB` (e.g. 3GPP TR 38.901 building-entry loss).
-  - An optional Lorentzian coincidence feature `coiA / (1 + (coiQ·(f - coiF)/coiF)²)`, active only
-    when `coiF > 0` and `coiA != 0`; negative `coiA` is a transmission dip (acoustic coincidence),
-    positive `coiA` a stop-band. The total is clamped to `>= 0`.
-- The reflection / conductivity columns (`a`, `b`, `c`, `d`) and the in-medium columns
-  (`alpha`, `alphaB`, `m`) of `mtl_prop` are not used here — the Fresnel reflection is handled by
-  the caller and the distance-dependent loss by [medium_gain](#medium_gain).
-
-### Declaration:
-```
-dtype quadriga_lib::interface_gain(
-    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
-    arma::uword iM,
-    dtype center_frequency);
-```
-
-### Inputs:
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
-- **`iM`** — 1-based material index (0 = no material / air)
-- **`center_frequency`** — Center frequency in [Hz]
-
-### Returns:
-- Linear interface gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the interface
-
-### See also:
-- [medium_gain](#medium_gain) (for the distance-dependent in-medium loss)
-- [ray_mesh_interact](#ray_mesh_interact) (for complex ray-material interactions)
-- [obj_file_read](#obj_file_read) (defines mtl_prop format)
-
----
-## medium_gain
-Linear gain of a ray traversing a homogeneous lossy medium
-
-- Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
-  of length `dist` inside the medium. The per-meter loss combines two contributions:
-  - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`,
-    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
-  - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
-    by `σ` (e.g. foliage, scattering media).
-- The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
-  thin-slab transmission loss, not propagation through a finite-thickness medium.
-
-### Declaration:
-```
-dtype quadriga_lib::medium_gain(
-    const arma::Mat<dtype> &mtl_prop,
-    arma::uword iM,
-    dtype dist,
-    dtype fGHz);
-```
-
-### Inputs:
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
-- **`iM`** —  1-based material index (0 = no material / air)
-- **`dist`** — Path length of the ray inside the medium
-- **`center_frequency`** — Center frequency in [Hz]
-
-### Returns:
-- Linear in-medium gain in `[0, 1]`; multiply by the incident field/power gain to get the value after the medium
-
-### See also:
-- [ray_mesh_interact](#ray_mesh_interact) (for complex ray-material interactions)
-- [obj_file_read](#obj_file_read) (defines mtl_prop format)
-
----
 ## mitsuba_xml_file_write
 Write a triangular mesh to a Mitsuba 3 XML scene file
 
@@ -3520,104 +3445,6 @@ arma::uvec quadriga_lib::point_inside_mesh(
 - [obj_file_read](#obj_file_read) (for reading `mesh` and `obj_ind` from an .obj file)
 
 ---
-## ray_mesh_interact
-Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
-
-- Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
-- Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
-- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
-  front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
-  FBS=SBS with opposing normals → media-to-media.
-- Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
-- Output direction encoding (spherical/Cartesian) matches input `tridir` format.
-- Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
-- Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
-  simulation with impedance-mapped material parameters (ε derived from Z).
-- For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
-
-### Declaration:
-```
-void quadriga_lib::ray_mesh_interact(
-    int interaction_type,
-    dtype center_frequency,
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
-    const arma::Mat<dtype> *mesh,
-    const arma::uvec *mtl_ind,
-    const std::unordered_map<std::string, td::vector<dtype>> *mtl_prop,
-    const arma::u32_vec *fbs_ind,
-    const arma::u32_vec *sbs_ind,
-    const arma::Mat<dtype> *trivec = nullptr,
-    const arma::Mat<dtype> *tridir = nullptr,
-    const arma::Col<dtype> *orig_length = nullptr,
-    arma::Mat<dtype> *origN = nullptr,
-    arma::Mat<dtype> *destN = nullptr,
-    arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
-    arma::Mat<dtype> *trivecN = nullptr,
-    arma::Mat<dtype> *tridirN = nullptr,
-    arma::Col<dtype> *orig_lengthN = nullptr,
-    arma::Col<dtype> *fbs_angleN = nullptr,
-    arma::Col<dtype> *thicknessN = nullptr,
-    arma::Col<dtype> *edge_lengthN = nullptr,
-    arma::Mat<dtype> *normal_vecN = nullptr,
-    arma::s32_vec *out_typeN = nullptr);
-```
-
-### Inputs:
-- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
-- **`center_frequency`** — Center frequency
-- **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
-- **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
-- **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`. 0 = face has no material (air). NULL → all faces treated as air.
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`. NULL → air defaults used.
-- **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); `[n_ray]`
-- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
-- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
-- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
-
-### Outputs:
-- **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
-- **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`; includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including in-medium attenuation; `[n_rayN, 8]`.
-- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
-- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
-- **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
-- **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
-- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
-- **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code; `[n_rayN]`
-   | Code  | Description                                         |
-   | :---: | --------------------------------------------------- |
-   |   1   | Single hit, outside→inside                          |
-   |   2   | Single hit, inside→outside                          |
-   |   3   | Single hit, inside→outside, total reflection        |
-   |   4   | Media-to-media, M2 hit first                        |
-   |   5   | Media-to-media, M1 hit first                        |
-   |   6   | Media-to-media, M1 hit first, total reflection      |
-   |   7   | Overlapping faces, outside→inside                   |
-   |   8   | Overlapping faces, inside→outside                   |
-   |   9   | Overlapping faces, inside→outside, total reflection |
-   |  10   | Edge hit, outside→inside→outside                    |
-   |  11   | Edge hit, inside→outside→inside                     |
-   |  12   | Edge hit, inside→outside→inside, total reflection   |
-   |  13   | Edge hit, outside→inside                            |
-   |  14   | Edge hit, inside→outside                            |
-   |  15   | Edge hit, inside→outside, total reflection          |
-
-### See also:
-- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
-- [obj_file_read](#obj_file_read) (for loading `mesh` and `mtl_prop` from OBJ file)
-- [ray_state_update](#ray_state_update) (inside/outside state machine)
-- [icosphere](#icosphere) (for generating beams)
-- [ray_triangle_intersect](#ray_triangle_intersect) (for computing FBS and SBS positions)
-- [ray_point_intersect](#ray_point_intersect) (for calculating beam interactions with sampling points)
-
----
 ## ray_point_intersect
 Calculate intersections of ray beams with points in 3D space
 
@@ -3659,87 +3486,6 @@ std::vector<arma::u32_vec> quadriga_lib::ray_point_intersect(
 - [subdivide_rays](#subdivide_rays) (subdivide beams into sub-beams)
 - [ray_triangle_intersect](#ray_triangle_intersect) (ray–triangle intersection)
 - [ray_mesh_interact](#ray_mesh_interact) (beam–mesh interaction)
-
----
-## ray_state_update
-Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) resolution
-
-- Corrects the per-interaction `gainN` / `xprmatN` produced by [ray_mesh_interact](#ray_mesh_interact) using a tracked
-  per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
-  current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
-  0x7FFF`, `flag = w & 0x8000`).
-- Ports the inside/outside state machine formerly embedded in [calc_diffraction_gain](#calc_diffraction_gain) and overlays
-  a closed-form thin-slab factor `S` (the Airy sum) so a single coefficient captures the full
-  internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on
-  the tracer to follow every internal bounce.
-- Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
-  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
-  suppressed (the survival gate re-emits) the transmission/refraction path reproduces
-  [calc_diffraction_gain](#calc_diffraction_gain) bit-for-bit.
-
-### Declaration:
-```
-void quadriga_lib::ray_state_update(
-    int interaction_type,
-    dtype center_frequency,
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
-    const arma::u32_vec *no_interact,
-    const arma::Col<dtype> *fbs_angleN,
-    const arma::s32_vec *out_typeN,
-    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
-    const arma::Col<short> *mtl_ind_fbs,
-    const arma::Col<short> *mtl_ind_sbs,
-    const arma::Col<short> *mtl_ind_prev_in = nullptr,
-    const arma::Col<short> *mtl_ind_current_in = nullptr,
-    const arma::Col<short> *mtl_ind_buffer_in = nullptr,
-    const arma::Mat<dtype> *normal_vecN = nullptr,
-    const arma::Mat<dtype> *path_dir_prev = nullptr,
-    arma::Col<short> *mtl_ind_prev_outN = nullptr,
-    arma::Col<short> *mtl_ind_current_outN = nullptr,
-    arma::Col<short> *mtl_ind_buffer_outN = nullptr,
-    arma::Col<dtype> *gainN = nullptr,
-    arma::Mat<dtype> *xprmatN = nullptr,
-    arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Col<dtype> *excess_delayN = nullptr,
-    const arma::u32_vec *ray_indN = nullptr,
-    const arma::Mat<dtype> *orig_correct = nullptr,
-    double eps = 0.15);
-```
-
-### Inputs:
-- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission
-- **`center_frequency`** — Center frequency in [Hz]
-- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in GCS, full ray set; `[n_ray, 3]`, read at `g = ray_ind[i]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`, read at `g`
-- **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
-- **`out_typeN`** — Interaction type code from [ray_mesh_interact](#ray_mesh_interact), compact set; `[n_rayN]`
-- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read))
-- **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — Old state words,
-  full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
-- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. NULL disables the parallelism (wedge) test
-- **`eps`** — Resolve threshold for the thin-slab (Fabry-Pérot) factor `S`. A slab is solved analytically only
-  when its round-trip amplitude `rho = sqrt(R_near · R_far · medium_gain(slab, 2L))` reaches `eps`; below it,
-  the bounce is re-emitted for the tracer to follow. Range `[0, 1]`. `eps = 0` always resolves — required
-  for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more
-  weak cavities back to the tracer (`eps ≈ drop_threshold^(1/N_max)`, ~0.1–0.25); `eps >= 1` disables `S`.
-
-### Outputs:
-- **`mtl_ind_prev_out`**, **`mtl_ind_current_out`**, **`mtl_ind_buffer_out`** — New state words,
-  compact set; `[n_rayN]`, written at `i`. NULL skips the write. Passing all six state args NULL disables tracking —
-  each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
-  reflection-bounce `S` need the tracked medium.
-- **`gainN`** *(in/out)* — Per-interaction gain, patched in place; `[n_rayN]`
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; `[n_rayN, 8]`
-- **`ray_ind`** — Compact-to-full ray index map; `[n_rayN]` -> `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
-
-### See also:
-- <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
-- [ray_mesh_interact](#ray_mesh_interact) (computes the per-interaction Fresnel/Jones result this function corrects)
-- [calc_diffraction_gain](#calc_diffraction_gain) (the reference state machine this function ports)
 
 ---
 ## ray_triangle_intersect
