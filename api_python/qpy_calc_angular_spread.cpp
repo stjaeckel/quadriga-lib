@@ -1,109 +1,65 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_lib.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Channel statistics
 SECTION!*/
 
 /*!MD
 # calc_angular_spread
 Calculate azimuth and elevation angular spreads with spherical wrapping
 
-## Description:
-- Calculates the RMS azimuth and elevation angular spreads from a set of power-weighted angles.
-- Inputs use lists of 1D numpy arrays so that each CIR can have a different number of paths.
-- Uses optional spherical coordinate wrapping to avoid the pole singularity: the power-weighted mean
-  direction is computed in Cartesian coordinates and all paths are rotated so the centroid lies
-  on the equator before computing spreads.
-- Without spherical wrapping, azimuth spread near the poles is inflated (large azimuth spread
-  despite energy being focused into a small solid angle). This method corrects for that.
-- Optionally computes an optimal bank (roll) angle that maximizes azimuth spread and minimizes
-  elevation spread, corresponding to the principal axes of the angular power distribution.
-- Setting `wrapping` to true enables spherical wrapping.
+- Computes RMS azimuth and elevation angular spreads from power-weighted angles
+- Inputs are lists of 1D arrays so each CIR can have a different number of paths
+- RMS spread uses the 3GPP TR 38.901 second-moment definition of wrapped deviations from the
+  circular mean
+- When `wrapping = True`, the power-weighted mean direction is computed in Cartesian coordinates
+  and all paths are rotated so the centroid lies on the equator before computing spreads,
+  avoiding pole singularity artifacts
+- When `wrapping = False`, spreads are computed directly from raw angles; `orientation` is zero
+  and `phi`/`theta` equal the input `az`/`el`
+- When `calc_bank_angle = True`, an optimal bank angle maximizing azimuth spread is derived
+  analytically from eigenvectors of the 2x2 power-weighted covariance matrix; only used when
+  `wrapping = True`
+- When `quantize > 0`, paths within that angular distance are grouped and their powers summed
 
 ## Usage:
 ```
-import quadriga_lib
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers)
-as_spread, es_spread, orientation, phi, theta = quadriga_lib.tools.calc_angular_spread( az, el, powers, \
-   wrapping=True, calc_bank_angle=True, quantize=0.0)
+azimuth_spread, elevation_spread, orientation, phi, theta = \
+    quadriga_lib.tools.calc_angular_spread( az, el, powers, wrapping, calc_bank_angle, quantize )
 ```
 
-## Arguments:
-- `list of np.ndarray **az**` (input)<br>
-  Azimuth angles in [rad]. List of length `n_cir`, each element is a 1D array of length `n_path`.
+## Inputs:
+- **`az`** — Azimuth angles; range -pi to pi; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`el`** — Elevation angles; range -pi/2 to pi/2; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`powers`** — Path powers; list of length `n_cir`, each element a 1D array of length `n_path`
+- **`wrapping`** — If True, enables spherical rotation; default: False
+- **`calc_bank_angle`** — If True, computes the optimal bank angle analytically; only used when `wrapping = True`; default: False
+- **`quantize`** — Angular quantization step in [deg]; paths within this distance are grouped; default: 0.0 (no quantization)
 
-- `list of np.ndarray **el**` (input)<br>
-  Elevation angles in [rad]. List of length `n_cir`, each element is a 1D array of length `n_path`.
-
-- `list of np.ndarray **powers**` (input)<br>
-  Path powers in [W]. List of length `n_cir`, each element is a 1D array of length `n_path`.
-
-- `bool **wrapping** = False` (input)<br>
-  If True, enable spherical rotation. Default: False (use raw angles)
-
-- `bool **calc_bank_angle** = False` (input)<br>
-  If True, compute the optimal bank angle analytically.
-
-- `float **quantize** = 0.0` (input)<br>
-  Angular quantization step in [deg]. Set to 0 for no quantization.
-
-## Returns:
-- `np.ndarray **azimuth_spread**` (output)<br>
-  RMS azimuth angular spread in [rad]. Shape `(n_cir,)`.
-
-- `np.ndarray **elevation_spread**` (output)<br>
-  RMS elevation angular spread in [rad]. Shape `(n_cir,)`.
-
-- `np.ndarray **orientation**` (output)<br>
-  Mean-angle orientation [bank, tilt, heading] in [rad]. Shape `(3, n_cir)`.
-
-- `list of np.ndarray **phi**` (output)<br>
-  Rotated azimuth angles in [rad]. List of length `n_cir`.
-
-- `list of np.ndarray **theta**` (output)<br>
-  Rotated elevation angles in [rad]. List of length `n_cir`.
-
-## Example:
-```
-import numpy as np
-import quadriga_lib
-
-az = [np.array([0.1, -0.1, 0.05]), np.array([0.2, -0.2, 0.1, -0.1])]
-el = [np.array([0.0, 0.0, 0.0]), np.array([0.05, -0.05, 0.0, 0.0])]
-powers = [np.array([1.0, 1.0, 0.5]), np.array([2.0, 1.0, 1.5, 0.5])]
-as_spread, es_spread, orient, phi, theta = quadriga_lib.tools.calc_angular_spread(az, el, powers)
-```
+## Outputs:
+- **`azimuth_spread`** — RMS azimuth angular spread; `(n_cir,)`
+- **`elevation_spread`** — RMS elevation angular spread; `(n_cir,)`
+- **`orientation`** — Power-weighted mean orientation in Euler angles [bank; tilt; heading]; `(3, n_cir)`
+- **`phi`** — Rotated azimuth angles; list of length `n_cir`
+- **`theta`** — Rotated elevation angles; list of length `n_cir`
 MD!*/
 
-static py::tuple calc_angular_spread(py::list az_py,
-                                     py::list el_py,
-                                     py::list powers_py,
-                                     bool wrapping = false,
-                                     bool calc_bank_angle = false,
-                                     double quantize = 0.0)
+py::tuple calc_angular_spread(py::list az,
+                              py::list el,
+                              py::list powers,
+                              bool wrapping,
+                              bool calc_bank_angle,
+                              double quantize)
 {
     // Convert inputs to std::vector<arma::vec>
-    std::vector<arma::vec> az = qd_python_list2vector_Col<double>(az_py);
-    std::vector<arma::vec> el = qd_python_list2vector_Col<double>(el_py);
-    std::vector<arma::vec> powers = qd_python_list2vector_Col<double>(powers_py);
+    std::vector<arma::vec> az_a = qd_python_list2vector_Col<double>(az);
+    std::vector<arma::vec> el_a = qd_python_list2vector_Col<double>(el);
+    std::vector<arma::vec> powers_a = qd_python_list2vector_Col<double>(powers);
 
     // Declare outputs
     arma::vec azimuth_spread, elevation_spread;
@@ -111,17 +67,25 @@ static py::tuple calc_angular_spread(py::list az_py,
     std::vector<arma::vec> phi, theta;
 
     // Call library function
-    quadriga_lib::calc_angular_spreads_sphere<double>(
-        az, el, powers,
-        &azimuth_spread, &elevation_spread, &orientation, &phi, &theta,
-        !wrapping, calc_bank_angle, quantize);
+    quadriga_lib::calc_angular_spreads_sphere<double>(az_a, el_a, powers_a,
+                                                      &azimuth_spread, &elevation_spread, &orientation,
+                                                      &phi, &theta, !wrapping, calc_bank_angle, quantize);
 
     // Convert to Python
-    auto as_py = qd_python_copy2numpy(&azimuth_spread);
-    auto es_py = qd_python_copy2numpy(&elevation_spread);
-    auto orient_py = qd_python_copy2numpy(&orientation);
+    auto azimuth_spread_py = qd_python_copy2numpy(&azimuth_spread);
+    auto elevation_spread_py = qd_python_copy2numpy(&elevation_spread);
+    auto orientation_py = qd_python_copy2numpy(&orientation);
     auto phi_py = qd_python_copy2list(&phi);
     auto theta_py = qd_python_copy2list(&theta);
 
-    return py::make_tuple(as_py, es_py, orient_py, phi_py, theta_py);
+    return py::make_tuple(azimuth_spread_py, elevation_spread_py, orientation_py, phi_py, theta_py);
 }
+
+// pybind11 declaration:
+// m.def("calc_angular_spread", &calc_angular_spread,
+//       py::arg("az"),
+//       py::arg("el"),
+//       py::arg("powers"),
+//       py::arg("wrapping") = false,
+//       py::arg("calc_bank_angle") = false,
+//       py::arg("quantize") = 0.0);
