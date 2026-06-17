@@ -513,7 +513,7 @@ namespace
             double gL = medium_gain(dist, fGHz, abs_cos);
             double n_re = std::real(std::sqrt(eta_s_med * mu_s)); // real refractive index
             double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
-            double arg_phi = -(omega / c0) * n_re * dist;
+            double arg_phi = -(omega / c0) * n_re * dist * abs_cos * abs_cos;         // walk-off: L*cos^2(theta_t)
             std::complex<double> phi2 = std::polar(abs_phi * abs_phi, 2.0 * arg_phi); // phi^2
             std::complex<double> denom = std::complex<double>(1.0, 0.0) - r_near * r_far * phi2;
 
@@ -652,6 +652,40 @@ namespace
         if (geometry_type != 0)
             gain *= M2.medium_gain(ray_offset, fGHz);
         return gain;
+    }
+
+    // VBS plane intersection
+    // Returns false when the ray is near-parallel to the plane
+    inline bool qd_vbs(double Ox, double Oy, double Oz,    // Segment origin O
+                       double Dx, double Dy, double Dz,    // Incoming physical direction (path_dirN)
+                       double Fx, double Fy, double Fz,    // Plane intersect point (FBS)
+                       double Nx, double Ny, double Nz,    // Plane normal N
+                       double &Vx, double &Vy, double &Vz, // Virtual back-scatter point (VBS)
+                       double &d_v,                        // Distance from O to V
+                       double &cos_theta_t)                // cos(theta_t) = |d . N|
+    {
+        // Normalize D and N to unit length
+        double d_len = std::sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
+        double n_len = std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz);
+        if (d_len < 1.0e-12 || n_len < 1.0e-12) // degenerate (zero-length) input
+            return false;
+
+        double d_inv = 1.0 / d_len, n_inv = 1.0 / n_len;
+        Dx *= d_inv, Dy *= d_inv, Dz *= d_inv;
+        Nx *= n_inv, Ny *= n_inv, Nz *= n_inv;
+
+        double dn = Dx * Nx + Dy * Ny + Dz * Nz;
+        if (std::abs(dn) < 1.0e-6) // near-parallel: division protection
+            return false;
+
+        double s = ((Fx - Ox) * Nx + (Fy - Oy) * Ny + (Fz - Oz) * Nz) / dn;
+        if (!std::isfinite(s) || s <= 0.0)
+            return false;
+
+        Vx = Ox + s * Dx, Vy = Oy + s * Dy, Vz = Oz + s * Dz;
+        d_v = s;
+        cos_theta_t = std::abs(dn);
+        return true;
     }
 }
 
@@ -1699,8 +1733,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
     // Ray offset is used to detect co-location of points, value in meters
     const double ray_offset = 0.001;
 
-    if (interaction_type < 0 || interaction_type > 4)
-        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission");
+    if (interaction_type < 0 || interaction_type > 5)
+        throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
 
     if (!std::isfinite((double)center_frequency) || center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
@@ -1758,7 +1792,9 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
     if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != n_rayN)
         throw std::invalid_argument("Input 'mtl_ind_sbs' must match the length of 'out_typeN'.");
-    if (normal_vecN != nullptr && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
+    if (normal_vecN == nullptr)
+        throw std::invalid_argument("Input 'normal_vecN' is required (VBS plane normal).");
+    if (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6)
         throw std::invalid_argument("Input 'normal_vecN' must have size [n_rayN, 6].");
     if (gainN != nullptr && gainN->n_elem != n_rayN)
         throw std::invalid_argument("In-out 'gainN' must match the length of 'out_typeN'.");
@@ -1772,8 +1808,10 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("Without 'ray_indN', the full and compact sets must have the same size.");
     if (path_dir_prev != nullptr && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
         throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
-    if (acc_dist_in != nullptr && acc_dist_in->n_elem != n_ray)
-        throw std::invalid_argument("Input 'acc_dist_in' must have size [n_ray].");
+    if (path_dir_prev != nullptr && !path_dir_prev->is_finite())
+        throw std::invalid_argument("Input 'path_dir_prev' must be finite.");
+    if (acc_dist_in != nullptr && (!acc_dist_in->is_finite() || acc_dist_in->min() < (dtype)0.0))
+        throw std::invalid_argument("Input 'acc_dist_in' must be finite and >= 0.");
     if (path_dirN != nullptr && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
         throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
 
@@ -1814,10 +1852,6 @@ void quadriga_lib::ray_state_update(int interaction_type,
         size_t ii = (size_t)i_rayN;
         size_t i_ray = (p_ray_indN == nullptr) ? ii : (size_t)p_ray_indN[ii]; // Full-set index
 
-        // Temporary
-        if (p_acc_dist_outN)
-            p_acc_dist_outN[ii] = p_acc_dist_in ? p_acc_dist_in[i_ray] : (dtype)0.0;
-
         // Old state at g (full set). Defaults to copy-through into the compact outputs at i.
         short s_prev = (p_prev_in == nullptr) ? (short)0 : p_prev_in[i_ray];
         short s_cur = (p_cur_in == nullptr) ? (short)0 : p_cur_in[i_ray];
@@ -1837,9 +1871,76 @@ void quadriga_lib::ray_state_update(int interaction_type,
         double theta = (p_fbs_angleN == nullptr) ? 0.0 : (double)p_fbs_angleN[ii];
         double fGHz = (double)center_frequency * 1e-9;
 
+        // Build a Material for a 1-based index (0 = air). Used by SAME, TRN and the slab-factor calls.
+        auto MAT = [&](int m) -> Material
+        { return Material(cols, (arma::uword)(m < 1 ? 0 : m)); };
+
+        // Same-medium test. Index 0 is the "outside / no medium" sentinel, not a material, so it
+        // only matches itself; two real materials match on identical properties.
+        auto SAME = [&](int a, int b) -> bool
+        { return a == b || (a > 0 && b > 0 && MAT(a).same_as(MAT(b))); };
+
+        // Medium gain shorthand: 1-based index m (0 = air -> gain 1)
+        auto MED = [&](int m, double dist) -> double
+        { return Material(cols, arma::uword(m < 1 ? 0 : m)).medium_gain(dist, fGHz); };
+
+        // Transmission gain shorthand
+        auto TRN = [&](int a, int b) -> double
+        { return MAT(a).interact_with(MAT(b), (is_scalar ? 4 : 1), theta, fGHz); };
+
         // Euclidean distance between two full-set geometry rows at g
         auto distance = [&](const arma::Mat<dtype> *A, const arma::Mat<dtype> *B) -> double
         { return (double)qd_calc_length(A->at(i_ray, 0), A->at(i_ray, 1), A->at(i_ray, 2), B->at(i_ray, 0), B->at(i_ray, 1), B->at(i_ray, 2)); };
+
+        // True in medium distance and back side incidence angle accounting for refraction at (previous) entry interaction
+        // Default to values obtained at FBS
+        double dist_orig_vbs = (nH == 0) ? distance(orig, dest) : distance(orig, fbs);
+        double cos_theta_t = std::abs(std::cos(theta + 1.570796326794897));
+        double theta_t = theta;
+
+        // Compute virtual scatter position (VBS), the interaction that would have been it with correct refraction at entry
+        if (p_path_dir_prev)
+        {
+            // Origin point
+            double Ox = (double)orig->at(i_ray, 0);
+            double Oy = (double)orig->at(i_ray, 1);
+            double Oz = (double)orig->at(i_ray, 2);
+
+            // True refraction direction at previous entry interaction
+            double Dx = (double)p_path_dir_prev[i_ray];
+            double Dy = (double)p_path_dir_prev[i_ray + n_ray];
+            double Dz = (double)p_path_dir_prev[i_ray + 2 * n_ray];
+
+            // VBS plane normal
+            double Nx = (double)p_normal_vecN[ii];
+            double Ny = (double)p_normal_vecN[ii + n_rayN];
+            double Nz = (double)p_normal_vecN[ii + 2 * n_rayN];
+            if (typeH == 5 && nH != 0) // FBS / SBS swapped
+            {
+                Nx = (double)p_normal_vecN[ii + 3 * n_rayN];
+                Ny = (double)p_normal_vecN[ii + 4 * n_rayN];
+                Nz = (double)p_normal_vecN[ii + 5 * n_rayN];
+            }
+
+            // FBS location = known point on the VBS plane, use dest for no-FBS-hit
+            const arma::Mat<dtype> *Fmat = (nH == 0) ? dest : fbs;
+            double Fx = (double)Fmat->at(i_ray, 0);
+            double Fy = (double)Fmat->at(i_ray, 1);
+            double Fz = (double)Fmat->at(i_ray, 2);
+
+            // VBS plane intersection point
+            double Vx, Vy, Vz, tmp_dist_orig_vbs, tmp_cos_theta_t;
+            bool vbs_ok = qd_vbs(Ox, Oy, Oz, Dx, Dy, Dz, Fx, Fy, Fz, Nx, Ny, Nz, Vx, Vy, Vz, tmp_dist_orig_vbs, tmp_cos_theta_t);
+            if (vbs_ok)
+            {
+                dist_orig_vbs = tmp_dist_orig_vbs;
+                cos_theta_t = (tmp_cos_theta_t > 1.0) ? 1.0 : tmp_cos_theta_t;
+                theta_t = std::acos(cos_theta_t) - 1.570796326794897;
+            }
+        }
+
+        // Accumulated in-medium distance
+        double accumulated_dist = p_acc_dist_in ? (double)p_acc_dist_in[i_ray] : 0.0;
 
         // Wedge test: true when FBS and SBS faces sit at a real angle. No-op (false) when normals are absent or the two faces
         // are a single point. Run only at o-i entries that capture both faces (nH >= 2 types 1/7/13).
@@ -1860,23 +1961,6 @@ void quadriga_lib::ray_state_update(int interaction_type,
             double d = nfx * nsx + nfy * nsy + nfz * nsz;
             return std::abs(d) < 1.0 - tol;
         };
-
-        // Build a Material for a 1-based index (0 = air). Used by SAME, TRN and the slab-factor calls.
-        auto MAT = [&](int m) -> Material
-        { return Material(cols, (arma::uword)(m < 1 ? 0 : m)); };
-
-        // Same-medium test. Index 0 is the "outside / no medium" sentinel, not a material, so it
-        // only matches itself; two real materials match on identical properties.
-        auto SAME = [&](int a, int b) -> bool
-        { return a == b || (a > 0 && b > 0 && MAT(a).same_as(MAT(b))); };
-
-        // Medium gain shorthand: 1-based index m (0 = air -> gain 1)
-        auto MED = [&](int m, double dist) -> double
-        { return Material(cols, arma::uword(m < 1 ? 0 : m)).medium_gain(dist, fGHz); };
-
-        // Transmission gain shorthand
-        auto TRN = [&](int a, int b) -> double
-        { return MAT(a).interact_with(MAT(b), (is_scalar ? 4 : 1), theta, fGHz); };
 
         // Gain / xprmat patch operations
         auto rsu_scale = [&](double cr, double ci)
@@ -1917,6 +2001,15 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     p_xprmatN[ii + (size_t)c * n_rayN] = (dtype)0.0;
             if (p_gainN != nullptr)
                 p_gainN[ii] = (dtype)0.0;
+        };
+
+        // Close the leaving layer's in-medium magnitude over the accumulated path at theta_t.
+        auto close_med = [&](int m)
+        {
+            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+            double g = MAT(m).medium_gain(L, fGHz, cos_theta_t); // angle-aware, spec 3.3
+            rsu_scale(std::sqrt(g < 0.0 ? 0.0 : g), 0.0);
+            accumulated_dist = 0.0;
         };
 
         if (refl_pass) // Reflection pass, interaction_type {0, 3}
@@ -2272,6 +2365,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
             p_cur_outN[ii] = out_cur;
         if (p_buf_outN != nullptr)
             p_buf_outN[ii] = out_buf;
+        if (p_acc_dist_outN)
+            p_acc_dist_outN[ii] = (dtype)accumulated_dist;
     }
 }
 
