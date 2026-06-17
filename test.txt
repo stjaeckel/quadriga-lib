@@ -1,0 +1,318 @@
+Randomness seeded to: 4078827950
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test_bin is a Catch2 v3.8.1 host application.
+Run with -? for options
+
+-------------------------------------------------------------------------------
+Acoustic - Coincidence dip (calc_diffraction_gain)
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:257
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:302: FAILED:
+  CHECK( run(2000.0) == Approx(std::pow(10.0, -0.1 * 4.0)).epsilon(1e-5) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:303: FAILED:
+  CHECK( run(2000.0) == Approx(ref_interface_gain(2000.0)).epsilon(1e-5) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:306: FAILED:
+  CHECK( run(1000.0) == Approx(ref_interface_gain(1000.0)).epsilon(1e-5) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:307: FAILED:
+  CHECK( run(4000.0) == Approx(ref_interface_gain(4000.0)).epsilon(1e-5) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:308: FAILED:
+  CHECK( run(2000.0) > run(1000.0) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:309: FAILED:
+  CHECK( run(2000.0) > run(4000.0) )
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Acoustic - Convergence to scalar EM when acoustic terms absent
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:382
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:382: FAILED:
+  {Unknown expression after the reported line}
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Acoustic - Convergence away from resonance and coincidence
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:436
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:436: FAILED:
+  {Unknown expression after the reported line}
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Acoustic - Pass-through calibration: ray_mesh_interact vs calc_diffraction_gain
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:496
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:496: FAILED:
+  {Unknown expression after the reported line}
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Acoustic - Interpenetrating material's isolation is counted exactly once
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:564
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:564: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Acoustic - ray_mesh_interact and calc_diffraction_gain agree through a medium
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:598
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_acoustic_interactions.cpp:598: FAILED:
+due to unexpected exception with messages:
+  case: dense absorber
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Calc Diffraction Gain
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:115
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:115: FAILED:
+  {Unknown expression after the reported line}
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Calc Diffraction Gain - Alpha in-medium absorption
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:196
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:196: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Calc Diffraction Gain - Penetration loss frequency scaling
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:229
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:229: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Calc Diffraction Gain - fRef parameterization equivalence
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:262
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:262: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+Calc Diffraction Gain - Scalar mode
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:298
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_calc_diffraction_gain.cpp:298: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+ray_state_update - optional arguments
+  null normal_vecN disables the wedge test, never the gain math
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1345
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1345: FAILED:
+due to unexpected exception with message:
+  Input 'normal_vecN' is required (VBS plane normal).
+
+-------------------------------------------------------------------------------
+ray_state_update - energy conservation of a lossless slab
+  scalar, 30 degrees
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1626
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  0.03891933017903659 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  0.13978119457751101 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  0.07350121494398854 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  0.01608552410788083 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  0.05777216012869703 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  0.01255550644108026 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1622: FAILED:
+  CHECK( std::abs(std::norm(R) + std::norm(T) - 1.0) < TOL )
+with expansion:
+  0.10997994159241897 < 0.000000001
+
+-------------------------------------------------------------------------------
+ray_state_update - energy conservation of a lossless slab
+  scalar, 55 degrees
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1627
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  0.4096558914654832 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  0.2886479180527432 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  0.7549034924357062 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  0.25047492650885655 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  0.17648730939168503 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  0.28221594028267083 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1622: FAILED:
+  CHECK( std::abs(std::norm(R) + std::norm(T) - 1.0) < TOL )
+with expansion:
+  0.67434901323369578 < 0.000000001
+
+-------------------------------------------------------------------------------
+ray_state_update - resolve clamp near the Airy pole
+  at the pole the resolve is refused
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1899
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:468: FAILED:
+  CHECK( arma::approx_equal(C.xprmat, C.x_in, "absdiff", (dtype)0) )
+with expansion:
+  false
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:470: FAILED:
+  CHECK( arma::approx_equal(C.gain, C.g_in, "absdiff", (dtype)0) )
+with expansion:
+  false
+
+-------------------------------------------------------------------------------
+ray_state_update - resolve clamp near the Airy pole
+  a quarter-wave detune leaves the clamp and resolves
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1911
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  0.35624315898544984 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  0.60705119689180786 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  0.4994302210043281 < 0.000000001
+
+-------------------------------------------------------------------------------
+ray_state_update - resolve clamp near the Airy pole
+  a strong but sub-clamp resonance resolves finite and bounded
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:1923
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:490: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k) - e.real()) < tol )
+with expansion:
+  6.19770516817514316 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:491: FAILED:
+  CHECK( std::abs((double)C.xprmat(i, 2 * k + 1) - e.imag()) < tol )
+with expansion:
+  3.71797367044331661 < 0.000000001
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:494: FAILED:
+  CHECK( std::abs((double)C.gain(i) - (double)C.g_in(i) * std::norm(f)) < tol )
+with expansion:
+  56.61884651153168591 < 0.000000001
+
+-------------------------------------------------------------------------------
+ray_state_update - input validation
+  interaction type range
+-------------------------------------------------------------------------------
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:2203
+...............................................................................
+
+/sjc/quadriga-lib/tests/catch2_tests/test_ray_state_update.cpp:2209: FAILED:
+  CHECK_THROWS_AS( C.run(), std::invalid_argument )
+because no exception was thrown where one was expected:
+
+===============================================================================
+test cases:    654 |    639 passed | 15 failed
+assertions: 251129 | 251089 passed | 40 failed
+
