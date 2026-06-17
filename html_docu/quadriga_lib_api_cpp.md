@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "16.06.2026"
+date: "17.06.2026"
 lang: en-US
 ---
 
@@ -119,13 +119,13 @@ lang: en-US
 | [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3523 |
 | [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3633 |
 | [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3676 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3756 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3804 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3848 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3878 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3906 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3947 |
-| [write_png](#write_png) | Site-specific simulation tools | 3982 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3759 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3807 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3851 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3881 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3909 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3950 |
+| [write_png](#write_png) | Site-specific simulation tools | 3985 |
 
 ---
 
@@ -3686,8 +3686,7 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
   the tracer to follow every internal bounce.
 - Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
   or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
-  suppressed (the survival gate re-emits) the transmission/refraction path reproduces
-  [calc_diffraction_gain](#calc_diffraction_gain) bit-for-bit.
+  suppressed (the survival gate re-emits) the transmission/refraction path reproduces [calc_diffraction_gain](#calc_diffraction_gain)
 
 ### Declaration:
 ```
@@ -3700,6 +3699,7 @@ void quadriga_lib::ray_state_update(
     const arma::Mat<dtype> *sbs,
     const arma::u32_vec *no_interact,
     const arma::Col<dtype> *fbs_angleN,
+    const arma::Mat<dtype> *normal_vecN,
     const arma::s32_vec *out_typeN,
     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
     const arma::Col<short> *mtl_ind_fbs,
@@ -3707,45 +3707,48 @@ void quadriga_lib::ray_state_update(
     const arma::Col<short> *mtl_ind_prev_in = nullptr,
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
-    const arma::Mat<dtype> *normal_vecN = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
+    const arma::Col<dtype> *acc_dist_in = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
+    arma::Col<dtype> *acc_dist_outN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
-    const arma::Mat<dtype> *orig_correct = nullptr,
     double eps = 0.15);
 ```
 
 ### Inputs:
-- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission
+- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 
+  4 scalar transmission, 5 scalar refraction
 - **`center_frequency`** — Center frequency in [Hz]
-- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in GCS, full ray set; `[n_ray, 3]`, read at `g = ray_ind[i]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`, read at `g`
+- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in 
+  GCS, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
+- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. 
+  The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test. 
+  NULL disables the wedge test.
 - **`out_typeN`** — Interaction type code from [ray_mesh_interact](#ray_mesh_interact), compact set; `[n_rayN]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read))
 - **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — Old state words,
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words,
   full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
-- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. NULL disables the parallelism (wedge) test
-- **`eps`** — Resolve threshold for the thin-slab (Fabry-Pérot) factor `S`. A slab is solved analytically only
-  when its round-trip amplitude `rho = sqrt(R_near · R_far · medium_gain(slab, 2L))` reaches `eps`; below it,
-  the bounce is re-emitted for the tracer to follow. Range `[0, 1]`. `eps = 0` always resolves — required
-  for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more
-  weak cavities back to the tracer (`eps ≈ drop_threshold^(1/N_max)`, ~0.1–0.25); `eps >= 1` disables `S`.
+- **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
+- **`acc_dist_in`** — Accumulated in-layer VBS distance carried into this call, full ray set; `[n_ray]`
+- **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 
 ### Outputs:
-- **`mtl_ind_prev_out`**, **`mtl_ind_current_out`**, **`mtl_ind_buffer_out`** — New state words,
-  compact set; `[n_rayN]`, written at `i`. NULL skips the write. Passing all six state args NULL disables tracking —
+- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
+  compact set; `[n_rayN]`. NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
 - **`gainN`** *(in/out)* — Per-interaction gain, patched in place; `[n_rayN]`
 - **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; `[n_rayN, 8]`
-- **`ray_ind`** — Compact-to-full ray index map; `[n_rayN]` -> `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`path_dirN`** *(in/out)* — Continuation direction from [ray_mesh_interact](#ray_mesh_interact), corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN]`
 
 ### See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)

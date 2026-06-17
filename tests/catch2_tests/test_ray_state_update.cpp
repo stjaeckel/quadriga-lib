@@ -202,11 +202,11 @@ static inline void mtl_matrix_to_map(const arma::Mat<dtype> &M,
 }
 
 // Constants of the suite
-static const double C0 = 299792458.0;           // speed of light, m/s
-static const double QPI = arma::datum::pi;      // pi
-static const double OFF = 0.001;                // ray_offset (design spec, section 4)
-static const double TOL = 1.0e-9;               // double tolerance (test spec)
-static const double FRQ = 1.0e9;                // default test frequency, Hz
+static const double C0 = 299792458.0;      // speed of light, m/s
+static const double QPI = arma::datum::pi; // pi
+static const double OFF = 0.001;           // ray_offset (design spec, section 4)
+static const double TOL = 1.0e-9;          // double tolerance (test spec)
+static const double FRQ = 1.0e9;           // default test frequency, Hz
 
 // Assumed extended material keys (see file header). Adjust here if the library differs.
 static const char *MTL_KEY_MASS = "m";
@@ -367,18 +367,21 @@ struct Rsu
             has_orig ? &orig : nullptr, has_dest ? &dest : nullptr,
             has_fbs ? &fbs : nullptr, has_sbs ? &sbs : nullptr,
             has_ni ? &no_interact : nullptr,
-            has_angle ? &fbs_angle : nullptr, has_otype ? &out_type : nullptr,
+            has_angle ? &fbs_angle : nullptr,
+            has_normals ? &normals : nullptr, // normal_vecN now here
+            has_otype ? &out_type : nullptr,
             has_mtl ? &mtl : nullptr,
             has_m1 ? &m1 : nullptr, has_m2 ? &m2 : nullptr,
             has_prev_in ? &prev_in : nullptr,
             has_cur_in ? &cur_in : nullptr,
             has_buf_in ? &buf_in : nullptr,
-            has_normals ? &normals : nullptr,
+            nullptr, nullptr, // path_dir_prev, acc_dist_in (Stage 4: unused)
             has_prev_out ? &prev_out : nullptr,
             has_cur_out ? &cur_out : nullptr,
             has_buf_out ? &buf_out : nullptr,
             has_gain ? &gain : nullptr,
             has_xprmat ? &xprmat : nullptr,
+            nullptr, nullptr, // path_dirN, acc_dist_outN (Stage 4: unused)
             has_ray_ind ? &ray_ind : nullptr,
             eps);
     }
@@ -1898,7 +1901,7 @@ TEST_CASE("ray_state_update - resolve clamp near the Airy pole")
         double theta_n = 89.8 * QPI / 180.0;
         double theta_i = std::asin(std::sin(theta_n) / n);
         std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, theta_i).r;
-        double L = 2.0 * half_wave(n, FRQ); // phi^2 = 1
+        double L = 2.0 * half_wave(n, FRQ);  // phi^2 = 1
         CHECK(std::abs(1.0 - r * r) < 1e-2); // the configuration is inside the clamp
 
         auto C = exit_at(theta_n, L);
@@ -1941,7 +1944,7 @@ TEST_CASE("ray_state_update - cross-pass invariance of the resolve decision")
     // internal bounce of the same slab segment must make the same resolve-vs-re-emit
     // decision and apply the same S.
     static const auto mtl = base_palette<double>();
-    const double L = 0.123; // generic, off resonance
+    const double L = 0.123;                                             // generic, off resonance
     std::complex<double> r = fresnel_te({9.0, 0.0}, {1.0, 0.0}, 0.0).r; // NINE, rho = 0.25
     std::complex<double> S = airy_S(r, r, phi_one_way(3.0, 1.0, FRQ, L));
 
@@ -2316,11 +2319,21 @@ TEST_CASE("ray_state_update - input validation")
             auto C = make_valid9();
             switch (k)
             {
-            case 0: C.has_orig = false; break;
-            case 1: C.has_dest = false; break;
-            case 2: C.has_fbs = false; break;
-            case 3: C.has_sbs = false; break;
-            case 4: C.has_otype = false; break;
+            case 0:
+                C.has_orig = false;
+                break;
+            case 1:
+                C.has_dest = false;
+                break;
+            case 2:
+                C.has_fbs = false;
+                break;
+            case 3:
+                C.has_sbs = false;
+                break;
+            case 4:
+                C.has_otype = false;
+                break;
             }
             CHECK_THROWS_AS(C.run(), std::invalid_argument);
         }
@@ -2339,10 +2352,18 @@ TEST_CASE("ray_state_update - input validation")
             auto C = make_valid9();
             switch (k)
             {
-            case 0: C.has_ni = false; break;
-            case 1: C.has_angle = false; break;
-            case 2: C.has_m1 = false; break;
-            case 3: C.has_m2 = false; break;
+            case 0:
+                C.has_ni = false;
+                break;
+            case 1:
+                C.has_angle = false;
+                break;
+            case 2:
+                C.has_m1 = false;
+                break;
+            case 3:
+                C.has_m2 = false;
+                break;
             }
             CHECK_NOTHROW(C.run());
         }
