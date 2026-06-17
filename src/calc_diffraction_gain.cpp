@@ -319,10 +319,14 @@ void quadriga_lib::calc_diffraction_gain(const arma::Mat<dtype> *orig,
 
                 quadriga_lib::ray_state_update<dtype>(interaction_type, center_frequency,
                                                       &s_orig, &s_dest, &fbs, &sbs, &no_interact,
-                                                      &fbs_angleN, &typeN, mtl_prop, &mtl_fbs, &mtl_sbs,
-                                                      &prev_in, &cur_in, &buf_in, nullptr,
+                                                      &fbs_angleN, nullptr, &typeN, // normal_vecN now here (still null)
+                                                      mtl_prop, &mtl_fbs, &mtl_sbs,
+                                                      &prev_in, &cur_in, &buf_in,
+                                                      nullptr, nullptr, // path_dir_prev, acc_dist_in (Stage 4: unused)
                                                       &prev_out, &cur_out, &buf_out,
-                                                      &gainN, nullptr, &ray_ind, eps_slab);
+                                                      &gainN, nullptr, // xprmatN
+                                                      nullptr, nullptr, // path_dirN, acc_dist_outN (Stage 4: unused)
+                                                      &ray_ind, eps_slab);
             }
 
             // Count double and multi-interactions

@@ -3,7 +3,6 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
 
 #include <complex>
 #include <unordered_map>
@@ -532,6 +531,17 @@ namespace
             return std::complex<double>(1.0, 0.0) / denom;
         }
     };
+
+    // Calculate the length of a vector
+    template <typename dtype>
+    inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
+    {
+        dtype a = Dx - Ox;
+        dtype b = a * a;
+        a = Dy - Oy, b += a * a;
+        a = Dz - Oz, b += a * a;
+        return std::sqrt(b);
+    }
 
     // Mirror reflection direction: d = u - 2*c*n, c = clamp(u.n)
     inline void qd_reflect(double Ux, double Uy, double Uz,
@@ -1587,8 +1597,7 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
   the tracer to follow every internal bounce.
 - Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
   or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
-  suppressed (the survival gate re-emits) the transmission/refraction path reproduces
-  [[calc_diffraction_gain]] bit-for-bit.
+  suppressed (the survival gate re-emits) the transmission/refraction path reproduces [[calc_diffraction_gain]]
 
 ## Declaration:
 ```
@@ -1601,6 +1610,7 @@ void quadriga_lib::ray_state_update(
     const arma::Mat<dtype> *sbs,
     const arma::u32_vec *no_interact,
     const arma::Col<dtype> *fbs_angleN,
+    const arma::Mat<dtype> *normal_vecN,
     const arma::s32_vec *out_typeN,
     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
     const arma::Col<short> *mtl_ind_fbs,
@@ -1608,45 +1618,48 @@ void quadriga_lib::ray_state_update(
     const arma::Col<short> *mtl_ind_prev_in = nullptr,
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
-    const arma::Mat<dtype> *normal_vecN = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
+    const arma::Col<dtype> *acc_dist_in = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
+    arma::Col<dtype> *acc_dist_outN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
-    const arma::Mat<dtype> *orig_correct = nullptr,
     double eps = 0.15);
 ```
 
 ## Inputs:
-- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission
+- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection,
+  4 scalar transmission, 5 scalar refraction
 - **`center_frequency`** — Center frequency in [Hz]
-- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in GCS, full ray set; `[n_ray, 3]`, read at `g = ray_ind[i]`
-- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`, read at `g`
+- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in
+  GCS, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
+- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`.
+  The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test.
+  NULL disables the wedge test.
 - **`out_typeN`** — Interaction type code from [[ray_mesh_interact]], compact set; `[n_rayN]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]])
 - **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — Old state words,
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words,
   full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
-- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. NULL disables the parallelism (wedge) test
-- **`eps`** — Resolve threshold for the thin-slab (Fabry-Pérot) factor `S`. A slab is solved analytically only
-  when its round-trip amplitude `rho = sqrt(R_near · R_far · medium_gain(slab, 2L))` reaches `eps`; below it,
-  the bounce is re-emitted for the tracer to follow. Range `[0, 1]`. `eps = 0` always resolves — required
-  for a forward/transmission-only run, where no reflection pass exists to carry the internal bounces. Raise it to hand more
-  weak cavities back to the tracer (`eps ≈ drop_threshold^(1/N_max)`, ~0.1–0.25); `eps >= 1` disables `S`.
+- **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
+- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray]`
+- **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
 
 ## Outputs:
-- **`mtl_ind_prev_out`**, **`mtl_ind_current_out`**, **`mtl_ind_buffer_out`** — New state words,
-  compact set; `[n_rayN]`, written at `i`. NULL skips the write. Passing all six state args NULL disables tracking —
+- **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
+  compact set; `[n_rayN]`. NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
-- **`gainN`** *(in/out)* — Per-interaction gain, patched in place; `[n_rayN]`
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; `[n_rayN, 8]`
-- **`ray_ind`** — Compact-to-full ray index map; `[n_rayN]` -> `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`gainN`** *(in/out)* — Per-interaction gain, updated in place; `[n_rayN]`
+- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), updated in place; `[n_rayN, 8]`
+- **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN]`
 
 ## See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
@@ -1663,6 +1676,7 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     const arma::Mat<dtype> *sbs,
                                     const arma::u32_vec *no_interact,
                                     const arma::Col<dtype> *fbs_angleN,
+                                    const arma::Mat<dtype> *normal_vecN,
                                     const arma::s32_vec *out_typeN,
                                     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
                                     const arma::Col<short> *mtl_ind_fbs,
@@ -1670,13 +1684,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     const arma::Col<short> *mtl_ind_prev_in,
                                     const arma::Col<short> *mtl_ind_current_in,
                                     const arma::Col<short> *mtl_ind_buffer_in,
-                                    const arma::Mat<dtype> *normal_vecN,
-                                    arma::Col<short> *mtl_ind_prev_out,
-                                    arma::Col<short> *mtl_ind_current_out,
-                                    arma::Col<short> *mtl_ind_buffer_out,
+                                    const arma::Mat<dtype> *path_dir_prev,
+                                    const arma::Col<dtype> *acc_dist_in,
+                                    arma::Col<short> *mtl_ind_prev_outN,
+                                    arma::Col<short> *mtl_ind_current_outN,
+                                    arma::Col<short> *mtl_ind_buffer_outN,
                                     arma::Col<dtype> *gainN,
                                     arma::Mat<dtype> *xprmatN,
-                                    arma::u32_vec *ray_ind,
+                                    arma::Mat<dtype> *path_dirN,
+                                    arma::Col<dtype> *acc_dist_outN,
+                                    const arma::u32_vec *ray_indN,
                                     double eps)
 {
     // Ray offset is used to detect co-location of points, value in meters
@@ -1747,20 +1764,28 @@ void quadriga_lib::ray_state_update(int interaction_type,
         throw std::invalid_argument("In-out 'gainN' must match the length of 'out_typeN'.");
     if (xprmatN != nullptr && (xprmatN->n_rows != n_rayN || xprmatN->n_cols != 8))
         throw std::invalid_argument("In-out 'xprmatN' must have size [n_rayN, 8].");
-    if (ray_ind != nullptr && ray_ind->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'ray_ind' must match the length of 'out_typeN'.");
-    if (ray_ind != nullptr && ray_ind->n_elem != 0 && (arma::uword)ray_ind->max() >= n_ray)
-        throw std::invalid_argument("Values in 'ray_ind' exceed the number of rays in 'orig'.");
-    if (ray_ind == nullptr && n_ray != n_rayN)
-        throw std::invalid_argument("Without 'ray_ind', the full and compact sets must have the same size.");
+    if (ray_indN != nullptr && ray_indN->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'ray_indN' must match the length of 'out_typeN'.");
+    if (ray_indN != nullptr && ray_indN->n_elem != 0 && (arma::uword)ray_indN->max() >= n_ray)
+        throw std::invalid_argument("Values in 'ray_indN' exceed the number of rays in 'orig'.");
+    if (ray_indN == nullptr && n_ray != n_rayN)
+        throw std::invalid_argument("Without 'ray_indN', the full and compact sets must have the same size.");
+    if (path_dir_prev != nullptr && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
+        throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
+    if (acc_dist_in != nullptr && acc_dist_in->n_elem != n_ray)
+        throw std::invalid_argument("Input 'acc_dist_in' must have size [n_ray].");
+    if (path_dirN != nullptr && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
+        throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
 
     // Allocate / size the output state arrays (compact set)
-    if (mtl_ind_prev_out != nullptr && mtl_ind_prev_out->n_elem != n_rayN)
-        mtl_ind_prev_out->set_size(n_rayN);
-    if (mtl_ind_current_out != nullptr && mtl_ind_current_out->n_elem != n_rayN)
-        mtl_ind_current_out->set_size(n_rayN);
-    if (mtl_ind_buffer_out != nullptr && mtl_ind_buffer_out->n_elem != n_rayN)
-        mtl_ind_buffer_out->set_size(n_rayN);
+    if (mtl_ind_prev_outN != nullptr && mtl_ind_prev_outN->n_elem != n_rayN)
+        mtl_ind_prev_outN->set_size(n_rayN);
+    if (mtl_ind_current_outN != nullptr && mtl_ind_current_outN->n_elem != n_rayN)
+        mtl_ind_current_outN->set_size(n_rayN);
+    if (mtl_ind_buffer_outN != nullptr && mtl_ind_buffer_outN->n_elem != n_rayN)
+        mtl_ind_buffer_outN->set_size(n_rayN);
+    if (acc_dist_outN != nullptr && acc_dist_outN->n_elem != n_rayN)
+        acc_dist_outN->set_size(n_rayN);
 
     // Input / output pointers
     const unsigned *p_no_interact = (no_interact == nullptr) ? nullptr : no_interact->memptr();
@@ -1772,18 +1797,26 @@ void quadriga_lib::ray_state_update(int interaction_type,
     const short *p_prev_in = (mtl_ind_prev_in == nullptr) ? nullptr : mtl_ind_prev_in->memptr();
     const short *p_cur_in = (mtl_ind_current_in == nullptr) ? nullptr : mtl_ind_current_in->memptr();
     const short *p_buf_in = (mtl_ind_buffer_in == nullptr) ? nullptr : mtl_ind_buffer_in->memptr();
-    short *p_prev_out = (mtl_ind_prev_out == nullptr) ? nullptr : mtl_ind_prev_out->memptr();
-    short *p_cur_out = (mtl_ind_current_out == nullptr) ? nullptr : mtl_ind_current_out->memptr();
-    short *p_buf_out = (mtl_ind_buffer_out == nullptr) ? nullptr : mtl_ind_buffer_out->memptr();
+    short *p_prev_outN = (mtl_ind_prev_outN == nullptr) ? nullptr : mtl_ind_prev_outN->memptr();
+    short *p_cur_outN = (mtl_ind_current_outN == nullptr) ? nullptr : mtl_ind_current_outN->memptr();
+    short *p_buf_outN = (mtl_ind_buffer_outN == nullptr) ? nullptr : mtl_ind_buffer_outN->memptr();
     dtype *p_gainN = (gainN == nullptr) ? nullptr : gainN->memptr();
     dtype *p_xprmatN = (xprmatN == nullptr) ? nullptr : xprmatN->memptr();
-    const unsigned *p_ray_ind = (ray_ind == nullptr) ? nullptr : ray_ind->memptr();
+    const unsigned *p_ray_indN = (ray_indN == nullptr) ? nullptr : ray_indN->memptr();
+    const dtype *p_path_dir_prev = (path_dir_prev == nullptr) ? nullptr : path_dir_prev->memptr();
+    const dtype *p_acc_dist_in = (acc_dist_in == nullptr) ? nullptr : acc_dist_in->memptr();
+    dtype *p_path_dirN = (path_dirN == nullptr) ? nullptr : path_dirN->memptr();
+    dtype *p_acc_dist_outN = (acc_dist_outN == nullptr) ? nullptr : acc_dist_outN->memptr();
 
 #pragma omp parallel for
     for (long long i_rayN = 0; i_rayN < (long long)n_rayN; ++i_rayN) // Interaction loop (compact set)
     {
         size_t ii = (size_t)i_rayN;
-        size_t i_ray = (p_ray_ind == nullptr) ? ii : (size_t)p_ray_ind[ii]; // Full-set index
+        size_t i_ray = (p_ray_indN == nullptr) ? ii : (size_t)p_ray_indN[ii]; // Full-set index
+
+        // Temporary
+        if (p_acc_dist_outN)
+            p_acc_dist_outN[ii] = p_acc_dist_in ? p_acc_dist_in[i_ray] : (dtype)0.0;
 
         // Old state at g (full set). Defaults to copy-through into the compact outputs at i.
         short s_prev = (p_prev_in == nullptr) ? (short)0 : p_prev_in[i_ray];
@@ -2233,12 +2266,12 @@ void quadriga_lib::ray_state_update(int interaction_type,
         }
 
         // Write the new state words (compact set)
-        if (p_prev_out != nullptr)
-            p_prev_out[ii] = out_prev;
-        if (p_cur_out != nullptr)
-            p_cur_out[ii] = out_cur;
-        if (p_buf_out != nullptr)
-            p_buf_out[ii] = out_buf;
+        if (p_prev_outN != nullptr)
+            p_prev_outN[ii] = out_prev;
+        if (p_cur_outN != nullptr)
+            p_cur_outN[ii] = out_cur;
+        if (p_buf_outN != nullptr)
+            p_buf_outN[ii] = out_buf;
     }
 }
 
@@ -2246,26 +2279,30 @@ template void quadriga_lib::ray_state_update(int interaction_type, float center_
                                              const arma::Mat<float> *orig, const arma::Mat<float> *dest,
                                              const arma::Mat<float> *fbs, const arma::Mat<float> *sbs,
                                              const arma::u32_vec *no_interact, const arma::Col<float> *fbs_angleN,
-                                             const arma::s32_vec *out_typeN,
+                                             const arma::Mat<float> *normal_vecN, const arma::s32_vec *out_typeN,
                                              const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<float> *normal_vecN,
-                                             arma::Col<short> *mtl_ind_prev_out, arma::Col<short> *mtl_ind_current_out,
-                                             arma::Col<short> *mtl_ind_buffer_out,
-                                             arma::Col<float> *gainN, arma::Mat<float> *xprmatN, arma::u32_vec *ray_ind, double eps);
+                                             const arma::Mat<float> *path_dir_prev, const arma::Col<float> *acc_dist_in,
+                                             arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
+                                             arma::Col<short> *mtl_ind_buffer_outN,
+                                             arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
+                                             arma::Mat<float> *path_dirN, arma::Col<float> *acc_dist_outN,
+                                             const arma::u32_vec *ray_indN, double eps);
 
 template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                              const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
                                              const arma::u32_vec *no_interact, const arma::Col<double> *fbs_angleN,
-                                             const arma::s32_vec *out_typeN,
+                                             const arma::Mat<double> *normal_vecN, const arma::s32_vec *out_typeN,
                                              const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<double> *normal_vecN,
-                                             arma::Col<short> *mtl_ind_prev_out, arma::Col<short> *mtl_ind_current_out,
-                                             arma::Col<short> *mtl_ind_buffer_out,
-                                             arma::Col<double> *gainN, arma::Mat<double> *xprmatN, arma::u32_vec *ray_ind, double eps);
+                                             const arma::Mat<double> *path_dir_prev, const arma::Col<double> *acc_dist_in,
+                                             arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
+                                             arma::Col<short> *mtl_ind_buffer_outN,
+                                             arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
+                                             arma::Mat<double> *path_dirN, arma::Col<double> *acc_dist_outN,
+                                             const arma::u32_vec *ray_indN, double eps);

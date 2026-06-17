@@ -136,9 +136,7 @@ so stage 5 wires logic into a stable interface.
 - Add inputs `path_dir_prev` (`[n_ray,3]`), `acc_dist_in` (`[n_ray]`).
 - Add in/out `path_dirN` (`[n_rayN,3]`) and output `acc_dist_outN` (`[n_rayN]`).
 - Add `ray_indN`.
-- Delete the stale `excess_delayN` line from the doc block — it is not in the real signature and
-  carries nothing.
-- Update the C++ call sites (`calc_diffraction_gain`, the SBR tracer) to pass the new args, null
+- Update the C++ call sites (`calc_diffraction_gain`) to pass the new args, null
   where not yet used. No language bindings exist yet, so binding exposure follows at leisure.
 
 **Unchanged.** All numeric behavior — the new params are inert until stage 5.
@@ -146,7 +144,6 @@ so stage 5 wires logic into a stable interface.
 **Gate.** Compiles for float and double; existing `ray_state_update` tests pass unchanged with the
 new params null/inert.
 
-**Merge.** Atomic with 3,5.
 
 ---
 

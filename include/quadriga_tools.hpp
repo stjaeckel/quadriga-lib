@@ -325,7 +325,7 @@ namespace quadriga_lib
 
     // Calculate the interaction of rays (beams) with a triangle mesh
     template <typename dtype>
-    void ray_mesh_interact(int interaction_type,                                                // 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+    void ray_mesh_interact(int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
                            dtype center_frequency,                                              // Center frequency in [Hz]
                            const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
                            const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
@@ -356,28 +356,32 @@ namespace quadriga_lib
 
     // Update inside/outside ray state and correct gainN / xprmatN
     template <typename dtype>
-    void ray_state_update(int interaction_type,                                                // 0 = EM refl, 1 = EM trans, 2 = EM refr, 3 = scalar refl, 4 = scalar trans
+    void ray_state_update(int interaction_type,                                                // 0 = EM reflect, 1 = EM transmit 2 = EM refract 3 = scalar reflect, 4 = scalar transmit, 5 = scalar refract
                           dtype center_frequency,                                              // Center frequency in [Hz]
-                          const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, read at g; [n_ray, 3]
-                          const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, read at g; [n_ray, 3]
-                          const arma::Mat<dtype> *fbs,                                         // First interaction points in GCS, read at g; [n_ray, 3]
-                          const arma::Mat<dtype> *sbs,                                         // Second interaction points in GCS, read at g; [n_ray, 3]
-                          const arma::u32_vec *no_interact,                                    // Mesh-hit count between orig and dest, read at g; [n_ray]
+                          const arma::Mat<dtype> *orig,                                        // Ray origins in GCS, [n_ray, 3]
+                          const arma::Mat<dtype> *dest,                                        // Ray destinations in GCS, [n_ray, 3]
+                          const arma::Mat<dtype> *fbs,                                         // First interaction points in GCS, [n_ray, 3]
+                          const arma::Mat<dtype> *sbs,                                         // Second interaction points in GCS, [n_ray, 3]
+                          const arma::u32_vec *no_interact,                                    // Mesh-hit count between orig and dest, [n_ray]
                           const arma::Col<dtype> *fbs_angleN,                                  // Incidence angle at FBS in [rad]; [n_rayN]
+                          const arma::Mat<dtype> *normal_vecN,                                 // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]; NULL disables wedge test; [n_rayN, 6]
                           const arma::s32_vec *out_typeN,                                      // Interaction type code from ray_mesh_interact; [n_rayN]
                           const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties keyed by column name; n_mtl materials
-                          const arma::Col<short> *mtl_ind_fbs,                                 // FBS material index (0 = air); [n_rayN]
-                          const arma::Col<short> *mtl_ind_sbs,                                 // SBS material index (0 = air); [n_rayN]
-                          const arma::Col<short> *mtl_ind_prev_in = nullptr,                   // In (read-only): previous medium (0 = outside), read at g; [n_ray]
-                          const arma::Col<short> *mtl_ind_current_in = nullptr,                // In (read-only): current medium (0 = outside), read at g; [n_ray]
-                          const arma::Col<short> *mtl_ind_buffer_in = nullptr,                 // In (read-only): next-transition buffer (0 = empty), read at g; [n_ray]
-                          const arma::Mat<dtype> *normal_vecN = nullptr,                       // FBS/SBS normals [Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]; NULL disables wedge test; [n_rayN, 6]
-                          arma::Col<short> *mtl_ind_prev_out = nullptr,                        // Out: previous medium (0 = outside), written at i; [n_rayN]
-                          arma::Col<short> *mtl_ind_current_out = nullptr,                     // Out: current medium (0 = outside), written at i; [n_rayN]
-                          arma::Col<short> *mtl_ind_buffer_out = nullptr,                      // Out: next-transition buffer (0 = empty), written at i; [n_rayN]
-                          arma::Col<dtype> *gainN = nullptr,                                   // In/Out: interaction gain, patched in place; [n_rayN]
-                          arma::Mat<dtype> *xprmatN = nullptr,                                 // In/Out: polarization transfer matrix, patched in place; [n_rayN, 8]
-                          arma::u32_vec *ray_ind = nullptr,                                    // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
+                          const arma::Col<short> *mtl_ind_fbs,                                 // 1-based FBS material index (0 = air); [n_rayN]
+                          const arma::Col<short> *mtl_ind_sbs,                                 // 1-based SBS material index (0 = air); [n_rayN]
+                          const arma::Col<short> *mtl_ind_prev_in = nullptr,                   // In (read-only): previous medium (0 = outside), [n_ray]
+                          const arma::Col<short> *mtl_ind_current_in = nullptr,                // In (read-only): current medium (0 = outside), [n_ray]
+                          const arma::Col<short> *mtl_ind_buffer_in = nullptr,                 // In (read-only): next-transition buffer (0 = empty), [n_ray]
+                          const arma::Mat<dtype> *path_dir_prev = nullptr,                     // Physical ray direction entering this segment, `[n_ray, 3]`
+                          const arma::Col<dtype> *acc_dist_in = nullptr,                       // Accumulated in-layer distance, `[n_ray]`
+                          arma::Col<short> *mtl_ind_prev_outN = nullptr,                       // Out: previous medium (0 = outside), written at i; [n_rayN]
+                          arma::Col<short> *mtl_ind_current_outN = nullptr,                    // Out: current medium (0 = outside), written at i; [n_rayN]
+                          arma::Col<short> *mtl_ind_buffer_outN = nullptr,                     // Out: next-transition buffer (0 = empty), written at i; [n_rayN]
+                          arma::Col<dtype> *gainN = nullptr,                                   // In/Out: interaction gain, updated in place; [n_rayN]
+                          arma::Mat<dtype> *xprmatN = nullptr,                                 // In/Out: polarization transfer matrix, updated in place; [n_rayN, 8]
+                          arma::Mat<dtype> *path_dirN = nullptr,                               // In/Out: pContinuation direction, updated in place; [n_rayN]
+                          arma::Col<dtype> *acc_dist_outN = nullptr,                           // In/Out: pAccumulated VBS distance leaving this call, [n_rayN]
+                          const arma::u32_vec *ray_indN = nullptr,                             // rayN -> ray map; NULL = identity (ray = rayN); [n_rayN]
                           double eps = 0.15);                                                  // Airy resolve threshold in [0, 1]; 0 = always resolve
 
     // Calculate in-medium gain
