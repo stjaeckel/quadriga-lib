@@ -1880,62 +1880,59 @@ void quadriga_lib::ray_state_update(int interaction_type,
         auto SAME = [&](int a, int b) -> bool
         { return a == b || (a > 0 && b > 0 && MAT(a).same_as(MAT(b))); };
 
-        // Medium gain shorthand: 1-based index m (0 = air -> gain 1)
-        auto MED = [&](int m, double dist) -> double
-        { return Material(cols, arma::uword(m < 1 ? 0 : m)).medium_gain(dist, fGHz); };
-
-        // Transmission gain shorthand
-        auto TRN = [&](int a, int b) -> double
-        { return MAT(a).interact_with(MAT(b), (is_scalar ? 4 : 1), theta, fGHz); };
-
         // Euclidean distance between two full-set geometry rows at g
         auto distance = [&](const arma::Mat<dtype> *A, const arma::Mat<dtype> *B) -> double
         { return (double)qd_calc_length(A->at(i_ray, 0), A->at(i_ray, 1), A->at(i_ray, 2), B->at(i_ray, 0), B->at(i_ray, 1), B->at(i_ray, 2)); };
 
-        // True in medium distance and back side incidence angle accounting for refraction at (previous) entry interaction
-        // Default to values obtained at FBS
+        // True in-medium incoming segment and back-side incidence angle, corrected for refraction at
+        // the previous entry interaction (VBS, spec 3.1). Default to FBS geometry; overwritten on solve.
         double dist_orig_vbs = (nH == 0) ? distance(orig, dest) : distance(orig, fbs);
         double cos_theta_t = std::abs(std::cos(theta + 1.570796326794897));
         double theta_t = theta;
 
-        // Compute virtual scatter position (VBS), the interaction that would have been it with correct refraction at entry
+        // VBS plane normal: FBS triple, or the SBS triple for an out-type-5 crossing (spec 3.1).
+        size_t normal_off = (typeH == 5 && nH != 0) ? (size_t)3 : (size_t)0;
+        double normal_x = (double)p_normal_vecN[ii + (normal_off + 0) * n_rayN];
+        double normal_y = (double)p_normal_vecN[ii + (normal_off + 1) * n_rayN];
+        double normal_z = (double)p_normal_vecN[ii + (normal_off + 2) * n_rayN];
+
+        // Plane point F (FBS at a crossing, dest at nH == 0) and segment origin O.
+        const arma::Mat<dtype> *Fmat = (nH == 0) ? dest : fbs;
+        double Ox = (double)orig->at(i_ray, 0), Oy = (double)orig->at(i_ray, 1), Oz = (double)orig->at(i_ray, 2);
+        double Fx = (double)Fmat->at(i_ray, 0), Fy = (double)Fmat->at(i_ray, 1), Fz = (double)Fmat->at(i_ray, 2);
+
+        // Incoming physical direction: path_dir_prev if supplied, else geometric orig->F (spec 7.3
+        // fallback; amplitude/phase/Airy then follow from FBS).
+        double dir_in_x, dir_in_y, dir_in_z;
         if (p_path_dir_prev)
+            dir_in_x = (double)p_path_dir_prev[i_ray],
+            dir_in_y = (double)p_path_dir_prev[i_ray + n_ray],
+            dir_in_z = (double)p_path_dir_prev[i_ray + 2 * n_ray];
+        else
+            dir_in_x = Fx - Ox, dir_in_y = Fy - Oy, dir_in_z = Fz - Oz;
+
+        // Unit-normalize the row-scope copies (qd_vbs also normalizes internally; the polarization
+        // basis needs unit vectors too).
         {
-            // Origin point
-            double Ox = (double)orig->at(i_ray, 0);
-            double Oy = (double)orig->at(i_ray, 1);
-            double Oz = (double)orig->at(i_ray, 2);
+            double dl = std::sqrt(dir_in_x * dir_in_x + dir_in_y * dir_in_y + dir_in_z * dir_in_z);
+            double nl = std::sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
+            if (dl > 1.0e-12)
+                dir_in_x /= dl, dir_in_y /= dl, dir_in_z /= dl;
+            if (nl > 1.0e-12)
+                normal_x /= nl, normal_y /= nl, normal_z /= nl;
 
-            // True refraction direction at previous entry interaction
-            double Dx = (double)p_path_dir_prev[i_ray];
-            double Dy = (double)p_path_dir_prev[i_ray + n_ray];
-            double Dz = (double)p_path_dir_prev[i_ray + 2 * n_ray];
-
-            // VBS plane normal
-            double Nx = (double)p_normal_vecN[ii];
-            double Ny = (double)p_normal_vecN[ii + n_rayN];
-            double Nz = (double)p_normal_vecN[ii + 2 * n_rayN];
-            if (typeH == 5 && nH != 0) // FBS / SBS swapped
+            // Refine theta_t / d_v from the real incoming direction only when it is supplied. Without
+            // path_dir_prev the VBS lands on FBS and the angle stays the fbs_angle default;
+            // deriving it from the geometric orig->F direction would override fbs_angle.
+            if (p_path_dir_prev)
             {
-                Nx = (double)p_normal_vecN[ii + 3 * n_rayN];
-                Ny = (double)p_normal_vecN[ii + 4 * n_rayN];
-                Nz = (double)p_normal_vecN[ii + 5 * n_rayN];
-            }
-
-            // FBS location = known point on the VBS plane, use dest for no-FBS-hit
-            const arma::Mat<dtype> *Fmat = (nH == 0) ? dest : fbs;
-            double Fx = (double)Fmat->at(i_ray, 0);
-            double Fy = (double)Fmat->at(i_ray, 1);
-            double Fz = (double)Fmat->at(i_ray, 2);
-
-            // VBS plane intersection point
-            double Vx, Vy, Vz, tmp_dist_orig_vbs, tmp_cos_theta_t;
-            bool vbs_ok = qd_vbs(Ox, Oy, Oz, Dx, Dy, Dz, Fx, Fy, Fz, Nx, Ny, Nz, Vx, Vy, Vz, tmp_dist_orig_vbs, tmp_cos_theta_t);
-            if (vbs_ok)
-            {
-                dist_orig_vbs = tmp_dist_orig_vbs;
-                cos_theta_t = (tmp_cos_theta_t > 1.0) ? 1.0 : tmp_cos_theta_t;
-                theta_t = std::acos(cos_theta_t) - 1.570796326794897;
+                double Vx, Vy, Vz, dv, ct;
+                if (qd_vbs(Ox, Oy, Oz, dir_in_x, dir_in_y, dir_in_z, Fx, Fy, Fz, normal_x, normal_y, normal_z, Vx, Vy, Vz, dv, ct))
+                {
+                    dist_orig_vbs = dv;
+                    cos_theta_t = (ct > 1.0) ? 1.0 : ct;
+                    theta_t = std::acos(cos_theta_t) - 1.570796326794897;
+                }
             }
         }
 
@@ -2003,13 +2000,56 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 p_gainN[ii] = (dtype)0.0;
         };
 
-        // Close the leaving layer's in-medium magnitude over the accumulated path at theta_t.
+        // Close the leaving layer: deferred mass-law magnitude over the accumulated in-medium path
+        // plus the layer's excess phase relative to the vacuum phase the tracer counts,
+        // folded once via complex rsu_scale, then reset. Air (m < 1) -> magnitude 1, phase 0.
         auto close_med = [&](int m)
         {
             double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-            double g = MAT(m).medium_gain(L, fGHz, cos_theta_t); // angle-aware, spec 3.3
-            rsu_scale(std::sqrt(g < 0.0 ? 0.0 : g), 0.0);
+            Material M = MAT(m);
+            double g = M.medium_gain(L, fGHz, cos_theta_t);
+            double n_re = std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz)));
+            double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
+            double dist_geo = (nH == 0) ? distance(orig, dest) : distance(orig, fbs);
+            double excess_phase = k0 * (n_re * L - dist_geo);
+            double amp = std::sqrt(g < 0.0 ? 0.0 : g);
+            rsu_scale(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
             accumulated_dist = 0.0;
+        };
+
+        // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
+        // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
+        //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
+        // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
+        auto RPL = [&](int Ma, int Mb, int itype, int geom)
+        {
+            std::complex<double> cTE, cTM, cos_t2, e1de2;
+            double snell = 1.0;
+            bool tir = false;
+            MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir);
+
+            double Ux = dir_in_x, Uy = dir_in_y, Uz = dir_in_z; // default: undeviated
+            if (geom == 0)
+                qd_reflect(dir_in_x, dir_in_y, dir_in_z, normal_x, normal_y, normal_z, Ux, Uy, Uz);
+            else if (geom == 2 && !tir)
+                qd_refract(dir_in_x, dir_in_y, dir_in_z, normal_x, normal_y, normal_z, snell, cos_theta_t, cos_t2, Ux, Uy, Uz);
+            else if (geom == 3 && p_path_dirN)
+                Ux = (double)p_path_dirN[ii],
+                Uy = (double)p_path_dirN[ii + n_rayN],
+                Uz = (double)p_path_dirN[ii + 2 * n_rayN];
+
+            if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
+                p_path_dirN[ii] = (dtype)Ux,
+                p_path_dirN[ii + n_rayN] = (dtype)Uy,
+                p_path_dirN[ii + 2 * n_rayN] = (dtype)Uz;
+
+            double xprmat[8], pgain;
+            qd_polbasis(dir_in_x, dir_in_y, dir_in_z, Ux, Uy, Uz, normal_x, normal_y, normal_z, 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+            if (p_xprmatN)
+                for (int k = 0; k < 8; ++k)
+                    p_xprmatN[ii + (size_t)k * n_rayN] = (dtype)xprmat[k];
+            if (p_gainN)
+                p_gainN[ii] = (dtype)pgain;
         };
 
         if (refl_pass) // Reflection pass, interaction_type {0, 3}
@@ -2021,16 +2061,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
             }
             else // Internal / back reflection of a resolvable parallel slab
             {
-                // Processed interface: cur|air at an i-o face, cur|iM at an i-i face (types 4/5)
                 int nearM = (typeH == 5) ? M2 : ((typeH == 4) ? M1 : 0);
-                double dist = distance(orig, fbs);
-                std::complex<double> S = MAT(cur).slab_airy_factor(MAT(nearM), MAT(prev_mat), theta, dist, fGHz, eps, !prev_nonpar);
+                accumulated_dist += dist_orig_vbs;
+                RPL(cur, nearM, (is_scalar ? 3 : 0), 0); // mirror at VBS, theta_t
+                double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                std::complex<double> S = MAT(cur).slab_airy_factor(MAT(nearM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
                 if (!std::isnan(std::real(S)))
                 {
-                    rsu_scale(std::real(S), std::imag(S));           // IG * S
-                    out_cur = (short)((cur & 0x7FFF) | (int)0x8000); // set resolved flag
+                    rsu_scale(std::real(S), std::imag(S));
+                    out_cur = (short)((cur & 0x7FFF) | (int)0x8000);
                 }
-                // else: ordinary reflection / re-emit: IG, copy-through
             }
         }
         else // Transmission / refraction pass, interaction_type {1, 2, 4}
@@ -2042,37 +2082,39 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 // Resolved rows charge the in-medium loss of their INCOMING segment (the unresolved
                 // entry / M2M rows charge forward, the resolving reflection charges nothing), so every
                 // segment of the resolved return path is charged exactly once.
-                int iM = (typeH == 5) ? M2 : M1;
-                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o: out-coupling t21, up-trip loss
+                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o out-coupling
                 {
-                    rsu_scale(std::sqrt(MED(cur, distance(orig, fbs))), 0.0);
-                    out_cur = (short)0; // current_out <- 0, clear resolved flag
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, 0, (is_scalar ? 4 : 1), 3); // exit transmission t21 at theta_t, keep traced direction
+                    close_med(cur);
+                    out_cur = (short)0;
                 }
-                else if (typeH == 4 || typeH == 5) // i-i: stay resolved, advance medium, incoming-segment loss
+                else if (typeH == 4 || typeH == 5) // i-i: advance medium, keep resolved
                 {
-                    rsu_scale(std::sqrt(MED(cur, distance(orig, fbs))), 0.0);
-                    out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // keep resolved flag
-                    out_prev = (short)cur;                          // prev_out <- old cur
+                    int iM = (typeH == 5) ? M2 : M1;
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, iM, (is_scalar ? 4 : 1), 2); // transition cur->iM at theta_t, Snell direction
+                    close_med(cur);
+                    accumulated_dist += distance(fbs, dest); // begin iM forward
+                    out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
+                    out_prev = (short)cur;
                 }
                 // else: o-i / edges: transparent pass-through, IG, state copy-through
             }
-            else if (nH == 0) // Not processed: the caller applies any whole-segment in-medium loss. Copy-through.
-            {
-            }
+            else if (nH == 0) // Interior segment, no crossing: accumulate the VBS distance, identity interface
+                accumulated_dist += dist_orig_vbs;
             else if ((nH == 1 && typeH == 1) || (nH == 2 && typeH == 7) || (nH == 2 && typeH == 13)) // o-i family, entry / overlapping-entry
             {
                 if (cur == 0) // enter
                 {
-                    double dist = distance(fbs, dest);
-                    dist = (dist > ray_offset) ? dist - ray_offset : 0.0; // clamped
-                    rsu_scale(std::sqrt(MED(M1, dist)), 0.0);             // IG * MED
+                    accumulated_dist += distance(fbs, dest); // begin M1 forward (deferred loss)
                     out_cur = (short)M1;
                     bool nonpar = (nH >= 2) && fbs_sbs_not_parallel();
-                    out_prev = (short)(nonpar ? (int)0x8000 : 0); // prev <- 0, +flag
+                    out_prev = (short)(nonpar ? (int)0x8000 : 0);
                 }
-                else // nested
+                else // nested: ignore the entry, continue in cur
                 {
-                    rsu_replace(MED(cur, distance(orig, dest)));
+                    accumulated_dist += dist_orig_vbs;
                     out_buf = (short)M1;
                 }
             }
@@ -2081,32 +2123,40 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (cur == 0) // false inside, IG, copy-through
                 {
                 }
-                else if (buf == 0) // cavity exit, IG * S
+                else if (buf == 0) // cavity exit
                 {
-                    std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, 0, (is_scalar ? 4 : 1), 3); // exit transmission at theta_t, keep traced direction
+                    double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                    std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
                     if (!std::isnan(std::real(S)))
                         rsu_scale(std::real(S), std::imag(S));
+                    close_med(cur);
                     out_cur = (short)0;
                 }
                 else if (nH == 1 && typeH == 2) // virtual i-i
                 {
                     if (SAME(buf, M1)) // M2 embedded in M1, ignore M2
                     {
-                        rsu_replace(MED(cur, distance(orig, dest)));
+                        rsu_replace(1.0);
+                        accumulated_dist += distance(orig, dest);
                         out_buf = (short)0;
                     }
                     else
                     {
-                        double g = MED(cur, distance(orig, fbs)) * TRN(cur, buf) * MED(buf, distance(fbs, dest));
-                        rsu_replace(g);
+                        accumulated_dist += dist_orig_vbs;
+                        RPL(cur, buf, (is_scalar ? 4 : 1), 2);
+                        close_med(cur);
+                        accumulated_dist += distance(fbs, dest);
                         out_cur = (short)buf;
                         out_buf = (short)0;
                     }
                 }
                 else // nH == 2 types 8/14, buf != 0: ii-oo
                 {
-                    double g = MED(cur, distance(orig, fbs)) * TRN(cur, 0);
-                    rsu_replace(g);
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, 0, (is_scalar ? 4 : 1), 3);
+                    close_med(cur);
                     out_cur = (short)0;
                     out_buf = (short)0;
                 }
@@ -2121,7 +2171,8 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 }
                 else // nested o-i-o
                 {
-                    rsu_replace(MED(cur, distance(orig, fbs)));
+                    rsu_replace(1.0);
+                    accumulated_dist += dist_orig_vbs;
                     out_buf = (short)M1;
                 }
             }
@@ -2131,25 +2182,31 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 {
                     if (M2 == 0) // illegal
                         rsu_kill();
-                    else // cavity exit, air gap: slab is air, bounded by M1 / M2
+                    else // cavity exit, air gap bounded by M1 / M2
                     {
-                        std::complex<double> S = MAT(0).slab_airy_factor(MAT(M1), MAT(M2), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                        accumulated_dist += dist_orig_vbs;
+                        double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                        std::complex<double> S = MAT(0).slab_airy_factor(MAT(M1), MAT(M2), theta_t, L, fGHz, eps, !prev_nonpar);
                         if (!std::isnan(std::real(S)))
                             rsu_scale(std::real(S), std::imag(S));
-                        out_cur = (short)0; // survives
+                        close_med(0); // air: magnitude 1, phase 0; resets accumulator
+                        out_cur = (short)0;
                     }
                 }
                 else if (cur != 0)
                 {
                     if (SAME(buf, M1))
                     {
-                        rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                        rsu_replace(1.0);
+                        accumulated_dist += dist_orig_vbs;
                         out_buf = (short)0; // survives
                     }
                     else
                     {
-                        double g = MED(cur, distance(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
-                        rsu_replace(g);
+                        accumulated_dist += dist_orig_vbs;
+                        RPL(cur, buf, (is_scalar ? 4 : 1), 2);
+                        close_med(cur);
+                        accumulated_dist += (double)ray_offset;
                         out_cur = (short)buf;
                         out_buf = (short)0; // survives
                     }
@@ -2165,25 +2222,28 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 {
                     if (M1 == 0 || M2 == 0) // illegal
                         rsu_kill();
-                    else // cavity transition: IG * S * MED(iM, d(fbs,dest) - off (unclamped))
+                    else // cavity transition (M2M)
                     {
                         int iM = (typeH == 5) ? M2 : M1;
-                        double gmed = MED(iM, distance(fbs, dest) - ray_offset); // unclamped
-                        std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
-                        double cr = std::sqrt(gmed), ci = 0.0;
-                        out_cur = (short)iM; // current_out <- iM
+                        accumulated_dist += dist_orig_vbs;
+                        RPL(cur, iM, (is_scalar ? 4 : 1), 2); // transition cur->iM at theta_t, Snell direction
+                        double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                        std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
+                        out_cur = (short)iM;
                         if (!std::isnan(std::real(S)))
                         {
-                            cr = std::real(S) * std::sqrt(gmed), ci = std::imag(S) * std::sqrt(gmed);
-                            out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // resolved: later crossings are transparent
+                            rsu_scale(std::real(S), std::imag(S));
+                            out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
                         }
-                        rsu_scale(cr, ci);
-                        out_prev = (short)cur; // prev_out <- old cur
+                        close_med(cur);
+                        accumulated_dist += distance(fbs, dest); // begin iM forward
+                        out_prev = (short)cur;
                     }
                 }
                 else // buf != 0: ignore hit, continue in cur, swap buffer
                 {
-                    rsu_replace(MED(cur, distance(orig, dest)));
+                    rsu_replace(1.0);
+                    accumulated_dist += distance(orig, dest);
                     out_buf = (short)(SAME(buf, M1) ? M2 : M1);
                 }
             }
@@ -2192,11 +2252,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (cur == 0) // IG; current_out <- 0
                     out_cur = (short)0;
                 else if (SAME(M1, M2)) // ignore hit
-                    rsu_replace(MED(cur, distance(orig, dest)));
+                {
+                    rsu_replace(1.0);
+                    accumulated_dist += distance(orig, dest);
+                }
                 else // i-i transition
                 {
-                    double g = MED(cur, distance(orig, fbs)) * TRN(cur, M1) * MED(M1, distance(fbs, dest));
-                    rsu_replace(g);
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, M1, (is_scalar ? 4 : 1), 2);
+                    close_med(cur);
+                    accumulated_dist += distance(fbs, dest);
                     out_cur = (short)M1;
                 }
             }
@@ -2205,10 +2270,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 if (cur == 0) // IG; current_out <- (d(fbs,sbs) > 1e-6 ? M2 : 0)
                     out_cur = (short)((distance(fbs, sbs) > 1.0e-6) ? M2 : 0);
                 else if (SAME(M1, M2)) // ignore hit
-                    rsu_replace(MED(cur, distance(orig, dest)));
-                else // i-i transition: MED(M2, d(fbs,dest) - off (unclamped))
                 {
-                    rsu_replace(MED(M2, distance(fbs, dest) - ray_offset));
+                    rsu_replace(1.0);
+                    accumulated_dist += distance(orig, dest);
+                }
+                else // i-i transition
+                {
+                    accumulated_dist += dist_orig_vbs;
+                    RPL(cur, M2, (is_scalar ? 4 : 1), 2);
+                    close_med(cur);
+                    accumulated_dist += distance(fbs, dest);
                     out_cur = (short)M2;
                 }
             }
@@ -2244,27 +2315,35 @@ void quadriga_lib::ray_state_update(int interaction_type,
                 {
                     if (typeH == 1 || typeH == 7 || typeH == 13) // nested o-i, overlapping mesh
                     {
-                        rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                        rsu_replace(1.0);
+                        accumulated_dist += dist_orig_vbs;
                         out_buf = (short)M1;
                     }
                     else if (typeH == 2 || typeH == 14) // i-o
                     {
-                        if (buf == 0) // cavity exit, IG * S
+                        if (buf == 0) // cavity exit
                         {
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                            accumulated_dist += dist_orig_vbs;
+                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
+                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
                             if (!std::isnan(std::real(S)))
                                 rsu_scale(std::real(S), std::imag(S));
+                            close_med(cur);
                             out_cur = (short)0;
                         }
                         else if (SAME(buf, M1)) // M2 embedded in M1
                         {
-                            rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                            rsu_replace(1.0);
+                            accumulated_dist += dist_orig_vbs;
                             out_buf = (short)0;
                         }
                         else
                         {
-                            double g = MED(cur, distance(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
-                            rsu_replace(g);
+                            accumulated_dist += dist_orig_vbs;
+                            RPL(cur, buf, (is_scalar ? 4 : 1), 2);
+                            close_med(cur);
+                            accumulated_dist += (double)ray_offset;
                             out_cur = (short)buf;
                             out_buf = (short)0;
                         }
@@ -2272,33 +2351,46 @@ void quadriga_lib::ray_state_update(int interaction_type,
                     else if (typeH == 4 || typeH == 5) // i-i
                     {
                         if (buf != 0) // spurious (probable false detection): IG
+                        {
+                            accumulated_dist += distance(orig, dest);
                             out_buf = (short)0;
+                        }
                         else // cavity transition, IG * S
                         {
                             int iM = (typeH == 5) ? M2 : M1;
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
-                            out_cur = (short)iM; // current_out <- iM
+                            accumulated_dist += dist_orig_vbs;
+                            RPL(cur, iM, (is_scalar ? 4 : 1), 2);
+                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
+                            out_cur = (short)iM;
                             if (!std::isnan(std::real(S)))
                             {
                                 rsu_scale(std::real(S), std::imag(S));
-                                out_cur = (short)((iM & 0x7FFF) | (int)0x8000); // resolved: later crossings are transparent
+                                out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
                             }
-                            out_prev = (short)cur; // prev_out <- old cur
+                            close_med(cur);
+                            accumulated_dist += distance(fbs, dest);
+                            out_prev = (short)cur;
                         }
                     }
                     else if (typeH == 8) // overlapping i-o
                     {
-                        if (buf == 0) // cavity exit, IG * S
+                        if (buf == 0) // cavity exit
                         {
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta, distance(orig, fbs), fGHz, eps, !prev_nonpar);
+                            accumulated_dist += dist_orig_vbs;
+                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
+                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
+                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
                             if (!std::isnan(std::real(S)))
                                 rsu_scale(std::real(S), std::imag(S));
+                            close_med(cur);
                             out_cur = (short)0;
                         }
                         else
                         {
-                            double g = MED(cur, distance(orig, fbs)) * TRN(cur, 0);
-                            rsu_replace(g);
+                            accumulated_dist += dist_orig_vbs;
+                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
+                            close_med(cur);
                             out_cur = (short)0;
                             out_buf = (short)0;
                         }
@@ -2308,11 +2400,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         if (buf == 0)
                         {
                             if (SAME(M1, M2)) // ignore hit
-                                rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                            {
+                                rsu_replace(1.0);
+                                accumulated_dist += dist_orig_vbs;
+                            }
                             else // i-i transition
                             {
-                                double g = MED(cur, distance(orig, fbs)) * TRN(cur, M1) * MED(M1, ray_offset);
-                                rsu_replace(g);
+                                accumulated_dist += dist_orig_vbs;
+                                RPL(cur, M1, (is_scalar ? 4 : 1), 2);
+                                close_med(cur);
+                                accumulated_dist += (double)ray_offset;
                                 out_cur = (short)M1;
                             }
                         }
@@ -2320,13 +2417,16 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         {
                             if (SAME(buf, M1))
                             {
-                                rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                                rsu_replace(1.0);
+                                accumulated_dist += dist_orig_vbs;
                                 out_buf = (short)0;
                             }
                             else
                             {
-                                double g = MED(cur, distance(orig, fbs)) * TRN(cur, buf) * MED(buf, ray_offset);
-                                rsu_replace(g);
+                                accumulated_dist += dist_orig_vbs;
+                                RPL(cur, buf, (is_scalar ? 4 : 1), 2);
+                                close_med(cur);
+                                accumulated_dist += (double)ray_offset;
                                 out_cur = (short)buf;
                                 out_buf = (short)0;
                             }
@@ -2337,16 +2437,22 @@ void quadriga_lib::ray_state_update(int interaction_type,
                         if (buf == 0)
                         {
                             if (SAME(M1, M2)) // ignore hit
-                                rsu_replace(MED(cur, distance(orig, fbs) + ray_offset));
+                            {
+                                rsu_replace(1.0);
+                                accumulated_dist += dist_orig_vbs;
+                            }
                             else // i-i transition
                             {
-                                double g = MED(cur, distance(orig, fbs)) * TRN(cur, M2) * MED(M2, ray_offset);
-                                rsu_replace(g);
+                                accumulated_dist += dist_orig_vbs;
+                                RPL(cur, M2, (is_scalar ? 4 : 1), 2);
+                                close_med(cur);
+                                accumulated_dist += (double)ray_offset;
                                 out_cur = (short)M2;
                             }
                         }
                         else // buf != 0: spurious, IG
                         {
+                            accumulated_dist += distance(orig, dest);
                             out_buf = (short)0;
                         }
                     }

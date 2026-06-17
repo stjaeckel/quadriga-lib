@@ -513,6 +513,40 @@ static inline void check_replace(const Rsu<dtype> &C, double g, double tol, arma
         CHECK(std::abs((double)C.gain(i) - g) < tol);
 }
 
+// Complex relative permittivity of a palette material (0 = air = 1)
+static inline std::complex<double> et(int idx)
+{
+    static const double a[8] = {1.0, 1.0, 1.0, 1.0, 4.0, 9.0, 4.0, 1.21};
+    return std::complex<double>(idx < 1 ? 1.0 : a[idx], 0.0);
+}
+
+// In-medium close factor for a single crossing where the VBS distance equals the geometric
+// distance (the normal-incidence dispatch harness). Mirrors ray_state_update close_med:
+// amp = sqrt(medg(m, L)), excess phase = k0 * (n_of(m) - 1) * L, factor = amp * exp(-i*excess).
+static inline std::complex<double> close_at(int m, double L)
+{
+    double k0 = 2.0 * QPI * FRQ / C0;
+    double excess = k0 * (n_of(m) - 1.0) * L;
+    return std::sqrt(medg(m, L)) * std::exp(std::complex<double>(0.0, -excess));
+}
+
+// Interface replace (RPL) + slab S + in-medium close. ray_state_update overwrites the Jones with
+// the interface coefficient at theta_t (here normal incidence), then scales by S and the close
+// factor. Verifies VV (and HH in EM mode), off-diagonals zero, and the |.|^2 power on gain.
+template <typename dtype>
+static inline void check_iface(const Rsu<dtype> &C, std::complex<double> coeff,
+                               std::complex<double> close, std::complex<double> S, double tol)
+{
+    std::complex<double> e = coeff * close * S;
+    bool scalar = C.itype >= 3;
+    CHECK(std::abs(cpx(C.xprmat, 0, 0) - e) < tol);                         // VV
+    CHECK(std::abs(cpx(C.xprmat, 0, 1)) < tol);                             // HV
+    CHECK(std::abs(cpx(C.xprmat, 0, 2)) < tol);                             // VH
+    CHECK(std::abs(cpx(C.xprmat, 0, 3) - (scalar ? std::complex<double>(0.0, 0.0) : e)) < tol); // HH
+    if (C.has_gain)
+        CHECK(std::abs((double)C.gain(0) - std::norm(e)) < tol);
+}
+
 // Applied complex factor on the VV pair
 template <typename dtype>
 static inline std::complex<double> vvf(const Rsu<dtype> &C, arma::uword i = 0)
@@ -560,28 +594,28 @@ TEST_CASE("ray_state_update - dispatch: resolved-ray precedence")
     SECTION("transmission pass, resolved i-o exit clears the state") // spec 10.0
     {
         auto C = disp(2, 1, 4, 0, 0, enc(4, true), 0);
-        check_keep(C);
+        check_iface(C, fresnel_te(et(4), et(0), 0.0).t, close_at(4, 1.0), 1.0, TOL);
         check_state(C, 0, 0, 0);
 
         // The resolved exit owns the in-medium loss of its incoming segment (up trip):
         // factor sqrt(MED(cur, d(orig, fbs))), here over the default d(orig, fbs) = 1
         auto D = disp(8, 2, 4, 0, 0, enc(1, true), 0);
-        check_mult(D, std::sqrt(medg(1, 1.0)), TOL);
+        check_iface(D, fresnel_te(et(1), et(0), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(D, 0, 0, 0);
 
         auto E = disp(14, 2, 4, 0, 0, enc(1, true), 0);
-        check_mult(E, std::sqrt(medg(1, 1.0)), TOL);
+        check_iface(E, fresnel_te(et(1), et(0), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(E, 0, 0, 0);
     }
     SECTION("transmission pass, resolved i-i crossing keeps the flag and shifts prev") // spec 10.0
     {
         // Resolved i-i also charges its incoming segment: sqrt(MED(cur, d(orig, fbs)))
         auto C = disp(4, 2, 2, 3, 0, enc(1, true), 0);
-        check_mult(C, std::sqrt(medg(1, 1.0)), TOL);
+        check_iface(C, fresnel_te(et(1), et(2), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(C, 1, enc(2, true), 0); // iM = M1 for type 4, prev <- old cur material
 
         auto D = disp(5, 2, 2, 3, 0, enc(1, true), 0);
-        check_mult(D, std::sqrt(medg(1, 1.0)), TOL);
+        check_iface(D, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(D, 1, enc(3, true), 0); // iM = M2 for type 5
     }
     SECTION("transmission pass, resolved transparent pass-through elsewhere") // spec 10.0
@@ -609,24 +643,24 @@ TEST_CASE("ray_state_update - dispatch: o-i entry family")
         // type 1, nH = 1, cur = 0: IG * sqrt(MED(M1, d(fbs,dest) - off)), state (0, M1, 0).
         // prev_in = 3 is a sentinel proving the explicit prev_out <- 0 write.
         auto C = disp(1, 1, 1, 0, 3, 0, 0, 1.0, 2.0);
-        check_mult(C, std::sqrt(medg(1, 2.0 - OFF)), TOL);
+        check_keep(C);
         check_state(C, 0, 1, 0);
     }
     SECTION("branch A, the entry clamp keeps the medium distance non-negative") // spec 10.1
     {
         // d(fbs,dest) = 0.0005 < ray_offset: max(d - off, 0) = 0, the factor must be 1
         auto C = disp(1, 1, 1, 0, 0, 0, 0, 1.0, 0.0005);
-        check_mult(C, 1.0, TOL);
+        check_keep(C);
         check_state(C, 0, 1, 0);
     }
     SECTION("branch A also serves nH = 2 types 7 and 13") // spec 10.1
     {
         auto C = disp(7, 2, 1, 0, 0, 0, 0, 1.0, 1.5);
-        check_mult(C, std::sqrt(medg(1, 1.5 - OFF)), TOL);
+        check_keep(C);
         check_state(C, 0, 1, 0);
 
         auto D = disp(13, 2, 1, 0, 0, 0, 0, 1.0, 1.5);
-        check_mult(D, std::sqrt(medg(1, 1.5 - OFF)), TOL);
+        check_keep(D);
         check_state(D, 0, 1, 0);
     }
     SECTION("branch A routes identically on the EM and refraction passes") // spec 10.1
@@ -636,7 +670,7 @@ TEST_CASE("ray_state_update - dispatch: o-i entry family")
         {
             auto C = make1<double>(mtl, it, 1, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
             C.run();
-            check_mult(C, std::sqrt(medg(1, 2.0 - OFF)), TOL);
+            check_keep(C);
             check_state(C, 0, 1, 0);
         }
     }
@@ -644,7 +678,7 @@ TEST_CASE("ray_state_update - dispatch: o-i entry family")
     {
         // cur != 0: replace MED(cur, d(orig,dest)), buffer <- M1
         auto C = disp(1, 1, 3, 0, 0, 2, 0, 1.0, 2.0); // d(orig,dest) = 3
-        check_replace(C, medg(2, 3.0), TOL);
+        check_keep(C);
         check_state(C, 0, 2, 3);
     }
     SECTION("branch B, slab entry from air is gain-neutral") // spec 10.1
@@ -656,7 +690,7 @@ TEST_CASE("ray_state_update - dispatch: o-i entry family")
     SECTION("branch B, nested slab entry replaces and buffers M1") // spec 10.1
     {
         auto C = disp(1, 2, 1, 1, 0, 3, 0, 1.5, 2.0, 0.5); // replace MED(cur, d(orig,fbs))
-        check_replace(C, medg(3, 1.5), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 3, 1);
     }
     SECTION("branch C, nH > 2 with cur = 0 and a non-empty buffer is inconsistent") // spec 10.1
@@ -682,7 +716,7 @@ TEST_CASE("ray_state_update - dispatch: o-i entry family")
     SECTION("branch C, nH > 2 nested entry replaces over d(orig,fbs) + off") // spec 10.1
     {
         auto C = disp(7, 3, 3, 0, 0, 1, 0, 2.0, 2.0, 0.5);
-        check_replace(C, medg(1, 2.0 + OFF), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 3);
     }
 }
@@ -705,18 +739,18 @@ TEST_CASE("ray_state_update - dispatch: i-o exit family")
     SECTION("branch A, cavity exit clears cur (S gated off here)") // spec 10.2
     {
         auto C = disp(2, 1, 4, 0, 0, 4, 0);
-        check_keep(C);
+        check_iface(C, fresnel_te(et(4), et(0), 0.0).t, close_at(4, 1.0), 1.0, TOL);
         check_state(C, 0, 0, 0);
 
         auto D = disp(14, 2, 1, 0, 0, 1, 0);
-        check_keep(D);
+        check_iface(D, fresnel_te(et(1), et(0), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(D, 0, 0, 0);
     }
     SECTION("branch A, buffered exit into the same material flushes the buffer") // spec 10.2
     {
         // same_materials(buf, M1): replace MED(cur, d(orig,dest)), buffer cleared
         auto C = disp(2, 1, 2, 0, 0, 1, 2, 1.0, 2.0); // d(orig,dest) = 3
-        check_replace(C, medg(1, 3.0), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
     }
     SECTION("branch A, buffered exit into a different material chains the gains") // spec 10.2
@@ -724,13 +758,13 @@ TEST_CASE("ray_state_update - dispatch: i-o exit family")
         // replace MED(cur, d(orig,fbs)) * TRN(cur, buf) * MED(buf, d(fbs,dest)); TRN = 1
         // between the eta-1 FOG materials, so the chain is the two medium gains
         auto C = disp(2, 1, 2, 0, 0, 1, 3, 1.2, 0.7);
-        check_replace(C, medg(1, 1.2) * medg(3, 0.7), TOL);
+        check_iface(C, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 1.2), 1.0, TOL);
         check_state(C, 0, 3, 0);
     }
     SECTION("branch A, type 8 ii-oo crossing leaves both media at once") // spec 10.2
     {
         auto C = disp(8, 2, 2, 0, 0, 1, 2, 0.9, 2.0);
-        check_replace(C, medg(1, 0.9), TOL); // MED(cur, d(orig,fbs)) * TRN(cur, 0)
+        check_iface(C, fresnel_te(et(1), et(0), 0.0).t, close_at(1, 0.9), 1.0, TOL);
         check_state(C, 0, 0, 0);
     }
     SECTION("branch B, type 2 at nH = 2 with no far material is inconsistent") // spec 10.2
@@ -748,13 +782,13 @@ TEST_CASE("ray_state_update - dispatch: i-o exit family")
     SECTION("branch B, buffered same-material exit") // spec 10.2
     {
         auto C = disp(2, 2, 2, 4, 0, 1, 2, 1.4, 2.0);
-        check_replace(C, medg(1, 1.4 + OFF), TOL); // MED(cur, d(orig,fbs) + off)
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
     }
     SECTION("branch B, buffered different-material exit") // spec 10.2
     {
         auto C = disp(2, 2, 2, 4, 0, 1, 3, 1.4, 2.0);
-        check_replace(C, medg(1, 1.4) * medg(3, OFF), TOL);
+        check_iface(C, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 1.4), 1.0, TOL);
         check_state(C, 0, 3, 0);
     }
     SECTION("branch B, a buffer without a current medium is inconsistent") // spec 10.2
@@ -770,17 +804,17 @@ TEST_CASE("ray_state_update - dispatch: i-o exit family")
         check_state(C, 0, 0, 0);
 
         auto D = disp(14, 3, 4, 0, 0, 4, 0);
-        check_keep(D);
+        check_iface(D, fresnel_te(et(4), et(0), 0.0).t, close_at(4, 1.0), 1.0, TOL);
         check_state(D, 0, 0, 0);
     }
     SECTION("branch C, nH > 2 buffered exits") // spec 10.2
     {
         auto C = disp(2, 3, 2, 0, 0, 1, 2, 1.1, 2.0); // same material
-        check_replace(C, medg(1, 1.1 + OFF), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
 
         auto D = disp(14, 3, 2, 0, 0, 1, 3, 1.1, 2.0); // different material
-        check_replace(D, medg(1, 1.1) * medg(3, OFF), TOL);
+        check_iface(D, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 1.1), 1.0, TOL);
         check_state(D, 0, 3, 0);
     }
     SECTION("branch D, type 8 at nH > 2") // spec 10.2
@@ -790,7 +824,7 @@ TEST_CASE("ray_state_update - dispatch: i-o exit family")
         check_state(C, 0, 0, 0);
 
         auto D = disp(8, 3, 1, 0, 0, 1, 2, 0.8, 2.0); // buffered ii-oo
-        check_replace(D, medg(1, 0.8), TOL);
+        check_iface(D, fresnel_te(et(1), et(0), 0.0).t, close_at(1, 0.8), 1.0, TOL);
         check_state(D, 0, 0, 0);
 
         auto E = disp(8, 3, 1, 0, 0, 0, 0); // cur = 0 is inconsistent here
@@ -823,23 +857,23 @@ TEST_CASE("ray_state_update - dispatch: material-to-material family")
     {
         // type 4: iM = M1. IG * sqrt(MED(iM, d(fbs,dest) - off)) without the entry clamp.
         auto C = disp(4, 2, 1, 2, 0, 4, 0, 1.0, 1.2);
-        check_mult(C, std::sqrt(medg(1, 1.2 - OFF)), TOL);
+        check_iface(C, fresnel_te(et(4), et(1), 0.0).t, close_at(4, 1.0), 1.0, TOL);
         check_state(C, 4, 1, 0);
 
         // type 5: iM = M2
         auto D = disp(5, 2, 2, 3, 0, 4, 0, 1.0, 1.2);
-        check_mult(D, std::sqrt(medg(3, 1.2 - OFF)), TOL);
+        check_iface(D, fresnel_te(et(4), et(3), 0.0).t, close_at(4, 1.0), 1.0, TOL);
         check_state(D, 4, 3, 0);
     }
     SECTION("buffered i-i replaces and swaps the buffer to the far face material") // spec 10.3
     {
         // replace MED(cur, d(orig,dest)); buffer <- same_materials(buf, M1) ? M2 : M1
         auto C = disp(4, 2, 2, 3, 0, 1, 2, 1.0, 1.5); // buf == M1 -> buffer <- M2 = 3
-        check_replace(C, medg(1, 2.5), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 3);
 
         auto D = disp(4, 2, 3, 2, 0, 1, 2, 1.0, 1.5); // buf != M1 -> buffer <- M1 = 3
-        check_replace(D, medg(1, 2.5), TOL);
+        check_replace(D, 1.0, TOL);
         check_state(D, 0, 1, 3);
     }
     SECTION("nH > 2 with a buffer only flushes the spurious buffer") // spec 10.3
@@ -875,14 +909,14 @@ TEST_CASE("ray_state_update - dispatch: o-i-o edge family")
     SECTION("nH = 2 inside, same material on both faces") // spec 10.4
     {
         auto C = disp(10, 2, 2, 2, 0, 1, 0, 1.0, 1.2); // replace MED(cur, d(orig,dest))
-        check_replace(C, medg(1, 2.2), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
     }
     SECTION("nH = 2 inside, different materials chain through M1") // spec 10.4
     {
         // replace MED(cur, d(orig,fbs)) * TRN(cur, M1) * MED(M1, d(fbs,dest)); TRN = 1
         auto C = disp(10, 2, 2, 3, 0, 1, 0, 0.8, 1.0);
-        check_replace(C, medg(1, 0.8) * medg(2, 1.0), TOL);
+        check_iface(C, fresnel_te(et(1), et(2), 0.0).t, close_at(1, 0.8), 1.0, TOL);
         check_state(C, 0, 2, 0);
     }
     SECTION("nH > 2 grazing pass outside any medium") // spec 10.4
@@ -894,21 +928,21 @@ TEST_CASE("ray_state_update - dispatch: o-i-o edge family")
     SECTION("nH > 2 inside without a buffer") // spec 10.4
     {
         auto C = disp(10, 3, 2, 2, 0, 1, 0, 1.3, 2.0); // same material
-        check_replace(C, medg(1, 1.3 + OFF), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
 
         auto D = disp(10, 3, 2, 3, 0, 1, 0, 1.3, 2.0); // different material
-        check_replace(D, medg(1, 1.3) * medg(2, OFF), TOL);
+        check_iface(D, fresnel_te(et(1), et(2), 0.0).t, close_at(1, 1.3), 1.0, TOL);
         check_state(D, 0, 2, 0);
     }
     SECTION("nH > 2 inside with a buffer") // spec 10.4
     {
         auto C = disp(10, 3, 2, 3, 0, 1, 2, 1.3, 2.0); // same_materials(buf, M1)
-        check_replace(C, medg(1, 1.3 + OFF), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
 
         auto D = disp(10, 3, 3, 2, 0, 1, 2, 1.3, 2.0); // buf != M1
-        check_replace(D, medg(1, 1.3) * medg(2, OFF), TOL);
+        check_iface(D, fresnel_te(et(1), et(2), 0.0).t, close_at(1, 1.3), 1.0, TOL);
         check_state(D, 0, 2, 0);
     }
 }
@@ -932,13 +966,13 @@ TEST_CASE("ray_state_update - dispatch: i-o-i edge family")
     SECTION("nH = 2 inside, same material") // spec 10.5
     {
         auto C = disp(11, 2, 2, 2, 0, 1, 0, 1.0, 1.0); // replace MED(cur, d(orig,dest))
-        check_replace(C, medg(1, 2.0), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
     }
     SECTION("nH = 2 inside, different materials re-enter through M2") // spec 10.5
     {
         auto C = disp(11, 2, 2, 3, 0, 1, 0, 1.0, 1.5); // replace MED(M2, d(fbs,dest) - off)
-        check_replace(C, medg(3, 1.5 - OFF), TOL);
+        check_iface(C, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 1.0), 1.0, TOL);
         check_state(C, 0, 3, 0);
     }
     SECTION("nH > 2 with cur = 0 is inconsistent") // spec 10.5
@@ -950,11 +984,11 @@ TEST_CASE("ray_state_update - dispatch: i-o-i edge family")
     SECTION("nH > 2 inside without a buffer") // spec 10.5
     {
         auto C = disp(11, 3, 2, 2, 0, 1, 0, 0.9, 2.0); // same material
-        check_replace(C, medg(1, 0.9 + OFF), TOL);
+        check_replace(C, 1.0, TOL);
         check_state(C, 0, 1, 0);
 
         auto D = disp(11, 3, 2, 3, 0, 1, 0, 0.9, 2.0); // different material
-        check_replace(D, medg(1, 0.9) * medg(3, OFF), TOL);
+        check_iface(D, fresnel_te(et(1), et(3), 0.0).t, close_at(1, 0.9), 1.0, TOL);
         check_state(D, 0, 3, 0);
     }
     SECTION("nH > 2 with a buffer only flushes the spurious buffer") // spec 10.5
@@ -1013,7 +1047,7 @@ TEST_CASE("ray_state_update - dispatch: reflection pass")
     SECTION("internal reflection re-emits unflagged when the gate is off") // spec 10.7
     {
         auto C = disp(2, 1, 4, 0, 0, 4, 0, 1.0, 2.0, 0.5, 3, 1.5);
-        check_keep(C);
+        check_iface(C, fresnel_te(et(4), et(0), 0.0).r, 1.0, 1.0, TOL);
         check_state(C, 0, 4, 0); // no resolved flag
     }
     SECTION("internal reflection of a resolvable slab applies S and flags the ray") // spec 10.7
@@ -1024,7 +1058,7 @@ TEST_CASE("ray_state_update - dispatch: reflection pass")
         std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
         std::complex<double> S = airy_S(r, r, phi_one_way(2.0, 1.0, FRQ, L));
         CHECK(std::abs(S - 1.125) < TOL); // oracle self-check at resonance
-        check_mult(C, S, TOL);
+        check_iface(C, r, 1.0, S, TOL);
         check_state(C, 0, enc(4, true), 0);
     }
 }
@@ -1309,7 +1343,7 @@ TEST_CASE("ray_state_update - optional arguments")
         auto C = make1<double>(mtl, 4, 2, 1, 4, 0, 0, 4, 0, L, 2.0, 0.5, QPI / 2.0, 0.0);
         C.has_prev_out = false;
         C.run();
-        check_mult(C, S, TOL);
+        CHECK(std::abs((double)C.gain(0) - (1.0 - std::norm(r)) * std::norm(S)) < TOL);
         CHECK((int)C.cur_out(0) == 0);
         CHECK((int)C.buf_out(0) == 0);
 
@@ -1317,23 +1351,21 @@ TEST_CASE("ray_state_update - optional arguments")
         D.has_cur_out = false;
         D.has_buf_out = false;
         D.run();
-        check_mult(D, S, TOL);
+        CHECK(std::abs((double)D.gain(0) - (1.0 - std::norm(r)) * std::norm(S)) < TOL);
         CHECK((int)D.prev_out(0) == 0);
     }
     SECTION("gainN and xprmatN can each be omitted")
     {
-        double g = medg(1, 2.0 - OFF);
-
         auto A = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
         A.has_gain = false;
         A.run();
-        check_mult(A, std::sqrt(g), TOL); // xprmat still scaled
+        check_keep(A); // entry defers the medium loss
         check_state(A, 0, 1, 0);
 
         auto B = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
         B.has_xprmat = false;
         B.run();
-        CHECK(std::abs((double)B.gain(0) - (double)B.g_in(0) * g) < TOL); // gain still scaled
+        CHECK(std::abs((double)B.gain(0) - (double)B.g_in(0)) < TOL); // gain unchanged at entry
         check_state(B, 0, 1, 0);
 
         auto C = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
@@ -1342,24 +1374,11 @@ TEST_CASE("ray_state_update - optional arguments")
         CHECK_NOTHROW(C.run()); // pure state update
         check_state(C, 0, 1, 0);
     }
-    SECTION("null normal_vecN disables the wedge test, never the gain math")
+    SECTION("null normal_vecN throws (required VBS plane normal)")
     {
-        // Entry without normals cannot set the non-parallel flag
         auto A = make1<double>(mtl, 4, 1, 2, 4, 4, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
         A.has_normals = false;
-        A.run();
-        check_keep(A);
-        check_state(A, 0, 4, 0);
-
-        // A later exit still resolves with the full S factor
-        double L = 2.0 * half_wave(2.0, FRQ);
-        std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
-        std::complex<double> S = airy_S(r, r, phi_one_way(2.0, 1.0, FRQ, L));
-        auto B = make1<double>(mtl, 4, 2, 1, 4, 0, 0, 4, 0, L, 2.0, 0.5, QPI / 2.0, 0.0);
-        B.has_normals = false;
-        B.run();
-        check_mult(B, S, TOL);
-        check_state(B, 0, 0, 0);
+        CHECK_THROWS_AS(A.run(), std::invalid_argument);
     }
     SECTION("with every state pointer null the per-call physics still works")
     {
@@ -1373,7 +1392,7 @@ TEST_CASE("ray_state_update - optional arguments")
         auto A = make1<double>(mtl, 4, 1, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 0.0);
         strip(A);
         A.run();
-        check_mult(A, std::sqrt(medg(1, 2.0 - OFF)), TOL);
+        check_keep(A); // entry defers the medium loss
 
         // (b) TR kill
         auto B = make1<double>(mtl, 2, 3, 1, 1, 0, 0, 0, 0, 1.0, 2.0, 0.5, QPI / 2.0, 0.0);
@@ -1423,29 +1442,6 @@ TEST_CASE("ray_state_update - gain operation semantics and probe handling")
         check_keep(C);
         check_state(C, 0, enc(1, true), 0);
     }
-    SECTION("IG * S multiplies every Jones pair, off-diagonals included")
-    {
-        double L = 2.0 * half_wave(2.0, FRQ);
-        std::complex<double> r = fresnel_te({4.0, 0.0}, {1.0, 0.0}, 0.0).r;
-        std::complex<double> S = airy_S(r, r, phi_one_way(2.0, 1.0, FRQ, L));
-
-        auto C = make1<double>(mtl, 1, 2, 1, 4, 0, 0, 4, 0, L, 2.0, 0.5, QPI / 2.0, 0.0);
-        C.xprmat(0, 0) = 0.31;
-        C.xprmat(0, 1) = -0.12;
-        C.xprmat(0, 2) = 0.05;
-        C.xprmat(0, 3) = 0.21;
-        C.xprmat(0, 4) = -0.17;
-        C.xprmat(0, 5) = 0.02;
-        C.xprmat(0, 6) = 0.44;
-        C.xprmat(0, 7) = 0.09;
-        double p = 0.0;
-        for (int c = 0; c < 8; ++c)
-            p += C.xprmat(0, c) * C.xprmat(0, c);
-        C.gain(0) = 0.5 * p;
-        C.run();
-        check_mult(C, S, TOL);
-        check_state(C, 0, 0, 0); // transmission exit clears cur (spec 10.2)
-    }
     SECTION("replace ignores the incoming field entirely")
     {
         auto A = make1<double>(mtl, 4, 1, 1, 3, 0, 0, 2, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5,
@@ -1456,17 +1452,17 @@ TEST_CASE("ray_state_update - gain operation semantics and probe handling")
         B.run();
         CHECK(arma::approx_equal(A.xprmat, B.xprmat, "absdiff", 0.0));
         CHECK(std::abs((double)A.gain(0) - (double)B.gain(0)) == 0.0);
-        check_replace(A, medg(2, 3.0), TOL);
+        check_replace(A, 1.0, TOL);
     }
     SECTION("EM replace writes sqrt(g) on VV and HH, scalar replace on VV only")
     {
         auto A = make1<double>(mtl, 1, 1, 1, 3, 0, 0, 2, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
         A.run();
-        check_replace(A, medg(2, 3.0), TOL); // checks the VV + HH layout for itype < 3
+        check_replace(A, 1.0, TOL); // checks the VV + HH layout for itype < 3
 
         auto B = make1<double>(mtl, 4, 1, 1, 3, 0, 0, 2, 0, 1.0, 2.0, 0.5, QPI / 2.0, 1.5);
         B.run();
-        check_replace(B, medg(2, 3.0), TOL); // checks the VV-only layout for itype >= 3
+        check_replace(B, 1.0, TOL); // checks the VV-only layout for itype >= 3
         double p = 0.0;
         for (int c = 0; c < 8; ++c)
             p += B.xprmat(0, c) * B.xprmat(0, c);
@@ -1481,7 +1477,7 @@ TEST_CASE("ray_state_update - gain operation semantics and probe handling")
         auto C = make1<double>(mtl, 4, 2, 1, 4, 0, 0, 4, 0, L, 2.0, 0.5, QPI / 2.0, 0.0);
         C.has_xprmat = false;
         C.run();
-        CHECK(std::abs((double)C.gain(0) - (double)C.g_in(0) * std::norm(S)) < TOL);
+        CHECK(std::abs((double)C.gain(0) - (1.0 - std::norm(r)) * std::norm(S)) < TOL);
         check_state(C, 0, 0, 0);
     }
 }
@@ -2202,13 +2198,13 @@ TEST_CASE("ray_state_update - input validation")
 
     SECTION("interaction type range") // 9.1
     {
-        for (int it : {5, -1, 99})
+        for (int it : {6, -1, 99})
         {
             auto C = make_valid9();
             C.itype = it;
             CHECK_THROWS_AS(C.run(), std::invalid_argument);
         }
-        for (int it : {0, 1, 2, 3, 4})
+        for (int it : {0, 1, 2, 3, 4, 5})
         {
             auto C = make_valid9();
             C.itype = it;
