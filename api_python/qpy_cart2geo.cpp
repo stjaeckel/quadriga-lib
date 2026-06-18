@@ -1,82 +1,119 @@
 // SPDX-License-Identifier: Apache-2.0
-//
-// quadriga-lib c++/MEX Utility library for radio channel modelling and simulations
 // Copyright (C) 2022-2026 Stephan Jaeckel (http://quadriga-lib.org)
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// ------------------------------------------------------------------------
+// Part of quadriga-lib — see LICENSE for terms.
 
 #include "python_arma_adapter.hpp"
 #include "quadriga_math.hpp"
 
 /*!SECTION
-Miscellaneous / Tools
+Math functions
 SECTION!*/
 
 /*!MD
 # cart2geo
-Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-## Description:
-This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length)
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle
-θ = 90° points to the zenith and θ = 0° points to the horizon.
+- Computes: length = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / length, -1, 1))
+- Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
+- z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
+- Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
+- Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
+- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
 
 ## Usage:
 ```
-import quadriga_lib
-geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
+geo_coords     = quadriga_lib.tools.cart2geo( cart, y, z, combine, use_kernel )
+az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 ```
 
-## Input Argument:
-- **`cart_coords`**<br>
-  Cartesian coordinates (x,y,z), Shape: `(3, n_row, n_col)`
+## Inputs:
+- **`cart`** — Combined Cartesian coordinates `(3, n, m)`; or, when `y` and `z` are given, the x-coordinates `(n, m)`
+- **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
+- **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
+- **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1
 
-## Output Arguments:
-- **`geo_coords`**<br>
-  Geographic coordinates, Shape: `(3, n_row, n_col)`<br>
-  First row: Azimuth angles in [rad], values between -pi and pi.<br>
-  Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br>
-  Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.
+## Outputs:
+- **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
+- **`az`** — Azimuth angles `(n, m)`; returned when `combine` is False
+- **`el`** — Elevation angles `(n, m)`; returned when `combine` is False
+- **`length`** — Vector length `(n, m)`; returned when `combine` is False
 MD!*/
 
-py::array_t<double> cart2geo(const py::array_t<double> &cart)
+py::object cart2geo(const py::array_t<double> &cart,
+                    py::handle y,
+                    py::handle z,
+                    bool combine,
+                    int use_kernel)
 {
-    const auto data = qd_python_numpy2arma_Cube(cart, true);
+    // Read inputs into flat coordinate vectors
+    arma::vec cx, cy, cz;
+    arma::uword n = 0, m = 0, n_val = 0;
 
-    if (data.n_elem == 0 || data.n_rows != 3)
-        throw std::invalid_argument("Input must have 3 rows.");
+    if (y.is_none() && z.is_none()) // Combined input: cart is (3, n, m)
+    {
+        const auto cart_a = qd_python_numpy2arma_Cube<double>(cart, true);
+        if (cart_a.n_elem == 0 || cart_a.n_rows != 3)
+            throw std::invalid_argument("Combined input 'cart' must have shape (3, n, m).");
 
-    // Split data
-    arma::uword n_val = data.n_cols * data.n_slices;
-    arma::vec x(n_val, arma::fill::none), y(n_val, arma::fill::none), z(n_val, arma::fill::none);
-    const double *pd = data.memptr();
-    double *px = x.memptr(), *py = y.memptr(), *pz = z.memptr();
-    for (arma::uword i = 0; i < n_val; ++i)
-        px[i] = pd[3 * i], py[i] = pd[3 * i + 1], pz[i] = pd[3 * i + 2];
+        n = cart_a.n_cols, m = cart_a.n_slices, n_val = n * m;
+        cx.set_size(n_val), cy.set_size(n_val), cz.set_size(n_val);
 
-    // Call library function (double precision)
-    arma::vec az, el, len;
-    quadriga_lib::fast_cart2geo<double>(x, y, z, az, el, &len, 1);
+        const double *pc = cart_a.memptr();
+        double *wx = cx.memptr(), *wy = cy.memptr(), *wz = cz.memptr();
+        for (arma::uword i = 0; i < n_val; ++i)
+            wx[i] = pc[3 * i], wy[i] = pc[3 * i + 1], wz[i] = pc[3 * i + 2];
+    }
+    else // Separate inputs: cart is x, plus y and z
+    {
+        auto cart_a = qd_python_numpy2arma_Mat<double>(cart, true);
+        auto y_a = qd_python_numpy2arma_Mat<double>(y, true);
+        auto z_a = qd_python_numpy2arma_Mat<double>(z, true);
 
-    // Combine outputs
-    arma::cube geo_arma;
-    auto geo = qd_python_init_output(3, data.n_cols, data.n_slices, &geo_arma);
+        if (cart_a.n_elem == 0 || y_a.n_elem != cart_a.n_elem || z_a.n_elem != cart_a.n_elem)
+            throw std::invalid_argument("Separate inputs 'x', 'y', 'z' must be non-empty and equal in size.");
 
-    double *pa = az.memptr(), *pe = el.memptr(), *pl = len.memptr(), *po = geo_arma.memptr();
-    for (arma::uword i = 0; i < n_val; ++i)
-        po[3 * i] = pa[i], po[3 * i + 1] = pe[i], po[3 * i + 2] = pl[i];
+        n = cart_a.n_rows, m = cart_a.n_cols, n_val = cart_a.n_elem;
+        cx = arma::vec(cart_a.memptr(), n_val, false, true);
+        cy = arma::vec(y_a.memptr(), n_val, false, true);
+        cz = arma::vec(z_a.memptr(), n_val, false, true);
+    }
 
-    return geo;
+    if (combine) // Single (3, n, m) output
+    {
+        arma::vec az, el, length;
+        quadriga_lib::fast_cart2geo<double>(cx, cy, cz, az, el, &length, use_kernel);
+
+        arma::cube geo_coords;
+        auto geo_coords_py = qd_python_init_output(3, n, m, &geo_coords);
+
+        const double *pa = az.memptr(), *pe = el.memptr(), *pl = length.memptr();
+        double *pg = geo_coords.memptr();
+        for (arma::uword i = 0; i < n_val; ++i)
+            pg[3 * i] = pa[i], pg[3 * i + 1] = pe[i], pg[3 * i + 2] = pl[i];
+
+        return geo_coords_py;
+    }
+
+    // Separate (n, m) outputs — written in place via strict views (zero-copy)
+    arma::mat az, el, length;
+    auto az_py = qd_python_init_output(n, m, &az);
+    auto el_py = qd_python_init_output(n, m, &el);
+    auto length_py = qd_python_init_output(n, m, &length);
+
+    arma::vec az_v(az.memptr(), n_val, false, true);
+    arma::vec el_v(el.memptr(), n_val, false, true);
+    arma::vec length_v(length.memptr(), n_val, false, true);
+
+    quadriga_lib::fast_cart2geo<double>(cx, cy, cz, az_v, el_v, &length_v, use_kernel);
+
+    return py::make_tuple(az_py, el_py, length_py);
 }
+
+// pybind11 declaration:
+// m.def("cart2geo", &cart2geo,
+//       py::arg("cart"),
+//       py::arg("y") = py::none(),
+//       py::arg("z") = py::none(),
+//       py::arg("combine") = true,
+//       py::arg("use_kernel") = 1);
