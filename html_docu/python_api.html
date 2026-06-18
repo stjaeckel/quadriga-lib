@@ -84,6 +84,7 @@ import quadriga_lib
 <li><a href="#eab50272">Channel functions</a></li>
 <li><a href="#6f9553d7">Channel generation functions</a></li>
 <li><a href="#c2d4d113">Channel statistics</a></li>
+<li><a href="#40522dfe">Math functions</a></li>
 <li><a href="#b11e2d16">Miscellaneous / Tools</a></li>
 <li><a href="#386370db">Site-specific simulation tools</a></li>
 </ul>
@@ -138,9 +139,14 @@ import quadriga_lib
   <tr><td><a href="#calc_rician_k_factor">calc_rician_k_factor</a></td><td>Calculate the Rician K-Factor from channel impulse response data</td></tr>
 </tbody></table><br>
 
+<b>Math functions</b><br><br>
+<table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
+  <tr><td><a href="#cart2geo">cart2geo</a></td><td>Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length</td></tr>
+  <tr><td><a href="#geo2cart">geo2cart</a></td><td>Convert elementwise azimuth/elevation angles to Cartesian coordinates</td></tr>
+</tbody></table><br>
+
 <b>Miscellaneous / Tools</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
-  <tr><td><a href="#cart2geo">cart2geo</a></td><td>Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates</td></tr>
   <tr><td><a href="#components">components</a></td><td>Returns the version numbers of all quadriga-lib sub-components</td></tr>
   <tr><td><a href="#version">version</a></td><td>Returns the quadriga-lib version number</td></tr>
   <tr><td><a href="#write_png">write_png</a></td><td>Write data to a PNG file</td></tr>
@@ -2088,36 +2094,83 @@ kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, r
 </ul>
 
 <hr class="greyline"><br><br>
-<span id="b11e2d16" class="qd-section"><b>Miscellaneous / Tools</b></span><br>
+<span id="40522dfe" class="qd-section"><b>Math functions</b></span><br>
 <br>
 <hr class="greyline"><br>
 <span id="cart2geo" class="qd-func"><b>cart2geo</b></span><br>
 <hr class="thin">
-Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
-<br><br>
-<b>Description:</b><br>
-This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length) 
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates 
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length 
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle 
-θ = 90° points to the zenith and θ = 0° points to the horizon.
+Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
+<ul>
+<li>Computes: length = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / length, -1, 1))</li>
+<li>Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm</li>
+<li>z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts</li>
+<li>Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon</li>
+<li>Two mutually exclusive input forms: a combined array <code>cart</code> of shape (3, n, m), or separate <code>x</code>, <code>y</code>, <code>z</code> of shape (n, m)</li>
+<li>The AVX2 kernel computes internally in single precision; use <code>use_kernel = 1</code> for full double precision</li>
+</ul>
 
 <b>Usage:</b><br>
 <pre>
-import quadriga_lib
-geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
+geo_coords     = quadriga_lib.tools.cart2geo( cart, y, z, combine, use_kernel )
+az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 </pre>
 
-<b>Input Argument:</b><br>
+<b>Inputs:</b><br>
 <ul>
-<li><b><code>cart_coords</code></b><br> Cartesian coordinates (x,y,z), Shape: <code>(3, n_row, n_col)</code></li>
+<li><b><code>cart</code></b> — Combined Cartesian coordinates <code>(3, n, m)</code>; or, when <code>y</code> and <code>z</code> are given, the x-coordinates <code>(n, m)</code></li>
+<li><b><code>y</code></b> — Y-coordinates <code>(n, m)</code>; provide together with <code>z</code> for separate inputs; default: None</li>
+<li><b><code>z</code></b> — Z-coordinates <code>(n, m)</code>; provide together with <code>y</code>; default: None</li>
+<li><b><code>combine</code></b> — If True, return a single <code>(3, n, m)</code> array; if False, return separate az, el, length arrays; default: True</li>
+<li><b><code>use_kernel</code></b> — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1</li>
 </ul>
 
-<b>Output Arguments:</b><br>
+<b>Outputs:</b><br>
 <ul>
-<li><b><code>geo_coords</code></b><br> Geographic coordinates, Shape: <code>(3, n_row, n_col)</code><br> First row: Azimuth angles in [rad], values between -pi and pi.<br> Second row: Elevation angles in [rad], values between -pi/2 and pi/2.<br> Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.</li>
+<li><b><code>geo_coords</code></b> — Combined geographic coordinates <code>(3, n, m)</code>; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when <code>combine</code> is True</li>
+<li><b><code>az</code></b> — Azimuth angles <code>(n, m)</code>; returned when <code>combine</code> is False</li>
+<li><b><code>el</code></b> — Elevation angles <code>(n, m)</code>; returned when <code>combine</code> is False</li>
+<li><b><code>length</code></b> — Vector length <code>(n, m)</code>; returned when <code>combine</code> is False</li>
 </ul>
 
+<hr class="greyline"><br>
+<span id="geo2cart" class="qd-func"><b>geo2cart</b></span><br>
+<hr class="thin">
+Convert elementwise azimuth/elevation angles to Cartesian coordinates
+<ul>
+<li>Conversion: x = cos(el)·cos(az)·len, y = cos(el)·sin(az)·len, z = sin(el)·len</li>
+<li>Two mutually exclusive input forms: a combined array <code>az</code> holding geographic coordinates (3, n, m), or separate <code>az</code>, <code>el</code>, <code>len</code> of shape (n, m)</li>
+<li>For combined input, row 0 = azimuth, row 1 = elevation, row 2 = length</li>
+<li><code>len</code> is optional in separate mode; omit it for unit length</li>
+<li>Inverse of <code>cart2geo</code>; round-trips in both the combined and separate forms</li>
+<li>The AVX2 kernel computes internally in single precision; use <code>use_kernel = 1</code> for full double precision</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+cart    = quadriga_lib.tools.geo2cart( az, el, len, combine, use_kernel )
+x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>az</code></b> — Azimuth angles <code>(n, m)</code>; or, when <code>el</code> is omitted, combined geographic coordinates <code>(3, n, m)</code> (row 0 = azimuth, row 1 = elevation, row 2 = length)</li>
+<li><b><code>el</code></b> — Elevation angles <code>(n, m)</code>; omit for combined input; default: None</li>
+<li><b><code>len</code></b> — Vector length <code>(n, m)</code>; omit for unit length; ignored for combined input; default: None</li>
+<li><b><code>combine</code></b> — If True, return a single <code>(3, n, m)</code> array; if False, return separate x, y, z  arrays; default: True</li>
+<li><b><code>use_kernel</code></b> — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>cart</code></b> — Combined Cartesian coordinates <code>(3, n, m)</code>; row 0 = x, row 1 = y, row 2 = z; returned when <code>combine</code> is True</li>
+<li><b><code>x</code></b> — X-coordinates <code>(n, m)</code>; returned when <code>combine</code> is False</li>
+<li><b><code>y</code></b> — Y-coordinates <code>(n, m)</code>; returned when <code>combine</code> is False</li>
+<li><b><code>z</code></b> — Z-coordinates <code>(n, m)</code>; returned when <code>combine</code> is False</li>
+</ul>
+
+<hr class="greyline"><br><br>
+<span id="b11e2d16" class="qd-section"><b>Miscellaneous / Tools</b></span><br>
+<br>
 <hr class="greyline"><br>
 <span id="components" class="qd-func"><b>components</b></span><br>
 <hr class="thin">

@@ -1,7 +1,7 @@
 ---
 title: "Python API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "17.06.2026"
+date: "18.06.2026"
 lang: en-US
 ---
 
@@ -12,56 +12,57 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 71 |
-| [calc_directivity](#calc_directivity) | Array antenna functions | 107 |
-| [combine_pattern](#combine_pattern) | Array antenna functions | 136 |
-| [concat](#concat) | Array antenna functions | 177 |
-| [copy_element](#copy_element) | Array antenna functions | 207 |
-| [export_obj_file](#export_obj_file) | Array antenna functions | 243 |
-| [generate](#generate) | Array antenna functions | 268 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 364 |
-| [interpolate](#interpolate) | Array antenna functions | 448 |
-| [qdant_read](#qdant_read) | Array antenna functions | 525 |
-| [qdant_write](#qdant_write) | Array antenna functions | 565 |
-| [rotate_pattern](#rotate_pattern) | Array antenna functions | 603 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 653 |
-| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 721 |
-| [hdf5_create_file](#hdf5_create_file) | Channel functions | 766 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 795 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 854 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 885 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 912 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 937 |
-| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 958 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1000 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1030 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1063 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1118 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1182 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1240 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1297 |
-| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1357 |
-| [acdf](#acdf) | Channel statistics | 1439 |
-| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1470 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1509 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1559 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1587 |
-| [cart2geo](#cart2geo) | Miscellaneous / Tools | 1621 |
-| [components](#components) | Miscellaneous / Tools | 1649 |
-| [version](#version) | Miscellaneous / Tools | 1658 |
-| [write_png](#write_png) | Miscellaneous / Tools | 1671 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1714 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 1762 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1794 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1827 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1877 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1924 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 1951 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 1981 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2014 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2051 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2094 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2120 |
+| [calc_beamwidth](#calc_beamwidth) | Array antenna functions | 72 |
+| [calc_directivity](#calc_directivity) | Array antenna functions | 108 |
+| [combine_pattern](#combine_pattern) | Array antenna functions | 137 |
+| [concat](#concat) | Array antenna functions | 178 |
+| [copy_element](#copy_element) | Array antenna functions | 208 |
+| [export_obj_file](#export_obj_file) | Array antenna functions | 244 |
+| [generate](#generate) | Array antenna functions | 269 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 365 |
+| [interpolate](#interpolate) | Array antenna functions | 449 |
+| [qdant_read](#qdant_read) | Array antenna functions | 526 |
+| [qdant_write](#qdant_write) | Array antenna functions | 566 |
+| [rotate_pattern](#rotate_pattern) | Array antenna functions | 604 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 654 |
+| [channel_export_obj_file](#channel_export_obj_file) | Channel functions | 722 |
+| [hdf5_create_file](#hdf5_create_file) | Channel functions | 767 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 796 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 855 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 886 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 913 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 938 |
+| [hdf5_write_channel](#hdf5_write_channel) | Channel functions | 959 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1001 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1031 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1064 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1119 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 1183 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 1241 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 1298 |
+| [get_ieee_indoor](#get_ieee_indoor) | Channel generation functions | 1358 |
+| [acdf](#acdf) | Channel statistics | 1440 |
+| [calc_angular_spread](#calc_angular_spread) | Channel statistics | 1471 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 1510 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 1560 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 1588 |
+| [cart2geo](#cart2geo) | Math functions | 1622 |
+| [geo2cart](#geo2cart) | Math functions | 1652 |
+| [components](#components) | Miscellaneous / Tools | 1689 |
+| [version](#version) | Miscellaneous / Tools | 1698 |
+| [write_png](#write_png) | Miscellaneous / Tools | 1711 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 1754 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 1802 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 1834 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 1867 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 1917 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 1964 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 1991 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 2021 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 2054 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 2091 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 2134 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 2160 |
 
 ---
 
@@ -1615,35 +1616,74 @@ kf, pg = quadriga_lib.tools.calc_rician_k_factor( powers, path_length, tx_pos, r
 
 ---
 
-# Miscellaneous / Tools
+# Math functions
 
 ---
 ## cart2geo
-Transform Cartesian (x,y,z) coordinates to Geographic (az, el, length) coordinates
+Convert elementwise Cartesian coordinates to azimuth/elevation angles and vector length
 
-### Description:
-This function transforms Cartesian (x,y,z) coordinates to Geographic (azimuth, elevation, length)
-coordinates. A geographic coordinate system is a three-dimensional reference system that locates
-points on the surface of a sphere. A point has three coordinate values: azimuth, elevation and length
-where azimuth and elevation measure angles. In the geographic coordinate system, the elevation angle
-θ = 90° points to the zenith and θ = 0° points to the horizon.
+- Computes: length = sqrt(x² + y² + z²), az = atan2(y, x), el = asin(clamp(z / length, -1, 1))
+- Inputs are arbitrary 3D vectors (not required to be unit length); length returns the Euclidean norm
+- z / length is clamped to [-1, 1] before asin to guard against length == 0 and rounding artifacts
+- Azimuth is in [-pi, pi], elevation in [-pi/2, pi/2]; elevation pi/2 points to the zenith, 0 to the horizon
+- Two mutually exclusive input forms: a combined array `cart` of shape (3, n, m), or separate `x`, `y`, `z` of shape (n, m)
+- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
 
 ### Usage:
 ```
-import quadriga_lib
-geo_coords = quadriga_lib.tools.cart2geo(cart_coords)
+geo_coords     = quadriga_lib.tools.cart2geo( cart, y, z, combine, use_kernel )
+az, el, length = quadriga_lib.tools.cart2geo( cart, y, z, combine=False )
 ```
 
-### Input Argument:
-- **`cart_coords`**
-  Cartesian coordinates (x,y,z), Shape: `(3, n_row, n_col)`
+### Inputs:
+- **`cart`** — Combined Cartesian coordinates `(3, n, m)`; or, when `y` and `z` are given, the x-coordinates `(n, m)`
+- **`y`** — Y-coordinates `(n, m)`; provide together with `z` for separate inputs; default: None
+- **`z`** — Z-coordinates `(n, m)`; provide together with `y`; default: None
+- **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate az, el, length arrays; default: True
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws if unavailable); default: 1
 
-### Output Arguments:
-- **`geo_coords`**
-  Geographic coordinates, Shape: `(3, n_row, n_col)`
-  First row: Azimuth angles in [rad], values between -pi and pi.
-  Second row: Elevation angles in [rad], values between -pi/2 and pi/2.
-  Third row: Vector length, i.e. the distance from the origin to the point defined by x,y,z.
+### Outputs:
+- **`geo_coords`** — Combined geographic coordinates `(3, n, m)`; row 0 = azimuth, row 1 = elevation, row 2 = vector length; returned when `combine` is True
+- **`az`** — Azimuth angles `(n, m)`; returned when `combine` is False
+- **`el`** — Elevation angles `(n, m)`; returned when `combine` is False
+- **`length`** — Vector length `(n, m)`; returned when `combine` is False
+
+---
+## geo2cart
+Convert elementwise azimuth/elevation angles to Cartesian coordinates
+
+- Conversion: x = cos(el)·cos(az)·len, y = cos(el)·sin(az)·len, z = sin(el)·len
+- Two mutually exclusive input forms: a combined array `az` holding geographic coordinates
+  (3, n, m), or separate `az`, `el`, `len` of shape (n, m)
+- For combined input, row 0 = azimuth, row 1 = elevation, row 2 = length
+- `len` is optional in separate mode; omit it for unit length
+- Inverse of `cart2geo`; round-trips in both the combined and separate forms
+- The AVX2 kernel computes internally in single precision; use `use_kernel = 1` for full double precision
+
+### Usage:
+```
+cart    = quadriga_lib.tools.geo2cart( az, el, len, combine, use_kernel )
+x, y, z = quadriga_lib.tools.geo2cart( az, el, len, combine=False )
+```
+
+### Inputs:
+- **`az`** — Azimuth angles `(n, m)`; or, when `el` is omitted, combined geographic coordinates
+  `(3, n, m)` (row 0 = azimuth, row 1 = elevation, row 2 = length)
+- **`el`** — Elevation angles `(n, m)`; omit for combined input; default: None
+- **`len`** — Vector length `(n, m)`; omit for unit length; ignored for combined input; default: None
+- **`combine`** — If True, return a single `(3, n, m)` array; if False, return separate x, y, z  arrays; default: True
+- **`use_kernel`** — Kernel: 0 = auto (AVX2 if available, else GENERIC), 1 = GENERIC, 2 = AVX2 (throws
+  if unavailable); default: 1
+
+### Outputs:
+- **`cart`** — Combined Cartesian coordinates `(3, n, m)`; row 0 = x, row 1 = y, row 2 = z; returned when `combine` is True
+- **`x`** — X-coordinates `(n, m)`; returned when `combine` is False
+- **`y`** — Y-coordinates `(n, m)`; returned when `combine` is False
+- **`z`** — Z-coordinates `(n, m)`; returned when `combine` is False
+
+---
+
+# Miscellaneous / Tools
 
 ---
 ## components
