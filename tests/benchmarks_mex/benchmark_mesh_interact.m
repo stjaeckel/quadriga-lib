@@ -2,20 +2,7 @@ clear all
 close all
 
 no_pos  = 100e6;
-
-% Cube
-cube = [  -1     1     1   ,    1    -1     1   ,    1     1     1;   %  1 Top NorthEast
-           1    -1     1   ,   -1    -1    -1   ,    1    -1    -1;   %  2 South Lower
-          -1    -1     1   ,   -1     1    -1   ,   -1    -1    -1;   %  3 West Lower
-           1     1    -1   ,   -1    -1    -1   ,   -1     1    -1;   %  4 Bottom NorthWest
-           1     1     1   ,    1    -1    -1   ,    1     1    -1;   %  5 East Lower
-          -1     1     1   ,    1     1    -1   ,   -1     1    -1;   %  6 North Lower
-          -1     1     1   ,   -1    -1     1   ,    1    -1     1;   %  7 Top SouthWest
-           1    -1     1   ,   -1    -1     1   ,   -1    -1    -1;   %  8 South Upper
-          -1    -1     1   ,   -1     1     1   ,   -1     1    -1;   %  9 West Upper
-           1     1    -1   ,    1    -1    -1   ,   -1    -1    -1;   % 10 Bottom SouthEast
-           1     1     1   ,    1    -1     1   ,    1    -1    -1;   % 11 East Upper
-          -1     1     1   ,    1     1     1   ,    1     1    -1 ]; % 12 North Upper
+cube = quadriga_lib.cube;
 
 mtl_ind  = ones(12,1);       % all faces -> material 1 (1-based; 0 would mean "no material")
 mtl_prop = struct('a', 1.5); % one material; each field is a length-n_mtl column (here n_mtl = 1)

@@ -11,6 +11,13 @@
 #include <stdexcept>
 #include <cstring>
 #include <cmath>
+#include <cstdint>
+
+// qd::bits<T> wraps a value of type T (sizeof 1, 2, 4, or 8) and lets you read and write its individual bits
+#include "bits.hpp"
+
+// Co-location distance. If 2 faces are closer than that, they are treated as a M2M transition
+#define colocation_dist 0.001
 
 // Materials
 namespace
@@ -222,20 +229,28 @@ namespace
         }
 
         // In-medium gain, linear
-        double medium_gain(double dist, double fGHz = 1.0, double abs_cos_theta = 1.0) const
+        double medium_gain(double dist_refract,              // In-medium distance (refracted path)
+                           double fGHz = 1.0,                // Frequency
+                           double abs_cos_theta_t = 1.0,     // Cosine of incidence angle @ FBS/VBS (refracted path)
+                           double dist_geo = 0.0,            // Geometric distance (0.0 = dist_refract)
+                           double abs_cos_theta = 0.0) const // Cosine of incidence angle @ orig (only used when dist_geo > 0)
         {
+            if (dist_geo == 0.0) // Identity fallback
+                dist_geo = dist_refract, abs_cos_theta = abs_cos_theta_t;
+
             std::complex<double> eta_val = eta(fGHz) * mu(fGHz);
             double er = std::real(eta_val);
             double tan_delta = std::imag(eta_val) / er;
             double cos_delta = 1.0 / std::sqrt(1.0 + tan_delta * tan_delta);
             double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
             Delta = std::sqrt(Delta) * 0.0477135 / (fGHz * std::sqrt(er));
-            double loss = dist * 8.686 / Delta;
-            loss += dist * alpha * std::pow(fGHz / fRef, alphaB);
+            double loss = dist_refract * 8.686 / Delta;
+            loss += dist_refract * alpha * std::pow(fGHz / fRef, alphaB);
+
             constexpr double mass_min_path = 0.0015;
-            if (m > 0.0 && dist > mass_min_path)
+            if (m > 0.0 && dist_geo > mass_min_path)
             {
-                double mass_path = dist * abs_cos_theta * abs_cos_theta;
+                double mass_path = dist_geo * abs_cos_theta * abs_cos_theta;
                 double m_dB = m * std::log10((fGHz / fRef) * mass_path);
                 if (m_dB > 0.0)
                     loss += m_dB;
@@ -278,12 +293,12 @@ namespace
         // face gives R_eff = 1.
         double apply_tf_pair(const Material &other, double R0, double fGHz = 1.0) const
         {
-            double tfA = tf(fGHz), tfB = other.tf(fGHz);
-            double tfAp = (tfA > 0.0) ? tfA : 0.0, tfAm = (tfA < 0.0) ? -tfA : 0.0;
-            double tfBp = (tfB > 0.0) ? tfB : 0.0, tfBm = (tfB < 0.0) ? -tfB : 0.0;
+            double tfX = tf(fGHz), tfY = other.tf(fGHz);
+            double tfXp = (tfX > 0.0) ? tfX : 0.0, tfXm = (tfX < 0.0) ? -tfX : 0.0;
+            double tfYp = (tfY > 0.0) ? tfY : 0.0, tfYm = (tfY < 0.0) ? -tfY : 0.0;
             R0 = (R0 < 0.0) ? 0.0 : ((R0 > 1.0) ? 1.0 : R0);
-            double R_leak = R0 * (1.0 - tfAp) * (1.0 - tfBp);
-            double tfm = (tfAm > tfBm) ? tfAm : tfBm;
+            double R_leak = R0 * (1.0 - tfXp) * (1.0 - tfYp);
+            double tfm = (tfXm > tfYm) ? tfXm : tfYm;
             return R_leak + (1.0 - R_leak) * tfm;
         }
 
@@ -358,6 +373,10 @@ namespace
                 std::complex<double> R_TE = tir ? std::complex<double>(1.0, 0.0) : (z1 * abs_cos_theta - z2 * ct2) / (z1 * abs_cos_theta + z2 * ct2);
                 std::complex<double> R_TM = tir ? std::complex<double>(1.0, 0.0) : (z2 * abs_cos_theta - z1 * ct2) / (z2 * abs_cos_theta + z1 * ct2);
                 double reflectance = tir ? 1.0 : 0.5 * (std::norm(R_TE) + std::norm(R_TM));
+
+                // ISSUE: reflectance is constructed from the average R_TE, R_TM, but the two should probably be treated
+                // independently. There is a companion fix in SLAB_AIRY_FACTOR that corrects the per-port transmittance.
+                // Touching this here will need a corresponding fix as well in SLAB_AIRY_FACTOR to avoid double-correction.
 
                 if (interaction_type == 0) // EM reflection: tf-adjusted reflectance
                 {
@@ -450,103 +469,12 @@ namespace
 
             return gain;
         }
-
-        // Analytic thin-slab (Fabry-Perot) factor S = 1 / (1 - r_near * r_far * phi^2)
-        // Returns S, or a NaN complex on re-emit: when parallel_ok is false (known wedge/edge), when the
-        // round-trip amplitude rho falls below eps, or when the denominator sits near the pole. Callers
-        // test the result with std::isnan(std::real(S)).
-        std::complex<double> slab_airy_factor(const Material &near,    // Material on the far side of the interface being processed (r_near, slab side)
-                                              const Material &far,     // Material on the far side of the opposite interface (r_far)
-                                              double theta,            // Incidence angle
-                                              double dist,             // One-way in-slab path d(orig, fbs)
-                                              double fGHz = 1.0,       // Frequency
-                                              double eps = 0.15,       // Resolve threshold
-                                              bool parallel_ok = true) // Set false if near/far interface are known not-parallel
-        {
-            const std::complex<double> nan_c(std::nan(""), std::nan(""));
-            if (!parallel_ok) // known wedge/edge -> re-emit
-                return nan_c;
-
-            const double c0 = 299792458.0;
-            const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
-
-            // Slab medium (= *this). eta_if includes the resonance pole (interface / Fresnel); eta_med excludes it (medium path / phase).
-            bool slab_is_air = same_as(Material());
-            std::complex<double> eta_s_if = eta(fGHz) + eta_resonance(fGHz);
-            std::complex<double> mu_s = mu(fGHz);
-            std::complex<double> eta_s_med = eta(fGHz);
-
-            // Incidence cosine (fbs_angleN convention)
-            double abs_cos = std::abs(std::cos(theta + 1.570796326794897));
-            abs_cos = (abs_cos > 1.0) ? 1.0 : abs_cos;
-            double sin2 = 1.0 - abs_cos * abs_cos;
-
-            // Fresnel (TE) amplitude reflection at slab|adjacent from the slab side, with tf folded into
-            // the magnitude and the Fresnel phase preserved. Returns r and R = |r|^2.
-            auto fresnel_r = [&](const Material &adj, std::complex<double> &r, double &R)
-            {
-                std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
-                std::complex<double> mu_a = adj.mu(fGHz);
-                std::complex<double> z1 = std::sqrt(eta_s_if / mu_s); // slab admittance
-                std::complex<double> z2 = std::sqrt(eta_a_if / mu_a); // adjacent admittance
-                std::complex<double> ratio = (eta_s_if * mu_s) / (eta_a_if * mu_a);
-                std::complex<double> cos_t2 = std::sqrt(1.0 - ratio * sin2);
-                std::complex<double> r_te = (z1 * abs_cos - z2 * cos_t2) / (z1 * abs_cos + z2 * cos_t2);
-                double R0 = std::norm(r_te);
-
-                // tf of the face owner: the slab if solid, the adjacent solid for an air gap
-                double Reff = (slab_is_air ? adj : *this).apply_tf(R0, fGHz);
-
-                r = std::polar(std::sqrt(Reff), std::arg(r_te));
-                R = Reff;
-            };
-
-            std::complex<double> r_near, r_far;
-            double R_near = 0.0, R_far = 0.0;
-            fresnel_r(near, r_near, R_near);
-            fresnel_r(far, r_far, R_far);
-
-            // One-way in-slab propagation phi: magnitude from the full medium_gain (dielectric + alpha +
-            // mass, with the mass-law angle factor evaluated at the actual incidence cosine so that
-            // dist * cos^2 = d * cos(theta) recovers the surface mass), phase from the resonance-excluded
-            // permittivity only. Air slab -> lossless, unit index.
-            double gL = medium_gain(dist, fGHz, abs_cos);
-            double n_re = std::real(std::sqrt(eta_s_med * mu_s)); // real refractive index
-            double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
-            double arg_phi = -(omega / c0) * n_re * dist * abs_cos * abs_cos;         // walk-off: L*cos^2(theta_t)
-            std::complex<double> phi2 = std::polar(abs_phi * abs_phi, 2.0 * arg_phi); // phi^2
-            std::complex<double> denom = std::complex<double>(1.0, 0.0) - r_near * r_far * phi2;
-
-            // Survival gate: rho^2 = R_near * R_far * medium_gain(2L)
-            double g2L = medium_gain(2.0 * dist, fGHz, abs_cos);
-            double rr = R_near * R_far;
-            rr = (rr < 0.0) ? 0.0 : rr;
-            g2L = (g2L < 0.0) ? 0.0 : g2L;
-            double rho = std::sqrt(rr * g2L);
-
-            // Survival + near-pole clamp -> re-emit
-            if (rho < eps || std::abs(denom) < 1.0e-2)
-                return nan_c;
-
-            return std::complex<double>(1.0, 0.0) / denom;
-        }
     };
 
-    // Calculate the length of a vector
-    template <typename dtype>
-    inline dtype qd_calc_length(dtype Ox, dtype Oy, dtype Oz, dtype Dx, dtype Dy, dtype Dz)
-    {
-        dtype a = Dx - Ox;
-        dtype b = a * a;
-        a = Dy - Oy, b += a * a;
-        a = Dz - Oz, b += a * a;
-        return std::sqrt(b);
-    }
-
     // Mirror reflection direction: d = u - 2*c*n, c = clamp(u.n)
-    inline void qd_reflect(double Ux, double Uy, double Uz,
-                           double Nx, double Ny, double Nz,
-                           double &Dx, double &Dy, double &Dz)
+    inline void qd_reflect(double Ux, double Uy, double Uz,    // Incoming direction, normalized
+                           double Nx, double Ny, double Nz,    // Plane normal vector, normalized
+                           double &Dx, double &Dy, double &Dz) // Outgoing direction (normalized if U and N are normalized)
     {
         double c = Ux * Nx + Uy * Ny + Uz * Nz;
         c = (c < -1.0) ? -1.0 : (c > 1.0 ? 1.0 : c);
@@ -555,10 +483,12 @@ namespace
     }
 
     // Snell refraction direction: normalize(eta*u + (eta*cos_in - Re(cos_theta2))*n)
-    inline void qd_refract(double Ux, double Uy, double Uz,
-                           double Nx, double Ny, double Nz,
-                           double eta, double cos_in, std::complex<double> cos_theta2,
-                           double &Dx, double &Dy, double &Dz)
+    inline void qd_refract(double Ux, double Uy, double Uz,    // Incoming direction, normalized
+                           double Nx, double Ny, double Nz,    // Plane normal vector, normalized
+                           double eta,                         // Snell ratio sqrt|eta1*mu1 / eta2*mu2|
+                           double cos_in,                      // Cosine of angle between normal vector and incoming ray
+                           std::complex<double> cos_theta2,    // Cosine of angle between normal vector and outgoing ray
+                           double &Dx, double &Dy, double &Dz) // Outgoing direction (normalized)
     {
         double s = eta * cos_in - std::real(cos_theta2);
         double Rx = eta * Ux + s * Nx, Ry = eta * Uy + s * Ny, Rz = eta * Uz + s * Nz;
@@ -636,57 +566,6 @@ namespace
                           VH_Re * VH_Re + VH_Im * VH_Im +
                           HH_Re * HH_Re + HH_Im * HH_Im);
     }
-
-    // Per-hit in-medium charge: incidence-side leg (if ray starts inside) and transmissive offset leg
-    inline double qd_hit_charges(const Material &M1, const Material &M2,
-                                 bool ray_starts_inside, int geometry_type,
-                                 double OF_length, double ray_offset,
-                                 double fGHz, double abs_cos_theta)
-    {
-        double gain = 1.0;
-        if (ray_starts_inside)
-        {
-            double thickness = (geometry_type == 0) ? OF_length + ray_offset : OF_length;
-            gain *= M1.medium_gain(thickness, fGHz, abs_cos_theta);
-        }
-        if (geometry_type != 0)
-            gain *= M2.medium_gain(ray_offset, fGHz);
-        return gain;
-    }
-
-    // VBS plane intersection
-    // Returns false when the ray is near-parallel to the plane
-    inline bool qd_vbs(double Ox, double Oy, double Oz,    // Segment origin O
-                       double Dx, double Dy, double Dz,    // Incoming physical direction (path_dirN)
-                       double Fx, double Fy, double Fz,    // Plane intersect point (FBS)
-                       double Nx, double Ny, double Nz,    // Plane normal N
-                       double &Vx, double &Vy, double &Vz, // Virtual back-scatter point (VBS)
-                       double &d_v,                        // Distance from O to V
-                       double &cos_theta_t)                // cos(theta_t) = |d . N|
-    {
-        // Normalize D and N to unit length
-        double d_len = std::sqrt(Dx * Dx + Dy * Dy + Dz * Dz);
-        double n_len = std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz);
-        if (d_len < 1.0e-12 || n_len < 1.0e-12) // degenerate (zero-length) input
-            return false;
-
-        double d_inv = 1.0 / d_len, n_inv = 1.0 / n_len;
-        Dx *= d_inv, Dy *= d_inv, Dz *= d_inv;
-        Nx *= n_inv, Ny *= n_inv, Nz *= n_inv;
-
-        double dn = Dx * Nx + Dy * Ny + Dz * Nz;
-        if (std::abs(dn) < 1.0e-6) // near-parallel: division protection
-            return false;
-
-        double s = ((Fx - Ox) * Nx + (Fy - Oy) * Ny + (Fz - Oz) * Nz) / dn;
-        if (!std::isfinite(s) || s <= 0.0)
-            return false;
-
-        Vx = Ox + s * Dx, Vy = Oy + s * Dy, Vz = Oz + s * Dz;
-        d_v = s;
-        cos_theta_t = std::abs(dn);
-        return true;
-    }
 }
 
 /*!SECTION
@@ -698,21 +577,23 @@ SECTION!*/
 Linear gain of a ray traversing a homogeneous lossy medium
 
 - Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
-  of length `dist` inside the medium. The per-meter loss combines two contributions:
+  of length `dist` inside the medium. The loss combines three contributions:
   - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`,
-    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+    `σ = c·(f/fRef)^d`. These give an attenuation length `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
   - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
     by `σ` (e.g. foliage, scattering media).
+  - An acoustic mass-law term `m·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
+    `dist` exceeds ~1.5 mm, and the term is positive; `m` is the mass-law slope in dB/decade.
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
 ## Declaration:
 ```
 dtype quadriga_lib::medium_gain(
-    const arma::Mat<dtype> &mtl_prop,
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
     dtype dist,
-    dtype fGHz);
+    dtype center_frequency);
 ```
 
 ## Inputs:
@@ -728,6 +609,10 @@ dtype quadriga_lib::medium_gain(
 - [[ray_mesh_interact]] (for complex ray-material interactions)
 - [[obj_file_read]] (defines mtl_prop format)
 MD!*/
+
+// ISSUE: medium_gain currently only evaluates one distance. However, for media using mass-law, it requires
+// two different inputs, one for the refracted path feeding the medium attenuation and one for the
+// geometric path feeding mass. This then needs to propagate to the call site, currently calc_diffraction_gain.
 
 template <typename dtype>
 dtype quadriga_lib::medium_gain(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
@@ -797,19 +682,70 @@ template float quadriga_lib::interface_gain(const std::unordered_map<std::string
 template double quadriga_lib::interface_gain(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_frequency);
 
 /*!MD
+# refractive_index
+Real refractive index of a homogeneous medium
+
+- Returns `n = Re(sqrt(ε_r · μ_r))`, the real part of the complex refractive index, using the
+  ITU-R P.2040-1 permittivity model `ε_r = a·(f/fRef)^b` together with the relative permeability `μ_r`.
+- Only the bulk (base) permittivity is used. The coincidence / resonance features
+  (`coiF`, `coiQ`, `coiA`, `resF`, ...) are excluded, since they model a thin-interface surface
+  effect, not bulk propagation, and must not enter the geometric refraction index.
+- Air (`iM = 0`) returns `1`.
+
+## Declaration:
+```
+dtype quadriga_lib::refractive_index(
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+    arma::uword iM,
+    dtype center_frequency);
+```
+
+## Inputs:
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]]); each value has length `n_mtl`
+- **`iM`** — 1-based material index (0 = no material / air)
+- **`center_frequency`** — Center frequency in [Hz]
+
+## Returns:
+- Real refractive index of the medium relative to air
+
+## See also:
+- [[medium_gain]] (for the distance-dependent in-medium loss)
+- [[ray_mesh_interact]] (for complex ray-material interactions)
+- [[obj_file_read]] (defines mtl_prop format)
+MD!*/
+
+template <typename dtype>
+dtype quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+                                     arma::uword iM, dtype center_frequency)
+{
+    if (!std::isfinite((double)center_frequency) || center_frequency <= (dtype)0.0)
+        throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
+    MaterialCols<dtype> cols(mtl_prop); // validates column lengths and physical sanity
+    if (iM > cols.n_mtl)
+        throw std::invalid_argument("Material index out of bound.");
+    Material M(cols, iM);
+    double fGHz = (double)center_frequency * 1e-9;
+    return (dtype)std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz))); // base eta, no resonance term
+}
+
+template float quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<float>> &mtl_prop, arma::uword iM, float center_frequency);
+template double quadriga_lib::refractive_index(const std::unordered_map<std::string, std::vector<double>> &mtl_prop, arma::uword iM, double center_frequency);
+
+/*!MD
 # ray_mesh_interact
 Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh surfaces
 
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
-- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
-  front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
-  FBS=SBS with opposing normals → media-to-media.
-- Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
+- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule); front-side hit with
+  FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.
+- With `compact = true` (default), rays with `fbs_ind = 0` (no interaction) are omitted from output,
+  so `n_rayN ≤ n_ray`; with `compact = false` they are kept as transparent pass-throughs (`n_rayN = n_ray`).
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format.
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
-- Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
-  simulation with impedance-mapped material parameters (ε derived from Z).
+- Types 3–5 (scalar) use a single TE-only coefficient (acoustic simulation with impedance-mapped
+  materials, `ε` derived from `Z`); total internal reflection is handled as in the EM path
+  (`snell·sinθ ≥ 1` ⇒ unit reflection, refraction collapses to undeviated transmission).
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Declaration:
@@ -819,11 +755,9 @@ void quadriga_lib::ray_mesh_interact(
     dtype center_frequency,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
     const arma::Mat<dtype> *mesh,
     const arma::uvec *mtl_ind,
-    const std::unordered_map<std::string, td::vector<dtype>> *mtl_prop,
+    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
     const arma::u32_vec *fbs_ind,
     const arma::u32_vec *sbs_ind,
     const arma::Mat<dtype> *trivec = nullptr,
@@ -831,6 +765,8 @@ void quadriga_lib::ray_mesh_interact(
     const arma::Col<dtype> *orig_length = nullptr,
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
+    arma::Mat<dtype> *fbsN = nullptr,
+    arma::Mat<dtype> *sbsN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
@@ -840,8 +776,9 @@ void quadriga_lib::ray_mesh_interact(
     arma::Col<dtype> *thicknessN = nullptr,
     arma::Col<dtype> *edge_lengthN = nullptr,
     arma::Mat<dtype> *normal_vecN = nullptr,
-    arma::s32_vec *out_typeN = nullptr,
+    std::vector<uint8_t> *out_typeN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
+    bool compact = true,
     arma::u32_vec *ray_indN = nullptr);
 ```
 
@@ -849,7 +786,6 @@ void quadriga_lib::ray_mesh_interact(
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
-- **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`.
   0 = face has no material (air). NULL → all faces treated as air.
@@ -859,40 +795,47 @@ void quadriga_lib::ray_mesh_interact(
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
 - **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
+- **`compact`** *(optional)* — If `true` (default), no-hit rays are dropped and `n_rayN ≤ n_ray`. If
+  `false`, all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
+  (gain 1, identity `xprmat`, `out_type = 0`).
 
 ## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM
-  polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
-  includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL);
-  `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including
-  in-medium attenuation; `[n_rayN, 8]`.
+- **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_ray, 3]`
+- **`gainN`** — Interaction gain; averaged over TE/TM polarizations for types 0–2, TE-only for types 3–5; `[n_rayN]`
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`;
+  includes interaction gain, TE/TM coefficients, incidence plane orientation; excludes in-medium attenuation, FSPL `[8, n_rayN]`.
+  For types 3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code; `[n_rayN]`<br><br>
-   | Code  | Description                                         |
-   | :---: | --------------------------------------------------- |
-   |   1   | Single hit, outside→inside                          |
-   |   2   | Single hit, inside→outside                          |
-   |   3   | Single hit, inside→outside, total reflection        |
-   |   4   | Media-to-media, M2 hit first                        |
-   |   5   | Media-to-media, M1 hit first                        |
-   |   6   | Media-to-media, M1 hit first, total reflection      |
-   |   7   | Overlapping faces, outside→inside                   |
-   |   8   | Overlapping faces, inside→outside                   |
-   |   9   | Overlapping faces, inside→outside, total reflection |
-   |  10   | Edge hit, outside→inside→outside                    |
-   |  11   | Edge hit, inside→outside→inside                     |
-   |  12   | Edge hit, inside→outside→inside, total reflection   |
-   |  13   | Edge hit, outside→inside                            |
-   |  14   | Edge hit, inside→outside                            |
-   |  15   | Edge hit, inside→outside, total reflection          |
+- **`out_typeN`** — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`<br><br>
+   |  Bit | Meaning                                                                 |
+   | :--: | ----------------------------------------------------------------------- |
+   |   0  | OK flag (0 = no valid interaction / undefined)                          |
+   |   1  | Front-side flag (1 = front: o→i or M2 hit first; 0 = back: i→o or M1)   |
+   |   2  | Co-located FBS/SBS flag (1 = single point, required for media-to-media) |
+   |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
+   |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
+   |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+   Reachable composite values (add 32 for the total-reflection variant):<br><br>
+   | Code  |  TIR  | Description                                         |
+   | :---: | :---: | --------------------------------------------------- |
+   |   0   |   —   | No hit                                              |
+   |   1   |  33   | Single hit, inside→outside (exit)                   |
+   |   3   |  35   | Single hit, outside→inside (entry)                  |
+   |   5   |  37   | Media-to-media, M1 (current, back) hit first        |
+   |   7   |  39   | Media-to-media, M2 (next, front) hit first          |
+   |  13   |  45   | Overlapping faces, inside-inside→outside            |
+   |  15   |  47   | Overlapping faces, outside→inside-inside            |
+   |  21   |  53   | Corner hit, inside→outside→inside                   |
+   |  23   |  55   | Corner hit, outside→inside→outside                  |
+   |  29   |  61   | Corner hit, inside-inside→outside                   |
+   |  31   |  63   | Corner hit, outside→inside-inside                   |
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
@@ -912,8 +855,6 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      dtype center_frequency,
                                      const arma::Mat<dtype> *orig,
                                      const arma::Mat<dtype> *dest,
-                                     const arma::Mat<dtype> *fbs,
-                                     const arma::Mat<dtype> *sbs,
                                      const arma::Mat<dtype> *mesh,
                                      const arma::uvec *mtl_ind,
                                      const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
@@ -924,6 +865,8 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      const arma::Col<dtype> *orig_length,
                                      arma::Mat<dtype> *origN,
                                      arma::Mat<dtype> *destN,
+                                     arma::Mat<dtype> *fbsN,
+                                     arma::Mat<dtype> *sbsN,
                                      arma::Col<dtype> *gainN,
                                      arma::Mat<dtype> *xprmatN,
                                      arma::Mat<dtype> *trivecN,
@@ -933,97 +876,64 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                                      arma::Col<dtype> *thicknessN,
                                      arma::Col<dtype> *edge_lengthN,
                                      arma::Mat<dtype> *normal_vecN,
-                                     arma::s32_vec *out_typeN,
+                                     std::vector<uint8_t> *out_typeN,
                                      arma::Mat<dtype> *path_dirN,
+                                     bool compact,
                                      arma::u32_vec *ray_indN)
 {
+    // ISSUE: standalone callers with no state tracking get no in-medium loss (before they did);
+    // resolve by adding state tracking to the engine or charging medium loss separately
 
-    // Internal documentation: out_typeN mapping logic
-    //   No | θF<0 | θS<0 | dFS=0 | TotRef | iSBS=0 | NF=-NS | NF=NS | startIn | endIn | Meaning
-    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-    //    0 |      |      |       |        |        |        |       |         |       | Undefined
-    //    1 |   no |  N/A |    no |    N/A |    yes |    N/A |   N/A |      no |   yes | Single Hit o-i
-    //    2 |  yes |  N/A |    no |     no |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o
-    //    3 |  yes |  N/A |    no |    yes |    yes |    N/A |   N/A |     yes |    no | Single Hit i-o, TR
-    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-    //    4 |   no |  yes |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M2 hit first
-    //    5 |  yes |   no |   yes |     no |     no |    yes |    no |     yes |   yes | M2M, M1 hit first
-    //    6 |  yes |   no |   yes |    yes |     no |    yes |    no |     yes |   yes | M2M, M1 hit first, TR
-    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-    //    7 |   no |   no |   yes |    N/A |     no |     no |   yes |      no |   yes | Overlapping Faces, o-i
-    //    8 |  yes |  yes |   yes |     no |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o
-    //    9 |  yes |  yes |   yes |    yes |     no |     no |   yes |     yes |    no | Overlapping Faces, i-o, TR
-    //   ---| -----|------|-------|--------|--------|--------|-------|---------|-------|----------------------------
-    //   10 |   no |  yes |   yes |    N/A |     no |     no |    no |      no |    no | Edge Hit, o-i-o
-    //   11 |  yes |   no |   yes |     no |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i
-    //   12 |  yes |   no |   yes |    yes |     no |     no |    no |     yes |   yes | Edge Hit, i-o-i, TR
-    //   13 |   no |   no |   yes |    N/A |     no |     no |    no |      no |   yes | Edge Hit, o-i
-    //   14 |  yes |  yes |   yes |     no |     no |     no |    no |     yes |    no | Edge Hit, i-o
-    //   15 |  yes |  yes |   yes |    yes |     no |     no |    no |     yes |    no | Edge Hit, i-o, TR
-
-    // Ray offset is used to detect co-location of points, value in meters
-    const double ray_offset = 0.001;
-
-    // Check interaction_type
     if (interaction_type < 0 || interaction_type > 5)
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
-
     bool is_scalar = interaction_type >= 3;
     int geometry_type = interaction_type % 3;
 
-    // Frequency in GHz
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
     double fGHz = (double)center_frequency * 1.0e-9;
 
-    // Check for NULL pointers
     if (orig == nullptr)
         throw std::invalid_argument("Input 'orig' cannot be NULL.");
-    if (dest == nullptr)
-        throw std::invalid_argument("Input 'dest' cannot be NULL.");
-    if (fbs == nullptr)
-        throw std::invalid_argument("Input 'fbs' cannot be NULL.");
-    if (sbs == nullptr)
-        throw std::invalid_argument("Input 'sbs' cannot be NULL.");
-    if (mesh == nullptr)
-        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
-    if (fbs_ind == nullptr)
-        throw std::invalid_argument("Input 'fbs_ind' cannot be NULL.");
-    if (sbs_ind == nullptr)
-        throw std::invalid_argument("Input 'sbs_ind' cannot be NULL.");
-
-    // Check for correct number of columns
     if (orig->n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing x,y,z coordinates.");
+    const arma::uword n_ray = orig->n_rows; // Number of rays
+    const dtype *p_orig = orig->memptr();
+
+    if (dest == nullptr)
+        throw std::invalid_argument("Input 'dest' cannot be NULL.");
     if (dest->n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing x,y,z coordinates.");
-    if (fbs->n_cols != 3)
-        throw std::invalid_argument("Input 'fbs' must have 3 columns containing x,y,z coordinates.");
-    if (sbs->n_cols != 3)
-        throw std::invalid_argument("Input 'sbs' must have 3 columns containing x,y,z coordinates.");
-    if (mesh->n_cols != 9)
-        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
-
-    const arma::uword n_ray = orig->n_rows;  // Number of rays
-    const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
-
-    // Check for correct number of rows
     if (dest->n_rows != n_ray)
         throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
-    if (fbs->n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'orig' and 'fbs' dont match.");
-    if (sbs->n_rows != n_ray)
-        throw std::invalid_argument("Number of rows in 'orig' and 'sbs' dont match.");
-    if (mtl_ind != nullptr && !mtl_ind->is_empty() && mtl_ind->n_elem != n_mesh)
-        throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
+    const dtype *p_dest = dest->memptr();
+
+    if (mesh == nullptr)
+        throw std::invalid_argument("Input 'mesh' cannot be NULL.");
+    if (mesh->n_cols != 9)
+        throw std::invalid_argument("Input 'mesh' must have 9 columns containing x,y,z coordinates of 3 vertices.");
+    const arma::uword n_mesh = mesh->n_rows; // Number of mesh elements
+    const dtype *p_mesh = mesh->memptr();
+
+    if (fbs_ind == nullptr)
+        throw std::invalid_argument("Input 'fbs_ind' cannot be NULL.");
     if (fbs_ind->n_elem != n_ray)
         throw std::invalid_argument("Number of elements in 'fbs_ind' does not match number of rows in 'orig'.");
+    const unsigned *p_fbs_ind = fbs_ind->memptr();
+
+    if (sbs_ind == nullptr)
+        throw std::invalid_argument("Input 'sbs_ind' cannot be NULL.");
     if (sbs_ind->n_elem != n_ray)
         throw std::invalid_argument("Number of elements in 'sbs_ind' does not match number of rows in 'orig'.");
 
+    const unsigned *p_sbs_ind = sbs_ind->memptr();
+
+    if (mtl_ind && !mtl_ind->is_empty() && mtl_ind->n_elem != n_mesh)
+        throw std::invalid_argument("Length of 'mtl_ind' must match the number of mesh faces.");
+
     // Check input data for ray tube
     int use_ray_tube = 0;
-    if (trivec != nullptr && !trivec->is_empty())
+    if (trivec && !trivec->is_empty())
     {
         if (tridir == nullptr || tridir->is_empty())
             throw std::invalid_argument("In order to use ray tubes, both 'trivec' and 'tridir' must be given.");
@@ -1037,222 +947,399 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             throw std::invalid_argument("Number of rows in 'orig' and 'tridir' dont match.");
         use_ray_tube = (tridir->n_cols == 6) ? 1 : 2;
     }
-    else if (tridir != nullptr && !tridir->is_empty())
+    else if (tridir && !tridir->is_empty())
         throw std::invalid_argument("In order to use ray tubes, both 'trivec' and 'tridir' must be given.");
+    const dtype *p_trivec = trivec ? trivec->memptr() : nullptr;
+    const dtype *p_tridir = tridir ? tridir->memptr() : nullptr;
 
     // Check for 'orig_length'
-    if (orig_length != nullptr && !orig_length->is_empty() && orig_length->n_elem != n_ray)
+    if (orig_length && !orig_length->is_empty() && orig_length->n_elem != n_ray)
         throw std::invalid_argument("Number of elements in 'orig_length' does not match number of rows in 'orig'.");
-
-    // Get input pointers
-    const dtype *p_orig = orig->memptr();
-    const dtype *p_dest = dest->memptr();
-    const dtype *p_fbs = fbs->memptr();
-    const dtype *p_sbs = sbs->memptr();
-    const dtype *p_mesh = mesh->memptr();
-    const unsigned *p_fbs_ind = fbs_ind->memptr();
-    const unsigned *p_sbs_ind = sbs_ind->memptr();
-    const dtype *p_trivec = (trivec == nullptr) ? nullptr : trivec->memptr();
-    const dtype *p_tridir = (tridir == nullptr) ? nullptr : tridir->memptr();
-    const dtype *p_orig_length = (orig_length == nullptr) ? nullptr : orig_length->memptr();
+    const dtype *p_orig_length = orig_length ? orig_length->memptr() : nullptr;
 
     // Resolve material columns once; air (empty) table when no material model is supplied.
     const arma::uword *p_mtl_ind = (mtl_ind == nullptr || mtl_ind->is_empty()) ? nullptr : mtl_ind->memptr();
-    MaterialCols<dtype> cols = (mtl_prop != nullptr) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
-    if (p_mtl_ind != nullptr && (arma::uword)mtl_ind->max() > cols.n_mtl)
+    MaterialCols<dtype> cols = (mtl_prop) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
+    if (p_mtl_ind && (arma::uword)mtl_ind->max() > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind' exceed the number of materials in 'mtl_prop'.");
 
     // Get number of output rays and build output ray index
     // - Only consider rays that have at least one interaction with the mesh, i.e. 'fbs_ind != 0'
     unsigned n_rayN_u = 0;
-    unsigned *output_ray_index = new unsigned[n_ray]; // 1-based
-    for (size_t i_ray = 0; i_ray < n_ray; ++i_ray)    // Ray loop
-        if (p_fbs_ind[i_ray] == 0)                    // No hit
-            output_ray_index[i_ray] = 0;
-        else if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
+    std::vector<unsigned> output_ray_index(n_ray); // 1-based
+    for (size_t i_ray = 0; i_ray < n_ray; ++i_ray) // Ray loop
+    {
+        if (p_fbs_ind[i_ray] > n_mesh) // Invalid, must be 1 ... n_mesh (1-based index)
             throw std::invalid_argument("Some values in 'fbs_ind' exceed number of mesh elements.");
-        else if (p_sbs_ind[i_ray] > n_mesh)
+        if (p_sbs_ind[i_ray] > n_mesh)
             throw std::invalid_argument("Some values in 'sbs_ind' exceed number of mesh elements.");
-        else // Store value
-            output_ray_index[i_ray] = ++n_rayN_u;
 
+        if (compact && p_fbs_ind[i_ray] == 0)
+            output_ray_index[i_ray] = 0; // compact: drop no-hits
+        else
+            output_ray_index[i_ray] = ++n_rayN_u; // keep (hit, or no-hit when !compact)
+    }
     const arma::uword n_rayN = (arma::uword)n_rayN_u;
 
     // Allocate output memory, if needed
-    if (origN != nullptr && (origN->n_rows != n_rayN || origN->n_cols != 3))
+    if (origN && (origN->n_rows != n_rayN || origN->n_cols != 3))
         origN->set_size(n_rayN, 3);
+    dtype *p_origN = origN ? origN->memptr() : nullptr;
 
-    if (destN != nullptr && (destN->n_rows != n_rayN || destN->n_cols != 3))
+    if (destN && (destN->n_rows != n_rayN || destN->n_cols != 3))
         destN->set_size(n_rayN, 3);
+    dtype *p_destN = destN ? destN->memptr() : nullptr;
 
-    if (gainN != nullptr && gainN->n_elem != n_rayN)
+    if (fbsN && (fbsN->n_rows != n_rayN || fbsN->n_cols != 3))
+        fbsN->set_size(n_rayN, 3);
+    dtype *p_fbsN = fbsN ? fbsN->memptr() : nullptr;
+
+    if (sbsN && (sbsN->n_rows != n_rayN || sbsN->n_cols != 3))
+        sbsN->set_size(n_rayN, 3);
+    dtype *p_sbsN = sbsN ? sbsN->memptr() : nullptr;
+
+    if (gainN && gainN->n_elem != n_rayN)
         gainN->set_size(n_rayN);
+    dtype *p_gainN = gainN ? gainN->memptr() : nullptr;
 
-    if (xprmatN != nullptr && (xprmatN->n_rows != n_rayN || xprmatN->n_cols != 8))
-        xprmatN->set_size(n_rayN, 8);
+    const arma::uword nXPR = is_scalar ? 2 : 8; // NUmber of columns in xprmat (8 for EM, 2 for scalar)
+    if (xprmatN && (xprmatN->n_rows != nXPR || xprmatN->n_cols != n_rayN))
+        xprmatN->set_size(nXPR, n_rayN);
+    dtype *p_xprmatN = xprmatN ? xprmatN->memptr() : nullptr;
 
-    if (trivecN != nullptr && use_ray_tube && (trivecN->n_rows != n_rayN || trivecN->n_cols != 9))
+    if (trivecN && use_ray_tube && (trivecN->n_rows != n_rayN || trivecN->n_cols != 9))
         trivecN->set_size(n_rayN, 9);
-    else if (trivecN != nullptr && !use_ray_tube && !trivecN->is_empty())
+    else if (trivecN && !use_ray_tube && !trivecN->is_empty())
         trivecN->reset();
+    dtype *p_trivecN = trivecN ? trivecN->memptr() : nullptr;
 
-    if (tridirN != nullptr && use_ray_tube == 1 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
+    if (tridirN && use_ray_tube == 1 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 6))
         tridirN->set_size(n_rayN, 6);
-    else if (tridirN != nullptr && use_ray_tube == 2 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
+    else if (tridirN && use_ray_tube == 2 && (tridirN->n_rows != n_rayN || tridirN->n_cols != 9))
         tridirN->set_size(n_rayN, 9);
-    else if (tridirN != nullptr && !use_ray_tube && !tridirN->is_empty())
+    else if (tridirN && !use_ray_tube && !tridirN->is_empty())
         tridirN->reset();
+    dtype *p_tridirN = tridirN ? tridirN->memptr() : nullptr;
 
-    if (orig_lengthN != nullptr && orig_lengthN->n_elem != n_rayN)
+    if (orig_lengthN && orig_lengthN->n_elem != n_rayN)
         orig_lengthN->set_size(n_rayN);
+    dtype *p_orig_lengthN = orig_lengthN ? orig_lengthN->memptr() : nullptr;
 
-    if (fbs_angleN != nullptr && fbs_angleN->n_elem != n_rayN)
+    if (fbs_angleN && fbs_angleN->n_elem != n_rayN)
         fbs_angleN->set_size(n_rayN);
+    dtype *p_fbs_angleN = fbs_angleN ? fbs_angleN->memptr() : nullptr;
 
-    if (thicknessN != nullptr && thicknessN->n_elem != n_rayN)
+    if (thicknessN && thicknessN->n_elem != n_rayN)
         thicknessN->set_size(n_rayN);
+    dtype *p_thicknessN = thicknessN ? thicknessN->memptr() : nullptr;
 
-    if (edge_lengthN != nullptr && edge_lengthN->n_elem != n_rayN)
+    if (edge_lengthN && edge_lengthN->n_elem != n_rayN)
         edge_lengthN->set_size(n_rayN);
+    dtype *p_edge_lengthN = edge_lengthN ? edge_lengthN->memptr() : nullptr;
 
-    if (normal_vecN != nullptr && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
+    if (normal_vecN && (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6))
         normal_vecN->set_size(n_rayN, 6);
+    dtype *p_normal_vecN = normal_vecN ? normal_vecN->memptr() : nullptr;
 
-    if (out_typeN != nullptr && out_typeN->n_elem != n_rayN)
-        out_typeN->set_size(n_rayN);
+    if (out_typeN && out_typeN->size() != n_rayN) // out_typeN is a std::vector, not arma::Col
+        out_typeN->resize(n_rayN, 0);
+    uint8_t *p_out_typeN = out_typeN ? out_typeN->data() : nullptr;
 
-    if (path_dirN != nullptr && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
+    if (path_dirN && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
         path_dirN->set_size(n_rayN, 3);
+    dtype *p_path_dirN = path_dirN ? path_dirN->memptr() : nullptr;
 
-    if (ray_indN != nullptr && ray_indN->n_elem != n_rayN)
+    if (ray_indN && ray_indN->n_elem != n_rayN)
         ray_indN->set_size(n_rayN);
-
-    // Get output pointers
-    dtype *p_origN = (origN == nullptr) ? nullptr : origN->memptr();
-    dtype *p_destN = (destN == nullptr) ? nullptr : destN->memptr();
-    dtype *p_gainN = (gainN == nullptr) ? nullptr : gainN->memptr();
-    dtype *p_xprmatN = (xprmatN == nullptr) ? nullptr : xprmatN->memptr();
-    dtype *p_trivecN = (trivecN == nullptr) ? nullptr : trivecN->memptr();
-    dtype *p_tridirN = (tridirN == nullptr) ? nullptr : tridirN->memptr();
-    dtype *p_orig_lengthN = (orig_lengthN == nullptr) ? nullptr : orig_lengthN->memptr();
-    dtype *p_fbs_angleN = (fbs_angleN == nullptr) ? nullptr : fbs_angleN->memptr();
-    dtype *p_thicknessN = (thicknessN == nullptr) ? nullptr : thicknessN->memptr();
-    dtype *p_edge_lengthN = (edge_lengthN == nullptr) ? nullptr : edge_lengthN->memptr();
-    dtype *p_normal_vecN = (normal_vecN == nullptr) ? nullptr : normal_vecN->memptr();
-    int *p_out_typeN = (out_typeN == nullptr) ? nullptr : out_typeN->memptr();
-    dtype *p_path_dirN = (path_dirN == nullptr) ? nullptr : path_dirN->memptr();
-    unsigned *p_ray_indN = (ray_indN == nullptr) ? nullptr : ray_indN->memptr();
+    unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;
 
     // Only calculate ray tube if it is required in the output
     if (use_ray_tube && p_trivecN == nullptr && p_tridirN == nullptr)
         use_ray_tube = 0;
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for (long long i_ray = 0; i_ray < (long long)n_ray; ++i_ray) // Ray loop
     {
-        if (p_fbs_ind[i_ray] == 0) // Skip non-hits
+        size_t iRx = (size_t)i_ray;                // Ray x-index
+        size_t iRy = iRx + n_ray;                  // Ray y-index
+        size_t iRz = iRy + n_ray;                  // Ray z-index
+        size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
+
+        // Normalization lambda
+        auto NORMALIZE = [](double &x, double &y, double &z, bool apply = true) -> double
+        {
+            double len = std::sqrt(x * x + y * y + z * z);
+            if (apply && len > 2e-7)
+            {
+                double scl = 1.0 / len;
+                x *= scl, y *= scl, z *= scl;
+            }
+            else if (apply) // Fallback
+                x = 1.0, y = 0.0, z = 0.0;
+            return len;
+        };
+
+        auto LENGTH = [](double x, double y, double z) -> double
+        { return std::sqrt(x * x + y * y + z * z); };
+
+        auto SET1 = [i_rayN](dtype *ptr, double val)
+        {
+            if (ptr)
+                ptr[i_rayN] = (dtype)val;
+        };
+
+        auto SET3 = [i_rayN, n_rayN](dtype *ptr, double x, double y, double z)
+        {
+            if (ptr)
+                ptr[i_rayN] = (dtype)x, ptr[i_rayN + n_rayN] = (dtype)y, ptr[i_rayN + 2 * n_rayN] = (dtype)z;
+        };
+
+        auto SETL = [i_rayN, n_rayN](dtype *ptr, double *data, size_t L = 9, bool set_row = true)
+        {
+            if (ptr)
+            {
+                if (set_row) // Set row
+                    for (size_t l = 0; l < L; ++l)
+                        ptr[i_rayN + l * n_rayN] = (dtype)data[l];
+                else // Set column
+                    for (size_t l = 0; l < L; ++l)
+                        ptr[i_rayN * L + l] = (dtype)data[l];
+            }
+        };
+
+        if (compact && p_fbs_ind[i_ray] == 0) // Compact stream, skip non-hits
             continue;
-
-        size_t iRx = (size_t)i_ray;               // Ray x-index
-        size_t iRy = iRx + n_ray;                 // Ray y-index
-        size_t iRz = iRy + n_ray;                 // Ray z-index
-        size_t iFBS = (size_t)p_fbs_ind[iRx] - 1; // Mesh FBS index, 0-based
-        size_t iSBS = (size_t)p_sbs_ind[iRx];     // Mesh SBS index, 1-based
-
-        // Material indices for FBS and SBS faces (0 if no material table)
-        arma::uword iMF = (p_mtl_ind == nullptr) ? 0 : (arma::uword)p_mtl_ind[iFBS];
-        arma::uword iMS = (p_mtl_ind == nullptr || iSBS == 0) ? 0 : (arma::uword)p_mtl_ind[iSBS - 1];
 
         double Ox = (double)p_orig[iRx], Oy = (double)p_orig[iRy], Oz = (double)p_orig[iRz]; // Origin position
         double Dx = (double)p_dest[iRx], Dy = (double)p_dest[iRy], Dz = (double)p_dest[iRz]; // Destination position
-        double Fx = (double)p_fbs[iRx], Fy = (double)p_fbs[iRy], Fz = (double)p_fbs[iRz];    // FBS position
-        double Sx = (double)p_sbs[iRx], Sy = (double)p_sbs[iRy], Sz = (double)p_sbs[iRz];    // SBS position
-        double scl = 0.0;                                                                    // Scaling factor (reused)
+        double ODx = Dx - Ox, ODy = Dy - Oy, ODz = Dz - Oz;                                  // Ray direction O to D
 
-        // Calculate normalized vector pointing from the origin to the FBS
-        double OFx = Fx - Ox, OFy = Fy - Oy, OFz = Fz - Oz;              // Vector from origin to FBS (OF)
-        double OF_length = std::sqrt(OFx * OFx + OFy * OFy + OFz * OFz); // Length of vector OF
-        if (OF_length < ray_offset)                                      // Origin and FBS are co-located (rare case)
-            OFx = Dx - Ox, OFy = Dy - Oy, OFz = Dz - Oz,                 // Assume that Destination is the FBS
-                scl = 1.0 / std::sqrt(OFx * OFx + OFy * OFy + OFz * OFz);
-        else
-            scl = 1.0 / OF_length;
-        OFx *= scl, OFy *= scl, OFz *= scl;
+        // Shift D back 2 ULP to drop paths that end on the FBS face
+        double odScale = std::max({std::abs(ODx), std::abs(ODy), std::abs(ODz), 1e-30});
+        double posScale = std::max({std::abs(Dx), std::abs(Dy), std::abs(Dz), 1.0});
+        double offset = 2.0 * posScale * 1.1920929e-7 / odScale;
+        Dx -= offset * ODx, Dy -= offset * ODy, Dz -= offset * ODz;
 
-        // Calculate the length of the vector from FBS to SBS
-        double FSx = Sx - Fx, FSy = Sy - Fy, FSz = Sz - Fz;              // Vector pointing from FBS to SBS
-        double FS_length = std::sqrt(FSx * FSx + FSy * FSy + FSz * FSz); // Length of FS
+        ODx = Dx - Ox, ODy = Dy - Oy, ODz = Dz - Oz; // Update direction O to D
+        double OD_length = NORMALIZE(ODx, ODy, ODz);
 
-        // Surface normal vector of the FBS mesh element calculated by taking the vector cross product of two edges of the triangle
-        // Note: Order of the vertices determines side (front or back) of the element
-        double V1x = (double)p_mesh[iFBS],
-               V1y = (double)p_mesh[iFBS + n_mesh],
-               V1z = (double)p_mesh[iFBS + 2 * n_mesh];
-        double E1x = (double)p_mesh[iFBS + 3 * n_mesh] - V1x,
-               E1y = (double)p_mesh[iFBS + 4 * n_mesh] - V1y,
-               E1z = (double)p_mesh[iFBS + 5 * n_mesh] - V1z;
-        double E2x = (double)p_mesh[iFBS + 6 * n_mesh] - V1x,
-               E2y = (double)p_mesh[iFBS + 7 * n_mesh] - V1y,
-               E2z = (double)p_mesh[iFBS + 8 * n_mesh] - V1z;
-        double Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x; // Mesh surface normal
-        scl = 1.0 / std::sqrt(Nx * Nx + Ny * Ny + Nz * Nz), Nx *= scl, Ny *= scl, Nz *= scl;       // Normalize to 1
+        size_t iFBS = (size_t)p_fbs_ind[iRx]; // Mesh FBS index, 1-based
+        size_t iSBS = (size_t)p_sbs_ind[iRx]; // Mesh SBS index, 1-based
 
-        // Calculate incidence angle between surface of the mesh element at FBS and incoming ray
-        double cos_theta = OFx * Nx + OFy * Ny + OFz * Nz;                           // Angle between normal vector and incoming ray
-        cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta); // Boundary fix
-        double theta = std::acos(cos_theta) - 1.570796326794897;                     // Angle between face and incoming ray, negative values illuminate back side
-
-        // Calculate normal vector of the SBS mesh element, if needed
-        double Mx = 0.0, My = 0.0, Mz = 0.0; // SBS normal vector
-        double theta_sbs = 0.0;
-        if (iSBS != 0 && (FS_length < ray_offset || p_normal_vecN != nullptr))
+        if (iFBS == 0) // no mesh hit
         {
-            V1x = (double)p_mesh[iSBS - 1],
-            V1y = (double)p_mesh[iSBS - 1 + n_mesh],
-            V1z = (double)p_mesh[iSBS - 1 + 2 * n_mesh];
-            E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh] - V1x,
-            E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh] - V1y,
-            E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh] - V1z;
-            E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh] - V1x,
-            E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh] - V1y,
-            E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh] - V1z;
-            Mx = E1y * E2z - E1z * E2y, My = E1z * E2x - E1x * E2z, Mz = E1x * E2y - E1y * E2x;  // Mesh surface normal
-            scl = 1.0 / std::sqrt(Mx * Mx + My * My + Mz * Mz), Mx *= scl, My *= scl, Mz *= scl; // Normalize to 1
+            SET3(p_origN, Dx, Dy, Dz);
+            SET3(p_destN, Dx + colocation_dist * ODx, Dy + colocation_dist * ODy, Dz + colocation_dist * ODz);
+            SET3(p_fbsN, Dx, Dy, Dz);
+            SET3(p_sbsN, Dx, Dy, Dz);
+            SET1(p_gainN, 1.0);
 
-            // Incidence angle at SBS
-            theta_sbs = OFx * Mx + OFy * My + OFz * Mz;
-            theta_sbs = (theta_sbs < -1.0) ? -1.0 : (theta_sbs > 1.0 ? 1.0 : theta_sbs);
-            theta_sbs = std::acos(theta_sbs) - 1.570796326794897;
+            double xprmat[8] = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+            SETL(p_xprmatN, xprmat, nXPR, false);
+
+            if (use_ray_tube)
+            {
+                double tv[9] = {0.0}, td[9] = {0.0};
+                double edge_len = 0.0;
+
+                for (size_t iTube = 0; iTube < 3; ++iTube)
+                {
+                    // Vertex origin = ray origin + trivec offset
+                    size_t io = iRx + 3 * iTube * n_ray;
+                    size_t ii = 3 * iTube;
+
+                    double Tx = Ox + (double)p_trivec[io];
+                    double Ty = Oy + (double)p_trivec[io + n_ray];
+                    double Tz = Oz + (double)p_trivec[io + 2 * n_ray];
+
+                    // Vertex direction from tridir (unchanged by a transparent pass)
+                    double Vx, Vy, Vz, az = 0.0, el = 0.0;
+                    if (use_ray_tube == 1) // spherical
+                    {
+                        az = (double)p_tridir[iRx + 2 * iTube * n_ray];
+                        el = (double)p_tridir[iRx + (2 * iTube + 1) * n_ray];
+                        double c = std::cos(el);
+                        Vx = std::cos(az) * c, Vy = std::sin(az) * c, Vz = std::sin(el);
+
+                        size_t ij = 2 * iTube;
+                        td[ij] = az, td[ij + 1] = el;
+                    }
+                    else // cartesian
+                    {
+                        Vx = (double)p_tridir[io], Vy = (double)p_tridir[io + n_ray], Vz = (double)p_tridir[io + 2 * n_ray];
+                        NORMALIZE(Vx, Vy, Vz);
+                        td[ii] = Vx, td[ii + 1] = Vy, td[ii + 2] = Vz;
+                    }
+
+                    // Advance the vertex ray to the wavefront plane through D with normal OD = (Nx,Ny,Nz)
+                    double denom = Vx * ODx + Vy * ODy + Vz * ODz;
+                    double Wx, Wy, Wz;
+                    if (std::abs(denom) < 1e-6) // vertex parallel to the wavefront plane
+                    {
+                        edge_len = INFINITY;
+                        Wx = Tx, Wy = Ty, Wz = Tz; // sane fallback instead of NaN
+                    }
+                    else
+                    {
+                        double d = ((Dx - Tx) * ODx + (Dy - Ty) * ODy + (Dz - Tz) * ODz) / denom;
+                        if (d < 0.0 || d > 1.0e5)
+                            edge_len = INFINITY;
+                        Wx = Tx + Vx * d, Wy = Ty + Vy * d, Wz = Tz + Vz * d;
+                    }
+                    tv[ii] = Wx - Dx, tv[ii + 1] = Wy - Dy, tv[ii + 2] = Wz - Dz; // trivec relative to origN = D
+                }
+                SETL(p_trivecN, tv);
+                if (use_ray_tube == 1) // Spherical
+                    SETL(p_tridirN, td, 6);
+                else // Cartesian
+                    SETL(p_tridirN, td);
+
+                if (p_edge_lengthN)
+                {
+                    if (!std::isinf(edge_len))
+                    {
+                        double e = 0.0, dx, dy, dz, l;
+                        dx = tv[3] - tv[0], dy = tv[4] - tv[1], dz = tv[5] - tv[2];
+                        l = dx * dx + dy * dy + dz * dz;
+                        e = l > e ? l : e;
+                        dx = tv[6] - tv[0], dy = tv[7] - tv[1], dz = tv[8] - tv[2];
+                        l = dx * dx + dy * dy + dz * dz;
+                        e = l > e ? l : e;
+                        dx = tv[6] - tv[3], dy = tv[7] - tv[4], dz = tv[8] - tv[5];
+                        l = dx * dx + dy * dy + dz * dz;
+                        e = l > e ? l : e;
+                        edge_len = std::sqrt(e);
+                    }
+                    p_edge_lengthN[i_rayN] = (dtype)edge_len;
+                }
+            }
+
+            SET1(p_orig_lengthN, (p_orig_length ? double(p_orig_length[iRx]) + OD_length : OD_length));
+            SET1(p_fbs_angleN, 1.570796326794897);
+            SET1(p_thicknessN, 0.0);
+
+            if (p_normal_vecN)
+                SET3(p_normal_vecN, ODx, ODy, ODz), SET3(&p_normal_vecN[3 * n_rayN], ODx, ODy, ODz);
+
+            if (p_out_typeN)
+                p_out_typeN[i_rayN] = 0;
+
+            SET3(p_path_dirN, ODx, ODy, ODz);
+
+            if (p_ray_indN)
+                p_ray_indN[i_rayN] = (unsigned)iRx;
+
+            continue;
+        } // end iFBS == 0 (no mesh hit)
+
+        // Material indices for FBS and SBS faces (0 if no material table)
+        arma::uword iMF = (p_mtl_ind && iFBS) ? p_mtl_ind[iFBS - 1] : 0;
+        arma::uword iMS = (p_mtl_ind && iSBS) ? p_mtl_ind[iSBS - 1] : 0;
+
+        // Compute the FBS intersect point, initialize with fallback
+        double Fx = (double)p_mesh[iFBS - 1];
+        double Fy = (double)p_mesh[iFBS - 1 + n_mesh];
+        double Fz = (double)p_mesh[iFBS - 1 + 2 * n_mesh];
+        double Nx = 0.0, Ny = 0.0, Nz = 0.0; // FBS normal vector
+        double cos_theta = 0.0;              // Angle between FBS normal and incoming ray
+        double OF_length = 0.0;              // Distance from origin to FBS
+        if (iFBS)
+        {
+            double E1x = (double)p_mesh[iFBS - 1 + 3 * n_mesh] - Fx,
+                   E1y = (double)p_mesh[iFBS - 1 + 4 * n_mesh] - Fy,
+                   E1z = (double)p_mesh[iFBS - 1 + 5 * n_mesh] - Fz;
+            double E2x = (double)p_mesh[iFBS - 1 + 6 * n_mesh] - Fx,
+                   E2y = (double)p_mesh[iFBS - 1 + 7 * n_mesh] - Fy,
+                   E2z = (double)p_mesh[iFBS - 1 + 8 * n_mesh] - Fz;
+
+            // Plane normal vector
+            Nx = E1y * E2z - E1z * E2y, Ny = E1z * E2x - E1x * E2z, Nz = E1x * E2y - E1y * E2x;
+            NORMALIZE(Nx, Ny, Nz);
+
+            // Ray-plane intersection
+            cos_theta = ODx * Nx + ODy * Ny + ODz * Nz;         // goes to zero as the ray approaches tangency
+            if (OD_length > 2e-7 && std::abs(cos_theta) > 2e-7) // guard degenerate ray and grazing/parallel plane
+            {
+                OF_length = ((Fx - Ox) * Nx + (Fy - Oy) * Ny + (Fz - Oz) * Nz) / cos_theta;
+                if (OF_length <= 0.0) // Origin lies in FBS plane (include)
+                    Fx = Ox, Fy = Oy, Fz = Oz, OF_length = 0.0;
+                else if (OF_length < OD_length) // True FBS intersect (include)
+                    Fx = Ox + OF_length * ODx, Fy = Oy + OF_length * ODy, Fz = Oz + OF_length * ODz;
+                else // Destination lies in FBS plane (exclude)
+                    Fx = Dx, Fy = Dy, Fz = Dz, OF_length = OD_length;
+            }
         }
 
+        // Calculate incidence angle between surface of the mesh element at FBS and incoming ray
+        cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta); // Boundary fix
+        double thetaF = std::acos(cos_theta) - 1.570796326794897;                    // Angle between FBS face and incoming ray
+
+        // Compute the SBS intersect point, initialize with fallback or destination
+        double Sx = iSBS ? (double)p_mesh[iSBS - 1] : Dx;
+        double Sy = iSBS ? (double)p_mesh[iSBS - 1 + n_mesh] : Dy;
+        double Sz = iSBS ? (double)p_mesh[iSBS - 1 + 2 * n_mesh] : Dz;
+        double Mx = ODx, My = ODy, Mz = ODz; // SBS normal vector
+        double thetaS = 0.0;                 // Angle between SBS face and incoming ray
+        if (iSBS)
+        {
+            double E1x = (double)p_mesh[iSBS - 1 + 3 * n_mesh] - Sx,
+                   E1y = (double)p_mesh[iSBS - 1 + 4 * n_mesh] - Sy,
+                   E1z = (double)p_mesh[iSBS - 1 + 5 * n_mesh] - Sz;
+            double E2x = (double)p_mesh[iSBS - 1 + 6 * n_mesh] - Sx,
+                   E2y = (double)p_mesh[iSBS - 1 + 7 * n_mesh] - Sy,
+                   E2z = (double)p_mesh[iSBS - 1 + 8 * n_mesh] - Sz;
+
+            // Plane normal vector
+            Mx = E1y * E2z - E1z * E2y, My = E1z * E2x - E1x * E2z, Mz = E1x * E2y - E1y * E2x;
+            NORMALIZE(Mx, My, Mz);
+
+            // Ray-plane intersection
+            thetaS = ODx * Mx + ODy * My + ODz * Mz;         // = cos(thetaS)
+            if (OD_length > 2e-7 && std::abs(thetaS) > 2e-7) // guard degenerate ray and grazing/parallel plane
+            {
+                double OS_length = ((Sx - Ox) * Mx + (Sy - Oy) * My + (Sz - Oz) * Mz) / thetaS;
+                if (OS_length <= OF_length) // SBS before FBS (not allowed)
+                    Sx = Fx, Sy = Fy, Sz = Fz, OS_length = OF_length;
+                else if (OS_length < OD_length) // True SBS intersect
+                    Sx = Ox + OS_length * ODx, Sy = Oy + OS_length * ODy, Sz = Oz + OS_length * ODz;
+                else // Destination lies in SBS plane
+                    Sx = Dx, Sy = Dy, Sz = Dz, OS_length = OD_length;
+            }
+
+            // Incidence angle
+            thetaS = (thetaS < -1.0) ? -1.0 : (thetaS > 1.0 ? 1.0 : thetaS);
+            thetaS = std::acos(thetaS) - 1.570796326794897;
+        }
+        double FS_length = LENGTH(Sx - Fx, Sy - Fy, Sz - Fz); // Length of vector FS
+
         // Determine the type of the interaction
-        int out_type = (theta >= 0.0) ? 1 : (theta < 0.0 ? 2 : 0); // Output type (0 = undefined, 1 = outside to inside, 2 = inside to outside)
-        bool material_to_material = false;                         // Assume no material to material transition
-        bool ray_starts_inside = theta < 0.0;                      // Hitting a face back side at the FBS is a certain sign
-        if (FS_length < ray_offset && iSBS != 0)                   // Two colocated faces
+        bool material_to_material = false; // Assume no material to material transition
+
+        // Set type codes
+        qd::bits<uint8_t> out_flags = OF_length == OD_length ? 0 : 1;    // Set OK flag out_flags[0] = 1
+        out_flags[1] = thetaF >= 0.0;                                    // Set front-side flag
+        bool colocated_faces = FS_length < colocation_dist && iSBS != 0; // Two colocated faces
+        out_flags[2] = colocated_faces;
+        if (colocated_faces)
         {
             const double lim = 1.0e-4;
-            if (std::abs(Nx + Mx) < lim && std::abs(Ny + My) < lim && std::abs(Nz + Mz) < lim) // Opposing normal vectors = material to material transition
-                material_to_material = true, ray_starts_inside = true,
-                out_type = (theta >= 0.0) ? 4 : (theta < 0.0 ? 5 : 0);
-            else if (std::abs(Nx - Mx) < lim && std::abs(Ny - My) < lim && std::abs(Nz - Mz) < lim) // Equal normal vectors = overlapping or duplicate faces
-                out_type = (theta >= 0.0) ? 7 : (theta < 0.0 ? 8 : 0);
-            else if (theta >= 0.0 && theta_sbs <= 0.0)
-                out_type = 10; // Edge Hit, o-i-o
-            else if (theta < 0.0 && theta_sbs >= 0.0)
-                out_type = 11; // Edge Hit, i-o-i
-            else if ((theta >= 0.0 && theta_sbs >= 0.0))
-                out_type = 13; // Edge Hit, o-i
-            else if ((theta < 0.0 && theta_sbs <= 0.0))
-                out_type = 14; // Edge Hit, i-o
-            else               // Undefined state
-                out_type = 0;
+            if (std::abs(Nx + Mx) < lim && std::abs(Ny + My) < lim && std::abs(Nz + Mz) < lim)
+                material_to_material = true; // Opposing normal vectors, Material to material transition
+            else if (std::abs(Nx - Mx) < lim && std::abs(Ny - My) < lim && std::abs(Nz - Mz) < lim)
+                out_flags[3] = true; // Equal normal vectors = overlapping or duplicate faces
+            else                     // FBS/SBS faces not parallel
+            {
+                out_flags[4] = 1; // Corner hit flag
+                if ((out_flags[1] && thetaS >= 0.0) ||
+                    (!out_flags[1] && thetaS < 0.0))
+                    out_flags[3] = true; // Same direction flag
+            }
         }
 
         // Flip normal vector in case of back side illumination
-        if (theta < 0.0)
+        if (thetaF < 0.0)
             Nx = -Nx, Ny = -Ny, Nz = -Nz,
-            cos_theta = OFx * Nx + OFy * Ny + OFz * Nz,
+            cos_theta = ODx * Nx + ODy * Ny + ODz * Nz,
             cos_theta = (cos_theta < -1.0) ? -1.0 : (cos_theta > 1.0 ? 1.0 : cos_theta);
 
         // Limit value to 0 ... 1 for calculating reflection and transmission coefficients
@@ -1262,7 +1349,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         // 1-based: Material(cols, 0) -> air. M2 always carries the FBS-face material whose
         // interface_gain is the transition gain (front: iMF; back: air, or iMS for M2M).
         Material M1, M2;
-        if (theta >= 0.0) // front hit: entered material = FBS face (iMF)
+        if (thetaF >= 0.0) // front hit: entered material = FBS face (iMF)
         {
             M2 = Material(cols, iMF);
             if (material_to_material) // SBS (front) hit first
@@ -1279,11 +1366,12 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         std::complex<double> cTE, cTM, cos_theta2, eta1_div_eta2;
         double eta; // Snell ratio sqrt|eta1*mu1 / eta2*mu2|
         bool total_reflection;
-        M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
+        M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, &cos_theta2, &eta1_div_eta2, &eta, &total_reflection);
         bool tir_central = total_reflection; // pre-ray-tube TIR state
+
         // Calculate the center path direction after medium interaction (normalized to length 1)
-        double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz;              // Vector from FBS to destination
-        double FD_length = std::sqrt(FDx * FDx + FDy * FDy + FDz * FDz); // Length of path from FBS to destination
+        double FDx = Dx - Fx, FDy = Dy - Fy, FDz = Dz - Fz; // Vector from FBS to destination
+        double FD_length = NORMALIZE(FDx, FDy, FDz);        // Length of path from FBS to destination
 
         // Per-vertex incidence, computed once and reused by the tube loop below
         double Vedge[9];                     // incoming vertex directions
@@ -1292,31 +1380,26 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         {
             cos_thetaV[0] = abs_cos_theta; // spine == center ray
             sin_thetaV[0] = std::sqrt(1.0 - abs_cos_theta * abs_cos_theta);
-            for (int iTube = 1; iTube <= 3; ++iTube)
+            for (int iTube = 0; iTube < 3; ++iTube)
             {
                 double Vx, Vy, Vz;
                 if (use_ray_tube == 1) // Spherical: az/el -> direction
                 {
-                    double az = (double)p_tridir[iRx + 2 * (iTube - 1) * n_ray];
-                    double el = (double)p_tridir[iRx + (2 * (iTube - 1) + 1) * n_ray];
+                    double az = (double)p_tridir[iRx + 2 * iTube * n_ray];
+                    double el = (double)p_tridir[iRx + (2 * iTube + 1) * n_ray];
                     double c = std::cos(el);
                     Vx = std::cos(az) * c, Vy = std::sin(az) * c, Vz = std::sin(el);
                 }
                 else // Cartesian
                 {
-                    size_t o = iRx + 3 * (iTube - 1) * n_ray;
+                    size_t o = iRx + 3 * iTube * n_ray;
                     Vx = (double)p_tridir[o], Vy = (double)p_tridir[o + n_ray], Vz = (double)p_tridir[o + 2 * n_ray];
-                    double s2 = Vx * Vx + Vy * Vy + Vz * Vz;
-                    if (std::abs(s2 - 1.0) > 2e-7)
-                    {
-                        double inv = 1.0 / std::sqrt(s2);
-                        Vx *= inv, Vy *= inv, Vz *= inv;
-                    }
+                    NORMALIZE(Vx, Vy, Vz);
                 }
-                Vedge[3 * (iTube - 1)] = Vx, Vedge[3 * (iTube - 1) + 1] = Vy, Vedge[3 * (iTube - 1) + 2] = Vz;
+                Vedge[3 * iTube] = Vx, Vedge[3 * iTube + 1] = Vy, Vedge[3 * iTube + 2] = Vz;
                 double c = std::abs(Vx * Nx + Vy * Ny + Vz * Nz);
                 c = (c > 1.0) ? 1.0 : c;
-                cos_thetaV[iTube] = c, sin_thetaV[iTube] = std::sqrt(1.0 - c * c);
+                cos_thetaV[iTube + 1] = c, sin_thetaV[iTube + 1] = std::sqrt(1.0 - c * c);
             }
 
             // Whole-tube TIR: pass through (undeviated) if the spine OR any edge is past critical
@@ -1327,55 +1410,52 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
         }
 
         if (geometry_type == 0) // Reflection, normalized by default
-            qd_reflect(OFx, OFy, OFz, Nx, Ny, Nz, FDx, FDy, FDz);
+            qd_reflect(ODx, ODy, ODz, Nx, Ny, Nz, FDx, FDy, FDz);
         else if (geometry_type == 1 || total_reflection) // Transmission without refraction
-            FDx = OFx, FDy = OFy, FDz = OFz;             // New path direction = same as incoming ray, already normalized
+            FDx = ODx, FDy = ODy, FDz = ODz;             // New path direction = same as incoming ray, already normalized
         else                                             // Refraction
-            qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
+            qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, FDx, FDy, FDz);
 
         // Update origin and direction of the ray tube vertices
-        double p_trivec_tmp[9] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-        double p_tridir_tmp[9] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        double p_trivec_tmp[9] = {};
+        double p_tridir_tmp[9] = {};
         double edge_length_tmp = 0.0;
         if (use_ray_tube)
         {
             // Process each vertex-ray separately
-            for (int iTube = 1; iTube <= 3; ++iTube)
+            for (int iTube = 0; iTube < 3; ++iTube)
             {
                 // Load origin and direction
                 double Tx = Ox, Ty = Oy, Tz = Oz, az = 0.0, el = 0.0;
-                double Vx = Vedge[3 * (iTube - 1)], Vy = Vedge[3 * (iTube - 1) + 1], Vz = Vedge[3 * (iTube - 1) + 2];
-                if (iTube == 1)
+                double Vx = Vedge[3 * iTube], Vy = Vedge[3 * iTube + 1], Vz = Vedge[3 * iTube + 2];
+                if (iTube == 0)
                     Tx += (double)p_trivec[iRx], Ty += (double)p_trivec[iRy], Tz += (double)p_trivec[iRz];
-                else if (iTube == 2)
+                else if (iTube == 1)
                     Tx += (double)p_trivec[iRx + 3 * n_ray], Ty += (double)p_trivec[iRx + 4 * n_ray], Tz += (double)p_trivec[iRx + 5 * n_ray];
-                else // iTube == 3
+                else // iTube == 2
                     Tx += (double)p_trivec[iRx + 6 * n_ray], Ty += (double)p_trivec[iRx + 7 * n_ray], Tz += (double)p_trivec[iRx + 8 * n_ray];
 
                 // Calculate intersect point of the vertex-ray with the face
-                double d = ((Fx - Tx) * Nx + (Fy - Ty) * Ny + (Fz - Tz) * Nz) / (Vx * Nx + Vy * Ny + Vz * Nz); // Distance from vert. origin to face (d)
-                double Wx = Tx + Vx * d, Wy = Ty + Vy * d, Wz = Tz + Vz * d;                                   // Intersect point with face (W)
+                double denom = Vx * Nx + Vy * Ny + Vz * Nz;
+                bool no_usable_hit = std::abs(denom) < 1e-6; // true => parallel, no face intersection
+                double d = no_usable_hit ? 0.0 : ((Fx - Tx) * Nx + (Fy - Ty) * Ny + (Fz - Tz) * Nz) / denom;
+                double Wx = Tx + Vx * d, Wy = Ty + Vy * d, Wz = Tz + Vz * d;
+                no_usable_hit = no_usable_hit || d > 1.0e5 || d < 0.0;
 
-                if (d < 0.0 || d > 1.0e5) // Vertex ray does not hit face
+                if (no_usable_hit) // no usable face intersection
                     edge_length_tmp = INFINITY;
 
                 if (geometry_type == 0) // Reflection
                 {
-                    if (d < 0.0 || d > 1.0e5) // Ray does not hit face - use orthogonal projection on ray
+                    if (no_usable_hit) // Use orthogonal projection on vertex ray
                     {
                         d = ((Fx - Tx) * Vx + (Fy - Ty) * Vy + (Fz - Tz) * Vz) / (Vx * Vx + Vy * Vy + Vz * Vz);
                         Tx = Tx + Vx * d - Fx, Ty = Ty + Vy * d - Fy, Tz = Tz + Vz * d - Fz; // Scaled vertex - updates T
                         double a = 2.0 * (Tx * Nx + Ty * Ny + Tz * Nz);                      // Reflection of T on face
-                        Tx -= a * Nx + ray_offset * FDx;
-                        Ty -= a * Ny + ray_offset * FDy;
-                        Tz -= a * Nz + ray_offset * FDz;
+                        Tx -= a * Nx, Ty -= a * Ny, Tz -= a * Nz;
                     }
                     else // Use intersect point W as new vertex origin
-                    {
-                        Tx = Wx - Fx - ray_offset * FDx;
-                        Ty = Wy - Fy - ray_offset * FDy;
-                        Tz = Wz - Fz - ray_offset * FDz;
-                    }
+                        Tx = Wx - Fx, Ty = Wy - Fy, Tz = Wz - Fz;
 
                     // Update vertex direction
                     qd_reflect(Vx, Vy, Vz, Nx, Ny, Nz, Vx, Vy, Vz);
@@ -1387,22 +1467,20 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 }
                 else // Transmission and Refraction
                 {
-                    if (d < 0.0 || d > 1.0e5) // Ray does not hit face - use orthogonal projection on vertex ray
+                    if (no_usable_hit) // Use orthogonal projection on vertex ray
                     {
                         d = ((Fx - Tx) * Vx + (Fy - Ty) * Vy + (Fz - Tz) * Vz) / (Vx * Vx + Vy * Vy + Vz * Vz);
                         Wx = Tx + Vx * d, Wy = Ty + Vy * d, Wz = Tz + Vz * d;
                     }
 
                     // Update ray tube coordinates
-                    Tx = Wx - Fx - ray_offset * FDx;
-                    Ty = Wy - Fy - ray_offset * FDy;
-                    Tz = Wz - Fz - ray_offset * FDz;
+                    Tx = Wx - Fx, Ty = Wy - Fy, Tz = Wz - Fz;
 
                     // Vertex ray directions remains the same for Transmission
                     if (geometry_type == 2 && !total_reflection) // Refraction (skipped when the whole tube passes through under TIR)
                     {
-                        std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV[iTube] * sin_thetaV[iTube]);
-                        qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV[iTube], cos_theta2V, Vx, Vy, Vz);
+                        std::complex<double> cos_theta2V = std::sqrt(1.0 - eta1_div_eta2 * sin_thetaV[iTube + 1] * sin_thetaV[iTube + 1]);
+                        qd_refract(Vx, Vy, Vz, Nx, Ny, Nz, eta, cos_thetaV[iTube + 1], cos_theta2V, Vx, Vy, Vz);
                     }
                 }
 
@@ -1414,7 +1492,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                 }
 
                 // Write new vertex ray origin and direction - convert back to dtype
-                if (iTube == 1)
+                if (iTube == 0)
                 {
                     p_trivec_tmp[0] = Tx, p_trivec_tmp[1] = Ty, p_trivec_tmp[2] = Tz;
                     if (use_ray_tube == 1)
@@ -1422,7 +1500,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     else
                         p_tridir_tmp[0] = Vx, p_tridir_tmp[1] = Vy, p_tridir_tmp[2] = Vz;
                 }
-                else if (iTube == 2)
+                else if (iTube == 1)
                 {
                     p_trivec_tmp[3] = Tx, p_trivec_tmp[4] = Ty, p_trivec_tmp[5] = Tz;
                     if (use_ray_tube == 1)
@@ -1430,7 +1508,7 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
                     else
                         p_tridir_tmp[3] = Vx, p_tridir_tmp[4] = Vy, p_tridir_tmp[5] = Vz;
                 }
-                else if (iTube == 3)
+                else if (iTube == 2)
                 {
                     p_trivec_tmp[6] = Tx, p_trivec_tmp[7] = Ty, p_trivec_tmp[8] = Tz;
                     if (use_ray_tube == 1)
@@ -1441,10 +1519,10 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             }
 
             // Calculate the maximum edge length
-            if (p_edge_lengthN != nullptr)
+            if (p_edge_lengthN)
             {
                 double Ex = p_trivec_tmp[3] - p_trivec_tmp[0], Ey = p_trivec_tmp[4] - p_trivec_tmp[1], Ez = p_trivec_tmp[5] - p_trivec_tmp[2];
-                scl = Ex * Ex + Ey * Ey + Ez * Ez;
+                double scl = Ex * Ex + Ey * Ey + Ez * Ez;
                 edge_length_tmp = (scl > edge_length_tmp) ? scl : edge_length_tmp;
                 Ex = p_trivec_tmp[6] - p_trivec_tmp[0], Ey = p_trivec_tmp[7] - p_trivec_tmp[1], Ez = p_trivec_tmp[8] - p_trivec_tmp[2];
                 scl = Ex * Ex + Ey * Ey + Ez * Ez;
@@ -1456,166 +1534,104 @@ void quadriga_lib::ray_mesh_interact(int interaction_type,
             }
         }
 
-        // Determine the in-medium gain
-        double gain = qd_hit_charges(M1, M2, ray_starts_inside, geometry_type,
-                                     OF_length, ray_offset, fGHz, abs_cos_theta);
-
         // Re-evaluate coefficients if the ray tube introduced TIR (type-2 tube vertices)
         if (total_reflection != tir_central)
-            M1.interact_with(M2, interaction_type, theta, fGHz, &cTE, &cTM,
-                             nullptr, nullptr, nullptr, nullptr, true);
+            M1.interact_with(M2, interaction_type, thetaF, fGHz, &cTE, &cTM, nullptr, nullptr, nullptr, nullptr, true);
 
         // Read the output ray index
-        size_t i_rayN = output_ray_index[iRx] - 1; // Output ray index, 0-based
-        if (i_rayN >= n_rayN)                      // Just to be sure to avoid any segfaults
+        if (i_rayN >= n_rayN) // Just to be sure to avoid any segfaults
             throw std::invalid_argument("Something went wrong. This should never be reached!");
 
         // Write ray_indN (inverse of the compaction map, 0-based input ray index)
-        if (p_ray_indN != nullptr)
+        if (p_ray_indN)
             p_ray_indN[i_rayN] = (unsigned)iRx;
 
-        // Write origN, add a small offset to prevent it from getting stuck inside the mesh element
-        if (p_origN != nullptr)
-        {
-            p_origN[i_rayN] = dtype(Fx + ray_offset * FDx);
-            p_origN[i_rayN + n_rayN] = dtype(Fy + ray_offset * FDy);
-            p_origN[i_rayN + 2 * n_rayN] = dtype(Fz + ray_offset * FDz);
-        }
+        // Relaunch offset: a few float ULP at the FBS coordinate magnitude, so the nudge survives the
+        // dtype(origN) store and the relaunched ray starts off the face without re-hitting it
+        double scale = std::max({std::abs(Fx), std::abs(Fy), std::abs(Fz), 1.0});
+        double relaunch_offset = 8.0 * scale * 1.1920929e-7; // ~8 float ULP at this magnitude (2^-23)
+        if (geometry_type != 0 && colocated_faces)           // Relaunch @ SBS
+            SET3(p_origN, Sx + relaunch_offset * FDx, Sy + relaunch_offset * FDy, Sz + relaunch_offset * FDz);
+        else // Relaunch @ FBS
+            SET3(p_origN, Fx + relaunch_offset * FDx, Fy + relaunch_offset * FDy, Fz + relaunch_offset * FDz);
 
-        // Write destN
-        if (p_destN != nullptr)
-        {
-            // Make sure the new destination is beyond the new start point
-            FD_length = (FD_length <= ray_offset) ? 2.0 * ray_offset : FD_length;
-            p_destN[i_rayN] = dtype(Fx + FD_length * FDx);
-            p_destN[i_rayN + n_rayN] = dtype(Fy + FD_length * FDy);
-            p_destN[i_rayN + 2 * n_rayN] = dtype(Fz + FD_length * FDz);
-        }
+        // Update FD_length to lay beyond the relaunch_offset
+        double min_seg = std::max(colocation_dist, 2.0 * relaunch_offset);
+        FD_length = (FD_length < min_seg) ? min_seg : FD_length;
+        SET3(p_destN, Fx + FD_length * FDx, Fy + FD_length * FDy, Fz + FD_length * FDz);
+
+        SET3(p_fbsN, Fx, Fy, Fz);
+        SET3(p_sbsN, Sx, Sy, Sz);
 
         // Write path_dirN: spine output direction (FD) for reflection/refraction (geometry 0/2, follows a
         // forced-TIR pass-through); spine Snell for undeviated transmission (geometry 1), or undeviated
         // when the spine is in TIR (no Snell direction; any TF leak travels undeviated).
-        if (p_path_dirN != nullptr)
+        if (p_path_dirN)
         {
             double PDx = FDx, PDy = FDy, PDz = FDz;
             if (geometry_type == 1 && !tir_central) // spine Snell; under spine TIR there is no Snell direction
-                qd_refract(OFx, OFy, OFz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
-            p_path_dirN[i_rayN] = (dtype)PDx;
-            p_path_dirN[i_rayN + n_rayN] = (dtype)PDy;
-            p_path_dirN[i_rayN + 2 * n_rayN] = (dtype)PDz;
+                qd_refract(ODx, ODy, ODz, Nx, Ny, Nz, eta, abs_cos_theta, cos_theta2, PDx, PDy, PDz);
+            SET3(p_path_dirN, PDx, PDy, PDz);
         }
 
         if (p_xprmatN || p_gainN)
         {
-            double amplitude = std::sqrt(gain);
             double xprmat[8], pgain;
-            qd_polbasis(OFx, OFy, OFz, FDx, FDy, FDz, Nx, Ny, Nz, amplitude, cTE, cTM, is_scalar, xprmat, pgain);
-
-            if (p_xprmatN)
-                for (int k = 0; k < 8; ++k)
-                    p_xprmatN[i_rayN + (size_t)k * n_rayN] = (dtype)xprmat[k];
-            if (p_gainN)
-                p_gainN[i_rayN] = (dtype)pgain;
+            qd_polbasis(ODx, ODy, ODz, FDx, FDy, FDz, Nx, Ny, Nz, 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+            SETL(p_xprmatN, xprmat, nXPR, false);
+            SET1(p_gainN, pgain);
         }
 
-        // Write trivecN
-        if (use_ray_tube && p_trivecN != nullptr)
+        if (use_ray_tube)
+            SETL(p_trivecN, p_trivec_tmp);
+        if (use_ray_tube == 1) // Spherical
+            SETL(p_tridirN, p_tridir_tmp, 6);
+        else // Cartesian
+            SETL(p_tridirN, p_tridir_tmp);
+
+        SET1(p_orig_lengthN, (p_orig_length ? double(p_orig_length[iRx]) + OF_length : OF_length));
+        SET1(p_fbs_angleN, thetaF);
+        SET1(p_thicknessN, FS_length);
+        SET1(p_edge_lengthN, edge_length_tmp);
+
+        if (p_normal_vecN)
+            SET3(p_normal_vecN, Nx, Ny, Nz), SET3(&p_normal_vecN[3 * n_rayN], Mx, My, Mz);
+
+        if (p_out_typeN)
         {
-            p_trivecN[i_rayN] = (dtype)p_trivec_tmp[0];
-            p_trivecN[i_rayN + n_rayN] = (dtype)p_trivec_tmp[1];
-            p_trivecN[i_rayN + 2 * n_rayN] = (dtype)p_trivec_tmp[2];
-            p_trivecN[i_rayN + 3 * n_rayN] = (dtype)p_trivec_tmp[3];
-            p_trivecN[i_rayN + 4 * n_rayN] = (dtype)p_trivec_tmp[4];
-            p_trivecN[i_rayN + 5 * n_rayN] = (dtype)p_trivec_tmp[5];
-            p_trivecN[i_rayN + 6 * n_rayN] = (dtype)p_trivec_tmp[6];
-            p_trivecN[i_rayN + 7 * n_rayN] = (dtype)p_trivec_tmp[7];
-            p_trivecN[i_rayN + 8 * n_rayN] = (dtype)p_trivec_tmp[8];
+            out_flags[5] = total_reflection; // Set total reflection flag
+            p_out_typeN[i_rayN] = (uint8_t)out_flags;
         }
-
-        // Write tridirN
-        if (use_ray_tube == 1 && p_tridirN != nullptr)
-        {
-            p_tridirN[i_rayN] = (dtype)p_tridir_tmp[0];
-            p_tridirN[i_rayN + n_rayN] = (dtype)p_tridir_tmp[1];
-            p_tridirN[i_rayN + 2 * n_rayN] = (dtype)p_tridir_tmp[2];
-            p_tridirN[i_rayN + 3 * n_rayN] = (dtype)p_tridir_tmp[3];
-            p_tridirN[i_rayN + 4 * n_rayN] = (dtype)p_tridir_tmp[4];
-            p_tridirN[i_rayN + 5 * n_rayN] = (dtype)p_tridir_tmp[5];
-        }
-        else if (use_ray_tube == 2 && p_tridirN != nullptr)
-        {
-            p_tridirN[i_rayN] = (dtype)p_tridir_tmp[0];
-            p_tridirN[i_rayN + n_rayN] = (dtype)p_tridir_tmp[1];
-            p_tridirN[i_rayN + 2 * n_rayN] = (dtype)p_tridir_tmp[2];
-            p_tridirN[i_rayN + 3 * n_rayN] = (dtype)p_tridir_tmp[3];
-            p_tridirN[i_rayN + 4 * n_rayN] = (dtype)p_tridir_tmp[4];
-            p_tridirN[i_rayN + 5 * n_rayN] = (dtype)p_tridir_tmp[5];
-            p_tridirN[i_rayN + 6 * n_rayN] = (dtype)p_tridir_tmp[6];
-            p_tridirN[i_rayN + 7 * n_rayN] = (dtype)p_tridir_tmp[7];
-            p_tridirN[i_rayN + 8 * n_rayN] = (dtype)p_tridir_tmp[8];
-        }
-
-        // Write orig_lengthN
-        if (p_orig_lengthN != nullptr)
-            p_orig_lengthN[i_rayN] = (p_orig_length == nullptr) ? dtype(OF_length + ray_offset)
-                                                                : dtype(p_orig_length[iRx] + OF_length + ray_offset);
-
-        // Write fbs_angleN
-        if (p_fbs_angleN != nullptr)
-            p_fbs_angleN[i_rayN] = (dtype)theta;
-
-        // Write thicknessN
-        if (p_thicknessN != nullptr)
-            p_thicknessN[i_rayN] = (dtype)FS_length;
-
-        // Write edge_lengthN
-        if (p_edge_lengthN != nullptr)
-            p_edge_lengthN[i_rayN] = (dtype)edge_length_tmp;
-
-        // Write normal_vecN
-        if (p_normal_vecN != nullptr)
-        {
-            // FBS normal vector
-            p_normal_vecN[i_rayN] = (dtype)Nx;
-            p_normal_vecN[i_rayN + n_rayN] = (dtype)Ny;
-            p_normal_vecN[i_rayN + 2 * n_rayN] = (dtype)Nz;
-            p_normal_vecN[i_rayN + 3 * n_rayN] = (dtype)Mx;
-            p_normal_vecN[i_rayN + 4 * n_rayN] = (dtype)My;
-            p_normal_vecN[i_rayN + 5 * n_rayN] = (dtype)Mz;
-        }
-
-        // Write out_typeN
-        if (p_out_typeN != nullptr)
-            p_out_typeN[i_rayN] = (out_type != 0 && geometry_type == 2 && total_reflection) ? out_type + 1 : out_type;
     }
-
-    // Delete ray index
-    delete[] output_ray_index;
 }
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, float center_frequency,
-                                              const arma::Mat<float> *orig, const arma::Mat<float> *dest, const arma::Mat<float> *fbs, const arma::Mat<float> *sbs,
+                                              const arma::Mat<float> *orig, const arma::Mat<float> *dest,
                                               const arma::Mat<float> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
                                               const arma::Mat<float> *trivec, const arma::Mat<float> *tridir, const arma::Col<float> *orig_length,
-                                              arma::Mat<float> *origN, arma::Mat<float> *destN, arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
+                                              arma::Mat<float> *origN, arma::Mat<float> *destN,
+                                              arma::Mat<float> *fbsN, arma::Mat<float> *sbsN,
+                                              arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
                                               arma::Mat<float> *trivecN, arma::Mat<float> *tridirN, arma::Col<float> *orig_lengthN,
                                               arma::Col<float> *fbs_angleN, arma::Col<float> *thicknessN, arma::Col<float> *edge_lengthN,
-                                              arma::Mat<float> *normal_vecN, arma::s32_vec *out_typeN,
-                                              arma::Mat<float> *path_dirN, arma::u32_vec *ray_indN);
+                                              arma::Mat<float> *normal_vecN, std::vector<uint8_t> *out_typeN,
+                                              arma::Mat<float> *path_dirN, bool compact, arma::u32_vec *ray_indN);
 
 template void quadriga_lib::ray_mesh_interact(int interaction_type, double center_frequency,
-                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest, const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
+                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
                                               const arma::Mat<double> *mesh, const arma::uvec *mtl_ind,
                                               const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                               const arma::u32_vec *fbs_ind, const arma::u32_vec *sbs_ind,
                                               const arma::Mat<double> *trivec, const arma::Mat<double> *tridir, const arma::Col<double> *orig_length,
-                                              arma::Mat<double> *origN, arma::Mat<double> *destN, arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
+                                              arma::Mat<double> *origN, arma::Mat<double> *destN,
+                                              arma::Mat<double> *fbsN, arma::Mat<double> *sbsN,
+                                              arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
                                               arma::Mat<double> *trivecN, arma::Mat<double> *tridirN, arma::Col<double> *orig_lengthN,
                                               arma::Col<double> *fbs_angleN, arma::Col<double> *thicknessN, arma::Col<double> *edge_lengthN,
-                                              arma::Mat<double> *normal_vecN, arma::s32_vec *out_typeN,
-                                              arma::Mat<double> *path_dirN, arma::u32_vec *ray_indN);
+                                              arma::Mat<double> *normal_vecN, std::vector<uint8_t> *out_typeN,
+                                              arma::Mat<double> *path_dirN, bool compact, arma::u32_vec *ray_indN);
 
 /*!MD
 # ray_state_update
@@ -1625,12 +1641,11 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
   per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
   current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
   0x7FFF`, `flag = w & 0x8000`).
-- Ports the inside/outside state machine formerly embedded in [[calc_diffraction_gain]] and overlays
-  a closed-form thin-slab factor `S` (the Airy sum) so a single coefficient captures the full
-  internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on
-  the tracer to follow every internal bounce.
+- Implements the inside/outside state machine and overlays a closed-form thin-slab factor `S` (the Airy
+  sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab
+  thin enough to matter, instead of relying on the tracer to follow every internal bounce.
 - Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
-  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
+  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2, 4, 5). With `S`
   suppressed (the survival gate re-emits) the transmission/refraction path reproduces [[calc_diffraction_gain]]
 
 ## Declaration:
@@ -1640,37 +1655,37 @@ void quadriga_lib::ray_state_update(
     dtype center_frequency,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
+    const arma::Mat<dtype> *fbsN,
+    const arma::Mat<dtype> *sbsN,
     const arma::u32_vec *no_interact,
     const arma::Col<dtype> *fbs_angleN,
     const arma::Mat<dtype> *normal_vecN,
-    const arma::s32_vec *out_typeN,
+    const std::vector<uint8_t> *out_typeN,
     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
-    const arma::Col<short> *mtl_ind_fbs,
-    const arma::Col<short> *mtl_ind_sbs,
+    const arma::Col<short> *mtl_ind_fbsN,
+    const arma::Col<short> *mtl_ind_sbsN,
     const arma::Col<short> *mtl_ind_prev_in = nullptr,
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
-    const arma::Col<dtype> *acc_dist_in = nullptr,
+    const arma::Mat<dtype> *acc_dist_in = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Col<dtype> *acc_dist_outN = nullptr,
+    arma::Mat<dtype> *acc_dist_outN = nullptr,
+    std::vector<uint8_t> *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     double eps = 0.15);
 ```
 
 ## Inputs:
-- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection,
-  4 scalar transmission, 5 scalar refraction
+- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission, 5 scalar refraction
 - **`center_frequency`** — Center frequency in [Hz]
-- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in
-  GCS, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
 - **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`.
@@ -1678,12 +1693,18 @@ void quadriga_lib::ray_state_update(
   NULL disables the wedge test.
 - **`out_typeN`** — Interaction type code from [[ray_mesh_interact]], compact set; `[n_rayN]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [[obj_file_read]])
-- **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words,
-  full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
+- **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
+  read at `g`, never written. NULL reads as state `0` (outside, no flags).
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray]`
+- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray, 2]`; col 1 = refracted distance; col 2 = geometric distance
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`eps`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab
+  amplitude `ρ` (`ρ ∈ [0, 1]`): the closed-form Airy factor is applied when `ρ ≥ eps` and the series
+  is re-emitted to the tracer when `ρ < eps` (weak / fast-decaying slabs). `eps = 0` always resolves
+  (for callers that cannot re-emit, e.g. [[calc_diffraction_gain]]); `eps ≥ 1` always re-emits
+  (resolution disabled). A near-pole `S` or a known non-parallel slab re-emits regardless of `eps`.
+  Default `0.15`.
 
 ## Outputs:
 - **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
@@ -1691,9 +1712,46 @@ void quadriga_lib::ray_state_update(
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
 - **`gainN`** *(in/out)* — Per-interaction gain, updated in place; `[n_rayN]`
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), updated in place; `[n_rayN, 8]`
+- **`xprmatN`** *(in/out)* — Polarization transfer matrix; updated in place; `[8, n_rayN]` for EM mode, `[2, n_rayN]` for scalar mode
 - **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
-- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN]`
+- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN, 2]`
+- **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
+  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.<br><br>
+   | Bit  | Flag        | Meaning                                                                        |
+   | :--: | :---------: | ------------------------------------------------------------------------------ |
+   |   0  | ok          | OK flag (0 = a deferred degenerate-resolve buffer is pending)                  |
+   |   1  | vbs         | VBS correction (gain/xprmat corrected at the VBS instead of FBS/SBS)           |
+   |   2  | resolve     | Slab-resolve flag (an internal multi-bounce series was resolved analytically)  |
+   |   3  | inside      | Inside-object flag (1 = ray continues inside, 0 = continues outside)           |
+   |   4  | fix         | Fix flag (resolved-false-outside, or entry/exit material mismatch)             |
+   |   5  | tir         | Total-reflection flag (also set when a transmission factor forced reflection)  |
+   |   6  | trans       | Transmission: transparent-interface flag; reflection: scatter flag             |
+   |   7  | refl        | Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)       |
+   Reachable composite values for transmission / refraction:<br><br>
+   |  Dec | Hex  | FIX  |   TIR   | Flags set                  | Meaning                                            |
+   | :--: | :--: | :--: | :-----: | -------------------------- | -------------------------------------------------- |
+   |    9 | 0x09 |   —  |    41   | inside, ok                 | o-i entry, OR i-i transition (refr. 2/5, FBS==VBS) |
+   |    8 | 0x08 |   —  |    40   | inside                     | o-i entry, deferred buffer set (overlap/edge)      |
+   |   11 | 0x0B |  27  |  43, 59 | inside, vbs, ok            | i-i transition (undev. 1/4, VBS relocated)         |
+   |   13 | 0x0D |  29  |  45, 61 | inside, resolve, ok        | i-i transition + slab series (refr. 2/5, FBS==VBS) |
+   |   15 | 0x0F |  31  |  47, 63 | inside, resolve, vbs, ok   | i-i transition + slab series (undev. 1/4, VBS)     |
+   |    1 | 0x01 |  17  |  33, 49 | ok                         | i-o exit (refr. 2/5, FBS==VBS)                     |
+   |    3 | 0x03 |  19  |  35, 51 | vbs, ok                    | i-o exit (undev. 1/4, VBS relocated)               |
+   |    5 | 0x05 |  21  |  37, 53 | resolve, ok                | i-o exit + slab series (refr. 2/5, FBS==VBS)       |
+   |    7 | 0x07 |  23  |  39, 55 | resolve, vbs, ok           | i-o exit + slab series (undev. 1/4, VBS)           |
+   |   73 | 0x49 |  89  |     —   | trans, inside, ok          | ignore-hit / same-medium pass, no gain change      |
+   |   72 | 0x48 |  88  |     —   | trans, inside              | nested pass-through, buffer deferred               |
+   |   65 | 0x41 |   —  |     —   | trans, ok                  | advance to ray destination, identity interface     |
+   Reachable composite values for reflection:<br><br>
+   |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
+   | :--: | :--: | :--: | :-----: | ------------------------------- |------------------------------------------------------------- |
+   |  129 | 0x81 |    — |   161   | refl, ok                        | eager front reflection (R0), outside (FBS==VBS)              |
+   |  137 | 0x89 |  153 | 169,185 | refl, inside, ok                | internal back-reflection (incoming refr. 2/5, FBS==VBS)      |
+   |  139 | 0x8B |  155 | 171,187 | refl, inside, vbs, ok           | internal back-reflection (incoming undev. 1/4, VBS)          |
+   |  141 | 0x8D |  157 | 173,189 | refl, inside, resolve, ok       | internal back-reflection + slab series (incoming refr. 2/5)  |
+   |  143 | 0x8F |  159 | 175,191 | refl, inside, resolve, vbs, ok  | internal back-reflection + slab series (incoming undev. 1/4) |
+   |  192+| 0xC0+|    — |    —    | refl, trans, ...                | reserved: scattering not implemented                         |
+
 
 ## See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
@@ -1706,35 +1764,36 @@ void quadriga_lib::ray_state_update(int interaction_type,
                                     dtype center_frequency,
                                     const arma::Mat<dtype> *orig,
                                     const arma::Mat<dtype> *dest,
-                                    const arma::Mat<dtype> *fbs,
-                                    const arma::Mat<dtype> *sbs,
+                                    const arma::Mat<dtype> *fbsN,
+                                    const arma::Mat<dtype> *sbsN,
                                     const arma::u32_vec *no_interact,
                                     const arma::Col<dtype> *fbs_angleN,
                                     const arma::Mat<dtype> *normal_vecN,
-                                    const arma::s32_vec *out_typeN,
+                                    const std::vector<uint8_t> *out_typeN,
                                     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
-                                    const arma::Col<short> *mtl_ind_fbs,
-                                    const arma::Col<short> *mtl_ind_sbs,
+                                    const arma::Col<short> *mtl_ind_fbsN,
+                                    const arma::Col<short> *mtl_ind_sbsN,
                                     const arma::Col<short> *mtl_ind_prev_in,
                                     const arma::Col<short> *mtl_ind_current_in,
                                     const arma::Col<short> *mtl_ind_buffer_in,
                                     const arma::Mat<dtype> *path_dir_prev,
-                                    const arma::Col<dtype> *acc_dist_in,
+                                    const arma::Mat<dtype> *acc_dist_in,
                                     arma::Col<short> *mtl_ind_prev_outN,
                                     arma::Col<short> *mtl_ind_current_outN,
                                     arma::Col<short> *mtl_ind_buffer_outN,
                                     arma::Col<dtype> *gainN,
                                     arma::Mat<dtype> *xprmatN,
                                     arma::Mat<dtype> *path_dirN,
-                                    arma::Col<dtype> *acc_dist_outN,
+                                    arma::Mat<dtype> *acc_dist_outN,
+                                    std::vector<uint8_t> *resolved_typeN,
                                     const arma::u32_vec *ray_indN,
                                     double eps)
 {
-    // Ray offset is used to detect co-location of points, value in meters
-    const double ray_offset = 0.001;
-
     if (interaction_type < 0 || interaction_type > 5)
         throw std::invalid_argument("Interaction type must be either (0) EM Reflection, (1) EM Transmission, (2) EM Refraction, (3) Scalar Reflection, (4) Scalar Transmission, (5) Scalar Refraction");
+    const bool is_scalar = interaction_type >= 3;
+    const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
+    const arma::uword nXPR = is_scalar ? 2 : 8;                              // NUmber of columns in xprmat (8 for EM, 2 for scalar)
 
     if (!std::isfinite((double)center_frequency) || center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Center frequency must be provided in Hertz and have values > 0.");
@@ -1742,18 +1801,49 @@ void quadriga_lib::ray_state_update(int interaction_type,
     if (!std::isfinite(eps) || eps < 0.0)
         throw std::invalid_argument("Input 'eps' must be finite and >= 0.");
 
-    if (orig == nullptr || dest == nullptr || fbs == nullptr || sbs == nullptr)
-        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' cannot be NULL.");
-    if (out_typeN == nullptr)
-        throw std::invalid_argument("Input 'out_typeN' cannot be NULL.");
+    if (orig == nullptr || dest == nullptr || fbsN == nullptr || sbsN == nullptr)
+        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbsN' and 'sbsN' cannot be NULL.");
+    if (orig->n_cols != 3 || dest->n_cols != 3 || fbsN->n_cols != 3 || sbsN->n_cols != 3)
+        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbsN' and 'sbsN' must have 3 columns.");
+    const arma::uword n_ray = orig->n_rows;
+    const arma::uword n_rayN = fbsN->n_rows;
+
+    if (dest->n_rows != n_ray)
+        throw std::invalid_argument("Inputs 'orig' and 'dest' must have the same number of rows.");
+    if (sbsN->n_rows != n_rayN)
+        throw std::invalid_argument("Inputs 'fbs' and 'sbs' must have the same number of rows.");
+
+    if (no_interact == nullptr || no_interact->n_elem != n_ray)
+        throw std::invalid_argument("Input 'no_interact' must match the number of rays in 'orig'.");
+    const unsigned *p_no_interact = no_interact->memptr();
+
+    if (fbs_angleN == nullptr || fbs_angleN->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'fbs_angleN' cannot be NULL and have length n_rayN.");
+    const dtype *p_fbs_angleN = fbs_angleN->memptr();
+
+    if (normal_vecN == nullptr)
+        throw std::invalid_argument("Input 'normal_vecN' is required (VBS plane normal).");
+    if (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6)
+        throw std::invalid_argument("Input 'normal_vecN' must have size [n_rayN, 6].");
+    const dtype *p_normal_vecN = normal_vecN->memptr();
+
+    if (out_typeN == nullptr || out_typeN->size() != n_rayN)
+        throw std::invalid_argument("Input 'out_typeN' cannot be NULL and have length n_rayN.");
+    const uint8_t *p_out_typeN = out_typeN->data();
 
     // Resolved material columns for the Material(cols, idx)
-    MaterialCols<dtype> cols = (mtl_prop != nullptr) ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
+    MaterialCols<dtype> cols = mtl_prop ? MaterialCols<dtype>(*mtl_prop) : MaterialCols<dtype>();
 
-    // Validate the material map
-    if (mtl_ind_fbs != nullptr && mtl_ind_fbs->n_elem != 0 && arma::uword(mtl_ind_fbs->max() & (short)0x7FFF) > cols.n_mtl)
+    if (mtl_ind_fbsN == nullptr || mtl_ind_fbsN->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
+    const short *p_mtl_ind_fbs = mtl_ind_fbsN->memptr();
+    if (mtl_ind_fbsN->n_elem != 0 && arma::uword(mtl_ind_fbsN->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_fbs' exceed the number of materials in 'mtl_prop'.");
-    if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != 0 && arma::uword(mtl_ind_sbs->max() & (short)0x7FFF) > cols.n_mtl)
+
+    if (mtl_ind_sbsN == nullptr || mtl_ind_sbsN->n_elem != n_rayN)
+        throw std::invalid_argument("Input 'mtl_ind_sbs' must match the length of 'out_typeN'.");
+    const short *p_mtl_ind_sbs = mtl_ind_sbsN->memptr();
+    if (mtl_ind_sbsN->n_elem != 0 && arma::uword(mtl_ind_sbsN->max() & (short)0x7FFF) > cols.n_mtl)
         throw std::invalid_argument("Values in 'mtl_ind_sbs' exceed the number of materials in 'mtl_prop'.");
 
     auto check_state_words = [&](const arma::Col<short> *v, const char *name)
@@ -1768,108 +1858,104 @@ void quadriga_lib::ray_state_update(int interaction_type,
     check_state_words(mtl_ind_current_in, "mtl_ind_current_in");
     check_state_words(mtl_ind_buffer_in, "mtl_ind_buffer_in");
 
-    const bool is_scalar = interaction_type >= 3;
-    const bool refl_pass = (interaction_type == 0 || interaction_type == 3); // geometry 0
-
-    const arma::uword n_rayN = out_typeN->n_elem;
-    const arma::uword n_ray = orig->n_rows;
-
-    if (orig->n_cols != 3 || dest->n_cols != 3 || fbs->n_cols != 3 || sbs->n_cols != 3)
-        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' must have 3 columns.");
-    if (dest->n_rows != n_ray || fbs->n_rows != n_ray || sbs->n_rows != n_ray)
-        throw std::invalid_argument("Inputs 'orig', 'dest', 'fbs' and 'sbs' must have the same number of rows.");
-    if (no_interact != nullptr && no_interact->n_elem != n_ray)
-        throw std::invalid_argument("Input 'no_interact' must match the number of rays in 'orig'.");
-    if (mtl_ind_prev_in != nullptr && mtl_ind_prev_in->n_elem != n_ray)
+    if (mtl_ind_prev_in && mtl_ind_prev_in->n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_prev_in' must match the number of rays in 'orig'.");
-    if (mtl_ind_current_in != nullptr && mtl_ind_current_in->n_elem != n_ray)
+    const short *p_prev_in = mtl_ind_prev_in ? mtl_ind_prev_in->memptr() : nullptr;
+
+    if (mtl_ind_current_in && mtl_ind_current_in->n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_current_in' must match the number of rays in 'orig'.");
-    if (mtl_ind_buffer_in != nullptr && mtl_ind_buffer_in->n_elem != n_ray)
+    const short *p_cur_in = mtl_ind_current_in ? mtl_ind_current_in->memptr() : nullptr;
+
+    if (mtl_ind_buffer_in && mtl_ind_buffer_in->n_elem != n_ray)
         throw std::invalid_argument("Input 'mtl_ind_buffer_in' must match the number of rays in 'orig'.");
-    if (fbs_angleN != nullptr && fbs_angleN->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'fbs_angleN' must match the length of 'out_typeN'.");
-    if (mtl_ind_fbs != nullptr && mtl_ind_fbs->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'mtl_ind_fbs' must match the length of 'out_typeN'.");
-    if (mtl_ind_sbs != nullptr && mtl_ind_sbs->n_elem != n_rayN)
-        throw std::invalid_argument("Input 'mtl_ind_sbs' must match the length of 'out_typeN'.");
-    if (normal_vecN == nullptr)
-        throw std::invalid_argument("Input 'normal_vecN' is required (VBS plane normal).");
-    if (normal_vecN->n_rows != n_rayN || normal_vecN->n_cols != 6)
-        throw std::invalid_argument("Input 'normal_vecN' must have size [n_rayN, 6].");
-    if (gainN != nullptr && gainN->n_elem != n_rayN)
+    const short *p_buf_in = mtl_ind_buffer_in ? mtl_ind_buffer_in->memptr() : nullptr;
+
+    if (path_dir_prev && !path_dir_prev->is_finite())
+        throw std::invalid_argument("Input 'path_dir_prev' must be finite.");
+    if (path_dir_prev && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
+        throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
+    const dtype *p_path_dir_prev = path_dir_prev ? path_dir_prev->memptr() : nullptr;
+
+    if (acc_dist_in && acc_dist_in->n_rows != n_ray)
+        throw std::invalid_argument("Number of rows in 'acc_dist_in' must match the number of rays in 'orig'.");
+    if (acc_dist_in && (!acc_dist_in->is_finite() || acc_dist_in->min() < (dtype)0.0))
+        throw std::invalid_argument("Input 'acc_dist_in' must be finite and >= 0.");
+    const dtype *p_acc_dist_in = acc_dist_in ? acc_dist_in->memptr() : nullptr;
+
+    if (mtl_ind_prev_outN && mtl_ind_prev_outN->n_elem != n_rayN)
+        mtl_ind_prev_outN->set_size(n_rayN);
+    short *p_prev_outN = mtl_ind_prev_outN ? mtl_ind_prev_outN->memptr() : nullptr;
+
+    if (mtl_ind_current_outN && mtl_ind_current_outN->n_elem != n_rayN)
+        mtl_ind_current_outN->set_size(n_rayN);
+    short *p_cur_outN = mtl_ind_current_outN ? mtl_ind_current_outN->memptr() : nullptr;
+
+    if (mtl_ind_buffer_outN && mtl_ind_buffer_outN->n_elem != n_rayN)
+        mtl_ind_buffer_outN->set_size(n_rayN);
+    short *p_buf_outN = mtl_ind_buffer_outN ? mtl_ind_buffer_outN->memptr() : nullptr;
+
+    if (gainN && gainN->n_elem != n_rayN)
         throw std::invalid_argument("In-out 'gainN' must match the length of 'out_typeN'.");
-    if (xprmatN != nullptr && (xprmatN->n_rows != n_rayN || xprmatN->n_cols != 8))
-        throw std::invalid_argument("In-out 'xprmatN' must have size [n_rayN, 8].");
-    if (ray_indN != nullptr && ray_indN->n_elem != n_rayN)
+    dtype *p_gainN = gainN ? gainN->memptr() : nullptr;
+
+    if (xprmatN && (xprmatN->n_rows != nXPR || xprmatN->n_cols != n_rayN))
+        throw std::invalid_argument("In-out 'xprmatN' must have size [8, n_rayN] for EM mode or [2, n_rayN] for scalar mode.");
+    dtype *p_xprmatN = xprmatN ? xprmatN->memptr() : nullptr;
+
+    if (path_dirN && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
+        throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
+    dtype *p_path_dirN = path_dirN ? path_dirN->memptr() : nullptr;
+
+    if (acc_dist_outN && (acc_dist_outN->n_rows != n_rayN || acc_dist_outN->n_cols != 2))
+        acc_dist_outN->set_size(n_rayN, 2);
+    dtype *p_acc_dist_outN = acc_dist_outN ? acc_dist_outN->memptr() : nullptr;
+
+    if (resolved_typeN && resolved_typeN->size() != n_rayN)
+        resolved_typeN->resize(n_rayN, 0); // Init to 0
+    uint8_t *p_resolved_typeN = resolved_typeN ? resolved_typeN->data() : nullptr;
+
+    if (ray_indN && ray_indN->n_elem != n_rayN)
         throw std::invalid_argument("Input 'ray_indN' must match the length of 'out_typeN'.");
-    if (ray_indN != nullptr && ray_indN->n_elem != 0 && (arma::uword)ray_indN->max() >= n_ray)
+    if (ray_indN && ray_indN->n_elem != 0 && (arma::uword)ray_indN->max() >= n_ray)
         throw std::invalid_argument("Values in 'ray_indN' exceed the number of rays in 'orig'.");
     if (ray_indN == nullptr && n_ray != n_rayN)
         throw std::invalid_argument("Without 'ray_indN', the full and compact sets must have the same size.");
-    if (path_dir_prev != nullptr && (path_dir_prev->n_rows != n_ray || path_dir_prev->n_cols != 3))
-        throw std::invalid_argument("Input 'path_dir_prev' must have size [n_ray, 3].");
-    if (path_dir_prev != nullptr && !path_dir_prev->is_finite())
-        throw std::invalid_argument("Input 'path_dir_prev' must be finite.");
-    if (acc_dist_in != nullptr && (!acc_dist_in->is_finite() || acc_dist_in->min() < (dtype)0.0))
-        throw std::invalid_argument("Input 'acc_dist_in' must be finite and >= 0.");
-    if (path_dirN != nullptr && (path_dirN->n_rows != n_rayN || path_dirN->n_cols != 3))
-        throw std::invalid_argument("In-out 'path_dirN' must have size [n_rayN, 3].");
+    const unsigned *p_ray_indN = ray_indN ? ray_indN->memptr() : nullptr;
 
-    // Allocate / size the output state arrays (compact set)
-    if (mtl_ind_prev_outN != nullptr && mtl_ind_prev_outN->n_elem != n_rayN)
-        mtl_ind_prev_outN->set_size(n_rayN);
-    if (mtl_ind_current_outN != nullptr && mtl_ind_current_outN->n_elem != n_rayN)
-        mtl_ind_current_outN->set_size(n_rayN);
-    if (mtl_ind_buffer_outN != nullptr && mtl_ind_buffer_outN->n_elem != n_rayN)
-        mtl_ind_buffer_outN->set_size(n_rayN);
-    if (acc_dist_outN != nullptr && acc_dist_outN->n_elem != n_rayN)
-        acc_dist_outN->set_size(n_rayN);
-
-    // Input / output pointers
-    const unsigned *p_no_interact = (no_interact == nullptr) ? nullptr : no_interact->memptr();
-    const int *p_out_typeN = out_typeN->memptr();
-    const dtype *p_fbs_angleN = (fbs_angleN == nullptr) ? nullptr : fbs_angleN->memptr();
-    const dtype *p_normal_vecN = (normal_vecN == nullptr) ? nullptr : normal_vecN->memptr();
-    const short *p_M1 = (mtl_ind_fbs == nullptr) ? nullptr : mtl_ind_fbs->memptr();
-    const short *p_M2 = (mtl_ind_sbs == nullptr) ? nullptr : mtl_ind_sbs->memptr();
-    const short *p_prev_in = (mtl_ind_prev_in == nullptr) ? nullptr : mtl_ind_prev_in->memptr();
-    const short *p_cur_in = (mtl_ind_current_in == nullptr) ? nullptr : mtl_ind_current_in->memptr();
-    const short *p_buf_in = (mtl_ind_buffer_in == nullptr) ? nullptr : mtl_ind_buffer_in->memptr();
-    short *p_prev_outN = (mtl_ind_prev_outN == nullptr) ? nullptr : mtl_ind_prev_outN->memptr();
-    short *p_cur_outN = (mtl_ind_current_outN == nullptr) ? nullptr : mtl_ind_current_outN->memptr();
-    short *p_buf_outN = (mtl_ind_buffer_outN == nullptr) ? nullptr : mtl_ind_buffer_outN->memptr();
-    dtype *p_gainN = (gainN == nullptr) ? nullptr : gainN->memptr();
-    dtype *p_xprmatN = (xprmatN == nullptr) ? nullptr : xprmatN->memptr();
-    const unsigned *p_ray_indN = (ray_indN == nullptr) ? nullptr : ray_indN->memptr();
-    const dtype *p_path_dir_prev = (path_dir_prev == nullptr) ? nullptr : path_dir_prev->memptr();
-    const dtype *p_acc_dist_in = (acc_dist_in == nullptr) ? nullptr : acc_dist_in->memptr();
-    dtype *p_path_dirN = (path_dirN == nullptr) ? nullptr : path_dirN->memptr();
-    dtype *p_acc_dist_outN = (acc_dist_outN == nullptr) ? nullptr : acc_dist_outN->memptr();
-
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for (long long i_rayN = 0; i_rayN < (long long)n_rayN; ++i_rayN) // Interaction loop (compact set)
     {
         size_t ii = (size_t)i_rayN;
-        size_t i_ray = (p_ray_indN == nullptr) ? ii : (size_t)p_ray_indN[ii]; // Full-set index
+        size_t i_ray = p_ray_indN ? (size_t)p_ray_indN[ii] : ii; // Full-set index
 
-        // Old state at g (full set). Defaults to copy-through into the compact outputs at i.
-        short s_prev = (p_prev_in == nullptr) ? (short)0 : p_prev_in[i_ray];
-        short s_cur = (p_cur_in == nullptr) ? (short)0 : p_cur_in[i_ray];
-        short s_buf = (p_buf_in == nullptr) ? (short)0 : p_buf_in[i_ray];
-        int cur = s_cur & 0x7FFF;
-        bool resolved = (s_cur & 0x8000) != 0;
-        int buf = s_buf & 0x7FFF;
-        int prev_mat = s_prev & 0x7FFF;
-        bool prev_nonpar = (s_prev & 0x8000) != 0;
-        short out_prev = s_prev, out_cur = s_cur, out_buf = s_buf;
+        // Resolved interaction type classifier
+        // Default to: transmission, outside, ok (no resolve, no vbs, not transparent)
+        qd::bits<uint8_t> typeR = 1; // Set OK, no-buffer
+
+        // Initialize output state words from current ones (will be overwritten)
+        short next_current = p_cur_in ? p_cur_in[i_ray] : (short)0;
+        short next_prev = p_prev_in ? p_prev_in[i_ray] : (short)0;
+        short next_buffer = p_buf_in ? p_buf_in[i_ray] : (short)0;
+
+        // Extract current material indices and flags
+        int mtl_current = next_current & 0x7FFF;
+        int mtl_prev = next_prev & 0x7FFF;
+        int mtl_buffer = next_buffer & 0x7FFF;
+        bool resolved = (next_current & 0x8000) != 0;
+        bool prev_nonpar = (next_prev & 0x8000) != 0;
 
         // Compact-set reads at i
-        unsigned nH = (p_no_interact == nullptr) ? 1u : p_no_interact[i_ray];
-        int typeH = p_out_typeN[ii];
-        int M1 = (p_M1 == nullptr) ? 0 : (int)(p_M1[ii] & (short)0x7FFF);
-        int M2 = (p_M2 == nullptr) ? 0 : (int)(p_M2[ii] & (short)0x7FFF);
-        double theta = (p_fbs_angleN == nullptr) ? 0.0 : (double)p_fbs_angleN[ii];
-        double fGHz = (double)center_frequency * 1e-9;
+        unsigned nH = p_no_interact[i_ray];                // No interactions
+        auto typeH = (qd::bits<uint8_t>)p_out_typeN[ii];   // Hit type code from ray_mesh_interact
+        int M1 = (int)(p_mtl_ind_fbs[ii] & (short)0x7FFF); // FBS material
+        int M2 = (int)(p_mtl_ind_sbs[ii] & (short)0x7FFF); // SBS material
+        double theta = (double)p_fbs_angleN[ii];           // Incidence angle @ FBS
+        double fGHz = (double)center_frequency * 1e-9;     // Frequency in GHz
+
+        // Read total reflection condition and strip TR flag from typeH
+        bool total_reflection = typeH[5]; // Read from hit type
+        typeH[5] = false;                 // Clear from hit type
+        typeR[5] = total_reflection;      // Set on resolved type
 
         // Build a Material for a 1-based index (0 = air). Used by SAME, TRN and the slab-factor calls.
         auto MAT = [&](int m) -> Material
@@ -1880,73 +1966,158 @@ void quadriga_lib::ray_state_update(int interaction_type,
         auto SAME = [&](int a, int b) -> bool
         { return a == b || (a > 0 && b > 0 && MAT(a).same_as(MAT(b))); };
 
-        // Euclidean distance between two full-set geometry rows at g
-        auto distance = [&](const arma::Mat<dtype> *A, const arma::Mat<dtype> *B) -> double
-        { return (double)qd_calc_length(A->at(i_ray, 0), A->at(i_ray, 1), A->at(i_ray, 2), B->at(i_ray, 0), B->at(i_ray, 1), B->at(i_ray, 2)); };
+        // Euclidean distance between two points
+        auto DIST = [](const double *A, const double *B) -> double
+        {
+            double a0 = B[0] - A[0], a1 = B[1] - A[1], a2 = B[2] - A[2];
+            return std::sqrt(a0 * a0 + a1 * a1 + a2 * a2);
+        };
+
+        // Normalize 3-element vector to unit-length
+        auto NORMALIZE = [](double *A) -> double
+        {
+            double len = std::sqrt(A[0] * A[0] + A[1] * A[1] + A[2] * A[2]);
+            if (len > 1.0e-12)
+                A[0] /= len, A[1] /= len, A[2] /= len;
+            else // Fallback
+                A[0] = 1.0, A[1] = 0.0, A[2] = 0.0;
+            return len;
+        };
+
+        // VBS plane normal: FBS triple, or the SBS triple for an type-(5/23/29) crossing, normalized
+        // - type-12 ia a o-i-o and we need to use the normal of the second i-o crossing (the first o-i is pass-through)
+        // - type-29 is a ii-o corner crossing, where ray_triangle_intersect outputs the FBS and SBS in order, but the re-launch happens
+        //   bast the SBS, so the SBS governs the correct exit.
+        double N[3];
+        {
+            size_t normal_off = ((typeH == 5 || typeH == 23 || typeH == 29) && nH != 0) ? 3 : 0;
+            N[0] = (double)p_normal_vecN[ii + (normal_off + 0) * n_rayN];
+            N[1] = (double)p_normal_vecN[ii + (normal_off + 1) * n_rayN];
+            N[2] = (double)p_normal_vecN[ii + (normal_off + 2) * n_rayN];
+            NORMALIZE(N);
+        }
+
+        // Segment origin O, destination D and plane crossing F
+        const double O[3] = {(double)orig->at(i_ray, 0), (double)orig->at(i_ray, 1), (double)orig->at(i_ray, 2)}; // Ray origin
+        const double D[3] = {(double)dest->at(i_ray, 0), (double)dest->at(i_ray, 1), (double)dest->at(i_ray, 2)}; // Ray destination
+        double F[3] = {(double)fbsN->at(ii, 0), (double)fbsN->at(ii, 1), (double)fbsN->at(ii, 2)};                // FBS position
+        double S[3] = {(double)sbsN->at(ii, 0), (double)sbsN->at(ii, 1), (double)sbsN->at(ii, 2)};                // SBS position
+
+        if (nH == 0) // No-hit fallback
+        {
+            F[0] = D[0], F[1] = D[1], F[2] = D[2];
+            S[0] = D[0], S[1] = D[1], S[2] = D[2];
+        }
+
+        // Incoming physical direction
+        double dir_prev[3];
+        bool use_vbs = false;
+        if (p_path_dir_prev)
+        {
+            dir_prev[0] = (double)p_path_dir_prev[i_ray];
+            dir_prev[1] = (double)p_path_dir_prev[i_ray + n_ray];
+            dir_prev[2] = (double)p_path_dir_prev[i_ray + 2 * n_ray];
+            use_vbs = NORMALIZE(dir_prev) > 1.0e-6;
+        }
+        if (!use_vbs) // Geometric fallback
+        {
+            dir_prev[0] = F[0] - O[0];
+            dir_prev[1] = F[1] - O[1];
+            dir_prev[2] = F[2] - O[2];
+            NORMALIZE(dir_prev);
+        }
+
+        // Outgoing physical direction
+        double dir_next[3];
+        if (path_dirN)
+        {
+            dir_next[0] = (double)p_path_dirN[i_rayN];
+            dir_next[1] = (double)p_path_dirN[i_rayN + n_rayN];
+            dir_next[2] = (double)p_path_dirN[i_rayN + 2 * n_rayN];
+        }
+        else if (nH == 0)
+            dir_next[0] = F[0] - O[0], dir_next[1] = F[1] - O[1], dir_next[2] = F[2] - O[2];
+        else // Geometric fallback
+            dir_next[0] = D[0] - F[0], dir_next[1] = D[1] - F[1], dir_next[2] = D[2] - F[2];
+        NORMALIZE(dir_next);
+
+        // VBS plane intersection
+        // Returns false when the ray is near-parallel to the plane
+        auto VBS_INTERSECT = [](const double *O,               // Segment origin O
+                                const double *U,               // Physical direction (path_dir), normalized
+                                const double *F,               // Plane intersect point (FBS)
+                                const double *N,               // Plane normal N, normalized
+                                double *dist_OV = nullptr,     // Distance from O to V
+                                double *cos_theta_t = nullptr, // |cos(theta_t)| = |d . N|
+                                double *V = nullptr) -> bool   // Virtual back-scatter point (VBS)
+        {
+            double un = U[0] * N[0] + U[1] * N[1] + U[2] * N[2];
+            if (std::abs(un) < 1.0e-6)
+                return false;
+
+            double s = ((F[0] - O[0]) * N[0] + (F[1] - O[1]) * N[1] + (F[2] - O[2]) * N[2]) / un;
+            if (!std::isfinite(s) || s <= 0.0)
+                return false;
+
+            if (dist_OV)
+                *dist_OV = s;
+            if (cos_theta_t)
+                *cos_theta_t = std::abs(un);
+            if (V)
+                V[0] = O[0] + s * U[0], V[1] = O[1] + s * U[1], V[2] = O[2] + s * U[2];
+            return true;
+        };
 
         // True in-medium incoming segment and back-side incidence angle, corrected for refraction at
         // the previous entry interaction (VBS, spec 3.1). Default to FBS geometry; overwritten on solve.
-        double dist_orig_vbs = (nH == 0) ? distance(orig, dest) : distance(orig, fbs);
-        double cos_theta_t = std::abs(std::cos(theta + 1.570796326794897));
+        const double dist_orig_fbs = (nH == 0) ? DIST(O, D) : DIST(O, F); // Geometric
+        const double dist_fbs_dest = (nH == 0) ? DIST(O, D) : DIST(F, D); // Geometric
+        double dist_orig_vbs = dist_orig_fbs;                             // Refracted
+
+        double abs_cos_theta = std::abs(std::cos(theta + 1.570796326794897));
         double theta_t = theta;
+        double abs_cos_theta_t = abs_cos_theta;
 
-        // VBS plane normal: FBS triple, or the SBS triple for an out-type-5 crossing (spec 3.1).
-        size_t normal_off = (typeH == 5 && nH != 0) ? (size_t)3 : (size_t)0;
-        double normal_x = (double)p_normal_vecN[ii + (normal_off + 0) * n_rayN];
-        double normal_y = (double)p_normal_vecN[ii + (normal_off + 1) * n_rayN];
-        double normal_z = (double)p_normal_vecN[ii + (normal_off + 2) * n_rayN];
-
-        // Plane point F (FBS at a crossing, dest at nH == 0) and segment origin O.
-        const arma::Mat<dtype> *Fmat = (nH == 0) ? dest : fbs;
-        double Ox = (double)orig->at(i_ray, 0), Oy = (double)orig->at(i_ray, 1), Oz = (double)orig->at(i_ray, 2);
-        double Fx = (double)Fmat->at(i_ray, 0), Fy = (double)Fmat->at(i_ray, 1), Fz = (double)Fmat->at(i_ray, 2);
-
-        // Incoming physical direction: path_dir_prev if supplied, else geometric orig->F (spec 7.3
-        // fallback; amplitude/phase/Airy then follow from FBS).
-        double dir_in_x, dir_in_y, dir_in_z;
-        if (p_path_dir_prev)
-            dir_in_x = (double)p_path_dir_prev[i_ray],
-            dir_in_y = (double)p_path_dir_prev[i_ray + n_ray],
-            dir_in_z = (double)p_path_dir_prev[i_ray + 2 * n_ray];
-        else
-            dir_in_x = Fx - Ox, dir_in_y = Fy - Oy, dir_in_z = Fz - Oz;
-
-        // Unit-normalize the row-scope copies (qd_vbs also normalizes internally; the polarization
-        // basis needs unit vectors too).
+        // Refine theta_t / d_v from the real incoming direction only when it is supplied. Without
+        // path_dir_prev the VBS lands on FBS and the angle stays the fbs_angle default;
+        // deriving it from the geometric orig->F direction would override fbs_angle.
+        double V[3] = {F[0], F[1], F[2]}; // VBS position
+        if (use_vbs)
         {
-            double dl = std::sqrt(dir_in_x * dir_in_x + dir_in_y * dir_in_y + dir_in_z * dir_in_z);
-            double nl = std::sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
-            if (dl > 1.0e-12)
-                dir_in_x /= dl, dir_in_y /= dl, dir_in_z /= dl;
-            if (nl > 1.0e-12)
-                normal_x /= nl, normal_y /= nl, normal_z /= nl;
-
-            // Refine theta_t / d_v from the real incoming direction only when it is supplied. Without
-            // path_dir_prev the VBS lands on FBS and the angle stays the fbs_angle default;
-            // deriving it from the geometric orig->F direction would override fbs_angle.
-            if (p_path_dir_prev)
+            double dist_OV, ct;
+            if (VBS_INTERSECT(O, dir_prev, F, N, &dist_OV, &ct, V))
             {
-                double Vx, Vy, Vz, dv, ct;
-                if (qd_vbs(Ox, Oy, Oz, dir_in_x, dir_in_y, dir_in_z, Fx, Fy, Fz, normal_x, normal_y, normal_z, Vx, Vy, Vz, dv, ct))
-                {
-                    dist_orig_vbs = dv;
-                    cos_theta_t = (ct > 1.0) ? 1.0 : ct;
-                    theta_t = std::acos(cos_theta_t) - 1.570796326794897;
-                }
+                dist_orig_vbs = dist_OV;
+                abs_cos_theta_t = (ct > 1.0) ? 1.0 : ct;
+                theta_t = std::acos(abs_cos_theta_t) - 1.570796326794897;
+                use_vbs = std::abs(abs_cos_theta_t - abs_cos_theta) > 1e-6;
             }
         }
 
         // Accumulated in-medium distance
-        double accumulated_dist = p_acc_dist_in ? (double)p_acc_dist_in[i_ray] : 0.0;
+        double dist_refract = p_acc_dist_in ? (double)p_acc_dist_in[i_ray] : 0.0;
+        double dist_geo = p_acc_dist_in ? (double)p_acc_dist_in[i_ray + n_ray] : 0.0;
+        auto DIST_ADD = [&](double val_refract = 0.0, double val_geo = 0.0)
+        {
+            dist_refract += (val_refract == 0.0) ? dist_orig_vbs : val_refract;
+            if (val_geo == 0.0)
+                dist_geo += (val_refract == 0.0) ? dist_orig_fbs : val_refract;
+            else
+                dist_geo += val_geo;
+        };
+        auto DIST_SET = [&](double val_refract = 0.0, double val_geo = 0.0)
+        {
+            dist_refract = val_refract;
+            dist_geo = (val_geo == 0.0) ? val_refract : val_geo;
+        };
 
         // Wedge test: true when FBS and SBS faces sit at a real angle. No-op (false) when normals are absent or the two faces
         // are a single point. Run only at o-i entries that capture both faces (nH >= 2 types 1/7/13).
         auto fbs_sbs_not_parallel = [&]() -> bool
         {
-            if (p_normal_vecN == nullptr)
+            if (DIST(F, S) < colocation_dist) // Co-located
                 return false;
-            if (!(distance(fbs, sbs) > 1.0e-6))
-                return false;
+
             double nfx = (double)p_normal_vecN[ii];
             double nfy = (double)p_normal_vecN[ii + n_rayN];
             double nfz = (double)p_normal_vecN[ii + 2 * n_rayN];
@@ -1959,551 +2130,519 @@ void quadriga_lib::ray_state_update(int interaction_type,
             return std::abs(d) < 1.0 - tol;
         };
 
-        // Gain / xprmat patch operations
-        auto rsu_scale = [&](double cr, double ci)
+        // Kill the current ray
+        auto KILL_RAY = [&]()
         {
-            if (p_xprmatN != nullptr)
-                for (int k = 0; k < 4; ++k)
-                {
-                    size_t re_i = ii + size_t(2 * k) * n_rayN;
-                    size_t im_i = ii + size_t(2 * k + 1) * n_rayN;
-                    double re = (double)p_xprmatN[re_i];
-                    double im = (double)p_xprmatN[im_i];
-                    p_xprmatN[re_i] = (dtype)(re * cr - im * ci);
-                    p_xprmatN[im_i] = (dtype)(re * ci + im * cr);
-                }
-            if (p_gainN != nullptr)
-                p_gainN[ii] = dtype(double(p_gainN[ii]) * (cr * cr + ci * ci));
-        };
-
-        auto rsu_replace = [&](double g)
-        {
-            if (p_xprmatN != nullptr)
-            {
-                for (int c = 0; c < 8; ++c)
-                    p_xprmatN[ii + (size_t)c * n_rayN] = (dtype)0.0;
-                double a = std::sqrt((g < 0.0) ? 0.0 : g);
-                p_xprmatN[ii] = (dtype)a; // VV_re
-                if (!is_scalar)
-                    p_xprmatN[ii + (size_t)6 * n_rayN] = (dtype)a; // HH_re
-            }
-            if (p_gainN != nullptr)
-                p_gainN[ii] = (dtype)g;
-        };
-
-        auto rsu_kill = [&]()
-        {
-            if (p_xprmatN != nullptr)
-                for (int c = 0; c < 8; ++c)
-                    p_xprmatN[ii + (size_t)c * n_rayN] = (dtype)0.0;
-            if (p_gainN != nullptr)
+            typeR = 0;     // Kill flag (all bits 0)
+            if (p_xprmatN) // Set xprmat to 0
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)0.0;
+            if (p_gainN) // Set gain to 0
                 p_gainN[ii] = (dtype)0.0;
         };
 
-        // Close the leaving layer: deferred mass-law magnitude over the accumulated in-medium path
-        // plus the layer's excess phase relative to the vacuum phase the tracer counts,
-        // folded once via complex rsu_scale, then reset. Air (m < 1) -> magnitude 1, phase 0.
-        auto close_med = [&](int m)
+        // Scale current xprmat and gain with a complex factor
+        auto SCALE_RAY = [&](double cr, double ci)
         {
-            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-            Material M = MAT(m);
-            double g = M.medium_gain(L, fGHz, cos_theta_t);
-            double n_re = std::real(std::sqrt(M.eta(fGHz) * M.mu(fGHz)));
-            double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
-            double dist_geo = (nH == 0) ? distance(orig, dest) : distance(orig, fbs);
-            double excess_phase = k0 * (n_re * L - dist_geo);
-            double amp = std::sqrt(g < 0.0 ? 0.0 : g);
-            rsu_scale(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
-            accumulated_dist = 0.0;
+            if (p_xprmatN)
+                for (size_t iX = 0; iX < nXPR; iX += 2)
+                {
+                    size_t re_i = ii * nXPR + iX;
+                    size_t im_i = re_i + 1;
+                    double re = (double)p_xprmatN[re_i];
+                    double im = (double)p_xprmatN[im_i];
+                    p_xprmatN[re_i] = dtype(re * cr - im * ci);
+                    p_xprmatN[im_i] = dtype(re * ci + im * cr);
+                }
+            if (p_gainN)
+                p_gainN[ii] = dtype(double(p_gainN[ii]) * (cr * cr + ci * ci));
         };
+
+        // Replace current xprmat and gain with a fixed gain
+        auto REPLACE_BY_GAIN = [&](double gain = 1.0, bool keep_dir = false)
+        {
+            if (gain == 1.0 && !refl_pass)
+            {
+                typeR[6] = true;  // Set pass-through flag
+                typeR[5] = false; // Clear TIR flag
+            }
+
+            if (p_xprmatN)
+            {
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)0.0;
+                double a = std::sqrt(gain < 0.0 ? 0.0 : gain);
+                p_xprmatN[ii * nXPR] = (dtype)a; // VV_re
+                if (!is_scalar)
+                    p_xprmatN[ii * nXPR + 6] = (dtype)a; // HH_re
+            }
+            if (p_gainN)
+                p_gainN[ii] = (dtype)gain;
+
+            // Transparent pass: carry the incoming physical direction through unchanged,
+            // overriding ray_mesh_interact's geometric-based Snell write. Only the caller knows whether
+            // dir_prev is the direction to keep, so this is opt-in.
+            if (keep_dir && p_path_dirN)
+                p_path_dirN[ii] = (dtype)dir_prev[0],
+                p_path_dirN[ii + n_rayN] = (dtype)dir_prev[1],
+                p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_prev[2];
+        };
+
+        // VBS-corrected coefficients
+        std::complex<double> cTE(0.0, 0.0), cTM(0.0, 0.0);
 
         // Replace the FBS-relative interface result ray_mesh_interact wrote with the VBS-equivalent at theta_t
         // - interface coefficients (interface_gain folded inside interact_with), incoming basis from dir_in,
         //   outgoing basis from the corrected continuation. In-medium magnitude/phase stay deferred to close_med.
         // - geom: 0 = reflect at VBS, 2 = Snell refract at VBS (undeviated under TIR), 3 = exit (keep the traced origN->destN direction).
-        auto RPL = [&](int Ma, int Mb, int itype, int geom)
+        auto REPLACE_BY_VBS = [&](int Ma, int Mb, int itype, int geom) -> double
         {
-            std::complex<double> cTE, cTM, cos_t2, e1de2;
+            // A resolved path will not call SLAB_AIRY_FACTOR, so we don't need the coefficients.
+            if (resolved)
+                return dist_fbs_dest;
+
+            // Compute coefficients (cTE and cTM are required by SLAB_AIRY_FACTOR, so we always compute them)
+            // only cTE/cTM are needed past the fast return; the geometry outs are used only in the VBS branch
+            std::complex<double> cos_t2, e1de2;
+            double xprmat[8], pgain;
             double snell = 1.0;
             bool tir = false;
             MAT(Ma).interact_with(MAT(Mb), itype, theta_t, fGHz, &cTE, &cTM, &cos_t2, &e1de2, &snell, &tir);
+            typeR[5] = tir; // TIR re-evaluated at the corrected VBS angle (overrides the geometric-angle verdict)
 
-            double Ux = dir_in_x, Uy = dir_in_y, Uz = dir_in_z; // default: undeviated
-            if (geom == 0)
-                qd_reflect(dir_in_x, dir_in_y, dir_in_z, normal_x, normal_y, normal_z, Ux, Uy, Uz);
-            else if (geom == 2 && !tir)
-                qd_refract(dir_in_x, dir_in_y, dir_in_z, normal_x, normal_y, normal_z, snell, cos_theta_t, cos_t2, Ux, Uy, Uz);
-            else if (geom == 3 && p_path_dirN)
-                Ux = (double)p_path_dirN[ii],
-                Uy = (double)p_path_dirN[ii + n_rayN],
-                Uz = (double)p_path_dirN[ii + 2 * n_rayN];
+            // Transition into buffer
+            if (!use_vbs && mtl_buffer && Mb == mtl_buffer && !SAME(mtl_buffer, M1))
+            {
+                qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                            N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+                if (p_xprmatN)
+                    for (size_t iX = 0; iX < nXPR; ++iX)
+                        p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
+                if (p_gainN)
+                    p_gainN[ii] = (dtype)pgain;
+            }
+
+            if (!use_vbs) // Fast return
+                return dist_fbs_dest;
+
+            typeR[1] = true; // Set VBS correction flag
+
+            // Update the outgoing direction based on the VBS geometry (using the refracted incoming direction)
+            if (geom == 0) // Reflect at VBS
+                qd_reflect(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], dir_next[0], dir_next[1], dir_next[2]);
+            else if (geom == 2 && !tir) // Snell refract at VBS (undeviated under TIR)
+                qd_refract(dir_prev[0], dir_prev[1], dir_prev[2], N[0], N[1], N[2], snell, abs_cos_theta_t, cos_t2, dir_next[0], dir_next[1], dir_next[2]);
 
             if (p_path_dirN && geom != 3) // write the corrected continuation; an exit keeps the traced direction
-                p_path_dirN[ii] = (dtype)Ux,
-                p_path_dirN[ii + n_rayN] = (dtype)Uy,
-                p_path_dirN[ii + 2 * n_rayN] = (dtype)Uz;
+                p_path_dirN[ii] = (dtype)dir_next[0],
+                p_path_dirN[ii + n_rayN] = (dtype)dir_next[1],
+                p_path_dirN[ii + 2 * n_rayN] = (dtype)dir_next[2];
 
-            double xprmat[8], pgain;
-            qd_polbasis(dir_in_x, dir_in_y, dir_in_z, Ux, Uy, Uz, normal_x, normal_y, normal_z, 1.0, cTE, cTM, is_scalar, xprmat, pgain);
+            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                        N[0], N[1], N[2], 1.0, cTE, cTM, is_scalar, xprmat, pgain);
             if (p_xprmatN)
-                for (int k = 0; k < 8; ++k)
-                    p_xprmatN[ii + (size_t)k * n_rayN] = (dtype)xprmat[k];
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
             if (p_gainN)
                 p_gainN[ii] = (dtype)pgain;
+
+            // Return virtual vbs-dest distance using the VBS position as start
+            // The refracted angle at the VBS differs from the FBS angle, so the refracted path length
+            // in the entered medium differs as well.
+            double dist_VV; // Distance from VBS to virtual destination
+            if (VBS_INTERSECT(V, dir_next, D, N, &dist_VV))
+                return dist_VV;
+            return dist_fbs_dest; // Fallback
+        };
+
+        // Apply medium gain and phase
+        auto SCALE_BY_MEDIUM = [&](int m)
+        {
+            Material mtl = MAT(m);
+            double g = mtl.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
+            double n_re = std::real(std::sqrt(mtl.eta(fGHz) * mtl.mu(fGHz)));
+            double k0 = 2.0 * 3.14159265358979323846 * fGHz * 1e9 / 299792458.0;
+
+            // Walk-off (cos^2) only for the undeviated tracer, where it substitutes for the untraced
+            // lateral shift. Genuine refraction traced the bent path, so cos2 = 1. The free-space
+            // reference sits on the same thickness axis, so dist_geo carries the geometric-incidence cos^2.
+            bool walk_off = use_vbs || refl_pass || resolved;
+            double cos2 = walk_off ? abs_cos_theta_t * abs_cos_theta_t : 1.0; // medium side, theta_t
+            double cos2_geo = walk_off ? abs_cos_theta * abs_cos_theta : 1.0; // free-space side, theta_i
+            double excess_phase = k0 * (n_re * dist_refract * cos2 - dist_geo * cos2_geo);
+
+            double amp = std::sqrt(g < 0.0 ? 0.0 : g);
+            SCALE_RAY(amp * std::cos(-excess_phase), amp * std::sin(-excess_phase));
+        };
+
+        // Obtain the material of the current medium by its exit face, flag a mismatch with mtl_current
+        auto GET_EXIT_MATERIAL = [&]() -> int
+        {
+            int mtl_exit = 0;
+            if (typeH == 1 || typeH == 5 || typeH == 13 || typeH == 21 || typeH == 29) // i-o or i-i
+                mtl_exit = M1;
+            else if (typeH == 7) // i-i with M2 (next, front) hit first
+                mtl_exit = M2;
+
+            if (mtl_exit && mtl_current != mtl_exit) // Current and exit mismatch
+                typeR[4] = true;                     // Set fix-flag
+
+            return mtl_exit;
+        };
+
+        // Analytic thin-slab (Fabry-Perot) resolution
+        // Folds the per-polarization Airy factor back into xprmat so TE and TM carry their own slab
+        // retardation (and the resulting depolarization). The total power gain is held at the TE/TM-averaged
+        // value - identical to the magnitude-only version - by scaling both channels with a common magnitude
+        // and only the per-channel phase; the per-channel magnitude of S is not split (that would reweight
+        // the gain). Scalar mode, reflection, no-VBS and gain-only cases keep the previous single-factor behavior.
+        // Returns true when the series resolved (caller sets any extra state, e.g. the reflected slab flag).
+        auto SLAB_AIRY_FACTOR = [&](int mtl_slab, int mtl_near, int mtl_far) -> bool
+        {
+            if (eps > 0.0 && prev_nonpar) // known wedge/edge -> re-emit (eps = 0.0 always resolves)
+                return false;
+
+            Material mat_slab = MAT(mtl_slab), mat_near = MAT(mtl_near), mat_far = MAT(mtl_far);
+
+            const double c0 = 299792458.0;
+            const double omega = 2.0 * 3.14159265358979323846 * fGHz * 1e9;
+
+            bool slab_is_air = mat_slab.same_as(Material());
+            std::complex<double> eta_s_if = mat_slab.eta(fGHz) + mat_slab.eta_resonance(fGHz);
+            std::complex<double> mu_s = mat_slab.mu(fGHz);
+            double n_cur = std::real(std::sqrt(mat_slab.eta(fGHz) * mu_s)); // resonance-excluded slab index
+            double sin2 = 1.0 - abs_cos_theta_t * abs_cos_theta_t;          // incidence sine (fbs_angleN convention)
+
+            // Fresnel TE/TM amplitude reflection at slab|adjacent from the slab side, tf folded into |r|
+            auto fresnel_r = [&](const Material &adj,
+                                 std::complex<double> &r_te, std::complex<double> &r_tm,
+                                 double &R_te, double &R_tm)
+            {
+                std::complex<double> eta_a_if = adj.eta(fGHz) + adj.eta_resonance(fGHz);
+                std::complex<double> mu_a = adj.mu(fGHz);
+                std::complex<double> z1 = std::sqrt(eta_s_if / mu_s);
+                std::complex<double> z2 = std::sqrt(eta_a_if / mu_a);
+                std::complex<double> rat = (eta_s_if * mu_s) / (eta_a_if * mu_a);
+                std::complex<double> cos_t2 = std::sqrt(1.0 - rat * sin2);
+                std::complex<double> te = (z1 * abs_cos_theta_t - z2 * cos_t2) / (z1 * abs_cos_theta_t + z2 * cos_t2);
+                std::complex<double> tm = is_scalar ? te : (z2 * abs_cos_theta_t - z1 * cos_t2) / (z2 * abs_cos_theta_t + z1 * cos_t2);
+                const Material &owner = slab_is_air ? adj : mat_slab; // tf of the solid face
+                R_te = owner.apply_tf(std::norm(te), fGHz);
+                R_tm = owner.apply_tf(std::norm(tm), fGHz);
+                r_te = std::polar(std::sqrt(R_te), std::arg(te));
+                r_tm = std::polar(std::sqrt(R_tm), std::arg(tm));
+            };
+
+            std::complex<double> rn_te, rn_tm, rf_te, rf_tm;
+            double Rn_te = 0.0, Rn_tm = 0.0, Rf_te = 0.0, Rf_tm = 0.0;
+            fresnel_r(mat_near, rn_te, rn_tm, Rn_te, Rn_tm);
+            fresnel_r(mat_far, rf_te, rf_tm, Rf_te, Rf_tm);
+
+            // One-way in-slab propag. phi (polarization-independent): magnitude from medium_gain, phase from n_cur
+            double gL = mat_slab.medium_gain(dist_refract, fGHz, abs_cos_theta_t, dist_geo, abs_cos_theta);
+            double abs_phi = std::sqrt((gL < 0.0) ? 0.0 : gL);
+            double arg_phi = -(omega / c0) * n_cur * dist_refract * abs_cos_theta_t * abs_cos_theta_t;
+            std::complex<double> phi2 = std::polar(abs_phi * abs_phi, 2.0 * arg_phi);
+
+            std::complex<double> denom_te = std::complex<double>(1.0, 0.0) - rn_te * rf_te * phi2;
+            std::complex<double> denom_tm = std::complex<double>(1.0, 0.0) - rn_tm * rf_tm * phi2;
+
+            // Survival gate (stronger polarization) + near-pole clamp (either) -> re-emit
+            double g2L = mat_slab.medium_gain(2.0 * dist_refract, fGHz, abs_cos_theta_t, 2.0 * dist_geo, abs_cos_theta);
+            g2L = (g2L < 0.0) ? 0.0 : g2L;
+            double rr_te = (Rn_te * Rf_te < 0.0) ? 0.0 : Rn_te * Rf_te;
+            double rr_tm = (Rn_tm * Rf_tm < 0.0) ? 0.0 : Rn_tm * Rf_tm;
+            double rho = std::sqrt(((rr_te > rr_tm) ? rr_te : rr_tm) * g2L);
+            if (rho < eps || std::abs(denom_te) < 1.0e-2 || std::abs(denom_tm) < 1.0e-2)
+                return false;
+
+            std::complex<double> S_te = std::complex<double>(1.0, 0.0) / denom_te;
+            std::complex<double> S_tm = std::complex<double>(1.0, 0.0) / denom_tm;
+
+            if (is_scalar) // single coefficient: keep the complex factor (phase carried into xprmat[0..1])
+            {
+                SCALE_RAY(std::real(S_te), std::imag(S_te));
+                return true;
+            }
+
+            // Per-channel single-pass transmittance (two interfaces) and the averaged value the ports carry
+            double Tn_avg = 1.0 - 0.5 * (Rn_te + Rn_tm);
+            double Tf_avg = 1.0 - 0.5 * (Rf_te + Rf_tm);
+            double single_pass = Tn_avg * Tf_avg;          // = |slab_cTE|^2 = |slab_cTM|^2 (averaged ports)
+            double Tsp_te = (1.0 - Rn_te) * (1.0 - Rf_te); // true TE single-pass transmittance
+            double Tsp_tm = (1.0 - Rn_tm) * (1.0 - Rf_tm); // true TM single-pass transmittance
+
+            // Full complex Airy factor per channel, plus port correction from averaged -> per-channel magnitude.
+            // |fac|^2 * |port|^2 = Tsp * |S|^2 = the exact per-channel slab transmittance (energy-correct, coherent).
+            double corr = (single_pass > 1.0e-12) ? 1.0 / single_pass : 0.0;
+            std::complex<double> fac_te = S_te * std::sqrt(Tsp_te * corr);
+            std::complex<double> fac_tm = S_tm * std::sqrt(Tsp_tm * corr);
+
+            // ISSUE: This corrects the average per-channel magnitude used in Material.interact_with, which may need
+            // to be fixed. So IF of get fixed, this here needs updating too to avoid double-correction.
+
+            // Rebuild xprmat from the single-pass coeffs with the per-channel slab factor applied to
+            // cTE/cTM before the polarization basis. gainN follows from the rebuilt matrix.
+            double xprmat[8], pgain;
+            qd_polbasis(dir_prev[0], dir_prev[1], dir_prev[2], dir_next[0], dir_next[1], dir_next[2],
+                        N[0], N[1], N[2], 1.0, cTE * fac_te, cTM * fac_tm, false, xprmat, pgain);
+            if (p_xprmatN)
+                for (size_t iX = 0; iX < nXPR; ++iX)
+                    p_xprmatN[ii * nXPR + iX] = (dtype)xprmat[iX];
+            if (p_gainN)
+                p_gainN[ii] = (dtype)pgain;
+            return true;
+        };
+
+        // M2M transition (i-i) and cavity exit (i-o)
+        auto APPLY_TRANSITION = [&](bool exit = false,         // Cavity exit flag
+                                    int mtl_next = 0,          // Next material: air (exit default)
+                                    bool preload_dest = false) // Preloads FBS/VBS to dest distance
+        {
+            // Update mtl_current based on the object-exit material
+            if (mtl_next == 0) // Skip for manual next-material overwrite
+            {
+                int mtl_exit = GET_EXIT_MATERIAL();
+                mtl_current = mtl_exit ? mtl_exit : mtl_current;
+            }
+
+            if (!exit && mtl_next == 0) // Auto-select next medium
+                mtl_next = typeH == 5 ? M2 : M1;
+
+            DIST_ADD(); // Add orig-fbs/vbs segment lengths
+
+            // Transparent transition for same material
+            if (SAME(mtl_current, mtl_next)) // Make interface transparent
+            {
+                REPLACE_BY_GAIN(1.0, true); // Maintain refracted direction, set transparent flag
+                if (preload_dest)           // Add distances: fbs-vbs (geometric) AND vbs-vdest (refracted)
+                {
+                    double dist_VV;
+                    if (VBS_INTERSECT(V, dir_prev, D, N, &dist_VV))
+                        DIST_ADD(dist_VV, dist_fbs_dest);
+                    else // Fallback, use fbs-dest distance for both
+                        DIST_ADD(dist_fbs_dest);
+                }
+            }
+            else // Different materials or exit
+            {
+                double dist_VV = REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 4 : 1), (exit ? 3 : 2));
+
+                if (!resolved) // Resolve multi-bounce series of current layer
+                {
+                    if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))
+                        typeR[2] = true; // Set slab resolve flag
+                }
+
+                SCALE_BY_MEDIUM(mtl_current); // Apply current medium gain and phase
+
+                if (preload_dest && exit) // exit into air: post-exit leg is unrefracted, refract == geo
+                    DIST_SET(dist_fbs_dest);
+                else if (preload_dest) // entered a medium: refracted slant distance differs from geometric
+                    DIST_SET(dist_VV, dist_fbs_dest);
+                else
+                    DIST_SET();
+
+                // These need to be here! Same materials with different ids have to keep the entry material on next_prev for SLAB_AIRY_FACTOR
+                next_prev = (short)mtl_current;
+                next_current = (short)mtl_next; // Clear resolved flag
+            }
+
+            next_buffer = (short)0; // Clear buffer
+
+            if (!exit) // Set continue-inside flag
+                typeR[3] = true;
         };
 
         if (refl_pass) // Reflection pass, interaction_type {0, 3}
         {
-            if (resolved) // Front reflection already summed inside S
-                rsu_kill();
-            else if (cur == 0) // Entry / order-0 front reflection: bare Fresnel r12 (naturally |R| = 1 under TIR). IG, state copy-through.
+            typeR[7] = true; // Set reflection flag
+
+            int mtl_exit = GET_EXIT_MATERIAL();
+            mtl_current = mtl_exit ? mtl_exit : mtl_current;          // Material the ray travels in
+            int mtl_next = typeH == 5 ? M2 : (typeH == 7 ? M1 : 0); // Material the ray reflects off
+
+            // Events that trigger a transparent pass-through cannot reflect at the same time
+            bool transparent_forward = (nH == 0) || (typeH == 23) || (!typeH[0]) ||
+                                       (mtl_current != 0 && SAME(mtl_current, mtl_next)) ||
+                                       (mtl_buffer != 0 && SAME(mtl_buffer, M1));
+
+            if (resolved)                 // Internal front reflection already included in internal back reflection
+                KILL_RAY();               // This terminates the infinite internal bounce series (typeR 0)
+            else if (transparent_forward) // Ray did not hit anything (= transparent pass-through, cannot reflect)
+                KILL_RAY();               // Set typeR 0
+            else if (mtl_current == 0)    // Entry front reflection, bare Fresnel copy-through
+                DIST_SET();               // Reset distance, flags already set: ok, refl (typeR 129)
+            else                          // Internal back reflection of a resolvable parallel slab (typeR 137, 139, 141, 143)
             {
-            }
-            else // Internal / back reflection of a resolvable parallel slab
-            {
-                int nearM = (typeH == 5) ? M2 : ((typeH == 4) ? M1 : 0);
-                accumulated_dist += dist_orig_vbs;
-                RPL(cur, nearM, (is_scalar ? 3 : 0), 0); // mirror at VBS, theta_t
-                double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                std::complex<double> S = MAT(cur).slab_airy_factor(MAT(nearM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                if (!std::isnan(std::real(S)))
+                DIST_ADD();                                                    // Update distances within the current medium
+                REPLACE_BY_VBS(mtl_current, mtl_next, (is_scalar ? 3 : 0), 0); // Mirror at VBS (typeR 137, 139)
+                if (SLAB_AIRY_FACTOR(mtl_current, mtl_next, mtl_prev))         // Apply thin-slab (Fabry-Perot) factor
                 {
-                    rsu_scale(std::real(S), std::imag(S));
-                    out_cur = (short)((cur & 0x7FFF) | (int)0x8000);
+                    next_current = (short)((mtl_current & 0x7FFF) | (int)0x8000); // keep material, set resolved
+                    typeR[2] = true;                                              // slab resolve flag
                 }
+                SCALE_BY_MEDIUM(mtl_current); // Apply medium gain and phase
+                DIST_SET();                   // Reset in-medium distance
+                next_buffer = (short)0;       // Clear buffer (match APPLY_TRANSITION)
+                typeR[3] = true;              // Set continue-inside flag (typeR 137)
             }
         }
-        else // Transmission / refraction pass, interaction_type {1, 2, 4}
+        else // Transmission / refraction pass, interaction_type {1, 2, 4, 5}
         {
-            if (typeH == 3 || typeH == 6 || typeH == 9 || typeH == 12 || typeH == 15) // TR forward-kill: TR out-codes occur only for interaction_type == 2 and win over the resolved flag
-                rsu_kill();
-            else if (resolved) // Resolved-ray out-coupling: iM = the next medium for an i-i
+            // Note: No separate slab-resolve logic needed.
+            // Resolved rays pass like any other ray and APPLY_TRANSITION gates multiple slab resolves.
+
+            // If the ray ends in the next segment, we can already preload its length
+            bool ray_ends = nH == 1 || (nH == 2 && typeH[2]);
+
+            if (nH == 0 || !typeH[0]) // No crossing: accumulate the path distance, identity interface
             {
-                // Resolved rows charge the in-medium loss of their INCOMING segment (the unresolved
-                // entry / M2M rows charge forward, the resolving reflection charges nothing), so every
-                // segment of the resolved return path is charged exactly once.
-                if (typeH == 2 || typeH == 8 || typeH == 14) // i-o out-coupling
-                {
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, 0, (is_scalar ? 4 : 1), 3); // exit transmission t21 at theta_t, keep traced direction
-                    close_med(cur);
-                    out_cur = (short)0;
-                }
-                else if (typeH == 4 || typeH == 5) // i-i: advance medium, keep resolved
-                {
-                    int iM = (typeH == 5) ? M2 : M1;
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, iM, (is_scalar ? 4 : 1), 2); // transition cur->iM at theta_t, Snell direction
-                    close_med(cur);
-                    accumulated_dist += distance(fbs, dest); // begin iM forward
-                    out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
-                    out_prev = (short)cur;
-                }
-                // else: o-i / edges: transparent pass-through, IG, state copy-through
+                DIST_ADD();                             // Advance to dest (preload next leg)
+                REPLACE_BY_GAIN(1.0, mtl_current != 0); // Pass-through, flags: transparent, ok (typeR 65)
+                if (mtl_current != 0)                   // Currently inside a material?
+                    typeR[3] = true;                    // Pass-through, flags: transparent, inside, ok (typeR 73)
             }
-            else if (nH == 0) // Interior segment, no crossing: accumulate the VBS distance, identity interface
-                accumulated_dist += dist_orig_vbs;
-            else if ((nH == 1 && typeH == 1) || (nH == 2 && typeH == 7) || (nH == 2 && typeH == 13)) // o-i family, entry / overlapping-entry
+            else if (typeH == 3 || typeH == 15 || typeH == 31) // o-i
             {
-                if (cur == 0) // enter
+                typeR[3] = true;      // Set inside flag (typeR 9)
+                if (mtl_current == 0) // Entry from air, keep xprmat and gain unchanged
                 {
-                    accumulated_dist += distance(fbs, dest); // begin M1 forward (deferred loss)
-                    out_cur = (short)M1;
-                    bool nonpar = (nH >= 2) && fbs_sbs_not_parallel();
-                    out_prev = (short)(nonpar ? (int)0x8000 : 0);
-                }
-                else // nested: ignore the entry, continue in cur
-                {
-                    accumulated_dist += dist_orig_vbs;
-                    out_buf = (short)M1;
-                }
-            }
-            else if ((nH == 1 && typeH == 2) || (nH == 2 && typeH == 8) || (nH == 2 && typeH == 14)) // i-o family, exit / false-inside / virtual transitions
-            {
-                if (cur == 0) // false inside, IG, copy-through
-                {
-                }
-                else if (buf == 0) // cavity exit
-                {
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, 0, (is_scalar ? 4 : 1), 3); // exit transmission at theta_t, keep traced direction
-                    double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                    std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                    if (!std::isnan(std::real(S)))
-                        rsu_scale(std::real(S), std::imag(S));
-                    close_med(cur);
-                    out_cur = (short)0;
-                }
-                else if (nH == 1 && typeH == 2) // virtual i-i
-                {
-                    if (SAME(buf, M1)) // M2 embedded in M1, ignore M2
+                    next_current = (short)M1;                          // Next medium
+                    bool nonpar = !ray_ends && fbs_sbs_not_parallel(); // SBS not parallel to FBS?
+                    next_prev = (short)(nonpar ? (int)0x8000 : 0);     // air + flag
+
+                    if (typeH == 15 || typeH == 31) // o-ii (degenerate geometry)
+                    {                               // Note: For type 15, M1/M2 order is random
+                        next_buffer = (short)M2;    // Push M2 into buffer
+                        typeR[0] = false;           // Clear OK bit (signal deferred buffer)
+                    }
+
+                    if (ray_ends) // Preload next leg
                     {
-                        rsu_replace(1.0);
-                        accumulated_dist += distance(orig, dest);
-                        out_buf = (short)0;
+                        double dist_VV; // Distance from VBS to virtual destination inside the object
+                        if (VBS_INTERSECT(F, dir_next, D, N, &dist_VV))
+                            DIST_SET(dist_VV, dist_fbs_dest);
+                        else // Fallback
+                            DIST_SET(dist_fbs_dest);
                     }
                     else
-                    {
-                        accumulated_dist += dist_orig_vbs;
-                        RPL(cur, buf, (is_scalar ? 4 : 1), 2);
-                        close_med(cur);
-                        accumulated_dist += distance(fbs, dest);
-                        out_cur = (short)buf;
-                        out_buf = (short)0;
-                    }
+                        DIST_SET(); // entering medium: drop accumulated free-space length, restart at FBS
                 }
-                else // nH == 2 types 8/14, buf != 0: ii-oo
+                else // inside. nested pass-through (o-i on an inside state), continue in cur (typeR 72)
                 {
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, 0, (is_scalar ? 4 : 1), 3);
-                    close_med(cur);
-                    out_cur = (short)0;
-                    out_buf = (short)0;
+                    APPLY_TRANSITION(false, mtl_current, ray_ends); // Stay in current, clear buffer
+                    next_buffer = (short)M1;                        // Store buffer material
+                    typeR[0] = false;                               // Clear OK bit (signal deferred buffer)
                 }
             }
-            else if (nH == 2 && typeH == 1) // o-i-o
+            else if (typeH == 1 || typeH == 13 || typeH == 29) // i-o
             {
-                if (cur == 0) // IG (bare); current_out <- M1, +flag
+                if (mtl_buffer == 0)                     // i-o: cavity exit
+                    APPLY_TRANSITION(true, 0, ray_ends); // Exit to air (typeR 1, 3, 5, 7)
+                else if (typeH == 1)                     // virtual i-i, mtl_buffer != 0
                 {
-                    out_cur = (short)M1;
-                    bool nonpar = fbs_sbs_not_parallel();
-                    out_prev = (short)(nonpar ? (int)0x8000 : 0);
+                    if (SAME(mtl_buffer, M1))                           // M2 embedded in M1, ignore M2
+                        APPLY_TRANSITION(false, mtl_current, ray_ends); // Stay in current, clear buffer
+                    else                                                // Transition into buffer material (typeR 9, 11, 13, 15)
+                        APPLY_TRANSITION(false, mtl_buffer, ray_ends);  // Clear buffer
                 }
-                else // nested o-i-o
-                {
-                    rsu_replace(1.0);
-                    accumulated_dist += dist_orig_vbs;
-                    out_buf = (short)M1;
-                }
+                else // typeH 13/29, buf != 0: ii-o, exit to air
+                    APPLY_TRANSITION(true, 0, ray_ends);
             }
-            else if (nH == 2 && typeH == 2) // i-o-i
+            else if (typeH == 23) // Corner o-i-o
             {
-                if (buf == 0)
+                if (mtl_current == 0) // Currently in air, ignore corner, stay in air
+                {
+                    DIST_ADD(dist_orig_fbs); // Accumulate distance orig-fbs
+                    REPLACE_BY_GAIN();       // Pass-through (typeR 65)
+                }
+                else                                     // Inside material, transition to outside
+                    APPLY_TRANSITION(true, 0, ray_ends); // Exit to air
+            }
+            else if (typeH == 21) // Corner i-o-i
+            {
+                if (mtl_buffer == 0)
                 {
                     if (M2 == 0) // illegal
-                        rsu_kill();
-                    else // cavity exit, air gap bounded by M1 / M2
+                        KILL_RAY();
+                    else // Air gap bounded by M1 / M2, treat as i-i transition
                     {
-                        accumulated_dist += dist_orig_vbs;
-                        double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                        std::complex<double> S = MAT(0).slab_airy_factor(MAT(M1), MAT(M2), theta_t, L, fGHz, eps, !prev_nonpar);
-                        if (!std::isnan(std::real(S)))
-                            rsu_scale(std::real(S), std::imag(S));
-                        close_med(0); // air: magnitude 1, phase 0; resets accumulator
-                        out_cur = (short)0;
+                        int mtl_exit = GET_EXIT_MATERIAL();              // Resolve M1 = exit material
+                        mtl_current = mtl_exit ? mtl_exit : mtl_current; // Should be same as mtl_current
+                        APPLY_TRANSITION(false, M2, ray_ends);           // i-i from M1 to M2
                     }
                 }
-                else if (cur != 0)
+                else if (mtl_current != 0) // current + buffer
                 {
-                    if (SAME(buf, M1))
-                    {
-                        rsu_replace(1.0);
-                        accumulated_dist += dist_orig_vbs;
-                        out_buf = (short)0; // survives
-                    }
-                    else
-                    {
-                        accumulated_dist += dist_orig_vbs;
-                        RPL(cur, buf, (is_scalar ? 4 : 1), 2);
-                        close_med(cur);
-                        accumulated_dist += (double)ray_offset;
-                        out_cur = (short)buf;
-                        out_buf = (short)0; // survives
-                    }
+                    if (SAME(mtl_buffer, M1))                           // M2 embedded in M1, ignore M2
+                        APPLY_TRANSITION(false, mtl_current, ray_ends); // Stay in current, clear buffer
+                    else                                                // Transition into buffer material
+                        APPLY_TRANSITION(false, mtl_buffer, ray_ends);  // Clear buffer
                 }
-                else // buf != 0 and cur == 0: terminate (source lines 649-650)
-                    rsu_kill();
+                else // buf != 0 and cur == 0: terminate
+                    KILL_RAY();
             }
-            else if (nH == 2 && (typeH == 4 || typeH == 5)) // M2M (i-i) family
+            else if (typeH == 5 || typeH == 7) // i-i
             {
-                if (cur == 0) // illegal
-                    rsu_kill();
-                else if (buf == 0)
+                if (mtl_buffer == 0)
+                    APPLY_TRANSITION(false, 0, ray_ends);
+                else
                 {
-                    if (M1 == 0 || M2 == 0) // illegal
-                        rsu_kill();
-                    else // cavity transition (M2M)
-                    {
-                        int iM = (typeH == 5) ? M2 : M1;
-                        accumulated_dist += dist_orig_vbs;
-                        RPL(cur, iM, (is_scalar ? 4 : 1), 2); // transition cur->iM at theta_t, Snell direction
-                        double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                        std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                        out_cur = (short)iM;
-                        if (!std::isnan(std::real(S)))
-                        {
-                            rsu_scale(std::real(S), std::imag(S));
-                            out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
-                        }
-                        close_med(cur);
-                        accumulated_dist += distance(fbs, dest); // begin iM forward
-                        out_prev = (short)cur;
-                    }
-                }
-                else // buf != 0: ignore hit, continue in cur, swap buffer
-                {
-                    rsu_replace(1.0);
-                    accumulated_dist += distance(orig, dest);
-                    out_buf = (short)(SAME(buf, M1) ? M2 : M1);
+                    APPLY_TRANSITION(false, mtl_current, ray_ends);        // Stay in current, clear buffer
+                    next_buffer = (short)(SAME(mtl_buffer, M1) ? M2 : M1); // Swap buffer
+                    typeR[0] = false;                                      // Clear OK bit (signal deferred buffer)
                 }
             }
-            else if (nH == 2 && typeH == 10) // Edge o-i-o; No S (graze, not a slab).
-            {
-                if (cur == 0) // IG; current_out <- 0
-                    out_cur = (short)0;
-                else if (SAME(M1, M2)) // ignore hit
-                {
-                    rsu_replace(1.0);
-                    accumulated_dist += distance(orig, dest);
-                }
-                else // i-i transition
-                {
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, M1, (is_scalar ? 4 : 1), 2);
-                    close_med(cur);
-                    accumulated_dist += distance(fbs, dest);
-                    out_cur = (short)M1;
-                }
-            }
-            else if (nH == 2 && typeH == 11) // Edge i-o-i. No S, no flag (edge normals not a slab pair)
-            {
-                if (cur == 0) // IG; current_out <- (d(fbs,sbs) > 1e-6 ? M2 : 0)
-                    out_cur = (short)((distance(fbs, sbs) > 1.0e-6) ? M2 : 0);
-                else if (SAME(M1, M2)) // ignore hit
-                {
-                    rsu_replace(1.0);
-                    accumulated_dist += distance(orig, dest);
-                }
-                else // i-i transition
-                {
-                    accumulated_dist += dist_orig_vbs;
-                    RPL(cur, M2, (is_scalar ? 4 : 1), 2);
-                    close_med(cur);
-                    accumulated_dist += distance(fbs, dest);
-                    out_cur = (short)M2;
-                }
-            }
-            else if (nH > 2) // Multi-hit
-            {
-                if (cur == 0) // outside
-                {
-                    if (buf != 0) // cannot have i-i transition in buffer
-                        rsu_kill();
-                    else if (typeH == 1 || typeH == 7) // o-i; IG; current_out <- M1, +flag
-                    {
-                        out_cur = (short)M1;
-                        bool nonpar = fbs_sbs_not_parallel();
-                        out_prev = (short)(nonpar ? (int)0x8000 : 0);
-                    }
-                    else if (typeH == 2) // false inside: IG
-                    {
-                    }
-                    else if (typeH == 10) // edge o-i-o, stay outside: IG
-                    {
-                    }
-                    else if (typeH == 13) // edge o-i;  IG; current_out <- M1, buffer_out <- M2, +flag
-                    {
-                        out_cur = (short)M1;
-                        out_buf = (short)M2;
-                        bool nonpar = fbs_sbs_not_parallel();
-                        out_prev = (short)(nonpar ? (int)0x8000 : 0);
-                    }
-                    else // some other hit type
-                        rsu_kill();
-                }
-                else // inside
-                {
-                    if (typeH == 1 || typeH == 7 || typeH == 13) // nested o-i, overlapping mesh
-                    {
-                        rsu_replace(1.0);
-                        accumulated_dist += dist_orig_vbs;
-                        out_buf = (short)M1;
-                    }
-                    else if (typeH == 2 || typeH == 14) // i-o
-                    {
-                        if (buf == 0) // cavity exit
-                        {
-                            accumulated_dist += dist_orig_vbs;
-                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
-                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                            if (!std::isnan(std::real(S)))
-                                rsu_scale(std::real(S), std::imag(S));
-                            close_med(cur);
-                            out_cur = (short)0;
-                        }
-                        else if (SAME(buf, M1)) // M2 embedded in M1
-                        {
-                            rsu_replace(1.0);
-                            accumulated_dist += dist_orig_vbs;
-                            out_buf = (short)0;
-                        }
-                        else
-                        {
-                            accumulated_dist += dist_orig_vbs;
-                            RPL(cur, buf, (is_scalar ? 4 : 1), 2);
-                            close_med(cur);
-                            accumulated_dist += (double)ray_offset;
-                            out_cur = (short)buf;
-                            out_buf = (short)0;
-                        }
-                    }
-                    else if (typeH == 4 || typeH == 5) // i-i
-                    {
-                        if (buf != 0) // spurious (probable false detection): IG
-                        {
-                            accumulated_dist += distance(orig, dest);
-                            out_buf = (short)0;
-                        }
-                        else // cavity transition, IG * S
-                        {
-                            int iM = (typeH == 5) ? M2 : M1;
-                            accumulated_dist += dist_orig_vbs;
-                            RPL(cur, iM, (is_scalar ? 4 : 1), 2);
-                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(iM), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                            out_cur = (short)iM;
-                            if (!std::isnan(std::real(S)))
-                            {
-                                rsu_scale(std::real(S), std::imag(S));
-                                out_cur = (short)((iM & 0x7FFF) | (int)0x8000);
-                            }
-                            close_med(cur);
-                            accumulated_dist += distance(fbs, dest);
-                            out_prev = (short)cur;
-                        }
-                    }
-                    else if (typeH == 8) // overlapping i-o
-                    {
-                        if (buf == 0) // cavity exit
-                        {
-                            accumulated_dist += dist_orig_vbs;
-                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
-                            double L = p_acc_dist_in ? accumulated_dist : dist_orig_vbs;
-                            std::complex<double> S = MAT(cur).slab_airy_factor(MAT(0), MAT(prev_mat), theta_t, L, fGHz, eps, !prev_nonpar);
-                            if (!std::isnan(std::real(S)))
-                                rsu_scale(std::real(S), std::imag(S));
-                            close_med(cur);
-                            out_cur = (short)0;
-                        }
-                        else
-                        {
-                            accumulated_dist += dist_orig_vbs;
-                            RPL(cur, 0, (is_scalar ? 4 : 1), 3);
-                            close_med(cur);
-                            out_cur = (short)0;
-                            out_buf = (short)0;
-                        }
-                    }
-                    else if (typeH == 10) // edge o-i-o (the cur == 0 guard at source 824-828 is dead)
-                    {
-                        if (buf == 0)
-                        {
-                            if (SAME(M1, M2)) // ignore hit
-                            {
-                                rsu_replace(1.0);
-                                accumulated_dist += dist_orig_vbs;
-                            }
-                            else // i-i transition
-                            {
-                                accumulated_dist += dist_orig_vbs;
-                                RPL(cur, M1, (is_scalar ? 4 : 1), 2);
-                                close_med(cur);
-                                accumulated_dist += (double)ray_offset;
-                                out_cur = (short)M1;
-                            }
-                        }
-                        else // buf != 0: virtual i-i
-                        {
-                            if (SAME(buf, M1))
-                            {
-                                rsu_replace(1.0);
-                                accumulated_dist += dist_orig_vbs;
-                                out_buf = (short)0;
-                            }
-                            else
-                            {
-                                accumulated_dist += dist_orig_vbs;
-                                RPL(cur, buf, (is_scalar ? 4 : 1), 2);
-                                close_med(cur);
-                                accumulated_dist += (double)ray_offset;
-                                out_cur = (short)buf;
-                                out_buf = (short)0;
-                            }
-                        }
-                    }
-                    else if (typeH == 11) // edge i-o-i
-                    {
-                        if (buf == 0)
-                        {
-                            if (SAME(M1, M2)) // ignore hit
-                            {
-                                rsu_replace(1.0);
-                                accumulated_dist += dist_orig_vbs;
-                            }
-                            else // i-i transition
-                            {
-                                accumulated_dist += dist_orig_vbs;
-                                RPL(cur, M2, (is_scalar ? 4 : 1), 2);
-                                close_med(cur);
-                                accumulated_dist += (double)ray_offset;
-                                out_cur = (short)M2;
-                            }
-                        }
-                        else // buf != 0: spurious, IG
-                        {
-                            accumulated_dist += distance(orig, dest);
-                            out_buf = (short)0;
-                        }
-                    }
-                    else // Unmatched inside type (TR or a degenerate out_type 0)
-                        rsu_kill();
-                }
-            }
-            else // Global default: any unmatched (out_type, nH, state): KILL
-                rsu_kill();
+            else // Unmatched
+                KILL_RAY();
         }
 
         // Write the new state words (compact set)
-        if (p_prev_outN != nullptr)
-            p_prev_outN[ii] = out_prev;
-        if (p_cur_outN != nullptr)
-            p_cur_outN[ii] = out_cur;
-        if (p_buf_outN != nullptr)
-            p_buf_outN[ii] = out_buf;
+        if (p_prev_outN)
+            p_prev_outN[ii] = next_prev;
+        if (p_cur_outN)
+            p_cur_outN[ii] = next_current;
+        if (p_buf_outN)
+            p_buf_outN[ii] = next_buffer;
         if (p_acc_dist_outN)
-            p_acc_dist_outN[ii] = (dtype)accumulated_dist;
+        {
+            p_acc_dist_outN[ii] = (dtype)dist_refract;
+            p_acc_dist_outN[ii + n_rayN] = (dtype)dist_geo;
+        }
+        if (p_resolved_typeN)
+            p_resolved_typeN[ii] = (uint8_t)typeR;
     }
 }
 
 template void quadriga_lib::ray_state_update(int interaction_type, float center_frequency,
                                              const arma::Mat<float> *orig, const arma::Mat<float> *dest,
-                                             const arma::Mat<float> *fbs, const arma::Mat<float> *sbs,
+                                             const arma::Mat<float> *fbsN, const arma::Mat<float> *sbsN,
                                              const arma::u32_vec *no_interact, const arma::Col<float> *fbs_angleN,
-                                             const arma::Mat<float> *normal_vecN, const arma::s32_vec *out_typeN,
+                                             const arma::Mat<float> *normal_vecN, const std::vector<uint8_t> *out_typeN,
                                              const std::unordered_map<std::string, std::vector<float>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<float> *path_dir_prev, const arma::Col<float> *acc_dist_in,
+                                             const arma::Mat<float> *path_dir_prev, const arma::Mat<float> *acc_dist_in,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
                                              arma::Col<float> *gainN, arma::Mat<float> *xprmatN,
-                                             arma::Mat<float> *path_dirN, arma::Col<float> *acc_dist_outN,
+                                             arma::Mat<float> *path_dirN, arma::Mat<float> *acc_dist_outN, std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps);
 
 template void quadriga_lib::ray_state_update(int interaction_type, double center_frequency,
                                              const arma::Mat<double> *orig, const arma::Mat<double> *dest,
-                                             const arma::Mat<double> *fbs, const arma::Mat<double> *sbs,
+                                             const arma::Mat<double> *fbsN, const arma::Mat<double> *sbsN,
                                              const arma::u32_vec *no_interact, const arma::Col<double> *fbs_angleN,
-                                             const arma::Mat<double> *normal_vecN, const arma::s32_vec *out_typeN,
+                                             const arma::Mat<double> *normal_vecN, const std::vector<uint8_t> *out_typeN,
                                              const std::unordered_map<std::string, std::vector<double>> *mtl_prop,
                                              const arma::Col<short> *mtl_ind_fbs, const arma::Col<short> *mtl_ind_sbs,
                                              const arma::Col<short> *mtl_ind_prev_in, const arma::Col<short> *mtl_ind_current_in,
                                              const arma::Col<short> *mtl_ind_buffer_in,
-                                             const arma::Mat<double> *path_dir_prev, const arma::Col<double> *acc_dist_in,
+                                             const arma::Mat<double> *path_dir_prev, const arma::Mat<double> *acc_dist_in,
                                              arma::Col<short> *mtl_ind_prev_outN, arma::Col<short> *mtl_ind_current_outN,
                                              arma::Col<short> *mtl_ind_buffer_outN,
                                              arma::Col<double> *gainN, arma::Mat<double> *xprmatN,
-                                             arma::Mat<double> *path_dirN, arma::Col<double> *acc_dist_outN,
+                                             arma::Mat<double> *path_dirN, arma::Mat<double> *acc_dist_outN, std::vector<uint8_t> *resolved_typeN,
                                              const arma::u32_vec *ray_indN, double eps);
