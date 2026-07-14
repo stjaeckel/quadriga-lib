@@ -124,7 +124,7 @@ try % orig/dest row count mismatch
     quadriga_lib.generate_diffraction_paths([orig; orig], dest, fc, 1);
     error('moxunit:exceptionNotRaised', 'Expected an error!');
 catch ME
-    expectedErrorMessage = 'Inputs ''orig'' and ''dest'' must have the same number of rows.';
+    expectedErrorMessage = 'Number of rows in ''orig'' and ''dest'' dont match.';
     if strcmp(ME.identifier, 'moxunit:exceptionNotRaised') || isempty(strfind(ME.message, expectedErrorMessage))
         error('moxunit:exceptionNotRaised', ['EXPECTED: "', expectedErrorMessage, '", GOT: "',ME.message,'"']);
     end

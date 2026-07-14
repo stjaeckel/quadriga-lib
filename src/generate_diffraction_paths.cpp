@@ -3,7 +3,27 @@
 // Part of quadriga-lib — see LICENSE for terms.
 
 #include "quadriga_tools.hpp"
-#include "quadriga_lib_helper_functions.hpp"
+
+// Helper functions
+namespace
+{
+    // Repeat sequence of values + Optional typecast
+    template <typename dtypeIn, typename dtypeOut>
+    inline void qd_repeat_sequence(const dtypeIn *sequence, size_t sequence_length, size_t repeat_value, size_t repeat_sequence, dtypeOut *output)
+    {
+        size_t pos = 0;                                  // Position in output
+        for (size_t rs = 0; rs < repeat_sequence; ++rs)  // Repeat sequence of values
+            for (size_t v = 0; v < sequence_length; ++v) // Iterate through all values of the sequence
+            {
+                dtypeOut val = (dtypeOut)sequence[v];        // Type conversion
+                for (size_t rv = 0; rv < repeat_value; ++rv) // Repeat each value
+                    output[pos++] = val;
+            }
+    }
+}
+
+// Make sure size_t and arma::uword are synonyms
+static_assert(sizeof(size_t) == sizeof(arma::uword), "size_t and arma::uword have different sizes");
 
 /*!SECTION
 Site-specific simulation tools
@@ -20,14 +40,14 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 ## Declaration:
 ```
 void generate_diffraction_paths(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
     dtype center_frequency,
     int lod,
-    arma::Cube<dtype> *ray_x,
-    arma::Cube<dtype> *ray_y,
-    arma::Cube<dtype> *ray_z,
-    arma::Cube<dtype> *weight);
+    arma::Cube<dtype> &ray_x,
+    arma::Cube<dtype> &ray_y,
+    arma::Cube<dtype> &ray_z,
+    arma::Cube<dtype> &weight);
 ```
 
 ## Inputs:
@@ -55,34 +75,33 @@ void generate_diffraction_paths(
 MD!*/
 
 template <typename dtype>
-void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig,
-                                              const arma::Mat<dtype> *dest,
+void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> &orig,
+                                              const arma::Mat<dtype> &dest,
                                               dtype center_frequency,
                                               int lod,
-                                              arma::Cube<dtype> *ray_x,
-                                              arma::Cube<dtype> *ray_y,
-                                              arma::Cube<dtype> *ray_z,
-                                              arma::Cube<dtype> *weight)
+                                              arma::Cube<dtype> &ray_x,
+                                              arma::Cube<dtype> &ray_y,
+                                              arma::Cube<dtype> &ray_z,
+                                              arma::Cube<dtype> &weight)
 {
     // Check data validity
-    if (orig == nullptr || orig->n_rows == 0ULL)
-        throw std::invalid_argument("Input 'orig' cannot be empty or NULL.");
-    if (dest == nullptr || dest->n_rows == 0ULL)
-        throw std::invalid_argument("Input 'dest' cannot be empty or NULL.");
-    if (orig->n_cols != 3ULL)
+    if (orig.n_rows == 0)
+        throw std::invalid_argument("Input 'orig' cannot be empty.");
+    if (orig.n_cols != 3)
         throw std::invalid_argument("Input 'orig' must have 3 columns containing the x,y,z coordinates.");
-    if (dest->n_cols != 3ULL)
+
+    const arma::uword n_pos = orig.n_rows; // Number of links
+
+    if (dest.n_cols != 3)
         throw std::invalid_argument("Input 'dest' must have 3 columns containing the x,y,z coordinates.");
+    if (dest.n_rows != n_pos)
+        throw std::invalid_argument("Number of rows in 'orig' and 'dest' dont match.");
+
     if (center_frequency <= (dtype)0.0)
         throw std::invalid_argument("Input 'center_frequency' must be larger that 0.");
-    if (ray_x == nullptr || ray_y == nullptr || ray_z == nullptr || weight == nullptr)
-        throw std::invalid_argument("Outputs 'ray_x', 'ray_y', 'ray_z' and 'weight' cannot be NULL.");
 
-    arma::uword n_pos = orig->n_rows;
-    if (dest->n_rows != n_pos)
-        throw std::invalid_argument("Inputs 'orig' and 'dest' must have the same number of rows.");
-
-    arma::uword n_path = 0, n_seg = 0;
+    arma::uword n_path = 0; // Number of diffraction arcs
+    arma::uword n_seg = 0;  // Number of segments per arc
     if (lod == 1)
         n_seg = 2, n_path = 7;
     else if (lod == 2)
@@ -95,18 +114,25 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig,
         n_seg = 1, n_path = 1;
     else if (lod == 6)
         n_seg = 1, n_path = 2;
+    else if (lod == 7)
+        n_seg = 9, n_path = 1;
     else
-        throw std::invalid_argument("Input 'lod' must be 1-6.");
+        throw std::invalid_argument("Input 'lod' must be 1-7.");
 
-    // Adjust output size, if needed
-    if (ray_x->n_rows != n_pos || ray_x->n_cols != n_path || ray_x->n_slices != n_seg)
-        ray_x->set_size(n_pos, n_path, n_seg);
-    if (ray_y->n_rows != n_pos || ray_y->n_cols != n_path || ray_y->n_slices != n_seg)
-        ray_y->set_size(n_pos, n_path, n_seg);
-    if (ray_z->n_rows != n_pos || ray_z->n_cols != n_path || ray_z->n_slices != n_seg)
-        ray_z->set_size(n_pos, n_path, n_seg);
-    if (weight->n_rows != n_pos || weight->n_cols != n_path || weight->n_slices != n_seg + 1)
-        weight->set_size(n_pos, n_path, n_seg + 1);
+    arma::uword n_ray = n_path * n_seg; // Total number of ellipsoid rays (n_path * n_seg)
+
+    // Adjust output size
+    if (ray_x.n_rows != n_pos || ray_x.n_cols != n_path || ray_x.n_slices != n_seg)
+        ray_x.set_size(n_pos, n_path, n_seg);
+
+    if (ray_y.n_rows != n_pos || ray_y.n_cols != n_path || ray_y.n_slices != n_seg)
+        ray_y.set_size(n_pos, n_path, n_seg);
+
+    if (ray_z.n_rows != n_pos || ray_z.n_cols != n_path || ray_z.n_slices != n_seg)
+        ray_z.set_size(n_pos, n_path, n_seg);
+
+    if (weight.n_rows != n_pos || weight.n_cols != n_path || weight.n_slices != n_seg + 1)
+        weight.set_size(n_pos, n_path, n_seg + 1);
 
     // Normalized ellipsoid coordinates and weights
     arma::vec tx, ty, tz, tw;
@@ -173,74 +199,92 @@ void quadriga_lib::generate_diffraction_paths(const arma::Mat<dtype> *orig,
         tz = {0.0, 0.0};
         tw = {0.5, 0.5};
     }
+    else if (lod == 7)
+    {
+        tx = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+        ty = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tz = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        tw = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    }
     else
-        throw std::invalid_argument("Input 'lod' must be 1-6.");
+        throw std::invalid_argument("Input 'lod' must be 1-7.");
 
-    // Copy weights to output memory
-    double *p_tw = tw.memptr();
-    double s = 1.0 / double(n_seg + 1);
+    double *p_tw = tw.memptr();         // Normalized weights
+    double s = 1.0 / double(n_seg + 1); // Divide by number of segments
     for (arma::uword i = 0; i < n_path; ++i)
         p_tw[i] = std::pow(p_tw[i], s);
-    qd_repeat_sequence(p_tw, n_path, n_pos, n_seg + 1, weight->memptr());
+
+    qd_repeat_sequence(p_tw, n_path, n_pos, n_seg + 1, weight.memptr());
 
     // Pointers
-    auto p_ox = orig->colptr(0), p_oy = orig->colptr(1), p_oz = orig->colptr(2); // Origin pointer (dtype)
-    auto p_dx = dest->colptr(0), p_dy = dest->colptr(1), p_dz = dest->colptr(2); // Destination pointer (dtype)
-    auto p_tx = tx.memptr(), p_ty = ty.memptr(), p_tz = tz.memptr();             // Path pointer (double)
-    auto p_rx = ray_x->memptr(), p_ry = ray_y->memptr(), p_rz = ray_z->memptr(); // Ray pointer (dtype)
+    auto p_ox = orig.colptr(0), p_oy = orig.colptr(1), p_oz = orig.colptr(2); // Origin pointer (dtype)
+    auto p_dx = dest.colptr(0), p_dy = dest.colptr(1), p_dz = dest.colptr(2); // Destination pointer (dtype)
+    auto p_tx = tx.memptr(), p_ty = ty.memptr(), p_tz = tz.memptr();          // Normalized ellipsoid coordinates
+    auto p_rx = ray_x.memptr(), p_ry = ray_y.memptr(), p_rz = ray_z.memptr(); // Output: scaled and rotated ellipsoid coordinates
 
     // Constants
     double lambda_div_8 = 0.125 * 299792458.0 / (double)center_frequency; // lambda / 8
 
-    // Iterate through positions
-    size_t n_pos_t = (size_t)n_pos;
-    size_t n_ray_t = size_t(n_path * n_seg);
-    for (size_t i = 0; i < n_pos_t; ++i)
+// Iterate through positions
+#pragma omp parallel for schedule(static)
+    for (long long i = 0; i < (long long)n_pos; ++i)
     {
         // Calculate ellipsoid orientation and length of the semi-major axis
-        double ox = (double)p_ox[i], oy = (double)p_oy[i], oz = (double)p_oz[i];
-        double x = (double)p_dx[i] - ox,
-               y = (double)p_dy[i] - oy,
-               z = (double)p_dz[i] - oz;
-        double d3d = std::sqrt(x * x + y * y + z * z), r_d3d = 1.0 / d3d;
-        x *= r_d3d, y *= r_d3d, z *= r_d3d;
-        z = (z > 1.0) ? 1.0 : (z < -1.0 ? -1.0 : z);
-        double az = std::atan2(y, x);
-        double el = std::asin(z);
+        double Ox = (double)p_ox[i], Oy = (double)p_oy[i], Oz = (double)p_oz[i];
 
-        double sin_el = z, cos_el = std::cos(el);
+        // Vector from O to D
+        double ODx = (double)p_dx[i] - Ox,
+               ODy = (double)p_dy[i] - Oy,
+               ODz = (double)p_dz[i] - Oz;
+
+        double d3d = std::sqrt(ODx * ODx + ODy * ODy + ODz * ODz);
+        if (d3d > 2e-7) // Normalize
+        {
+            double scl = 1.0 / d3d;
+            ODx *= scl, ODy *= scl, ODz *= scl;
+        }
+        else // Fallback
+            ODx = 1.0, ODy = 0.0, ODz = 0.0;
+
+        // Convert to geographic coordinates to obtain ellipsoid orientation
+        ODz = (ODz > 1.0) ? 1.0 : (ODz < -1.0 ? -1.0 : ODz);
+        double az = std::atan2(ODy, ODx);
+        double el = std::asin(ODz);
         double sin_az = std::sin(az), cos_az = std::cos(az);
+        double sin_el = ODz, cos_el = std::cos(el);
+
+        // Width of the Fresnel ellipsoid (scales with distance)
+        double width = std::sqrt(d3d * lambda_div_8);
 
         // Calculate ray coordinates
-        double width = std::sqrt(d3d * lambda_div_8);
-        for (size_t j = 0; j < n_ray_t; ++j)
+        for (arma::uword i_ray = 0; i_ray < n_ray; ++i_ray)
         {
-            // Read normalized coordinates
-            x = p_tx[j], y = p_ty[j], z = p_tz[j];
+            // Read normalized start coordinates of the current ray
+            double Rx = p_tx[i_ray], Ry = p_ty[i_ray], Rz = p_tz[i_ray];
 
             // Scale length and width of the ellipsoid
-            x *= d3d, y *= width, z *= width;
+            Rx *= d3d, Ry *= width, Rz *= width;
 
             // Rotate the ellipsoid
-            double tmp = cos_el * x - sin_el * z;
-            z = sin_el * x + cos_el * z, x = tmp;
-            tmp = cos_az * x - sin_az * y;
-            y = sin_az * x + cos_az * y, x = tmp;
+            double tmp = cos_el * Rx - sin_el * Rz;
+            Rz = sin_el * Rx + cos_el * Rz, Rx = tmp;
+            tmp = cos_az * Rx - sin_az * Ry;
+            Ry = sin_az * Rx + cos_az * Ry, Rx = tmp;
 
             // Add origin
-            x += ox, y += oy, z += oz;
+            Rx += Ox, Ry += Oy, Rz += Oz;
 
             // Convert type and write to output
-            size_t ij = j * n_pos_t + i;
-            p_rx[ij] = (dtype)x;
-            p_ry[ij] = (dtype)y;
-            p_rz[ij] = (dtype)z;
+            arma::uword ij = i_ray * n_pos + i;
+            p_rx[ij] = (dtype)Rx;
+            p_ry[ij] = (dtype)Ry;
+            p_rz[ij] = (dtype)Rz;
         }
     }
 }
 
-template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> *orig, const arma::Mat<float> *dest, float center_frequency, int lod,
-                                                       arma::Cube<float> *ray_x, arma::Cube<float> *ray_y, arma::Cube<float> *ray_z, arma::Cube<float> *weight);
+template void quadriga_lib::generate_diffraction_paths(const arma::Mat<float> &orig, const arma::Mat<float> &dest, float center_frequency, int lod,
+                                                       arma::Cube<float> &ray_x, arma::Cube<float> &ray_y, arma::Cube<float> &ray_z, arma::Cube<float> &weight);
 
-template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> *orig, const arma::Mat<double> *dest, double center_frequency, int lod,
-                                                       arma::Cube<double> *ray_x, arma::Cube<double> *ray_y, arma::Cube<double> *ray_z, arma::Cube<double> *weight);
+template void quadriga_lib::generate_diffraction_paths(const arma::Mat<double> &orig, const arma::Mat<double> &dest, double center_frequency, int lod,
+                                                       arma::Cube<double> &ray_x, arma::Cube<double> &ray_y, arma::Cube<double> &ray_z, arma::Cube<double> &weight);

@@ -119,6 +119,6 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
         plhs[1] = qd_mex_init_output(&weight, n_pos, n_path, n_seg);
 
     // Call library function
-    CALL_QD(quadriga_lib::generate_diffraction_paths<double>(&orig, &dest, center_frequency, lod,
-                                                             &ray_x, &ray_y, &ray_z, &weight));
+    CALL_QD(quadriga_lib::generate_diffraction_paths<double>(orig, dest, center_frequency, lod,
+                                                             ray_x, ray_y, ray_z, weight));
 }
