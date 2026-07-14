@@ -12,8 +12,10 @@
 #include <set>
 #include <stdexcept>
 #include <filesystem>
-#include <charconv>
 #include <limits>
+#include <cstdio>      // std::snprintf
+#include <cstdlib>     // std::strtod
+#include <type_traits> // std::is_same
 
 // Helper: Convert mesh to vert_list + face_ind (Blender-style, per-object self-contained)
 // - Co-located vertices within "threshold" belonging to the SAME object are merged into one.
@@ -382,13 +384,21 @@ void quadriga_lib::obj_file_write(const std::string &fn,
     const bool write_materials = !used_mtl.empty();
 
     // Shortest round-trip number formatter (also maps -0 -> 0)
+    // snprintf-based to avoid the std::to_chars float overloads (GLIBCXX_3.4.29 / GCC 11)
     auto fmt = [](dtype v) -> std::string
     {
         if (v == (dtype)0)
             return std::string("0");
+        constexpr int max_prec = std::is_same<dtype, float>::value ? 9 : 17;
         char buf[64];
-        auto r = std::to_chars(buf, buf + sizeof(buf), v);
-        return std::string(buf, r.ptr);
+        for (int prec = 1; prec < max_prec; ++prec)
+        {
+            std::snprintf(buf, sizeof(buf), "%.*g", prec, (double)v);
+            if ((dtype)std::strtod(buf, nullptr) == v)
+                return std::string(buf);
+        }
+        std::snprintf(buf, sizeof(buf), "%.*g", max_prec, (double)v);
+        return std::string(buf);
     };
 
     // Write .obj (per-object self-contained vertex blocks)
