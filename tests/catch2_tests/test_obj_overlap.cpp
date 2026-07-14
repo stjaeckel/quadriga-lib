@@ -13,18 +13,7 @@
 
 TEST_CASE("Test OBJ Overlap - Identical objects")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  0 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  1 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  2 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  3 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  4 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  5 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  6 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  7 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  8 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  //  9 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 10 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat tmp = cube; // Second cube
     arma::mat mesh = arma::join_cols(cube, tmp);
@@ -47,18 +36,7 @@ TEST_CASE("Test OBJ Overlap - Identical objects")
 
 TEST_CASE("Test OBJ Overlap - Touching cubes")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  0 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  1 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  2 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  3 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  4 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  5 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  6 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  7 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  8 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  //  9 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 10 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat tmp = cube; // Second cube
     tmp.col(0) = tmp.col(0) + 2.0;
@@ -78,18 +56,7 @@ TEST_CASE("Test OBJ Overlap - Touching cubes")
 
 TEST_CASE("Test OBJ Overlap - 3D overlap")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  0 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  1 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  2 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  3 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  4 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  5 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  6 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  7 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  8 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  //  9 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 10 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat tmp = cube; // Second cube
     tmp.col(0) = tmp.col(0) + 1.0;
@@ -121,18 +88,7 @@ TEST_CASE("Test OBJ Overlap - 3D overlap")
 
 TEST_CASE("Test OBJ Overlap - Overlapping Edges")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  0 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  1 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  2 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  3 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  4 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  5 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  6 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  7 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  8 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  //  9 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 10 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat tmp = cube * 1.0; // Second cube
     tmp.col(0) = tmp.col(0) + 1.0;
@@ -160,18 +116,7 @@ TEST_CASE("Test OBJ Overlap - Overlapping Edges")
 
 TEST_CASE("Test OBJ Overlap - Overlapping Faces")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  0 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  1 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  2 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  3 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  4 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  5 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  6 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  7 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  8 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  //  9 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 10 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 11 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat tmp = cube * 1.0; // Second cube
     tmp.col(0) = tmp.col(0) + 1.0;
@@ -196,19 +141,3 @@ TEST_CASE("Test OBJ Overlap - Overlapping Faces")
 
     CHECK(reason[0].substr(0, 21) == "2D Intersect: OBJ-IDs");
 }
-
-// TEST_CASE("Test OBJ Overlap - File")
-// {
-
-//     std::string fn_obj = "/tmp/qrt_overlap_test.obj";
-//     arma::fmat mesh;
-//     arma::uvec obj_ind;
-//     std::vector<std::string> obj_names;
-//     quadriga_lib::obj_file_read<float>(fn_obj, &mesh, nullptr, nullptr, nullptr, &obj_ind, nullptr, &obj_names);
-
-//     std::vector<std::string> reason;
-//     arma::uvec intersecting = quadriga_lib::obj_overlap_test(&mesh, &obj_ind, &reason);
-
-//     intersecting.print();
-
-// }
