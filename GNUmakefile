@@ -83,6 +83,9 @@ ifneq ($(OCTAVE_VERSION),)
 	octave --eval "cd tests; quadriga_lib_mex_tests;"
 endif
 endif
+ifeq ($(matlab),ON)
+	matlab -batch "run('tests/quadriga_lib_mex_tests.m');"
+endif
 ifneq ($(PYTHON_SHARED_OBJ),)
 	python3 -m pytest tests/python_tests -x -s
 endif
