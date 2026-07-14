@@ -24,8 +24,8 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 
 ## Usage:
 ```
-[ gain, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
-    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id );
+[ gain, xprmat, coord ] = quadriga_lib.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, ...
+    center_freq, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, resolve_multi_bounce );
 ```
 
 ## Inputs:
@@ -42,9 +42,15 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
   default: `[]` (not using sub-meshes)
 - **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0
 - **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels; default: 0
+- **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
+  energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode).
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 
+  1 = resolve never, see [[ray_state_update]]
 
 ## Outputs:
 - **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos, 1]`
+- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major 
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`; For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
 - **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ## See also:
@@ -55,10 +61,10 @@ MD!*/
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
-    if (nrhs < 6 || nrhs > 11)
+    if (nrhs < 6 || nrhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
 
-    if (nlhs > 2)
+    if (nlhs > 3)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Too many output arguments.");
 
     // Load inputs (cast to double if needed)
@@ -82,6 +88,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     int use_kernel = (nrhs < 10) ? 0 : qd_mex_get_scalar<int>(prhs[9], "use_kernel", 0);
     int gpu_id = (nrhs < 11) ? 0 : qd_mex_get_scalar<int>(prhs[10], "gpu_id", 0);
+    bool scalar_mode = (nrhs < 12) ? false : qd_mex_get_scalar<bool>(prhs[11], "scalar_mode", false);
+    double thin_slab_threshold = (nrhs < 13) ? 0.0 : qd_mex_get_scalar<double>(prhs[12], "thin_slab_threshold", 0.0);
 
     arma::uword n_pos = orig.n_rows;
     arma::uword n_seg = 0;
@@ -96,19 +104,24 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     // Initialize output containers
     arma::vec gain;
+    arma::mat xprmat;
     arma::cube coord;
 
     if (nlhs > 0)
         plhs[0] = qd_mex_init_output(&gain, n_pos);
 
     if (nlhs > 1)
-        plhs[1] = qd_mex_init_output(&coord, 3, n_seg, n_pos);
+        plhs[1] = qd_mex_init_output(&xprmat, (scalar_mode ? 2 : 8), n_pos);
+
+    if (nlhs > 2)
+        plhs[2] = qd_mex_init_output(&coord, 3, n_seg, n_pos);
 
     arma::vec *p_gain = gain.empty() ? nullptr : &gain;
+    arma::mat *p_xprmat = xprmat.empty() ? nullptr : &xprmat;
     arma::cube *p_coord = coord.empty() ? nullptr : &coord;
     arma::u32_vec *p_sub_mesh_index = sub_mesh_index.empty() ? nullptr : &sub_mesh_index;
 
-    CALL_QD(quadriga_lib::calc_diffraction_gain(&orig, &dest, &mesh, &mtl_ind, &mtl_prop,
-                                                center_freq, lod, p_gain, p_coord, verbose,
-                                                p_sub_mesh_index, use_kernel, gpu_id));
+    CALL_QD(quadriga_lib::calc_diffraction_gain(orig, dest, mesh, mtl_ind, mtl_prop,
+                                                center_freq, lod, p_gain, p_xprmat, p_coord, verbose,
+                                                p_sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold));
 }
