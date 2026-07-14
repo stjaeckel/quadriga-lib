@@ -155,6 +155,7 @@ import quadriga_lib
 <b>Site-specific simulation tools</b><br><br>
 <table style="border-collapse: separate; border-spacing: 20px 0;"><tbody>
   <tr><td><a href="#calc_diffraction_gain">calc_diffraction_gain</a></td><td>Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh</td></tr>
+  <tr><td><a href="#cube">cube</a></td><td>Construct a triangulated cube mesh</td></tr>
   <tr><td><a href="#icosphere">icosphere</a></td><td>Construct a geodesic polyhedron from recursive icosahedron subdivision</td></tr>
   <tr><td><a href="#mitsuba_xml_file_write">mitsuba_xml_file_write</a></td><td>Write a triangular mesh to a Mitsuba 3 XML scene file</td></tr>
   <tr><td><a href="#obj_file_read">obj_file_read</a></td><td>Read a Wavefront `.obj` file and extract geometry, visual materials, and EM/acoustic materials</td></tr>
@@ -2243,11 +2244,11 @@ Calculate diffraction gain for multiple TX-RX pairs using a 3D triangular mesh
 <pre>
 # Output as tuple
 data = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
 
 # Unpacked outputs
-gain, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
-    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode )
+gain, xprmat, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_ind, mtl_prop, \
+    center_frequency, lod, verbose, sub_mesh_index, use_kernel, gpu_id, scalar_mode, thin_slab_threshold )
 </pre>
 
 <b>Inputs:</b><br>
@@ -2264,11 +2265,13 @@ gain, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_
 <li><b><code>use_kernel</code></b> — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable; default: 0</li>
 <li><b><code>gpu_id</code></b> — CUDA device ID; ignored for non-CUDA kernels; default: 0</li>
 <li><b><code>scalar_mode</code></b> — If <code>True</code>, uses scalar transmission (TE-only reflection coefficient, energy-conservation transmission) instead of EM TE/TM averaging; default: <code>False</code></li>
+<li><b><code>thin_slab_threshold</code></b> — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always, 1 = resolve never; see <a href="#ray_state_update">ray_state_update</a>; default: 0</li>
 </ul>
 
 <b>Outputs:</b><br>
 <ul>
 <li><b><code>gain</code></b> — Diffraction gain per TX-RX pair, linear scale; <code>(n_pos,)</code></li>
+<li><b><code>xprmat</code></b> — EM mode: polarization transfer matrix excluding FSPL, interleaved complex, column-major <code>[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]</code>, <code>(8, n_pos)</code>; scalar mode: scalar pressure coefficient <code>[Re Im]</code>, <code>(2, n_pos)</code></li>
 <li><b><code>coord</code></b> — Diffracted path coordinates excluding endpoints; <code>(3, n_seg-1, n_pos)</code></li>
 </ul>
 
@@ -2277,6 +2280,37 @@ gain, coord = quadriga_lib.RTtools.calc_diffraction_gain( orig, dest, mesh, mtl_
 <li><a href="#generate_diffraction_paths">generate_diffraction_paths</a> (controls path/segment count via <code>lod</code>)</li>
 <li><a href="#triangle_mesh_segmentation">triangle_mesh_segmentation</a> (generates <code>sub_mesh_index</code>)</li>
 <li><a href="#obj_file_read">obj_file_read</a> (defines the material format)</li>
+</ul>
+
+<hr class="greyline"><br>
+<span id="cube" class="qd-func"><b>cube</b></span><br>
+<hr class="thin">
+Construct a triangulated cube mesh
+<ul>
+<li>Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1)</li>
+<li>Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1</li>
+<li>Optional uniform subdivision produces 12 · n_div^2 triangles</li>
+<li>Triangle winding is consistent (outward-facing normals), compatible with obj_file_write</li>
+<li>Scale, rotation, and translation are applied in that order (scale -> rotate -> translate)</li>
+<li>An odd number of negative scale components flips the winding (inward-facing normals)</li>
+</ul>
+
+<b>Usage:</b><br>
+<pre>
+mesh = quadriga_lib.RTtools.cube( scale, rotation, location, n_div )
+</pre>
+
+<b>Inputs:</b><br>
+<ul>
+<li><b><code>scale</code></b> — Length 1 scales all axes uniformly; length 3 scales (x, y, z) independently; <code>None</code> or empty = 1 (no scaling); default: <code>None</code></li>
+<li><b><code>rotation</code></b> — Euler angles about (x, y, z), applied as R = Rz·Ry·Rx (Blender XYZ); shape <code>(3,)</code>; <code>None</code> or empty = no rotation; default: <code>None</code></li>
+<li><b><code>location</code></b> — Translation (x, y, z); shape <code>(3,)</code>; <code>None</code> or empty = origin; default: <code>None</code></li>
+<li><b><code>n_div</code></b> — Number of subdivisions per edge; yields 12 · n_div^2 triangles; default: 1</li>
+</ul>
+
+<b>Outputs:</b><br>
+<ul>
+<li><b><code>mesh</code></b> — Triangle mesh; each row holds (x1, y1, z1, x2, y2, z2, x3, y3, z3); <code>(12 · n_div^2, 9)</code></li>
 </ul>
 
 <hr class="greyline"><br>

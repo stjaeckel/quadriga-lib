@@ -1,7 +1,7 @@
 ---
 title: "C++ API Documentation for Quadriga-Lib v0.11.8"
 author: "Stephan Jaeckel"
-date: "17.06.2026"
+date: "14.07.2026"
 lang: en-US
 ---
 
@@ -27,105 +27,108 @@ lang: en-US
 
 | Function | Section | Line |
 | --- | --- | --- |
-| [arrayant](#arrayant) | Array antenna class | 135 |
-| [.append](#append) | Array antenna class | 186 |
-| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 208 |
-| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 240 |
-| [.combine_pattern](#combine_pattern) | Array antenna class | 261 |
-| [.copy_element](#copy_element) | Array antenna class | 286 |
-| [.export_obj_file](#export_obj_file) | Array antenna class | 306 |
-| [.interpolate](#interpolate) | Array antenna class | 336 |
-| [.is_valid](#is_valid) | Array antenna class | 388 |
-| [.qdant_write](#qdant_write) | Array antenna class | 406 |
-| [.remove_zeros](#remove_zeros) | Array antenna class | 433 |
-| [.rotate_pattern](#rotate_pattern) | Array antenna class | 449 |
-| [.set_size](#set_size) | Array antenna class | 485 |
-| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 511 |
-| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 545 |
-| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 579 |
-| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 619 |
-| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 678 |
-| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 705 |
-| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 737 |
-| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 763 |
-| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 813 |
-| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 838 |
-| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 855 |
-| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 872 |
-| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 926 |
-| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 943 |
-| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 971 |
-| [generate_speaker](#generate_speaker) | Array antenna functions | 988 |
-| [qdant_read](#qdant_read) | Array antenna functions | 1063 |
-| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1089 |
-| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1116 |
-| [channel](#channel) | Channel class | 1145 |
-| [.add_paths](#add_paths) | Channel class | 1192 |
-| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1230 |
-| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1249 |
-| [any_type_id](#any_type_id) | Channel functions | 1290 |
-| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1333 |
-| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1376 |
-| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1424 |
-| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1462 |
-| [hdf5_create](#hdf5_create) | Channel functions | 1474 |
-| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1504 |
-| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1536 |
-| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1572 |
-| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1606 |
-| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1632 |
-| [hdf5_write](#hdf5_write) | Channel functions | 1660 |
-| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1700 |
-| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1739 |
-| [qrt_file_read](#qrt_file_read) | Channel functions | 1787 |
-| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1879 |
-| [quantize_delays](#quantize_delays) | Channel functions | 1916 |
-| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1978 |
-| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2059 |
-| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2153 |
-| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2221 |
-| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2289 |
-| [acdf](#acdf) | Channel statistics | 2365 |
-| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2400 |
-| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2442 |
-| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2494 |
-| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2527 |
-| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2562 |
-| [fast_acos](#fast_acos) | Math functions | 2595 |
-| [fast_asin](#fast_asin) | Math functions | 2614 |
-| [fast_atan2](#fast_atan2) | Math functions | 2633 |
-| [fast_cart2geo](#fast_cart2geo) | Math functions | 2654 |
-| [fast_geo2cart](#fast_geo2cart) | Math functions | 2687 |
-| [fast_sincos](#fast_sincos) | Math functions | 2732 |
-| [fast_slerp](#fast_slerp) | Math functions | 2753 |
-| [interp_2D](#interp_2d) | Math functions | 2788 |
-| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2852 |
-| [colormap](#colormap) | Site-specific simulation tools | 2905 |
-| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2924 |
-| [coord2path](#coord2path) | Site-specific simulation tools | 2967 |
-| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3005 |
-| [icosphere](#icosphere) | Site-specific simulation tools | 3049 |
-| [interface_gain](#interface_gain) | Site-specific simulation tools | 3083 |
-| [medium_gain](#medium_gain) | Site-specific simulation tools | 3119 |
-| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3154 |
-| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3196 |
-| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3263 |
-| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3324 |
-| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3355 |
-| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3383 |
-| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3412 |
-| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3451 |
-| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3487 |
-| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3523 |
-| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3633 |
-| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3676 |
-| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3759 |
-| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3807 |
-| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3851 |
-| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 3881 |
-| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 3909 |
-| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 3950 |
-| [write_png](#write_png) | Site-specific simulation tools | 3985 |
+| [arrayant](#arrayant) | Array antenna class | 138 |
+| [.append](#append) | Array antenna class | 189 |
+| [.calc_beamwidth_deg](#calc_beamwidth_deg) | Array antenna class | 211 |
+| [.calc_directivity_dBi](#calc_directivity_dbi) | Array antenna class | 243 |
+| [.combine_pattern](#combine_pattern) | Array antenna class | 264 |
+| [.copy_element](#copy_element) | Array antenna class | 289 |
+| [.export_obj_file](#export_obj_file) | Array antenna class | 309 |
+| [.interpolate](#interpolate) | Array antenna class | 339 |
+| [.is_valid](#is_valid) | Array antenna class | 391 |
+| [.qdant_write](#qdant_write) | Array antenna class | 409 |
+| [.remove_zeros](#remove_zeros) | Array antenna class | 436 |
+| [.rotate_pattern](#rotate_pattern) | Array antenna class | 452 |
+| [.set_size](#set_size) | Array antenna class | 488 |
+| [arrayant_combine_pattern_multi](#arrayant_combine_pattern_multi) | Array antenna functions | 514 |
+| [arrayant_concat_multi](#arrayant_concat_multi) | Array antenna functions | 548 |
+| [arrayant_copy_element_multi](#arrayant_copy_element_multi) | Array antenna functions | 582 |
+| [arrayant_interpolate_multi](#arrayant_interpolate_multi) | Array antenna functions | 622 |
+| [arrayant_is_valid_multi](#arrayant_is_valid_multi) | Array antenna functions | 681 |
+| [arrayant_rotate_pattern_multi](#arrayant_rotate_pattern_multi) | Array antenna functions | 708 |
+| [arrayant_set_element_pos_multi](#arrayant_set_element_pos_multi) | Array antenna functions | 740 |
+| [generate_arrayant_3GPP](#generate_arrayant_3gpp) | Array antenna functions | 766 |
+| [generate_arrayant_custom](#generate_arrayant_custom) | Array antenna functions | 816 |
+| [generate_arrayant_dipole](#generate_arrayant_dipole) | Array antenna functions | 841 |
+| [generate_arrayant_half_wave_dipole](#generate_arrayant_half_wave_dipole) | Array antenna functions | 858 |
+| [generate_arrayant_multibeam](#generate_arrayant_multibeam) | Array antenna functions | 875 |
+| [generate_arrayant_omni](#generate_arrayant_omni) | Array antenna functions | 929 |
+| [generate_arrayant_ula](#generate_arrayant_ula) | Array antenna functions | 946 |
+| [generate_arrayant_xpol](#generate_arrayant_xpol) | Array antenna functions | 974 |
+| [generate_speaker](#generate_speaker) | Array antenna functions | 991 |
+| [qdant_read](#qdant_read) | Array antenna functions | 1066 |
+| [qdant_read_multi](#qdant_read_multi) | Array antenna functions | 1092 |
+| [qdant_write_multi](#qdant_write_multi) | Array antenna functions | 1119 |
+| [channel](#channel) | Channel class | 1148 |
+| [.add_paths](#add_paths) | Channel class | 1195 |
+| [.calc_effective_path_gain](#calc_effective_path_gain) | Channel class | 1233 |
+| [.write_paths_to_obj_file](#write_paths_to_obj_file) | Channel class | 1252 |
+| [any_type_id](#any_type_id) | Channel functions | 1293 |
+| [baseband_freq_response](#baseband_freq_response) | Channel functions | 1336 |
+| [baseband_freq_response_multi](#baseband_freq_response_multi) | Channel functions | 1379 |
+| [baseband_freq_response_vec](#baseband_freq_response_vec) | Channel functions | 1427 |
+| [get_HDF5_version](#get_hdf5_version) | Channel functions | 1465 |
+| [hdf5_create](#hdf5_create) | Channel functions | 1477 |
+| [hdf5_read_channel](#hdf5_read_channel) | Channel functions | 1507 |
+| [hdf5_read_dset](#hdf5_read_dset) | Channel functions | 1539 |
+| [hdf5_read_dset_names](#hdf5_read_dset_names) | Channel functions | 1575 |
+| [hdf5_read_layout](#hdf5_read_layout) | Channel functions | 1609 |
+| [hdf5_reshape_layout](#hdf5_reshape_layout) | Channel functions | 1635 |
+| [hdf5_write](#hdf5_write) | Channel functions | 1663 |
+| [hdf5_write_dset](#hdf5_write_dset) | Channel functions | 1703 |
+| [qrt_file_parse](#qrt_file_parse) | Channel functions | 1742 |
+| [qrt_file_read](#qrt_file_read) | Channel functions | 1790 |
+| [qrt_read_cache_init](#qrt_read_cache_init) | Channel functions | 1882 |
+| [quantize_delays](#quantize_delays) | Channel functions | 1919 |
+| [get_channels_ieee_indoor](#get_channels_ieee_indoor) | Channel generation functions | 1981 |
+| [get_channels_irs](#get_channels_irs) | Channel generation functions | 2062 |
+| [get_channels_multifreq](#get_channels_multifreq) | Channel generation functions | 2156 |
+| [get_channels_planar](#get_channels_planar) | Channel generation functions | 2224 |
+| [get_channels_spherical](#get_channels_spherical) | Channel generation functions | 2292 |
+| [acdf](#acdf) | Channel statistics | 2368 |
+| [calc_angular_spreads_sphere](#calc_angular_spreads_sphere) | Channel statistics | 2403 |
+| [calc_cross_polarization_ratio](#calc_cross_polarization_ratio) | Channel statistics | 2445 |
+| [calc_delay_spread](#calc_delay_spread) | Channel statistics | 2497 |
+| [calc_rician_k_factor](#calc_rician_k_factor) | Channel statistics | 2530 |
+| [calc_rotation_matrix](#calc_rotation_matrix) | Math functions | 2565 |
+| [fast_acos](#fast_acos) | Math functions | 2598 |
+| [fast_asin](#fast_asin) | Math functions | 2617 |
+| [fast_atan2](#fast_atan2) | Math functions | 2636 |
+| [fast_cart2geo](#fast_cart2geo) | Math functions | 2657 |
+| [fast_geo2cart](#fast_geo2cart) | Math functions | 2690 |
+| [fast_sincos](#fast_sincos) | Math functions | 2735 |
+| [fast_slerp](#fast_slerp) | Math functions | 2756 |
+| [interp_2D](#interp_2d) | Math functions | 2791 |
+| [calc_diffraction_gain](#calc_diffraction_gain) | Site-specific simulation tools | 2855 |
+| [colormap](#colormap) | Site-specific simulation tools | 2912 |
+| [combine_irs_coord](#combine_irs_coord) | Site-specific simulation tools | 2931 |
+| [coord2path](#coord2path) | Site-specific simulation tools | 2974 |
+| [cube](#cube) | Site-specific simulation tools | 3012 |
+| [generate_diffraction_paths](#generate_diffraction_paths) | Site-specific simulation tools | 3045 |
+| [icosphere](#icosphere) | Site-specific simulation tools | 3089 |
+| [interface_gain](#interface_gain) | Site-specific simulation tools | 3123 |
+| [medium_gain](#medium_gain) | Site-specific simulation tools | 3159 |
+| [mitsuba_xml_file_write](#mitsuba_xml_file_write) | Site-specific simulation tools | 3196 |
+| [obj_file_read](#obj_file_read) | Site-specific simulation tools | 3238 |
+| [obj_file_write](#obj_file_write) | Site-specific simulation tools | 3305 |
+| [obj_overlap_test](#obj_overlap_test) | Site-specific simulation tools | 3366 |
+| [path_to_tube](#path_to_tube) | Site-specific simulation tools | 3397 |
+| [point_cloud_aabb](#point_cloud_aabb) | Site-specific simulation tools | 3425 |
+| [point_cloud_segmentation](#point_cloud_segmentation) | Site-specific simulation tools | 3454 |
+| [point_cloud_split](#point_cloud_split) | Site-specific simulation tools | 3493 |
+| [point_inside_mesh](#point_inside_mesh) | Site-specific simulation tools | 3529 |
+| [ray_mesh_interact](#ray_mesh_interact) | Site-specific simulation tools | 3565 |
+| [ray_point_intersect](#ray_point_intersect) | Site-specific simulation tools | 3683 |
+| [ray_state_update](#ray_state_update) | Site-specific simulation tools | 3726 |
+| [ray_triangle_intersect](#ray_triangle_intersect) | Site-specific simulation tools | 3850 |
+| [refractive_index](#refractive_index) | Site-specific simulation tools | 3898 |
+| [subdivide_rays](#subdivide_rays) | Site-specific simulation tools | 3930 |
+| [subdivide_triangles](#subdivide_triangles) | Site-specific simulation tools | 3974 |
+| [triangle_mesh_aabb](#triangle_mesh_aabb) | Site-specific simulation tools | 4004 |
+| [triangle_mesh_segmentation](#triangle_mesh_segmentation) | Site-specific simulation tools | 4032 |
+| [triangle_mesh_split](#triangle_mesh_split) | Site-specific simulation tools | 4073 |
+| [write_png](#write_png) | Site-specific simulation tools | 4108 |
+| [xpr_update](#xpr_update) | Site-specific simulation tools | 4134 |
 
 ---
 
@@ -2867,6 +2870,7 @@ void calc_diffraction_gain(
     dtype center_frequency,
     int lod = 2,
     arma::Col<dtype> *gain = nullptr,
+    arma::Mat<dtype> *xprmat = nullptr,
     arma::Cube<dtype> *coord = nullptr,
     int verbose = 0,
     const arma::u32_vec *sub_mesh_index = nullptr,
@@ -2882,18 +2886,21 @@ void calc_diffraction_gain(
 - **`mtl_ind`** — 1-based material index per face, 0 = no material (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
 - **`center_frequency`** — Center frequency
-- **`lod`** *(optional)* — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
-- **`verbose`** *(optional)* — Verbosity level
-- **`sub_mesh_index`** *(optional)* — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
-- **`use_kernel`** *(optional)* — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
-- **`gpu_id`** *(optional)* — CUDA device ID; ignored for non-CUDA kernels
-- **`scalar_mode`** *(optional)* — If `true`, uses scalar transmission (TE-only reflection coefficient,
+- **`lod`** — Level of detail (0–6), controls `n_path` and `n_seg`; see [generate_diffraction_paths](#generate_diffraction_paths)
+- **`verbose`** — Verbosity level
+- **`sub_mesh_index`** — 0-based sub-mesh index for acceleration; see [triangle_mesh_segmentation](#triangle_mesh_segmentation); `[n_mesh]`
+- **`use_kernel`** — Kernel selection: 0 = auto, 1 = GENERIC, 2 = AVX2, 3 = CUDA; error if unavailable
+- **`gpu_id`** — CUDA device ID; ignored for non-CUDA kernels
+- **`scalar_mode`** — If `true`, uses scalar transmission (TE-only reflection coefficient,
   energy-conservation transmission) instead of EM TE/TM averaging. Default `false` (EM mode). Selects
   interaction type passed to [ray_mesh_interact](#ray_mesh_interact) (4 vs. 1).
+- **`thin_slab_threshold`** — Thin-slab (Fabry-Pérot) resolve threshold; 0 = resolve always (default), 1 = resolve never,  see [ray_state_update](#ray_state_update)
 
 ### Outputs:
-- **`gain`** *(optional)* — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
-- **`coord`** *(optional)* — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
+- **`gain`** — Diffraction gain per TX-RX pair, linear scale; `[n_pos]`
+- **`xprmat`** — For EM mode: polarization transfer matrix excluding FSPL, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; `[8, n_pos]`;
+  For scalar mode: scalar pressure coefficient `[Re Im]`; `[2, n_pos]`.
+- **`coord`** — Diffracted path coordinates excluding endpoints; `[3, n_seg-1, n_pos]`
 
 ### See also:
 - [generate_diffraction_paths](#generate_diffraction_paths) (controls path/segment count via `lod`)
@@ -3002,6 +3009,39 @@ void quadriga_lib::coord2path(
 - **`path_coord`** (optional) — Full path coordinates including TX and RX; vector of `n_path` matrices, each `[3, n_interact+2]`
 
 ---
+## cube
+Construct a triangulated cube mesh
+
+- Generates a Blender-style cube: a 2 x 2 x 2 box centered at the origin (vertices at +/-1) before scaling
+- Each of the 6 faces is split into 2 triangles, yielding 12 triangles at n_div = 1
+- Optional uniform subdivision produces 12 * n_div^2 triangles
+- Triangle winding is consistent (outward-facing normals), compatible with [obj_file_write](#obj_file_write)
+- Scale, Euler rotation, and translation are applied in that order (scale -> rotate -> translate)
+
+### Declaration:
+```
+arma::Mat<dtype> quadriga_lib::cube(
+    const arma::vec &scale = {1.0},
+    const arma::vec &rotation = {0.0, 0.0, 0.0},
+    const arma::vec &location = {0.0, 0.0, 0.0},
+    const arma::uword n_div = 1);
+```
+
+### Inputs:
+- **`scale`** — Length 1 scales all axes uniformly; length 3 scales `{x,y,z}` independently; empty = 1 (no scaling)
+- **`rotation`** — Euler angles in [rad] about {x,y,z}, applied as R = Rz*Ry*Rx (Blender XYZ); length 3 or empty (no rotation)
+- **`location`** — Translation {x,y,z} in [m]; length 3 or empty (origin)
+- **`n_div`** — Number of subdivisions per edge; results in `12 * n_div^2` triangles
+
+### Returns:
+- Triangle mesh; each row holds `{x1,y1,z1,x2,y2,z2,x3,y3,z3}`; `[12 * n_div^2, 9]`
+
+### See also:
+- [icosphere](#icosphere)
+- [subdivide_triangles](#subdivide_triangles)
+- [obj_file_write](#obj_file_write)
+
+---
 ## generate_diffraction_paths
 Generate elliptic propagation paths and weights for diffraction gain estimation
 
@@ -3012,14 +3052,14 @@ Generate elliptic propagation paths and weights for diffraction gain estimation
 ### Declaration:
 ```
 void generate_diffraction_paths(
-    const arma::Mat<dtype> *orig,
-    const arma::Mat<dtype> *dest,
+    const arma::Mat<dtype> &orig,
+    const arma::Mat<dtype> &dest,
     dtype center_frequency,
     int lod,
-    arma::Cube<dtype> *ray_x,
-    arma::Cube<dtype> *ray_y,
-    arma::Cube<dtype> *ray_z,
-    arma::Cube<dtype> *weight);
+    arma::Cube<dtype> &ray_x,
+    arma::Cube<dtype> &ray_y,
+    arma::Cube<dtype> &ray_z,
+    arma::Cube<dtype> &weight);
 ```
 
 ### Inputs:
@@ -3120,21 +3160,23 @@ dtype quadriga_lib::interface_gain(
 Linear gain of a ray traversing a homogeneous lossy medium
 
 - Computes `g = 10^(-A/10)`, where `A` [dB] is the total attenuation accumulated over a path
-  of length `dist` inside the medium. The per-meter loss combines two contributions:
+  of length `dist` inside the medium. The loss combines three contributions:
   - Conductivity-based loss from the complex permittivity model of ITU-R P.2040-1: `ε_r = a·(f/fRef)^b`,
-    `σ = c·(f/fRef)^d`. These give an gain distance `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
+    `σ = c·(f/fRef)^d`. These give an attenuation length `Δ` and a per-meter power loss `8.686 / Δ` dB/m.
   - Distance absorption of the form `α·(f/fRef)^αB` dB/m, intended to model excess loss not captured
     by `σ` (e.g. foliage, scattering media).
+  - An acoustic mass-law term `m·log10((f/fRef)·dist)` dB, added once (not per meter) when `m > 0`,
+    `dist` exceeds ~1.5 mm, and the term is positive; `m` is the mass-law slope in dB/decade.
 - The penetration-loss columns (`att`, `attB`) of `mtl_prop` are not used — they describe
   thin-slab transmission loss, not propagation through a finite-thickness medium.
 
 ### Declaration:
 ```
 dtype quadriga_lib::medium_gain(
-    const arma::Mat<dtype> &mtl_prop,
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
     arma::uword iM,
     dtype dist,
-    dtype fGHz);
+    dtype center_frequency);
 ```
 
 ### Inputs:
@@ -3525,14 +3567,15 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 
 - Computes interaction of plane waves with planar interfaces between homogeneous isotropic media.
 - Supports beam-based modeling via triangular ray tubes (`trivec`, `tridir`).
-- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
-  front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
-  FBS=SBS with opposing normals → media-to-media.
-- Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`.
+- Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule); front-side hit with
+  FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air; FBS=SBS with opposing normals → media-to-media.
+- With `compact = true` (default), rays with `fbs_ind = 0` (no interaction) are omitted from output,
+  so `n_rayN ≤ n_ray`; with `compact = false` they are kept as transparent pass-throughs (`n_rayN = n_ray`).
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format.
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves).
-- Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for acoustic
-  simulation with impedance-mapped material parameters (ε derived from Z).
+- Types 3–5 (scalar) use a single TE-only coefficient (acoustic simulation with impedance-mapped
+  materials, `ε` derived from `Z`); total internal reflection is handled as in the EM path
+  (`snell·sinθ ≥ 1` ⇒ unit reflection, refraction collapses to undeviated transmission).
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ### Declaration:
@@ -3542,11 +3585,9 @@ void quadriga_lib::ray_mesh_interact(
     dtype center_frequency,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
     const arma::Mat<dtype> *mesh,
     const arma::uvec *mtl_ind,
-    const std::unordered_map<std::string, td::vector<dtype>> *mtl_prop,
+    const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
     const arma::u32_vec *fbs_ind,
     const arma::u32_vec *sbs_ind,
     const arma::Mat<dtype> *trivec = nullptr,
@@ -3554,6 +3595,8 @@ void quadriga_lib::ray_mesh_interact(
     const arma::Col<dtype> *orig_length = nullptr,
     arma::Mat<dtype> *origN = nullptr,
     arma::Mat<dtype> *destN = nullptr,
+    arma::Mat<dtype> *fbsN = nullptr,
+    arma::Mat<dtype> *sbsN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *trivecN = nullptr,
@@ -3563,8 +3606,9 @@ void quadriga_lib::ray_mesh_interact(
     arma::Col<dtype> *thicknessN = nullptr,
     arma::Col<dtype> *edge_lengthN = nullptr,
     arma::Mat<dtype> *normal_vecN = nullptr,
-    arma::s32_vec *out_typeN = nullptr,
+    std::vector<uint8_t> *out_typeN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
+    bool compact = true,
     arma::u32_vec *ray_indN = nullptr);
 ```
 
@@ -3572,7 +3616,6 @@ void quadriga_lib::ray_mesh_interact(
 - **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
-- **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
 - **`mesh`** — Triangle mesh faces; see [obj_file_read](#obj_file_read); `[n_mesh, 9]`
 - **`mtl_ind`** — 1-based material index per face (the `csv_ind` output of [obj_file_read](#obj_file_read)); `[n_mesh]`.
   0 = face has no material (air). NULL → all faces treated as air.
@@ -3582,40 +3625,47 @@ void quadriga_lib::ray_mesh_interact(
 - **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; `[n_ray, 9]`, order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`
 - **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian
 - **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`, default 0
+- **`compact`** *(optional)* — If `true` (default), no-hit rays are dropped and `n_rayN ≤ n_ray`. If
+  `false`, all rays are kept (`n_rayN = n_ray`) and no-hit rays are written as a transparent pass-through
+  (gain 1, identity `xprmat`, `out_type = 0`).
 
 ### Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear scale, includes in-medium attenuation, excludes FSPL); averaged over TE/TM
-  polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
-  includes interaction gain, TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL);
-  `[n_rayN, 8]`. For types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient including
-  in-medium attenuation; `[n_rayN, 8]`.
+- **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_ray, 3]`
+- **`gainN`** — Interaction gain; averaged over TE/TM polarizations for types 0–2, TE-only for types 3–5; `[n_rayN]`
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, col-major `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`;
+  includes interaction gain, TE/TM coefficients, incidence plane orientation; excludes in-medium attenuation, FSPL `[8, n_rayN]`.
+  For types 3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`.
 - **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if inputs not provided
 - **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS in rad; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
 - **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (∞ if partial hit); `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code; `[n_rayN]`
-   | Code  | Description                                         |
-   | :---: | --------------------------------------------------- |
-   |   1   | Single hit, outside→inside                          |
-   |   2   | Single hit, inside→outside                          |
-   |   3   | Single hit, inside→outside, total reflection        |
-   |   4   | Media-to-media, M2 hit first                        |
-   |   5   | Media-to-media, M1 hit first                        |
-   |   6   | Media-to-media, M1 hit first, total reflection      |
-   |   7   | Overlapping faces, outside→inside                   |
-   |   8   | Overlapping faces, inside→outside                   |
-   |   9   | Overlapping faces, inside→outside, total reflection |
-   |  10   | Edge hit, outside→inside→outside                    |
-   |  11   | Edge hit, inside→outside→inside                     |
-   |  12   | Edge hit, inside→outside→inside, total reflection   |
-   |  13   | Edge hit, outside→inside                            |
-   |  14   | Edge hit, inside→outside                            |
-   |  15   | Edge hit, inside→outside, total reflection          |
+- **`out_typeN`** — Interaction type code, bit-encoded (`qd::bits<uint8_t>`); `[n_rayN]`
+   |  Bit | Meaning                                                                 |
+   | :--: | ----------------------------------------------------------------------- |
+   |   0  | OK flag (0 = no valid interaction / undefined)                          |
+   |   1  | Front-side flag (1 = front: o→i or M2 hit first; 0 = back: i→o or M1)   |
+   |   2  | Co-located FBS/SBS flag (1 = single point, required for media-to-media) |
+   |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
+   |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
+   |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+   Reachable composite values (add 32 for the total-reflection variant):
+   | Code  |  TIR  | Description                                         |
+   | :---: | :---: | --------------------------------------------------- |
+   |   0   |   —   | No hit                                              |
+   |   1   |  33   | Single hit, inside→outside (exit)                   |
+   |   3   |  35   | Single hit, outside→inside (entry)                  |
+   |   5   |  37   | Media-to-media, M1 (current, back) hit first        |
+   |   7   |  39   | Media-to-media, M2 (next, front) hit first          |
+   |  13   |  45   | Overlapping faces, inside-inside→outside            |
+   |  15   |  47   | Overlapping faces, outside→inside-inside            |
+   |  21   |  53   | Corner hit, inside→outside→inside                   |
+   |  23   |  55   | Corner hit, outside→inside→outside                  |
+   |  29   |  61   | Corner hit, inside-inside→outside                   |
+   |  31   |  63   | Corner hit, outside→inside-inside                   |
 - **`path_dirN`** — Refraction-correct path direction: mirror for types 0/3, Snell direction for types 1/2/4; `[n_rayN, 3]`.
   For undeviated transmission (types 1/4) this is the *refracted* direction, which differs from the geometric continuation
   (along the incoming ray) used for `origN`/`destN`; it lets downstream code recover the true transmission angle.
@@ -3680,12 +3730,11 @@ Batched inside/outside ray-state machine with analytic thin-slab (Fabry-Perot) r
   per-ray medium state, and carries that state forward. Three signed-`short` words per ray hold the
   current medium, the previous medium, and a one-slot next-transition buffer (bit-masked: `mat = w &
   0x7FFF`, `flag = w & 0x8000`).
-- Ports the inside/outside state machine formerly embedded in [calc_diffraction_gain](#calc_diffraction_gain) and overlays
-  a closed-form thin-slab factor `S` (the Airy sum) so a single coefficient captures the full
-  internal multiple-reflection series of a parallel slab thin enough to matter, instead of relying on
-  the tracer to follow every internal bounce.
+- Implements the inside/outside state machine and overlays a closed-form thin-slab factor `S` (the Airy
+  sum) so a single coefficient captures the full internal multiple-reflection series of a parallel slab
+  thin enough to matter, instead of relying on the tracer to follow every internal bounce.
 - Called twice per interaction by the ray tracer: once for the reflection pass (`interaction_type` 0
-  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2 or 4). With `S`
+  or 3) and once for the transmission/refraction pass (`interaction_type` 1, 2, 4, 5). With `S`
   suppressed (the survival gate re-emits) the transmission/refraction path reproduces [calc_diffraction_gain](#calc_diffraction_gain)
 
 ### Declaration:
@@ -3695,60 +3744,102 @@ void quadriga_lib::ray_state_update(
     dtype center_frequency,
     const arma::Mat<dtype> *orig,
     const arma::Mat<dtype> *dest,
-    const arma::Mat<dtype> *fbs,
-    const arma::Mat<dtype> *sbs,
+    const arma::Mat<dtype> *fbsN,
+    const arma::Mat<dtype> *sbsN,
     const arma::u32_vec *no_interact,
     const arma::Col<dtype> *fbs_angleN,
     const arma::Mat<dtype> *normal_vecN,
-    const arma::s32_vec *out_typeN,
+    const std::vector<uint8_t> *out_typeN,
     const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop,
-    const arma::Col<short> *mtl_ind_fbs,
-    const arma::Col<short> *mtl_ind_sbs,
+    const arma::Col<short> *mtl_ind_fbsN,
+    const arma::Col<short> *mtl_ind_sbsN,
     const arma::Col<short> *mtl_ind_prev_in = nullptr,
     const arma::Col<short> *mtl_ind_current_in = nullptr,
     const arma::Col<short> *mtl_ind_buffer_in = nullptr,
     const arma::Mat<dtype> *path_dir_prev = nullptr,
-    const arma::Col<dtype> *acc_dist_in = nullptr,
+    const arma::Mat<dtype> *acc_dist_in = nullptr,
     arma::Col<short> *mtl_ind_prev_outN = nullptr,
     arma::Col<short> *mtl_ind_current_outN = nullptr,
     arma::Col<short> *mtl_ind_buffer_outN = nullptr,
     arma::Col<dtype> *gainN = nullptr,
     arma::Mat<dtype> *xprmatN = nullptr,
     arma::Mat<dtype> *path_dirN = nullptr,
-    arma::Col<dtype> *acc_dist_outN = nullptr,
+    arma::Mat<dtype> *acc_dist_outN = nullptr,
+    std::vector<uint8_t> *resolved_typeN = nullptr,
     const arma::u32_vec *ray_indN = nullptr,
     double eps = 0.15);
 ```
 
 ### Inputs:
-- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 
-  4 scalar transmission, 5 scalar refraction
+- **`interaction_type`** — 0 EM reflection, 1 EM transmission, 2 EM refraction, 3 scalar reflection, 4 scalar transmission, 5 scalar refraction
 - **`center_frequency`** — Center frequency in [Hz]
-- **`orig`**, **`dest`**, **`fbs`**, **`sbs`** — Ray origin, destination, first and second interaction points in 
-  GCS, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`orig`**, **`dest`** — Ray origin, destination, full ray set; `[n_ray, 3]`, read at `g = ray_indN[i]`
+- **`fbsN`**, **`sbsN`**  — First and second interaction points, compact set; `[n_rayN, 3]`
 - **`no_interact`** — Mesh-hit count per ray, full ray set; `[n_ray]`
 - **`fbs_angleN`** — Incidence angle at FBS (ITU convention), compact set; `[n_rayN]`
-- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`. 
-  The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test. 
+- **`normal_vecN`** — FBS and SBS normals `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`, compact set; `[n_rayN, 6]`.
+  The VBS plane normal for the Snell corrections; currently also gates the parallelism (wedge) test.
   NULL disables the wedge test.
 - **`out_typeN`** — Interaction type code from [ray_mesh_interact](#ray_mesh_interact), compact set; `[n_rayN]`
 - **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read))
-- **`mtl_ind_fbs`**, **`mtl_ind_sbs`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
-- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words,
-  full ray set; `[n_ray]`, read at `g`, never written. NULL reads as state `0` (outside, no flags).
+- **`mtl_ind_fbsN`**, **`mtl_ind_sbsN`** — Material indices M1 / M2 of the FBS / SBS faces, compact set; `[n_rayN]` (0 = air)
+- **`mtl_ind_prev_in`**, **`mtl_ind_current_in`**, **`mtl_ind_buffer_in`** — State words, full ray set; `[n_ray]`,
+  read at `g`, never written. NULL reads as state `0` (outside, no flags).
 - **`path_dir_prev`** — Physical ray direction entering this segment, full ray set; `[n_ray, 3]`
-- **`acc_dist_in`** — Accumulated in-layer VBS distance carried into this call, full ray set; `[n_ray]`
+- **`acc_dist_in`** — Accumulated in-layer distance carried into this call, full ray set; `[n_ray, 2]`; col 1 = refracted distance; col 2 = geometric distance
 - **`ray_indN`** — Compact-to-full ray index map; `[n_rayN]` to `[n_ray]`; NULL = identity (`n_ray == n_rayN`)
+- **`eps`** *(optional)* — Thin-slab (Fabry-Pérot) resolve threshold on the round-trip in-slab
+  amplitude `ρ` (`ρ ∈ [0, 1]`): the closed-form Airy factor is applied when `ρ ≥ eps` and the series
+  is re-emitted to the tracer when `ρ < eps` (weak / fast-decaying slabs). `eps = 0` always resolves
+  (for callers that cannot re-emit, e.g. [calc_diffraction_gain](#calc_diffraction_gain)); `eps ≥ 1` always re-emits
+  (resolution disabled). A near-pole `S` or a known non-parallel slab re-emits regardless of `eps`.
+  Default `0.15`.
 
 ### Outputs:
 - **`mtl_ind_prev_outN`**, **`mtl_ind_current_outN`**, **`mtl_ind_buffer_outN`** — Updated state words,
   compact set; `[n_rayN]`. NULL skips the write. Passing all six state args NULL disables tracking —
   each interaction is corrected on its own (entry loss, TR kill, single-hit air-gap `S`); cross-interaction slab `S` and
   reflection-bounce `S` need the tracked medium.
-- **`gainN`** *(in/out)* — Per-interaction gain, patched in place; `[n_rayN]`
-- **`xprmatN`** *(in/out)* — Polarization transfer matrix, columns VV, HV, VH, HH (re, im per entry), patched in place; `[n_rayN, 8]`
-- **`path_dirN`** *(in/out)* — Continuation direction from [ray_mesh_interact](#ray_mesh_interact), corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
-- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN]`
+- **`gainN`** *(in/out)* — Per-interaction gain, updated in place; `[n_rayN]`
+- **`xprmatN`** *(in/out)* — Polarization transfer matrix; updated in place; `[8, n_rayN]` for EM mode, `[2, n_rayN]` for scalar mode
+- **`path_dirN`** *(in/out)* — Continuation direction, corrected in place by the VBS construction, compact set; `[n_rayN, 3]`
+- **`acc_dist_outN`** — Accumulated VBS distance leaving this call, compact set; `[n_rayN, 2]`
+- **`resolved_typeN`** *(optional)* — Resolved interaction-type code, bit-encoded (`qd::bits<uint8_t>`),
+  compact set; `[n_rayN]`. 0 = ray killed. NULL skips the write.
+   | Bit  | Flag        | Meaning                                                                        |
+   | :--: | :---------: | ------------------------------------------------------------------------------ |
+   |   0  | ok          | OK flag (0 = a deferred degenerate-resolve buffer is pending)                  |
+   |   1  | vbs         | VBS correction (gain/xprmat corrected at the VBS instead of FBS/SBS)           |
+   |   2  | resolve     | Slab-resolve flag (an internal multi-bounce series was resolved analytically)  |
+   |   3  | inside      | Inside-object flag (1 = ray continues inside, 0 = continues outside)           |
+   |   4  | fix         | Fix flag (resolved-false-outside, or entry/exit material mismatch)             |
+   |   5  | tir         | Total-reflection flag (also set when a transmission factor forced reflection)  |
+   |   6  | trans       | Transmission: transparent-interface flag; reflection: scatter flag             |
+   |   7  | refl        | Reflection flag (0 = transmission/refraction, 1 = reflection/scattering)       |
+   Reachable composite values for transmission / refraction:
+   |  Dec | Hex  | FIX  |   TIR   | Flags set                  | Meaning                                            |
+   | :--: | :--: | :--: | :-----: | -------------------------- | -------------------------------------------------- |
+   |    9 | 0x09 |   —  |    41   | inside, ok                 | o-i entry, OR i-i transition (refr. 2/5, FBS==VBS) |
+   |    8 | 0x08 |   —  |    40   | inside                     | o-i entry, deferred buffer set (overlap/edge)      |
+   |   11 | 0x0B |  27  |  43, 59 | inside, vbs, ok            | i-i transition (undev. 1/4, VBS relocated)         |
+   |   13 | 0x0D |  29  |  45, 61 | inside, resolve, ok        | i-i transition + slab series (refr. 2/5, FBS==VBS) |
+   |   15 | 0x0F |  31  |  47, 63 | inside, resolve, vbs, ok   | i-i transition + slab series (undev. 1/4, VBS)     |
+   |    1 | 0x01 |  17  |  33, 49 | ok                         | i-o exit (refr. 2/5, FBS==VBS)                     |
+   |    3 | 0x03 |  19  |  35, 51 | vbs, ok                    | i-o exit (undev. 1/4, VBS relocated)               |
+   |    5 | 0x05 |  21  |  37, 53 | resolve, ok                | i-o exit + slab series (refr. 2/5, FBS==VBS)       |
+   |    7 | 0x07 |  23  |  39, 55 | resolve, vbs, ok           | i-o exit + slab series (undev. 1/4, VBS)           |
+   |   73 | 0x49 |  89  |     —   | trans, inside, ok          | ignore-hit / same-medium pass, no gain change      |
+   |   72 | 0x48 |  88  |     —   | trans, inside              | nested pass-through, buffer deferred               |
+   |   65 | 0x41 |   —  |     —   | trans, ok                  | advance to ray destination, identity interface     |
+   Reachable composite values for reflection:
+   |  Dec | Hex  |  FIX |   TIR   | Flags set                       | Meaning                                                      |
+   | :--: | :--: | :--: | :-----: | ------------------------------- |------------------------------------------------------------- |
+   |  129 | 0x81 |    — |   161   | refl, ok                        | eager front reflection (R0), outside (FBS==VBS)              |
+   |  137 | 0x89 |  153 | 169,185 | refl, inside, ok                | internal back-reflection (incoming refr. 2/5, FBS==VBS)      |
+   |  139 | 0x8B |  155 | 171,187 | refl, inside, vbs, ok           | internal back-reflection (incoming undev. 1/4, VBS)          |
+   |  141 | 0x8D |  157 | 173,189 | refl, inside, resolve, ok       | internal back-reflection + slab series (incoming refr. 2/5)  |
+   |  143 | 0x8F |  159 | 175,191 | refl, inside, resolve, vbs, ok  | internal back-reflection + slab series (incoming undev. 1/4) |
+   |  192+| 0xC0+|    — |    —    | refl, trans, ...                | reserved: scattering not implemented                         |
 
 ### See also:
 - <a target="_blank" rel="noopener noreferrer" href="quadriga_lib_material_model.md">The quadriga-lib Material Model and Ray-State Machine</a> (companion document)
@@ -3802,6 +3893,38 @@ void quadriga_lib::ray_triangle_intersect(
 - [ray_point_intersect](#ray_point_intersect) (beam interactions with sampling points)
 - [icosphere](#icosphere) (generate ray beams)
 - [subdivide_rays](#subdivide_rays) (split ray beams into sub-beams)
+
+---
+## refractive_index
+Real refractive index of a homogeneous medium
+
+- Returns `n = Re(sqrt(ε_r · μ_r))`, the real part of the complex refractive index, using the
+  ITU-R P.2040-1 permittivity model `ε_r = a·(f/fRef)^b` together with the relative permeability `μ_r`.
+- Only the bulk (base) permittivity is used. The coincidence / resonance features
+  (`coiF`, `coiQ`, `coiA`, `resF`, ...) are excluded, since they model a thin-interface surface
+  effect, not bulk propagation, and must not enter the geometric refraction index.
+- Air (`iM = 0`) returns `1`.
+
+### Declaration:
+```
+dtype quadriga_lib::refractive_index(
+    const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop,
+    arma::uword iM,
+    dtype center_frequency);
+```
+
+### Inputs:
+- **`mtl_prop`** — Material properties keyed by column name (the `csv_prop` output of [obj_file_read](#obj_file_read)); each value has length `n_mtl`
+- **`iM`** — 1-based material index (0 = no material / air)
+- **`center_frequency`** — Center frequency in [Hz]
+
+### Returns:
+- Real refractive index of the medium relative to air
+
+### See also:
+- [medium_gain](#medium_gain) (for the distance-dependent in-medium loss)
+- [ray_mesh_interact](#ray_mesh_interact) (for complex ray-material interactions)
+- [obj_file_read](#obj_file_read) (defines mtl_prop format)
 
 ---
 ## subdivide_rays
@@ -4006,4 +4129,101 @@ void quadriga_lib::write_png(
 - **`min_val`** *(optional)* — Lower clipping bound; auto-detected if `NAN`
 - **`max_val`** *(optional)* — Upper clipping bound; auto-detected if `NAN`
 - **`log_transform`** *(optional)* — Apply 10*log10(data) before mapping; non-positive values map to the minimum color
+
+---
+## xpr_update
+Thread a polarization transfer (Jones) matrix along a ray path
+
+- Left-multiplies each per-ray state matrix by a new interaction matrix, vectorized across up to
+  hundreds of millions of rays, then optionally normalizes the touched columns and re-imposes a
+  separately tracked scalar gain — all in a single pass
+- One entry point covers every operation needed while threading a chain: initialization, updating,
+  gain extraction, normalization, and gain application. They are selected independently through
+  `initialize`, `update`, `normalize`, `gain`, and `apply_gain`, so a call can do any combination
+  (see Usage)
+- An optional `ray_index` lets the update set be a subset of the global state, scattered into
+  `xprmat` by column. Without it the mapping is 1:1 and `n_ray == n_rayU`
+- Storage is interleaved complex, column-major, matching the `xprmat` output of
+  [calc_diffraction_gain](#calc_diffraction_gain). EM mode carries the full 2x2 Jones matrix; scalar mode carries a
+  single complex pressure coefficient
+
+### Declaration:
+```
+void xpr_update(
+    arma::Mat<dtype> &xprmat,
+    const arma::Mat<dtype> *update = nullptr,
+    arma::Col<dtype> *gain = nullptr,
+    bool initialize = false,
+    bool normalize = false,
+    bool apply_gain = false,
+    const arma::uvec *ray_index = nullptr);
+```
+
+### Arguments:
+- **`xprmat`** — Global XPR state, updated in place. EM mode `[8, n_ray]`, scalar mode
+  `[2, n_ray]`. If empty on entry it is sized from `update` and seeded to unity (see Usage). A
+  pre-sized (non-empty) buffer is treated as accumulated state unless `initialize` is set. When
+  `ray_index` is given, `xprmat` must already exist, because the extent of the global set cannot be
+  inferred from a subset.
+- **`update`** — Interaction matrix left-multiplied onto each ray of the update set. Layout must
+  match `xprmat` (8 or 2 rows). Shapes: `[8 or 2, n_rayU]` applies one matrix per update; `[8 or 2, 1]`
+  broadcasts one matrix to every update; `nullptr` or empty applies the identity (no multiply).
+- **`gain`** — Dual-purpose, length `n_rayU`; direction set by `apply_gain`:
+  - `apply_gain == false` (output): resized to `[n_rayU]` and filled with each ray's gain *before*
+    normalization. With `normalize == false` this measures the gain without modifying the matrix
+    part of `xprmat` (gain extraction); with `normalize == true` it reports the gain that was
+    removed. A value of 0 flags a degenerate (zero / non-finite) matrix the caller should prune.
+  - `apply_gain == true` (input): read, not resized; each touched column is multiplied by the
+    corresponding `gain` value *after* normalization. Must be non-null and length `n_rayU`.
+- **`initialize`** — If `true`, each touched column is set to unity (identity for EM, `[1,0]` for
+  scalar) before the update. With an `update` this is a copy-through (the column becomes the
+  update, prior contents discarded); without an `update` it is a pure reset. Use this to
+  (re)initialize a pre-sized or reused buffer without reallocating.
+- **`normalize`** — If `true`, each touched column is scaled to unit gain after the update.
+  Untouched columns of `xprmat` are left alone.
+- **`apply_gain`** — Flips `gain` from output to input (see above). Applying a gain requires a `gain` vector.
+- **`ray_index`** — Optional map from update index (`0..n_rayU-1`) to global column of `xprmat`.
+  Length `n_rayU`. Default is the identity map, which requires `n_ray == n_rayU`. Values must be
+  `< n_ray`.
+
+### Usage:
+The flags are composable in one call; the per-column order is always
+initialize -> update -> normalize -> apply_gain. Argument order is
+`(xprmat, update, gain, initialize, normalize, apply_gain, ray_index)`.
+```
+arma::Mat<dtype> M;                                 // ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH (EM)
+
+// (1) Initialization
+xpr_update(M, &U0);                                 // empty M: sized from U0, seeded, M := U0
+xpr_update(M, nullptr, nullptr, true);              // pre-sized M: reset every column to unity
+xpr_update(M, &U0, nullptr, true);                  // pre-sized M: copy-through, M := U0 (ignores old)
+
+// (2) Updating (accumulate onto existing state)
+xpr_update(M, &U);                                  // M := U * M
+xpr_update(M, &Usub, nullptr, false, false, false, &idx);   // scatter: M[:,idx[k]] := Usub[:,k] * M[:,idx[k]]
+
+// (3) Gain extraction (measure, leave the matrix part untouched)
+arma::Col<dtype> g;
+xpr_update(M, nullptr, &g);                         // g[k] = gain( M[:,k] )
+xpr_update(M, &U, &g);                              // apply U, then measure into g (no normalize)
+
+// (4) Normalizing (scale each column to unit gain; optionally update first)
+xpr_update(M, nullptr, nullptr, false, true);       // M[:,k] := M[:,k] / gain( M[:,k] )
+xpr_update(M, &U, nullptr, false, true);            // update, then normalize, one pass
+
+// (5) Normalizing + gain application (strip the matrix's own magnitude, impose a tracked scalar).
+//     'g' is read here (apply_gain = true):
+xpr_update(M, nullptr, &g, false, true, true);      // M[:,k] := g[k] * ( M[:,k] / gain( M[:,k] ) )
+xpr_update(M, &U, &g, false, true, true, &idx);     // full chain step: scatter+update+normalize+apply
+```
+
+### Storage layout (column-major, interleaved complex):
+- **EM mode**, 8 values per ray: `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`, so column 0 of the
+  2x2 is `[VV; HV]` (response to a V input) and column 1 is `[VH; HH]` (response to an H input).
+- **Scalar mode**, 2 values per ray: `[Re Im]`.
+- The update is `M_out = M_update * M_state` (new interaction left-multiplies), consistent with
+  `E_out = M * E_in` for column vectors and Armadillo/MATLAB column-major storage.
+
+### See also:
+- [calc_diffraction_gain](#calc_diffraction_gain) (produces `xprmat` in this exact layout)
 
