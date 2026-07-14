@@ -480,6 +480,17 @@ namespace quadriga_lib
                             arma::Mat<dtype> *meshB,              // Second half, Size: [ n_meshB, 9 ]
                             int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
                             arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
+
+    // Polarization transfer (Jones) matrix threading along a ray path
+    template <typename dtype>
+    void xpr_update(arma::Mat<dtype> &xprmat,                 // Existing XPR matrix; Updated in-place; EM mode [8, n_ray]; Scalar mode [2, n_ray]; Initialized if empty
+                    const arma::Mat<dtype> *update = nullptr, // XPR Update; [8 or 2, 1] broadcasts; empty = unitary; otherwise [8 or 2, n_rayU]
+                    arma::Col<dtype> *gain = nullptr,         // The per-ray gain; Length [n_rayU]
+                    bool initialize = false,                  // Initialize xprmat to unity before applying the update
+                    bool normalize = false,                   // Normalize result after updating (only n_rayU updated columns, ignores rest)
+                    bool apply_gain = false,                  // If true, read gain from *gain and apply it to xprmat after normalization
+                    const arma::uvec *ray_index = nullptr);   // Optional rayU to ray mapping; default: 1:1 (n_ray == n_rayU)
+
 }
 
 #endif
