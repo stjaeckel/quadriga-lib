@@ -104,31 +104,24 @@ namespace quadriga_lib
     // - Supported colormaps: jet, parula, winter, hot, turbo, copper, spring, cool, gray, autumn, summer
     arma::uchar_mat colormap(std::string map, bool high_res = false);
 
-    // Write data to PNG file
-    template <typename dtype>                    // Types: float, double
-    void write_png(const arma::Mat<dtype> &data, // Data matrix
-                   std::string fn,               // Filename of the PNG file, string
-                   std::string colormap = "jet", // Colormap
-                   dtype min_val = NAN,          // Minimum value, when passing NAN, minimum in data is used
-                   dtype max_val = NAN,          // Maximum value, when passing NAN, maximum data is used
-                   bool log_transform = false);  // Transform data to log-domain (10*log10(data))
-
     // Calculate diffraction gain for multiple transmit and receive positions
     template <typename dtype>                                                                       // Supported types: float or double
-    void calc_diffraction_gain(const arma::Mat<dtype> *orig,                                        // TX positions; Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *dest,                                        // RX positions; Size: [ n_pos, 3 ]
-                               const arma::Mat<dtype> *mesh,                                        // Triangle vertices; Size: [ no_mesh, 9 ]
-                               const arma::uvec *mtl_ind,                                           // 0-based material index, Size: [n_mesh]
-                               const std::unordered_map<std::string, std::vector<dtype>> *mtl_prop, // Material properties; Length: [n_mtl]
+    void calc_diffraction_gain(const arma::Mat<dtype> &orig,                                        // TX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> &dest,                                        // RX positions; Size: [ n_pos, 3 ]
+                               const arma::Mat<dtype> &mesh,                                        // Triangle vertices; Size: [ no_mesh, 9 ]
+                               const arma::uvec &mtl_ind,                                           // 0-based material index, Size: [n_mesh]
+                               const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                                dtype center_frequency,                                              // Center frequency in [Hz]
                                int lod = 2,                                                         // Level of detail, 0-6
                                arma::Col<dtype> *gain = nullptr,                                    // Diffraction gain, linear scale; Size: [ n_pos ]
+                               arma::Mat<dtype> *xprmat = nullptr,                                  // Polarization transfer matrix; Size [n_pos, 8] for EM or [n_pos, 8] for scalar
                                arma::Cube<dtype> *coord = nullptr,                                  // Diffracted path coords (excl. endpoints); Size: [ 3, n_seg-1, n_pos ]
                                int verbose = 0,                                                     // Verbosity level
                                const arma::u32_vec *sub_mesh_index = nullptr,                       // Sub-mesh index, 0-based; Length: [ no_mesh ]
                                int use_kernel = 0,                                                  // Kernel: 0=auto, 1=GENERIC, 2=AVX2, 3=CUDA
                                int gpu_id = 0,                                                      // CUDA device ID, ignored otherwise
-                               bool scalar_mode = false);
+                               bool scalar_mode = false,                                            // Scalar (acoustic) mode
+                               double thin_slab_threshold = 0.0);                                   // Resolve threshold on the round-trip in-slab amplitude, 0 = always resolve, 1 = never
 
     // Convert path interaction coordinates into FBS/LBS positions, path length and angles
     // - FBS / LBS position of the LOS path is placed half way between TX and RX
@@ -396,7 +389,7 @@ namespace quadriga_lib
     template <typename dtype>
     dtype refractive_index(const std::unordered_map<std::string, std::vector<dtype>> &mtl_prop, // Material properties; Length: [n_mtl]
                            arma::uword iM,                                                      // 1-based material index of the entered material
-                         dtype center_frequency);                                             // Frequency in Hz
+                           dtype center_frequency);                                             // Frequency in Hz
 
     // Calculate the intersections of ray tubes with point clouds
     // - Returns the number of hits per point and the (0-based) indices of the rays that hit each point
@@ -489,6 +482,15 @@ namespace quadriga_lib
                             arma::Mat<dtype> *meshB,              // Second half, Size: [ n_meshB, 9 ]
                             int axis = 0,                         // Axis selector: 0 = Longest, 1 = x, 2 = y, 3 = z
                             arma::Col<int> *split_ind = nullptr); // Split indicator (optional): 1 = meshA, 2 = meshB, 0 = Error, Length: [ n_mesh ]
+
+    // Write data to PNG file
+    template <typename dtype>
+    void write_png(const arma::Mat<dtype> &data, // Data matrix
+                   std::string fn,               // Filename of the PNG file, string
+                   std::string colormap = "jet", // Colormap
+                   dtype min_val = NAN,          // Minimum value, when passing NAN, minimum in data is used
+                   dtype max_val = NAN,          // Maximum value, when passing NAN, maximum data is used
+                   bool log_transform = false);  // Transform data to log-domain (10*log10(data))
 
     // Polarization transfer (Jones) matrix threading along a ray path
     template <typename dtype>

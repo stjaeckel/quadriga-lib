@@ -8,6 +8,8 @@
 namespace py = pybind11;
 
 // Include parts
+#include "qpy_calc_diffraction_gain.cpp"
+#include "qpy_cube.cpp"
 #include "qpy_icosphere.cpp"
 #include "qpy_mitsuba_xml_file_write.cpp"
 #include "qpy_obj_file_read.cpp"
@@ -19,7 +21,6 @@ namespace py = pybind11;
 #include "qpy_ray_triangle_intersect.cpp"
 #include "qpy_triangle_mesh_aabb.cpp"
 #include "qpy_triangle_mesh_segmentation.cpp"
-#include "qpy_calc_diffraction_gain.cpp"
 
 void quadriga_lib_RTtools(py::module_ &m)
 {
@@ -35,7 +36,14 @@ void quadriga_lib_RTtools(py::module_ &m)
           py::arg("sub_mesh_index") = py::none(),
           py::arg("use_kernel") = 0,
           py::arg("gpu_id") = 0,
-          py::arg("scalar_mode") = false);
+          py::arg("scalar_mode") = false,
+          py::arg("thin_slab_threshold") = 0.0);
+
+    m.def("cube", &cube,
+          py::arg("scale") = py::none(),
+          py::arg("rotation") = py::none(),
+          py::arg("location") = py::none(),
+          py::arg("n_div") = 1);
 
     m.def("icosphere", &icosphere, py::arg("n_div") = 1,
           py::arg("radius") = 1.0, py::arg("direction_xyz") = false);
