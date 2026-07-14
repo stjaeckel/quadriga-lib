@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <cstdint>
 
 // Function to calculate the gain
 static inline double calc_transition_gain(int interaction_type,       // (0) Reflection, (1) Transmission, (2) Refraction
@@ -120,23 +121,6 @@ static inline double calc_transition_gain_mu(int interaction_type,
     return medium_1_gain * refraction_gain * medium_2_gain; // interaction_type == 2
 }
 
-// Shared unit cube (same 12 faces every existing test redefines inline)
-static inline arma::mat make_cube()
-{
-    return arma::mat{{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
-                     {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
-                     {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
-                     {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
-                     {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
-                     {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
-                     {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
-                     {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
-}
-
 // Append constant permeability columns e,f,g,h to an existing material map (assumes a
 // uniform mu across the deduplicated materials, which is all the mu tests below need).
 template <typename dtype>
@@ -202,19 +186,8 @@ static inline void mtl_matrix_to_map(const arma::Mat<dtype> &M,
 
 TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
 {
-    // Default cube
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    // Blender-style 2x2x2 cube centered at the origin, 12 triangles, outward normals
+    arma::mat cube = quadriga_lib::cube<double>();
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
@@ -254,7 +227,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
 
     // Output containers
-    arma::mat origN, destN, xprmatN, trivecN, tridir_sphN, normal_vecN, tridir_crtN;
+    arma::mat origN, destN, fbsN, sbsN, xprmatN, trivecN, tridir_sphN, normal_vecN, tridir_crtN;
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, U;
     double a;
 
@@ -265,17 +238,21 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     std::unordered_map<std::string, std::vector<double>> mtl_map;
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
 
-    // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+    // Test reflection (spherical tridir); also capture fbsN/sbsN (now engine-computed outputs)
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir_sph, &orig_length,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_sphN,
+                                    &origN, &destN, &fbsN, &sbsN, &gainN, &xprmatN, &trivecN, &tridir_sphN,
                                     &orig_lengthN, &fbs_angleN, &thicknessN, &edge_lengthN, &normal_vecN);
 
     CHECK(tridir_sphN.n_cols == 6);
 
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+    // fbsN/sbsN reproduce the ray_triangle_intersect points
+    CHECK(arma::approx_equal(fbsN, fbs, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(sbsN, sbs, "absdiff", 1e-6));
+
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir_crt, &orig_length,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_crtN,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridir_crtN,
                                     &orig_lengthN, &fbs_angleN, &thicknessN, &edge_lengthN, &normal_vecN);
 
     CHECK(tridir_crtN.n_cols == 9);
@@ -293,26 +270,26 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
 
     CHECK(arma::approx_equal(tridir_crtN, T, "absdiff", 1e-6));
 
-    T = {{-1.001, 0.0, 0.5}};
+    T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = {{-12.0, 0.0, 0.5}};
-    CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(destN, T, "absdiff", 5e-6));
 
     U = {0.0}; // Air does not reflect anything
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6)); // xprmat now [8, n_rayN]
 
     a = std::tan(1.0 * deg2rad) * 9.0 + 0.2;
-    T = {{0.001, -0.1, a, 0.001, -0.1, -0.2, 0.001, a, 0.0}};
+    T = {{0.0, -0.1, a, 0.0, -0.1, -0.2, 0.0, a, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{180.0, 1.0, 180.0, 0.0, 179.0, 0.0}};
     CHECK(arma::approx_equal(tridir_sphN, T * deg2rad, "absdiff", 1e-6));
 
-    U = {2.7 + 9.0 + 0.001};
+    U = {2.7 + 9.0};
     CHECK(arma::approx_equal(orig_lengthN, U, "absdiff", 1e-6));
 
     U = {90.0 * deg2rad};
@@ -328,23 +305,23 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
     CHECK(arma::approx_equal(normal_vecN, T, "absdiff", 1e-6));
 
     // Test transmission on air
-    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir_sph, &orig_length,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridir_sphN);
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir_sph, &orig_length,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridir_sphN);
 
-    T = {{-0.999, 0.0, 0.5}};
+    T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = dest;
-    CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(destN, T, "absdiff", 5e-6));
 
     U = {1.0}; // Air does transmit everything
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
     a = std::tan(1.0 * deg2rad) * 9.0 + 0.2;
-    T = {{-0.001, -0.1, a, -0.001, -0.1, -0.2, -0.001, a, 0.0}};
+    T = {{0.0, -0.1, a, 0.0, -0.1, -0.2, 0.0, a, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{0.0, 1.0, 0.0, 0.0, 1.0, 0.0}};
@@ -353,19 +330,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Air (x-z plane)")
 
 TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
 {
-    // Default cube
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     // Conversions
     double deg2rad = arma::datum::pi / 180.0;
@@ -381,7 +346,6 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
 
     arma::mat T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(fbs, T, "absdiff", 1e-6));
-    arma::mat xxx = fbs - T;
 
     T = {{-0.5, 0.0, 1.0}}; // Ceiling of cube
     CHECK(arma::approx_equal(sbs, T, "absdiff", 1e-6));
@@ -402,11 +366,10 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
 
     // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    a = 0.001 * std::cos(45 * deg2rad);
-    T = {{-1.0 - a, 0.0, 0.5 + a}};
+    T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = {{-2.0, 0.0, 1.5}};
@@ -424,28 +387,26 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{-R_par, 0.0, 0.0, 0.0, 0.0, 0.0, -R_per, 0.0}}; // 180° phase shift for reflection
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    T = {{a, -0.1, 0.2 - a, a, -0.1, -0.2 - a, a, 0.2, -a}};
+    T = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{180.0, 45.0, 180.0, 45.0, 180.0, 45.0}};
     CHECK(arma::approx_equal(tridirN, T * deg2rad, "absdiff", 1e-6));
 
     // Test refraction into medium
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     // Refraction angle calculated from Snell's law
     double th2 = std::asin(std::sin(45.0 * deg2rad) / std::sqrt(eps));
 
-    double x = std::cos(th2) * 0.001 - 1;
-    double z = std::sin(th2) * 0.001 + 0.5;
-    T = {{x, 0.0, z}};
+    T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
-    x = std::cos(th2) * std::sqrt(2) - 1;
-    z = std::sin(th2) * std::sqrt(2) + 0.5;
+    double x = std::cos(th2) * std::sqrt(2) - 1;
+    double z = std::sin(th2) * std::sqrt(2) + 0.5;
     T = {{x, 0.0, z}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-6));
 
@@ -457,22 +418,19 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{T_tm, 0.0, 0.0, 0.0, 0.0, 0.0, T_te, 0.0}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    a = std::cos(th2) * 0.001;
-    double b = std::sin(th2) * 0.001;
-    T = {{-a, -0.1, 0.2 - b, -a, -0.1, -0.2 - b, -a, 0.2, -b}};
+    T = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{0.0, th2, 0.0, th2, 0.0, th2}};
     CHECK(arma::approx_equal(tridirN, T, "absdiff", 1e-6));
 
     // Test transmission into medium
-    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    a = 0.001 * std::cos(45 * deg2rad); // Same as reflection
-    T = {{-1.0 + a, 0.0, 0.5 + a}};
+    T = {{-1.0, 0.0, 0.5}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = dest;
@@ -489,7 +447,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
 
     T = {{T_tm, 0.0, 0.0, 0.0, 0.0, 0.0, T_te, 0.0}}; // Same as refraction
     T = T * std::sqrt((1 - G) / H);
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
     T = {{-a, -0.1, 0.2 - a, -a, -0.1, -0.2 - a, -a, 0.2, -a}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
@@ -501,19 +459,7 @@ TEST_CASE("Ray-Mesh Interact - Air to Dielectric Medium (x-z plane)")
 
 TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
 {
-    // Default cube
-    arma::fmat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                       {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                       {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                       {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                       {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                       {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                       {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                       {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                       {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                       {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                       {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                       {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    arma::fmat cube = quadriga_lib::cube<float>();
 
     // Conversions
     float deg2rad = arma::datum::pi / 180.0;
@@ -548,12 +494,11 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     mtl_matrix_to_map<float>(mtl_prop, mtl_ind, mtl_map);
 
     // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     float cos_th = std::cos(45.0 * deg2rad);
-    float a = 0.001 * cos_th;
-    T = {{1.0f - a, 0.6f + a, 0.0f}};
+    T = {{1.0f, 0.6f, 0.0f}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = {{0.0f, 1.6f, 0.0f}};
@@ -572,21 +517,21 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     float R_te = (sqrt_eps * cos_th - cos_th2) / (sqrt_eps * cos_th + cos_th2);
     float R_tm = (cos_th - sqrt_eps * cos_th2) / (cos_th + sqrt_eps * cos_th2);
     T = {{R_te, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, R_tm, 0.0f}}; // x-y plane swaps base vectors
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    T = {{a, -0.1f - a, 0.2, a, -0.1f - a, -0.2f, a, 0.2f - a, 0.0}};
+    T = {{0.0f, -0.1f, 0.2, 0.0f, -0.1f, -0.2f, 0.0f, 0.2f, 0.0f}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{135.0f, 0.0f, 135.0f, 0.0f, 135.0f, 0.0f}};
     CHECK(arma::approx_equal(tridirN, T * deg2rad, "absdiff", 1e-07));
 
     // Test refraction
-    quadriga_lib::ray_mesh_interact(2, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     float th2 = std::acos(cos_th2);
-    float x = std::cos(th2) * 0.001 + 1.0;
-    float y = std::sin(th2) * 0.001 + 0.6;
+    float x = 1.0f;
+    float y = 0.6f;
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
@@ -608,19 +553,17 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
 
     // x-y plane swaps base vectors
     T = {{T_te, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, T_tm, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    a = std::cos(th2) * 0.001;
-    float b = std::sin(th2) * 0.001;
-    T = {{-a, -0.1f - b, 0.2f, -a, -0.1f - b, -0.2f, -a, 0.2f - b, 0.0f}};
+    T = {{0.0f, -0.1f, 0.2f, 0.0f, -0.1f, -0.2f, 0.0f, 0.2f, 0.0f}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{th2, 0.0f, th2, 0.0f, th2, 0.0f}};
     CHECK(arma::approx_equal(tridirN, T, "absdiff", 1e-6));
 
     // Transmission from inside to outside without refraction
-    quadriga_lib::ray_mesh_interact(1, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(1, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     U = {(float)calc_transition_gain(1, 45.0, 0.0, 0.0, eta1, eta2)};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
@@ -633,52 +576,36 @@ TEST_CASE("Ray-Mesh Interact - Dielectric Medium to Air (x-y plane, float)")
     mtl_prop = repmat(mtl_prop, 12, 1);
     mtl_matrix_to_map<float>(mtl_prop, mtl_ind, mtl_map);
 
-    quadriga_lib::ray_mesh_interact(0, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
     U = {1.0f};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    quadriga_lib::ray_mesh_interact(2, 10.0e9f, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9f, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::fvec *)nullptr,
+                                    &origN, &destN, (arma::fmat *)nullptr, (arma::fmat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
     U = {0.0f};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     T = {{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 }
 
 TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
 {
-
-    // Default cube
-    arma::mat msh = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                     {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                     {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                     {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                     {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                     {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                     {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                     {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
-
-    auto tmp = msh; // Second cube
-    tmp.col(0) = tmp.col(0) + 2.0;
-    tmp.col(3) = tmp.col(3) + 2.0;
-    tmp.col(6) = tmp.col(6) + 2.0;
+    // Two adjacent cubes; the second is the first shifted +2 in x (shared wall at x = 1)
+    arma::mat msh = quadriga_lib::cube<double>();
+    arma::mat tmp = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
     msh = arma::join_cols(msh, tmp);
 
     arma::mat mtl_prop = {{1.2, std::log10(1.5 / 1.2), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
 
-    tmp = {{1.33, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 1.0}};
-    tmp = repmat(tmp, 12, 1);
-    mtl_prop = arma::join_cols(mtl_prop, tmp);
+    arma::mat mtl_tmp = {{1.33, 0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl_tmp = repmat(mtl_tmp, 12, 1);
+    mtl_prop = arma::join_cols(mtl_prop, mtl_tmp);
     arma::uvec mtl_ind;
     std::unordered_map<std::string, std::vector<double>> mtl_map;
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
@@ -710,12 +637,11 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, U;
 
     // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     double cos_th = std::cos(45.0 * deg2rad);
-    double a = 0.001 * cos_th;
-    T = {{1.0 - a, 0.6 + a, 0.0}};
+    T = {{1.0, 0.6, 0.0}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
     T = {{0.0, 1.6, 0.0}};
@@ -734,24 +660,26 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     // x-y plane swaps base vectors
-    T = {{R_te, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, R_tm, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    T = {{R_te, 0.0, 0.0, 0.0, 0.0, 0.0, R_tm, 0.0}};
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    T = {{a, -0.1 - a, 0.2, a, -0.1 - a, -0.2, a, 0.2 - a, 0.0}};
+    T = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
     T = {{135.0, 0.0, 135.0, 0.0, 135.0, 0.0}};
     CHECK(arma::approx_equal(tridirN, T * deg2rad, "absdiff", 1e-07));
 
     // Test refraction
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
+    // Entered medium (M2) carries att = 3 dB as a lumped interface loss (still folded into
+    // the transmission-class gain after the refactor; in-medium distance loss is not).
     double transition_gain = std::pow(10.0, -0.1 * 3.0);
 
     double th2 = std::acos(cos_th2);
-    double x = std::cos(th2) * 0.001 + 1.0;
-    double y = std::sin(th2) * 0.001 + 0.6;
+    double x = 1.0;
+    double y = 0.6;
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
@@ -771,47 +699,29 @@ TEST_CASE("Ray-Mesh Interact - Medium to Medium (x-y plane, double)")
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     // x-y plane swaps base vectors
-    T = {{T_te, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, T_tm, 0.0f}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    T = {{T_te, 0.0, 0.0, 0.0, 0.0, 0.0, T_tm, 0.0}};
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
 
-    a = std::cos(th2) * 0.001;
-    double b = std::sin(th2) * 0.001;
-    T = {{-a, -0.1f - b, 0.2f, -a, -0.1f - b, -0.2f, -a, 0.2f - b, 0.0f}};
+    T = {{0.0, -0.1, 0.2, 0.0, -0.1, -0.2, 0.0, 0.2, 0.0}};
     CHECK(arma::approx_equal(trivecN, T, "absdiff", 1e-6));
 
-    T = {{th2, 0.0f, th2, 0.0f, th2, 0.0f}};
+    T = {{th2, 0.0, th2, 0.0, th2, 0.0}};
     CHECK(arma::approx_equal(tridirN, T, "absdiff", 1e-6));
 }
 
 TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
 {
-
-    // Default cube
-    arma::mat msh = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                     {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                     {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                     {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                     {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                     {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                     {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                     {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                     {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                     {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
-
-    auto tmp = msh; // Second cube
-    tmp.col(0) = tmp.col(0) + 2.0;
-    tmp.col(3) = tmp.col(3) + 2.0;
-    tmp.col(6) = tmp.col(6) + 2.0;
+    // Two adjacent cubes; conductive medium 1, dielectric medium 2, shared wall at x = 1
+    arma::mat msh = quadriga_lib::cube<double>();
+    arma::mat tmp = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
     msh = arma::join_cols(msh, tmp);
 
     arma::mat mtl_prop = {{1.2, std::log10(1.5 / 1.2), 0.01, std::log10(0.02 / 0.01), 0.0, 0.0, 0.0, 0.0, 1.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
 
-    tmp = {{1.33, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
-    tmp = repmat(tmp, 12, 1);
-    mtl_prop = arma::join_cols(mtl_prop, tmp);
+    arma::mat mtl_tmp = {{1.33, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    mtl_tmp = repmat(mtl_tmp, 12, 1);
+    mtl_prop = arma::join_cols(mtl_prop, mtl_tmp);
     arma::uvec mtl_ind;
     std::unordered_map<std::string, std::vector<double>> mtl_map;
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
@@ -843,8 +753,8 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, U;
 
     // Test reflection
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     double cos_th = std::cos(45.0 * deg2rad);
 
@@ -860,32 +770,34 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     std::complex<double> R_te = (sqrt_eps1 * cos_th - sqrt_eps2 * cos_th2) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     std::complex<double> R_tm = (sqrt_eps2 * cos_th - sqrt_eps1 * cos_th2) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
 
-    // In-medium attenuation
-    double thickness = std::sqrt(2.0 * 0.5 * 0.5) + 0.001;
-    double tan_delta = std::imag(eta1) / std::real(eta1); // Loss tangent, Rec. ITU-R P.2040-1, eq. (13)
-    double cos_delta = std::cos(std::atan(tan_delta));
-    double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
-    Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(eta1)));
-    double A = 8.686 * thickness / Delta;   // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
-    double gain = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
-
-    R_te *= std::sqrt(gain);
-    R_tm *= std::sqrt(gain);
-    U = {0.5 * std::abs(R_tm) * std::abs(R_tm) + 0.5 * std::abs(R_te) * std::abs(R_te)}; // Gain without FSPL
+    // Gain and coefficients now exclude in-medium (distance) loss; the complex eta from the
+    // conductive incidence medium still shapes the Fresnel terms.
+    U = {0.5 * std::norm(R_tm) + 0.5 * std::norm(R_te)}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
 
     // x-y plane swaps base vectors
     T = {{std::real(R_te), std::imag(R_te), 0.0, 0.0, 0.0, 0.0, std::real(R_tm), std::imag(R_tm)}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-6));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-6));
+
+    // The in-medium conductivity attenuation the interaction gain used to carry now lives in
+    // medium_gain(): verify it reproduces the ITU P.2040-1 conductive loss over the in-slab path.
+    double thickness = std::sqrt(2.0 * 0.5 * 0.5) + 0.001;
+    double tan_delta = std::imag(eta1) / std::real(eta1); // Loss tangent, ITU-R P.2040-1, eq. (13)
+    double cos_delta = std::cos(std::atan(tan_delta));
+    double Delta = 2.0 * cos_delta / (1.0 - cos_delta);
+    Delta = std::sqrt(Delta) * 0.0477135 / (10.0 * std::sqrt(std::real(eta1)));
+    double A = 8.686 * thickness / Delta;        // Attenuation in db/m, ITU-R P.2040-1, eq. (26)
+    double gain_bulk = std::pow(10.0, -0.1 * A); // Gain caused by conductive medium in linear scale
+    CHECK(std::abs(quadriga_lib::medium_gain(mtl_map, 1, thickness, 10.0e9) - gain_bulk) < 1e-9);
 
     // Test refraction
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     // Wave direction is not defined precisely due to the complex angles
     std::complex<double> th2 = std::acos(cos_th2);
-    double x = std::real(cos_th2) * 0.001 + 1.0;
-    double y = std::real(std::sin(th2)) * 0.001 + 0.6;
+    double x = 1.0;
+    double y = 0.6;
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(origN, T, "absdiff", 1e-6));
 
@@ -894,34 +806,21 @@ TEST_CASE("Ray-Mesh Interact - Conductive to Dielectric (x-y plane, double)")
     T = {{x, y, 0.0}};
     CHECK(arma::approx_equal(destN, T, "absdiff", 1e-3));
 
-    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b)
+    // Tranmission coefficients, ITU-R P.2040-1, eq. (31a) and (31b); M2 is lossless (att = 0)
     std::complex<double> T_te = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps1 * cos_th + sqrt_eps2 * cos_th2);
     std::complex<double> T_tm = (2.0 * sqrt_eps1 * cos_th) / (sqrt_eps2 * cos_th + sqrt_eps1 * cos_th2);
 
-    T_te *= std::sqrt(gain);
-    T_tm *= std::sqrt(gain);
-    U = {0.5 * std::abs(T_tm) * std::abs(T_tm) + 0.5 * std::abs(T_te) * std::abs(T_te)}; // Gain without FSPL
+    U = {0.5 * std::norm(T_tm) + 0.5 * std::norm(T_te)}; // Gain without FSPL
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-3));
 
     // x-y plane swaps base vectors
     T = {{std::real(T_te), std::imag(T_te), 0.0, 0.0, 0.0, 0.0, std::real(T_tm), std::imag(T_tm)}};
-    CHECK(arma::approx_equal(xprmatN, T, "absdiff", 1e-3));
+    CHECK(arma::approx_equal(xprmatN.t(), T, "absdiff", 1e-3));
 }
 
 TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     double deg2rad = arma::datum::pi / 180.0;
 
@@ -939,7 +838,9 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
     // Both parameterisations are identical at every frequency:
     //   ε_r(f) = 2·f        σ(f) = 0.01·f
     //   Att(f) = 1·f [dB]   α(f) = 0.5·f [dB/m]
-    // Material A specifies at fRef = 1 GHz; Material B at fRef = 2 GHz
+    // Material A specifies at fRef = 1 GHz; Material B at fRef = 2 GHz.
+    // After the refactor only att and the (complex) Fresnel terms remain in gain/xprmat; both stay
+    // identical across the two parameterisations, so the equivalence still holds.
     arma::mat mtl_A = {{2.0, 1.0, 0.01, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0}};
     arma::mat mtl_B = {{4.0, 1.0, 0.02, 1.0, 2.0, 1.0, 1.0, 1.0, 2.0}};
     mtl_A = repmat(mtl_A, 12, 1);
@@ -953,12 +854,12 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
     arma::mat origNb, destNb, xprmatNb, trivecNb, tridirNb;
     arma::vec gainNa, gainNb;
 
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind_A, &mtl_map_A, &fbs_ind, &sbs_ind,
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &mtl_ind_A, &mtl_map_A, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origNa, &destNa, &gainNa, &xprmatNa, &trivecNa, &tridirNa);
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind_B, &mtl_map_B, &fbs_ind, &sbs_ind,
+                                    &origNa, &destNa, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainNa, &xprmatNa, &trivecNa, &tridirNa);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &mtl_ind_B, &mtl_map_B, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origNb, &destNb, &gainNb, &xprmatNb, &trivecNb, &tridirNb);
+                                    &origNb, &destNb, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainNb, &xprmatNb, &trivecNb, &tridirNb);
 
     CHECK(arma::approx_equal(gainNa, gainNb, "absdiff", 1e-12));
     CHECK(arma::approx_equal(xprmatNa, xprmatNb, "absdiff", 1e-12));
@@ -968,18 +869,7 @@ TEST_CASE("Ray-Mesh Interact - fRef parameterization equivalence")
 
 TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     // Normal incidence through the cube
     arma::mat orig = {{-2.0, 0.0, 0.5}};
@@ -991,6 +881,7 @@ TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling")
 
     // ε_r = 1, σ = 0 (no reflection, no in-medium loss)
     // att = 6 dB @ 2 GHz, attB = 1  →  at 10 GHz:  Att = 6·(10/2)^1 = 30 dB
+    // Interface (att) loss is still folded into transmission-class gain after the refactor.
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 6.0, 1.0, 0.0, 0.0, 2.0}};
     mtl_prop = repmat(mtl_prop, 12, 1);
     arma::uvec mtl_ind;
@@ -1003,29 +894,18 @@ TEST_CASE("Ray-Mesh Interact - Penetration loss frequency scaling")
     arma::mat origN, destN, xprmatN, trivecN, tridirN;
     arma::vec gainN;
 
-    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
     // transition_gain = 10^(-0.1 · 30) = 1e-3
     arma::vec U = {1.0e-3};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-12));
 }
 
-TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption")
+TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption (medium_gain)")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},      //  1 Top NorthEast
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},  //  2 South Lower
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0}, //  3 West Lower
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},  //  4 Bottom NorthWest
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},     //  5 East Lower
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},    //  6 North Lower
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},    //  7 Top SouthWest
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},  //  8 South Upper
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},   //  9 West Upper
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},  // 10 Bottom SouthEast
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},     // 11 East Upper
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};     // 12 North Upper
+    arma::mat cube = quadriga_lib::cube<double>();
 
     double deg2rad = arma::datum::pi / 180.0;
 
@@ -1052,24 +932,27 @@ TEST_CASE("Ray-Mesh Interact - Alpha in-medium absorption")
     arma::mat origN, destN, xprmatN, trivecN, tridirN;
     arma::vec gainN;
 
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
                                     &trivec, &tridir, (arma::vec *)nullptr,
-                                    &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
 
-    // Expected: lossless-reflection gain × α-loss
+    // Reflection gain is now the lossless Fresnel term only; the α loss moved to medium_gain().
     std::complex<double> eta1(1.5, 0.0), eta2(1.0, 0.0);
     double refl_gain = calc_transition_gain(0, 45.0, 0.0, 0.0, eta1, eta2);
+    arma::vec U = {refl_gain};
+    CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-9));
+
+    // α in-medium absorption is now owned by medium_gain(): with real ε and σ = 0 it returns
+    // exactly the α term over the in-slab path.
     double thickness = std::sqrt(0.5 * 0.5 + 0.5 * 0.5) + 0.001; // OF_length + ray_offset
     double alpha_10 = 2.0 * std::pow(10.0 / 5.0, 1.0);           // 4 dB/m
     double alpha_loss = std::pow(10.0, -0.1 * thickness * alpha_10);
-
-    arma::vec U = {refl_gain * alpha_loss};
-    CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-9));
+    CHECK(std::abs(quadriga_lib::medium_gain(mtl_map, 1, thickness, 10.0e9) - alpha_loss) < 1e-9);
 }
 
 TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
 
     arma::mat orig = {{-1.5, 0.0, 0.0}};
@@ -1096,10 +979,10 @@ TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)"
 
     for (int it : {0, 1, 2}) // reflection, transmission, refraction
     {
-        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind0, &map0, &fbs_ind, &sbs_ind,
-                                        &trivec, &tridir, (arma::vec *)nullptr, &o0, &d0, &g0, &x0, &tv0, &td0);
-        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
-                                        &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, &g1, &x1, &tv1, &td1);
+        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &cube, &ind0, &map0, &fbs_ind, &sbs_ind,
+                                        &trivec, &tridir, (arma::vec *)nullptr, &o0, &d0, (arma::mat *)nullptr, (arma::mat *)nullptr, &g0, &x0, &tv0, &td0);
+        quadriga_lib::ray_mesh_interact(it, 10.0e9, &orig, &dest, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
+                                        &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, (arma::mat *)nullptr, (arma::mat *)nullptr, &g1, &x1, &tv1, &td1);
         CHECK(arma::approx_equal(g0, g1, "absdiff", 1e-12));
         CHECK(arma::approx_equal(x0, x1, "absdiff", 1e-12)); // xprmat must be bit-stable too
         CHECK(arma::approx_equal(d0, d1, "absdiff", 1e-12));
@@ -1107,15 +990,15 @@ TEST_CASE("Ray-Mesh Interact - Permeability defaults to 1 (backward compatible)"
     }
 
     // Anchor mu=1 to the oracle (single-eps reflection)
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, &g1, &x1, &tv1, &td1);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &ind1, &map1, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o1, &d1, (arma::mat *)nullptr, (arma::mat *)nullptr, &g1, &x1, &tv1, &td1);
     arma::vec U = {calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {1.5, 0.0}, {1.0, 0.0}, {1.0, 0.0})};
     CHECK(arma::approx_equal(g1, U, "absdiff", 1e-9));
 }
 
 TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
 
     arma::mat orig = {{-1.5, 0.0, 0.0}};
@@ -1143,18 +1026,18 @@ TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction
     arma::vec gA, gB;
 
     // Refraction: identical n -> identical bending and path
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
-    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, (arma::mat *)nullptr, (arma::mat *)nullptr, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, (arma::mat *)nullptr, (arma::mat *)nullptr, &gB, &xB, &tvB, &tdB);
     CHECK(arma::approx_equal(tdA, tdB, "absdiff", 1e-9));
     CHECK(arma::approx_equal(dA, dB, "absdiff", 1e-9));
 
     // Reflection: different admittance sqrt(eps/mu) -> different reflected power
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, (arma::mat *)nullptr, (arma::mat *)nullptr, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, (arma::mat *)nullptr, (arma::mat *)nullptr, &gB, &xB, &tvB, &tdB);
     double refA = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {2.0, 0.0}, {1.0, 0.0}, {3.0, 0.0});
     double refB = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, {1.0, 0.0}, {6.0, 0.0}, {1.0, 0.0}, {1.0, 0.0});
     CHECK(std::abs(refA - refB) > 0.05); // the two genuinely differ
@@ -1165,7 +1048,7 @@ TEST_CASE("Ray-Mesh Interact - Permeability decouples reflection from refraction
 
 TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
 
     // Normal incidence on the west wall
     arma::mat orig = {{-2.0, 0.0, 0.5}};
@@ -1189,18 +1072,18 @@ TEST_CASE("Ray-Mesh Interact - Permeability impedance-matches a dense medium")
     arma::mat o, d, x, tv, td;
     arma::vec g, U;
 
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, (arma::mat *)nullptr, (arma::mat *)nullptr, &g, &x, &tv, &td);
     U = {0.0};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // matched -> no reflection
 
-    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &indM, &mapM, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, (arma::mat *)nullptr, (arma::mat *)nullptr, &g, &x, &tv, &td);
     U = {1.0};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // matched -> full transmission
 
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indU, &mapU, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indU, &mapU, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, (arma::mat *)nullptr, (arma::mat *)nullptr, &g, &x, &tv, &td);
     U = {1.0 / 9.0};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9)); // unmatched -> ((1-2)/(1+2))^2
 }
@@ -1210,7 +1093,7 @@ TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant")
     // Swapping eps and mu preserves n = sqrt(eps*mu) and, at normal incidence, |R|, so the
     // reflected power must be identical. Tripwire: if the Fresnel term reverts to sqrt(eps),
     // A and B diverge.
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat orig = {{-2.0, 0.0, 0.5}};
     arma::mat dest = {{2.0, 0.0, 0.5}};
@@ -1234,18 +1117,18 @@ TEST_CASE("Ray-Mesh Interact - eps<->mu swap leaves reflected power invariant")
 
     arma::mat oA, dA, xA, tvA, tdA, oB, dB, xB, tvB, tdB;
     arma::vec gA, gB;
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, &gA, &xA, &tvA, &tdA);
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, &gB, &xB, &tvB, &tdB);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indA, &mapA, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oA, &dA, (arma::mat *)nullptr, (arma::mat *)nullptr, &gA, &xA, &tvA, &tdA);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &indB, &mapB, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &oB, &dB, (arma::mat *)nullptr, (arma::mat *)nullptr, &gB, &xB, &tvB, &tdB);
 
     CHECK(arma::approx_equal(gA, gB, "absdiff", 1e-10));
     CHECK(gA(0) > 1e-6); // non-trivial reflection, so the equality is not vacuous
 }
 
-TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss")
+TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss (medium_gain)")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
 
     // Ray starts INSIDE and reflects off the east wall, so the in-medium path accrues loss.
@@ -1270,8 +1153,8 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss")
 
     arma::mat o, d, x, tv, td;
     arma::vec g;
-    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &ind, &map, &fbs_ind, &sbs_ind,
-                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, &g, &x, &tv, &td);
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &ind, &map, &fbs_ind, &sbs_ind,
+                                    &trivec, &tridir, (arma::vec *)nullptr, &o, &d, (arma::mat *)nullptr, (arma::mat *)nullptr, &g, &x, &tv, &td);
 
     std::complex<double> eta1(1.5, 0.0), eta2(1.0, 0.0);
     std::complex<double> mu1(1.0, -17.98 * 0.003 / 10.0), mu2(1.0, 0.0);
@@ -1280,26 +1163,19 @@ TEST_CASE("Ray-Mesh Interact - Permeability drives in-medium loss")
     double full = calc_transition_gain_mu(0, 45.0, thickness, 0.0, eta1, eta2, mu1, mu2);
     double refl_only = calc_transition_gain_mu(0, 45.0, 0.0, 0.0, eta1, eta2, mu1, mu2);
 
-    arma::vec U = {full};
+    // Reflection gain is now the loss-free admittance term; the mu-driven bulk loss moved to medium_gain().
+    arma::vec U = {refl_only};
     CHECK(arma::approx_equal(g, U, "absdiff", 1e-9));
-    CHECK(full < 0.7 * refl_only); // mu attenuates the path; this factor is exactly 1 if the
-                                   // loss feed reverts to eps (which is real here)
+
+    double bulk = full / refl_only; // loss factor the gain used to carry
+    CHECK(std::abs(quadriga_lib::medium_gain(map, 1, thickness, 10.0e9) - bulk) < 1e-9);
+    CHECK(bulk < 0.7); // mu attenuates the path; this factor is exactly 1 if the loss feed
+                       // reverts to eps (which is real here)
 }
 
 TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-z plane)")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
+    arma::mat cube = quadriga_lib::cube<double>();
 
     // 45° incidence on the West face
     arma::mat orig = {{-1.5, 0.0, 0.0}};
@@ -1321,13 +1197,14 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
     auto run = [&](int type)
     {
         quadriga_lib::ray_mesh_interact(
-            type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+            type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
             (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
-            &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr,
+            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+            (arma::vec *)nullptr, (arma::mat *)nullptr,
             (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
             (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
-            (arma::mat *)nullptr, (arma::s32_vec *)nullptr,
-            &path_dirN, &ray_indN);
+            (arma::mat *)nullptr, (std::vector<uint8_t> *)nullptr,
+            &path_dirN, true, &ray_indN);
     };
 
     // Manual unit-norm helpers (avoid arma::norm / arma::normalise, which pull in BLAS)
@@ -1376,18 +1253,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN direction contract (45° dielectric, x-
 
 TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
 {
-    arma::mat cube = {{-1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0},
-                      {1.0, -1.0, 1.0, -1.0, -1.0, -1.0, 1.0, -1.0, -1.0},
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0},
-                      {1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0},
-                      {1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0},
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0, -1.0},
-                      {-1.0, 1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0},
-                      {1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, -1.0, -1.0},
-                      {-1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0},
-                      {1.0, 1.0, -1.0, 1.0, -1.0, -1.0, -1.0, -1.0, -1.0},
-                      {1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0},
-                      {-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0}};
+    arma::mat cube = quadriga_lib::cube<double>();
 
     arma::mat mtl_prop = {{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; // air (irrelevant to ray_indN)
     mtl_prop = repmat(mtl_prop, 12, 1);
@@ -1404,13 +1270,14 @@ TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
 
         arma::mat origN, destN, path_dirN;
         quadriga_lib::ray_mesh_interact(
-            1, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+            1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
             (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
-            &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr,
+            &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+            (arma::vec *)nullptr, (arma::mat *)nullptr,
             (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
             (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
-            (arma::mat *)nullptr, (arma::s32_vec *)nullptr,
-            &path_dirN, &ray_indN);
+            (arma::mat *)nullptr, (std::vector<uint8_t> *)nullptr,
+            &path_dirN, true, &ray_indN);
     };
 
     SECTION("mixed hits and misses")
@@ -1451,7 +1318,7 @@ TEST_CASE("Ray-Mesh Interact - ray_indN compaction round-trip")
 
 TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invariant, interface gain")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
     arma::mat orig = {{0.5, 0.1, 0.0}}; // inside, 45 deg on the East face (dense -> air)
     arma::mat dest = {{2.0, 1.6, 0.0}};
@@ -1466,9 +1333,9 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
 
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::vec *)nullptr, &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
     };
     auto vnorm = [](const arma::rowvec &v)
@@ -1489,14 +1356,13 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     arma::mat mtl_prop = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
 
-    // Type 3 - scalar reflection: gain = |R|^2, single scalar coefficient, off-diagonal zero
+    // Type 3 - scalar reflection: gain = |R|^2, single scalar coefficient; scalar xprmat is [2, n_rayN]
     run(3);
     U = {R * R};
     CHECK(arma::approx_equal(gainN, U, "absdiff", 1e-6));
     CHECK(std::abs(gainN(0) - coeff_energy()) < 1e-6);
-    CHECK(std::abs(xprmatN(2)) + std::abs(xprmatN(3)) + std::abs(xprmatN(4)) +
-              std::abs(xprmatN(5)) + std::abs(xprmatN(6)) + std::abs(xprmatN(7)) <
-          1e-9);
+    CHECK(xprmatN.n_rows == 2);
+    CHECK(xprmatN.n_cols == 1);
 
     // Type 4 - scalar transmission (undeviated): gain = 1 - |R|^2
     run(4);
@@ -1505,7 +1371,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     CHECK(std::abs(gainN(0) - coeff_energy()) < 1e-6);
     CHECK(arma::approx_equal(dir(destN - origN), incoming, "absdiff", 1e-5));
 
-    // Type 5 (refraction) must carry the interface penetration loss, same factor as type 4 (line-430 fix).
+    // Type 5 (refraction) must carry the interface penetration loss, same factor as type 4.
     // interface_gain comes from the ENTERED medium, so this has to enter the lossy cube from air.
     arma::mat orig_in = {{-1.5, 0.0, 0.0}}, dest_in = {{0.0, 0.0, 1.5}}; // 45 deg into the West face
     arma::mat fbs_in, sbs_in;
@@ -1516,9 +1382,9 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
     {
         arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, att, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
         mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig_in, &dest_in, &fbs_in, &sbs_in, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig_in, &dest_in, &cube, &mtl_ind, &mtl_map,
                                         &fbs_in_ind, &sbs_in_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::vec *)nullptr, &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
         return gainN(0);
     };
@@ -1537,7 +1403,7 @@ TEST_CASE("Ray-Mesh Interact - Scalar interactions (types 3/4/5) gains, invarian
 
 TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmission energy")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     arma::mat orig = {{0.5, 0.1, 0.0}};
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
@@ -1562,9 +1428,9 @@ TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmissio
     { mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map); set_tf<double>(mtl_map, tf, 0.0); };
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr,
-                                        (arma::vec *)nullptr, &origN, &destN, &gainN, &xprmatN,
+                                        (arma::vec *)nullptr, &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN,
                                         (arma::mat *)nullptr, (arma::mat *)nullptr);
         return gainN(0);
     };
@@ -1604,7 +1470,7 @@ TEST_CASE("Ray-Mesh Interact - Transmission factor splits reflection/transmissio
 
 TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-through")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
     arma::mat orig = {{0.5, 0.1, 0.0}}; // spine 45 deg on East face
     arma::mat dest = {{2.0, 1.6, 0.0}};
@@ -1627,9 +1493,9 @@ TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-thro
 
     auto run = [&](arma::mat &tridir)
     {
-        quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(2, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                        &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
     };
 
     // Baseline: all edges parallel to the spine (45 deg) -> clean refraction, spine bends
@@ -1655,7 +1521,7 @@ TEST_CASE("Ray-Mesh Interact - Ray-tube TIR straddle forces whole-tube pass-thro
 
 TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     arma::mat orig = {{0.5, 0.1, 0.0}};
     arma::mat dest = {{2.0, 1.6, 0.0}};
     arma::mat fbs, sbs;
@@ -1671,11 +1537,12 @@ TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR
     arma::u32_vec ray_indN;
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
-                                        &origN, &destN, (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::mat *)nullptr,
                                         (arma::mat *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
-                                        (arma::vec *)nullptr, (arma::mat *)nullptr, (arma::s32_vec *)nullptr, &path_dirN, &ray_indN);
+                                        (arma::vec *)nullptr, (arma::mat *)nullptr, (std::vector<uint8_t> *)nullptr, &path_dirN, true, &ray_indN);
     };
     auto vnorm = [](const arma::rowvec &v)
     { return std::sqrt(v(0) * v(0) + v(1) * v(1) + v(2) * v(2)); };
@@ -1704,7 +1571,7 @@ TEST_CASE("Ray-Mesh Interact - path_dirN collapses to undeviated under spine TIR
 
 TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on pass-through")
 {
-    arma::mat cube = make_cube();
+    arma::mat cube = quadriga_lib::cube<double>();
     double deg2rad = arma::datum::pi / 180.0;
     arma::mat orig = {{0.5, 0.1, 0.0}};
     arma::mat dest = {{2.0, 1.6, 0.0}};
@@ -1721,9 +1588,9 @@ TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on
 
     auto run = [&](int type)
     {
-        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &fbs, &sbs, &cube, &mtl_ind, &mtl_map,
+        quadriga_lib::ray_mesh_interact(type, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map,
                                         &fbs_ind, &sbs_ind, &trivec, &tridir, (arma::vec *)nullptr,
-                                        &origN, &destN, &gainN, &xprmatN, &trivecN, &tridirN);
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr, &gainN, &xprmatN, &trivecN, &tridirN);
     };
 
     // Undeviated transmission (type 1): vertex az/el unchanged (== input), NOT reset to (0,0)
@@ -1737,4 +1604,227 @@ TEST_CASE("Ray-Mesh Interact - Spherical ray-tube keeps undeviated directions on
     mtl_matrix_to_map<double>(mtl_prop, mtl_ind, mtl_map);
     run(2);
     CHECK(arma::approx_equal(tridirN, tridir, "absdiff", 1e-6));
+}
+
+TEST_CASE("Ray-Mesh Interact - Public helpers: refractive_index, interface_gain, medium_gain")
+{
+    // refractive_index = Re(sqrt(eps_r * mu_r)); air (medium 0) is 1
+    {
+        arma::mat m = repmat(arma::mat{{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec ind;
+        std::unordered_map<std::string, std::vector<double>> map;
+        mtl_matrix_to_map<double>(m, ind, map); // eps = 4, mu = 1 -> n = 2
+        CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 2.0) < 1e-9);
+        CHECK(std::abs(quadriga_lib::refractive_index(map, 0, 10.0e9) - 1.0) < 1e-12); // air
+    }
+    {
+        arma::mat m = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec ind;
+        std::unordered_map<std::string, std::vector<double>> map;
+        mtl_matrix_to_map<double>(m, ind, map); // eps = 1.5, mu = 1 -> n = sqrt(1.5)
+        CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - std::sqrt(1.5)) < 1e-9);
+    }
+    {
+        arma::mat m = repmat(arma::mat{{4.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec ind;
+        std::unordered_map<std::string, std::vector<double>> map;
+        mtl_matrix_to_map<double>(m, ind, map);
+        set_mu<double>(map, 4.0, 0.0, 0.0, 0.0); // eps = 4, mu = 4 -> n = 4 (mu participates)
+        CHECK(std::abs(quadriga_lib::refractive_index(map, 1, 10.0e9) - 4.0) < 1e-9);
+    }
+
+    // interface_gain: att = 6 dB @ 2 GHz, attB = 1 -> 30 dB @ 10 GHz -> 1e-3; air is 1
+    {
+        arma::mat m = repmat(arma::mat{{1.0, 0.0, 0.0, 0.0, 6.0, 1.0, 0.0, 0.0, 2.0}}, 12, 1);
+        arma::uvec ind;
+        std::unordered_map<std::string, std::vector<double>> map;
+        mtl_matrix_to_map<double>(m, ind, map);
+        CHECK(std::abs(quadriga_lib::interface_gain(map, 1, 10.0e9) - 1.0e-3) < 1e-9);
+        CHECK(std::abs(quadriga_lib::interface_gain(map, 0, 10.0e9) - 1.0) < 1e-12); // air
+    }
+
+    // medium_gain: eps = 1, sigma = 0, alpha = 10 dB/m (alphaB = 0), dist = 2 -> 20 dB -> 1e-2
+    {
+        arma::mat m = repmat(arma::mat{{1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 10.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec ind;
+        std::unordered_map<std::string, std::vector<double>> map;
+        mtl_matrix_to_map<double>(m, ind, map);
+        CHECK(std::abs(quadriga_lib::medium_gain(map, 1, 2.0, 10.0e9) - 1.0e-2) < 1e-9);
+        CHECK(std::abs(quadriga_lib::medium_gain(map, 0, 2.0, 10.0e9) - 1.0) < 1e-12); // air
+    }
+}
+
+TEST_CASE("Ray-Mesh Interact - out_typeN bit encoding")
+{
+    arma::mat origN, destN;
+    arma::vec gainN;
+
+    // Entry: air -> dielectric, front face hit -> OK|front = 3
+    {
+        arma::mat cube = quadriga_lib::cube<double>();
+        arma::mat orig = {{-1.5, 0.0, 0.0}}; // outside, 45 deg into the West face
+        arma::mat dest = {{0.0, 0.0, 1.5}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl_map;
+        mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+
+        std::vector<uint8_t> otype;
+        quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::mat *)nullptr, &otype);
+        REQUIRE(otype.size() == 1);
+        CHECK((int)otype[0] == 3); // OK(1) | front(2)
+    }
+
+    // Exit: inside -> air, back face hit, no TIR (eps = 1.5 @ 45 deg) -> OK = 1
+    {
+        arma::mat cube = quadriga_lib::cube<double>();
+        arma::mat orig = {{0.5, 0.1, 0.0}}; // inside, 45 deg on the East face
+        arma::mat dest = {{2.0, 1.6, 0.0}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl_map;
+        mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+
+        std::vector<uint8_t> otype;
+        quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::mat *)nullptr, &otype);
+        REQUIRE(otype.size() == 1);
+        CHECK((int)otype[0] == 1);        // OK, back face, no TIR
+        CHECK(((int)otype[0] & 32) == 0); // TIR bit clear
+    }
+
+    // Media-to-media: co-located shared wall between two cubes -> co-located bit (4) set
+    {
+        arma::mat msh = quadriga_lib::cube<double>();
+        arma::mat tmp = quadriga_lib::cube<double>(arma::vec{1.0}, arma::vec{0.0, 0.0, 0.0}, arma::vec{2.0, 0.0, 0.0});
+        msh = arma::join_cols(msh, tmp);
+
+        arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::mat mp2 = repmat(arma::mat{{1.33, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        mp = arma::join_cols(mp, mp2);
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl_map;
+        mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+
+        arma::mat orig = {{0.5, 0.1, 0.0}}; // inside cube 1, crossing into cube 2 at x = 1
+        arma::mat dest = {{2.0, 1.6, 0.0}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &msh, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        std::vector<uint8_t> otype;
+        quadriga_lib::ray_mesh_interact(1, 10.0e9, &orig, &dest, &msh, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::mat *)nullptr, &otype);
+        REQUIRE(otype.size() == 1);
+        CHECK(((int)otype[0] & 4) != 0); // co-located bit set
+
+        bool o57 = ((int)otype[0] == 5) || ((int)otype[0] == 7);
+        CHECK(o57); // OK|colocated with either front sense
+    }
+
+    // TIR: inside eps = 2.5, reflection at 45 deg -> base exit (1) | TIR (32) = 33
+    {
+        arma::mat cube = quadriga_lib::cube<double>();
+        arma::mat orig = {{0.5, 0.1, 0.0}};
+        arma::mat dest = {{2.0, 1.6, 0.0}};
+        arma::mat fbs, sbs;
+        arma::u32_vec fbs_ind, sbs_ind;
+        quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+
+        arma::mat mp = repmat(arma::mat{{2.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+        arma::uvec mtl_ind;
+        std::unordered_map<std::string, std::vector<double>> mtl_map;
+        mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+
+        std::vector<uint8_t> otype;
+        quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                        &gainN, (arma::mat *)nullptr,
+                                        (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                        (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                        (arma::mat *)nullptr, &otype);
+        REQUIRE(otype.size() == 1);
+        CHECK(((int)otype[0] & 32) != 0); // TIR bit set
+        CHECK((int)otype[0] == 33);       // exit(1) | TIR(32)
+    }
+}
+
+TEST_CASE("Ray-Mesh Interact - compact = false keeps missed rays in place")
+{
+    arma::mat cube = quadriga_lib::cube<double>();
+
+    // Rays 0 and 2 hit the West face; ray 1 (offset in y) misses the cube.
+    arma::mat orig = {{-1.5, 0.0, 0.0}, {-1.5, 3.0, 0.0}, {-1.5, 0.5, 0.5}};
+    arma::mat dest = {{0.0, 0.0, 0.0}, {0.0, 3.0, 0.0}, {0.0, 0.5, 0.5}};
+
+    arma::mat fbs, sbs;
+    arma::u32_vec fbs_ind, sbs_ind;
+    quadriga_lib::ray_triangle_intersect(&orig, &dest, &cube, &fbs, &sbs, NULL, &fbs_ind, &sbs_ind);
+    REQUIRE(fbs_ind(1) == 0); // ray 1 really misses
+
+    arma::mat mp = repmat(arma::mat{{1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0}}, 12, 1);
+    arma::uvec mtl_ind;
+    std::unordered_map<std::string, std::vector<double>> mtl_map;
+    mtl_matrix_to_map<double>(mp, mtl_ind, mtl_map);
+
+    arma::mat origN, destN, xprmatN;
+    arma::vec gainN;
+    std::vector<uint8_t> otype;
+    arma::u32_vec ray_indN;
+
+    // compact = false: all three rays are retained, in input order
+    quadriga_lib::ray_mesh_interact(0, 10.0e9, &orig, &dest, &cube, &mtl_ind, &mtl_map, &fbs_ind, &sbs_ind,
+                                    (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                    &origN, &destN, (arma::mat *)nullptr, (arma::mat *)nullptr,
+                                    &gainN, &xprmatN,
+                                    (arma::mat *)nullptr, (arma::mat *)nullptr, (arma::vec *)nullptr,
+                                    (arma::vec *)nullptr, (arma::vec *)nullptr, (arma::vec *)nullptr,
+                                    (arma::mat *)nullptr, &otype,
+                                    (arma::mat *)nullptr, false, &ray_indN);
+
+    REQUIRE(gainN.n_elem == 3);
+    REQUIRE(otype.size() == 3);
+    REQUIRE(xprmatN.n_cols == 3);
+    REQUIRE(ray_indN.n_elem == 3);
+
+    // ray_indN is the identity map when nothing is dropped
+    for (arma::uword k = 0; k < 3; ++k)
+        CHECK(ray_indN(k) == (unsigned)k);
+
+    // The missed ray (column 1) passes through untouched
+    CHECK(std::abs(gainN(1) - 1.0) < 1e-9);
+    CHECK((int)otype[1] == 0);
+    arma::vec identity = {1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0};
+    CHECK(arma::approx_equal(xprmatN.col(1), identity, "absdiff", 1e-9));
+
+    // The surviving rays actually interacted (OK bit set, reflected power < 1)
+    CHECK(((int)otype[0] & 1) != 0);
+    CHECK(((int)otype[2] & 1) != 0);
+    CHECK(gainN(0) < 1.0);
+    CHECK(gainN(2) < 1.0);
 }

@@ -19,66 +19,90 @@ Calculates reflection, transmission, or refraction of EM/acoustic waves at mesh 
 - Face side determined by vertex order; CCW winding = front, CW = back (right-hand rule);
   front-side hit with FBS≠SBS → air-to-media; back-side hit with FBS≠SBS → media-to-air;
   FBS=SBS with opposing normals → media-to-media
-- Rays with `fbs_ind = 0` (no interaction) are omitted from output, so `n_rayN ≤ n_ray`
+- With `compact = true` (default), rays with `fbs_ind = 0` (no interaction) are dropped, so
+  `n_rayN ≤ n_ray`; with `compact = false` all rays are kept and no-hit rays pass through unchanged
 - Output direction encoding (spherical/Cartesian) matches input `tridir` format
 - Overlapping mesh geometry must be avoided (materials are transparent to radio waves)
-- Types 3–4 (scalar) use TE-only reflection with no total internal reflection, suitable for
-  acoustic simulation with impedance-mapped material parameters (ε derived from Z)
+- Types 3–5 (scalar) use a single TE-only coefficient, suitable for acoustic simulation with
+  impedance-mapped material parameters (ε derived from Z); total internal reflection is handled as
+  in the EM path
 - For a detailed description of the material model see <a href="http://quadriga-lib.org/formats.html">Data Formats</a>
 
 ## Usage:
 ```
-[ origN, destN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN, ...
-    normal_vecN, out_typeN ] = quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, ...
-    orig, dest, fbs, sbs, mesh, mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length );
+[ origN, destN, fbsN, sbsN, gainN, xprmatN, trivecN, tridirN, orig_lengthN, fbs_angleN, ...
+    thicknessN, edge_lengthN, normal_vecN, out_typeN, path_dirN, ray_indN ] = ...
+    quadriga_lib.ray_mesh_interact( interaction_type, center_frequency, orig, dest, mesh, ...
+    mtl_ind, mtl_prop, fbs_ind, sbs_ind, trivec, tridir, orig_length, compact );
 ```
 
 ## Inputs:
-- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction, 3 = scalar reflection, 4 = scalar transmission
+- **`interaction_type`** — 0 = EM reflection, 1 = EM transmission, 2 = EM refraction,
+  3 = scalar reflection, 4 = scalar transmission, 5 = scalar refraction
 - **`center_frequency`** — Center frequency
 - **`orig`**, **`dest`** — Ray origin and destination in GCS; `[n_ray, 3]`
-- **`fbs`**, **`sbs`** — First/second interaction points in GCS; `[n_ray, 3]`
-- **`mesh`** — Triangle mesh faces; see `obj_file_read`; `[n_mesh, 9]`
-- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of [[obj_file_read]]); `[n_mesh]`
+- **`mesh`** — Triangle mesh faces; see [[obj_file_read]]; `[n_mesh, 9]`
+- **`mtl_ind`** — 1-based material index per face (0 = no material; the `csv_ind` output of
+  [[obj_file_read]]); `[n_mesh]`
 - **`mtl_prop`** — Material properties as a struct; each field is one column (the `csv_prop` output
   of [[obj_file_read]]); each field holds a vector of length `n_mtl`
 - **`fbs_ind`**, **`sbs_ind`** — 1-based mesh face indices per ray (0 = no hit); uint32; `[n_ray]`
-- **`trivec`** — Beam wavefront triangle vertices relative to origin; order `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
-- **`tridir`** — Vertex-ray directions; `[n_ray, 6]` for spherical `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
-- **`orig_length`** — Accumulated path length at origin; default: 0; `[n_ray]`; default: `[]`
+- **`trivec`** *(optional)* — Beam wavefront triangle vertices relative to origin; order
+  `[v1x v1y v1z v2x v2y v2z v3x v3y v3z]`; `[n_ray, 9]`; default: `[]`
+- **`tridir`** *(optional)* — Vertex-ray directions; `[n_ray, 6]` for spherical
+  `[v1az v1el v2az v2el v3az v3el]` or `[n_ray, 9]` for Cartesian; default: `[]`
+- **`orig_length`** *(optional)* — Accumulated path length at origin; `[n_ray]`; default: 0
+- **`compact`** *(optional)* — If true, rays with no interaction (`fbs_ind = 0`) are dropped so
+  `n_rayN <= n_ray`; if false, all rays are kept (`n_rayN = n_ray`) and no-hit rays are returned as a
+  transparent pass-through; logical; default: true
 
 ## Outputs:
 - **`origN`** — New origins after interaction (offset 0.001 m along travel direction); `[n_rayN, 3]`
 - **`destN`** — New destinations accounting for direction change; `[n_rayN, 3]`
-- **`gainN`** — Interaction gain (linear, includes in-medium attenuation, excludes FSPL);
-  averaged over TE/TM polarizations for types 0–2, TE-only for types 3–4; `[n_rayN]`
-- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex `[ReVV ImVV ReVH ImVH ReHV ImHV ReHH ImHH]`;
-  for types 3–4 (scalar): `[Re Im 0 0 0 0 0 0]` where Re+jIm is the scalar pressure coefficient; includes interaction gain,
-  TE/TM coefficients, incidence plane orientation, in-medium attenuation (excludes FSPL); `[n_rayN, 8]`
-- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if `trivec`/`tridir` not provided
-- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given; `[n_rayN]`
+- **`fbsN`**, **`sbsN`** — First/second interaction points in GCS; `[n_rayN, 3]`
+- **`gainN`** — Interaction gain (linear scale); averaged over TE/TM polarizations for types 0–2,
+  single TE coefficient for types 3–5; `[n_rayN]`
+- **`xprmatN`** — For types 0–2: polarization transfer matrix, interleaved complex, column-major
+  `[ReVV ImVV ReHV ImHV ReVH ImVH ReHH ImHH]`; includes interaction gain, TE/TM coefficients,
+  incidence plane orientation; excludes in-medium attenuation and FSPL; `[8, n_rayN]`. For types
+  3–5 (scalar): `[Re Im]` where Re+jIm is the scalar pressure coefficient; `[2, n_rayN]`
+- **`trivecN`**, **`tridirN`** — Updated beam geometry/direction (format matches input); empty if
+  `trivec`/`tridir` not provided
+- **`orig_lengthN`** — Path length from `orig` to `origN`, added to input `orig_length` if given;
+  `[n_rayN]`
 - **`fbs_angleN`** — Incidence angle at FBS; `[n_rayN]`
 - **`thicknessN`** — Material thickness (FBS-to-SBS distance); `[n_rayN]`
-- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit); `[n_rayN]`
+- **`edge_lengthN`** — Max edge length of ray tube triangle at new origin (Inf if partial hit);
+  `[n_rayN]`
 - **`normal_vecN`** — FBS and SBS normal vectors `[Nx_F Ny_F Nz_F Nx_S Ny_S Nz_S]`; `[n_rayN, 6]`
-- **`out_typeN`** — Interaction type code (int32); `[n_rayN]`<br><br>
-   | Code  | Description                                         |
-   | :---: | --------------------------------------------------- |
-   |   1   | Single hit, outside→inside                          |
-   |   2   | Single hit, inside→outside                          |
-   |   3   | Single hit, inside→outside, total reflection        |
-   |   4   | Media-to-media, M2 hit first                        |
-   |   5   | Media-to-media, M1 hit first                        |
-   |   6   | Media-to-media, M1 hit first, total reflection      |
-   |   7   | Overlapping faces, outside→inside                   |
-   |   8   | Overlapping faces, inside→outside                   |
-   |   9   | Overlapping faces, inside→outside, total reflection |
-   |  10   | Edge hit, outside→inside→outside                    |
-   |  11   | Edge hit, inside→outside→inside                     |
-   |  12   | Edge hit, inside→outside→inside, total reflection   |
-   |  13   | Edge hit, outside→inside                            |
-   |  14   | Edge hit, inside→outside                            |
-   |  15   | Edge hit, inside→outside, total reflection          |
+- **`out_typeN`** — Interaction type code, bit-encoded (uint32); `[n_rayN]`<br><br>
+   |  Bit | Meaning                                                                 |
+   | :--: | ----------------------------------------------------------------------- |
+   |   0  | OK flag (0 = no valid interaction / undefined)                          |
+   |   1  | Front-side flag (1 = front: o→i or M2 hit first; 0 = back: i→o or M1)   |
+   |   2  | Co-located FBS/SBS flag (1 = single point, required for media-to-media) |
+   |   3  | Same-direction flag (FBS and SBS normals point the same way)            |
+   |   4  | Corner-hit flag (FBS/SBS faces not parallel)                            |
+   |   5  | Total-reflection flag (also set when a transmission factor forced it)   |
+   Reachable composite values (add 32 for the total-reflection variant):<br><br>
+   | Code  |  TIR  | Description                                         |
+   | :---: | :---: | --------------------------------------------------- |
+   |   0   |   —   | No hit                                              |
+   |   1   |  33   | Single hit, inside→outside (exit)                   |
+   |   3   |  35   | Single hit, outside→inside (entry)                  |
+   |   5   |  37   | Media-to-media, M1 (current, back) hit first        |
+   |   7   |  39   | Media-to-media, M2 (next, front) hit first          |
+   |  13   |  45   | Overlapping faces, inside-inside→outside            |
+   |  15   |  47   | Overlapping faces, outside→inside-inside            |
+   |  21   |  53   | Corner hit, inside→outside→inside                   |
+   |  23   |  55   | Corner hit, outside→inside→outside                  |
+   |  29   |  61   | Corner hit, inside-inside→outside                   |
+   |  31   |  63   | Corner hit, outside→inside-inside                   |
+- **`path_dirN`** — Refraction-correct continuation direction: mirror for types 0/3, Snell direction
+  for types 1/2/4/5; for undeviated transmission (types 1/4) this is the refracted direction, which
+  differs from the geometric continuation used for `origN`/`destN`; `[n_rayN, 3]`
+- **`ray_indN`** — 1-based input ray index for each output ray (inverse of the compaction map,
+  order-preserving); equals `1:n_ray` when `compact = false`; uint32; `[n_rayN]`
 
 ## See also:
 - [[obj_file_read]] (for loading `mesh` and `mtl_prop` from OBJ file)
@@ -90,9 +114,9 @@ MD!*/
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
     // Validate argument counts
-    if (nrhs < 11 || nrhs > 14)
+    if (nrhs < 9 || nrhs > 13)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of input arguments.");
-    if (nlhs > 12)
+    if (nlhs > 16)
         mexErrMsgIdAndTxt("quadriga_lib:CPPerror", "Wrong number of output arguments.");
 
     // Read input data
@@ -100,22 +124,25 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const auto center_frequency = qd_mex_get_scalar<double>(prhs[1], "center_frequency", 0.0);
     const auto orig = qd_mex_get_Mat<double>(prhs[2]);
     const auto dest = qd_mex_get_Mat<double>(prhs[3]);
-    const auto fbs = qd_mex_get_Mat<double>(prhs[4]);
-    const auto sbs = qd_mex_get_Mat<double>(prhs[5]);
-    const auto mesh = qd_mex_get_Mat<double>(prhs[6]);
-    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[7]);
-    const auto mtl_prop = qd_mex_struct2map<double>(prhs[8]);
-    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[9]);
-    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[10]);
-    const auto trivec = (nrhs < 12) ? arma::mat() : qd_mex_get_Mat<double>(prhs[11]);
-    const auto tridir = (nrhs < 13) ? arma::mat() : qd_mex_get_Mat<double>(prhs[12]);
-    const auto orig_length = (nrhs < 14) ? arma::vec() : qd_mex_get_Col<double>(prhs[13]);
+    const auto mesh = qd_mex_get_Mat<double>(prhs[4]);
+    const arma::uvec mtl_ind = qd_mex_get_Col<arma::uword>(prhs[5]);
+    const auto mtl_prop = qd_mex_struct2map<double>(prhs[6]);
+    const auto fbs_ind = qd_mex_get_Col<unsigned>(prhs[7]);
+    const auto sbs_ind = qd_mex_get_Col<unsigned>(prhs[8]);
+    const auto trivec = (nrhs < 10) ? arma::mat() : qd_mex_get_Mat<double>(prhs[9]);
+    const auto tridir = (nrhs < 11) ? arma::mat() : qd_mex_get_Mat<double>(prhs[10]);
+    const auto orig_length = (nrhs < 12) ? arma::vec() : qd_mex_get_Col<double>(prhs[11]);
+    const auto compact = (nrhs < 13) ? true : qd_mex_get_scalar<bool>(prhs[12], "compact", true);
 
-    // Get number of output rays (fbs_ind != 0)
-    arma::uword n_rayN = 0;
-    const unsigned *p_fbs = fbs_ind.memptr();
-    for (arma::uword i_ray = 0; i_ray < fbs_ind.n_elem; ++i_ray)
-        n_rayN += p_fbs[i_ray] ? 1 : 0;
+    // Number of output rays: all rays when compact == false, else only rays that hit (fbs_ind != 0)
+    arma::uword n_rayN = orig.n_rows;
+    if (compact)
+    {
+        n_rayN = 0;
+        const unsigned *p_fbs = fbs_ind.memptr();
+        for (arma::uword i_ray = 0; i_ray < fbs_ind.n_elem; ++i_ray)
+            n_rayN += p_fbs[i_ray] ? 1 : 0;
+    }
 
     // Wrap optional input pointers
     const arma::mat *p_trivec = trivec.empty() ? nullptr : &trivec;
@@ -124,57 +151,84 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     const arma::uvec *p_mtl_ind = mtl_ind.is_empty() ? nullptr : &mtl_ind;
     const auto *p_mtl_prop = mtl_prop.empty() ? nullptr : &mtl_prop;
 
-    // Output containers
-    arma::mat origN, destN, xprmatN, trivecN, tridirN, normal_vecN;
+    // Output containers with known size (aliased to MATLAB memory via qd_mex_init_output)
+    arma::mat origN, destN, fbsN, sbsN, xprmatN, trivecN, tridirN, normal_vecN, path_dirN;
     arma::vec gainN, orig_lengthN, fbs_angleN, thicknessN, edge_lengthN;
-    arma::s32_vec out_typeN;
+    std::vector<uint8_t> out_typeN;
+    arma::u32_vec ray_indN;
+
+    // xprmat: 8 rows for EM (types 0-2), 2 rows for scalar (types 3-5); one column per output ray
+    const arma::uword n_xpr = (interaction_type <= 2) ? 8 : 2;
 
     if (nlhs > 0)
         plhs[0] = qd_mex_init_output(&origN, n_rayN, 3);
     if (nlhs > 1)
         plhs[1] = qd_mex_init_output(&destN, n_rayN, 3);
     if (nlhs > 2)
-        plhs[2] = qd_mex_init_output(&gainN, n_rayN);
+        plhs[2] = qd_mex_init_output(&fbsN, n_rayN, 3);
     if (nlhs > 3)
-        plhs[3] = qd_mex_init_output(&xprmatN, n_rayN, 8);
+        plhs[3] = qd_mex_init_output(&sbsN, n_rayN, 3);
     if (nlhs > 4)
-        plhs[4] = p_trivec ? qd_mex_init_output(&trivecN, n_rayN, 9) : mxCreateDoubleMatrix(0, 0, mxREAL);
+        plhs[4] = qd_mex_init_output(&gainN, n_rayN);
     if (nlhs > 5)
-        plhs[5] = p_tridir ? qd_mex_init_output(&tridirN, n_rayN, tridir.n_cols) : mxCreateDoubleMatrix(0, 0, mxREAL);
+        plhs[5] = qd_mex_init_output(&xprmatN, n_xpr, n_rayN);
     if (nlhs > 6)
-        plhs[6] = qd_mex_init_output(&orig_lengthN, n_rayN);
+        plhs[6] = p_trivec ? qd_mex_init_output(&trivecN, n_rayN, 9) : mxCreateDoubleMatrix(0, 0, mxREAL);
     if (nlhs > 7)
-        plhs[7] = qd_mex_init_output(&fbs_angleN, n_rayN);
+        plhs[7] = p_tridir ? qd_mex_init_output(&tridirN, n_rayN, tridir.n_cols) : mxCreateDoubleMatrix(0, 0, mxREAL);
     if (nlhs > 8)
-        plhs[8] = qd_mex_init_output(&thicknessN, n_rayN);
+        plhs[8] = qd_mex_init_output(&orig_lengthN, n_rayN);
     if (nlhs > 9)
-        plhs[9] = qd_mex_init_output(&edge_lengthN, n_rayN);
+        plhs[9] = qd_mex_init_output(&fbs_angleN, n_rayN);
     if (nlhs > 10)
-        plhs[10] = qd_mex_init_output(&normal_vecN, n_rayN, 6);
+        plhs[10] = qd_mex_init_output(&thicknessN, n_rayN);
     if (nlhs > 11)
-        plhs[11] = qd_mex_init_output(&out_typeN, n_rayN);
+        plhs[11] = qd_mex_init_output(&edge_lengthN, n_rayN);
+    if (nlhs > 12)
+        plhs[12] = qd_mex_init_output(&normal_vecN, n_rayN, 6);
+    if (nlhs > 14)
+        plhs[14] = qd_mex_init_output(&path_dirN, n_rayN, 3);
 
     // Wrap optional output pointers based on requested outputs
     arma::mat *p_origN = (nlhs > 0) ? &origN : nullptr;
     arma::mat *p_destN = (nlhs > 1) ? &destN : nullptr;
-    arma::vec *p_gainN = (nlhs > 2) ? &gainN : nullptr;
-    arma::mat *p_xprmatN = (nlhs > 3) ? &xprmatN : nullptr;
-    arma::mat *p_trivecN = (nlhs > 4) ? &trivecN : nullptr;
-    arma::mat *p_tridirN = (nlhs > 5) ? &tridirN : nullptr;
-    arma::vec *p_orig_lengthN = (nlhs > 6) ? &orig_lengthN : nullptr;
-    arma::vec *p_fbs_angleN = (nlhs > 7) ? &fbs_angleN : nullptr;
-    arma::vec *p_thicknessN = (nlhs > 8) ? &thicknessN : nullptr;
-    arma::vec *p_edge_lengthN = (nlhs > 9) ? &edge_lengthN : nullptr;
-    arma::mat *p_normal_vecN = (nlhs > 10) ? &normal_vecN : nullptr;
-    arma::s32_vec *p_out_typeN = (nlhs > 11) ? &out_typeN : nullptr;
+    arma::mat *p_fbsN = (nlhs > 2) ? &fbsN : nullptr;
+    arma::mat *p_sbsN = (nlhs > 3) ? &sbsN : nullptr;
+    arma::vec *p_gainN = (nlhs > 4) ? &gainN : nullptr;
+    arma::mat *p_xprmatN = (nlhs > 5) ? &xprmatN : nullptr;
+    arma::mat *p_trivecN = (nlhs > 6) ? &trivecN : nullptr;
+    arma::mat *p_tridirN = (nlhs > 7) ? &tridirN : nullptr;
+    arma::vec *p_orig_lengthN = (nlhs > 8) ? &orig_lengthN : nullptr;
+    arma::vec *p_fbs_angleN = (nlhs > 9) ? &fbs_angleN : nullptr;
+    arma::vec *p_thicknessN = (nlhs > 10) ? &thicknessN : nullptr;
+    arma::vec *p_edge_lengthN = (nlhs > 11) ? &edge_lengthN : nullptr;
+    arma::mat *p_normal_vecN = (nlhs > 12) ? &normal_vecN : nullptr;
+    std::vector<uint8_t> *p_out_typeN = (nlhs > 13) ? &out_typeN : nullptr;
+    arma::mat *p_path_dirN = (nlhs > 14) ? &path_dirN : nullptr;
+    arma::u32_vec *p_ray_indN = (nlhs > 15) ? &ray_indN : nullptr;
 
-    
     // Call library function
     CALL_QD(quadriga_lib::ray_mesh_interact<double>(
         interaction_type, center_frequency,
-        &orig, &dest, &fbs, &sbs, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
+        &orig, &dest, &mesh, p_mtl_ind, p_mtl_prop, &fbs_ind, &sbs_ind,
         p_trivec, p_tridir, p_orig_length,
-        p_origN, p_destN, p_gainN, p_xprmatN,
+        p_origN, p_destN, p_fbsN, p_sbsN, p_gainN, p_xprmatN,
         p_trivecN, p_tridirN, p_orig_lengthN,
-        p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN));
+        p_fbs_angleN, p_thicknessN, p_edge_lengthN, p_normal_vecN, p_out_typeN,
+        p_path_dirN, compact, p_ray_indN));
+
+    // Copy post-processed outputs to MATLAB
+    if (nlhs > 13) // out_typeN: bit-encoded uint8 -> uint32
+    {
+        arma::u32_vec out_type_u32;
+        plhs[13] = qd_mex_init_output(&out_type_u32, out_typeN.size());
+        for (arma::uword i = 0; i < (arma::uword)out_typeN.size(); ++i)
+            out_type_u32[i] = (unsigned)out_typeN[i];
+    }
+
+    if (nlhs > 15) // ray_indN: 0-based (C++) -> 1-based (MATLAB)
+    {
+        ray_indN += 1;
+        plhs[15] = qd_mex_copy2matlab(&ray_indN);
+    }
 }
